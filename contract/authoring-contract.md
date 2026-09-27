@@ -1575,11 +1575,20 @@ warns and is ignored.
 
 Lint findings (advisory, from `tools/validate.js` and the workbench; never
 block rendering): an edge label longer than its edge can carry; more than 4
-edges crossing one row corridor; two steps sharing the same first edge (their
-step coins collide); a protocol declared in `page.protocols` that no edge
-uses. Fix these in the spec rather than shipping
+edges crossing one row corridor; a protocol declared in `page.protocols` that
+no edge uses. Fix these in the spec rather than shipping
 them — they are exactly the defects an author without a browser cannot see.
 A `page.contract` declaring a major version other than 1 also warns.
+
+Every edge-bearing step gets its own numbered coin on its FIRST delivered
+edge. Several steps may share a first edge — repeated heartbeats, retries,
+daily reports: their coins sit side by side along that edge in step order,
+centred on its midpoint and clear of the cards and arrowhead. An edge too
+short or too sharply bent for that row, or whose row would cover a card, gets
+a compact block of coins instead, read left to right then top to bottom and
+kept off every card (floats included). The block moves wholly off the edge
+when a card covers the midpoint, and the board grows if it needs the room. Do not reorder `edges` or drop real hops to give a
+step its own edge.
 
 ## Viewer features you get for free
 

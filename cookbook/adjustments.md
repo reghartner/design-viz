@@ -22,7 +22,7 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "those two chips should read as one device" | make them one stacked slot: `["lp", "soc"]` inside a row, plus a `groups` boundary | stacked cards share a column |
 | "that label is sitting on the line / hanging off" | shorten the label, or nudge with `edges[i].labelDx` / `labelDy` (px) | budget ≈ 6.4 px per character vs the edge's length; the lint prints both numbers |
 | "curve that arrow / it cuts through a box" | `edges[i].bend` | positive/negative bows the path to either side |
-| "two step numbers are on top of each other" | give the steps distinct FIRST edges in `edges`; keep true firing order with explicit `packets` | the coin lands on the first edge's midpoint |
+| "several step numbers crowd one edge" | nothing to fix unless the story is wrong — keep each step's real first hop | steps sharing a first edge get one coin each, side by side along that edge in step order |
 | "zoom the sensing wedge out — I can't see all of it" | Radar `range`, or `scale.pxPerUnit` when using physical units | keep sourced range unchanged; adjust display scale/placement and inspect wedge fit in the 320×180 frame |
 | "have the sensor face up instead of left" | Radar `facing` | degrees clockwise from +x: 0 right, 90 down, 180 left, 270 up |
 | "the alert should happen one step later" | Radar step `alert:false`, then `alert:true` at the intended beat | preserve the source event timing; subject movement and geometric occupancy do not trigger alerts |
@@ -49,9 +49,8 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 2. Apply the smallest knob from the table. Prefer structure changes (row
    order, stacking) over pixel nudges; pixel nudges exist only where the table
    lists them (float/label offsets, bends, or map/sensor coordinates).
-3. Re-validate. The lint is layout-aware — it will name label overflows,
-   crowded corridors, and coin collisions with the numbers that justify the
-   fix.
+3. Re-validate. The lint is layout-aware — it will name label overflows and
+   crowded corridors with the numbers that justify the fix.
 4. Re-inject and reload. For Radar geometry changes, use the model check in
    `motion-detection.md` to verify distance and occupancy, then inspect wedge
    fit. Check the separately authored alert transitions against the source;

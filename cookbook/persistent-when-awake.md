@@ -73,9 +73,9 @@ Complete working spec:
 
 Adaptation notes:
 
-- Step 4 is EDGELESS on purpose: re-listing `soc->cloud` would put a second
-  step coin on the same edge midpoint (lint). Lighting the two nodes and
-  narrating "still riding the socket" reads correctly; the ambient view
-  animates the edge continuously anyway.
+- Step 4 is edgeless: lighting the two nodes and narrating "still riding the
+  socket" reads correctly, and the ambient view animates the edge continuously
+  anyway. Re-listing `soc->cloud` is also fine when a real message crosses it;
+  its coin sits beside the earlier step's coin on that edge.
 - To argue a FAILURE ("command arrived while the socket was down"), follow
   this recipe with `wake-message.md` — the mailbox is what bridges the gap.

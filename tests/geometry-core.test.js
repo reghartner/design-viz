@@ -14,7 +14,6 @@ const fixtures = ['tests/fixtures/lint-crowded.json', 'examples/doorbell-atlas/a
 const lintFindings = [
   'blocks[0].diagram.edges[0].label: "this label is extremely l…" (~425px) is longer than its edge can carry (~90px) — shorten it, or the auto-layout will push it far off the line',
   'blocks[0].diagram: 5 edges cross the corridor between rows 1 and 2 — expect crowding; consider fewer return edges or a second section',
-  'blocks[0].diagram.steps[1]: shares first edge "a->g" with steps[0] — both step coins land on the same midpoint; reorder the edges list of one step',
   'page.protocols.unusedproto: declared but no edge uses kind "unusedproto" — remove it or use it',
 ];
 
@@ -135,7 +134,7 @@ test('the CLI retains findings and batch exit status when no renderer source is 
       const copy = spawnSync(process.execPath, [path.join(isolated, 'tools/validate.js'), ...args], {cwd: isolated, encoding: 'utf8', timeout: 10000});
       assert.equal(copy.status, 1, copy.stderr || String(copy.error || ''));
       assert.equal(copy.status, original.status); assert.equal(copy.stdout, original.stdout); assert.equal(copy.stderr, '');
-      assert.ok(copy.stdout.includes(inputs[0] + ': 0 errors, 4 warnings'));
+      assert.ok(copy.stdout.includes(inputs[0] + ': 0 errors, 3 warnings'));
       assert.ok(copy.stdout.includes(inputs[3] + ': 0 errors, 0 warnings'));
       if (!quiet) for (const finding of lintFindings) assert.ok(copy.stdout.includes(': lint  ' + finding));
       else assert.equal(copy.stdout.includes(': lint  '), false);

@@ -67,8 +67,8 @@ Complete working spec:
 Adaptation notes:
 
 - `packets` sets the FIRING ORDER and stagger inside a multi-edge step; the
-  step's coin lands on the FIRST edge in `edges`. When another step already
-  coins that edge, reorder `edges` and keep the true order in `packets`
-  (see `soc-egress-routing.md` for that exact move).
+  step's coin lands on the FIRST edge in `edges`. Steps that share that first
+  edge each keep their own coin, drawn side by side along the edge, so list
+  `edges` in the true order.
 - The stacked-chip edge (`soc->lp`) stays unlabeled — too short for a label
   (lint); the caption and the log line carry the meaning.

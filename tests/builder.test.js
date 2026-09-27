@@ -707,8 +707,9 @@ test('generated workbench validates imported skeletons and retains expected auth
   const lint = sandbox.lintPage(page);
   // Full-width rows give the shorter imported labels enough space.
   assert.strictEqual(lint.filter(w => w.includes('longer than its edge can carry')).length, 1);
-  assert.strictEqual(lint.filter(w => w.includes('shares first edge')).length, 2);
-  assert.strictEqual(lint.length, 3);
+  // Imported steps may share a first hop; each still gets its own coin, so no lint.
+  assert.strictEqual(lint.filter(w => w.includes('shares first edge')).length, 0);
+  assert.strictEqual(lint.length, 1);
   const simple = sandbox.normalize(sandbox.mermaidToSpec(MERMAID_SEQ));
   assert.deepStrictEqual(plain(sandbox.validate(simple)), {errors: [], warnings: []});
 });

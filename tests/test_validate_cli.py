@@ -61,7 +61,8 @@ class ValidateCliTest(unittest.TestCase):
         self.assertIn("lint", r.stdout)
         self.assertIn("cross the corridor", r.stdout)
         self.assertIn("longer than its edge", r.stdout)
-        self.assertIn("shares first edge", r.stdout)
+        # steps sharing a first edge each get their own coin: not a finding
+        self.assertNotIn("shares first edge", r.stdout)
         self.assertIn("unusedproto", r.stdout)
 
     def test_quiet_suppresses_warnings_keeps_summary(self):

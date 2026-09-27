@@ -39,9 +39,9 @@ The starter uses existing widgets. It adds no new schema.
   new dependency failures. A half-open probe can succeed or reopen the circuit;
   show one observed/authored path at a time.
   [Circuit Breaker pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/circuit-breaker).
-- Repeated operations can patch panels and light `nodes` instead of reusing
-  an edge as every step's first hop. This avoids overlapping number coins.
-  The board still declares the relationship once.
+- Repeated operations can reuse the same edge as their first hop: each step's
+  number coin sits beside the others along that edge. The board still declares
+  the relationship once.
 - `rows`, `results` and `values` replace their entire previous snapshots.
   Include every value you intend to retain within an updated snapshot.
 

@@ -452,8 +452,8 @@ offending JSON field in the editor (or its nearest existing parent when
 the message names a field the text does not carry). **Steps are selectable
 everywhere**: besides the numbered coins, every chip in the click-through
 bar selects its step (and jumps playback there), and clicking the caption
-line selects the step being shown — so steps that share a first hop or
-have no edge at all are reachable too. **The step form
+line selects the step being shown — so steps that have no edge at all
+are reachable too. **The step form
 edits the whole step contract**: the caption, lane, and link sit above chip
 rows for the step's hops, lit nodes, and panel patches — each chip removes
 with one click (hop shapes normalize automatically between `edge`,
@@ -522,7 +522,7 @@ node tools/validate.js --quiet my-page.spec.json  # errors + summary only
 
 An authoring agent's loop is: emit JSON → run the CLI → fix what it names → inject.
 Lint findings are advisory layout heuristics (label longer than its edge, crowded
-row corridors, two steps sharing a first edge, unused declared protocols, 3+ rows);
+row corridors, unused declared protocols, 3+ rows);
 they never block rendering.
 
 ## Comparing spec revisions
@@ -800,8 +800,6 @@ bases are rejected.
   lint rules in `tools/validate.js` flag what it cannot save (labels far longer than
   their edge, heavily crowded corridors). Manual `bend` / `labelDx` / `labelDy`
   nudges remain available and documented.
-- Two steps sharing the same first edge collide on step-number placement (lint
-  warns; reorder one step's edges list).
 - Group members must be placed adjacently (one stack column works best); the boundary is a
   bounding box, not a layout constraint.
 - Spec comparison annotates contract rows for the existing delta badges; it does

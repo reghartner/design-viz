@@ -626,13 +626,75 @@ function overlapArea(a, b){
   var h = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
   return (w > 0 && h > 0) ? w * h : 0;
 }
+/* Obstacles may carry `hard: true` (e.g. step coins). Only a label whose best
+   near placement still covers a hard obstacle may try the wide sideways
+   moves, and only onto a spot that is clear of everything by LABEL_CLEAR. */
+var LABEL_CLEAR = 3;
 function resolveLabelCollisions(labels, obstacles){
   var placed = [];
   var out = [];
-  var CAND = [];
+  var CAND = [], WIDE = [];
   [0, -9, 9, -18, 18, -27, 27, -40, 40, -54, 54].forEach(function(dy){
     [0, -14, 14, -28, 28].forEach(function(dx){ CAND.push({dx: dx, dy: dy}); });
   });
+  [0, -9, 9, -18, 18].forEach(function(dy){
+    [-56, 56, -70, 70, -84, 84].forEach(function(dx){ WIDE.push({dx: dx, dy: dy}); });
+  });
+  WIDE.sort(function(a, b){ return (Math.abs(a.dx) + Math.abs(a.dy)) - (Math.abs(b.dx) + Math.abs(b.dy)); });
+  /* obstacles filed in a LABEL_CELL grid; a query returns the indices of
+     obstacles whose cells meet r, in original order, so sums match a full scan */
+  var LABEL_CELL = 48, grid = {}, huge = [];
+  function cellsOf(r, g, visit){
+    var x0 = Math.floor((r.x - g) / LABEL_CELL), x1 = Math.floor((r.x + r.w + g) / LABEL_CELL),
+        y0 = Math.floor((r.y - g) / LABEL_CELL), y1 = Math.floor((r.y + r.h + g) / LABEL_CELL);
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 4096) return false;
+    for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++) visit(gx + ',' + gy);
+    return true;
+  }
+  obstacles.forEach(function(o, i){
+    if (!cellsOf(o, 0, function(key){ (grid[key] || (grid[key] = [])).push(i); })) huge.push(i);
+  });
+  function nearby(r, g){
+    var seen = new Set(huge);
+    if (!cellsOf(r, g, function(key){ (grid[key] || []).forEach(function(i){ seen.add(i); }); })){
+      return obstacles.map(function(o, i){ return i; });
+    }
+    return Array.from(seen).sort(function(a, b){ return a - b; });
+  }
+  function overlap(r, hardOnly){
+    var total = 0, oi, ids = nearby(r, 0);
+    for (var k = 0; k < ids.length; k++){
+      var o = obstacles[ids[k]];
+      if (!hardOnly || o.hard) total += overlapArea(r, o);
+    }
+    if (!hardOnly) for (oi = 0; oi < placed.length; oi++) total += overlapArea(r, placed[oi]);
+    return total;
+  }
+  /* bounding box of the hard obstacles touching r, grown through any hard
+     obstacle within 12px of the cluster (a block of coins is one cluster) */
+  function hardCluster(r){
+    /* flood fill through the obstacle grid: each hard obstacle joins once */
+    function near(a, b, g){ return a.x - g < b.x + b.w && b.x - g < a.x + a.w && a.y - g < b.y + b.h && b.y - g < a.y + a.h; }
+    var member = new Set(), queue = [], inside = [], box = null;
+    nearby(r, 0).forEach(function(i){
+      if (obstacles[i].hard && overlapArea(r, obstacles[i]) > 0){ member.add(i); queue.push(i); }
+    });
+    while (queue.length){
+      var q = obstacles[queue.pop()];
+      inside.push(q);
+      nearby(q, 12).forEach(function(i){
+        var o = obstacles[i];
+        if (!o.hard || member.has(i) || !near(o, q, 12)) return;
+        member.add(i); queue.push(i);
+      });
+    }
+    inside.forEach(function(o){
+      if (!box){ box = {x: o.x, y: o.y, w: o.w, h: o.h}; return; }
+      var x2 = Math.max(box.x + box.w, o.x + o.w), y2 = Math.max(box.y + box.h, o.y + o.h);
+      box.x = Math.min(box.x, o.x); box.y = Math.min(box.y, o.y); box.w = x2 - box.x; box.h = y2 - box.y;
+    });
+    return box;
+  }
   labels.forEach(function(lb){
     if (lb.fixed){
       placed.push({x: lb.x, y: lb.y, w: lb.w, h: lb.h});
@@ -642,13 +704,28 @@ function resolveLabelCollisions(labels, obstacles){
     var best = CAND[0], bestScore = Infinity;
     for (var ci = 0; ci < CAND.length; ci++){
       var c = CAND[ci];
-      var r = {x: lb.x + c.dx, y: lb.y + c.dy, w: lb.w, h: lb.h};
-      var score = 0, oi;
-      for (oi = 0; oi < obstacles.length; oi++) score += overlapArea(r, obstacles[oi]);
-      for (oi = 0; oi < placed.length; oi++) score += overlapArea(r, placed[oi]);
-      score += (Math.abs(c.dx) + Math.abs(c.dy)) * 0.01;  /* prefer small moves */
+      var cover = overlap({x: lb.x + c.dx, y: lb.y + c.dy, w: lb.w, h: lb.h}, false);
+      var score = cover + (Math.abs(c.dx) + Math.abs(c.dy)) * 0.01;  /* prefer small moves */
       if (score < bestScore){ bestScore = score; best = c; }
-      if (bestScore < 0.02) break;                        /* first clean candidate wins */
+      if (cover === 0 && !c.dx && !c.dy) break;          /* an untouched, exactly clean label stays put */
+    }
+    var bestRect = {x: lb.x + best.dx, y: lb.y + best.dy, w: lb.w, h: lb.h};
+    if (overlap(bestRect, true) > 0){
+      /* also try just outside the cluster of hard obstacles the label sits on
+         (e.g. a whole block of step coins): above, below, left and right */
+      var cluster = hardCluster(bestRect), escape = [];
+      if (cluster){
+        var m = LABEL_CLEAR + 1;
+        escape.push({dx: 0, dy: cluster.y - m - lb.h - lb.y}, {dx: 0, dy: cluster.y + cluster.h + m - lb.y},
+          {dx: cluster.x - m - lb.w - lb.x, dy: 0}, {dx: cluster.x + cluster.w + m - lb.x, dy: 0});
+      }
+      var tries = WIDE.concat(escape).sort(function(a, b){
+        return (Math.abs(a.dx) + Math.abs(a.dy)) - (Math.abs(b.dx) + Math.abs(b.dy));
+      });
+      for (var wi = 0; wi < tries.length; wi++){
+        var c2 = LABEL_CLEAR, w = tries[wi];
+        if (overlap({x: lb.x + w.dx - c2, y: lb.y + w.dy - c2, w: lb.w + 2 * c2, h: lb.h + 2 * c2}, false) === 0){ best = w; break; }
+      }
     }
     placed.push({x: lb.x + best.dx, y: lb.y + best.dy, w: lb.w, h: lb.h});
     out.push({dx: best.dx, dy: best.dy});

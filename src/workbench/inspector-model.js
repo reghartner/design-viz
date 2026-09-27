@@ -223,7 +223,8 @@ var BUILDER_GUIDES = {
       ['text', 'paragraph or list of paragraphs above the diagram'],
       ['bullets', 'bullet list; entries may reveal/hide per step'],
       ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
-      ['diagram', 'the board: nodes, rows, edges, panels, steps']
+      ['diagram', 'the board: nodes, rows, edges, panels, steps'],
+      ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram']
     ]
   }
 };

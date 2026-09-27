@@ -455,6 +455,13 @@ bounding-box rule applies at every level.
 
 ### rows — left-to-right slots (no coordinates)
 
+Diagrams default to **no lanes** (`"curves"` or omitted `routing`), including
+catalog seeds, Honeycomb imports, and new projects from built-in templates.
+In the workbench, select the section heading (or its Outline entry), then use
+**Inspect → Edge routing → No lanes (default) / Lanes**. This diagram-level
+setting applies to every view; step story-lane labels are separate. Existing
+specs retain their explicit routing when opened or rebuilt.
+
 Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
 between rows and channels around cards. It spreads ports and scores crossings
 and coincident segments; dense graphs can still cross, with visual breaks at
@@ -1106,6 +1113,14 @@ perspectives" of one timeline). Types:
   arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
   `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
   its host profiles; tile `hidden:true` hides a panel or diagram in that view.
+  Optional `layouts[].presentation` is `"standard"` (the default when omitted)
+  or `"explore"`. Standard retains the authored arrangement. Explore provides a
+  full-height graph with independently draggable, resizable, hideable floating
+  panels and pinned step controls. The setting belongs to the view across all
+  host profiles; reader panel movement and sizing do not rewrite the spec.
+  Arrange section temporarily uses the saved grid; Done arranging restores the
+  chosen presentation. Duplicate view preserves it. Invalid values warn and
+  fall back to Standard; legacy single arrangements remain Standard.
   Named views are the complete button set; there is no extra automatic Data flow
   view. All views share step definitions, paths and live widget state. Optional
   `layouts[].steps:[step IDs]` chooses a nonempty subset of playback stops; omitted

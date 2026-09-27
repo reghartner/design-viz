@@ -30,7 +30,7 @@ existing pure, build and host checks; merge only after this job passes too.
 | Case | Production boundary and assertions |
 | --- | --- |
 | Offline standalone | Normal `inject.py` uses the current template, then deletes the input JSON. The only delivered file opens offline and restores a composed tab/section/step/contract-row reference, row focus and local fonts; real fragment navigation after fonts settle verifies exact scroll alignment. |
-| Committed workbench | The actual committed HTML edits an inspector field with exact surrounding bytes and focus; Undo/Redo retains handwritten source; a real pointer swap has one Undo; a wholly hidden alternate remains the exact source step; a held file read cannot replace a newer project. |
+| Built workbench | The production HTML rebuilt from current source edits an inspector field with exact surrounding bytes and focus; Undo/Redo retains handwritten source; a real pointer swap has one Undo; a wholly hidden alternate remains the exact source step; a held file read cannot replace a newer project. |
 | Workbench browser navigation | Native Back/Forward follows welcome, paste, templates, agent guidance and editor screens; unfinished text and editor Undo survive; reload restores a local draft; pending imports stay retired; detached canonical review URLs cannot reappear. The first app entry still allows Back to leave normally. |
 | Builder lifetime | The production named workbench assembly and skeleton receive an appended test-only facade. Destroy retires held graph and captured Home gestures, old controls and public callbacks; two same-DOM remounts each retain one exact Undo. Open picker cleanup and global resource counts return to the still-mounted boot/workspace/Canon/preview baseline. |
 | Native React host | The actual `InlineFlowview` component imports its committed static renderer. Two viewers resist hostile host CSS, retain independent state and exact hidden/numeric navigation, reject stale revisions, remount and release their listeners/timers/observers/fonts. |
@@ -40,8 +40,10 @@ existing pure, build and host checks; merge only after this job passes too.
 The server binds an ephemeral loopback port and serves only temporary fixture
 outputs. The workbench fixtures include the real local catalog. Global setup
 uses normal build commands and shared named entrypoints; no private source or
-neighboring-comment slicing is used. Temporary serving roots are removed after
-the suite. Forge's ordinary ignored `static/viewer` build remains in its normal
+neighboring-comment slicing is used. Run `python3 tools/build.py` first, as CI
+does; checked-in HTML is allowed to differ from that fresh build. Temporary
+serving roots are removed after the suite. Forge's ordinary ignored
+`static/viewer` build remains in its normal
 location. The full installed Backstage rehearsal remains a separate documented
 integration check; this thin React host does not replace it or establish company
 SSO, authorization or CSP acceptance.

@@ -477,8 +477,9 @@ def find_chrome(explicit: str | None = None) -> str | None:
 def clip_expression(section_reference: str, margin: int) -> str:
     """JS that returns the diagram clip rect for a section, in page coordinates.
 
-    The rect covers the visible custom composition or legacy board grid,
-    plus step controls wherever they are attached or detached. Custom layouts
+    The rect covers the visible Explore stage, custom composition or legacy
+    board grid, plus step controls wherever they are attached or detached. Explore
+    keeps the graph, floating panels and pinned controls inside its stage. Custom layouts
     relocate panels out of ``.boardgrid`` and hide that old container, so both
     grid types must be considered. Zero-area hidden elements contribute nothing.
     Expand by ``margin`` CSS pixels and clamp to the document. Return null when
@@ -490,7 +491,7 @@ def clip_expression(section_reference: str, margin: int) -> str:
         "if (!sec) return null;"
         "var pad = %d;"
         "var parts = Array.prototype.slice.call(sec.querySelectorAll("
-        "'.section-layout-grid, .boardgrid, .termbar'));"
+        "'.explore-stage, .section-layout-grid, .boardgrid, .termbar'));"
         "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
         "parts.forEach(function(el){"
         "var r = el.getBoundingClientRect();"
@@ -503,7 +504,11 @@ def clip_expression(section_reference: str, margin: int) -> str:
         # bottom edge; keep the clip below everything in the section that
         # sits above the diagram.
         "var introBottom = -Infinity;"
-        "Array.prototype.forEach.call(sec.children, function(child){"
+        # Named views may nest their toolbar in a viewport wrapper. Keep the
+        # margin below that toolbar too, rather than capturing its bottom edge.
+        "var intro = Array.prototype.slice.call(sec.children).concat("
+        "Array.prototype.slice.call(sec.querySelectorAll('.diagram-views')));"
+        "intro.forEach(function(child){"
         "if (parts.indexOf(child) >= 0) return;"
         "var r = child.getBoundingClientRect();"
         "if (r.height <= 0 || r.bottom > top + 1) return;"
@@ -597,7 +602,8 @@ def view_expression(section_reference: str, view: ViewTarget,
       function visible(el){return !!el && el.getBoundingClientRect().width>0 && el.getBoundingClientRect().height>0;}
       if(layoutId!==null){
         var grid=section.querySelector('.section-layout-grid');
-        if(!visible(grid) || grid.getAttribute('data-layout-id')!==layoutId)
+        var explore=section.querySelector('.section-viewport.viewport-explore .explore-stage');
+        if(!grid || grid.getAttribute('data-layout-id')!==layoutId || !(visible(grid) || visible(explore)))
           return 'requested layout is not visible';
       }else{
         var grid=section.querySelector('.boardgrid');

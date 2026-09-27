@@ -57,8 +57,12 @@ name in the same Undo action as the binding; existing titles remain authored.
 For bulk graph seeding, use **From service catalog** on the homepage or **Add to
 diagram → Services from catalog**. Choose an explicit subset of approved service
 identities. Optional connections come from `dependsOn` or `consumesApis` joined
-to selected API providers; arrows point to the dependency/provider. These are
-structural relationships, not observed calls or an execution timeline. Author
+to selected API providers; arrows point to the dependency/provider. Connections
+use one edge per directed pair, retaining every consumed API title
+and any explicit dependency. Existing authored edge labels remain unchanged.
+API display titles prefer catalog metadata, then OpenAPI `info.title`, then the
+entity name; the fully qualified entity reference remains the identity. Catalog
+connections are structural relationships, not observed calls or an execution timeline. Author
 steps from actual evidence separately. Existing bound nodes are reused; the
 whole insertion is undoable. See `docs/workbench-catalog-sync.md` for the snapshot
 shape, import path and dependency export configuration.

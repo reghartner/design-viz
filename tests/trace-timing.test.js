@@ -107,6 +107,7 @@ test('import includes normalized service timing, selects each span, and keeps un
   input[0].secret='private-value';
   const d=C.traceToSpec(input).spec.page.blocks[0].diagram, p=d.panels.find(p=>p.type==='trace');
   assert.equal(p.spans.length,input.length); assert.equal(d.steps.length,input.length);
+  assert.equal(d.routing,undefined);assert.notEqual(C.layout(d).routing,'lanes');
   assert.ok(!JSON.stringify(p).includes('private-value'));
   for(const st of d.steps) assert.equal(C.traceTimingModel(p,st.panels.internal).selected.span.id,st.id);
   const root=C.traceTimingModel(p,{selected:'root'});

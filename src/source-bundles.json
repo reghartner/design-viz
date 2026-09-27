@@ -24,6 +24,7 @@
     "viewer/prose.js",
     "viewer/contracts.js",
     "viewer/path-timeline.js",
+    "viewer/explore.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",
@@ -204,6 +205,7 @@
     ],
     "sharedStyles": {
       "core": [
+        "viewer/explore.css",
         "icons/library.css",
         "icons/brand.css"
       ],

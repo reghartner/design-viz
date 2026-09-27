@@ -24,10 +24,12 @@ export function catalogFromEntities(entities,baseUrl){
       telemetry:{serviceName:annotations['flowview.io/telemetry-service'] || e.metadata.name},
       apis:[...new Set(provided.map(a=>qualify(a,'api',ns)))].map(id=>{
         const a=apis.get(id);if(!a){warnings.push('API '+id+' was not returned by the catalog.');return null;}
-        const result={entityRef:id,title:a.metadata.title || a.metadata.name,definitionUrl:entityUrl(a),endpoints:{},operations:[]};
+        const title=typeof a.metadata.title==='string' && a.metadata.title.trim()?a.metadata.title:null;
+        const result={entityRef:id,title:title || a.metadata.name,definitionUrl:entityUrl(a),endpoints:{},operations:[]};
         if(a.spec?.type==='openapi'){
           try{
             const definition=typeof a.spec.definition==='string'?JSON.parse(a.spec.definition):a.spec.definition;
+            if(!title && typeof definition?.info?.title==='string' && definition.info.title.trim())result.title=definition.info.title;
             if(!definition?.paths)throw new Error('No paths');
             for(const [route,methods] of Object.entries(definition.paths))for(const [method,op] of Object.entries(methods)){
               if(['get','post','put','patch','delete','head','options','trace'].includes(method) && op.operationId)result.operations.push({operationId:op.operationId,method:method.toUpperCase(),path:route});

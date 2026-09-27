@@ -88,7 +88,9 @@ plan concise; it is a reviewable artifact, not a reasoning transcript.
 - Preserve concurrency and causal dependencies. Presentation order and animation
   duration must not imply an unsupported execution order or measured latency.
 - Keep every `rows` array in visual left-to-right order. Story order comes
-  from steps and edges.
+  from steps and edges. Default to no lanes: omit `diagram.routing` or use
+  `"curves"`. Use `"lanes"` only when requested; the workbench exposes this at
+  section **Inspect → Edge routing**. Preserve an existing spec’s explicit choice.
 - For the same topology, prefer happy and alternate outcomes in `diagram.paths`.
   Reuse IDs only for identical shared content. The **first differing beat gets
   its own ID**. Reuse downstream IDs after translation or a rejoin only when

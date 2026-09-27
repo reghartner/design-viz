@@ -3,11 +3,21 @@ import path from 'node:path';
 import {build} from 'esbuild';
 import {describe, expect, expectTypeOf, it} from 'vitest';
 import * as api from '../src/index';
-import type {DiagramHandoffReference, NativeViewerOptions} from '../src/index';
+import type {DiagramHandoffReference, NativeViewerOptions, NativeViewerTarget, ViewerTarget, DetailViewState} from '../src/index';
 
 const app=fileURLToPath(new URL('../',import.meta.url));
 
 describe('loader-injected public API',()=>{
+  it('exports named-view targets and reports router-neutral viewer state',()=>{
+    const target: ViewerTarget = {section:'recording',view:'operations',path:'failed',step:'timeout',request:2};
+    const detail: DetailViewState = {view:'business'};
+    expectTypeOf<ViewerTarget['view']>().toEqualTypeOf<string | undefined>();
+    expectTypeOf<NonNullable<NativeViewerOptions['onChange']>>()
+      .toEqualTypeOf<(target: NativeViewerTarget | null) => void>();
+    const options: NativeViewerOptions = {onChange: () => {}};
+    options.onChange?.(target);
+    expect(target.view).toBe('operations');expect(detail.view).toBe('business');
+  });
   it('exports a synchronous optional host resolver with portable handoff metadata',()=>{
     const reference: DiagramHandoffReference = {spec:'recording',revision:'r1',section:'storage',url:'https://designs.test/fallback'};
     expectTypeOf<NonNullable<NativeViewerOptions['resolveDiagramLink']>>()

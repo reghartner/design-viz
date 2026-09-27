@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AssociatedDiagram, SpecLoader } from '../api/types';
 import { FlowviewCompatibility } from '../generated/compatibility';
-import { mountNativeViewer, type NativeViewer, type NativeViewerOptions } from '../generated/nativeViewer';
+import { mountNativeViewer, type NativeViewer, type NativeViewerOptions, type NativeViewerTarget } from '../generated/nativeViewer';
 import type { ViewerTarget } from '../viewer/protocol';
 
 /** Owns one revision request and one native mount, with paired cleanup. */
@@ -16,12 +16,19 @@ export function useInlineViewer(
   // a new revision during the render before its loading effect runs.
   const request = useMemo(() => ({ id: diagram.id, revision: diagram.revision, loadSpec, attempt }),
     [diagram.id, diagram.revision, loadSpec, attempt]);
+  const navigationTarget = useMemo(() => target ? { ...target } : undefined,
+    [target?.section, target?.view, target?.path, target?.step, target?.drilldown, target?.request]);
   const [state, setState] = useState<{
     request?: typeof request; spec?: unknown; error?: string; loading: boolean;
   }>({ loading: true });
   const [renderError, setRenderError] = useState(''), [rendered, setRendered] = useState(false);
   const host = useRef<HTMLDivElement>(null);
-  const mounted = useRef<{ request: typeof request; viewer: NativeViewer }>();
+  const mounted = useRef<{
+    request: typeof request; viewer: NativeViewer; navigated: boolean; target?: ViewerTarget;
+  }>();
+  const navigation = useRef<{
+    request: typeof request; state: NativeViewerTarget; target?: ViewerTarget;
+  }>();
   useEffect(() => {
     const abort = new AbortController();
     setState({ request, loading: true });
@@ -53,13 +60,18 @@ export function useInlineViewer(
           return loadSpec({ id: reference.spec, revision: reference.revision }, signal);
         },
         onWarning: message => { if (active) setRenderError(message); },
+        onChange: next => {
+          const owned = mounted.current;
+          if (active && owned?.viewer === viewer)
+            navigation.current = next ? { request, state: next, target: owned.target } : undefined;
+        },
       });
     } catch (error) {
       active = false;
       setRenderError(error instanceof Error ? error.message : 'Unable to render diagram.');
       return;
     }
-    mounted.current = { request, viewer };
+    mounted.current = { request, viewer, navigated: false };
     setRendered(true);
     const pause = () => { if (active) viewer.pause(); };
     const visibility = () => { if (document.hidden) pause(); };
@@ -77,10 +89,19 @@ export function useInlineViewer(
   }, [request, state, resolveDiagramLink]);
   useEffect(() => {
     const owned = mounted.current;
-    if (!target || !rendered || owned?.request !== request) return;
-    try { owned.viewer.navigate(target); setRenderError(''); }
+    if (!rendered || owned?.request !== request ||
+      owned.navigated && owned.target === navigationTarget) return;
+    const saved = navigation.current;
+    // A router refresh replaces the renderer but keeps the reader's current
+    // view/step. A new host target takes precedence over that saved position.
+    const next = saved?.request === request && (!navigationTarget || saved.target === navigationTarget)
+      ? saved.state : navigationTarget;
+    owned.navigated = true;
+    owned.target = navigationTarget;
+    if (!next) return;
+    try { owned.viewer.navigate(next); setRenderError(''); }
     catch (error) { setRenderError(error instanceof Error ? error.message : 'Unable to navigate diagram.'); }
-  }, [target, rendered, request, resolveDiagramLink]);
+  }, [navigationTarget, rendered, request, resolveDiagramLink]);
   return {
     state: state.request === request ? state : { loading: true },
     renderError, rendered, host,

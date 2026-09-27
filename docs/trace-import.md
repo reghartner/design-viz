@@ -125,11 +125,12 @@ saved focused diagram. Source completeness warnings still apply to every focus.
 Imports place upstream services before their downstream dependencies. Service
 cycles are grouped at the same dependency level; large levels wrap into rows
 of at most four cards. Neighbour ordering reduces avoidable crossings. The
-result is ordinary `rows` data you can edit, with `routing: "lanes"` enabled.
+result is ordinary `rows` data you can edit, with no lanes by default. To opt in,
+select the section heading and choose **Inspect → Edge routing → Lanes**.
 Row position represents dependency order. Slots within each row render left to
 right. Position does not represent timestamp order or duration.
 
-Lane routing spreads attachment ports, reserves horizontal tracks between
+Optional lane routing spreads attachment ports, reserves horizontal tracks between
 rows, and chooses vertical channels that clear every card. Tracks expand the
 row gaps when needed. Routes prefer shorter paths with fewer crossings and
 coincident segments; a background break separates remaining crossings.
@@ -139,7 +140,7 @@ relationship; the complete graph remains available for context.
 
 Use **Open file** with
 [`src/starters/complex-trace.json`](../src/starters/complex-trace.json)
-for a fictional request with shared dependencies and a service cycle. Long service labels are abbreviated on
+for a fictional request with shared dependencies and a service cycle. In lane mode, long service labels are abbreviated on
 cards, with the complete name in the card tooltip and span details.
 
 The diagram's **View** controls select **Auto**, **Fit width** or **Readable**.
@@ -159,7 +160,7 @@ section retains its view choice through normal edits and skin changes. A
 rebuilt board starts with a fresh pan position; reload resets its choice to
 Auto. Printed diagrams fit the page and omit the view controls.
 
-`routing: "curves"` (or omitting routing) restores the existing renderer.
+`routing: "curves"` (or omitting routing) uses the default no-lanes renderer.
 Lane routing supports one to five unstacked cards per row, without floats or
 self-loops. Unsupported edited layouts fall back to curves with a validation
 warning. Lane routing ignores authored edge bends; label offsets still work.

@@ -1,0 +1,35 @@
+import {readFile} from 'node:fs/promises';
+import path from 'node:path';
+import {test,expect,paste} from '../helpers/test.mjs';
+import {repo} from '../helpers/prepare.mjs';
+const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
+named.page.sections[0].diagram.autoplay=false;
+const section=page=>page.locator('#docview .doc-sec').first();
+const raw=async page=>JSON.parse(await page.locator('#src').inputValue());
+
+test('Presentation is a per-view undoable edit and survives host preview changes and duplication',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));
+  await expect(page.locator('#welcome-paste-error')).toBeEmpty();
+  await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
+  await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
+  const presentation=()=>section(page).getByRole('combobox',{name:'Presentation',exact:true});
+  await expect(presentation()).toHaveValue('explore');
+  const before=await page.locator('#src').inputValue();
+  await presentation().selectOption('standard');
+  const changed=await page.locator('#src').inputValue();expect(changed).toBe(before.replace('"presentation": "explore"','"presentation": "standard"'));
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(presentation()).toHaveValue('explore');
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(presentation()).toHaveValue('standard');
+  await presentation().selectOption('explore');
+  const explored=await page.locator('#src').inputValue();
+  await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
+  await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
+  await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
+  await section(page).getByRole('button',{name:'Duplicate view',exact:true}).click();
+  const diagram=(await raw(page)).page.sections[0].diagram,copy=diagram.layouts.at(-1);
+  expect(copy.presentation).toBe('explore');expect(diagram.defaultLayout).toBe('home-story');
+  expect(diagram.layouts[0]).toEqual(named.page.sections[0].diagram.layouts[0]);
+  expect(diagram.steps).toEqual(named.page.sections[0].diagram.steps);expect(diagram.paths).toEqual(named.page.sections[0].diagram.paths);
+  expect(copy.sectionLayout).toEqual(diagram.layouts[1].sectionLayout);
+  await expect(section(page)).toHaveAttribute('data-view-id',copy.id);await expect(presentation()).toHaveValue('explore');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);
+});

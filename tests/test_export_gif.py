@@ -222,6 +222,7 @@ class ExportGifPureTests(unittest.TestCase):
         self.assertIn("'section-' + \"delivery-flow\"", expression)
         self.assertIn("var pad = 16", expression)
         self.assertIn(".boardgrid", expression)
+        self.assertIn(".explore-stage", expression)
         self.assertIn(".termbar", expression)
         # Reference goes through JSON so quotes cannot break the script.
         self.assertIn('\\"', export_gif.clip_expression('a"b', 0))
@@ -289,7 +290,7 @@ class ExportGifPureTests(unittest.TestCase):
 
 @unittest.skipUnless(CHROME, "Chrome/Chromium not available")
 class ExportGifChromeSmokeTest(unittest.TestCase):
-    def inspect_page(self, page, fragment, expression):
+    def inspect_page(self, page, fragment, expression, *, settle=False):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             profile = temp_path / "profile"
@@ -316,6 +317,13 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                         "url": page.resolve().as_uri() + fragment,
                     })
                     export_gif._wait_for_rendered_page(devtools, process, 20)
+                    if settle:
+                        # Match capture_frames before measuring a viewport
+                        # whose available height depends on loaded fonts.
+                        devtools.command("Runtime.evaluate", {
+                            "expression": "document.fonts.ready.then(function(){return new Promise(function(resolve){requestAnimationFrame(function(){requestAnimationFrame(resolve);});});})",
+                            "awaitPromise": True,
+                        })
                     result = devtools.command("Runtime.evaluate", {
                         "expression": expression,
                         "returnByValue": True,
@@ -491,6 +499,81 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                         self.assertGreaterEqual(clip["y"] + clip["height"], r["bottom"], part)
                     self.assertGreater(clip["y"], state["heading"]["bottom"])
                     self.assertLessEqual(clip["height"], state["grid"]["height"] + 33)
+
+    def test_explore_capture_includes_graph_floating_panels_and_pinned_steps(self):
+        spec = json.loads((ROOT / "src/starters/named-layouts.json").read_text())
+        spec["page"]["sections"][0]["id"] = "front-door"
+        spec["page"]["sections"][0]["diagram"]["autoplay"] = False
+        target = export_gif.choose_target(spec, view="service-flow")
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
+            temp_path = pathlib.Path(temp)
+            source, page = temp_path / "explore.json", temp_path / "explore.html"
+            source.write_text(json.dumps(spec))
+            subprocess.run(
+                [sys.executable, str(ROOT / "tools/inject.py"), str(source),
+                 str(ROOT / "template/flowview.html"), str(page)],
+                check=True, capture_output=True)
+            verification = export_gif.view_expression(
+                target.section_reference, target.view, target.source_indices[0])
+            state = self.inspect_page(page, target.fragments[0], """
+              (function(){
+                var sec=document.getElementById('section-front-door');
+                function rect(el){
+                  var r=el.getBoundingClientRect();
+                  return {top:r.top+scrollY,bottom:r.bottom+scrollY,
+                    left:r.left+scrollX,right:r.right+scrollX,height:r.height};
+                }
+                var grid=sec.querySelector('.section-layout-grid'),
+                    stage=sec.querySelector('.explore-stage');
+                var state={clip:%s,valid:%s,stage:rect(stage),
+                  graph:rect(sec.querySelector('.explore-canvas')),
+                  bar:rect(sec.querySelector('.termbar')),grid:rect(grid),
+                  heading:rect(sec.querySelector('.sec-h')),
+                  toolbar:rect(sec.querySelector('.diagram-views')),
+                  panels:Array.from(sec.querySelectorAll('.explore-window'))
+                    .filter(function(el){return el.getBoundingClientRect().height>0;})
+                    .map(function(el){return {id:el.getAttribute('data-explore-panel'),rect:rect(el)};})};
+                grid.setAttribute('data-layout-id','wrong-view');
+                state.wrongView=%s;
+                grid.setAttribute('data-layout-id','service-flow');stage.hidden=true;
+                state.hiddenStage=%s;
+                return state;
+              })()
+            """ % (export_gif.clip_expression(target.section_reference, 16),
+                   verification, verification, verification), settle=True)
+            self.assertIs(state["valid"], True)
+            self.assertEqual(state["wrongView"], "requested layout is not visible")
+            self.assertEqual(state["hiddenStage"], "requested layout is not visible")
+            self.assertEqual(state["grid"]["height"], 0)
+            self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
+            clip = state["clip"]
+            self.assertIsNotNone(clip)
+            for part in [state["stage"], state["graph"], state["bar"],
+                         *(panel["rect"] for panel in state["panels"])]:
+                self.assertGreater(part["height"], 0)
+                self.assertLessEqual(clip["x"], part["left"])
+                self.assertLessEqual(clip["y"], part["top"])
+                self.assertGreaterEqual(clip["x"] + clip["width"], part["right"])
+                self.assertGreaterEqual(clip["y"] + clip["height"], part["bottom"])
+            self.assertGreater(clip["y"], state["heading"]["bottom"])
+            self.assertGreater(clip["y"], state["toolbar"]["bottom"])
+            self.assertLessEqual(clip["height"], state["stage"]["height"] + 33)
+            # Exercise the production frame path too: view verification must
+            # accept a hidden authored grid, and capture more than the step bar.
+            frames = export_gif.capture_frames(
+                page, [target.fragments[0], target.fragments[-2]], CHROME, 1280,
+                temp_path, section_reference=target.section_reference, scale=1,
+                view=target.view,
+                source_indices=[target.source_indices[0], target.source_indices[-2]])
+            self.assertEqual(len(frames), 2)
+            for frame in frames:
+                width, height, _ = export_gif.decode_png(frame.read_bytes())
+                self.assertGreater(width, 600)
+                self.assertGreater(height, 300)
+            self.assertNotEqual(frames[0].read_bytes(), frames[1].read_bytes())
+            gif = temp_path / "explore.gif"
+            export_gif.write_animated_gif(frames, gif, 80)
+            self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 2)
 
     def test_skin_switch_and_dim_alpha_change_the_captured_frame(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:

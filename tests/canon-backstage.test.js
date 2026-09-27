@@ -1,4 +1,33 @@
 const test=require('node:test'),assert=require('node:assert/strict');
+test('API title prefers catalog metadata, then a nonempty OpenAPI title, then the entity name',async()=>{
+  const {catalogFromEntities}=await import('../tools/canon/backstage.mjs');
+  for(const [metadataTitle,definitionTitle,expected] of [
+    ['Catalog title','OpenAPI title','Catalog title'],
+    [undefined,'SomeService (Critical)','SomeService (Critical)'],
+    ['', 'OpenAPI title','OpenAPI title'],['  ','OpenAPI title','OpenAPI title'],
+    [undefined,undefined,'some-service-critical'],[undefined,'','some-service-critical'],
+    [undefined,'  ','some-service-critical'],[undefined,123,'some-service-critical'],
+    [undefined,{title:'Invalid'},'some-service-critical']
+  ])for(const serialized of [false,true]){
+    const definition={info:{title:definitionTitle},paths:{'/status':{get:{operationId:'status'}}},servers:[{url:'https://service.example.test'}]};
+    const entities=[{kind:'Component',metadata:{name:'service'},spec:{providesApis:['some-service-critical']}},
+      {kind:'API',metadata:{name:'some-service-critical',title:metadataTitle},spec:{type:'openapi',definition:serialized?JSON.stringify(definition):definition}}];
+    const before=JSON.stringify(entities),result=catalogFromEntities(entities,'https://backstage.example.test'),api=result.catalog.services[0].apis[0];
+    assert.equal(api.title,expected);assert.deepEqual(result.warnings,[]);
+    assert.deepEqual(api.operations,[{operationId:'status',method:'GET',path:'/status'}]);
+    assert.deepEqual(api.endpoints,{'server-1':'https://service.example.test'});
+    assert.equal(JSON.stringify(entities),before);
+  }
+});
+
+test('non-OpenAPI and unreadable definitions retain entity-name fallback and conversion warnings',async()=>{
+  const {catalogFromEntities}=await import('../tools/canon/backstage.mjs');
+  for(const [type,definition,warnings] of [['asyncapi',{info:{title:'Unused title'}},0],['openapi','{invalid',1],['openapi',null,1]]){
+    const result=catalogFromEntities([{kind:'Component',metadata:{name:'service'},spec:{providesApis:['api']}},
+      {kind:'API',metadata:{name:'api'},spec:{type,definition}}],'https://backstage.example.test');
+    assert.equal(result.catalog.services[0].apis[0].title,'api');assert.equal(result.warnings.length,warnings);
+  }
+});
 test('Backstage adapter resolves catalog identities, API operations and declared endpoint environments',async()=>{
   const {catalogFromEntities}=await import('../tools/canon/backstage.mjs');
   const result=catalogFromEntities([{kind:'Component',metadata:{name:'recording',namespace:'home'},spec:{owner:'team',providesApis:['recording-api']}},{kind:'API',metadata:{name:'recording-api',namespace:'home'},spec:{type:'openapi',definition:JSON.stringify({openapi:'3.0.0',servers:[{url:'https://recording.example.test','x-environment':'development'}],paths:{'/recordings':{post:{operationId:'createRecording'}}}})}}],'https://backstage.example.test');

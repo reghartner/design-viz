@@ -12,12 +12,13 @@ const origin='https://flowview-folder.test';
 // validation, rendering, history and conversation are real. It is not evidence
 // that a human granted native browser permission or that Claude's Monitor ran.
 async function setup(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder;const requests=[],errors=[];
+  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite;const requests=[],errors=[];
+  await writeFile(path.join(folder,'README.md'),'Existing agent project notes.');
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
     const target=path.resolve(folder,'.'+name);if(!target.startsWith(folder+path.sep)&&target!==folder)throw Error('Outside test folder');
     if(operation==='mkdir'){await mkdir(target,{recursive:true});sessionFolder=target;return;}
-    if(operation==='write'){await writeFile(target,value);return;}
+    if(operation==='write'){if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}await writeFile(target,value);return;}
     if(operation==='read'){try{return await readFile(target,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}}
     if(operation==='exists'){try{await stat(target);return true;}catch{return false;}}
   });
@@ -30,7 +31,7 @@ async function setup(page){
         return {async getFile(){const text=await window.folderDisk('read',file);return new File([text],child);},
           async createWritable(){let value;return {async write(text){value=text;},async close(){await window.folderDisk('write',file,value);},async abort(){}};}};
       }};}
-    window.showDirectoryPicker=async()=>{if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir('');};
+    window.showDirectoryPicker=async()=>{if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.resumeFolder?'/'+window.resumeFolder:'');};
   });
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
@@ -39,9 +40,9 @@ async function setup(page){
     return route.fulfill({contentType:'application/json',body:'[]'});
   });
   await page.goto(origin+'/index.html');
-  return {folder,requests,errors,get session(){return sessionFolder;},
+  return {folder,requests,errors,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
     read:async name=>JSON.parse(await readFile(path.join(sessionFolder,name),'utf8')),
-    run:(...args)=>execFileSync('python3',[path.join(sessionFolder,'folder-agent.py'),...args],{encoding:'utf8'}),
+    run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
     cleanup:()=>rm(folder,{recursive:true,force:true})};
 }
 test('editor conversation uses real local files and helper; changes render with one Undo/Redo',async({page},info)=>{
@@ -52,6 +53,11 @@ test('editor conversation uses real local files and helper; changes render with 
     await page.locator('[data-dv-node="a"]').click();await page.locator('#editor-tab-agent').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
+    const manifest=await h.read('session.json'),prompt=await page.locator('#folder-agent-instructions').inputValue();
+    expect(prompt).toContain(JSON.stringify('./'+path.basename(h.session)));
+    expect(prompt).toContain('relative to your current working directory');
+    expect(prompt).toContain(manifest.sessionId);expect(prompt).toContain(manifest.connectionId);
+    expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
     await expect(page.locator('#folder-agent-context')).toContainText('a');
     await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');expect(request.selection[0].id).toBe('a');
@@ -92,6 +98,40 @@ test('new-story entry, picker cancellation and unsupported browser have useful s
   }finally{await page.close();await h.cleanup();}
 });
 
+
+
+test('refused resume preserves the paired agent instructions; successful resume issues a new connection',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
+    await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
+    const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    await page.locator('#folder-agent-disconnect').click();
+    await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
+    await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
+    await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:true,at:Date.now()}));
+    await page.locator('#folder-agent-resume').click();
+    await expect(page.locator('#folder-agent-status')).toContainText('still connected to another editor');
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
+    expect((await h.read('editor.json')).connected).toBe(true);
+    expect((await h.read('session.json')).connectionId).toBe(before.connectionId);
+    await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
+    await page.locator('#folder-agent-resume').click();
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/selected exchange folder/);
+    const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
+    expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
+    await page.locator('#folder-agent-disconnect').click();
+    await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
+    await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-status')).toContainText('Test write failure');
+    await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
+    await expect(page.locator('#folder-agent-copy')).toBeDisabled();
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();
+    await expect(page.locator('#folder-agent-connect')).toBeEnabled();
+    expect((await h.read('editor.json')).connected).toBe(false);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 
 test('measure 50 file-only exchanges separately from model work',async({page},info)=>{
   test.setTimeout(90000);

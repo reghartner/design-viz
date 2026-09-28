@@ -113,3 +113,22 @@ Complete these before calling the experience proven:
 
 The implementation is ready for this paired trial, not a completed business-user
 adoption study or a production rollout.
+
+## Working-folder pairing correction
+
+The chooser now explicitly asks for the existing Claude session's working/project
+folder. The copied prompt locates its unique exchange subfolder relative to that
+working directory and verifies both session and connection IDs before using it.
+It requires Claude to report a mismatch instead of guessing an absolute path or
+searching the disk. All subsequent filenames resolve inside that verified
+exchange. No existing live trial files were moved or edited for this correction.
+
+A rejected resume leaves the active pairing instructions untouched; instruction
+files are replaced only after claiming the session. A failed instruction write
+disconnects that attempted connection, disables Send/Copy, and allows a retry.
+
+Validation for this correction: 34 focused JavaScript tests, 12 build tests and
+three browser scenarios passed. The browser scenarios run the actual helper
+relative to the selected working folder, preserve a project README, verify
+prompt identities, exercise rejected/successful resume and recover from an
+instruction-file write failure. Claude Monitor acceptance remains separate.

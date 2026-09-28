@@ -9,10 +9,23 @@ not sandbox Claude or change access already granted to that session.
 ## Connect
 
 Choose **Build it with your agent → Start with Claude**, or the **Agent** tab
-in an existing project. Choose a folder: Flowview creates a new
-`flowview-session-…` subfolder without replacing other files. Read and copy the
-connection instructions into Claude. Supply its absolute path, or drag the
-subfolder's CONNECT.md into Claude; browsers do not expose its absolute path.
+in an existing project. Start with the working/project folder of the user's
+existing Claude session. If its location is unclear, ask Claude to report its
+current working directory; do not guess a Documents or Downloads path.
+
+Select **Choose Claude’s working folder** and pick that exact directory. Flowview
+creates a new `flowview-session-…` exchange subfolder there. It leaves the project
+files and any older exchanges in place. Read and paste the connection instructions
+into that same Claude session. They name `./flowview-session-…` relative to its
+working directory and include both connection identities for verification.
+
+The browser cannot discover Claude's working directory or expose the selected
+folder's absolute path. Claude resolves the exact relative location from its own
+working directory. If it is missing or its identities differ, it stops and reports
+the working directory for corrected pairing; it does not search disk or invent
+another location. This uses the agent's working folder, not its internal chat or
+account storage. The browser's permission covers the selected folder, while the
+exchange code accesses only its dedicated subfolder.
 
 For the live proof, start a visible Claude Code session with Chrome integration
 and external MCP servers disabled. The local CLI supports:
@@ -102,6 +115,7 @@ kill arbitrary work in Claude. Interrupt Claude there if needed. The watcher
 exits on a disconnected editor or a changed connection identity. Browser closure
 or sleep may leave a stale heartbeat; stale requests are not emitted.
 
+Use Claude in the original working folder (or the exchange folder itself).
 Open `story.spec.json` with the ordinary workbench file opener, then use
 **Resume a session folder** and choose the saved session subfolder itself. Resume
 requires the exact saved source and refuses a recent active editor lease. It

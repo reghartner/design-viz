@@ -1,8 +1,13 @@
 /* Conversation UI for an explicitly paired, user-owned Claude session. */
-function folderAgentInstructions(folderName,level){
+function folderAgentInstructions(folderName,level,resume,identity){
+  var relative=JSON.stringify('./'+folderName);
+  var location=resume
+    ? 'Use this Claude session’s working directory as the starting point. The selected exchange folder is '+JSON.stringify(folderName)+'. If your working directory is that exchange folder, use it directly; otherwise check only '+relative+' inside your working directory.'
+    : 'The editor was paired with this Claude session’s working folder. Read the exchange folder '+relative+' relative to your current working directory.';
   return [
     'Connect this Claude Code session to my Flowview editor through local files only.',
-    'Session folder: '+folderName+'. If you cannot locate this exact folder from the path or CONNECT.md I supply, ask me for its path. Do not search my whole disk.',
+    location+' Resolve that exact location to an absolute path before running the helper. All later filenames in these instructions are relative to that verified exchange folder. Keep your working directory unchanged. Do not guess a Documents or Downloads path, search the disk, or change your working directory to make it fit. If it is missing, report your current working directory and ask me to select that same folder in the editor and copy fresh instructions.',
+    'Read session.json there first and require sessionId '+JSON.stringify(identity.sessionId)+' and connectionId '+JSON.stringify(identity.connectionId)+'. If either differs, stop and request fresh connection instructions; do not use another session folder.',
     'Read CONNECT.md and folder-agent.py in that folder before running anything. Keep normal permissions. Do not enable or use browser tools, Chrome integration, screenshots, browser automation, or an HTTP server. Do not start another agent session. Before connecting, confirm Monitor is available and no browser integration tools are offered; otherwise stop and explain the missing setup.',
     'The folder contains a version-matched authoring kit. The inspectable helper unpacks it into authoring/ and watches for requests. It uses only local files, no networking or subprocesses.',
     'Start a Monitor on this exact command, using the actual absolute path: python3 "<session folder>/folder-agent.py" watch --minutes 25. Give Monitor a 30-minute deadline. Renew the watch only while this editor connection remains active; stop when editor.json says disconnected or the connection identity changes. If Monitor is unavailable, tell me; do not install anything or change permissions to work around it.',
@@ -31,7 +36,8 @@ function initWorkbenchAgentChat(opts){
     Object.assign(state,update);
     if(update.status)status(update.status);
     get('connection').textContent=state.connected?(state.listening?'Claude listener active':'Waiting for Claude listener'):'Not connected';
-    get('send').disabled=!state.connected || !!state.pending;
+    get('send').disabled=connecting || !state.connected || !!state.pending;
+    get('copy').disabled=connecting || !state.connected || !get('instructions').value;
     get('disconnect').disabled=!state.connected;
     get('connect').disabled=connecting || state.connected;
     get('resume').disabled=connecting || state.connected;
@@ -70,7 +76,7 @@ function initWorkbenchAgentChat(opts){
     if(typeof window.showDirectoryPicker!=='function' || !window.isSecureContext){
       status('Use this workbench in a desktop Chrome or Edge tab over HTTPS to connect a folder.');return;
     }
-    connecting=true;paint({});var token=++generation;
+    connecting=true;get('instructions').value='';paint({});var token=++generation;
     try{
       // The picker must run before any asynchronous work, during the click gesture.
       var parent=await window.showDirectoryPicker({mode:'readwrite',id:'flowview-agent'});
@@ -94,21 +100,25 @@ function initWorkbenchAgentChat(opts){
         await files.write('authoring-kit.json',{gzip:kit.gzip,sha256:kit.sha256});
       }
       if(!life.alive() || token!==generation)return;
-      var name=resume?directory.name:parent.name+'/'+directory.name;
-      var instructions=folderAgentInstructions(name,get('level').value);
-      await files.write('CONNECT.md',instructions+'\n');
-      if(!life.alive() || token!==generation)return;
-      await files.write('README.md',instructions+'\n');
-      if(!life.alive() || token!==generation)return;
       client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,level:function(){return get('level').value;},changed:paint});
-      await client.start(resume);
+      var identity=await client.start(resume);
+      if(!life.alive() || token!==generation){await disconnect();return;}
+      // Claim the session before replacing its pairing instructions. A refused
+      // resume must leave the active editor/agent's instructions untouched.
+      var instructions=folderAgentInstructions(directory.name,get('level').value,resume,identity);
+      await files.write('CONNECT.md',instructions+'\n');
+      if(!life.alive() || token!==generation){await disconnect();return;}
+      await files.write('README.md',instructions+'\n');
       if(!life.alive() || token!==generation){await disconnect();return;}
       get('instructions').value=instructions;get('setup').open=true;
-      get('folder').textContent=name;
+      get('folder').textContent=resume?'Exchange folder: '+directory.name:'Claude working folder: '+parent.name+' · Exchange: ./'+directory.name;
       get('copy').disabled=false;
       tick(token);
     }catch(ex){
-      if(client && !state.connected){client.destroy();client=null;}
+      if(client){
+        try{await client.disconnect();}catch(ignored){}
+        client.destroy();client=null;
+      }
       if(releaseLock){releaseLock();releaseLock=null;}
       if(life.alive() && token===generation)status(ex.name==='AbortError'?'Folder selection cancelled.':ex.message);
     }finally{
@@ -121,7 +131,7 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('resume'),'click',function(){connect(true);});
   life.listen(get('disconnect'),'click',disconnect);
   life.listen(get('copy'),'click',async function(){
-    try{await navigator.clipboard.writeText(get('instructions').value);status('Copied. Paste into Claude; provide the session folder path or drag CONNECT.md into that conversation.');}
+    try{await navigator.clipboard.writeText(get('instructions').value);status('Copied. Paste into the Claude session working in the folder you selected. The instructions use its current working directory.');}
     catch(ex){get('instructions').focus();get('instructions').select();status('Press ⌘C or Ctrl+C to copy the selected instructions.');}
   });
   async function send(event){

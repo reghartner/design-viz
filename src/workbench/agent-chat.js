@@ -3,7 +3,7 @@ function folderAgentInstructions(folderName,level,resume,identity){
   var relative=JSON.stringify('./'+folderName);
   var location=resume
     ? 'Use this Claude session’s working directory as the starting point. The selected exchange folder is '+JSON.stringify(folderName)+'. If your working directory is that exchange folder, use it directly; otherwise check only '+relative+' inside your working directory.'
-    : 'The editor was paired with this Claude session’s working folder. Read the exchange folder '+relative+' relative to your current working directory.';
+    : 'Read the exchange folder '+relative+' relative to your current working directory. The browser created it inside the folder selected in the picker. That selected folder must be this Claude session’s exact working directory.';
   return [
     'Connect this Claude Code session to my Flowview editor through local files only.',
     location+' Resolve that exact location to an absolute path before running the helper. All later filenames in these instructions are relative to that verified exchange folder. Keep your working directory unchanged. Do not guess a Documents or Downloads path, search the disk, or change your working directory to make it fit. If it is missing, report your current working directory and ask me to select that same folder in the editor and copy fresh instructions.',
@@ -111,7 +111,7 @@ function initWorkbenchAgentChat(opts){
       await files.write('README.md',instructions+'\n');
       if(!life.alive() || token!==generation){await disconnect();return;}
       get('instructions').value=instructions;get('setup').open=true;
-      get('folder').textContent=resume?'Exchange folder: '+directory.name:'Claude working folder: '+parent.name+' · Exchange: ./'+directory.name;
+      get('folder').textContent=resume?'Exchange folder: '+directory.name:'Selected folder: '+parent.name+' · Exchange: ./'+directory.name;
       get('copy').disabled=false;
       tick(token);
     }catch(ex){

@@ -13,7 +13,10 @@ in an existing project. Start with the working/project folder of the user's
 existing Claude session. If its location is unclear, ask Claude to report its
 current working directory; do not guess a Documents or Downloads path.
 
-Select **Choose Claude’s working folder** and pick that exact directory. Flowview
+Select **Choose Claude’s exact working folder** and pick that directory itself,
+not its parent or an existing exchange subfolder. The visible folder diagram
+marks the working folder as the selection and the exchange as automatically
+created. Flowview
 creates a new `flowview-session-…` exchange subfolder there. It leaves the project
 files and any older exchanges in place. Read and paste the connection instructions
 into that same Claude session. They name `./flowview-session-…` relative to its

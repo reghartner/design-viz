@@ -54,7 +54,7 @@ function canonDiagramURL(href,id){
    only retires an old Canon attachment; authored text stays in the draft owner. */
 function createWelcomeNavigation(win, initial, changed){
   var key='flowviewWorkbenchEntry', retiredPrefix='dv-workbench-retired-entry-';
-  var names=['home','paste','new','agent','editor','library','reader'];
+  var names=['home','paste','new','build','agent','editor','library','reader'];
   function read(state){
     var value=state && state[key];
     return value && value.v===1 && names.indexOf(value.screen)>=0 &&
@@ -150,7 +150,7 @@ function initWorkbenchWelcome(opts){
   var editor = document.getElementById('workbench-workspace');
   if (!root || !editor) return {show:function(){}, enterEditor:function(){}, openWorkspace:function(){},localProjectOpened:function(){},canonicalLoaded:function(){}};
   var builder = opts.builder, templates = opts.templates || [];
-  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', agent:'welcome-agent-screen', library:'welcome-library-screen', reader:'welcome-reader-screen'};
+  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', build:'welcome-build-screen', agent:'welcome-agent-screen', library:'welcome-library-screen', reader:'welcome-reader-screen'};
   var screen = 'home', operation = 0, manifestStarted = false, activeReader=null, navigation, library;
   function retireRead(){
     operation++;
@@ -247,12 +247,15 @@ function initWorkbenchWelcome(opts){
   ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
     el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
   });
-  ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('agent');});});
-  function buildWithClaude(){
+  ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('build');});});
+  el('welcome-build-brief').addEventListener('click',function(){navigation.go('agent');});
+  function buildWithClaude(mode){
     if(!builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
-    enterEditor();builder.startAgent();
+    enterEditor();builder.startAgent(mode);
   }
-  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',buildWithClaude);});
+  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('build');});});
+  el('welcome-build-external').addEventListener('click',function(){buildWithClaude('external');});
+  el('welcome-build-embedded').addEventListener('click',function(){buildWithClaude('embedded');});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });

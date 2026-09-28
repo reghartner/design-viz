@@ -1041,9 +1041,9 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
-  function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject({preserveHistory:true});}
+  function prepareWelcome(){if(agentMessage)agentMessage.close(false);if(session.isProjectOpen())session.save();session.invalidateProject({preserveHistory:true});}
   function retireProjectUI(){
-    io.retireProject();
+    io.retireProject();if(agentMessage)agentMessage.close(false);
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();
     interactions.retire();
@@ -1145,6 +1145,7 @@ function initWorkbenchBuilder(opts){
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
+    validate:function(text){var findings=validate(normalize(JSON.parse(text)));return findings.errors.join('\n');},
     apply:function(text,expected,proposal){
       var snapshot=session.snapshot();
       if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
@@ -1179,6 +1180,8 @@ function initWorkbenchBuilder(opts){
   };
   var agentSession=typeof initWorkbenchAgentSession==='function'?initWorkbenchAgentSession(agentOptions):null;
   agentOptions.show=function(){if(opts.workspace)opts.workspace.showTool('agent');};
+  agentOptions.hide=function(){if(opts.workspace && opts.workspace.isOpen('agent'))opts.workspace.hideTool('agent');};
+  agentOptions.message=function(){if(agentMessage)agentMessage.open();};
   var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   var handoffRequests=new Set();life.own(function(){handoffRequests.forEach(function(request){request.abort();});});
   async function handoffHtml(source){
@@ -1223,10 +1226,21 @@ function initWorkbenchBuilder(opts){
     if(stepList)stepList.sync();
   }
   life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
+  var agentMessage=typeof initWorkbenchAgentMessage==='function'?initWorkbenchAgentMessage({document:document,pause:pausePreview,
+    connection:function(){return agentChat?agentChat.messageConnection():{connected:false};},
+    connect:function(){var project=session.snapshot().project;if(agentChat)agentChat.openMessageSetup(function(){if(agentMessage && session.snapshot().project===project)agentMessage.open(true);});},
+    send:function(text,context){return agentChat.sendMessage(text,context);},
+    cancel:function(){return agentChat.cancelMessage();},
+    snapshot:function(){
+      var snap=session.snapshot();
+      return Object.assign({},snap,agentOptions.snapshot());
+    }
+  }):null;
+  if(agentMessage)life.own(function(){agentMessage.destroy();});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw,origin){var ok=life.alive() && loadText(JSON.stringify(raw,null,2));if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
-    startAgent:function(){if(agentChat)agentChat.openSetup();},
+    startAgent:function(mode){if(agentChat)agentChat.openSetup(mode || 'external');},
     preserveDraft:life.guard(session.preserveDraft),
     earlierDrafts:session.earlierDrafts,
     restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),

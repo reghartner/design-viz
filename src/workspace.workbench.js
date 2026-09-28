@@ -148,5 +148,5 @@ function initWorkbenchWorkspace(){
   }
   if(preset)preset.addEventListener('change',function(){applyPreset(preset.value);});
 
-  return {setHistory:function(value){finish(true);history=value;canvas.setHistory(value);},showTool:showTool,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
+  return {setHistory:function(value){finish(true);history=value;canvas.setHistory(value);},showTool:showTool,hideTool:close,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
 }

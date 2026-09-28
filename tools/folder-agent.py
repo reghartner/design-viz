@@ -207,6 +207,9 @@ def watch(folder, interval=0.25, minutes=25):
                         if kind in ('request', 'result') and cancelled(folder, owner, value.get('id') if kind == 'request' else value.get('requestId')):
                             seen.add(key)
                             continue
+                        if kind == 'request' and value.get('delivery') in ('clipboard', 'native'):
+                            seen.add(key)
+                            continue
                         if kind == 'request':
                             try:
                                 reply = read(folder, 'reply.json')
@@ -240,6 +243,8 @@ def main():
     watching.add_argument('--interval', type=float, default=0.25)
     watching.add_argument('--minutes', type=float, default=25)
     commands.add_parser('prepare')
+    beginning = commands.add_parser('begin', help='Register a request from the native agent conversation')
+    beginning.add_argument('--text', required=True)
     checking = commands.add_parser('preflight')
     checking.add_argument('--monitor', choices=('available', 'unavailable', 'unverified'), default='unverified',
                           help='Report Monitor availability after checking the visible Claude session; never inferred by this helper')
@@ -269,6 +274,26 @@ def main():
         watch(folder, args.interval, args.minutes)
         return
     owner = identity(folder)
+    if args.command == 'begin':
+        if read(folder, 'session.json').get('workflow') != 'external':
+            raise ValueError('Native requests require the Work in your agent workflow.')
+        if not args.text.strip() or len(args.text) > 16000:
+            raise ValueError('Enter a request of at most 16000 characters.')
+        editor = read(folder, 'editor.json')
+        if not editor.get('connected') or time.time() * 1000 - editor.get('at', 0) > 15000 or any(editor.get(k) != v for k, v in owner.items()):
+            raise ValueError('Return to the workbench and reconnect before starting a request.')
+        request_id = uuid.uuid4().hex
+        write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text, 'expiresAt': int(time.time() * 1000) + 8000}, guard=lambda: assert_owner(folder, owner))
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            assert_owner(folder, owner)
+            try:
+                request = active_request(folder, owner, request_id)
+                print(json.dumps({'id': request_id, 'revision': request['revision']}))
+                return
+            except (OSError, ValueError):
+                time.sleep(0.1)
+        raise ValueError('The workbench has not accepted this request. Finish or stop the active turn, keep the workbench open, and retry. Do not submit a proposal for an unacknowledged request.')
     active_request(folder, owner, args.request)
     input_name = args.file
     if input_name:
@@ -297,8 +322,10 @@ def main():
         if len(text.encode('utf-8')) > 4 * 1024 * 1024:
             raise ValueError('Proposal source exceeds 4 MiB')
         state = read(folder, 'state.json')
-        if state['revision'] != args.revision or any(state.get(k) != v for k, v in owner.items()):
-            raise ValueError('Document changed: reread state.json and reconcile, not just the revision number.')
+        if any(state.get(k) != v for k, v in owner.items()) or not args.revision.startswith(owner['connectionId'] + '-'):
+            raise ValueError('Unknown connection revision: reread state.json in this session.')
+        # The workbench retains baselines and previews safe three-way merges.
+        # It rejects unknown/expired revisions and asks for conflict resolution.
         json.loads(text)
         value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
         filename = 'proposal.json'

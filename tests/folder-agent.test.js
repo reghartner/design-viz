@@ -1,14 +1,14 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-function harness(){
+function harness(extra={}){
   const context={TextEncoder,SyntaxError};vm.createContext(context);
-  for(const file of ['agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
+  for(const file of ['agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
   const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
   const files={async read(name){if(gate)await gate(name);const value=disk.get(name);if(value instanceof Error)throw value;return copy(value)||null;},
     async readText(name){if(gate)await gate(name);return disk.has(name)?String(disk.get(name)):null;},
     async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard();if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));}};
-  const options={files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,project,open,selection,views}),busy:()=>busy,
+  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,project,open,selection,views}),busy:()=>busy,
     apply(text){writes.push(text);source=text;return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
   let client=context.createFolderAgentClient(options);
   const h={disk,writes,updates,files,context,client,get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
@@ -238,7 +238,7 @@ test('preflight and reported permission-needed progress are surfaced without cla
 });
 
 
-test('optional proposal review waits without losing progress, validates acceptance, and keeps automatic mode default',async()=>{
+test('optional proposal review waits without losing progress, validates acceptance, and refreshes before accepting after further edits',async()=>{
   const h=harness();await h.client.start();h.client.setReviewMode(true);await h.client.send('Edit');h.proposal();
   h.disk.set('listener.json',h.envelope({listening:true,at:100000}));
   h.disk.set('progress.json',h.envelope({id:'review-progress',requestId:h.last.pending,text:'Ready for your review'}));
@@ -247,7 +247,7 @@ test('optional proposal review waits without losing progress, validates acceptan
   await h.client.acceptReview();assert.equal(h.writes.length,1);assert.equal(h.last.review,null);assert.equal(h.last.pending,null);
   assert.equal(h.last.changes[0].status,'applied');
   await h.client.send('Manual conflict');h.proposal({id:'stale-review'});await h.client.poll();h.type('manual source');
-  await h.client.acceptReview();assert.equal(h.writes.length,1);assert.equal(h.last.changes.at(-1).status,'rejected');
+  await h.client.acceptReview();assert.equal(h.writes.length,1);assert.equal(h.last.review.ok,false);assert.match(h.last.review.conflicts[0].reason,/JSON/);
 });
 test('review approval binds the entire proposal and never accepts same-ID content swaps or a cancelled turn',async()=>{
   const h=harness();await h.client.start();h.client.setReviewMode(true);await h.client.send('Edit');h.proposal();await h.client.poll();
@@ -421,4 +421,41 @@ test('native file creation exposes an empty placeholder until close without brea
   disk.set('session.json','');const before=[...disk];
   await assert.rejects(h.context.createFolderAgentClient(options).start(false),{name:'SyntaxError'});
   assert.deepEqual([...disk],before);
+});
+
+test('default folder workflow holds all proposals, merges separate changes and commits exact preview once',async()=>{
+  const h=harness({reviewMode:undefined});h.type('{"nodes":{"a":{"title":"A"},"b":{"title":"B"}}}');await h.client.start();await h.client.send('Edit B');
+  const base=h.disk.get('state.json').revision;h.type('{"nodes":{"a":{"title":"Human A"},"b":{"title":"B"}}}');
+  h.proposal({baseRevision:base,source:'{"nodes":{"a":{"title":"A"},"b":{"title":"Agent B"}}}'});await h.client.poll();
+  assert.equal(h.writes.length,0);assert.equal(h.last.review.merged,true);assert.equal(h.last.review.ok,true);
+  const expected=h.client.reviewContent();assert.equal(JSON.parse(expected).nodes.a.title,'Human A');
+  const version=h.last.review.version;assert.equal(await h.client.acceptReview(version+1),false);assert.equal(h.writes.length,0);
+  await h.client.acceptReview(version);assert.equal(h.writes.length,1);assert.equal(h.writes[0],expected);assert.equal(h.disk.get('result.json').baseRevision,base);
+  await h.client.poll();assert.equal(h.writes.length,1);
+});
+test('overlapping changes stay pending for feedback and cannot be committed',async()=>{
+  const h=harness({reviewMode:true});await h.client.start();await h.client.send('Edit');h.proposal();h.type('{"title":"human"}');await h.client.poll();
+  assert.equal(h.last.review.ok,false);assert.equal(h.last.review.conflicts[0].path,'/title');assert.equal(await h.client.acceptReview(),false);
+  const version=h.last.review.version;await h.client.rejectReview('Please reconcile /title with my latest story.',version);
+  assert.equal(h.writes.length,0);assert.match(h.disk.get('result.json').message,/reconcile/);
+});
+test('a local edit during commit I/O invalidates approval and produces a new preview',async()=>{
+  const h=harness({reviewMode:true});h.type('{"a":1,"b":1}');await h.client.start();await h.client.send('Edit');h.proposal({source:'{"a":1,"b":2}'});await h.client.poll();
+  const version=h.last.review.version;let release,reached;const hit=new Promise(r=>reached=r);
+  h.gate(name=>name==='session.json'?new Promise(r=>{release=r;reached();}):null);
+  const committing=h.client.acceptReview(version);await hit;h.type('{"a":2,"b":1}');h.gate(null);release();await committing;
+  assert.equal(h.writes.length,0);assert.ok(h.last.review.version>version);assert.deepEqual(JSON.parse(h.client.reviewContent()),{a:2,b:2});
+});
+test('copy delivery freezes explicit nodes and native reply surface without a second send',async()=>{
+  const h=harness({reviewMode:true});await h.client.start();const focus={source:h.disk.get('state.json').source,project:1,selection:[{kind:'node',id:'specific'}],replySurface:'agent',delivery:'clipboard'};
+  const request=await h.client.send('Copy this',focus);assert.equal(request.delivery,'clipboard');assert.equal(request.replySurface,'agent');assert.equal(request.selection[0].id,'specific');
+  assert.equal(h.disk.get('request.json').id,request.id);await assert.rejects(h.client.send('Second'),/Wait/);
+});
+test('native requests are accepted only in external workflow, once and before their deadline',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();
+  h.disk.set('agent-request.json',h.envelope({id:'native-1',text:'Make the change discussed in my agent',expiresAt:108000}));await h.client.poll();
+  assert.equal(h.last.pending,'native-1');assert.equal(h.disk.get('request.json').delivery,'native');h.reply();await h.client.poll();await h.client.poll();assert.equal(h.last.pending,null);
+  h.disk.set('agent-request.json',h.envelope({id:'expired',text:'Do not start later',expiresAt:99999}));await h.client.poll();assert.equal(h.last.pending,null);
+  h.disk.set('agent-request.json',h.envelope({id:'foreign',connectionId:'other',text:'Ignore',expiresAt:108000}));await h.client.poll();assert.equal(h.last.pending,null);
+  const embedded=harness({workflow:'embedded'});await embedded.client.start();embedded.disk.set('agent-request.json',embedded.envelope({id:'native',text:'Ignore',expiresAt:108000}));await embedded.client.poll();assert.equal(embedded.last.pending,null);
 });

@@ -1,13 +1,34 @@
 /* Optional local-file transport. No browser-control or script-execution commands. */
 function createWorkbenchAgentExchange(opts){
-  var lastSource=null,lastProject=null,sequence=0,pending=null;
+  var lastSource=null,lastProject=null,sequence=0,pending=null,baselines=new Map(),baselineBytes=0,pinned=null;
   function snapshot(){
     var value=opts.snapshot();
-    if(value.source!==lastSource || value.project!==lastProject){lastSource=value.source;lastProject=value.project;sequence++;}
+    if(value.source!==lastSource || value.project!==lastProject){
+      if(value.project!==lastProject){baselines.clear();baselineBytes=0;pinned=null;}
+      lastSource=value.source;lastProject=value.project;sequence++;
+      baselines.set(opts.clientId+'-'+sequence,{source:value.source,project:value.project});baselineBytes+=value.source.length;
+      while(baselines.size>32 || baselineBytes>16*1024*1024 && baselines.size>1){var key=baselines.keys().next().value;baselineBytes-=baselines.get(key).source.length;baselines.delete(key);}
+    }
     value.revision=opts.clientId+'-'+sequence;
     return value;
   }
   return {
+    pin:function(){var current=snapshot();pinned={revision:current.revision,source:current.source,project:current.project};},
+    preview:function(proposal){
+      var current=snapshot(),base=baselines.get(proposal.baseRevision) || (pinned && pinned.revision===proposal.baseRevision?pinned:null),outcome;
+      function blocked(reason){return {ok:false,current:current,conflicts:[{path:'/',reason:reason}]};}
+      if(!current.open)return blocked('Open the original project before reviewing this update.');
+      if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))return blocked('Submit a complete updated document in source.');
+      if(typeof proposal.source!=='string' || new TextEncoder().encode(proposal.source).length>4*1024*1024)return blocked('Invalid or oversized proposed source.');
+      if(!base || base.project!==current.project)return blocked('The starting revision is no longer available. Reread state.json and reconcile your proposal with the latest story.');
+      try{outcome=mergeWorkbenchAgentSource(base.source,current.source,proposal.source);}catch(ex){return blocked('The document is too complex to merge safely. Ask for a revised proposal.');}outcome.current=current;
+      if(outcome.ok && new TextEncoder().encode(outcome.source).length>4*1024*1024)return blocked('The combined story exceeds the 4 MiB size limit.');
+      if(outcome.ok && opts.validate){
+        try{var error=opts.validate(outcome.source);if(error)return blocked('The combined story failed validation: '+error);}
+        catch(ex){return blocked('The combined story failed validation: '+ex.message);}
+      }
+      return outcome;
+    },
     request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},
     receive:function(reply,sent){
       if(pending && sent.result && pending.id===sent.result.id && reply.acknowledged===pending.id)pending=null;

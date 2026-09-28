@@ -1,4 +1,4 @@
-# Talk to Claude through a local folder
+# Build with your agent through a shared folder
 
 This experimental workbench connection is designed for a hosted HTTPS page in a
 desktop Chrome/Edge tab. It needs no local server, agent backend, API key, or
@@ -8,8 +8,11 @@ not sandbox Claude or change access already granted to that session.
 
 ## Connect
 
-Choose **Build it with your agent → Start with Claude**, or the **Agent** tab
-in an existing project. Start with the working/project folder of the user's
+Choose **Build with Claude** and then **Work in your agent** (copy/paste,
+recommended) or **Talk here with Claude** (embedded conversation). Both use the
+same shared folder and preview/commit gate. Copy/paste requires no Monitor;
+Monitor is needed only for direct Send and embedded conversation. In an existing project, use
+**Message agent** to select nodes and references, or open the **Agent** tab. Start with the working/project folder of the user's
 existing Claude session. If its location is unclear, ask Claude to report its
 current working directory; do not guess a Documents or Downloads path.
 
@@ -42,7 +45,7 @@ not an operating-system sandbox for Bash. Keep ordinary permission prompts;
 inspect the session's tool list before claiming browser access is unavailable.
 Then paste the visible connection instructions.
 
-Claude reads the helper before starting it with its Monitor tool. The helper
+For direct Send or embedded conversation, Claude reads the helper before starting it with its Monitor tool. The helper
 unpacks the version-matched authoring kit and watches request/result files. It
 does not open ports, make network requests, execute file contents, or launch
 subprocesses. Python 3 runs the helper; Node runs the skill's existing validation
@@ -56,6 +59,29 @@ Claude to renew a 25-minute watcher while the same connection is active. Closing
 Claude stops the connection. Normal permission prompts are handled in Claude.
 
 ## Communicate
+
+**Work in your agent:** keep questions, answers, permissions and interrupts in
+the native agent app. **Message agent** lets you select nodes and code/service
+references independently, add file paths or URLs, and inspect the message before
+copying. Copy registers a `delivery: clipboard` request and puts its identity in
+the pasted message; Monitor deliberately does not emit it as a request event.
+The user must paste it to start work. The external setup prompt unpacks the kit
+with `prepare`; an optional Monitor can enable direct Send later. Clipboard refusal selects the prepared text
+for manual copying. **Send to Claude** explicitly dispatches through Monitor.
+A connected folder shares the full story; message checkboxes select focus, not
+folder access. `replySurface: agent` keeps conversation in the native app even
+when a message is sent directly. Use a helper `reply` at completion to release
+the request. Do not finish a request while its proposal is awaiting review.
+
+For a new request spoken directly in the native conversation, use
+`python3 /path/to/session/folder-agent.py begin --text 'The requested change'`.
+The workbench must acknowledge it before submitting work. This is available only
+in the external workflow. An unacknowledged request expires after eight seconds;
+finish or stop the active turn and retry. Continue discussion under the active
+request while resolving questions. **Stop accepting this turn** cancels acceptance
+here; interrupt the agent itself in its app if needed.
+
+**Talk here with Claude:**
 
 Agent is a floating window over the diagram canvas. **Focus** summarizes the
 selection in one line; expand it to inspect every selected item and the current
@@ -84,7 +110,7 @@ Claude must immediately acknowledge each request with `progress`, then report
 each meaningful phase (reading, planning, editing, validating), errors, and any
 upcoming permission prompt. For longer work, send an update at the next tool
 boundary after roughly 20 seconds. Use brief observable actions and results,
-not private reasoning. Send all questions, blockers and final answers through
+not private reasoning. For embedded conversation, send all questions, blockers and final answers through
 `reply` so the user can answer in the editor. Its ordinary terminal text is not
 mirrored automatically. Permission approvals still take place in Claude.
 
@@ -114,11 +140,35 @@ python3 /path/to/session/folder-agent.py propose --request REQUEST_ID --revision
 
 Text/candidate input files must be regular files directly inside the session
 folder. `progress` and `reply` also accept `--text` for short updates; use normal
-shell-safe quoting. Keep the base revision read **before** planning the edit. The helper
-rejects stale publication. Reconcile against the latest state; never substitute
-a fresh revision onto an old replacement. Wait for result.json before submitting
+shell-safe quoting. Keep the base revision read **before** planning the edit. The workbench retains recent baselines and the active request baseline. It can
+merge independent changes from an older revision in this connection. Reconcile
+conflicts against the latest state; never substitute a fresh revision onto an old
+replacement. Wait for result.json before submitting
 another proposal or sending the final reply. All authored document replacements
 are validated by the editor and accepted through its ordinary Undo history.
+
+## Preview and commit
+
+Every proposal waits behind **Preview Agent Updates**, a prominent banner that
+is available with the Agent panel closed. The full viewer lets the user switch
+between proposed and current state without changing the editor. **Commit update**
+applies the reviewed version as one undoable local change; it is not a Git commit.
+If the document or proposal changes during review, approval is invalidated and
+the preview refreshes before another commit is possible. Closing the preview
+keeps it pending; discarding returns a rejection.
+
+The editor performs a conservative three-way merge of the baseline, current
+source and proposal. Disjoint object fields and collections with unique IDs
+merge; unchanged section headings and tab labels identify legacy containers.
+Same-field edits, delete-versus-edit, ambiguous ordering, unknown baselines and
+invalid combined references require a revision. Arrays without stable identities
+are treated as a unit. Nothing partially applies. The combined document is
+validated and must render before the commit button is enabled.
+
+**Agent update needs attention** offers **Copy feedback for your agent** with
+conflicting paths and instructions to reread the latest shared story. Copying
+also returns the rejection through `result.json`; after a manual clipboard
+fallback, **Return for revision** does that explicitly. Current edits remain intact.
 
 ## Files and ownership
 
@@ -129,6 +179,7 @@ are validated by the editor and accepted through its ordinary Undo history.
 | authoring-kit.json / folder-agent.py | Editor | Bundled authoring references and inspectable helper |
 | state.json | Editor | Exact source, revision, project and authored selection/view context |
 | editor.json | Editor | Connection identity, connected flag and heartbeat timestamp `at` |
+| agent-request.json | Agent helper | Expiring native-conversation request, acknowledged by the editor |
 | request.json | Editor | One outstanding user message with ID and frozen selection/view context |
 | transcript.json | Editor | Last 100 user/assistant messages for handoff |
 | story.spec.json | Editor | Latest exact source checkpoint, including recoverable invalid handwriting |

@@ -83,14 +83,14 @@ async function inspectFolderAgentSession(files,snapshot,now){
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null;
-  var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),chain=Promise.resolve();
-  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
+  var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
+  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   function publish(state){
     var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
     var phase=!connected?'disconnected':!pending?(activity.length?'complete':'idle'):activity.length && activity[activity.length-1].phase==='permission-needed'?'permission-needed':quietSeconds>=30?'quiet':lastAgentAt===null?'waiting':'responding';
     if(!disposed && opts.changed)opts.changed(Object.assign({connected:connected,pending:pending,transcript:transcript.slice(),
-      activity:activity.slice(),activityPhase:phase,quietSeconds:quietSeconds,agentResponded:lastAgentAt!==null,changes:changes.slice(),preflight:preflight,reviewMode:reviewMode,review:reviewCandidate?reviewCandidate.public:null},state));
+      activity:activity.slice(),activityPhase:phase,quietSeconds:quietSeconds,agentResponded:lastAgentAt!==null,changes:changes.slice(),preflight:preflight,reviewMode:reviewMode,review:connected && reviewCandidate?reviewCandidate.public:null},state));
   }
   function envelope(value){return Object.assign({sessionId:manifest.sessionId,connectionId:manifest.connectionId},value);}
   function belongs(value){return value && value.sessionId===manifest.sessionId && value.connectionId===manifest.connectionId;}
@@ -109,14 +109,16 @@ function createFolderAgentClient(opts){
   }
   function clearReview(){reviewCandidate=null;reviewDecision=null;}
   function reviewProposal(proposal){
-    var signature=JSON.stringify(proposal);
+    var current=exchange.request().snapshot,signature=JSON.stringify(proposal)+'\n'+current.revision;
     if(reviewDecision && reviewDecision.signature===signature)return reviewDecision.action;
     if(!reviewMode && !reviewCandidate && !reviewDecision)return 'accept';
     if(reviewCandidate && reviewCandidate.signature===signature)return 'wait';
     reviewDecision=null;
-    reviewCandidate={signature:signature,proposal:proposal,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,summary:String(proposal.summary || 'Claude proposed a story update.').slice(0,1000),
-      baseRevision:String(proposal.baseRevision || '').slice(0,160),kind:'replacement'}};
-    publish({status:'Claude proposed a change. Review its summary, then accept or decline it. Validation runs before an accepted change is applied.'});
+    var preview=exchange.preview(proposal);
+    reviewCandidate={signature:signature,proposal:proposal,preview:preview,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,
+      summary:String(proposal.summary || 'Your agent proposed a story update.').slice(0,1000),baseRevision:String(proposal.baseRevision || '').slice(0,160),
+      revision:preview.current.revision,kind:'replacement',ok:preview.ok,merged:!!preview.merged,conflicts:preview.conflicts || []}};
+    publish({status:preview.ok?'Agent updates are ready to preview. Your current story is unchanged.':'Agent update needs attention. Copy the feedback to your agent to resolve it.'});
     return 'wait';
   }
   function clearReceipt(){pendingReviewResult=null;if(exchange){var ack=exchange.request();if(ack.result)exchange.receive({acknowledged:ack.result.id},ack);}}
@@ -151,6 +153,19 @@ function createFolderAgentClient(opts){
   async function poll(){
     if(!connected || disposed)return;
     var token=epoch,turn=turnEpoch,requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
+    if(opts.workflow==='external' && !pending){
+      var incoming=await readOptional('agent-request.json');if(!alive(token) || turn!==turnEpoch)return;
+      if(belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
+        var request=envelope({id:incoming.id,text:incoming.text,at:now(),revision:sent.snapshot.revision,selection:[],views:[],
+          technicalLevel:opts.level?opts.level():'story',replySurface:'agent',delivery:'native'});
+        exchange.pin();
+        await files.write('request.json',request,function(){if(!alive(token) || turn!==turnEpoch || now()>=incoming.expiresAt)throw Error('Native request expired before publication.');});if(!alive(token) || turn!==turnEpoch)return;
+        nativeSeen.add(incoming.id);pending=requestId=incoming.id;turn=++turnEpoch;requestAt=now();lastAgentAt=null;
+        activity=[];activitySeen.clear();clearReceipt();clearReview();
+        transcript.push({role:'user',text:incoming.text,requestId:incoming.id});await saveTranscript();
+        publish({status:'Your agent is preparing an update. It will wait for your review.'});
+      }
+    }
     if(changesDirty){await saveChanges();if(!alive(token) || turn!==turnEpoch)return;}
     var proposal=await readOptional('proposal.json');if(!alive(token) || turn!==turnEpoch)return;
     if(belongs(proposal) && validId(proposal.id) && pending && proposal.requestId===pending && !seen.has(proposal.id)){
@@ -160,13 +175,16 @@ function createFolderAgentClient(opts){
       var decision=ack.result?'accept':reviewProposal(proposal);
       if(decision!=='wait'){
         if(decision==='reject'){
-          message='Change declined in the editor. Claude can revise its proposal.';
+          message=reviewDecision && reviewDecision.message || 'Change declined in the editor. The agent can revise its proposal.';
           pendingReviewResult={id:proposal.id,baseRevision:proposal.baseRevision,status:'rejected',message:message,revision:ack.snapshot.revision};
           ack.result=pendingReviewResult;
         }
         if(!ack.result){
           if(typeof proposal.source==='string' && new TextEncoder().encode(proposal.source).length>4*1024*1024)proposal.source=null;
-          message=exchange.receive({proposal:proposal},sent);ack=exchange.request();
+          var accepted=reviewDecision && reviewDecision.preview;
+          var applying=accepted?Object.assign({},proposal,{source:accepted.source,baseRevision:accepted.current.revision}):proposal;
+          message=exchange.receive({proposal:applying},sent);ack=exchange.request();
+          if(ack.result)ack.result.baseRevision=proposal.baseRevision;
         }else message=ack.result.message;
         if(ack.result){
           clearReview();receipt(ack.result,proposal,requestId);
@@ -253,10 +271,10 @@ function createFolderAgentClient(opts){
             throw Error('The saved session changed while preserving its story. Review recovery again.');
         }
       }
-      manifest={protocol:'flowview-folder-v1',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
+      manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
-      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply});
+      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate});
       var recoveryState='state-'+manifest.connectionId+'.json';
       manifest.recoveryState=recoveryState;
       try{
@@ -313,18 +331,18 @@ function createFolderAgentClient(opts){
       publish({status:'Paste the connection instructions into Claude.',listening:false});
       return manifest;
     });},
-    send:function(text){
+    send:function(text,context){
       // Capture the user's focus at Send, before queued polling or disk I/O.
       var captured;
       try{
-        var focus=opts.snapshot();
+        var focus=context || opts.snapshot();
         captured=JSON.parse(JSON.stringify({source:focus.source,project:focus.project,selection:focus.selection,
-          views:focus.views,previewCurrent:focus.previewCurrent,technicalLevel:opts.level?opts.level():'story'}));
+          views:focus.views,previewCurrent:focus.previewCurrent,replySurface:focus.replySurface,delivery:focus.delivery,technicalLevel:opts.level?opts.level():'story'}));
       }catch(ex){return Promise.reject(ex);}
       return serial(async function(){
       if(!connected || disposed)throw Error('Connect a folder first.');
       if(pending)throw Error('Wait for Claude’s reply before sending another message.');
-      text=String(text).trim();if(!text || text.length>16000)throw Error('Enter a message of at most 16000 characters.');
+      text=context?String(text):String(text).trim();if(!text.trim() || text.length>16000)throw Error('Enter a message of at most 16000 characters.');
       var token=epoch,turn=++turnEpoch,id=uuid();pending=id;requestAt=now();lastAgentAt=null;
       activity=[];activitySeen.clear();clearReceipt();clearReview();publish({status:'Saving your message…'});
       try{
@@ -335,32 +353,32 @@ function createFolderAgentClient(opts){
           !current.open || current.project!==captured.project || current.source!==captured.source)
           throw Error('The story changed while saving your message. Check the selection and send it again.');
         var request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
-          selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel});
+          selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel,replySurface:captured.replySurface,delivery:captured.delivery});
+        exchange.pin();
         await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:'Message saved — waiting for Claude.',progress:''});
-        await saveTranscript();
+        await saveTranscript();return request;
       }catch(ex){
         // A committed request remains pending when only its transcript failed to save.
         if(!transcript.some(function(item){return item.requestId===id;})){if(pending===id)pending=null;publish({});}
         throw ex;
       }
     });},
-    reviewContent:function(){
-      if(!reviewCandidate)return '';
-      var proposal=reviewCandidate.proposal;
-      return typeof proposal.source==='string'?proposal.source:JSON.stringify(proposal,null,2);
-    },
+    reviewContent:function(){return reviewCandidate && reviewCandidate.preview.ok?reviewCandidate.preview.source:reviewCandidate && reviewCandidate.proposal.source || '';},
+    reviewSnapshot:function(){return connected && reviewCandidate?{review:reviewCandidate.public,source:reviewCandidate.preview.source || null,current:reviewCandidate.preview.current.source}:null;},
     setReviewMode:function(value){reviewMode=value===true;publish({});},
-    acceptReview:function(){
-      if(!connected || disposed || !reviewCandidate || reviewCandidate.public.requestId!==pending)return Promise.resolve(false);
-      reviewDecision={signature:reviewCandidate.signature,action:'accept'};reviewCandidate=null;publish({status:'Checking the proposed change…'});
-      return serial(poll).then(function(){return true;});
+    acceptReview:function(version){
+      if(!connected || disposed || !reviewCandidate || !reviewCandidate.preview.ok || reviewCandidate.public.requestId!==pending || version!==undefined && version!==reviewCandidate.public.version)return Promise.resolve(false);
+      reviewDecision={signature:reviewCandidate.signature,action:'accept',preview:reviewCandidate.preview};
+      publish({status:'Checking the proposed change…'});
+      return serial(poll).then(function(){return !reviewCandidate;});
     },
-    rejectReview:function(){
-      if(!connected || disposed || !reviewCandidate || reviewCandidate.public.requestId!==pending)return Promise.resolve(false);
-      reviewDecision={signature:reviewCandidate.signature,action:'reject'};reviewCandidate=null;publish({status:'Declining the proposed change…'});
-      return serial(poll).then(function(){return true;});
+    rejectReview:function(message,version){
+      if(!connected || disposed || !reviewCandidate || reviewCandidate.public.requestId!==pending || version!==undefined && version!==reviewCandidate.public.version)return Promise.resolve(false);
+      reviewDecision={signature:reviewCandidate.signature,action:'reject',message:message};
+      publish({status:'Returning the proposed change…'});
+      return serial(poll).then(function(){return !reviewCandidate;});
     },
     cancel:function(){
       var requestId=pending,token=epoch;

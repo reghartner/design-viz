@@ -326,11 +326,17 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   whose protocol is `flowview-folder-v1`, read its `CONNECT.md` and follow
   [folder sessions](../../../docs/folder-agent-session.md). This is a local
   session with a different transport. Use its reply/progress/proposal helper
-  so the user receives questions and answers inside the editor. Immediately
+  according to `session.workflow` and `request.replySurface`: external/agent
+  conversations stay in the native agent app; embedded questions and answers
+  use the editor. A copied request is not automatically dispatched by Monitor. Immediately
   acknowledge every request with `progress`, report each work phase and errors,
   and send longer-work updates at tool boundaries roughly every 20 seconds.
-  Report observable actions; terminal-only output is invisible to this user.
-  Route every question, blocker and final answer through `reply`. Preserve the
+  Report observable actions. In embedded conversation, route questions, blockers
+  and final answers through `reply`. In external conversation, use `reply` only
+  to release the turn on completion; native followups register with `begin`.
+  Every proposed update waits for visual preview and explicit commit. Wait for
+  its result before replying, and reconcile conflict feedback without relabeling
+  an old proposal with a newer revision. Preserve the
   worksheet and decisions in `story.ledger.md` in that folder. The bundled
   `authoring/` directory is VIZ; use its validator and state-walk tools, without
   an OUT build. Browser access is unavailable: never claim visual inspection.

@@ -13,7 +13,7 @@ async function mount(page,{stored,denied=false}={}){
   if(stored)await page.evaluate(value=>localStorage.setItem('dv-folder-agent-recovery-v1',JSON.stringify(value)),stored);
   await page.evaluate(skeleton=>{
     const parsed=new DOMParser().parseFromString(skeleton,'text/html');
-    for(const id of ['editor-agent','folder-agent-guide','folder-agent-indicator','folder-agent-selection'])document.body.appendChild(parsed.getElementById(id));
+    for(const id of ['editor-agent','folder-agent-guide','folder-agent-indicator','folder-agent-selection','agent-update-banner','agent-update-dialog'])document.body.appendChild(parsed.getElementById(id));
     const panel=document.createElement('section');panel.className='workspace-window';panel.id='test-window';panel.style.cssText='left:20px;top:60px;width:min(420px,calc(100vw - 40px));height:calc(100dvh - 80px)';
     panel.appendChild(document.getElementById('editor-agent'));document.body.appendChild(panel);document.getElementById('editor-agent').hidden=false;
     const kit=document.createElement('script');kit.id='flowview-folder-kit';kit.type='application/json';kit.textContent=JSON.stringify({watcher:'# harmless test fixture',gzip:'',sha256:''});document.body.appendChild(kit);
@@ -25,12 +25,12 @@ async function mount(page,{stored,denied=false}={}){
     window.createFolderAgentFiles=()=>({write:async(name,value)=>window.diskWrites.push({name,value})});
     window.inspectFolderAgentSession=async()=>{window.inspectCalls++;if(window.inspectFailure)throw Error(window.inspectFailure);return structuredClone({identity:window.savedIdentity,savedSource:window.savedSource || window.testSource,savedRevision:window.savedRevision,sourceMatches:!window.savedSource || window.savedSource===window.testSource,transcript:window.savedTranscript,changes:[],lease:{active:!!window.activeOwner}});};
     window.createFolderAgentClient=options=>{
-      window.publish=options.changed;window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
-      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewContent:()=>window.proposedContent || '',acceptReview:async()=>{window.reviewAccepted=true;options.changed({review:null});},rejectReview:async()=>{window.reviewRejected=true;options.changed({review:null});},readLedger:async()=>null};
+      window.publish=update=>{if('review' in update)window.testReview=update.review;options.changed(update);};window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
+      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewSnapshot:()=>window.testReview?{review:window.testReview,source:null,current:window.testSource}:null,acceptReview:async()=>{window.reviewAccepted=true;window.publish({review:null});},rejectReview:async()=>{window.reviewRejected=true;window.publish({review:null});},readLedger:async()=>null};
     };
   },await read('workbench.skel.html'));
   for(const file of ['style.core.css','style.workbench.css','workbench/agent-conversation.css'])await page.addStyleTag({content:await read(file)});
-  for(const file of ['workbench/lifetime.js','workbench/agent-recovery.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
+  for(const file of ['workbench/lifetime.js','workbench/agent-recovery.js','workbench/agent-review.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
   await page.evaluate(denied=>{
     window.denyPermission=denied;
     if(denied){const original=createWorkbenchAgentRecovery;window.createWorkbenchAgentRecovery=options=>{const store=original(options);return {...store,handle:async()=>({handle:window.testDirectory,sessionId:'s1'})};};}
@@ -187,15 +187,14 @@ test('receipts remain inert, reviewable and honest when undo is no longer safe',
   await page.evaluate(()=>agentUI.destroy());await page.locator('[data-receipt-action="show"]').click();
 });
 
-test('optional proposal review shows exact inert content and refreshes when proposal version changes',async({page})=>{
+test('proposal feedback stays inert and refreshes when proposal version changes',async({page})=>{
   await mount(page);await connect(page);
-  await page.locator('#folder-agent-focus-summary').click();await page.locator('#folder-agent-review-mode').check();expect(await page.evaluate(()=>reviewEnabled)).toBe(true);
-  await page.evaluate(()=>{window.proposedContent='{"title":"<script>unsafe()</script>"}';publish({review:{id:'p1',version:1,kind:'replacement',summary:'Rename the story'}});});
-  await expect(page.locator('#folder-agent-review')).toContainText('validates the complete story');await page.getByText('Inspect proposed content',{exact:true}).click();
-  await expect(page.locator('#folder-agent-review-source')).toHaveValue('{"title":"<script>unsafe()</script>"}');
-  await page.evaluate(()=>{window.proposedContent='{"title":"Changed while reviewing"}';publish({review:{id:'p1',version:2,kind:'replacement',summary:'Different rename'}});});
-  await expect(page.locator('#folder-agent-review-source')).toBeHidden();await page.getByText('Inspect proposed content',{exact:true}).click();await expect(page.locator('#folder-agent-review-source')).toHaveValue('{"title":"Changed while reviewing"}');
-  await page.locator('#folder-agent-review-reject').click();await expect(page.locator('#folder-agent-review')).toBeHidden();expect(await page.evaluate(()=>reviewRejected)).toBe(true);expect(await page.evaluate(()=>window.reviewAccepted)).toBeUndefined();
+  await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:1,ok:false,summary:'Needs a revision',baseRevision:'c1-1',revision:'c1-2',conflicts:[{path:'/title',reason:'<script>unsafe()</script>'}]}}));
+  await page.locator('#folder-agent-review-accept').click();
+  await expect(page.locator('#agent-update-feedback')).toHaveValue(/<script>unsafe/);await expect(page.locator('#agent-update-dialog script')).toHaveCount(0);
+  await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:2,ok:false,summary:'Changed while reviewing',conflicts:[{path:'/title',reason:'The latest conflict'}]}}));
+  await expect(page.locator('#agent-update-summary')).toHaveText('Changed while reviewing');await expect(page.locator('#agent-update-feedback')).toHaveValue(/latest conflict/);
+  await page.locator('#agent-update-return').click();expect(await page.evaluate(()=>window.reviewRejected)).toBe(true);expect(await page.evaluate(()=>window.reviewAccepted)).toBeUndefined();
 });
 
 test('context stays concise and expandable; setup and next-message detail preserve the sent context',async({page})=>{

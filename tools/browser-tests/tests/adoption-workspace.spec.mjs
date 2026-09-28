@@ -69,3 +69,17 @@ test('short-height rail scrolls to every tool with pointer and keyboard access',
   await page.keyboard.press('Home');await expect(page.locator('#editor-tab-agent')).toBeFocused();await expect(page.locator('#editor-tab-agent')).toBeInViewport();
   const r=await rail.boundingBox();expect(r.y+r.height).toBeLessThanOrEqual(360);
 });
+
+
+test('short floating tools keep their close buttons and rail reachable above canvas chrome',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
+  for(const width of [640,390]){
+    await page.setViewportSize({width,height:360});await page.locator('#workspace-preset').selectOption('present');
+    for(const tool of ['agent','brief','inspect','steps','outline','json','file']){
+      await page.locator('#editor-tab-'+tool).click();const win=page.locator('#workspace-window-'+tool);
+      await expect(win).toBeVisible();const close=win.locator('.workspace-window-close');
+      expect(await close.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),tool+' close at '+width+'px').toBe(true);
+      await close.click();await expect(win).toBeHidden();await expect(page.locator('#editor-tab-'+tool)).toBeFocused();await expect(page.locator('#editor-tab-'+tool)).toBeInViewport();
+    }
+  }
+});

@@ -2024,6 +2024,13 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas .workspace-tools .rbtn{padding:7px 10px;}
 }
 
+/* At short heights, panels are clamped into the same vertical band as canvas
+   chrome. Keep their controls above that chrome and the tool rail accessible. */
+@media(max-height:520px){
+  .workspace-canvas .workwrap #spec-editor{z-index:136;}
+  .workspace-canvas .workspace-rail{z-index:160;}
+}
+
 /* A compact field control opens the same full-color library from every form. */
 .flow-icon-control{display:flex;align-items:center;gap:6px;flex:1;min-width:0;flex-wrap:wrap;}
 .flow-icon-control>select{flex:1 1 70px;min-width:0;width:0;}

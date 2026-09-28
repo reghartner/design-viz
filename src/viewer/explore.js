@@ -60,7 +60,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function beginEdit(panels){
     if(!active || retired)return false;
-    var authored=author && (!workbenchCanvas || definition.presentation==='explore');
+    var authored=author && (!workbenchCanvas || panels && definition.presentation==='explore');
     var token=authored?author.begin(definition.id):null;if(token===false)return false;
     return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && !authored && panels?panelGeometry(memory):null};
   }
@@ -91,7 +91,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
     board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
   }
-  function saveCamera(token){if(!active || retired)return;memory.layout.camera=camera();publish(token);}
+  function saveCamera(token){
+    if(!active || retired)return;
+    // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
+    // authorable layout also prevents a later panel move from exporting it.
+    if(!workbenchCanvas)memory.layout.camera=camera();
+    publish(token);
+  }
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || !author || gesture)return;

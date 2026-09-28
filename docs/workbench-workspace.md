@@ -58,6 +58,9 @@ Camera and panel state follow matched sections through source edits; new project
 start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named view
 retains its own camera for the session.
+Canvas panning, zooming and **Fit diagram** remain temporary navigation and do
+not add Undo entries or change the saved opening camera. Use Page preview to
+author that camera.
 
 Choose a named view above the graph to work on it. The adjacent **Presentation**
 control saves **Standard** or **Explore** for that view. Keep

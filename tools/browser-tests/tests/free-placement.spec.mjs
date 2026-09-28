@@ -9,6 +9,26 @@ const node=(root,id)=>root.locator('g.node[data-dv-node="'+id+'"]');
 const geometry=async(root,id)=>node(root,id).evaluate(n=>{const t=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:t.e,y:t.f,w:Number(c.getAttribute('width')),h:Number(c.getAttribute('height'))};});
 const source=page=>page.locator('#src').inputValue();
 const raw=async page=>JSON.parse(await source(page));
+
+test('new nodes are immediately draggable free nodes with one-step Undo and Redo',async({page,server})=>{
+ await page.goto(server.origin+'/workbench.html');
+ await paste(page,JSON.stringify({page:{title:'New free nodes',blocks:[{diagram:{nodes:{},rows:[[]]}}]}}));
+ for(const title of ['Service','Store']){
+  await page.locator('#diagram-add').click();await page.locator('[data-add-kind=node]').click();
+  await page.locator('#diagram-add-presets').getByRole('button',{name:title,exact:true}).click();
+ }
+ const root=page.locator('#docview'),before=await source(page),d=diagram(JSON.parse(before));
+ expect(d.rows).toEqual([[]]);expect(d.floats).toHaveLength(2);
+ const f=d.floats[0];await node(root,f.id).click();
+ await expect(page.locator('#guide').getByRole('combobox',{name:'float',exact:true})).toHaveValue('free');
+ await startDrag(page,root,f.id,90,100);await page.mouse.up();
+ const moved=diagram(await raw(page));
+ expect(Math.abs(moved.floats[0].x-f.x-90)).toBeLessThan(2);expect(Math.abs(moved.floats[0].y-f.y-100)).toBeLessThan(2);
+ expect(moved.rows).toEqual([[]]);expect(moved.floats[1]).toEqual(d.floats[1]);
+ const after=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+});
+
 async function startDrag(page,root,id,dx,dy){
  const card=node(root,id).locator('.card'),box=await card.boundingBox();
  const scale=await node(root,id).evaluate(n=>{const m=n.ownerSVGElement.getScreenCTM();return {x:m.a,y:m.d};});

@@ -11,7 +11,8 @@ var BUILDER_SECTION_TEMPLATE = [
   '      "svc1": {"title": "Service A", "sub": "does a thing", "icon": "gear", "tint": "cmd"},',
   '      "svc2": {"title": "Service B", "sub": "stores it", "icon": "db", "tint": "data"}',
   '    },',
-  '    "rows": [["svc1", "svc2"]],',
+  '    "rows": [[]],',
+  '    "floats": [{"id": "svc1", "side": "below", "x": 110, "y": 69}, {"id": "svc2", "side": "below", "x": 1070, "y": 69}],',
   '    "edges": [{"from": "svc1", "to": "svc2", "kind": "int", "label": "call"}],',
   '    "steps": [{"edge": "svc1->svc2", "text": "Service A calls Service B"}]',
   '  }',
@@ -274,7 +275,7 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
   var id=taken[stem]?builderUniqueKey(taken,stem+'-'):stem;
   var section={id:id,heading:(node.title || nodeId)+' detail',detailOnly:true,accent:'cyan',diagram:{
     nodes:{start:{title:'Start',sub:'Describe the first internal responsibility',icon:'gear',tint:'cmd'}},
-    rows:[['start']],edges:[],steps:[{id:'start',text:'Describe what happens inside '+(node.title || nodeId),nodes:['start']}]}};
+    rows:[[]],floats:[{id:'start',side:'below',x:590,y:69}],edges:[],steps:[{id:'start',text:'Describe what happens inside '+(node.title || nodeId),nodes:['start']}]}};
   var added=jsonInsertMember(text,listPath,null,JSON.stringify(section,null,2));
   if(!added)return {error:'could not create the detail section'};
   var assigned=planSetNodeDetail(added.text,JSON.parse(added.text),sectionIdx,nodeId,{section:id,mode:'focus'});

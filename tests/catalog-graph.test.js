@@ -17,7 +17,9 @@ test('catalog seed scopes and deduplicates declared dependencies and API provide
   assert.equal(seed.created,3);assert.equal(seed.edges,2);
   assert.equal(seed.diagram.routing,undefined);assert.notEqual(B.layout(seed.diagram).routing,'lanes');
   assert.deepEqual(seed.diagram.edges,[{from:'camera-1',to:'recording-1',kind:'catalog',label:'depends on; uses Recording API'},{from:'camera-1',to:'notify-1',kind:'catalog',label:'uses Notify API'}]);
-  assert.deepEqual(seed.diagram.rows,[['camera-1','recording-1','notify-1']]);
+  assert.deepEqual(seed.diagram.rows,[[]]);
+  assert.deepEqual(seed.diagram.floats.map(f=>f.id),['camera-1','recording-1','notify-1']);
+  assert.ok(seed.diagram.floats.every(f=>B.positionedFloat(f)));
   assert.equal(seed.diagram.nodes['camera-1'].binding.entityRef,ref('camera'));
   assert.equal(seed.diagram.nodes['outside-1'],undefined);assert.deepEqual(seed.diagram.steps,[]);
   assert.deepEqual(plain(B.validate(B.normalize({page:{title:'Catalog',blocks:[{heading:'Services',diagram:seed.diagram}]}}))).errors,[]);
@@ -74,16 +76,35 @@ test('add reuses service identity, preserves authored data and formats only the 
   assert.ok(!plan.error,plan.error);const d=JSON.parse(plan.text).page.blocks[1].tabs[0].sections[0].diagram;
   assert.equal(d.nodes.existing.title,'Authored');assert.deepEqual(d.steps,existing.steps);assert.deepEqual(d.panels,existing.panels);
   assert.equal(JSON.parse(plan.text).page.protocols.catalog.label,'Catalog relationship');
-  assert.deepEqual(d.rows,[['existing','recording-1'],['recording-2']]);assert.equal(d.edges[0].from,'existing');
+  assert.deepEqual(d.rows,existing.rows);assert.equal(d.floats[0].id,'recording-2');assert.ok(B.positionedFloat(d.floats[0]));assert.equal(d.edges[0].from,'existing');
   assert.ok(plan.text.includes('"title" :'));assert.deepEqual(raw.page.blocks[1].tabs[0].sections[0].diagram,existing);
   assert.match(B.planCatalogGraph(plan.text,JSON.parse(plan.text),1,catalog(),[ref('camera'),ref('recording')],true).error,/already/);
 });
 
-test('cycle and disconnected nodes survive dependency ordering, with at most four cards per row',()=>{
+test('cycle and disconnected nodes survive dependency ordering as free nodes, with at most four cards across',()=>{
   const services=Array.from({length:10},(_,i)=>({entityRef:ref('svc'+i),dependsOn:i<2?[ref('svc'+(1-i))]:[],apis:[]}));
   const seeded=B.catalogGraphSeed({version:1,services},services.map(s=>s.entityRef),true);
-  assert.equal(seeded.edges,2);assert.equal(new Set(seeded.diagram.rows.flat()).size,10);
-  assert.ok(seeded.diagram.rows.every(row=>row.length<=4));
+  assert.equal(seeded.edges,2);assert.equal(new Set(seeded.diagram.floats.map(f=>f.id)).size,10);
+  assert.deepEqual(plain(seeded.diagram.rows),[[]]);
+  const bands=new Map();
+  for(const f of seeded.diagram.floats){assert.ok(B.positionedFloat(f));bands.set(f.y,(bands.get(f.y)||0)+1);}
+  assert.ok([...bands.values()].every(count=>count<=4));
+});
+
+test('catalog insertion avoids placed cards, pins unplaced services, and retains existing placement',()=>{
+  const existing={nodes:{a:{title:'Pinned',binding:{entityRef:ref('camera')}},b:{title:'Unplaced',binding:{entityRef:ref('recording')}}},
+    rows:[[]],floats:[{id:'a',side:'below',x:110,y:69}]};
+  const seeded=plain(B.catalogGraphSeed(catalog(),[ref('camera'),ref('recording'),ref('notify')],true,existing));
+  assert.equal(seeded.created,1);assert.equal(seeded.reused,2);assert.equal(seeded.placed,2);
+  assert.deepEqual(seeded.diagram.rows,existing.rows);assert.deepEqual(seeded.diagram.floats[0],existing.floats[0]);
+  assert.equal(seeded.diagram.nodes.b.title,'Unplaced');
+  const positions=plain(B.layout(seeded.diagram).pos);
+  for(const id of ['b','notify-1']){
+    assert.ok(positions[id].free);
+    assert.ok(Math.abs(positions[id].cx-positions.a.cx)>=150+24 || Math.abs(positions[id].cy-positions.a.cy)>=44+24);
+  }
+  seeded.diagram.edges=[];
+  assert.deepEqual(plain(B.layout(seeded.diagram).pos),positions,'connections do not move free catalog nodes');
 });
 
 test('invalid or stale selection refuses without a partial source edit',()=>{

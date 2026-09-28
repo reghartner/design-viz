@@ -40,8 +40,9 @@ repository or survive a reload. Bad imports preserve the current catalog.
   Generated connections have their own **Catalog relationship** legend; existing
   protocol definitions are preserved.
 - Existing nodes with matching service identities are reused without overwriting
-  authored content or positions. New nodes append in rows of up to four cards,
-  left to right in dependency order. Cycles retain every selected node and edge.
+  authored content or positions. New nodes use free placement in available grid
+  positions, up to four cards across in dependency order. Their saved centers
+  stay fixed when connections change. Cycles retain every selected node and edge.
   Other sections, panels, steps, and layouts remain intact. The whole insertion
   is one Undo/Redo action.
 - An older snapshot with no dependency data can still seed nodes. Rerun catalog

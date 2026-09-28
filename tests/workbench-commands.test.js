@@ -142,7 +142,7 @@ test('planBulkSetField marks and clears delta on a step target', () => {
   assert.deepStrictEqual(plain(JSON.parse(clear.text)), SPEC);
 });
 
-test('planAddNode places a fresh id in nodes AND the last row', () => {
+test('planAddNode places a fresh id in nodes and pins a float without changing rows', () => {
   const plan = B.planAddNode(TEXT, SPEC, 0);
   assert.ok(!plan.error, plan.error);
   assert.strictEqual(plan.kind, 'node');
@@ -150,8 +150,34 @@ test('planAddNode places a fresh id in nodes AND the last row', () => {
   const out = JSON.parse(plan.text);
   const d = out.page.blocks[0].diagram;
   assert.deepStrictEqual(d.nodes.node1, {title: 'New node', sub: 'what it does', icon: 'gear', tint: 'cmd'});
-  assert.deepStrictEqual(d.rows[d.rows.length - 1], ['a', 'b', 'node1']);
+  assert.deepStrictEqual(d.rows, SPEC.page.blocks[0].diagram.rows);
+  assert.ok(d.floats.some(f => f.id === 'node1' && B.positionedFloat(f)));
   assert.deepStrictEqual(JSON.parse(plan.text.slice(plan.start, plan.end)), d.nodes.node1);
+});
+
+test('successive additions to an empty diagram remain free, avoid overlaps and support connections', () => {
+  let raw = {nodes:{},rows:[]}, text = JSON.stringify(raw);
+  const ids = [];
+  for (let i = 0; i < 9; i++){
+    const plan = B.planAddNode(text, raw, 0);
+    assert.ok(!plan.error, plan.error);
+    const next = JSON.parse(plan.text);
+    assert.deepStrictEqual(next.floats.slice(0, -1), raw.floats || []);
+    raw = next; text = plan.text; ids.push(plan.id);
+  }
+  assert.deepStrictEqual(raw.rows, [[]]);
+  assert.deepStrictEqual(raw.floats.map(f => f.id), ids);
+  const positions = plain(B.layout(raw).pos);
+  for (const [i, a] of Object.values(positions).entries()){
+    assert.ok(a.free);
+    for (const b of Object.values(positions).slice(i + 1))
+      assert.ok(Math.abs(a.cx - b.cx) >= (a.w + b.w) / 2 + 24 || Math.abs(a.cy - b.cy) >= (a.h + b.h) / 2 + 24);
+  }
+  const connected = B.planAddEdge(text, raw, 0);
+  assert.ok(!connected.error, connected.error);
+  const next = JSON.parse(connected.text);
+  assert.deepStrictEqual(plain(B.layout(next).pos), positions);
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).errors), []);
 });
 
 test('planAddNode skips ids already taken and reports diagram-less sections plainly', () => {
@@ -161,6 +187,21 @@ test('planAddNode skips ids already taken and reports diagram-less sections plai
   assert.strictEqual(plan.id, 'node2');
   const bad = B.planAddNode(TEXT, SPEC, 2); /* "Second tab" has no diagram */
   assert.match(bad.error, /no diagram/);
+});
+
+test('new free nodes avoid automatic floats after insertion changes their spacing', () => {
+  const raw = {nodes:{a:{},f:{},g:{},h:{},i:{}},rows:[['a']],
+    floats:[{id:'f',side:'below',dx:-150,dy:-94},...['g','h','i'].map(id=>({id,side:'below'}))]};
+  const before = JSON.stringify(raw), plan = B.planAddNode(before, raw, 0);
+  assert.ok(!plan.error, plan.error);
+  const next = JSON.parse(plan.text), positions = B.layout(next).pos, added = positions[plan.id];
+  for (const id of Object.keys(raw.nodes)){
+    const p = positions[id];
+    assert.ok(Math.abs(added.cx - p.cx) >= (added.w + p.w) / 2 + 24 ||
+      Math.abs(added.cy - p.cy) >= (added.h + p.h) / 2 + 24, 'overlap with ' + id);
+  }
+  assert.deepStrictEqual(next.floats.slice(0, -1), raw.floats);
+  assert.equal(JSON.stringify(raw), before);
 });
 
 test('planAddEdge avoids duplicate from->to keys and creates edges when missing', () => {
@@ -224,7 +265,7 @@ test('planAddSection appends a complete renderable section and handles every pag
 test('the section template itself is valid JSON', () => {
   const sec = JSON.parse(B.BUILDER_SECTION_TEMPLATE);
   assert.strictEqual(sec.heading, 'New section');
-  assert.deepStrictEqual(Object.keys(sec.diagram), ['nodes', 'rows', 'edges', 'steps']);
+  assert.deepStrictEqual(Object.keys(sec.diagram), ['nodes', 'rows', 'floats', 'edges', 'steps']);
 });
 
 test('builder helpers: unique keys count past collisions, row flattening sees stacks', () => {
@@ -656,7 +697,8 @@ test('planAddNode presets carry icon, tint, title, and an icon-named id', () => 
   const plan = B.planAddNode(TEXT, SPEC, 0, plain(preset));
   const d = JSON.parse(plan.text).page.blocks[0].diagram;
   assert.deepStrictEqual(d.nodes.db1, {title: 'Store', sub: 'what it does', icon: 'db', tint: 'data'});
-  assert.deepStrictEqual(d.rows[0], ['a', 'b', 'db1']);
+  assert.deepStrictEqual(d.rows[0], ['a', 'b']);
+  assert.ok(d.floats.some(f => f.id === 'db1' && B.positionedFloat(f)));
   /* every preset yields a validator-clean insert */
   for (const pr of B.NODE_PRESETS){
     const pl = B.planAddNode(TEXT, SPEC, 0, plain(pr));
@@ -674,6 +716,8 @@ test('the tab template is valid JSON holding one renderable section', () => {
   assert.strictEqual(tab.label, 'New tab');
   assert.strictEqual(tab.sections.length, 1);
   assert.ok(tab.sections[0].diagram.nodes.svc1);
+  assert.deepStrictEqual(tab.sections[0].diagram.rows, [[]]);
+  assert.ok(tab.sections[0].diagram.floats.every(f => B.positionedFloat(f)));
 });
 
 test('planAddTab inserts a validator-clean tab directly after the current one', () => {

@@ -80,6 +80,8 @@ test('creating a detail flow preserves exact unrelated source and is one Undo/Re
   const next=JSON.parse(plan.text),section=next.page.blocks.at(-1);
   assert.equal(plan.index,3);assert.equal(section.id,'domain-detail');assert.equal(section.detailOnly,true);
   assert.equal(Object.keys(section.diagram.nodes).length,1);
+  assert.deepEqual(section.diagram.rows,[[]]);
+  assert.ok(section.diagram.floats.every(f=>B.positionedFloat(f)));
   assert.deepEqual(parent(next).nodes.domain.detail,{section:'domain-detail',mode:'focus'});
   assert.equal(JSON.parse(plan.text.slice(plan.start,plan.end)).id,section.id);
   assert.ok(plan.text.startsWith(' \n'));assert.ok(plan.text.endsWith('\n '));assert.match(plan.text,/Domain \\u006dap/);

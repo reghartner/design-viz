@@ -22,14 +22,18 @@ function planAddNode(text, raw, sectionIdx, preset){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var d = got.d;
-  if (!Array.isArray(d.rows) || !d.rows.length)
-    return {error: 'this diagram has no rows — a node needs a row slot to render'};
   var icon = preset && preset.icon ? preset.icon : 'gear';
   var tint = preset && preset.tint ? preset.tint : 'cmd';
   var title = preset && preset.title ? preset.title : 'New node';
   var id = builderUniqueKey(d.nodes || {}, preset && preset.icon ? preset.icon : 'node');
-  var r1 = jsonInsertMember(text, got.path.concat(['rows', d.rows.length - 1]), null, JSON.stringify(id));
-  if (!r1) return {error: 'could not edit rows in the editor text'};
+  var placed = text;
+  if (!d.rows || !d.rows.length){
+    var rows = jsonSetField(placed, got.path, 'rows', '[[]]');
+    if (!rows) return {error: 'could not edit rows in the editor text'};
+    placed = rows.text;
+  }
+  var r1 = jsonInsertListItemOrCreate(placed, got.path, 'floats', JSON.stringify(builderNewNodeFloats(d, [id])[0]));
+  if (!r1) return {error: 'could not edit floats in the editor text'};
   var r2 = jsonInsertMember(r1.text, got.path.concat(['nodes']), id,
     '{"title": ' + JSON.stringify(title) + ', "sub": "what it does", "icon": ' +
     JSON.stringify(icon) + ', "tint": ' + JSON.stringify(tint) + '}');
@@ -40,6 +44,7 @@ function planAddEdge(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var ids = builderFlatRowIds(got.d.rows);
+  (got.d.floats || []).forEach(function(f){ if (f && ids.indexOf(f.id) < 0) ids.push(f.id); });
   if (ids.length < 2) return {error: 'an edge needs two placed nodes — add nodes first'};
   /* the engine keys edges by "from->to", so a duplicate pair overrides the
      first edge's animation anchors — prefer a pair with no edge yet,

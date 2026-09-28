@@ -2,6 +2,16 @@
 
 The same inspectable folder protocol accepts focused operations as well as complete replacement specs. No browser access or transport server is needed. Read `state.json` before planning and use its exact revision. A stale proposal is rejected; reread and reconcile rather than copying a newer revision onto old work.
 
+Before proposing a change, establish the intended target, scope and meaning.
+Use the selection captured with the request; later clicks must not retarget it.
+An explicit, unambiguous named target takes precedence over selection.
+If a request relying on selection names a different object, names are ambiguous, units are missing,
+or an old target has changed role, ask a focused question through `reply` and
+submit no proposal. Pressure to "just guess" does not resolve those decisions.
+Structural validity, stable IDs, dry runs, review and Undo cannot establish user
+intent. Use the smallest operation that fulfills a clear request. Full-source
+replacement is not a workaround for an unclear request or a rejected reference.
+
 Write a UTF-8 JSON file in the session folder. It may contain an array of operations or an object with `operations` and `dryRun: true`. Submit with:
 
 ```sh
@@ -30,6 +40,6 @@ All operations require `op` and `sectionId`. Use a unique authored section `id`;
 }
 ```
 
-The editor validates the complete resulting story before publication. All operations succeed together as one Undo action or none apply. Limits: 100 operations, 1 MiB operation payload, 4 MiB resulting source, 40 levels of operation nesting. Unknown commands, unknown envelope fields, ambiguous IDs and prototype keys are rejected. Patches set fields shallowly; `null` is a value, not a deletion command. Unknown unrelated authored fields are preserved. Full replacement with `--file candidate.spec.json` remains available for edits outside this vocabulary.
+The editor validates the complete resulting story before publication. All operations succeed together as one Undo action or none apply. Limits: 100 operations, 1 MiB operation payload, 4 MiB resulting source, 40 levels of operation nesting. Unknown commands, unknown envelope fields, ambiguous IDs and prototype keys are rejected. If present, `dryRun` must be a boolean; strings such as `"true"` are rejected. Focused operations also reject dangling references and duplicate identities in sections they touch. Patches set fields shallowly; `null` is a value, not a deletion command. Unknown unrelated authored fields are preserved. Full replacement with `--file candidate.spec.json` remains available for edits outside this vocabulary.
 
 Use `progress` for meaningful updates and questions through `reply`. Wait for the matching result, then send a final reply so the user can continue in the editor.

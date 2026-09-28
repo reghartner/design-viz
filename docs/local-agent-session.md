@@ -97,13 +97,6 @@ and `index` values are zero-based raw
 authoring addresses. `views[].sourceStep` is a raw source index, not the visible
 stop number in a filtered view. Identifiers are scoped to this document.
 
-Before changing source, establish the request's target, scope and meaning from
-the context the user referred to. Ask in chat and wait if materially different
-interpretations remain; do not infer permission from "just guess", a valid spec
-or Undo. If a stale target disappeared or changed role, ask rather than
-substituting a similar object. A fully specified small edit needs no extra
-confirmation, and unrelated source stays intact.
-
 Write this envelope to a temporary file in the scratch directory, then rename
 it to `proposal.json`:
 

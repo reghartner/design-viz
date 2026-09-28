@@ -115,8 +115,7 @@ function createFolderAgentClient(opts){
     if(reviewCandidate && reviewCandidate.signature===signature)return 'wait';
     reviewDecision=null;
     reviewCandidate={signature:signature,proposal:proposal,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,summary:String(proposal.summary || 'Claude proposed a story update.').slice(0,1000),
-      baseRevision:String(proposal.baseRevision || '').slice(0,160),kind:Array.isArray(proposal.operations)?'operations':'replacement',
-      operationCount:Array.isArray(proposal.operations)?proposal.operations.length:null}};
+      baseRevision:String(proposal.baseRevision || '').slice(0,160),kind:'replacement'}};
     publish({status:'Claude proposed a change. Review its summary, then accept or decline it. Validation runs before an accepted change is applied.'});
     return 'wait';
   }
@@ -335,7 +334,7 @@ function createFolderAgentClient(opts){
     reviewContent:function(){
       if(!reviewCandidate)return '';
       var proposal=reviewCandidate.proposal;
-      return typeof proposal.source==='string'?proposal.source:JSON.stringify({baseRevision:proposal.baseRevision,operations:proposal.operations,dryRun:proposal.dryRun===true},null,2);
+      return typeof proposal.source==='string'?proposal.source:JSON.stringify(proposal,null,2);
     },
     setReviewMode:function(value){reviewMode=value===true;publish({});},
     acceptReview:function(){

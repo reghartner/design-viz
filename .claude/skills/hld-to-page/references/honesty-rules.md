@@ -21,12 +21,7 @@ every worksheet cell and every spec field. For longer discussion and examples
   one line in the section description, such as "Clock times and the battery
   drain rate are illustrative." Any value the source does state is used
   verbatim instead.
-- Explicit factual corrections from the operator are evidence too; speculation,
-  shorthand or a request to make an outcome look better is not a correction.
-  If it is unclear whether they are correcting a fact or proposing a design,
-  ask before changing it. An explicitly requested hypothetical can be authored
-  as such, with its assumptions labelled and observed behavior kept separate.
-  A time or value the operator gives is an
+- Operator answers are facts too. A time or value the operator gives is an
   anchor (an absolute step `time`, a `charge` patch); never move or replace
   it to fit an approximate rate. Drift fills gaps between anchors only where
   a supplied (or labeled illustrative) rate applies.

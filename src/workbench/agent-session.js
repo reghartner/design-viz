@@ -16,26 +16,14 @@ function createWorkbenchAgentExchange(opts){
       var proposal=reply.proposal;
       if(!proposal)return null;
       var current=snapshot();
-      var description=null;
-      function result(status,message){pending={id:proposal.id,baseRevision:proposal.baseRevision,status:status,message:message,revision:current.revision};if(description)pending.description=description;return message;}
-      if(Object.prototype.hasOwnProperty.call(proposal,'dryRun') && typeof proposal.dryRun!=='boolean')
-        return result('rejected','dryRun must be true or false. The proposal was not applied.');
+      function result(status,message){pending={id:proposal.id,baseRevision:proposal.baseRevision,status:status,message:message,revision:current.revision};return message;}
+      if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))
+        return result('rejected','Submit the complete updated document in source. Operation and dry-run proposals are no longer supported.');
       if(!current.open)return result('rejected','Open a project before applying agent changes.');
       if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
       if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';
       var source=proposal.source;
-      if(proposal.operations!==undefined){
-        if(source!==undefined)return result('rejected','Choose operations or replacement source, not both.');
-        if(typeof planWorkbenchAgentOperations!=='function')return result('rejected','This editor does not support operations.');
-        var planned=planWorkbenchAgentOperations(current.source,proposal.operations);
-        if(planned.error)return result('rejected',planned.error);
-        source=planned.text;description=planned.description;
-      }
       if(typeof source!=='string' || source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
-      if(proposal.dryRun===true){
-        if(!proposal.operations)return result('rejected','Dry run requires operations.');
-        return result('validated','Operations validated. Your story is unchanged. Submit again at this revision to apply.');
-      }
       if(source===current.source)return result('unchanged','Agent proposal matches the current document.');
       var outcome;
       try{outcome=opts.apply(source,current,proposal);}

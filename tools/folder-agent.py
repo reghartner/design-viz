@@ -152,6 +152,21 @@ def prepare(folder):
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         target.write_text(text, encoding='utf-8')
         os.chmod(target, 0o600)
+    # These formerly bundled files teach the retired operation API. Refreshing
+    # an existing session must remove them without touching authored files.
+    for name in ('docs/agent-operations.md', 'docs/agent-intent-testing.md',
+                 'src/workbench/agent-operations.js'):
+        if name in kit['files']:
+            continue
+        target = destination
+        for part in Path(name).parts:
+            target = target / part
+            if target.is_symlink():
+                raise ValueError('Retired authoring kit path cannot contain symlinks')
+        if target.exists():
+            if not target.is_file():
+                raise ValueError('Retired authoring kit path must be a regular file')
+            target.unlink()
     return packed['sha256']
 
 
@@ -238,8 +253,6 @@ def main():
         if name == 'progress':
             command.add_argument('--phase', choices=('working', 'permission-needed'), default='working')
         if name == 'propose':
-            content.add_argument('--operations', help='Session JSON file: up to 100 stable-ID operations, or {operations: [...], dryRun: true}')
-            command.add_argument('--dry-run', action='store_true', help='Validate an operations transaction without applying it')
             command.add_argument('--revision', required=True, help='Revision read BEFORE planning the edit')
             command.add_argument('--summary', default='Updated the story.')
     args = parser.parse_args()
@@ -257,7 +270,7 @@ def main():
         return
     owner = identity(folder)
     active_request(folder, owner, args.request)
-    input_name = args.operations if args.command == 'propose' and args.operations else args.file
+    input_name = args.file
     if input_name:
         if not re.fullmatch(r'[A-Za-z0-9_.-]+', input_name) or input_name in ('.', '..'):
             raise ValueError('Use a plain filename inside the session folder')
@@ -286,25 +299,8 @@ def main():
         state = read(folder, 'state.json')
         if state['revision'] != args.revision or any(state.get(k) != v for k, v in owner.items()):
             raise ValueError('Document changed: reread state.json and reconcile, not just the revision number.')
-        parsed = json.loads(text)
-        value.update(baseRevision=args.revision, summary=args.summary[:1000])
-        if args.operations:
-            if isinstance(parsed, dict) and set(parsed) - {'operations', 'dryRun'}:
-                raise ValueError('Operation files accept only operations and dryRun keys')
-            operations = parsed.get('operations') if isinstance(parsed, dict) else parsed
-            dry_run = parsed.get('dryRun', False) if isinstance(parsed, dict) else False
-            if not isinstance(dry_run, bool):
-                raise ValueError('dryRun must be true or false')
-            if not isinstance(operations, list) or not 1 <= len(operations) <= 100:
-                raise ValueError('Supply between 1 and 100 semantic operations')
-            allowed = {'updateNode', 'insertStep', 'patchPanelState', 'addPath', 'replaceSection'}
-            if any(not isinstance(operation, dict) or operation.get('op') not in allowed for operation in operations):
-                raise ValueError('Unknown semantic operation; use updateNode, insertStep, patchPanelState, addPath, or replaceSection')
-            value.update(operations=operations, dryRun=args.dry_run or dry_run)
-        else:
-            if args.dry_run:
-                raise ValueError('--dry-run requires --operations')
-            value['source'] = text
+        json.loads(text)
+        value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
         filename = 'proposal.json'
     else:
         if len(text) > 32000:

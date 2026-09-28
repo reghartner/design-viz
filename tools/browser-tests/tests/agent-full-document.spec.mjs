@@ -7,13 +7,13 @@ import {fileURLToPath} from 'node:url';
 import {source} from '../fixtures/editor-spec.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
-const origin='https://flowview-operation-pressure.test';
+const origin='https://flowview-full-source-pressure.test';
 
 // Only native directory picking/handles are substituted. The built editor,
-// folder client, exchange, operation planner, renderer, history and Python
+// folder client, exchange, renderer, history and Python
 // helper are real. No model, native permission grant or watcher is claimed.
 async function folderSession(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-operation-pressure-'));
+  const folder=await mkdtemp(path.join(tmpdir(),'flowview-full-source-pressure-'));
   let session,writeId=0;const errors=[],unexpectedRequests=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
@@ -58,7 +58,7 @@ async function folderSession(page){
     cleanup:()=>rm(folder,{recursive:true,force:true})};
 }
 
-test('risky operation envelopes reject atomically; an exact rename applies as one undoable change',async({page})=>{
+test('retired API and invalid full source preserve exact source and history; a valid document applies once',async({page})=>{
   const h=await folderSession(page);
   try{
     const raw=JSON.parse(source);raw.page.blocks[0].id='delivery';
@@ -89,21 +89,20 @@ test('risky operation envelopes reject atomically; an exact rename applies as on
       expect((await h.read('state.json')).revision).toBe(state.revision);
       await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
     }
-    // Deliberately bypass helper input validation: the editor boundary must
-    // reject a string flag instead of interpreting it as permission to apply.
-    await h.write('proposal.json',{...manifest,id:'malformed-dry-run',requestId:request.id,baseRevision:state.revision,operations:[renameOperation],dryRun:'true'});
-    expect(await result('malformed-dry-run')).toMatchObject({status:'rejected',revision:state.revision,message:expect.stringMatching(/dryRun.*true or false/i)});
-    await unchanged();
-    // The first operation is valid; a later dangling reference must reject
-    // the entire transaction without publishing that otherwise valid rename.
-    await h.write('operations.json',[renameOperation,{op:'insertStep',sectionId:'delivery',afterStepId:'done',step:{id:'missing-node-step',text:'Unspecified service completes the work',nodes:['not-authored']}}]);
-    const rejected=h.run('propose','--request',request.id,'--revision',state.revision,'--operations','operations.json','--summary','Invalid reference pressure test');
-    expect(await result(rejected.id)).toMatchObject({status:'rejected',revision:state.revision,message:expect.stringContaining('not-authored')});
-    await unchanged();
-    await h.write('operations.json',[renameOperation]);
-    const accepted=h.run('propose','--request',request.id,'--revision',state.revision,'--operations','operations.json','--summary','Rename exactly one service');
-    expect(await result(accepted.id)).toMatchObject({status:'applied'});
+    // A stale helper must not apply operations, or silently apply accompanying source.
     const expected=structuredClone(raw);expected.page.blocks[0].diagram.nodes.b.title='Delivery service';
+    for(const [id,extra] of [['retired-operations',{operations:[renameOperation]}],['retired-dry-run',{dryRun:'true',source:JSON.stringify(expected)}]]){
+      await h.write('proposal.json',{...manifest,id,requestId:request.id,baseRevision:state.revision,...extra});
+      expect(await result(id)).toMatchObject({status:'rejected',revision:state.revision,message:expect.stringContaining('complete updated document')});
+      await unchanged();
+    }
+    // The complete document still passes through the editor validator.
+    await h.write('proposal.json',{...manifest,id:'invalid-document',requestId:request.id,baseRevision:state.revision,source:'{"page":{"blocks":[{"diagram":{"nodes":{}}}]}}'});
+    expect(await result('invalid-document')).toMatchObject({status:'rejected',revision:state.revision});
+    await unchanged();
+    await h.write('candidate.spec.json',expected);
+    const accepted=h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--summary','Rename exactly one service');
+    expect(await result(accepted.id)).toMatchObject({status:'applied'});
     await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue())).toEqual(expected);
     const changed=await page.locator('#src').inputValue();
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Delivery service');
@@ -111,8 +110,8 @@ test('risky operation envelopes reject atomically; an exact rename applies as on
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
     await expect(page.locator('#undo-builder')).toBeEnabled();await expect(page.locator('#redo-builder')).toBeEnabled();
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
-    // The next Undo must be the original paste, proving the rejected batch
-    // and accepted transaction introduced no hidden or duplicate entries.
+    // The next Undo must be the original paste, proving rejected proposals
+    // and the accepted document introduced no hidden or duplicate entries.
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(previous);
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);

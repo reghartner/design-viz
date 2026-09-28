@@ -512,6 +512,13 @@
   <ol class="folder-agent-guide-steps" aria-label="Connection progress"><li data-agent-stage="folder">Choose folder</li><li data-agent-stage="review">Paste in Claude</li><li data-agent-stage="waiting">Connect</li></ol>
   <h2 id="folder-agent-guide-title">Let’s connect your Claude.</h2>
   <div id="folder-agent-guide-folder">
+    <section class="folder-agent-resume-card" aria-label="Resume a Claude session">
+      <b>Pick up where you left off</b>
+      <p id="folder-agent-resume-help">Choose your <code>flowview-session-…</code> folder. We’ll open its saved story and conversation. Your current draft stays in Earlier drafts.</p>
+      <button type="button" class="welcome-button welcome-button-primary" id="folder-agent-resume" aria-describedby="folder-agent-resume-help">Resume from folder</button>
+    </section>
+    <h3>Start a new session</h3>
+    <div id="folder-agent-new-session">
     <p>Keep your Claude Code session open. Choose the folder it’s working in to bring the conversation here.</p>
     <pre class="folder-agent-command">Claude’s working folder ← choose this folder
 └─ flowview-session-…   created for you</pre>
@@ -519,7 +526,7 @@
     <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><p>Use your own account and normal permission prompts. The session must offer Monitor. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
     <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose Claude’s exact working folder</button><button type="button" class="welcome-text-button" data-agent-later>Connect later</button></div>
     <p class="folder-agent-hint">Your browser will ask for folder access. Flowview creates an exchange subfolder inside it.</p>
-    <details><summary>Resume an existing exchange</summary><p>Open its story.spec.json in the editor first, then select that exchange subfolder. Paste fresh instructions into Claude in the same working folder.</p><button type="button" class="bbtn" id="folder-agent-resume">Resume a session folder</button></details>
+    </div>
   </div>
   <div id="folder-agent-guide-review" hidden>
     <p>Copy these instructions into your open Claude session. Everything you’ll send is visible below.</p>

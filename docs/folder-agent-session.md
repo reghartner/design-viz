@@ -153,15 +153,20 @@ exits on a disconnected editor or a changed connection identity. Browser closure
 or sleep may leave a stale heartbeat; stale requests are not emitted.
 
 Use Claude in the original working folder (or the exchange folder itself).
-Open `story.spec.json` with the ordinary workbench file opener, then use
-**Resume a session folder** and choose the saved session subfolder itself. Resume
-requires the exact saved source and refuses a recent active editor lease. It
-starts a new connection identity, restores the conversation, refreshes the helper
+Choose the prominent **Resume from folder** button at the top of connection
+setup and select the saved `flowview-session-…` subfolder itself. The editor
+loads its saved story and conversation automatically; no separate file opening
+or story-choice step is needed. A different current draft is kept in
+**Earlier drafts**. The resumed story starts a fresh Undo/Redo history, so Undo
+cannot switch back to another file. Resume refuses an
+active editor lease, a changed folder snapshot, or a draft edited while the
+folder is being selected. If the earlier draft cannot be preserved, it stops
+without replacing it. Resume starts a new connection identity, restores the conversation, refreshes the helper
 and authoring kit, and requires new connection instructions in Claude. These
 files are refreshed only after the resume is accepted. Old pending work is not replayed automatically.
 Sessions created with the retired operation API need this refresh and fresh
 connection instructions before continuing with complete document proposals.
-Reload the updated workbench, resume the exchange, paste its fresh instructions
+Reload the updated workbench, choose **Resume from folder**, paste its fresh instructions
 into Claude, and start the new watch. That watch refreshes the bundled skill and
 removes retired API guidance before emitting requests. It does not erase earlier
 messages from the Claude conversation.

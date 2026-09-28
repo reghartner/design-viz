@@ -224,10 +224,13 @@ function createFolderAgentClient(opts){
       var snap=opts.snapshot();if(!snap.open || !opening.open || snap.project!==opening.project)throw Error('Open the same project before connecting.');
       if(preview){
         if(choice && !['saved','current'].includes(choice.resumeSource))throw Error('Choose the saved story or the current draft.');
+        if(choice && (choice.expectedSessionId!==undefined && choice.expectedSessionId!==preview.identity.sessionId ||
+            choice.expectedConnectionId!==undefined && choice.expectedConnectionId!==preview.identity.connectionId))
+          throw Error('The saved session changed since the recovery preview. Select the session folder again to resume.');
         if(choice && (choice.expectedSavedRevision!==preview.savedRevision || choice.expectedSavedSource!==preview.savedSource))
           throw Error('The saved story changed since the recovery preview. Review it again before reconnecting.');
         if(preview.savedSource!==snap.source && (!choice || choice.resumeSource!=='current'))
-          throw Error('Open story.spec.json from this folder before resuming its conversation, or explicitly choose your current draft.');
+          throw Error('The editor story changed during resume. Select the session folder again to load its saved story.');
         transcript=preview.transcript;changes=preview.changes;changesDirty=false;
       }else{transcript=[];changes=[];changesDirty=false;}
       function checkOpening(){

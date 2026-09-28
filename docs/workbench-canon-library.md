@@ -7,7 +7,8 @@ Back and Forward navigate between the library, reader, and workbench; reloading
 a reader restores its selected diagram from the published snapshot.
 
 **Edit in Workbench** opens a local editable copy through the normal import
-transaction. A single Undo restores the previous project. Browsing alone never
+transaction, with a fresh Undo/Redo history. The previous project is kept in
+**Earlier drafts**. Browsing alone never
 replaces a current project, draft, or its history. Returning to a reader displays
 the published version, not unsaved editor changes. Use **Continue** on welcome
 or **Back to project** in the header to return to the current local project.

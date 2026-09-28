@@ -199,8 +199,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function begin(ev,w,kind,handle){
     if(!active || ev.button!==0 || gesture)return;
+    ev.preventDefault();ev.stopPropagation();handle.focus({preventScroll:true});
+    /* Leaving an Inspector field can synchronously rebuild this viewport. */
+    if(retired || !active || !handle.isConnected)return;
     clearScrollEdit();var token=beginEdit(true);if(token===false)return;
-    ev.preventDefault();ev.stopPropagation();raise(w);
+    raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=Object.assign({},r);
     gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
@@ -219,11 +222,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
     var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
+    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=Object.assign({},w.rect);
-    var n=ev.shiftKey?24:8,r=w.rect;
+    var n=ev.shiftKey?24:8;
     if(kind==='resize')Object.assign(w.state,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}));
     else Object.assign(w.state,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),{stacked:false});
-    paint();rememberRect(w);publish(token);
+    paint();
+    if(['x','y','w','h'].every(function(key){return Math.abs(w.rect[key]-r[key])<.01;})){
+      Object.assign(w.state,before);if(automatic)memory.controls=null;paint();return;
+    }
+    rememberRect(w);publish(token);
   }
   function panelWindow(card,panel,it,index){
     var label=panel.title || panel.id;

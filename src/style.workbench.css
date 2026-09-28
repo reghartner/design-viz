@@ -275,6 +275,10 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .folder-agent-guide-header{color:var(--sub);font-size:13px;margin-bottom:20px;}
 .folder-agent-guide h2{font-size:24px;line-height:1.3;margin:22px 0 10px;}
 .folder-agent-guide p{margin:12px 0;}
+.folder-agent-resume-card{margin:18px 0 24px;padding:18px;border:1px solid var(--accent);border-radius:12px;background:var(--card);}
+.folder-agent-resume-card>b{display:block;font-size:17px;}
+.folder-agent-resume-card .welcome-button{width:100%;justify-content:center;}
+#folder-agent-new-session{border-top:1px solid var(--line);padding-top:8px;}
 .folder-agent-guide details{margin:15px 0;color:var(--sub);font-size:13px;}
 .folder-agent-guide summary{cursor:pointer;}
 .folder-agent-guide-steps{list-style:none;display:flex;justify-content:space-between;gap:12px;padding:0 0 18px;margin:0;border-bottom:1px solid var(--line);counter-reset:connect;}

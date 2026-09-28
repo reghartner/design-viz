@@ -959,8 +959,7 @@ function initWorkbenchBuilder(opts){
     },true);
   });
 
-  /* Text fields keep native Undo; canvas/tools use the shared action history.
-     Whole-project imports remain undoable even when the source has focus. */
+  /* Text fields keep native Undo; canvas/tools use this project's action history. */
   life.listen(document,'keydown', function(ev){
     if (ev.defaultPrevented || opts.isActive && !opts.isActive()) return;
     if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
@@ -968,9 +967,8 @@ function initWorkbenchBuilder(opts){
     if (key!=='z' && !redo || interactions.adding()) return;
     var ae = document.activeElement;
     if(ae && ae.closest('dialog[open]'))return;
-    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable) && !(ae===src && !redo && session.canUndoProject()))return;
+    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable))return;
     ev.preventDefault();
-    session.clearProjectUndo();
     if(redo)doRedo();else doUndo();
   });
 
@@ -1039,7 +1037,7 @@ function initWorkbenchBuilder(opts){
   var initial = parseEditor();
   updateTargetLabel(initial.error ? null : initial.raw);
   applyRowGrabs(); /* the boot render happened before this wiring ran */
-  function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject();}
+  function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject({preserveHistory:true});}
   function retireProjectUI(){
     io.retireProject();
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
@@ -1163,7 +1161,11 @@ function initWorkbenchBuilder(opts){
       if(accepted && storyBrief)storyBrief.refresh();refreshProvenance();
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
     },
-    restoreSavedStory:function(source){session.preserveDraft();var result=agentOptions.apply(source,agentOptions.snapshot());if(result.ok){sourceOrigin=null;refreshProvenance();}return result;},
+    restoreSavedStory:function(source,expected){
+      var current=agentOptions.snapshot();
+      if(expected && (current.project!==expected.project || current.source!==expected.source))return {ok:false,error:'Your draft changed while opening the folder. Select the session folder again to resume.'};
+      var ok=loadText(source);return {ok:ok,project:session.snapshot().project};
+    },
     showChanges:showAgentChanges,
     undoChange:function(receipt){
       var change=agentChanges.get(receipt.id),snapshot=session.snapshot();

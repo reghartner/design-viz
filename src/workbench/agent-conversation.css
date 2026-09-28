@@ -51,7 +51,6 @@
 .folder-agent-receipt button{font-size:11px;margin:6px 6px 0 0;}
 .folder-agent-prerequisites{border:1px solid var(--line);padding:10px;border-radius:8px;}
 .folder-agent-prerequisites ul{padding-left:20px;}
-.folder-agent-recovery-options{display:flex;gap:8px;flex-wrap:wrap;}
 #editor-agent [hidden]{display:none!important;}
 @media(max-height:600px){.folder-agent-composer{padding:6px 9px;}.folder-agent-header{padding:5px 9px;}.folder-agent-header-controls{max-height:44px;}.folder-agent-compose-settings{max-height:64px;}.folder-agent-composer #folder-agent-level{margin:1px 0 3px;}.folder-agent-composer #folder-agent-form textarea{height:2.8em;}.folder-agent-compose-actions .folder-agent-hint{display:none;}}
 .folder-agent-review-toggle{display:flex!important;align-items:flex-start;gap:5px;font-weight:400!important;margin-top:7px;}

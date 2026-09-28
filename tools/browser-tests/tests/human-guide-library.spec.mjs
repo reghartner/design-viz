@@ -51,7 +51,7 @@ test('guide and bundled canon example also work from a downloaded file',async({p
   await expect(page.locator('#workbench-workspace')).not.toBeVisible();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 });
 
-test('canon browsing is read-only and editing is an explicit undoable handoff with browser navigation',async({page,server},info)=>{
+test('canon browsing is read-only and editing opens a separate project while preserving the earlier draft',async({page,server},info)=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-home').click();const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text);
@@ -65,11 +65,16 @@ test('canon browsing is read-only and editing is an explicit undoable handoff wi
   await info.attach('canon-reader',{body:await page.screenshot(),contentType:'image/png'});
   await page.goBack();await expect(screen(page,'library')).toBeVisible();await page.goForward();await expect(screen(page,'reader')).toBeVisible();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
-  await expect(page.locator('#workbench-workspace')).toBeVisible();await expect(page.locator('#src')).toHaveValue(JSON.stringify(data.diagrams[0].spec,null,2));
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+  const published=JSON.stringify(data.diagrams[0].spec,null,2);
+  await expect(page.locator('#workbench-workspace')).toBeVisible();await expect(page.locator('#src')).toHaveValue(published);
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(entry=>entry.text))).toContain(source);
   await page.goBack();await expect(screen(page,'reader')).toBeVisible();await page.reload();
   await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');await expect(page.locator('#workbench-workspace')).not.toBeVisible();
-  await page.locator('#workbench-home').click();await page.locator('#welcome-resume').click();await expect(page.locator('#src')).toHaveValue(source);
+  await page.locator('#workbench-home').click();await page.locator('#welcome-resume').click();await expect(page.locator('#src')).toHaveValue(published);
+  await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
+  await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract ·/}).click();
+  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
 test('empty or invalid company libraries do not masquerade as demos and late loads do not navigate',async({page,server})=>{
@@ -129,7 +134,8 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   await page.goForward();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
   await page.locator('#canon-reader-edit').click();expect(new URL(page.url()).searchParams.has('diagram')).toBe(false);
   await expect(page.locator('#src')).toHaveValue(JSON.stringify(library().diagrams[0].spec,null,2));
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(entry=>entry.text))).toContain(source);
 });
 
 test('direct readers report missing documents and snapshots, retry, and offer a manual copy fallback',async({page,server,audit})=>{

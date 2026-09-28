@@ -71,18 +71,32 @@ function harness(adapters={},options={}){
     flush(){for(const [id,{fn}]of [...timers]){timers.delete(id);fn();}}};
 }
 
-test('file-open remains repairable and one Undo; independent trace input cancels only its reader',()=>{
-  const h=harness();h.click('import-trace');
+test('file-open starts fresh history and preserves the earlier draft; invalid incoming source stays repairable',()=>{
+  const h=harness(),outgoing=INITIAL+'  ';
+  h.session.accept({text:outgoing});h.session.accept({text:INITIAL+'\t'});h.session.undo();
+  assert.equal(h.session.canUndo(),true);assert.equal(h.session.canRedo(),true);
+  const beforeOpenRenders=h.renders;h.click('import-trace');
   const file=h.file('file-input'),trace=h.file('trace-file');
   h.type('trace-text','typed trace');assert.equal(trace.abortCount,1);assert.equal(file.abortCount,0);
   trace.load('stale trace');trace.fail();assert.equal(h.e['trace-text'].value,'typed trace');
   const raw='  { unfinished\r\n';file.load(raw);
   assert.equal(h.text,raw);assert.equal(h.session.baseline(),raw);assert.equal(h.e.tracebox.hidden,true);
-  assert.equal(h.renders,1);h.session.undo();assert.equal(h.text,INITIAL);h.session.redo();assert.equal(h.text,raw);
+  assert.equal(h.renders,beforeOpenRenders+1);assert.equal(h.session.canUndo(),false);assert.equal(h.session.canRedo(),false);
+  assert.equal(h.session.undo(),false);assert.equal(h.session.redo(),false);assert.equal(h.text,raw);
+  assert.equal(h.session.earlierDrafts().length,1);assert.equal(h.session.earlierDrafts()[0].text,outgoing);assert.equal(h.session.earlierDrafts()[0].baseline,INITIAL);
   h.click('import-trace');const current=h.file('trace-file');current.load(TRACE);h.click('trace-preview');
   assert.equal(h.e['trace-convert'].disabled,false);h.click('trace-convert');
   assert.equal(JSON.parse(h.text).page.blocks[0].diagram.steps.length,2);assert.equal(h.session.imported(),false);
   assert.equal(h.session.baseline(),raw);h.session.undo();assert.equal(h.text,raw);
+});
+
+test('file-open reports a replacement failure and leaves the current source intact',()=>{
+  const h=harness({}, {replaceProject(){throw Error('Your earlier draft could not be saved.');}});
+  const pending=h.file('file-input');
+  assert.doesNotThrow(()=>pending.load('{"page":{"title":"Another file"}}'));
+  assert.equal(h.text,INITIAL);assert.equal(h.session.baseline(),INITIAL);assert.equal(h.renders,0);
+  assert.equal(h.session.canUndo(),false);assert.equal(h.session.canRedo(),false);
+  assert.match(h.messages.at(-1),/earlier draft could not be saved/);
 });
 
 test('project replacement, close and fresh input retire trace preview, search callbacks and pending file loads',()=>{

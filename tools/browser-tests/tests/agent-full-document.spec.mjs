@@ -65,11 +65,10 @@ test('retired API and invalid full source preserve exact source and history; a v
     const original=JSON.stringify(raw,null,2).replace('"title": "Browser contract"','"title"  :  "Browser contract"');
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);
     await page.locator('#welcome-paste-form button[type=submit]').click();
-    // Pasting itself is undoable. Record that earlier history entry rather
-    // than assuming a newly opened story has an empty Undo stack.
-    await page.locator('#undo-builder').click();const previous=await page.locator('#src').inputValue();expect(previous).not.toBe(original);
-    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-    await expect(page.locator('#undo-builder')).toBeEnabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+    // Opening a story starts its own history. Rejected proposals must leave
+    // that empty stack untouched, and an accepted document adds one entry.
+    await expect(page.locator('#src')).toHaveValue(original);
+    await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
     await page.locator('#editor-tab-agent').click();
     if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
@@ -85,7 +84,7 @@ test('retired API and invalid full source preserve exact source and history; a v
     }
     async function unchanged(){
       await expect(page.locator('#src')).toHaveValue(original);
-      await expect(page.locator('#undo-builder')).toBeEnabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+      await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
       expect((await h.read('state.json')).revision).toBe(state.revision);
       await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
     }
@@ -108,12 +107,9 @@ test('retired API and invalid full source preserve exact source and history; a v
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Delivery service');
     h.run('reply','--request',request.id,'--text','Renamed exactly one service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-    await expect(page.locator('#undo-builder')).toBeEnabled();await expect(page.locator('#redo-builder')).toBeEnabled();
+    await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeEnabled();
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
-    // The next Undo must be the original paste, proving rejected proposals
-    // and the accepted document introduced no hidden or duplicate entries.
-    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(previous);
-    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+    // No earlier or duplicate action remains, including a different project.
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
     await expect(page.locator('#redo-builder')).toBeDisabled();
     expect(h.errors).toEqual([]);expect(h.unexpectedRequests).toEqual([]);

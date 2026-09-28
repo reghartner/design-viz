@@ -57,7 +57,8 @@ function createBuilderIO(opts){
       reader.onload = function(){
         if(disposed || readVersion!==fileReadVersion)return;
         fileReader=null;
-        opts.replaceProject(String(reader.result)); /* invalid source remains repairable in the editor */
+        try{opts.replaceProject(String(reader.result));} /* invalid source remains repairable in the editor */
+        catch(ex){inspectorMessage('could not open "' + f.name + '": ' + errorText(ex));}
       };
       reader.onerror = function(){
         if(disposed || readVersion!==fileReadVersion)return;

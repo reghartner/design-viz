@@ -905,7 +905,7 @@ test('diff UI toggles, selects JSON, and hides on Escape, input, and render atte
   w.diff(); w.render(); assert.ok(w.ids.diffbox.hidden);
 });
 
-test('baseline survives autosave and recovery, and open/save reset it without breaking undo', () => {
+test('baseline survives autosave and recovery, and opening a file resets its baseline and history', () => {
   const w = diffWorkbench(), next = diffFixture(); next.page.title = 'Draft';
   w.ids.src.value = JSON.stringify(next); w.ids.src.fire('input'); w.flush();
   const recovered = diffWorkbench(w.storage);
@@ -920,10 +920,12 @@ test('baseline survives autosave and recovery, and open/save reset it without br
   recovered.ids['file-input'].fire('change');
   assert.deepStrictEqual(recovered.diff(), ['no changes']);
   recovered.ids['undo-builder'].click();
-  assert.deepStrictEqual(recovered.diff(), ['page skin changed']);
+  assert.deepStrictEqual(recovered.diff(), ['no changes']);
+  assert.equal(recovered.ids.src.value,JSON.stringify(file));
+  assert.ok(recovered.builder.earlierDrafts().some(entry=>entry.text===JSON.stringify(next)));
   const reload = diffWorkbench(w.storage);
   reload.ids.draftbar.children[1].click();
-  assert.deepStrictEqual(reload.diff(), ['page skin changed']);
+  assert.deepStrictEqual(reload.diff(), ['no changes']);
 });
 
 test('legacy draft recovery falls back visibly, discard keeps demo baseline, and unavailable storage is safe', () => {
@@ -962,7 +964,7 @@ test('welcome does not autosave a boot demo or replace an existing draft before 
   assert.strictEqual(w.builder.draft(), null);
 });
 
-test('leaving the editor flushes exact unfinished source before the autosave delay without changing undo', () => {
+test('leaving the editor flushes unfinished source without restoring the previously loaded project through undo', () => {
   const w = diffWorkbench(new Map(), {deferInitialSave:true});
   const initial = JSON.stringify(diffFixture());
   w.builder.loadText(initial);
@@ -972,11 +974,12 @@ test('leaving the editor flushes exact unfinished source before the autosave del
   w.ids.src.value = unfinished; w.ids.src.fire('input');
   w.builder.prepareWelcome();
   assert.strictEqual(JSON.parse(w.storage.get('dv-workbench-draft')).text, unfinished);
-  w.ids['undo-builder'].click(); assert.strictEqual(w.ids.src.value, initial);
+  w.ids['undo-builder'].click(); assert.strictEqual(w.ids.src.value, unfinished);
   w.ids['redo-builder'].click(); assert.strictEqual(w.ids.src.value, unfinished);
+  assert.ok(JSON.parse(w.storage.get('dv-workbench-earlier-drafts')).some(entry=>entry.text===initial));
 });
 
-test('welcome imports validate before mutation and preserve the pending draft in one undo', () => {
+test('welcome imports validate before mutation and archive the pending draft outside the new project history', () => {
   const saved = {text:'  { unfinished JSON\n', at:123};
   const storage = new Map([['dv-workbench-draft', JSON.stringify(saved)]]);
   const w = diffWorkbench(storage, {deferInitialSave:true});
@@ -992,9 +995,10 @@ test('welcome imports validate before mutation and preserve the pending draft in
   assert.strictEqual(w.ids.draftbar.hidden, true);
   assert.deepStrictEqual(w.diff(), ['no changes']);
   w.ids['undo-builder'].click();
-  assert.strictEqual(w.ids.src.value, saved.text);
+  assert.strictEqual(w.ids.src.value, text);
   w.ids['redo-builder'].click();
   assert.strictEqual(w.ids.src.value, text);
+  assert.ok(JSON.parse(storage.get('dv-workbench-earlier-drafts')).some(entry=>entry.text===saved.text));
 });
 
 test('superseded editor file reads cannot replace the project selected from welcome', () => {
@@ -1012,7 +1016,7 @@ test('superseded editor file reads cannot replace the project selected from welc
   assert.equal(w.ids.guide.hidden, true);
 });
 
-test('typing before first autosave is preserved by undo when a canonical response arrives', () => {
+test('typing before first autosave is archived when a canonical response opens another project', () => {
   const saved = diffFixture(); saved.page.title = 'Saved old draft';
   const w = diffWorkbench(new Map([['dv-workbench-draft',JSON.stringify({text:JSON.stringify(saved),at:1})]]), {deferInitialSave:true});
   const typed = diffFixture(); typed.page.title = 'Typed while canonical link loads';
@@ -1020,10 +1024,12 @@ test('typing before first autosave is preserved by undo when a canonical respons
   const canonical = diffFixture(); canonical.page.title = 'Canonical response';
   w.builder.loadSpec(canonical);
   w.ids['undo-builder'].click();
-  assert.equal(w.ids.src.value, JSON.stringify(typed));
+  assert.equal(JSON.parse(w.ids.src.value).page.title, 'Canonical response');
+  assert.equal(w.ids['undo-builder'].disabled,true);
+  assert.ok(w.builder.earlierDrafts().some(entry=>entry.text===JSON.stringify(typed)));
 });
 
-test('new projects and pasted JSON are exact, independent undoable replacements', () => {
+test('new projects and pasted JSON have independent history and preserve exact earlier drafts', () => {
   const w = diffWorkbench(new Map(), {deferInitialSave:true});
   const first = diffFixture(); first.page.title = 'First project';
   const second = diffFixture(); second.page.title = 'Second project';
@@ -1034,7 +1040,9 @@ test('new projects and pasted JSON are exact, independent undoable replacements'
   w.builder.loadSpec(second);
   assert.strictEqual(w.builder.isProjectOpen(), true);
   w.ids['undo-builder'].click();
-  assert.strictEqual(w.ids.src.value, firstText);
+  assert.strictEqual(JSON.parse(w.ids.src.value).page.title, 'Second project');
+  assert.equal(w.ids['undo-builder'].disabled,true);assert.equal(w.ids['redo-builder'].disabled,true);
+  assert.ok(w.builder.earlierDrafts().some(entry=>entry.text===firstText));
   w.ids['redo-builder'].click();
   assert.strictEqual(JSON.parse(w.ids.src.value).page.title, 'Second project');
 });

@@ -54,10 +54,10 @@ function folderAgentInstructions(folderName,level,resume,identity){
 function initWorkbenchAgentChat(opts){
   var doc=opts.document,root=doc.getElementById('editor-agent');
   if(!root)return {destroy:function(){}};
-  var life=createWorkbenchLifetime(),client=null,timer=null,connecting=false,generation=0,releaseLock=null;
+  var life=createWorkbenchLifetime(),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
   var state={connected:false,pending:null,transcript:[],changes:[],listening:false};
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
-  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,recoveryPreview=null,activeFolder=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
+  var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
   var kitNode=doc.getElementById('flowview-folder-kit'),kit=null;
   function setText(id,text){var node=get(id);if(node && node.textContent!==text)node.textContent=text;}
@@ -96,7 +96,7 @@ function initWorkbenchAgentChat(opts){
   detailSettings.append(detailSummary,detailBody);
   var setupDetail=element('div','folder-agent-setup-detail'),setupLabel=element('label','','How much detail should Claude include?'),setupLevel=levelControl.cloneNode(true);
   setupLevel.id='folder-agent-setup-level';setupLabel.htmlFor=setupLevel.id;
-  setupDetail.append(setupLabel,setupLevel,element('p','folder-agent-hint','Start with the story. You can add engineering detail later.'));get('guide-folder').prepend(setupDetail);
+  setupDetail.append(setupLabel,setupLevel,element('p','folder-agent-hint','Start with the story. You can add engineering detail later.'));get('new-session').prepend(setupDetail);
   var form=get('form'),composeActions=element('div','folder-agent-compose-actions'),cancelButton=button('cancel','Stop accepting this turn');cancelButton.hidden=true;
   cancelButton.title='Stops accepting this turn’s changes and reply. To stop Claude computing, interrupt it in its session.';
   composeActions.append(get('send'),cancelButton,form.querySelector('.folder-agent-hint'));form.appendChild(composeActions);
@@ -104,13 +104,9 @@ function initWorkbenchAgentChat(opts){
   composer.append(composeSettings,form);shell.replaceChildren(header,historyFrame,composer);
   var prerequisites=element('details','folder-agent-prerequisites'),prerequisiteSummary=element('summary','','Is this machine ready?'),prerequisiteBody=element('div');
   prerequisiteBody.textContent='This local pilot needs desktop Chrome or Edge over HTTPS, Claude Code running in a known working folder, Python 3, and Claude’s Monitor tool. A Claude web chat alone cannot watch these files. Ask your facilitator to check those prerequisites before pairing. The helper reports runtime readiness; it does not install tools or change permissions.';
-  prerequisites.append(prerequisiteSummary,prerequisiteBody);get('guide-folder').prepend(prerequisites);
+  prerequisites.append(prerequisiteSummary,prerequisiteBody);get('new-session').prepend(prerequisites);
   var preflightStatus=element('p','folder-agent-hint');preflightStatus.id='folder-agent-preflight';preflightStatus.setAttribute('role','status');get('guide-waiting').appendChild(preflightStatus);
   var access=element('p','folder-agent-hint','You choose one local exchange folder. The editor shares the whole story and your selected focus there. Claude reads and writes local files using its existing permissions; pairing gives it no browser access. Review the full copy below.');get('guide-review').prepend(access);
-  var conflict=element('section','folder-agent-recovery');conflict.id='folder-agent-recovery-choice';conflict.hidden=true;
-  var conflictTitle=element('b','','Which story should continue?'),conflictText=element('p'),conflictActions=element('div','folder-agent-recovery-options');
-  conflictActions.append(button('resume-saved','Open saved story'),button('resume-current','Keep my current draft'),button('resume-cancel','Cancel'));
-  conflict.append(conflictTitle,conflictText,conflictActions);get('guide-folder').appendChild(conflict);
   var following=true;
   function scrollLatest(){following=true;latest.hidden=true;history.scrollTop=history.scrollHeight;}
   function isAtLatest(){return history.scrollHeight-history.scrollTop-history.clientHeight<48;}
@@ -132,14 +128,18 @@ function initWorkbenchAgentChat(opts){
     if(state.connected)record.at=Date.now();
     if(recovery.save(record)){lastSaved=signature;remembered=folderAgentRecoveryRecord(record);}
   }
+  function resetConversationForProject(current){
+    cacheReady=false;seenProject=current.project;activeFolder=null;accessLost=false;lastSaved='';
+    Object.assign(state,{connected:false,pending:null,listening:false,transcript:[],changes:[],activity:[],activityPhase:'idle',review:null,preflight:null,cancelling:false});
+    get('input').value='';get('instructions').value='';
+    get('folder').textContent='';get('guide-folder-name').textContent='';
+  }
   function restoreRecoveryForProject(current){
-    if(!current.open || seenProject===current.project)return;
+    if(adoptingProject || !current.open || seenProject===current.project)return;
     generation++;life.cancelDelay(timer);
     var retired=client,unlock=releaseLock;client=null;releaseLock=null;connecting=false;cacheReady=false;
     if(retired)retired.disconnect().catch(function(){}).finally(function(){retired.destroy();if(unlock)unlock();});else if(unlock)unlock();
-    seenProject=current.project;activeFolder=null;accessLost=false;recoveryPreview=null;conflict.hidden=true;
-    Object.assign(state,{connected:false,pending:null,listening:false,transcript:[],changes:[],activity:[],activityPhase:'idle',review:null,preflight:null,cancelling:false});
-    get('input').value='';get('instructions').value='';
+    resetConversationForProject(current);
     if(remembered){
       get('level').value=remembered.level;
       var key=folderAgentSourceKey(current.source);
@@ -149,7 +149,7 @@ function initWorkbenchAgentChat(opts){
     cacheReady=true;paint({});
   }
   function paintRecovery(){
-    recoveryCard.hidden=state.connected || !remembered || !remembered.folderName;
+    recoveryCard.hidden=!cacheReady || state.connected || !remembered || !remembered.folderName;
     if(recoveryCard.hidden)return;
     recoveryTitle.textContent='Continue '+(remembered.title || 'your story');
     var date=remembered.at?new Date(remembered.at).toLocaleString():'';
@@ -213,12 +213,16 @@ function initWorkbenchAgentChat(opts){
     if(state.listening && !accessLost){get('input').focus();return;}
     stage(state.connected?(guideStage==='waiting'?'waiting':'review'):'folder');
     if(!guide.open)guide.showModal();
-    get(guideStage==='folder'?'connect':guideStage==='review'?'copy':'show-copy').focus();
+    get(guideStage==='folder'?'resume':guideStage==='review'?'copy':'show-copy').focus();
+    if(guideStage==='folder')guide.scrollTop=0;
   }
   function closeGuide(){if(guide.open)guide.close();}
   function paint(update){
     if(!life.alive())return;
-    var previousPending=state.pending,previousReview=reviewCard.dataset.proposal,wasAtLatest=following,previousScroll=history.scrollTop,justListening=update.listening && !state.listening;
+    // A reader can scroll before the browser delivers its queued scroll event.
+    // Capture the actual position before changing content or running resize work.
+    var previousPending=state.pending,previousReview=reviewCard.dataset.proposal,wasAtLatest=following && isAtLatest(),previousScroll=history.scrollTop,justListening=update.listening && !state.listening;
+    following=wasAtLatest;
     Object.assign(state,update);
     if(justListening){
       get('pairing').open=false;
@@ -291,14 +295,19 @@ function initWorkbenchAgentChat(opts){
   async function disconnect(){
     var token=++generation;life.cancelDelay(timer);
     var unlock=releaseLock;releaseLock=null;
-    var old=client,message='Disconnected. Connect Claude when you’re ready.';client=null;accessLost=false;recoveryPreview=null;conflict.hidden=true;
+    var old=client,message='Disconnected. Connect Claude when you’re ready.';client=null;accessLost=false;
     if(old){try{await old.disconnect();}catch(ex){message='Disconnected. Could not update the folder: '+ex.message;}old.destroy();}
     if(unlock)unlock();
     if(!life.alive() || token!==generation)return;
     paint({connected:false,pending:null,listening:false,progress:''});
     stage('folder');status(message);
   }
-  async function beginConnection(directory,parent,resume,token,choice){
+  function checkResumeDraft(expected){
+    var current=opts.snapshot();
+    if(!current.open || current.project!==expected.project || current.source!==expected.source)
+      throw Error('Your draft changed while opening the folder. Select the session folder again to resume.');
+  }
+  async function beginConnection(directory,parent,resume,token,recovered){
     var files=createFolderAgentFiles(directory),acquiredLock=null;
     if(navigator.locks){
       acquiredLock=await new Promise(function(resolve,reject){
@@ -310,6 +319,34 @@ function initWorkbenchAgentChat(opts){
     }
     if(!life.alive() || token!==generation){if(acquiredLock)acquiredLock();return;}
     releaseLock=acquiredLock;
+    var choice;
+    if(recovered){
+      checkResumeDraft(recovered.current);
+      var saved=recovered.preview,fresh=await inspectFolderAgentSession(files,opts.snapshot);
+      if(!life.alive() || token!==generation)return;
+      checkResumeDraft(recovered.current);
+      if(fresh.lease && fresh.lease.active)throw Error('This folder is still connected to another editor. Disconnect it there first.');
+      if(fresh.identity.sessionId!==saved.identity.sessionId || fresh.identity.connectionId!==saved.identity.connectionId ||
+          fresh.savedSource!==saved.savedSource || fresh.savedRevision!==saved.savedRevision)
+        throw Error('The saved story changed while opening the folder. Select the session folder again to resume.');
+      if(typeof opts.restoreSavedStory!=='function')throw Error('This workbench cannot restore the saved story. Reload it and try again.');
+      // Rendering the restored story can synchronously ask for recoveryInfo.
+      // Retire the old chat below without cancelling our own explicit open.
+      var restored;adoptingProject=true;
+      try{restored=await opts.restoreSavedStory(saved.savedSource,recovered.current);}
+      finally{adoptingProject=false;}
+      if(restored===false || restored && restored.ok===false)throw Error(restored && restored.error || 'Could not restore the saved story.');
+      if(!life.alive() || token!==generation)return;
+      var resumed=opts.snapshot();
+      if(!resumed.open || resumed.source!==saved.savedSource || restored && restored.project!==undefined && restored.project!==resumed.project)
+        throw Error('The project changed while opening the saved story. Select the session folder again to resume.');
+      // Explicit Resume opens a new project even when its bytes match. Retire
+      // old chat state without cancelling this intentional connection attempt.
+      // Keep recovery writes suspended until the folder's transcript is loaded.
+      resetConversationForProject(resumed);paint({});
+      choice={resumeSource:'saved',expectedSavedSource:saved.savedSource,expectedSavedRevision:saved.savedRevision,
+        expectedSessionId:saved.identity.sessionId,expectedConnectionId:saved.identity.connectionId};
+    }
     if(!kit)kit=JSON.parse(kitNode.textContent);
     var connectionProject=opts.snapshot().project;
     client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,
@@ -317,7 +354,7 @@ function initWorkbenchAgentChat(opts){
     if(client.setReviewMode)client.setReviewMode(reviewMode.checked);
     var connectingClient=client,identity=await connectingClient.start(resume,choice);
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
-    activeFolder=directory;accessLost=false;
+    activeFolder=directory;accessLost=false;cacheReady=true;
     // Store only a browser-owned handle. Access is requested later by a click.
     recovery.remember(directory,identity.sessionId).then(function(saved){if(life.alive() && token===generation && saved)rememberedHandle={handle:directory,sessionId:identity.sessionId};});
     status('Preparing the authoring instructions in your folder…');
@@ -333,7 +370,7 @@ function initWorkbenchAgentChat(opts){
     get('instructions').value=instructions;
     get('folder').textContent=resume?'Exchange folder: '+directory.name:'Selected folder: '+parent.name+' · Exchange: ./'+directory.name;
     get('guide-folder-name').textContent=get('folder').textContent;
-    conflict.hidden=true;recoveryPreview=null;stage('review');
+    stage('review');
     status('Paste the connection instructions into Claude.');get('copy').disabled=false;saveRecovery();tick(token);
   }
   async function connectionFailure(ex,token){
@@ -343,7 +380,7 @@ function initWorkbenchAgentChat(opts){
     if(unlock)unlock();
     if(life.alive() && token===generation){
       paint({connected:false,pending:null,listening:false});
-      status(ex.name==='AbortError'?'Folder selection cancelled.':ex.name==='NotAllowedError'?'Folder access was not granted. Your draft is unchanged. Choose Resume an existing exchange to select the folder again.':ex.message);
+      status(ex.name==='AbortError'?'Folder selection cancelled.':ex.name==='NotAllowedError'?'Folder access was not granted. Choose Resume from folder to select the folder again.':ex.message);
     }
   }
   async function connect(resume,useRemembered){
@@ -351,7 +388,7 @@ function initWorkbenchAgentChat(opts){
     if(typeof window.showDirectoryPicker!=='function' || !window.isSecureContext){
       status('Use this workbench in a desktop Chrome or Edge tab over HTTPS to connect a folder.');return;
     }
-    connecting=true;get('instructions').value='';recoveryPreview=null;conflict.hidden=true;paint({});var token=++generation;
+    connecting=true;get('instructions').value='';paint({});var token=++generation,opening=opts.snapshot();
     try{
       var parent,directory;
       // Permission/picker must be the first await, inside this click gesture.
@@ -366,39 +403,19 @@ function initWorkbenchAgentChat(opts){
         directory=resume?parent:await parent.getDirectoryHandle('flowview-session-'+crypto.randomUUID().slice(0,8),{create:true});
       }
       if(!life.alive() || token!==generation)return;
+      var recovered;
       if(resume){
+        checkResumeDraft(opening);
         var preview=await inspectFolderAgentSession(createFolderAgentFiles(directory),opts.snapshot());
         if(!life.alive() || token!==generation)return;
+        checkResumeDraft(opening);
         if(preview.lease && preview.lease.active)throw Error('This folder is still connected to another editor. Disconnect it there first.');
-        if(!preview.sourceMatches){
-          recoveryPreview={directory:directory,parent:parent,preview:preview,token:token};
-          conflictText.textContent='The folder has “'+sourceTitle(preview.savedSource)+'”. Your current draft is different. Opening the saved story keeps your current draft in Earlier drafts. Keeping your current draft archives the folder’s saved story before replacing it. Interrupted requests will not replay.';
-          conflict.hidden=false;get('resume-saved').disabled=typeof opts.restoreSavedStory!=='function';stage('folder');
-          if(!guide.open)guide.showModal();get('resume-current').focus();status('Choose which story to continue. Nothing has been replaced.');return;
-        }
+        recovered={preview:preview,current:opening};
+        status('Opening the saved story and conversation…');
       }
-      await beginConnection(directory,parent,resume,token);
+      await beginConnection(directory,parent,resume,token,recovered);
     }catch(ex){await connectionFailure(ex,token);}
     finally{if(life.alive() && token===generation){connecting=false;paint({});}}
-  }
-  async function chooseRecovery(choice){
-    if(connecting || !recoveryPreview)return;
-    var picked=recoveryPreview,token=picked.token;connecting=true;paint({});
-    get('resume-saved').disabled=true;get('resume-current').disabled=true;
-    try{
-      if(choice==='saved'){
-        // Recheck before importing; start() independently checks again before writes.
-        var fresh=await inspectFolderAgentSession(createFolderAgentFiles(picked.directory),opts.snapshot());
-        if(!life.alive() || token!==generation)return;
-        if(fresh.savedSource!==picked.preview.savedSource || fresh.savedRevision!==picked.preview.savedRevision)throw Error('The saved story changed. Select the session again before choosing.');
-        var restored=await opts.restoreSavedStory(picked.preview.savedSource);
-        if(restored===false || restored && restored.ok===false)throw Error(restored.error || 'Could not restore the saved story.');
-      }
-      if(!life.alive() || token!==generation)return;
-      await beginConnection(picked.directory,picked.parent,true,token,{resumeSource:choice,
-        expectedSavedSource:picked.preview.savedSource,expectedSavedRevision:picked.preview.savedRevision});
-    }catch(ex){await connectionFailure(ex,token);}
-    finally{if(life.alive() && token===generation){connecting=false;get('resume-saved').disabled=typeof opts.restoreSavedStory!=='function';get('resume-current').disabled=false;paint({});}}
   }
   life.listen(reviewMode,'change',function(){if(client && client.setReviewMode)client.setReviewMode(reviewMode.checked);});
   life.listen(reviewDetails,'toggle',function(){
@@ -428,9 +445,6 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('connect'),'click',function(){connect(false);});
   life.listen(get('resume'),'click',function(){connect(true);});
   life.listen(continueButton,'click',function(){if(opts.show)opts.show();stage('folder');if(!guide.open)guide.showModal();connect(true,true);});
-  life.listen(get('resume-saved'),'click',function(){chooseRecovery('saved');});
-  life.listen(get('resume-current'),'click',function(){chooseRecovery('current');});
-  life.listen(get('resume-cancel'),'click',function(){if(connecting)return;recoveryPreview=null;conflict.hidden=true;status('Your draft and saved session are unchanged.');});
   life.listen(cancelButton,'click',async function(){
     if(!client || !state.pending)return;state.cancelling=true;paint({});
     try{await client.cancel();status('This turn is no longer accepted. To stop Claude computing, interrupt it in its session. You can send a corrected request here.');}
@@ -488,5 +502,5 @@ function initWorkbenchAgentChat(opts){
   contextTick();stage('folder');paint({});
   return {destroy:life.destroy,openSetup:openSetup,
     readLedger:function(){return client && state.connected?client.readLedger():Promise.resolve(null);},
-    recoveryInfo:function(){restoreRecoveryForProject(opts.snapshot());return {connected:state.connected,listening:state.listening,folderName:activeFolder?activeFolder.name:remembered && remembered.folderName,sessionId:client && client.manifest()?client.manifest().sessionId:null,changes:state.changes.slice(-100)};}};
+    recoveryInfo:function(){restoreRecoveryForProject(opts.snapshot());return {connected:state.connected,listening:state.listening,folderName:activeFolder?activeFolder.name:cacheReady && remembered?remembered.folderName:null,sessionId:client && client.manifest()?client.manifest().sessionId:null,changes:state.changes.slice(-100)};}};
 }

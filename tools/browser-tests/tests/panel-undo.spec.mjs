@@ -124,11 +124,51 @@ test('returning a canvas drag to its starting rectangle preserves Redo',async({p
   await expect.poll(()=>geometry(panel)).toEqual(before);await expect(page.locator('#redo-builder')).toBeEnabled();
 });
 
+test('canvas panel drag and resize take keyboard Undo focus from the Inspector',async({page,server})=>{
+  const raw=editorSpec();delete raw.page.blocks[0].diagram.layouts;delete raw.page.blocks[0].diagram.defaultLayout;
+  const original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);await closeTools(page);
+  await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
+  await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
+  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Focused camera');await title.press('Enter');
+  await expect(page.locator('#src')).toHaveValue(/Focused camera/);const edited=await page.locator('#src').inputValue();
+  const panel=page.locator('[data-explore-panel=home]'),before=await geometry(panel),grip=panel.locator('.explore-window-grip');
+  await title.focus();await drag(page,grip,-350,60);const moved=await geometry(panel);expect(moved).not.toEqual(before);
+  await expect(grip).toBeFocused();await page.keyboard.press('ControlOrMeta+z');await expect.poll(()=>geometry(panel)).toEqual(before);
+  await expect(page.locator('#src')).toHaveValue(edited);await expect(title).toHaveValue('Focused camera');
+  await page.keyboard.press('ControlOrMeta+Shift+z');await expect.poll(()=>geometry(panel)).toEqual(moved);
+  const resize=panel.locator('.explore-window-resize');await title.focus();await drag(page,resize,70,45);const resized=await geometry(panel);
+  expect(resized).not.toEqual(moved);await expect(resize).toBeFocused();await page.keyboard.press('ControlOrMeta+z');await expect.poll(()=>geometry(panel)).toEqual(moved);
+  await expect(page.locator('#src')).toHaveValue(edited);await expect(title).toHaveValue('Focused camera');
+});
+
+test('a clamped canvas arrow movement is a no-op and preserves Redo',async({page,server})=>{
+  await open(page,server);const panel=page.locator('[data-explore-panel=home]'),before=await geometry(panel),grip=panel.locator('.explore-window-grip');
+  await drag(page,grip,-180,60);await page.locator('#undo-builder').click();await expect.poll(()=>geometry(panel)).toEqual(before);
+  await grip.focus();await page.keyboard.press('ArrowRight');await expect.poll(()=>geometry(panel)).toEqual(before);
+  await expect(page.locator('#redo-builder')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(source);
+});
+
+test('leaving a changed Inspector field cannot start a drag on a retired canvas',async({page,server})=>{
+  await open(page,server);await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
+  await drag(page,page.locator('#workspace-window-inspect .workspace-window-grip'),-900,0);
+  const title=page.locator('#guide').getByLabel('title',{exact:true}),panel=page.locator('[data-explore-panel=home]');
+  const before=await geometry(panel),old=await panel.elementHandle();await title.fill('Committed on leaving Inspector');
+  await drag(page,panel.locator('.explore-window-grip'),-350,60);
+  await expect(page.locator('#src')).toHaveValue(/Committed on leaving Inspector/);
+  expect(await old.evaluate(el=>el.isConnected)).toBe(false);await expect.poll(()=>geometry(panel)).toEqual(before);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+  await drag(page,panel.locator('.explore-window-grip'),-350,60);expect(await geometry(panel)).not.toEqual(before);
+  await page.keyboard.press('ControlOrMeta+z');await expect.poll(()=>geometry(panel)).toEqual(before);await expect(page.locator('#src')).toHaveValue(source);
+});
+
 test('removing a moved view in handwritten JSON retires its history without losing the draft on Redo',async({page,server})=>{
-  await open(page,server);await page.locator('#undo-builder').click();const previous=await page.locator('#src').inputValue();
-  await page.locator('#redo-builder').click();await closeTools(page);
+  await open(page,server);const previous=await page.locator('#src').inputValue();
+  await page.locator('[data-dv-node=a]').first().click();await page.locator('#editor-tab-inspect').click();
+  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited camera');await title.press('Enter');
+  const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(previous);await closeTools(page);
   await page.locator('[data-explore-panel=home] .explore-window-grip').focus();await page.keyboard.press('Shift+ArrowLeft');
-  const raw=JSON.parse(source);delete raw.page.blocks[0].diagram.layouts;delete raw.page.blocks[0].diagram.defaultLayout;
+  const raw=JSON.parse(edited);delete raw.page.blocks[0].diagram.layouts;delete raw.page.blocks[0].diagram.defaultLayout;
   const handwritten='  '+JSON.stringify(raw,null,2)+'\n';
   await page.locator('#editor-tab-json').click();await page.locator('#src').fill(handwritten);await page.locator('#go').click();await closeTools(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(previous);

@@ -26,8 +26,10 @@ skin choice or hosting preference can override it.
 
 Use **← New / open** in the workspace toolbar, or the Flowview wordmark, to return
 to welcome. **Continue** returns to the current project with its undo history.
-Opening another valid project is one undoable replacement. Welcome navigation
-cancels temporary editor modes and pauses playback.
+Opening another project starts a fresh Undo/Redo history. The outgoing draft is
+kept in **Earlier drafts**; Undo never changes which file is open. Welcome
+navigation cancels temporary editor modes and pauses playback while retaining
+the current project's source and panel history.
 
 The browser’s **Back** and **Forward** buttons follow the welcome, template
 picker, agent guidance, Paste JSON, and editor screens. The in-app **Back** button

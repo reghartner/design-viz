@@ -44,7 +44,11 @@ floating panel positions are viewing preferences, not source edits. Panel moves
 and resizes join the same **Undo**/**Redo** history as story edits, one entry per
 completed drag or arrow-key adjustment. Undo restores geometry without moving
 the camera, reopening closed tools, or changing the JSON. Camera movement and
-opening/closing tools do not add history entries.
+opening/closing tools do not add history entries. A movement that hits an edge
+without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
+panel moves keyboard focus to its handle, so the next keyboard Undo targets the
+panel. Loading another file or resuming a folder starts fresh history; recover
+the previous story through **Earlier drafts**.
 Camera and panel state follow matched sections through source edits; new projects
 start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named view

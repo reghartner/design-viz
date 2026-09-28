@@ -80,7 +80,7 @@ test('project switches disconnect; lost ownership does not overwrite a new owner
 test('resume requires matching story, rejects active owner, changes connection and never replays a request',async()=>{
   const h=harness();await h.client.start();await h.client.send('Outstanding');h.proposal();
   await assert.rejects(h.fresh().start(true),/still connected/);await h.client.disconnect();
-  h.type('{}');await assert.rejects(h.fresh().start(true),/Open story/);h.type(h.disk.get('state.json').source);
+  h.type('{}');await assert.rejects(h.fresh().start(true),/story changed during resume/);h.type(h.disk.get('state.json').source);
   const next=h.fresh();await next.start(true);assert.notEqual(next.manifest().connectionId,h.client.manifest().connectionId);
   await next.poll();assert.equal(h.writes.length,0);assert.equal(h.last.pending,null);assert.equal(h.last.transcript.length,1);
 });
@@ -172,7 +172,7 @@ test('explicit current draft recovery archives the saved source and refuses a ch
 test('explicit saved story recovery requires caller restoration and failed archival leaves session untouched',async()=>{
   const h=harness();await h.client.start();await h.client.disconnect();const saved=h.disk.get('state.json'),owner=h.disk.get('session.json');h.type('{}');
   const choice={resumeSource:'saved',expectedSavedSource:saved.source,expectedSavedRevision:saved.revision};
-  await assert.rejects(h.fresh().start(true,choice),/Open story/);
+  await assert.rejects(h.fresh().start(true,choice),/story changed during resume/);
   h.writeGate(name=>{if(name.startsWith('saved-story-'))throw Error('Archive unavailable');});
   await assert.rejects(h.fresh().start(true,{...choice,resumeSource:'current'}),/Archive unavailable/);
   assert.deepEqual(h.disk.get('session.json'),owner);assert.equal(h.disk.get('story.spec.json'),saved.source);

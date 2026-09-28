@@ -29,6 +29,8 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   const created=await spec(page),d=created.page.blocks[0].diagram;
   expect(d.routing).toBeUndefined();await expect(page.locator('#docview .lane-bridge')).toHaveCount(0);
   expect(created.page.title).toBe('Doorbell platform');expect(d.edges).toHaveLength(2);expect(d.steps).toEqual([]);
+  expect(d.rows).toEqual([[]]);expect(d.floats).toHaveLength(3);
+  for(const f of d.floats)expect(f).toMatchObject({side:'below',x:expect.any(Number),y:expect.any(Number)});
   expect(d.edges[0].label).toBe('depends on; uses Recording v1, Recording v2');
   expect(Object.values(d.nodes).map(n=>n.binding.entityRef)).toEqual([ref('doorbell'),ref('recording'),ref('notifications')]);
   await expect(page.locator('#docview [data-dv-node]')).toHaveCount(3);
@@ -60,7 +62,7 @@ test('Add seeds only the destination, reuses nodes and supports one-action undo 
   await page.locator('#catalog-add').click();
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[1].tabs[0].sections[0].diagram;
   expect(raw.page.blocks[0]).toEqual(JSON.parse(before).page.blocks[0]);expect(d.nodes.authored.title).toBe('My gateway');expect(d.panels).toEqual([{id:'q',type:'queue'}]);
-  expect(d.rows).toEqual([['authored'],['recording-1']]);expect(d.edges[0].from).toBe('authored');
+  expect(d.rows).toEqual([['authored']]);expect(d.floats).toEqual([{id:'recording-1',side:'below',x:expect.any(Number),y:expect.any(Number)}]);expect(d.edges[0].from).toBe('authored');
   expect(d.edges[0].label).toBe('depends on; uses Recording v1, Recording v2');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);

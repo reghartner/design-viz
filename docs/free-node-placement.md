@@ -1,7 +1,11 @@
 # Free node placement and edge entry/exit
 
-Rows keep their automatic spacing and left-to-right ordering. To place a node
-independently, select it and choose **float → Free placement** in the inspector.
+New nodes use **Free placement** by default, including nodes created from the
+catalog and in new sections or detail flows. Individual additions and catalog
+nodes start in available positions on a four-column grid. Free nodes keep their
+saved centers when connections change.
+Rows keep their automatic spacing and left-to-right ordering. To make an existing
+row node independent, select it and choose **float → Free placement** in the inspector.
 Drag it anywhere in the diagram, including over a row or another node. A float
 drag saves a position; it never swaps cards or inserts the node into a row.
 Dragging an automatic **above/below** float also pins it at the dropped position.

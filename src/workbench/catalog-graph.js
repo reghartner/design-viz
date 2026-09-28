@@ -66,7 +66,7 @@ function catalogGraphSeed(catalog, refs, connect, diagram, edgeKind){
       next.edges.push(item);addedEdges.push(item);
     });
   }
-  /* Stable dependency order, four cards per row, left to right. Cycles retain
+  /* Stable dependency order, four free cards across, left to right. Cycles retain
      every selected node and connection; breaking an ordering tie drops no data. */
   var remaining=new Set(newIds),incoming=new Map(newIds.map(function(id){return [id,new Set()];}));
   next.edges.forEach(function(e){if(remaining.has(e.from) && remaining.has(e.to))incoming.get(e.to).add(e.from);});
@@ -76,8 +76,9 @@ function catalogGraphSeed(catalog, refs, connect, diagram, edgeKind){
     var id=candidates[0] || remaining.values().next().value;ordered.push(id);remaining.delete(id);
   }
   if(ordered.length){
-    if(next.rows.length===1 && next.rows[0].length===0)next.rows=[];
-    for(var i=0;i<ordered.length;i+=4)next.rows.push(ordered.slice(i,i+4));
+    var floats=builderNewNodeFloats(next,ordered);
+    next.floats=(next.floats || []).concat(floats);
+    if(!next.rows.length)next.rows=[[]];
   }
   return {diagram:next,created:created,reused:reused,edges:addedEdges.length,placed:newIds.length};
 }

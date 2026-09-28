@@ -8795,7 +8795,7 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
       </section>
       <section id="hg-connect" tabindex="-1"><p class="human-guide-eyebrow">03 / NODES & CONNECTIONS</p><h3>Arrange the actors. Make each connection explain itself.</h3><p><strong>Rows</strong> keep nodes ordered left to right. Drag a node to another row or position to reorganize the flow. For arbitrary placement, select the node and choose <b>float → Free placement</b>, then drag it anywhere or adjust <b>Float X / Y</b>. Choose an automatic float position or return it to rows when you want automatic placement again.</p><p><b>Edge routing</b> belongs to the whole diagram. Select its section heading or Outline entry, then choose <b>Inspect → Edge routing → No lanes (default)</b> or <b>Lanes</b>. New projects, built-in templates, catalog seeds and trace imports start without lanes. Opening an existing spec preserves its setting. Lanes reserve connector tracks between rows and require 1–5 unstacked nodes per row, no floats or self-loops; other layouts use curves. This is separate from the story lane labels on steps.</p><p>To draw a connection, <b>Alt/Option-click a source, then click a destination</b>. You can also use <b>Connect from this node</b> in the inspector, or <b>Add to diagram → Connection</b>. A preview arrow shows where you are connecting. <kbd>Esc</kbd> cancels. Connections stay within a section; an existing ordinary connection is not duplicated.</p><p>Select the connection to edit its label, <b>Connection type</b>, and arrow behavior. All built-in protocols are available. Use <b>New connection type…</b> for a custom name/color; creation also assigns it to this connection. <b>Edit connection type</b> updates its name/color everywhere in the document. Step inspectors provide the matching <b>Story lane</b> and <b>New lane…</b> controls. Display-name edits preserve IDs and advanced palette colors; setting a color replaces that palette. <b>Exit side</b> and <b>Entry side</b> choose its attachment edges; the position percentage moves an endpoint along that side. Use these when automatic routing obscures a relationship.</p><p>Click any bullet or subpoint to edit it directly. <b>Add sibling</b> and <b>Add subpoint</b> grow the list; <b>Indent</b>, <b>Outdent</b>, and <b>Move point up/down</b> move the whole subtree in one undoable edit. The Outline includes every nested point. Prose textareas offer <b>Bold</b>, <b>Italic</b>, <b>Code</b>, <b>Code block</b>, and a URL field with <b>Insert link</b>. Select text before formatting. Enter and Tab keep their normal text-editing behavior.</p><p>Connections, bullets, and contract fields have <b>Visibility by path position</b> in their inspector. Choose <b>Show from position</b> and <b>Hide starting at position</b>, using the full story’s captions as a guide. These one-based positions apply on every alternate path, even if a view hides some stops; they stay in place when you reorder steps. <b>Caption path</b> previews the other path’s captions. The current-position buttons use the full path position. Ambient mode shows everything.</p><p><b>Fit width</b> uses the available width; <b>Readable</b> preserves node readability and lets you pan horizontally when the board overflows. These controls change your viewing scale, not the authored node positions.</p><aside class="human-guide-tip"><strong>Give a large process its own detail.</strong> A node’s <b>Create detail flow</b> starts a drilldown into another section. Readers keep context through the overview map and breadcrumbs. In <b>Domain detail</b>, apply a local child section, then map <b>When parent event</b> to a <b>Child path</b> and <b>Child event</b>. Valid row edits save directly; <b>Preview mapping</b> opens the saved child position, even when that view normally hides the stop. Unset choices inherit the detail entry defaults. Imported numeric positions and advanced fields stay intact; <b>Advanced mapping JSON</b> remains available. Apply changed entry defaults before editing mappings. Choosing another child section or target type resets its entry position, mappings, and boundary ports; unrelated metadata is retained. A pointer to another diagram is a separate document handoff, useful for an independently maintained process.</aside>
       </section>
-      <section id="hg-steps" tabindex="-1"><p class="human-guide-eyebrow">04 / STEPS & PLAYBACK</p><h3>A step is a change, not a screenshot.</h3><p>Use <b>Steps</b> to select, search, append, duplicate, or move beats earlier and later. A useful caption explains what changed and why: “The recording service stores the clip before notifying the resident.” Captions and prose support backticks for inline code and triple backticks for code blocks; node labels stay plain text.</p><p><b>ADD TO STEP</b> selects the nodes, edges, and panels involved in a beat. Finish this mode before trying to edit or connect objects normally. Panel fields describe what changes at that beat. A value you do not change usually carries forward from earlier steps on the selected path. The <b>Effective state · all panels</b> inspector explains whether a value is initial, set here, inherited, or transient.</p><p>Use the numbered circles and previous/next controls to walk the story. Play starts automatic advancement; Pause holds the current beat. Under <b>Playback settings</b>, choose the opening view and whether it should autoplay. The editor starts paused even when the exported viewer is configured to autoplay. Ambient view animates the overall diagram; step view follows one path.</p><p>You can color an individual step circle to mark a phase change without making an alternate path. Use a branch only when the outcome or sequence actually differs.</p><p><strong>Story time.</strong> When the story happens at a particular time, first decide its span: when it starts and when it ends. Select the section and open <b>Story time and device defaults</b>. Enter a <b>Start</b> such as 2026-09-24T22:30, optionally an <b>End</b>, and choose the <b>Clock</b> (12-hour or 24-hour) and <b>Date</b> format. Then select a step and set its <b>Story time</b>: <b>+45m</b> moves forward from the previous step, <b>06:50</b> jumps to the next 6:50, and a full date-time sets it exactly. Leave it empty to keep the previous step’s time. The note underneath shows the resolved time on the selected path. Phone, Device app and App screens clocks and dates follow the step automatically; a clock or date you type on a panel still wins at that step until the story time next moves. Clear <b>Start</b> to turn story time off.</p><p>Batteries drain with the elapsed story time and charge while their trend is <b>charging</b>. Ask the device owner or check the source for the real rates, then set diagram-wide <b>Drain %/h</b> and <b>Charge %/h</b> under the same section group, or override them on a Battery panel. Empty rate fields show the <b>built-in default (placeholder)</b>: it keeps a sketch moving but is not a fact about your device. If you keep it, say on the page that the battery is an illustrative estimate. New battery panels start with the diagram’s rates. In a step’s battery changes, <b>Extra drain %</b> subtracts a one-time cost such as a recorded clip, and <b>charge</b> sets a known reading from which the drain continues. <b>Effective state</b> labels these values <b>Story time</b> or <b>Story time · battery drift</b>, adding <b>built-in default rate</b> when a placeholder rate is in use. Device app battery cards show what the app last received; set them at the step the report arrives.</p>
+      <section id="hg-steps" tabindex="-1"><p class="human-guide-eyebrow">04 / STEPS & PLAYBACK</p><h3>A step is a change, not a screenshot.</h3><p>Use <b>Steps</b> to select, search, append, duplicate, or move beats earlier and later. A useful caption explains what changed and why: “The recording service stores the clip before notifying the resident.” Captions and prose support backticks for inline code and triple backticks for code blocks; node labels stay plain text.</p><p><b>ADD TO STEP</b> selects the nodes, edges, and panels involved in a beat. Finish this mode before trying to edit or connect objects normally. Panel fields describe what changes at that beat. A value you do not change usually carries forward from earlier steps on the selected path. The <b>Effective state · all panels</b> inspector explains whether a value is initial, set here, inherited, or transient.</p><p>Use the numbered circles and previous/next controls to walk the story. Play starts automatic advancement; Pause holds the current beat. Under <b>Playback settings</b>, choose the opening view and whether it should autoplay. The editor starts paused even when the exported viewer is configured to autoplay. Ambient view animates the overall diagram; step view follows one path.</p><p>You can color an individual step circle to mark a phase change without making an alternate path. Use a branch only when the outcome or sequence actually differs.</p><p><strong>Story time.</strong> When the story happens at a particular time, first decide its span: when it starts and when it ends. Select the section and open <b>Story time and device defaults</b>. Enter a <b>Start</b> such as 2026-09-24T22:30, optionally an <b>End</b>, and choose the <b>Clock</b> (12-hour or 24-hour) and <b>Date</b> format. Then select a step and set its <b>Story time</b>: <b>+45m</b> moves forward from the previous step, <b>06:50</b> jumps to the next 6:50, and a full date-time sets it exactly. Leave it empty to keep the previous step’s time. The note underneath shows the resolved time on the selected path. Phone, Device app and App screens clocks and dates follow the step automatically; a clock or date you type on a panel still wins at that step until the story time next moves. Clear <b>Start</b> to turn story time off.</p><p>Batteries drain with the elapsed story time and charge while their trend is <b>charging</b>. Ask the device owner or check the source for the real rates, then set diagram-wide <b>Drain %/h</b> and <b>Charge %/h</b> under the same section group, or override them on a Battery panel. Empty rate fields show the <b>built-in default (placeholder)</b>: it keeps a sketch moving but is not a fact about your device. If you keep it, say on the page that the battery is an illustrative estimate. New battery panels start with the diagram’s rates. In a step’s battery changes, <b>Extra drain %</b> subtracts a one-time cost such as a recorded clip, and <b>charge</b> sets a known reading from which the drain continues. <b>Effective state</b> labels these values <b>Story time</b> or <b>Story time · battery drift</b>, adding <b>built-in default rate</b> when a placeholder rate is in use. Device app battery cards show what the app last received; set them at the step the report arrives.</p><p><strong>Report times.</strong> Don’t type “Updated just now” or “Updated 3 h ago” into a Device app card: it will be wrong a few steps later. Instead, on the step where the app receives new data, open that card under <b>Panel changes</b>, set its value and press <b>Reported at this step</b> (in <b>Starting state</b> the button reads <b>Reported at story start</b>). On every later step the card works out its own text from the story time: <b>Updated just now</b>, <b>Updated 5 min ago</b>, <b>Updated 3 h ago</b>, and <b>Last report</b> with the date and time after a day. The <b>Report time</b> box also takes <b>-15m</b> (15 minutes before this step), <b>06:05</b> (the latest 6:05 at or before this step) or a full date-time. <b>Clear report time</b> stops the computed text from this step on, even when the report came from an earlier step; <b>Inherit</b> removes this step’s report time so the earlier report applies again. In the panel’s <b>fields</b> table, set a card’s <b>freshness</b> to <b>absolute</b> to show “Last report 6:05 PM” instead, or <b>off</b> to keep your own text. Text you type in <b>detail</b> still wins until the next report. Freshness never marks a card <b>Cached</b>; choose that status yourself. <b>Effective state</b> labels the computed text <b>Story time · derived freshness</b>. Without a story start, report times are ignored.</p>
       </section>
       <section id="hg-alternates" tabindex="-1"><p class="human-guide-eyebrow">05 / ALTERNATE OUTCOMES</p><h3>Show where the same story goes differently.</h3><p>An alternate belongs on the same diagram: a dropped signal, a retry, a rejected request, or a recovery. Keep the common lead-in shared, then show the first different event.</p>
         <div class="human-guide-timeline" role="img" aria-label="Happy path and Recovery share steps 1 and 2, differ at steps 3 and 4, and converge on one shared ending at step 5."><div><b>Happy path</b><span>1</span><span>2</span><span>3</span><span>4</span></div><div class="human-guide-alternate"><b>Recovery</b><span class="shared">1</span><span class="shared">2</span><span>3</span><span>4</span></div><div class="human-guide-shared-ending"><b>Shared ending</b><span>5</span></div><p>Shared beginning → independent outcome → one shared ending</p></div>
@@ -9299,7 +9299,7 @@ var FlowviewCompatibility = (function(){
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
-    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain' };
+    'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
@@ -9351,6 +9351,9 @@ var FlowviewCompatibility = (function(){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
             (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'visible');}));};
+          var reported=function(v){return object(v) && (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'reportedAt');});};
+          if((Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && f.freshness!=null;}) || reported(p.initial) ||
+            (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && reported(patches[p.id]);}))used['content.deviceapp-freshness']=true;
           if(navigation(p.initial) || (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && navigation(patches[p.id]);}))used['content.deviceapp-navigation']=true;
           if(p.showSources!=null || !Array.isArray(p.sources) || !p.sources.length || notify(p.initial) ||
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
@@ -11165,6 +11168,65 @@ function storyTimeLabel(ms, config){
   config = config || {};
   var date = storyTimeDate(ms, config.date === 'none' || config.date == null ? 'short' : config.date);
   return date + ' · ' + storyTimeClock(ms, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(ms).h < 12 ? ' AM' : ' PM'));
+}
+
+/* Report times: when a device-app field's value was last reported, in story
+   time. "now" is this step's time; "-15m" is before it; "+5m" is after the
+   previous step's time (like step.time); "06:05" is the latest 06:05 at or
+   before this step's time; an absolute date-time is exact. Returns null for
+   unrecognized or out-of-range values. See docs/step-time.md. */
+var STORY_FRESHNESS_MODES = ['relative', 'absolute', 'off'];
+function storyTimeReportParsable(value){
+  if (typeof value !== 'string') return false;
+  var text = value.trim();
+  if (text === 'now') return true;
+  if (text.charAt(0) === '-') return storyTimeDuration('+' + text.slice(1), true) != null;
+  return storyTimeParsable(text);
+}
+function storyTimeReportResolve(value, now, previous){
+  if (typeof value !== 'string' || !storyTimeInRange(now)) return null;
+  var text = value.trim(), out = null;
+  if (text === 'now') return now;
+  if (text.charAt(0) === '-'){
+    var back = storyTimeDuration('+' + text.slice(1), true);
+    out = back == null ? null : now - back;
+  } else if (text.charAt(0) === '+'){
+    out = storyTimeResolve(text, storyTimeInRange(previous) ? previous : now);
+  } else {
+    out = storyTimeAbsolute(text);
+    if (out == null){
+      var m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(text);
+      if (!m || +m[1] > 23 || +m[2] > 59 || (m[3] != null && +m[3] > 59)) return null;
+      var day = 86400000, of = ((+m[1] * 60 + +m[2]) * 60 + +(m[3] || 0)) * 1000;
+      var base = Math.floor(now / day) * day + of;
+      out = base <= now ? base : base - day;
+    }
+  }
+  return storyTimeInRange(out) ? out : null;
+}
+/* Normalized absolute form for folded state, e.g. "2026-09-25T06:05". */
+function storyTimeIso(ms){
+  var p = storyTimeParts(ms), s = new Date(ms).getUTCSeconds();
+  var y = String(p.y); while (y.length < 4) y = '0' + y;
+  return y + '-' + storyTimePad(p.mo + 1) + '-' + storyTimePad(p.d) + 'T' + storyTimePad(p.h) + ':' + storyTimePad(p.mi) + (s ? ':' + storyTimePad(s) : '');
+}
+/* Freshness text for a report at `reported` seen at story time `now`.
+   relative: under 1 min "Updated just now", under 1 h "Updated N min ago",
+   under 24 h "Updated N h ago", otherwise the absolute form. absolute:
+   "Last report 6:05 PM", with the short date when the report is from another
+   calendar day. Elapsed time is floored; a report from the future reads as
+   just now (the validator warns). */
+function storyTimeFreshness(reported, now, config, mode){
+  config = config || {};
+  var elapsed = Math.max(0, now - reported), minute = 60000, hour = 3600000;
+  if (mode !== 'absolute' && elapsed < 24 * hour){
+    if (elapsed < minute) return 'Updated just now';
+    if (elapsed < hour) return 'Updated ' + Math.floor(elapsed / minute) + ' min ago';
+    return 'Updated ' + Math.floor(elapsed / hour) + ' h ago';
+  }
+  var clock = storyTimeClock(reported, config.clock || '12h') + (config.clock === '24h' ? '' : (storyTimeParts(reported).h < 12 ? ' AM' : ' PM'));
+  var sameDay = Math.floor(reported / 86400000) === Math.floor(now / 86400000);
+  return 'Last report ' + (sameDay ? '' : storyTimeDate(reported, 'short') + ', ') + clock;
 }
 
 /* Derived-field provenance for inspectors. Snapshots are fresh per fold, so a
@@ -14976,7 +15038,7 @@ function deviceAppItems(panel, key) {
     })
     .slice(0, key === 'sources' ? 6 : 12);
 }
-function deviceAppPatchWarnings(obj, path, panel, warnings) {
+function deviceAppPatchWarnings(obj, path, panel, warnings, context) {
   if (obj == null) return;
   if (!panelObject(obj)) {
     warnings.push(path + ': expected an object — ignored');
@@ -15007,13 +15069,19 @@ function deviceAppPatchWarnings(obj, path, panel, warnings) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?, reportedAt?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail', 'visible', 'icon'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible', 'icon', 'reportedAt'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
+    if (panelOwn(v, 'reportedAt') && v.reportedAt !== null) {
+      if (!storyTimeReportParsable(v.reportedAt))
+        warnings.push(p + '.reportedAt: "' + String(v.reportedAt).slice(0, 80) + '" is not a report time — use "now", "-15m", "+5m", "06:05" or "2026-09-25T06:05" (years 100–9999); ignored');
+      else if (!(context && context.story))
+        warnings.push(p + '.reportedAt: ignored — declare diagram.storyTime.start to compute report freshness');
+    }
     if (
       panelOwn(v, 'value') &&
       v.value !== null &&
@@ -15081,6 +15149,8 @@ function deviceAppWarnings(panel, d, path, warnings) {
       } else {
         if (item.kind != null && ['text', 'battery'].indexOf(item.kind) < 0)
           warnings.push(p + '.kind: expected text or battery — using text');
+        if (item.freshness != null && STORY_FRESHNESS_MODES.indexOf(item.freshness) < 0)
+          warnings.push(p + '.freshness: expected ' + STORY_FRESHNESS_MODES.join(', ') + ' — using relative');
         if (item.icon != null && ICON_SET.indexOf(item.icon) < 0)
           warnings.push(p + '.icon: unknown icon — ignored');
         if (
@@ -15093,7 +15163,94 @@ function deviceAppWarnings(panel, d, path, warnings) {
       }
     });
   });
-  deviceAppPatchWarnings(panel.initial, path + '.initial', panel, warnings);
+  var story = storyTimeConfig(d);
+  deviceAppPatchWarnings(panel.initial, path + '.initial', panel, warnings, {story: !!story});
+  if (story) deviceAppReportWarnings(panel, d, path, story, warnings);
+  return {story: !!story};
+}
+/* Walk one path's report times per field. Explicit detail pins its text
+   until a later step delivers a newer report without detail; a null field
+   patch resets the field. visit(fieldId, reportedMs, nowMs, stepIndex) runs
+   for every accepted report time (stepIndex -1 is initial), and with a null
+   reportedMs for a parsable one that lands outside the supported range. */
+function deviceAppReportWalk(panel, steps, story, each, visit) {
+  var fields = deviceAppItems(panel, 'fields'),
+    carried = Object.create(null);
+  function apply(patch, now, previous, index) {
+    if (!panelObject(patch)) return;
+    fields.forEach(function (f) {
+      if (!panelOwn(patch, f.id)) return;
+      var v = patch[f.id];
+      if (v === null) { carried[f.id] = { reported: null, pinned: false, at: null }; return; }
+      if (!panelObject(v)) return;
+      var c = carried[f.id] || (carried[f.id] = { reported: null, pinned: false, at: null }),
+        hasDetail = v.detail === null || typeof v.detail === 'string';
+      if (hasDetail) c.pinned = typeof v.detail === 'string' && v.detail !== '';
+      if (!panelOwn(v, 'reportedAt')) return;
+      if (v.reportedAt === null) { c.reported = null; c.at = null; return; }
+      var ms = storyTimeReportResolve(v.reportedAt, now, previous);
+      if (ms == null) {
+        /* Parsable but outside years 100–9999: ignored, reported by the validator. */
+        if (visit && storyTimeReportParsable(v.reportedAt)) visit(f.id, null, now, index);
+        return;
+      }
+      c.reported = ms;
+      c.at = index;
+      if (!hasDetail) c.pinned = false;
+      if (visit) visit(f.id, ms, now, index);
+    });
+  }
+  apply(panel.initial, story.config.start, story.config.start, -1);
+  var count = Math.max(steps.length, 1);
+  for (var i = 0; i < count; i++) {
+    var at = storyTimeAt(story, i);
+    if (i < steps.length) apply((stepPanelPatch(steps[i]) || {})[panel.id], at.time, at.previous, i);
+    if (each) each(i, at.time, carried, fields);
+  }
+}
+/* A report later than the step's own story time is a report from the future. */
+function deviceAppReportWarnings(panel, d, path, config, warnings) {
+  var DP = path.replace(/\.panels\[\d+\]$/, ''),
+    steps = Array.isArray(d.steps) ? d.steps : [],
+    paths = diagramPathList(d),
+    reported = Object.create(null);
+  paths.forEach(function (route) {
+    var projected = route.indices.map(function (i) { return steps[i]; }),
+      story = storyTimeSequence({ steps: projected }, config),
+      label = paths.length > 1 ? ' on path "' + route.id + '"' : '';
+    deviceAppReportWalk(panel, projected, story, null, function (fieldId, ms, now, n) {
+      if (ms != null && ms <= now) return;
+      var where = n < 0 ? path + '.initial.' + fieldId : DP + '.steps[' + route.indices[n] + '].panels.' + panel.id + '.' + fieldId,
+        key = (ms == null ? 'range:' : 'future:') + where + label, once = (ms == null ? 'range:' : 'future:') + where;
+      if (reported[key] || (n < 0 && reported[once])) return;
+      reported[key] = reported[once] = true;
+      if (ms == null) {
+        warnings.push(where + '.reportedAt: lands outside the supported range (years 100–9999)' + (n < 0 ? '' : label) + ' — ignored');
+        return;
+      }
+      warnings.push(where + '.reportedAt: ' + storyTimeLabel(ms, config) + ' is later than the step’s story time' + (n < 0 ? '' : label) + ' (' + storyTimeLabel(now, config) + ') — freshness treats it as just reported');
+    });
+  });
+}
+/* Freshness text from story time (docs/step-time.md). Only fields with an
+   accepted report time change; without story time nothing changes. */
+function deviceAppFreshnessStates(panel, states, steps, story) {
+  if (!story) return states;
+  deviceAppReportWalk(panel, steps, story, function (i, now, carried, fields) {
+    var state = states[i];
+    if (!state) return;
+    fields.forEach(function (f) {
+      var c = carried[f.id], field = state[f.id];
+      if (!c || c.reported == null || !panelObject(field)) return;
+      field.reportedAt = storyTimeIso(c.reported);
+      if (c.at === i && Array.isArray(state._updated) && state._updated.indexOf(f.id) < 0) state._updated.push(f.id);
+      var mode = STORY_FRESHNESS_MODES.indexOf(f.freshness) >= 0 ? f.freshness : 'relative';
+      if (c.pinned || mode === 'off') return;
+      field.detail = storyTimeFreshness(c.reported, now, story.config, mode);
+      storyTimeMark(state, f.id, 'freshness');
+    });
+  });
+  return states;
 }
 function foldDeviceAppStates(panel, steps) {
   var fields = deviceAppItems(panel, 'fields'),
@@ -15162,14 +15319,14 @@ function foldDeviceAppStates(panel, steps) {
 
 PanelRegistry.extend('deviceapp', {
   validateDeclaration: function (p, PP, warnings, errors, d) {
-    deviceAppWarnings(p, d, PP, warnings);
+    return deviceAppWarnings(p, d, PP, warnings);
   },
   validatePatch: function (patch, path, panel, warnings, context) {
-    deviceAppPatchWarnings(patch, path, panel, warnings);
+    deviceAppPatchWarnings(patch, path, panel, warnings, context);
   },
   fold: foldDeviceAppStates,
   storyTime: function (panel, states, steps, story) {
-    return story ? storyTimeClockOverlay(panel, states, steps, story) : states;
+    return story ? deviceAppFreshnessStates(panel, storyTimeClockOverlay(panel, states, steps, story), steps, story) : states;
   },
 });
 
@@ -15648,6 +15805,7 @@ PanelRegistry.extend('deviceapp', {
             { k: 'source' },
             { k: 'icon', kind: 'icon' },
             { k: 'unit' },
+            { k: 'freshness', kind: 'enum', options: STORY_FRESHNESS_MODES },
           ],
           max: 12,
         },
@@ -15674,7 +15832,37 @@ PanelRegistry.extend('deviceapp', {
       sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
     },
     editor: function(context){
-      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key;},
+      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key==='reportedAt'?'Report time':key;},
+      validateSubfield:function(key,col,value){
+        return col[0]==='reportedAt' && value!=null && !storyTimeReportParsable(value)?'use now, -15m, +5m, 06:05 or 2026-09-25T06:05 for the report time':null;
+      },
+      /* Report time: when this card's value last arrived, in story time. */
+      patchSubfield:function(key,col,input,options){
+        if(col[0]!=='reportedAt')return null;
+        var initial=options && options.initial;
+        input.setAttribute('aria-label',key+' report time');
+        input.placeholder=initial?'Optional · now = story start':'Inherit · now, -15m or 06:05';
+        var box=document.createElement('div');box.className='da-report-actions';
+        var mark=context.controls.action(initial?'Reported at story start':'Reported at this step',function(){return options.commit('now');});
+        mark.setAttribute('aria-label',key+': '+(initial?'reported at story start':'reported at this step'));
+        box.appendChild(mark);
+        /* Clear writes reportedAt:null, which also drops an inherited report on
+           this and later steps; Inherit removes this step's assignment. The
+           starting state has nothing to inherit, so Clear just removes it. */
+        if(!initial || options.value!==undefined){
+          var clear=context.controls.action('Clear report time',function(){return options.commit(initial?undefined:null);});
+          clear.setAttribute('aria-label',key+': clear report time');clear.disabled=!initial && options.value===null;box.appendChild(clear);
+        }
+        if(!initial && options.value!==undefined){
+          var inherit=context.controls.action('Inherit',function(){return options.commit(undefined);});
+          inherit.setAttribute('aria-label',key+': inherit report time');box.appendChild(inherit);
+        }
+        var note=document.createElement('p');note.className='fnote';
+        note.textContent=options.value===null?'Report time cleared at this step: this and later steps show no computed freshness. Inherit restores the earlier report.':
+          'With story time the card shows “Updated 5 min ago” from this report time on every later step. Detail text overrides it until a newer report. Clear stops freshness from this step on; Inherit removes this step’s report time.';
+        box.appendChild(note);
+        return box;
+      },
       patchField:function(field,input,options){
         if(field[0]==='date'){
           if(options && options.initial)input.setAttribute('aria-label','Starting date');
@@ -15724,6 +15912,7 @@ PanelRegistry.extend('deviceapp', {
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
+              ['reportedAt', 'text'],
             ],
           ];
         });
@@ -36638,6 +36827,11 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         var builtIn=Object.keys(sources).some(function(k){return sources[k]==='built-in';});
         return {kind:'story',label:'Story time · battery drift'+(builtIn?' · built-in default rate':''),inputs:drift.inputs.concat(timeInputs())};
       }
+      if(derived==='freshness'){
+        /* The field's value is authored; its detail is derived from the report time. */
+        var reports=history([key],true,'Field value and source history'),text=specObject(snapshot[key])?snapshot[key].detail:'';
+        return {kind:'story',label:'Story time · derived freshness “'+text+'”',inputs:reports.inputs.concat(timeInputs())};
+      }
       var authoring=panelAuthoring(p.type), current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
       var custom=authoring.origin && authoring.origin(p,key,snapshot,{assignment:assignment,history:history,input:input,own:own,currentPatch:current,stepIndex:stepIndex});
       if(custom) return custom;
@@ -36776,7 +36970,7 @@ var BUILDER_GUIDES = {
       ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps'],
       ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram'],
-      ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it'],
+      ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it, and device-app fields with reportedAt show computed freshness'],
       ['diagram.deviceDefaults', 'battery drain/charge percent per hour for every battery panel without its own rates']
     ]
   }
@@ -38460,9 +38654,17 @@ function panelPatchControl(pid, patch, decl, target, options){
             var values=Object.create(null);values[col[0]]=input.value;
             var out=patchFieldsCollect([col],values);
             if(out.error){formError(key+': '+out.error);return false;}
+            var invalid=editor.validateSubfield && editor.validateSubfield(key,col,out.item[col[0]]);
+            if(invalid){formError(key+': '+invalid);return false;}
             return commitPatch(key,out.item,false,[col],storage);
           });
           group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], col[0]==='icon' && col[1]==='enum'?iconPickerControl(input):input));
+          /* Optional per-panel actions beside one sub-field (device-app report time). */
+          var extra=editor.patchSubfield && editor.patchSubfield(key,col,input,{initial:initial,value:cur && cur[col[0]],commit:function(value){
+            var item=Object.create(null);if(value!==undefined)item[col[0]]=value;
+            return commitPatch(key,item,false,[col],storage);
+          }});
+          if(extra)group.appendChild(extra);
         });
         body.appendChild(frowBlock(key, group));
       } else {
@@ -45345,6 +45547,10 @@ var CONTRACT = [
   '       "fields":[{"id":"battery","label":"Battery","kind":"battery"}],',
   '       "initial":{"battery":{"value":68,"status":"ready"}}}',
   '                                     // patch {"battery":{"status":"stale"}} keeps the last value;',
+  '                                     // with storyTime, patch {"battery":{"value":41,"reportedAt":"now"}} on the step that delivers',
+  '                                     // a report; the card then shows "Updated 5 min ago" etc. by itself - never hand-write freshness',
+  '                                     // in detail (detail overrides it). reportedAt: now | -15m | 06:05 | 2026-09-25T06:05;',
+  '                                     // field "freshness":"absolute" shows "Last report 6:05 PM", "off" disables it',
   '                                     // patch {"notify":{"app":"Homestead","title":"Doorbell pressed"}}; {"clear":true} dismisses notifications only',
   '                                     // sources and per-field source mappings are optional; showSources:false hides their map and badges',
   '                                     // status: unknown/loading/ready/stale/error; source override allowed',

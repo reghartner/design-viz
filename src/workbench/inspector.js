@@ -1028,9 +1028,17 @@ function panelPatchControl(pid, patch, decl, target, options){
             var values=Object.create(null);values[col[0]]=input.value;
             var out=patchFieldsCollect([col],values);
             if(out.error){formError(key+': '+out.error);return false;}
+            var invalid=editor.validateSubfield && editor.validateSubfield(key,col,out.item[col[0]]);
+            if(invalid){formError(key+': '+invalid);return false;}
             return commitPatch(key,out.item,false,[col],storage);
           });
           group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], col[0]==='icon' && col[1]==='enum'?iconPickerControl(input):input));
+          /* Optional per-panel actions beside one sub-field (device-app report time). */
+          var extra=editor.patchSubfield && editor.patchSubfield(key,col,input,{initial:initial,value:cur && cur[col[0]],commit:function(value){
+            var item=Object.create(null);if(value!==undefined)item[col[0]]=value;
+            return commitPatch(key,item,false,[col],storage);
+          }});
+          if(extra)group.appendChild(extra);
         });
         body.appendChild(frowBlock(key, group));
       } else {

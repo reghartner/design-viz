@@ -9,6 +9,9 @@ const d=s=>s.page.sections[0].diagram;
 /* [phone clock, phone date, device-app clock, battery readout] per step. */
 const expected=[['10:30','Thu, Sep 24','10:30','38'],['12:40','Fri, Sep 25','12:40','36'],['12:41','Fri, Sep 25','12:41','35'],['12:41','Fri, Sep 25','12:41','35'],
   ['4:15','Fri, Sep 25','4:15','33'],['6:50','Fri, Sep 25','6:50','32'],['8:20','Fri, Sep 25','8:20','41'],['8:21','Fri, Sep 25','8:21','41']];
+/* [reported value, computed freshness] on the app's battery card per step. */
+const cards=[['38%','Updated just now'],['38%','Updated 2 h ago'],['35%','Updated just now'],['35%','Updated just now'],
+  ['35%','Updated 3 h ago'],['35%','Updated 6 h ago'],['35%','Updated 7 h ago'],['41%','Updated just now']];
 async function check(root,index){
   const [clock,date,app,charge]=expected[index];
   await chip(root,index).click();
@@ -17,6 +20,9 @@ async function check(root,index){
   await expect(root.locator('.pt-battery .btval')).toHaveText(charge+'%');
   if(await root.locator('.pt-deviceapp .da-statusbar').count())await expect(root.locator('.pt-deviceapp .da-statusbar > span').first()).toHaveText(app);
   else await expect(root.locator('.pt-deviceapp .da-home-clock strong')).toHaveText(app);
+  const card=root.locator('.pt-deviceapp [data-da-field="battery"]');
+  await expect(card.locator('.da-value')).toHaveText(cards[index][0]);
+  await expect(card.locator('.da-detail')).toHaveText(cards[index][1]);
 }
 
 test('standalone and native viewers show step time on every clock and drain the battery with elapsed time',async({page,server},testInfo)=>{
@@ -26,6 +32,10 @@ test('standalone and native viewers show step time on every clock and drain the 
   for(const index of [0,1,2,3,4,5,6,7,4,0])await check(root,index);
   await expect(root.locator('.pt-battery .bttrend')).toHaveText('idle');
   await chip(root,6).click();await expect(root.locator('.pt-battery .bttrend')).toHaveText('charging');
+  for(const index of [0,1,2,6,7]){
+    await check(root,index);
+    await root.locator('.pt-deviceapp .da-phone').screenshot({path:testInfo.outputPath('freshness-step-'+(index+1)+'.png')});
+  }
   await page.screenshot({path:testInfo.outputPath('story-time-standalone.png'),fullPage:true});
   await writeFile(path.join(server.root,'story-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'story-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./story-native.js";window.mount=mountNativeViewer;</script>');
@@ -112,4 +122,99 @@ test('workbench story time, step time, battery constants and extra drain edit th
   await expect(root.locator('.pt-phone .phoneclock')).toHaveText('');
   await page.locator('#undo-builder').click();await expect(root.locator('.pt-phone .phoneclock')).not.toHaveText('');
   expect(started.length).toBeGreaterThan(source.length);
+});
+
+test('workbench device app report time: mark reported at this step, derived freshness, validation and exact Undo/Redo',async({page,server},testInfo)=>{
+  const raw={page:{title:'Freshness',sections:[{heading:'Night',diagram:{view:'step',storyTime:{start:'2026-09-24T22:30'},nodes:{cam:{title:'Camera'}},rows:[['cam']],
+    panels:[{id:'app',type:'deviceapp',title:'App',device:'Camera',fields:[{id:'battery',label:'Battery',kind:'battery'}],initial:{battery:{value:60,status:'ready'}}}],
+    steps:[{id:'armed',nodes:['cam'],text:'Armed'},{id:'report',time:'+1h',nodes:['cam'],text:'Report',panels:{app:{battery:{value:55}}}},{id:'later',time:'+20m',nodes:['cam'],text:'Later'}]}}]}};
+  const source=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
+  const spec=async()=>JSON.parse(await src.inputValue());
+  const detail=root.locator('.pt-deviceapp [data-da-field="battery"] .da-detail');
+  await chip(root,1).click();await expect(detail).toHaveCount(0);
+  const openPatch=async()=>{
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
+    const patch=guide.locator('.patchedit').filter({has:page.locator(':scope > summary').filter({hasText:/^app ·/})});
+    if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
+    return patch;
+  };
+  let patch=await openPatch();
+  const before=await src.inputValue();
+  const time=patch.getByRole('textbox',{name:'battery report time',exact:true});
+  await expect(time).toHaveAttribute('placeholder','Inherit · now, -15m or 06:05');
+  await time.fill('soon');await time.press('Tab');
+  await expect(guide).toContainText('use now, -15m, +5m, 06:05 or 2026-09-25T06:05');await expect(src).toHaveValue(before);
+  await patch.getByRole('button',{name:'battery: reported at this step',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{value:55,reportedAt:'now'}});
+  patch=await openPatch();await patch.screenshot({path:testInfo.outputPath('freshness-report-control.png')});
+  await chip(root,1).click();await expect(detail).toHaveText('Updated just now');
+  await chip(root,2).click();await expect(detail).toHaveText('Updated 20 min ago');
+  const marked=await src.inputValue();
+
+  // Effective state labels the computed detail as derived.
+  patch=await openPatch();
+  const effective=guide.locator('.effective-state');
+  if(await effective.getAttribute('open')===null)await effective.locator(':scope > summary').click();
+  const panel=effective.locator('.effective-panel').filter({hasText:'app · deviceapp'});
+  if(await panel.getAttribute('open')===null)await panel.locator(':scope > summary').click();
+  await expect(panel.locator('[data-effective-field="battery"] .effective-origin')).toHaveText('Story time · derived freshness “Updated just now”');
+  await page.locator('#guide').screenshot({path:testInfo.outputPath('freshness-step-inspector.png')});
+
+  // A typed relative report time, then clear it.
+  patch=await openPatch();
+  await patch.getByRole('textbox',{name:'battery report time',exact:true}).fill('-5m');await patch.getByRole('textbox',{name:'battery report time',exact:true}).press('Tab');
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app.battery.reportedAt).toBe('-5m');
+  await chip(root,1).click();await expect(detail).toHaveText('Updated 5 min ago');
+  patch=await openPatch();
+  await patch.getByRole('button',{name:'battery: clear report time',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{value:55,reportedAt:null}});
+  await chip(root,2).click();await expect(detail).toHaveCount(0);
+  await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(src).toHaveValue(marked);
+  await chip(root,2).click();await expect(detail).toHaveText('Updated 20 min ago');
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(before);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(marked);
+
+  // Starting state: reported at story start.
+  await root.locator('.pt-deviceapp .ptitle').click();
+  const start=guide.getByRole('button',{name:'battery: reported at story start',exact:true});
+  await start.click();
+  await expect.poll(async()=>d(await spec()).panels[0].initial.battery).toEqual({value:60,status:'ready',reportedAt:'now'});
+  await chip(root,0).click();await expect(detail).toHaveText('Updated just now');
+});
+
+test('workbench Clear report time stops an inherited report on this and later steps; Inherit restores it with exact Undo/Redo',async({page,server})=>{
+  const raw={page:{title:'Inherited',sections:[{heading:'Night',diagram:{view:'step',storyTime:{start:'2026-09-24T22:30'},nodes:{cam:{title:'Camera'}},rows:[['cam']],
+    panels:[{id:'app',type:'deviceapp',title:'App',device:'Camera',fields:[{id:'battery',label:'Battery',kind:'battery'}],initial:{battery:{value:60,status:'ready',reportedAt:'now'}}}],
+    steps:[{id:'armed',nodes:['cam'],text:'Armed'},{id:'gap',time:'+1h',nodes:['cam'],text:'Gap',panels:{app:{}}},{id:'later',time:'+20m',nodes:['cam'],text:'Later'}]}}]}};
+  const source=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
+  const spec=async()=>JSON.parse(await src.inputValue());
+  const detail=root.locator('.pt-deviceapp [data-da-field="battery"] .da-detail');
+  const shows=async texts=>{for(const [index,text] of texts.entries()){await chip(root,index).click();if(text==null)await expect(detail).toHaveCount(0);else await expect(detail).toHaveText(text);}};
+  await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  const openPatch=async()=>{
+    await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
+    const patch=guide.locator('.patchedit').filter({has:page.locator(':scope > summary').filter({hasText:/^app ·/})});
+    if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
+    return patch;
+  };
+  let patch=await openPatch();
+  await expect(patch.getByRole('button',{name:'battery: inherit report time',exact:true})).toHaveCount(0);
+  await patch.getByRole('button',{name:'battery: clear report time',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({battery:{reportedAt:null}});
+  const cleared=await src.inputValue();
+  await shows(['Updated just now',null,null]);
+  patch=await openPatch();
+  await expect(patch.getByRole('button',{name:'battery: clear report time',exact:true})).toBeDisabled();
+  await patch.getByRole('button',{name:'battery: inherit report time',exact:true}).click();
+  await expect.poll(async()=>d(await spec()).steps[1].panels.app).toEqual({});
+  await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  const inherited=await src.inputValue();
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(cleared);await shows(['Updated just now',null,null]);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(cleared);await shows(['Updated just now',null,null]);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(inherited);await shows(['Updated just now','Updated 1 h ago','Updated 1 h ago']);
 });

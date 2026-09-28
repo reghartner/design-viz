@@ -13,7 +13,7 @@
         "heading": "One night on a battery camera",
         "text": [
           "The story starts at 10:30 PM and each step moves the story clock. The phone and the app take their clock and date from the step, and the camera battery drains with the elapsed hours, loses extra charge for each recorded clip and recovers once solar charging starts at sunrise.",
-          "No clock, date or battery percentage is typed per panel except the app's battery card, which shows the last value the camera reported.",
+          "No clock, date, battery percentage or \"updated\" text is typed per panel. The app's battery card shows the last value the camera reported, and the step that delivers a report marks it with reportedAt, so the card says how long ago it arrived on every later step.",
           "Drain and charge rates are illustrative estimates, not measured device behavior."
         ],
         "diagram": {
@@ -41,7 +41,7 @@
                {"id": "battery", "label": "Battery", "kind": "battery"},
                {"id": "clip", "label": "Last recording", "icon": "camera"}
              ],
-             "initial": {"battery": {"value": 38, "status": "ready", "detail": "Reported 10:30 PM"},
+             "initial": {"battery": {"value": 38, "status": "ready", "reportedAt": "now"},
                          "clip": {"value": "None tonight", "status": "ready"}}}
           ],
           "steps": [
@@ -51,8 +51,9 @@
              "text": "Two hours later motion wakes the camera. Recording the clip costs an extra 1.5 percent.",
              "panels": {"battery": {"drain": 1.5, "trend": "draining", "note": "recording"}}},
             {"id": "upload", "time": "+1m", "edge": "camera->cloud", "lane": "CLOUD",
-             "text": "The clip uploads to the event service.",
-             "panels": {"battery": {"drain": 0.5, "trend": "idle", "note": "idle"}}},
+             "text": "The clip uploads to the event service with a battery report; the app's card now shows 35 percent, reported just now.",
+             "panels": {"battery": {"drain": 0.5, "trend": "idle", "note": "idle"},
+                        "app": {"battery": {"value": 35, "status": "ready", "reportedAt": "now"}}}},
             {"id": "push", "edge": "cloud->phone", "lane": "RESIDENT",
              "text": "The resident's phone shows the motion alert at the same minute.",
              "panels": {"phone": {"notify": {"app": "Homestead", "title": "Motion in the backyard", "text": "Backyard camera recorded a clip"}}}},
@@ -63,10 +64,10 @@
              "text": "Sunrise at 6:50 AM. The panel starts charging, so the next interval adds charge instead of draining it.",
              "panels": {"battery": {"trend": "charging", "note": "solar charging"}}},
             {"id": "check", "time": "08:20", "edge": "phone->cloud", "lane": "RESIDENT",
-             "text": "At 8:20 AM the resident opens the app to review the night."},
+             "text": "At 8:20 AM the resident opens the app to review the night. The battery card still shows the 12:41 AM report, now 7 hours old."},
             {"id": "status", "time": "+1m", "edge": "cloud->phone", "lane": "CLOUD",
              "text": "The app receives the camera's latest report. It shows the rounded value the camera sent, not a live reading.",
-             "panels": {"app": {"battery": {"value": 41, "status": "ready", "detail": "Reported 8:21 AM"},
+             "panels": {"app": {"battery": {"value": 41, "status": "ready", "reportedAt": "now"},
                                 "clip": {"value": "Fox · 4:15 AM", "status": "ready"}}}}
           ]
         }

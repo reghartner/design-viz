@@ -106,6 +106,11 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
         var builtIn=Object.keys(sources).some(function(k){return sources[k]==='built-in';});
         return {kind:'story',label:'Story time · battery drift'+(builtIn?' · built-in default rate':''),inputs:drift.inputs.concat(timeInputs())};
       }
+      if(derived==='freshness'){
+        /* The field's value is authored; its detail is derived from the report time. */
+        var reports=history([key],true,'Field value and source history'),text=specObject(snapshot[key])?snapshot[key].detail:'';
+        return {kind:'story',label:'Story time · derived freshness “'+text+'”',inputs:reports.inputs.concat(timeInputs())};
+      }
       var authoring=panelAuthoring(p.type), current=(stepPanelPatch(d.steps[stepIndex])||{})[p.id];
       var custom=authoring.origin && authoring.origin(p,key,snapshot,{assignment:assignment,history:history,input:input,own:own,currentPatch:current,stepIndex:stepIndex});
       if(custom) return custom;
@@ -244,7 +249,7 @@ var BUILDER_GUIDES = {
       ['contract / contracts', 'legacy single card or an ordered array of sized contract blocks'],
       ['diagram', 'the board: nodes, rows, edges, panels, steps'],
       ['diagram.routing', 'Edge routing: No lanes (default) or Lanes; applies to every view of this diagram'],
-      ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it'],
+      ['diagram.storyTime', 'Story time: start (and optional end), 12/24-hour clock and date format; steps move it, clocks follow it, and device-app fields with reportedAt show computed freshness'],
       ['diagram.deviceDefaults', 'battery drain/charge percent per hour for every battery panel without its own rates']
     ]
   }

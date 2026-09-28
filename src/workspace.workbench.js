@@ -24,7 +24,7 @@ function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;
   var names=['agent','brief','inspect','steps','outline','json','file'],labels={agent:'Agent · Claude',brief:'Story brief',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
-  var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false;
+  var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false,history=null;
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
   var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0;
   document.body.classList.add('workspace-canvas');
@@ -54,18 +54,25 @@ function initWorkbenchWorkspace(){
     persist();return true;
   }
   function close(name){prefs.windows[name].open=false;paint(name);persist();focusTab(name);}
+  function geometry(name){var value=prefs.windows[name],out={};['x','y','w','h'].forEach(function(k){out[k]=value[k];});return out;}
+  function remember(name,before){
+    if(!history || JSON.stringify(workspacePanelRect(before,innerWidth,innerHeight))===JSON.stringify(rect(name)))return;
+    history({before:before,after:geometry(name),restore:function(value){
+      finish(true);Object.assign(prefs.windows[name],value);paint(name);persist();return true;
+    }});
+  }
   function finish(cancel){
     if(!gesture)return;
     var g=gesture;gesture=null;
     if(cancel)prefs.windows[g.name]=g.before;
     document.body.classList.remove('workspace-dragging');document.body.style.cursor='';
     if(g.handle.hasPointerCapture(g.id))g.handle.releasePointerCapture(g.id);
-    paint(g.name);if(!cancel)persist();
+    paint(g.name);if(!cancel){persist();remember(g.name,g.geometry);}
   }
   function begin(ev,name,kind,handle){
     if(ev.button!==0 || !ev.isPrimary || gesture)return;
     ev.preventDefault();front(name);handle.focus({preventScroll:true});
-    gesture={id:ev.pointerId,name:name,kind:kind,handle:handle,x:ev.clientX,y:ev.clientY,rect:rect(name),before:Object.assign({},prefs.windows[name])};
+    gesture={id:ev.pointerId,name:name,kind:kind,handle:handle,x:ev.clientX,y:ev.clientY,rect:rect(name),before:Object.assign({},prefs.windows[name]),geometry:geometry(name)};
     handle.setPointerCapture(ev.pointerId);document.body.classList.add('workspace-dragging');document.body.style.cursor=kind==='move'?'grabbing':'nwse-resize';
   }
   function move(ev){
@@ -76,10 +83,10 @@ function initWorkbenchWorkspace(){
   }
   function keyMove(ev,name,kind){
     if(ev.altKey || ev.ctrlKey || ev.metaKey || !/^Arrow(Left|Right|Up|Down)$/.test(ev.key))return;
-    ev.preventDefault();ev.stopPropagation();var r=rect(name),amount=ev.shiftKey?50:10;
+    ev.preventDefault();ev.stopPropagation();var before=geometry(name),r=rect(name),amount=ev.shiftKey?50:10;
     var axis=/Left|Right/.test(ev.key)?(kind==='move'?'x':'w'):(kind==='move'?'y':'h');
     r[axis]+=/Left|Up/.test(ev.key)?-amount:amount;
-    Object.assign(prefs.windows[name],workspacePanelRect(r,innerWidth,innerHeight));paint(name);persist();
+    Object.assign(prefs.windows[name],workspacePanelRect(r,innerWidth,innerHeight));paint(name);persist();remember(name,before);
   }
   names.forEach(function(name,index){
     var pane=panes[name]=document.getElementById('editor-'+name),tab=tabs[name]=document.getElementById('editor-tab-'+name);
@@ -141,5 +148,5 @@ function initWorkbenchWorkspace(){
   }
   if(preset)preset.addEventListener('change',function(){applyPreset(preset.value);});
 
-  return {showTool:showTool,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
+  return {setHistory:function(value){finish(true);history=value;canvas.setHistory(value);},showTool:showTool,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
 }

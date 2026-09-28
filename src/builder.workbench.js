@@ -477,6 +477,10 @@ function initWorkbenchBuilder(opts){
     },
     invalidateProject:retireProjectUI
   });
+  if(opts.workspace && opts.workspace.setHistory){
+    opts.workspace.setHistory(life.guard(session.rememberView));
+    life.own(function(){opts.workspace.setHistory(null);});
+  }
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
     download:function(name,text,mime){return io && io.download(name,text,mime);},
@@ -594,8 +598,8 @@ function initWorkbenchBuilder(opts){
     var tool=opts.workspace && opts.workspace.tool(),result=action();
     if(tool)opts.workspace.showTool(tool);return result;
   }
-  function doUndo(){return agentHistory(function(){return session.undo();});}
-  function doRedo(){return agentHistory(function(){return session.redo();});}
+  function doUndo(){return session.historyType()==='view'?session.undo():agentHistory(function(){return session.undo();});}
+  function doRedo(){return session.historyType(true)==='view'?session.redo():agentHistory(function(){return session.redo();});}
   if (undoBtn) life.listen(undoBtn,'click', doUndo);
   if (redoBtn) life.listen(redoBtn,'click', doRedo);
   life.listen(src,'input', function(){
@@ -955,16 +959,19 @@ function initWorkbenchBuilder(opts){
     },true);
   });
 
-  /* Whole-project imports are undoable even when the source has focus. */
+  /* Text fields keep native Undo; canvas/tools use the shared action history.
+     Whole-project imports remain undoable even when the source has focus. */
   life.listen(document,'keydown', function(ev){
-    if (opts.isActive && !opts.isActive()) return;
-    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
-    if (interactions.adding() || !session.canUndoProject()) return;
+    if (ev.defaultPrevented || opts.isActive && !opts.isActive()) return;
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey) return;
+    var key=ev.key.toLowerCase(),redo=key==='z' && ev.shiftKey || key==='y' && !ev.shiftKey;
+    if (key!=='z' && !redo || interactions.adding()) return;
     var ae = document.activeElement;
-    if (ae && ae !== src && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+    if(ae && ae.closest('dialog[open]'))return;
+    if(ae && (ae.tagName==='INPUT' || ae.tagName==='TEXTAREA' || ae.isContentEditable) && !(ae===src && !redo && session.canUndoProject()))return;
     ev.preventDefault();
     session.clearProjectUndo();
-    doUndo();
+    if(redo)doRedo();else doUndo();
   });
 
   /* Node presets and the panel library share the persistent Add entry point. */

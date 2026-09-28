@@ -17,13 +17,16 @@ function createWorkbenchAgentExchange(opts){
       if(!proposal)return null;
       var current=snapshot();
       function result(status,message){pending={id:proposal.id,baseRevision:proposal.baseRevision,status:status,message:message,revision:current.revision};return message;}
+      if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))
+        return result('rejected','Submit the complete updated document in source. Operation and dry-run proposals are no longer supported.');
       if(!current.open)return result('rejected','Open a project before applying agent changes.');
       if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
       if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';
-      if(typeof proposal.source!=='string' || proposal.source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
-      if(proposal.source===current.source)return result('unchanged','Agent proposal matches the current document.');
+      var source=proposal.source;
+      if(typeof source!=='string' || source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
+      if(source===current.source)return result('unchanged','Agent proposal matches the current document.');
       var outcome;
-      try{outcome=opts.apply(proposal.source,current);}
+      try{outcome=opts.apply(source,current,proposal);}
       catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}
       if(!outcome || !outcome.ok)return result('rejected',outcome && outcome.error || 'Document changed before the proposal could apply.');
       current=snapshot();

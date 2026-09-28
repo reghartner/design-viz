@@ -71,10 +71,10 @@ test('replacement failure invalidates retired preview identity; failure before t
   h.fail(null);assert.equal(p.render(SOURCE).ok,true);assert.ok(p.controller());assert.equal(p.renderedText(),SOURCE);
 });
 test('session keeps accepted exact source/history and persistence when replacement fails, and reports distinct operation policies',()=>{
-  const h=harness(),p=h.preview,saves=[];let text=SOURCE;
+  const h=harness(),p=h.preview,saves=[],archives=[];let text=SOURCE;
   p.render(text);
   const session=h.c.createBuilderSession({source:{read:()=>text,write:value=>{text=value;}},
-    persistence:{read:()=>({}),save:(...args)=>saves.push(args),cancel(){},destroy(){}},
+    persistence:{read:()=>({}),save:(...args)=>saves.push(args),preserve:(...args)=>archives.push(args),cancel(){},destroy(){}},
     render:request=>p.render(text,request),renderedText:p.renderedText});
   h.fail('replace');let delivered;
   const edited=SOURCE+'  ';
@@ -83,6 +83,7 @@ test('session keeps accepted exact source/history and persistence when replaceme
   assert.equal(session.snapshot().renderedText,null);assert.equal(session.canUndo(),true);assert.deepEqual(saves.at(-1),[edited,SOURCE]);
   h.fail(null);session.undo();assert.equal(text,SOURCE);assert.equal(p.renderedText(),SOURCE);session.redo();assert.equal(text,edited);
   session.importText(SOURCE);session.replaceProject(SOURCE);
+  assert.deepEqual(archives,[[SOURCE,SOURCE]]);assert.equal(session.canUndo(),false);assert.equal(session.canRedo(),false);
   assert.deepEqual(h.events.filter(e=>e[0]==='before').map(e=>e[1].origin),['manual','edit','history','history','import','project']);
   assert.deepEqual(h.events.filter(e=>e[0]==='before')[1][1].retention,{multi:true});
 });

@@ -57,21 +57,28 @@ Claude stops the connection. Normal permission prompts are handled in Claude.
 
 ## Communicate
 
-Agent is a floating window over the diagram canvas. Inspect the named selection
-and current view/path/step before sending; expand **Sent with…** beside a sent
+Agent is a floating window over the diagram canvas. **Focus** summarizes the
+selection in one line; expand it to inspect every selected item and the current
+view/path/step before sending. Expand **Sent with…** beside a sent
 message to see its frozen receipt. The complete story is shared with Claude,
 with the selection identifying the focus. Selection changes cannot silently
 retarget an already sent request. The toolbar keeps Claude's activity state
 visible while the Agent window is closed.
 
 Send one message at a time from the editor. Each request includes the authored
-selection, current path/view/step, and the chosen Story detail level. Change that
-level to Engineering when enriching the same story. Selection or detail changes after Send do not change
+selection, current path/view/step, and the chosen Story detail level. Choose detail
+during connection setup; afterward, open the compact **Detail: Story** control
+to change it, for example to Engineering when enriching the same story.
+Selection or detail changes after Send do not change
 that request. The editor shows a timestamped **Claude activity** feed while a
 request is pending and keeps it visible with the final answer. It distinguishes
 waiting for Claude's first acknowledgment from receiving an update. After 30
 seconds without an update, it says so; a watcher heartbeat alone never claims
 the model is working. If the watcher stops, the editor reports that separately.
+The status icon and label distinguish waiting, working, permission needed,
+review-ready and finished states. Incoming output follows automatically while
+you are at the latest update. Scroll up to read without being pulled back; use
+**New output · Jump to latest** to resume following the conversation.
 
 Claude must immediately acknowledge each request with `progress`, then report
 each meaningful phase (reading, planning, editing, validating), errors, and any
@@ -94,7 +101,8 @@ questions appropriate to the selected audience. `authoring/` is the version-matc
 VIZ directory. It includes the skill, references, recipes, validator, compatibility
 stamper and state walker. Browser checks remain separate and must not be claimed.
 
-The helper supports these commands (run from anywhere, using its absolute path):
+Claude writes the complete updated document to `candidate.spec.json` for each
+edit. The helper supports these commands (run from anywhere, using its absolute path):
 
 ```sh
 python3 /path/to/session/folder-agent.py watch --minutes 25
@@ -145,12 +153,23 @@ exits on a disconnected editor or a changed connection identity. Browser closure
 or sleep may leave a stale heartbeat; stale requests are not emitted.
 
 Use Claude in the original working folder (or the exchange folder itself).
-Open `story.spec.json` with the ordinary workbench file opener, then use
-**Resume a session folder** and choose the saved session subfolder itself. Resume
-requires the exact saved source and refuses a recent active editor lease. It
-starts a new connection identity, restores the conversation, refreshes the helper
+Choose the prominent **Resume from folder** button at the top of connection
+setup and select the saved `flowview-session-…` subfolder itself. The editor
+loads its saved story and conversation automatically; no separate file opening
+or story-choice step is needed. A different current draft is kept in
+**Earlier drafts**. The resumed story starts a fresh Undo/Redo history, so Undo
+cannot switch back to another file. Resume refuses an
+active editor lease, a changed folder snapshot, or a draft edited while the
+folder is being selected. If the earlier draft cannot be preserved, it stops
+without replacing it. Resume starts a new connection identity, restores the conversation, refreshes the helper
 and authoring kit, and requires new connection instructions in Claude. These
 files are refreshed only after the resume is accepted. Old pending work is not replayed automatically.
+Sessions created with the retired operation API need this refresh and fresh
+connection instructions before continuing with complete document proposals.
+Reload the updated workbench, choose **Resume from folder**, paste its fresh instructions
+into Claude, and start the new watch. That watch refreshes the bundled skill and
+removes retired API guidance before emitting requests. It does not erase earlier
+messages from the Claude conversation.
 Use the saved ledger to continue with another person or agent.
 
 The initial experiment supports one editor/Claude session on local disk. Avoid

@@ -57,6 +57,7 @@
     "workbench/lifetime.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",
+    "workbench/agent-recovery.js",
     "workbench/agent-chat.js",
     "workbench/controls.js",
     "workbench/notifications.js",
@@ -73,6 +74,7 @@
     "workbench/interactions.js",
     "workbench/add-menu.js",
     "workbench/catalog-picker.js",
+    "workbench/story-brief.js",
     "builder.workbench.js"
   ],
   "clipboard.workbench.js": [
@@ -225,7 +227,9 @@
       ],
       "workbench": [
         "workbench/icon-picker.css",
-        "workbench/brand.css"
+        "workbench/brand.css",
+        "workbench/agent-conversation.css",
+        "workbench/story-brief.css"
       ]
     },
     "iconLibrary": "icons/library.js"

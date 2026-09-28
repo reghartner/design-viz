@@ -219,8 +219,11 @@ See [local design sessions](local-agent-session.md) for the wire/file contract.
 DOM references. The controller separately owns highlighted elements, field focus,
 selection ranges, multiselection and gesture state. `invalidateProject()` increments
 the project generation, invokes the controller's operation/preview retirement hook
-and clears the selected authored target itself. `replaceProject()` also resets
-insertion to section zero and cancels a pending draft save.
+and clears the selected authored target and history. Home navigation uses
+`invalidateProject({preserveHistory:true})` to keep the same document's history
+while retiring pending work. `replaceProject()` archives the outgoing exact
+draft before clearing history, resets insertion to section zero and cancels a
+pending draft save.
 
 | Session entrypoint | Publication and history policy |
 | --- | --- |
@@ -228,7 +231,7 @@ insertion to section zero and cancels a pending draft save.
 | `importText(text, hooks)` | Adds one Undo entry while keeping the original baseline. Runs caller-specific before/after-render hooks; only Mermaid requests the imported-text keyboard shortcut marker. File/trace parsing, cancellation and dialogs remain in their I/O controllers. |
 | `undo()` / `redo()` | Captures the current exact adapter text on the opposite stack before writing the historical text, clearing the authored target, rendering, notifying the UI and saving. Intervening invalid handwriting remains reachable. New actions cap Undo at thirty and clear Redo. |
 | `noteInput()` | Marks the project live immediately, clears the import shortcut and schedules the 800 ms save. Typing adds no builder history and is not parsed, rewritten or rendered by the session. |
-| `replaceProject()` / `restoreDraft()` | Retires the previous project, publishes once, changes the baseline and runs project-specific hooks. If recovery is still pending, the first Undo target is the recovered draft rather than the boot demo. Typing makes the current text win over pending recovery. |
+| `replaceProject()` / `restoreDraft()` | Archives the outgoing or pending recovered draft, retires the previous project, clears both history stacks, publishes once, changes the baseline and runs project-specific hooks. Archive failure leaves the current document and history intact. Undo never crosses a loaded-file boundary. Typing makes the current text win over pending recovery. |
 | `markSaved()` / `save()` | Marks the current exact source as the comparison baseline, or persists the current draft and baseline pair. Saving does not require valid JSON. |
 
 All ordinary builder writes use `accept()`: the common `applyPlan()` path,
@@ -461,7 +464,8 @@ Promises, timers, URLs and directory streams without importing the builder.
 Publication policies stay distinct:
 
 - **Open file** replaces the project with exact text even if JSON is unfinished,
-  preserving repair and one project Undo. The public validated `loadText()` path
+  preserving the outgoing draft in Earlier drafts and starting fresh Undo/Redo.
+  The public validated `loadText()` path
   still validates before replacement.
 - **Save** downloads the current snapshot, including invalid JSON, and marks the
   current exact source as the baseline only after download dispatch succeeds.

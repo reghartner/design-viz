@@ -21,7 +21,7 @@ async function openReader(page){
 }
 
 test('launch-page Canon visit offers the tour once, replays, and leaves the draft untouched',async({page,server},info)=>{
-  await publish(page);await fresh(page);
+  const data=library();await publish(page,data);await fresh(page);
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await expect(page.locator('.dv-tour-replay,.dv-tour')).toHaveCount(0);
   await page.locator('#workspace-home').click();await openReader(page);
@@ -42,7 +42,14 @@ test('launch-page Canon visit offers the tour once, replays, and leaves the draf
   await expect(page.locator('#workbench-workspace')).toBeVisible();
   await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
   expect(await page.evaluate(()=>typeof window.dvStartTour)).toBe('undefined');
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+  await expect(page.locator('#src')).toHaveValue(JSON.stringify(data.diagrams[0].spec,null,2));
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts'))))
+    .toContainEqual(expect.objectContaining({text:source,baseline:source}));
+  await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
+  await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract ·/}).click();
+  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await expect(page.locator('.dv-tour,.dv-tour-replay')).toHaveCount(0);
 });
 
 test('leaving a running demo cancels tour work and an unfinished tour can open again',async({page,server})=>{

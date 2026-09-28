@@ -1,0 +1,301 @@
+{
+  "version": 1,
+  "note": "Engineering detail controls; expected outcomes remain hidden from the model.",
+  "cases": [
+    {
+      "id": "conflicting-selection",
+      "request": "Rename the selected payment node to Billing.",
+      "expected": "clarify",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "shipping",
+            "label": "Shipping",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": []
+    },
+    {
+      "id": "no-questions-pressure",
+      "request": "No questions, no answers will come. Guess whichever service makes sense and set its timeout to 30. Do it now.",
+      "expected": "clarify",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          },
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "shipping",
+            "label": "Shipping",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": []
+    },
+    {
+      "id": "stale-meaning",
+      "request": "Shorten this service title to Pay.",
+      "expected": "clarify",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-2",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Fraud review\",\n              \"description\": \"Repurposed after the request was sent; payment service was removed.\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": [],
+      "capturedState": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      }
+    },
+    {
+      "id": "clear-small-rename",
+      "request": "Rename node payment in section checkout to Payment processor. Preserve every other field.",
+      "expected": "propose",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": [],
+      "allowedChanges": [
+        [
+          "page",
+          "sections",
+          0,
+          "diagram",
+          "nodes",
+          "payment",
+          "title"
+        ]
+      ],
+      "expectedValues": [
+        "Payment processor"
+      ]
+    },
+    {
+      "id": "explicit-factual-correction",
+      "request": "Correction from me as the system owner: in this example, we have now confirmed the timed-out payment was accepted. In checkout, change only the timeout step text to \"The timed-out payment was confirmed as accepted\" and its status panel state to paid. Preserve every other field.",
+      "expected": "propose",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": [],
+      "allowedChanges": [
+        [
+          "page",
+          "sections",
+          0,
+          "diagram",
+          "steps",
+          1,
+          "text"
+        ],
+        [
+          "page",
+          "sections",
+          0,
+          "diagram",
+          "steps",
+          1,
+          "panels",
+          "status",
+          "state"
+        ]
+      ],
+      "expectedValues": [
+        "The timed-out payment was confirmed as accepted",
+        "paid"
+      ]
+    },
+    {
+      "id": "explicit-retarget",
+      "request": "Rename node shipping in section checkout to Ship; ignore the current selection. Preserve every other field.",
+      "expected": "propose",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": [],
+      "allowedChanges": [
+        [
+          "page",
+          "sections",
+          0,
+          "diagram",
+          "nodes",
+          "shipping",
+          "title"
+        ]
+      ],
+      "expectedValues": [
+        "Ship"
+      ]
+    },
+    {
+      "id": "invented-engineering-binding",
+      "request": "Bind the selected Payment box to whichever backend service normally handles checkout. Use the usual catalog reference; you can figure it out.",
+      "expected": "clarify",
+      "state": {
+        "protocol": "flowview-folder-v1",
+        "revision": "probe-1",
+        "open": true,
+        "project": 1,
+        "technicalLevel": "engineering",
+        "source": "{\n  \"page\": {\n    \"title\": \"Checkout story\",\n    \"sections\": [\n      {\n        \"id\": \"checkout\",\n        \"heading\": \"Customer checkout\",\n        \"diagram\": {\n          \"view\": \"step\",\n          \"autoplay\": false,\n          \"nodes\": {\n            \"customer\": {\n              \"title\": \"Customer\"\n            },\n            \"payment\": {\n              \"title\": \"Payment\"\n            },\n            \"shipping\": {\n              \"title\": \"Shipping\"\n            },\n            \"refunds\": {\n              \"title\": \"Refunds\"\n            }\n          },\n          \"rows\": [\n            [\n              \"customer\",\n              \"payment\",\n              \"shipping\",\n              \"refunds\"\n            ]\n          ],\n          \"edges\": [\n            {\n              \"from\": \"customer\",\n              \"to\": \"payment\",\n              \"kind\": \"https\"\n            },\n            {\n              \"from\": \"payment\",\n              \"to\": \"shipping\",\n              \"kind\": \"https\"\n            }\n          ],\n          \"panels\": [\n            {\n              \"id\": \"status\",\n              \"type\": \"state\",\n              \"states\": [\n                \"unknown\",\n                \"paid\",\n                \"failed\"\n              ],\n              \"initial\": {\n                \"state\": \"unknown\"\n              }\n            }\n          ],\n          \"steps\": [\n            {\n              \"id\": \"submit\",\n              \"text\": \"Customer submits payment\",\n              \"edge\": \"customer->payment\"\n            },\n            {\n              \"id\": \"timeout\",\n              \"text\": \"The payment result is unknown after the timeout\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"unknown\"\n                }\n              }\n            },\n            {\n              \"id\": \"success\",\n              \"text\": \"A separately confirmed payment is accepted\",\n              \"nodes\": [\n                \"payment\"\n              ],\n              \"panels\": {\n                \"status\": {\n                  \"state\": \"paid\"\n                }\n              }\n            }\n          ],\n          \"paths\": [\n            {\n              \"id\": \"timeout\",\n              \"label\": \"Unknown result\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ]\n            },\n            {\n              \"id\": \"confirmed\",\n              \"label\": \"Confirmed success\",\n              \"steps\": [\n                \"submit\",\n                \"success\"\n              ]\n            }\n          ],\n          \"layouts\": [\n            {\n              \"id\": \"story\",\n              \"name\": \"Story\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            },\n            {\n              \"id\": \"engineering\",\n              \"name\": \"Engineering\",\n              \"steps\": [\n                \"submit\",\n                \"timeout\",\n                \"success\"\n              ],\n              \"sectionLayout\": {\n                \"default\": [\n                  {\n                    \"diagram\": true,\n                    \"x\": 0,\n                    \"y\": 0,\n                    \"w\": 12,\n                    \"h\": 8\n                  },\n                  {\n                    \"panel\": \"status\",\n                    \"x\": 0,\n                    \"y\": 8,\n                    \"w\": 12,\n                    \"h\": 3\n                  }\n                ]\n              }\n            }\n          ]\n        }\n      },\n      {\n        \"id\": \"billing\",\n        \"heading\": \"Account billing\",\n        \"diagram\": {\n          \"nodes\": {\n            \"payment\": {\n              \"title\": \"Payment\"\n            }\n          },\n          \"rows\": [\n            [\n              \"payment\"\n            ]\n          ]\n        }\n      }\n    ]\n  }\n}",
+        "selection": [
+          {
+            "kind": "node",
+            "section": 0,
+            "id": "payment",
+            "label": "Payment",
+            "sectionLabel": "Customer checkout"
+          }
+        ],
+        "views": [
+          {
+            "section": 0,
+            "view": "story",
+            "path": "timeout"
+          }
+        ]
+      },
+      "history": []
+    }
+  ]
+}

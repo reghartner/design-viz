@@ -45,7 +45,7 @@ function createBuilderPersistence(options){
           entries.unshift({text:text,baseline:baseline,at:options.now()});
           storage.setItem(archiveKey,JSON.stringify(entries));
         }
-      }catch(ex){throw Error('Your earlier draft could not be saved. Save it to a file or free browser storage, then retry Build.');}
+      }catch(ex){throw Error('Your earlier draft could not be saved. Save it to a file or free browser storage, then try again.');}
     },
     clear:function(){
       if(disposed)return;

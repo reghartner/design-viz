@@ -40,9 +40,19 @@ The diagram is the full browser canvas. Its nodes and connections pan and zoom
 without a surrounding document card. Select a **Section** in the top toolbar;
 its view choices, playback and data panels float over the canvas. Use **Pan**
 (or hold Space), zoom, and **Fit diagram** to navigate. Camera movements and
-floating tool positions are viewing preferences, not source edits or Undo entries.
+floating panel positions are viewing preferences, not source edits. Panel moves
+and resizes join the same **Undo**/**Redo** history as story edits, one entry per
+completed drag or arrow-key adjustment. Undo restores geometry without moving
+the camera, reopening closed tools, or changing the JSON. Camera movement and
+opening/closing tools do not add history entries. A movement that hits an edge
+without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
+panel moves keyboard focus to its handle, so the next keyboard Undo targets the
+panel. Loading another file or resuming a folder starts fresh history; recover
+the previous story through **Earlier drafts**.
 Camera and panel state follow matched sections through source edits; new projects
-start fresh. Each named view retains its own camera for the session.
+start fresh. Local drill-down panels keep their own geometry through preview
+refreshes; undoing a closed detail’s geometry does not reopen it. Each named view
+retains its own camera for the session.
 
 **Canvas appearance → Page preview** shows prose, contract cards and the authored
 page arrangement. Use it to arrange/export curated Home-centric views or simulate
@@ -91,6 +101,10 @@ visibility uses the diagram's **Panels** menu. **File → Workspace preferences 
 Reset panel layout** restores initial positions and sizes. Geometry and open
 windows persist in this browser; resizing the browser keeps their handles on
 screen. Escape, pointer cancellation and losing window focus cancel a drag.
+Use **⌘/Ctrl Z** to undo and **⌘/Ctrl Shift Z** (or **Ctrl Y**) to redo while
+working on the canvas or panel handles. Text fields keep their native text undo.
+Temporary geometry history ends when a different project is opened or the page
+reloads; saved editor-window positions still return on reload.
 
 The Agent window names the current selection and the view/path/step context.
 Each sent message retains a receipt of that exact context. A persistent Claude

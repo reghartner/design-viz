@@ -12,20 +12,21 @@ const origin='https://flowview-folder.test';
 // validation, rendering, history and conversation are real. It is not evidence
 // that a human granted native browser permission or that Claude's Monitor ran.
 async function setup(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0;const requests=[],errors=[];
+  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0,readGate=null;const requests=[],errors=[],writes=[];
   await writeFile(path.join(folder,'README.md'),'Existing agent project notes.');
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
     const target=path.resolve(folder,'.'+name);if(!target.startsWith(folder+path.sep)&&target!==folder)throw Error('Outside test folder');
     if(operation==='mkdir'){await mkdir(target,{recursive:true});sessionFolder=target;return;}
     if(operation==='write'){
+      writes.push(name);
       if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}
       // createWritable buffers writes until close; readers see a complete file.
       const pending=path.join(path.dirname(target),'.browser-write-'+(++writeId));
       try{await writeFile(pending,value,{flag:'wx'});await rename(pending,target);}finally{await rm(pending,{force:true});}
       return;
     }
-    if(operation==='read'){try{return await readFile(target,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}}
+    if(operation==='read'){if(readGate)await readGate(path.basename(target));try{return await readFile(target,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}}
     if(operation==='exists'){try{await stat(target);return true;}catch{return false;}}
   });
   await page.addInitScript(()=>{
@@ -47,7 +48,7 @@ async function setup(page){
     return route.fulfill({contentType:'application/json',body:'[]'});
   });
   await page.goto(origin+'/index.html');
-  return {folder,requests,errors,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
+  return {folder,requests,errors,writes,readGate:gate=>readGate=gate,failNextWrite:name=>failWrite=name,get session(){return sessionFolder;},
     read:async name=>JSON.parse(await readFile(path.join(sessionFolder,name),'utf8')),
     run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
     cleanup:()=>rm(folder,{recursive:true,force:true})};
@@ -61,8 +62,14 @@ async function chooseFolder(page){
 }
 async function resumeFolder(page){
   if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
-  if(!await page.locator('#folder-agent-resume').isVisible())await page.getByText('Resume an existing exchange',{exact:true}).click();
+  await expect(page.locator('#folder-agent-resume')).toBeVisible();
   await page.locator('#folder-agent-resume').click();
+}
+async function publishedRequest(h,text){
+  // Send disables while its file write is pending, before Claude can read it.
+  // Synchronize on the exact published turn so a previous request cannot pass.
+  await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe(text);
+  return h.read('request.json');
 }
 async function disconnect(page){
   await closeGuide(page);
@@ -84,7 +91,10 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
     await expect(page.locator('#folder-agent-context')).toContainText('a');
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
-    await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');expect(request.selection[0].id).toBe('a');
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await publishedRequest(h,'Tell the customer story');expect(request.selection[0].id).toBe('a');
+    expect(request.technicalLevel).toBe('story');
+    await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');
+    expect(await h.read('request.json')).toEqual(request); // This control configures the next request only.
     // Simulated agent asks a real protocol question; text must stay inert.
     await writeFile(path.join(h.session,'answer.txt'),'What should the customer learn? <img src=x onerror=alert(1)>');
     h.run('reply','--request',request.id,'--file','answer.txt');
@@ -92,7 +102,8 @@ test('editor conversation uses real local files and helper; changes render with 
     await expect(page.locator('#folder-agent-messages img')).toHaveCount(0);
     await closeGuide(page);await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(3);
-    const next=await h.read('request.json'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
+    const next=await publishedRequest(h,'They can receive camera updates.'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
+    expect(next.technicalLevel).toBe('engineering');
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
     await page.locator('#folder-agent-input').focus(); // Composer focus must allow diagram updates.
     h.run('propose','--request',next.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Customer story updated');
@@ -167,7 +178,7 @@ test('Claude activity streams before the final answer and remains visible withou
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain our customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
     await expect(page.locator('#folder-agent-progress')).toContainText('has not acknowledged');
-    const request=await h.read('request.json');
+    const request=await publishedRequest(h,'Explain our customer story');
     h.run('progress','--request',request.id,'--text','Reading your customer story.');
     h.run('progress','--request',request.id,'--text','Checking the paths. <img src=x onerror=alert(1)>');
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
@@ -190,15 +201,27 @@ test('Claude activity streams before the final answer and remains visible withou
 });
 
 
-test('refused resume preserves the paired agent instructions; successful resume issues a new connection',async({page})=>{
+test('refused folder Resume preserves the draft and instructions; successful Resume restores saved story and conversation',async({page})=>{
   const h=await setup(page);
   try{
     await page.locator('#welcome-agent').click();
     await chooseFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    const savedSource=(await h.read('state.json')).source;
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('Keep this conversation for folder Resume');await page.locator('#folder-agent-send').click();
+    const request=await publishedRequest(h,'Keep this conversation for folder Resume');
+    h.run('reply','--request',request.id,'--text','The saved folder conversation is ready to continue.');
+    await expect(page.locator('#folder-agent-messages')).toContainText('The saved folder conversation is ready to continue.');
+    h.run('prepare');
+    const skillFile=path.join(h.session,'authoring/.claude/skills/hld-to-page/SKILL.md');
+    await writeFile(skillFile,'Stale skill: use the old API');
+    await writeFile(path.join(h.session,'authoring/docs/agent-operations.md'),'Stale operation guidance');
+    await writeFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'),'Stale planner');
     await disconnect(page);
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
+    const localDraft=' {"page":{"title":"Unfinished local draft before Resume"';
+    await page.locator('#editor-tab-json').click();await page.locator('#src').fill(localDraft);await page.locator('#editor-tab-agent').click();
     await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
     await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:true,at:Date.now()}));
@@ -208,12 +231,25 @@ test('refused resume preserves the paired agent instructions; successful resume 
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toContain('# Old helper preserved');
     expect((await h.read('editor.json')).connected).toBe(true);
     expect((await h.read('session.json')).connectionId).toBe(before.connectionId);
+    await expect(page.locator('#src')).toHaveValue(localDraft);expect((await h.read('state.json')).source).toBe(savedSource);
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
     await resumeFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/selected exchange folder/);
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
+    await expect(page.locator('#folder-agent-recovery-choice')).toBeHidden();
+    await expect(page.locator('#src')).toHaveValue(savedSource);
+    expect(await page.evaluate(text=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).some(entry=>entry.text===text),localDraft)).toBe(true);
+    await closeGuide(page);await expect(page.locator('#folder-agent-messages')).toContainText('The saved folder conversation is ready to continue.');
+    await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+    await page.locator('#editor-tab-agent').focus();await page.keyboard.press('Control+z');await expect(page.locator('#src')).toHaveValue(savedSource);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toBe(await readFile(path.join(root,'tools/folder-agent.py'),'utf8'));
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).not.toMatch(/--operations|--dry-run|Semantic operations/);
+    // watch() performs this same preparation before emitting any request.
+    h.run('prepare');
+    expect(await readFile(skillFile,'utf8')).toBe(await readFile(path.join(root,'.claude/skills/hld-to-page/SKILL.md'),'utf8'));
+    await expect(readFile(path.join(h.session,'authoring/docs/agent-operations.md'))).rejects.toMatchObject({code:'ENOENT'});
+    await expect(readFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'))).rejects.toMatchObject({code:'ENOENT'});
     await disconnect(page);
     await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
     await chooseFolder(page);
@@ -224,6 +260,40 @@ test('refused resume preserves the paired agent instructions; successful resume 
     await expect(page.locator('#folder-agent-connect')).toBeEnabled();
     expect((await h.read('editor.json')).connected).toBe(false);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
+});
+
+test('byte-identical Resume clears old history and a late owner change refuses without writing session files',async({page})=>{
+  const h=await setup(page);let release;
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await disconnect(page);
+    await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
+    await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();
+    const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edit before identical Resume');await title.press('Enter');
+    await expect(page.locator('#undo-builder')).toBeEnabled();await page.locator('#undo-builder').click();
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#redo-builder')).toBeEnabled();
+    await page.locator('#editor-tab-agent').click();await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
+    const owner=await h.read('session.json'),saved=await h.read('state.json'),editor=await h.read('editor.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    let reads=0,reached=false;const held=new Promise(resolve=>release=resolve);
+    // UI inspection and its locked recheck have finished. Hold the client's
+    // first owner read so its own complete inspection sees the new identity.
+    h.readGate(async name=>{if(name==='session.json' && ++reads===3){reached=true;await held;}});
+    h.writes.length=0;await resumeFolder(page);await expect.poll(()=>reached).toBe(true);
+    const replacement={...owner,connectionId:'replacement-owner'};
+    const replacementState={...saved,connectionId:replacement.connectionId};
+    const replacementEditor={...editor,connectionId:replacement.connectionId,connected:false};
+    await writeFile(path.join(h.session,'session.json'),JSON.stringify(replacement));
+    await writeFile(path.join(h.session,'state.json'),JSON.stringify(replacementState));
+    await writeFile(path.join(h.session,'editor.json'),JSON.stringify(replacementEditor));
+    release();await expect(page.locator('#folder-agent-status')).toContainText(/saved session changed|identity/i);
+    await expect(page.locator('#folder-agent-resume')).toBeEnabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
+    await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
+    expect(h.writes).toEqual([]);expect(await h.read('session.json')).toEqual(replacement);expect(await h.read('state.json')).toEqual(replacementState);expect(await h.read('editor.json')).toEqual(replacementEditor);
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+    expect(h.errors).toEqual([]);
+  }finally{release?.();h.readGate(null);await page.close();await h.cleanup();}
 });
 
 test('measure 50 file-only exchanges separately from model work',async({page},info)=>{
@@ -246,7 +316,8 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     const detections=[],deliveries=[];
     for(let i=0;i<50;i++){
       await closeGuide(page);await page.locator('#folder-agent-input').fill('Measured request '+i);await page.locator('#folder-agent-send').click();
-      await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');
+      await expect(page.locator('#folder-agent-send')).toBeDisabled();
+      const request=await publishedRequest(h,'Measured request '+i);
       const at=events.has(request.id)?events.get(request.id):await new Promise(resolve=>waiting.set(request.id,resolve));
       detections.push(at-request.at);
       const reply='Measured reply '+i;await writeFile(path.join(h.session,'answer.txt'),reply);h.run('reply','--request',request.id,'--file','answer.txt');
@@ -316,7 +387,7 @@ test('agent context names the selection before pairing and freezes it beside the
     await chooseFolder(page);await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
-    const request=await h.read('request.json');expect(request.selection[0].label).toBe('Doorbell');
+    const request=await publishedRequest(h,'Explain this');expect(request.selection[0].label).toBe('Doorbell');
     await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('[data-dv-node="b"]').first().click();
     h.run('progress','--request',request.id,'--text','Reading the selected doorbell.');
@@ -365,6 +436,33 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     expect(await camera()).toEqual(prior);
     await expect(page.locator('#src')).toHaveValue(input.replace('"Backend"','"Customer support"'));
     await page.screenshot({path:info.outputPath('full-diagram-canvas.png')});
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+
+test('full-document reviewed apply, exact receipt Undo and cancelled late proposals use the real folder transport',async({page})=>{
+  const h=await setup(page);
+  try{
+    const spec=JSON.parse(source);spec.page.blocks[0].id='delivery';const original=JSON.stringify(spec,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
+    async function send(text){await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();return publishedRequest(h,text);}
+    const request=await send('Rename the delivery service'),current=await h.read('state.json');
+    await page.locator('#folder-agent-focus-summary').click();await page.locator('#folder-agent-review-mode').check();await page.locator('#folder-agent-focus-summary').click();
+    spec.page.blocks[0].diagram.nodes.b.title='Delivery service';
+    await writeFile(path.join(h.session,'candidate.spec.json'),JSON.stringify(spec,null,2));
+    h.run('propose','--request',request.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Rename one service');
+    await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
+    await page.locator('#folder-agent-review-accept').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(/Delivery service/);h.run('reply','--request',request.id,'--text','Renamed the service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.getByRole('button',{name:'Undo change',exact:true}).click();await expect(page.locator('#src')).toHaveValue(original);
+    const cancelled=await send('This turn will be stopped'),state=await h.read('state.json');await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    const manifest=await h.read('session.json');await writeFile(path.join(h.session,'proposal.json'),JSON.stringify({...manifest,id:'late-cancelled',requestId:cancelled.id,baseRevision:state.revision,source:original.replace('Doorbell','Wrong old reply')}));
+    await send('Keep this new turn separate');await expect(page.locator('#folder-agent-messages')).toContainText('Keep this new turn separate');await expect(page.locator('#src')).toHaveValue(original);
+    // Switching projects must retire both pending work and old conversation receipts.
+    await page.locator('#file-input').setInputFiles({name:'new.spec.json',mimeType:'application/json',buffer:Buffer.from(original.replace('Browser contract','Separate story'))});
+    await expect(page.locator('#folder-agent-messages')).not.toContainText('Rename the delivery service');await expect(page.locator('#folder-agent-messages [data-change-id]')).toHaveCount(0);await expect(page.locator('#folder-agent-input')).toHaveValue('');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

@@ -5,8 +5,8 @@ function createBuilderSession(options){
   var persistence=options.persistence, recovered=persistence.read();
   var initialDraft=recovered.draft, recoveredBaseline=recovered.baseline;
   var baselineText=options.source.read(), projectOpen=!options.deferInitialSave;
-  var undoStack=[], redoStack=[], target=null, insertSection=0;
-  var importedText=null, projectUndoText=null, project=0, disposed=false;
+  var undoStack=[], redoStack=[], target=null, insertSection=0,historyVersion=0;
+  var importedText=null, project=0, disposed=false;
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;
   function text(){return options.source.read();}
   function parse(value){
@@ -15,6 +15,7 @@ function createBuilderSession(options){
   }
   function historyChanged(){if(options.historyChanged)options.historyChanged(!!undoStack.length,!!redoStack.length);}
   function pushUndo(value){
+    historyVersion++;
     importedText=null;undoStack.push(value);
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
@@ -23,24 +24,40 @@ function createBuilderSession(options){
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
+    var entry=from[from.length-1];
+    if(typeof entry!=='string'){
+      var restored=entry.restore(entry.before);if(restored===false)return false;
+      if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
+      from.pop();to.push({restore:entry.restore,before:entry.after,after:entry.before});
+      historyVersion++;historyChanged();return true;
+    }
+    historyVersion++;
     to.push(text());options.source.write(from.pop());historyChanged();target=null;
     var outcome=render('history');
     if(options.afterHistory)options.afterHistory(message,outcome);
     save();return true;
   }
-  function invalidateProject(){
+  function preserveDraft(){
+    if(projectOpen)persistence.preserve(text(),baselineText);
+    else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline);
+  }
+  function invalidateProject(policy){
     if(disposed)return;
+    // Leaving for Home retires async work, but returning to this same document
+    // keeps its source and panel history. A replacement starts a fresh history.
+    if(!policy || policy.preserveHistory!==true){
+      undoStack.length=redoStack.length=0;importedText=null;historyVersion++;historyChanged();
+    }
     project++;
     if(options.invalidateProject)options.invalidateProject();
     target=null;
   }
   function replaceProject(value,baseline,hooks){
     if(disposed)return false;
-    invalidateProject();persistence.cancel();
-    // A pending recovery is the first Undo target, never the boot demo.
-    pushUndo(!projectOpen && initialDraft ? initialDraft.text : text());
+    // Archive first: failure must leave the current document and history intact.
+    preserveDraft();invalidateProject();persistence.cancel();
     options.source.write(value);baselineText=baseline==null?value:baseline;
-    projectUndoText=value;initialDraft=null;insertSection=0;
+    initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
     var outcome=render('project');
     if(hooks && hooks.afterRender)hooks.afterRender(outcome);
@@ -68,6 +85,11 @@ function createBuilderSession(options){
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
       return true;
     },
+    rememberView:function(change){
+      if(disposed || !change || typeof change.restore!=='function' || JSON.stringify(change.before)===JSON.stringify(change.after))return false;
+      pushUndo({restore:change.restore,before:change.before,after:change.after});return true;
+    },
+    historyType:function(redo){var stack=redo?redoStack:undoStack;return !stack.length?null:typeof stack[stack.length-1]==='string'?'source':'view';},
     importText:function(value,hooks){
       if(disposed)return false;
       pushUndo(text());options.source.write(value);
@@ -80,25 +102,22 @@ function createBuilderSession(options){
     undo:function(){return historyStep(undoStack,redoStack,'undid the last builder action — board re-rendered');},
     redo:function(){return historyStep(redoStack,undoStack,'redid the builder action — board re-rendered');},
     canUndo:function(){return !!undoStack.length;},canRedo:function(){return !!redoStack.length;},
+    historyVersion:function(){return historyVersion;},
     imported:function(){return importedText!=null && text()===importedText;},
-    canUndoProject:function(){return projectUndoText!=null && text()===projectUndoText && !!undoStack.length;},
-    clearProjectUndo:function(){if(!disposed)projectUndoText=null;},
     noteInput:function(){
       if(disposed)return;
+      historyVersion++;
       projectOpen=true;importedText=null;persistence.schedule(save);
     },
     save:save,markSaved:function(){if(!disposed)baselineText=text();},baseline:function(){return baselineText;},
     saveInitial:function(){if(!options.deferInitialSave && (!initialDraft || initialDraft.text===text()))save();},
     discardDraft:function(){if(disposed)return;persistence.clear();initialDraft=null;save();},
     draft:function(){return initialDraft?{text:initialDraft.text,at:initialDraft.at}:null;},
-    preserveDraft:function(){
-      if(projectOpen)persistence.preserve(text(),baselineText);
-      else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline);
-    },
+    preserveDraft:preserveDraft,
     earlierDrafts:persistence.archived,
     restoreEarlierDraft:function(entry,hooks){
       if(!entry || typeof entry.text!=='string')return false;
-      this.preserveDraft();return replaceProject(entry.text,entry.baseline,hooks);
+      return replaceProject(entry.text,entry.baseline,hooks);
     },
     isProjectOpen:function(){return projectOpen;},
     invalidateProject:invalidateProject,replaceProject:replaceProject,
@@ -108,6 +127,6 @@ function createBuilderSession(options){
       replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,hooks);
       return {missingBaseline:missingBaseline};
     },
-    destroy:function(){if(disposed)return;disposed=true;project++;persistence.destroy();}
+    destroy:function(){if(disposed)return;disposed=true;project++;undoStack.length=redoStack.length=0;persistence.destroy();}
   };
 }

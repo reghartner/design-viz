@@ -25,16 +25,21 @@ calls. It does not replace the preserved first-round scores or author outputs.
    semantics. Distinguish stored values from visible values, physical battery
    from the last reported battery, clocks from report timestamps, graph topology
    from the edges active in a particular step, and a repeated shared step from
-   a distinct state in an alternate path.
+   a distinct state in an alternate path. Pin one current renderer/folding
+   implementation and record its source hashes for all eight stories; this is
+   not a claim about how an older native renderer displayed the baseline.
 3. Record explicit interpretations where the rubric leaves counting or state
    semantics ambiguous. Apply the same interpretation to all eight stories.
-   Freeze these interpretations before the first adjudication call. Changes
+   Freeze these interpretations before the first adjudication call. The exact
+   [SOL/medium interpretations](adjudication-interpretations.json) and
+   [adjudication prompt](adjudication-prompt.md) are recorded alongside this plan. Changes
    after judging require a disclosed amendment and consistent reassessment of
    every affected story, not an adjustment to a selected score.
 4. Give two independent SOL/medium adjudicators each story, its original brief,
    answers, questions, ledger, mechanical check, factual state evidence and the
    disputed claims. Remove previous scores, judge identities and method labels.
-   Author style can still reveal the workflow; this is limited label blinding.
+   Repeated claims from old judges carry no extra weight. Author style can still
+   reveal the workflow; this is limited label blinding.
 5. Require evidence-backed decisions on every prior claim and evidence-backed
    deductions for any additional defect. Each deduction identifies its rubric
    rule, scoring unit and source location. Review both agreements and

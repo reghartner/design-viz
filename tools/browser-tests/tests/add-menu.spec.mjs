@@ -10,6 +10,7 @@ const spec=async page=>JSON.parse(await text(page));
 
 test('persistent Add entry targets tab sections and preserves one-change Undo/Redo',async({page,server})=>{
   const raw=editorSpec();
+  raw.page.blocks[0].diagram.layouts[0].presentation='explore';
   raw.page.blocks.push({tabs:[{label:'Overview',sections:[{heading:'Overview',diagram:{nodes:{x:{title:'Overview node'}},rows:[['x']]}}]},
     {label:'Operations',sections:[{heading:'Cloud processing',diagram:{nodes:{y:{title:'Cloud'}},rows:[['y']]}}]}]});
   const original=JSON.stringify(raw,null,2);

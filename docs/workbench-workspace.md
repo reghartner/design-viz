@@ -42,7 +42,7 @@ floating panels. The editor displays the selected type just as the exported
 HTML does. Select a **Section** in the top toolbar and use its view buttons to
 switch between the saved views.
 
-In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate.
+In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
 Moving or resizing a data panel or the step controls saves that view's floating
 defaults in the source, so the placement survives HTML export. Standard keeps
 its panels in the authored page arrangement; use **Arrange section** to edit

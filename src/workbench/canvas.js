@@ -175,7 +175,6 @@ function initWorkbenchCanvas(){
   surface.addEventListener('pointerup',function(ev){if(drag && drag.id===ev.pointerId){ev.preventDefault();ev.stopPropagation();finish(false);}},true);
   surface.addEventListener('pointercancel',function(){finish(true);});surface.addEventListener('lostpointercapture',function(ev){if(drag)finish(ev.buttons!==0);});
   surface.addEventListener('click',function(ev){if((hand || spaceHeld) && ev.target.closest('.explore-board')){ev.preventDefault();ev.stopPropagation();}},true);
-  surface.addEventListener('wheel',function(ev){if((ev.ctrlKey || ev.metaKey) && ev.target.closest('.explore-board')){ev.preventDefault();setZoom(viewport().canvasZoom()*Math.exp(-ev.deltaY*.006));}},{passive:false});
   window.addEventListener('keydown',function(ev){
     if(!diagramMode() || document.body.classList.contains('welcome-active'))return;
     if(ev.key==='Escape' && drag){ev.preventDefault();ev.stopPropagation();finish(true);return;}

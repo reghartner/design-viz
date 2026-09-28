@@ -52,7 +52,9 @@ test('first connections in a step-free graph keep the header clear of nodes acro
   const raw=initial(),d=raw.page.blocks[0].diagram;delete d.edges;delete d.steps;d.view='ambient-only';
   const original=JSON.stringify(raw);await page.goto(server.origin+'/workbench.html');await paste(page,original);
   for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
-    await page.locator('#workspace-appearance > summary').click();await page.locator('#sk-'+skin).click();await page.locator('#workspace-appearance > summary').click();const before=await node(page,'a').boundingBox();
+    await page.locator('#workspace-appearance > summary').click();await page.locator('#sk-'+skin).click();await page.locator('#workspace-appearance > summary').click();
+    // Completing a connection opens its Inspector; clear it before the next skin's pointer gesture.
+    await closeTools(page);const before=await node(page,'a').boundingBox();
     await start(page);await node(page,'c').hover();
     const hint=await page.locator('.dv-connect-hint').boundingBox(),a=await node(page,'a').boundingBox();
     // Highlight strokes expand the painted bounds; the card's center must stay fixed.
@@ -83,7 +85,8 @@ test('source changes, blur, remount and stale inspector actions cannot publish p
 });
 
 test('modifier selection, ordinary dragging and zoomed connection creation coexist',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial());await paste(page,original);
+  const raw=initial();raw.page.blocks[0].diagram.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:10}]}}];
+  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw);await paste(page,original);
   await node(page,'a').click();await node(page,'b').click({modifiers:['ControlOrMeta']});
   await expect(page.locator('#guide')).toContainText('2 nodes');await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await page.keyboard.press('Escape');

@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 function spec(routing='curves'){
  const ids=[...'abcdefghi'];
@@ -20,7 +20,7 @@ async function drag(page,source,to,line){
  await page.mouse.move(to.x,to.y,{steps:14});await expect(page.locator(line)).toHaveAttribute('visibility','visible');await page.mouse.up();
 }
 for(const routing of ['curves','lanes'])test(`${routing}: node row insertion and removal preserve lower row order with exact Undo/Redo`,async({page,server},testInfo)=>{
- const raw=spec(routing),source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ const raw=spec(routing),source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
  const root=page.locator('#docview');await inOrder(root,diagram(raw).rows);
  const lower=await positions(root,[...'defghi']);
  const a=await node(root,'a').boundingBox(),d=await node(root,'d').boundingBox();

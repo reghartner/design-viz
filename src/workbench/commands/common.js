@@ -38,8 +38,11 @@ function builderNewNodeFloats(d, ids){
   /* Seed free nodes on a four-column grid, skipping occupied cards. Saved
      centers keep later insertions and connection edits from rearranging them. */
   var rows = d.rows && d.rows.length ? d.rows : [[]];
-  var pos = layout(Object.assign({}, d, {rows: rows})).pos;
-  var occupied = Object.keys(pos).map(function(id){ return pos[id]; });
+  /* Adding floats can re-space automatic floats or switch lane routing to
+     curves. Check the resulting layout, excluding the new cards' draft slots. */
+  var floats = (d.floats || []).concat(ids.map(function(id){ return {id:id, side:'below'}; }));
+  var pos = layout(Object.assign({}, d, {rows:rows, floats:floats})).pos;
+  var occupied = Object.keys(pos).filter(function(id){ return ids.indexOf(id) < 0; }).map(function(id){ return pos[id]; });
   var slot = 0;
   return ids.map(function(id){
     var x, y;

@@ -189,6 +189,21 @@ test('planAddNode skips ids already taken and reports diagram-less sections plai
   assert.match(bad.error, /no diagram/);
 });
 
+test('new free nodes avoid automatic floats after insertion changes their spacing', () => {
+  const raw = {nodes:{a:{},f:{},g:{},h:{},i:{}},rows:[['a']],
+    floats:[{id:'f',side:'below',dx:-150,dy:-94},...['g','h','i'].map(id=>({id,side:'below'}))]};
+  const before = JSON.stringify(raw), plan = B.planAddNode(before, raw, 0);
+  assert.ok(!plan.error, plan.error);
+  const next = JSON.parse(plan.text), positions = B.layout(next).pos, added = positions[plan.id];
+  for (const id of Object.keys(raw.nodes)){
+    const p = positions[id];
+    assert.ok(Math.abs(added.cx - p.cx) >= (added.w + p.w) / 2 + 24 ||
+      Math.abs(added.cy - p.cy) >= (added.h + p.h) / 2 + 24, 'overlap with ' + id);
+  }
+  assert.deepStrictEqual(next.floats.slice(0, -1), raw.floats);
+  assert.equal(JSON.stringify(raw), before);
+});
+
 test('planAddEdge avoids duplicate from->to keys and creates edges when missing', () => {
   /* a->b already exists — the engine keys edges by "from->to", so a
      duplicate would override the first edge; the planner takes b->a */

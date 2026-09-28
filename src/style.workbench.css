@@ -1220,6 +1220,18 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) .diagram-view-choice,.workspace-diagram:not(.welcome-active) .viewport-actions{background:var(--card);padding:7px;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;}
 .workspace-diagram:not(.welcome-active) .diagram-view-choice:empty{display:none;}
 .workspace-diagram:not(.welcome-active) .viewport-actions{margin-left:0;}
+.section-view-settings{display:flex;order:-1;align-items:center;flex-wrap:wrap;gap:6px;padding:7px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;font:12px 'IBM Plex Sans',sans-serif;max-width:100%;box-sizing:border-box;}
+.diagram-view-choice{order:-2;}
+.workbench-views-label{align-self:center;font-size:12px;font-weight:600;margin-right:3px;}
+.section-view-settings label{display:flex;align-items:center;gap:6px;}
+.section-view-settings select,.section-view-settings input{font:inherit;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px;min-width:0;}
+.section-view-settings .bbtn{font:inherit;padding:6px 8px;}
+.section-view-options{position:relative;}
+.section-view-options>summary{padding:6px;cursor:pointer;border-radius:5px;}
+.section-view-options-body{position:absolute;top:calc(100% + 8px);right:0;z-index:50;width:min(276px,calc(100vw - 100px));box-sizing:border-box;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:9px;box-shadow:0 5px 20px #14244225;}
+.section-view-options-body label{flex-direction:column;align-items:stretch;margin-bottom:10px;}
+.section-view-options-body .fnote{margin:10px 0 0;line-height:1.5;}
+@media(max-width:700px){.section-view-settings{position:relative;}.section-view-options{position:static;}.section-view-options-body{max-width:100%;}}
 .workspace-diagram:not(.welcome-active) .viewport-actions>[aria-label*="Expand"],.workspace-diagram:not(.welcome-active) .viewport-actions>[aria-label*="expanded"],.workspace-diagram:not(.welcome-active) .layout-flow-toggle{display:none;}
 .workspace-diagram:not(.welcome-active) .explore-tools{left:auto;right:12px;top:118px;bottom:auto;padding:0;background:none;border:0;box-shadow:none;}
 .workspace-diagram:not(.welcome-active) .explore-tools>.mbtn,.workspace-diagram:not(.welcome-active) .explore-zoom,.workspace-diagram:not(.welcome-active) .explore-tools .board-size{display:none;}
@@ -1228,8 +1240,6 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) .explore-board::-webkit-scrollbar{display:none;}
 .workspace-diagram:not(.welcome-active) .workspace-empty-section{inset:150px 84px auto;padding:24px;}
 .workspace-diagram:not(.welcome-active) .workspace-empty-section>*{display:revert;}
-.workspace-view-label{display:flex;align-items:center;gap:8px;font-size:12px;margin:6px 0 12px;}
-.workspace-view-label select{font:inherit;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink);}
 @media(max-width:1050px){.workspace-canvas .workspace-create .editor-add-destination{display:flex;max-width:220px;}.workspace-canvas .editor-add-destination select{min-width:0;max-width:150px;}}
 @media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:124px;right:12px;}.workspace-canvas .workspace-create .editor-add-destination{position:fixed;top:82px;left:84px;max-width:calc(100vw - 280px);}.workspace-diagram:not(.welcome-active) .explore-tools{display:none;}}
 
@@ -1284,4 +1294,12 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-height:520px){
   .workspace-canvas .workwrap #spec-editor{z-index:136;}
   .workspace-canvas .workspace-rail{z-index:160;}
+}
+
+/* Responsive Standard pages use the space beside the tool rail. Explicit host
+   previews retain their chosen width and horizontal scrolling. */
+@media(max-width:700px){
+  body:not(.workspace-diagram) #workspace-canvas-world{padding-right:12px;}
+  .layout-preview-frame[data-target="default"]{min-width:0;}
+  .layout-preview-frame[data-target="default"]>#docview{padding-left:0;padding-right:0;}
 }

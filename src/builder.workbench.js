@@ -852,6 +852,10 @@ function initWorkbenchBuilder(opts){
     }
   }) : null;
 
+  life.listen(view,'workbench-view-section',function(ev){
+    var parsed=session.snapshot();if(parsed.error || !specSectionPaths(parsed.raw)[ev.detail])return;
+    session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();
+  });
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
@@ -865,7 +869,7 @@ function initWorkbenchBuilder(opts){
       return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);},{exploreLayout:{section:section,id:id}});
     },
     setPresentation:function(section,id,value){
-      return commitCascade(function(raw){return planSectionViewPresentation(session.text(),raw,section,id,value);});
+      var nextId,ok=commitCascade(function(raw){var plan=planSectionViewPresentation(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
     ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(session.text(),raw,section,target);});},
     steps:function(section,id,indices){
@@ -878,7 +882,7 @@ function initWorkbenchBuilder(opts){
       var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(session.text(),raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
     remove:function(section,id){return commitCascade(function(raw){return planDeleteSectionLayout(session.text(),raw,section,id);});},
-    makeDefault:function(section,id){return commitCascade(function(raw){return planDefaultSectionLayout(session.text(),raw,section,id);});}
+    makeDefault:function(section,id){var nextId,ok=commitCascade(function(raw){var plan=planDefaultSectionLayout(session.text(),raw,section,id);nextId=plan.layoutId || id;return plan;});return ok?nextId:null;}
 
   }) : null;
   /* Controlled preview replacement is explicit; rejected source leaves the board intact. */

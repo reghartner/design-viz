@@ -26219,6 +26219,11 @@ function restoreCanvasPanelMemory(d, memories, id, value){
     saved.panels[key]=Object.assign(saved.panels[key] || {hidden:false},value.panels[key]);
   });
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
+  if(value.layout){
+    ['panels','controls'].forEach(function(key){
+      if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
+    });
+  }
   return true;
 }
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
@@ -26258,13 +26263,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,controls:value.controls?copy(value.controls):null};
+    return {panels:panels,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
-    var authored=author && !workbenchCanvas;
+    var authored=author && (!workbenchCanvas || panels && definition.presentation==='explore');
     var token=authored?author.begin(definition.id):null;if(token===false)return false;
-    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && panels?panelGeometry(memory):null};
+    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && !authored && panels?panelGeometry(memory):null};
   }
   function publish(token){
     if(retired || !active || token===false)return false;
@@ -26284,16 +26289,22 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
       if(i<0)panels.push(value);else panels[i]=value;
     }
   }
-  function camera(){
+  function camera(width,height){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
-    return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+board.clientWidth/2-marginX)/(graphPixels || 1),y:(board.scrollTop+board.clientHeight/2-marginY)/((graphPixels || 1)*ratio)};
+    return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
   }
   function positionCamera(c){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
     board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
   }
-  function saveCamera(token){if(!active || retired)return;memory.layout.camera=camera();publish(token);}
+  function saveCamera(token){
+    if(!active || retired)return;
+    // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
+    // authorable layout also prevents a later panel move from exporting it.
+    if(!workbenchCanvas)memory.layout.camera=camera();
+    publish(token);
+  }
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || !author || gesture)return;
@@ -26336,6 +26347,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function paint(){
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
+    var boundsChanged=b.w!==lastWidth || b.h!==lastHeight;
+    var priorCamera=boundsChanged && graphPixels && lastWidth && lastHeight?camera(lastWidth,lastHeight):memory.layout.camera;
+    if(boundsChanged){
+      // Defaults are viewport fractions. Initial mounting and full-browser
+      // promotion can both change bounds after panel DOM has been created.
+      windows.forEach(function(w){var saved=(memory.layout.panels || []).find(function(p){return p.panel===w.panel.id;});if(saved)Object.assign(w.state,absolute(saved));});
+      if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
+    }
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
     var insetTop=workbenchCanvas?142:readerCanvas?96:12,insetBottom=workbenchCanvas?68:12;
     var total=stacked.reduce(function(n,w){return n+w.state.h;},0),room=Math.max(0,b.h-insetTop-insetBottom-gap*Math.max(0,stacked.length-1));
@@ -26362,7 +26381,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     player.hidden=!bar || bar.hidden;
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
-    if(b.w!==lastWidth || b.h!==lastHeight){lastWidth=b.w;lastHeight=b.h;sizeGraph(true);}
+    if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
   }
   function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
   function sizeGraph(preserve){
@@ -26624,7 +26643,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
 /* Standalone Explore uses the entire browser (or embedding frame). Curated
    standard views keep their document layout. Navigation never edits the spec. */
 function initViewerExploreCanvas(ctl,view){
-  var active=null,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
+  var active=null,detailRoot=null,detailOriginExplore=false,pageOnly=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
@@ -26652,26 +26671,41 @@ function initViewerExploreCanvas(ctl,view){
   }
   sections.addEventListener('change',function(){
     var rec=ctl.sections.find(function(r){return r.number===Number(sections.value);});if(!rec)return;
+    pageOnly=false;detailRoot=null;
     if(ctl.details)ctl.details.showSection(rec.reference);
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
     ctl.activeTarget={kind:'diagram',section:rec.number};
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   });
-  back.addEventListener('click',function(){var rec=active;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
+  back.addEventListener('click',function(){var rec=active;pageOnly=true;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
   function viewChanged(ev){
-    var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});if(rec)show(rec);
+    var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});
+    if(rec){pageOnly=false;show(rec);}
+    else if(ctl.details && ctl.details.activeSections().some(function(r){return r.sectionEl.contains(ev.target);})){
+      pageOnly=false;detailChanged();
+    }
   }
   view.addEventListener('diagram-view-change',viewChanged);
   function detailChanged(){
-    if(!active)return;
-    var detail=ctl.details && ctl.details.activeSection && ctl.details.activeSection();
-    if(detail){detail.viewport.setWorkbenchCanvas(true);show(detail);}
-    else{var target=ctl.activeTarget;show(ctl.sections.find(function(r){return r.number===target.section;}));}
+    if(pageOnly)return;
+    var stack=ctl.details && ctl.details.activeSections?ctl.details.activeSections():[];
+    if(stack.length>1){
+      if(detailRoot!==stack[0]){detailRoot=stack[0];detailOriginExplore=active===detailRoot;}
+      var inherited=detailOriginExplore;
+      stack.slice(1).forEach(function(rec){
+        var p=rec.presentation,id=p && p.viewId && p.viewId(),definition=rec.viewport && rec.viewport.viewDefinition();
+        var explicit=definition && !definition.legacy && p && p.views && p.views().some(function(v){return v.id===id;});
+        rec.viewport.setWorkbenchCanvas(!explicit && inherited);inherited=rec.viewport.isExplore();
+      });
+      show(stack[stack.length-1]);
+    }else if(detailRoot){var root=detailRoot;detailRoot=null;show(detailOriginExplore?root:null);}
+    else if(active){var target=ctl.activeTarget;show(ctl.sections.find(function(r){return target && r.number===target.section;}));}
   }
   view.addEventListener('detail-navigation',detailChanged);
   function navigationChanged(){
     var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
+    pageOnly=false;detailRoot=null;
     var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
     if(rec!==active)show(rec);
   }
@@ -30135,6 +30169,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   return {snapshot:snapshot,restore:restore,close:close,
     showSection:function(reference){close(true);liveRoots.forEach(function(f){restoreOriginal(f);});var frame=liveRoots.get(reference);if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
+    activeSections:function(){return session?session.stack.map(function(frame){return frame.rec;}):[];},
     activeStepper:function(){return current() && current().rec.stepper;},
     pause:function(){if(session)session.stack.forEach(pause);},
     destroy:function(){disposed=true;close(true);ctl.view.removeEventListener('click',gesture,true);ctl.view.removeEventListener('keydown',gesture,true);ctl.view.removeEventListener('pointerdown',cancelInteraction,true);}

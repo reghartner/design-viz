@@ -12,6 +12,11 @@ function restoreCanvasPanelMemory(d, memories, id, value){
     saved.panels[key]=Object.assign(saved.panels[key] || {hidden:false},value.panels[key]);
   });
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
+  if(value.layout){
+    ['panels','controls'].forEach(function(key){
+      if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
+    });
+  }
   return true;
 }
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
@@ -51,13 +56,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,controls:value.controls?copy(value.controls):null};
+    return {panels:panels,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
-    var authored=author && !workbenchCanvas;
+    var authored=author && (!workbenchCanvas || panels && definition.presentation==='explore');
     var token=authored?author.begin(definition.id):null;if(token===false)return false;
-    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && panels?panelGeometry(memory):null};
+    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && !authored && panels?panelGeometry(memory):null};
   }
   function publish(token){
     if(retired || !active || token===false)return false;
@@ -77,16 +82,22 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
       if(i<0)panels.push(value);else panels[i]=value;
     }
   }
-  function camera(){
+  function camera(width,height){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
-    return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+board.clientWidth/2-marginX)/(graphPixels || 1),y:(board.scrollTop+board.clientHeight/2-marginY)/((graphPixels || 1)*ratio)};
+    return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
   }
   function positionCamera(c){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
     board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
   }
-  function saveCamera(token){if(!active || retired)return;memory.layout.camera=camera();publish(token);}
+  function saveCamera(token){
+    if(!active || retired)return;
+    // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
+    // authorable layout also prevents a later panel move from exporting it.
+    if(!workbenchCanvas)memory.layout.camera=camera();
+    publish(token);
+  }
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || !author || gesture)return;
@@ -129,6 +140,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function paint(){
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
+    var boundsChanged=b.w!==lastWidth || b.h!==lastHeight;
+    var priorCamera=boundsChanged && graphPixels && lastWidth && lastHeight?camera(lastWidth,lastHeight):memory.layout.camera;
+    if(boundsChanged){
+      // Defaults are viewport fractions. Initial mounting and full-browser
+      // promotion can both change bounds after panel DOM has been created.
+      windows.forEach(function(w){var saved=(memory.layout.panels || []).find(function(p){return p.panel===w.panel.id;});if(saved)Object.assign(w.state,absolute(saved));});
+      if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
+    }
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
     var insetTop=workbenchCanvas?142:readerCanvas?96:12,insetBottom=workbenchCanvas?68:12;
     var total=stacked.reduce(function(n,w){return n+w.state.h;},0),room=Math.max(0,b.h-insetTop-insetBottom-gap*Math.max(0,stacked.length-1));
@@ -155,7 +174,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     player.hidden=!bar || bar.hidden;
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
-    if(b.w!==lastWidth || b.h!==lastHeight){lastWidth=b.w;lastHeight=b.h;sizeGraph(true);}
+    if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
   }
   function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
   function sizeGraph(preserve){

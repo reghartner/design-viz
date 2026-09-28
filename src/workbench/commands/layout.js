@@ -320,9 +320,18 @@ function planSectionLayoutName(text,raw,section,name,layoutId){
 function planSectionViewPresentation(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(value!=='standard' && value!=='explore')return {error:'Choose Standard or Explore for this view.'};
+  if(!Array.isArray(got.d.layouts)){
+    if(value==='standard')return {error:'This view already uses Standard presentation.'};
+    var selected,plan=builderRewrite(text,raw,got.path,function(d){
+      selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
+      d.layouts.find(function(v){return v.id===selected.layoutId;}).presentation=value;
+    });
+    if(!plan.error)plan.layoutId=selected.layoutId;return plan;
+  }
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
   if(index<0)return {error:'Select a named view before changing its presentation.'};
-  return planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
+  var plan=planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
+  if(!plan.error)plan.layoutId=layoutId;return plan;
 }
 function planSectionExploreLayout(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
@@ -333,14 +342,47 @@ function planSectionExploreLayout(text,raw,section,layoutId,value){
   if(warnings.length)return {error:warnings.join('\n')};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
 }
+function builderEnsureSectionView(d){
+  var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
+  d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+  d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
+}
+/* Match the viewer's legacy Home/Layout and Data choices when a header action
+   first authors them. Only geometry is new: the story and its default survive. */
+function builderPromoteSectionViews(d,layoutId){
+  var source=sectionLayoutDefinition(d),panels=Array.isArray(d.panels)?d.panels:[];
+  var focus=panels.find(function(p){return p && typeof p.id==='string' && p.id && p.id===d.primaryPanel;}) ||
+    panels.find(function(p){return p && typeof p.id==='string' && p.id && panelCapability(p.type,'focusByDefault',false);});
+  var first=source?'layout':focus?'home':null,defaultId=source?'layout':focus && d.primaryPanel===focus.id?'home':'flow';
+  var selected=layoutId==null || layoutId==='default'?defaultId:source && layoutId==='home'?'layout':layoutId;
+  if(selected!=='flow' && selected!==first)return {error:'Reselect the view before editing it.'};
+  var views=[],targets=['default'];
+  if(source){
+    views.push({id:'layout',name:source.name,sectionLayout:builderClone(source.sectionLayout)});
+    ['backstage','confluence'].forEach(function(target){if(Array.isArray(source.sectionLayout[target]))targets.push(target);});
+  }else if(focus){
+    var homeDiagram=Object.assign({},d,{primaryPanel:focus.id}),preset=sectionLayoutPreset(homeDiagram,'default');
+    var hidden=Object.assign({},preset.find(function(it){return sectionLayoutKey(it)==='diagram';}),{hidden:true});
+    var controls=preset.find(function(it){return it.controls==='steps';}),items;
+    if(controls){
+      if(panelCapability(focus.type,'attachControls',false))controls.attachTo='panel:'+focus.id;
+      items=sectionLayoutOptimize(homeDiagram,'default',[hidden,controls]);
+    }else items=sectionLayoutPreset(homeDiagram,'default',['diagram']).concat([hidden]);
+    var label=panelCapability(focus.type,'focusLabel',focus.title || 'Home');
+    views.push({id:'home',name:String(label).trim().slice(0,40) || 'Home',sectionLayout:{default:items}});
+  }
+  var flowDiagram=Object.assign({},d,{primaryPanel:undefined}),profiles={};
+  targets.forEach(function(target){profiles[target]=sectionLayoutOptimize(flowDiagram,target,null);});
+  views.push({id:'flow',name:'Data flow',sectionLayout:profiles});
+  d.layouts=views;d.defaultLayout=defaultId;delete d.sectionLayout;delete d.layoutName;
+  return {layoutId:selected};
+}
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(Array.isArray(got.d.layouts))return {error:'This diagram already has named views.'};
   return builderRewrite(text,raw,got.path,function(d){
-    var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
-    d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+    builderEnsureSectionView(d);
     if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
-    d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
   });
 }
 function planSectionViewSteps(text,raw,section,layoutId,indices){
@@ -365,8 +407,13 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   var warnings=[];sectionLayoutWarnings(got.d,'diagram',warnings);if(warnings.length)return {error:warnings.join('\n')};
   var d=builderClone(got.d), source=sectionLayoutDefinition(d,layoutId);
   if(!Array.isArray(d.layouts)){
-    d.layouts=[{id:'layout-1',name:source?source.name:'Layout',sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutPreset(d,'default')})}];
-    d.defaultLayout='layout-1';delete d.sectionLayout;delete d.layoutName;source=d.layouts[0];
+    if(layoutId!=null && layoutId!=='default'){
+      var selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
+      source=sectionLayoutDefinition(d,selected.layoutId);
+    }else{
+      d.layouts=[{id:'layout-1',name:source?source.name:'Layout',sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutPreset(d,'default')})}];
+      d.defaultLayout='layout-1';delete d.sectionLayout;delete d.layoutName;source=d.layouts[0];
+    }
   }
   if(!source)return {error:'Select a layout to duplicate.'};
   var n=1;while(d.layouts.some(function(v){return v.id==='layout-'+n;}))n++;
@@ -394,6 +441,13 @@ function planDeleteSectionLayout(text,raw,section,layoutId){
 }
 function planDefaultSectionLayout(text,raw,section,layoutId){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(!Array.isArray(got.d.layouts) && layoutId!=null && layoutId!=='default'){
+    var selected,plan=builderRewrite(text,raw,got.path,function(d){
+      selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
+      d.defaultLayout=selected.layoutId;
+    });
+    if(!plan.error)plan.layoutId=selected.layoutId;return plan;
+  }
   if(!Array.isArray(got.d.layouts) || !got.d.layouts.some(function(v){return v && v.id===layoutId;}))return {error:'Select a named layout first.'};
   return planSetField(text,raw,got.path,'defaultLayout',JSON.stringify(layoutId));
 }

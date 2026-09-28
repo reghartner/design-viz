@@ -2,10 +2,11 @@ import {readFile} from 'node:fs/promises';
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 
-async function open(page,server){await page.goto(server.origin+'/workbench.html');await paste(page,source);}
+async function open(page,server,text=source){await page.goto(server.origin+'/workbench.html');await paste(page,text);}
 
 test('floating tools leave the diagram full-window and global actions available',async({page,server})=>{
-  await open(page,server);
+  const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
+  await open(page,server,JSON.stringify(raw,null,2));
   const size=page.viewportSize();
   expect(await page.locator('.explore-board').boundingBox()).toEqual({x:0,y:0,width:size.width,height:size.height});
   await expect(page.locator('#workspace-columns')).toBeHidden();

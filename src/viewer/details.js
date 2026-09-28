@@ -242,6 +242,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   return {snapshot:snapshot,restore:restore,close:close,
     showSection:function(reference){close(true);liveRoots.forEach(function(f){restoreOriginal(f);});var frame=liveRoots.get(reference);if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
+    activeSections:function(){return session?session.stack.map(function(frame){return frame.rec;}):[];},
     activeStepper:function(){return current() && current().rec.stepper;},
     pause:function(){if(session)session.stack.forEach(pause);},
     destroy:function(){disposed=true;close(true);ctl.view.removeEventListener('click',gesture,true);ctl.view.removeEventListener('keydown',gesture,true);ctl.view.removeEventListener('pointerdown',cancelInteraction,true);}

@@ -5,6 +5,12 @@ import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 
 const source=await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8');
+function withExploreRoot(raw){
+  const d=raw.page.sections[0].diagram;
+  d.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:15},{controls:'steps',x:0,y:15,w:12,h:7}]}}];d.defaultLayout='canvas';
+  return raw;
+}
+const editorSource=JSON.stringify(withExploreRoot(JSON.parse(source)),null,2);
 async function childCanvas(root,page){
   const child=root.locator('[data-dv-detail-preview]:visible');
   await expect(child).toHaveCount(1);await expect(child.locator('.explore-board')).toBeVisible();
@@ -15,10 +21,12 @@ async function childCanvas(root,page){
 }
 
 test('editor canvas follows nested details, returns to its camera and edits the real child section',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  await page.goto(server.origin+'/workbench.html');await paste(page,editorSource);
   await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   const root=page.locator('#docview'),parent=root.locator('#section-doorbell-domains');
+  await expect(parent.locator('.explore-board')).toBeVisible();
   const camera=()=>parent.locator('.board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+  await expect(parent.locator('[data-dv-node="connectivity"]').first()).toBeInViewport({ratio:.9});
   const before=await camera();
   await parent.locator('[data-dv-detail="connectivity"]').click();
   await expect(parent).toBeHidden();let child=await childCanvas(root,page);
@@ -27,9 +35,9 @@ test('editor canvas follows nested details, returns to its camera and edits the 
   await expect(parent).toBeVisible();expect(await camera()).toEqual(before);
   await parent.locator('[data-dv-detail="connectivity"]').click();child=await childCanvas(root,page);
   await child.getByRole('button',{name:'Edit detail section',exact:true}).click();
-  await expect(root.locator('#section-connectivity')).toHaveClass(/workspace-active-section/);
+  await expect(root.locator('#section-connectivity')).toBeVisible();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
-  await expect(page.locator('#src')).toHaveValue(source);
+  await expect(page.locator('#src')).toHaveValue(editorSource);
 });
 
 test('native canvas owns details while keeping root navigation, sibling isolation and curated return',async({page,server})=>{
@@ -66,7 +74,7 @@ test('canvas keeps unavailable, loading and failed detail messages above the dia
     const notice=root.locator('.detail-notice');await expect(notice).toContainText(text);await expect(notice).toBeVisible();
     expect(await notice.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(el.getRootNode().elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
   }
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(withExploreRoot(structuredClone(raw))));
   await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   await page.locator('#section-doorbell-domains [data-dv-detail="connectivity"]').click();
   await visibleNotice(page.locator('#docview'),'host');

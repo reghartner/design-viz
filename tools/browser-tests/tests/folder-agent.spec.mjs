@@ -363,7 +363,8 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
 test('diagram itself fills the browser and pans and zooms without editing source or losing the rendered nodes',async({page},info)=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    const raw=JSON.parse(source);raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');const input=JSON.stringify(raw,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
     const canvas=page.locator('.workspace-active-section .explore-board');
     expect(await canvas.boundingBox()).toEqual({x:0,y:0,...page.viewportSize()});
@@ -373,7 +374,7 @@ test('diagram itself fills the browser and pans and zooms without editing source
     await page.locator('#workspace-pan').click();await page.mouse.move(n.x+10,n.y+10);await page.mouse.down();await page.mouse.move(n.x+90,n.y+70,{steps:5});await page.mouse.up();
     expect((await position()).x).toBeCloseTo(before.x-80,0);expect((await position()).y).toBeCloseTo(before.y-60,0);
     const z=await page.locator('#workspace-zoom').textContent();await page.locator('#workspace-zoom-in').click();expect(await page.locator('#workspace-zoom').textContent()).not.toBe(z);
-    await page.locator('#workspace-fit').click();await expect(node).toBeInViewport();await expect(page.locator('#src')).toHaveValue(source);
+    await page.locator('#workspace-fit').click();await expect(node).toBeInViewport();await expect(page.locator('#src')).toHaveValue(input);
     await page.screenshot({path:info.outputPath('diagram-canvas.png')});expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
@@ -404,8 +405,11 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
   const h=await setup(page);
   try{
     const raw=JSON.parse(source),d=raw.page.blocks[0].diagram;
+    d.layouts.forEach(view=>view.presentation='explore');
     d.layouts.push({...structuredClone(d.layouts[0]),id:'technical',name:'Technical',steps:undefined});
     raw.page.blocks.push({tabs:[{label:'More',sections:[{id:'other',heading:'Other story',text:['Page preview prose'],diagram:{view:'step',nodes:{customer:{title:'Customer'},team:{title:'Team'}},rows:[['customer','team']],edges:[{from:'customer',to:'team'}],steps:[{edge:'customer->team',text:'Contact the team'}]}}]}]});
+    const otherDiagram=raw.page.blocks[1].tabs[0].sections[0].diagram;
+    otherDiagram.layouts=[{id:'flow',name:'Data',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',attachTo:'diagram',x:0,y:12,w:12,h:4}]}}];
     const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#workspace-panels').click();
@@ -428,11 +432,11 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Customer support');
     expect(await camera()).toEqual(prior);
     await page.locator('#workspace-window-json .workspace-window-close').click();
-    await page.locator('#workspace-appearance>summary').click();await page.locator('#workspace-view').selectOption('page');
+    await page.locator('#workspace-page').click();
     await expect(page.locator('#docview .doc-title')).toBeVisible();
     await expect(page.locator('.workbench-diagram-canvas')).toHaveCount(0);
     await expect(page.getByRole('button',{name:'Arrange section',exact:true}).first()).toBeVisible();
-    await page.locator('#workspace-view').selectOption('diagram');await page.locator('#workspace-appearance>summary').click();
+    await page.locator('#workspace-page').click();
     expect(await camera()).toEqual(prior);
     await expect(page.locator('#src')).toHaveValue(input.replace('"Backend"','"Customer support"'));
     await page.screenshot({path:info.outputPath('full-diagram-canvas.png')});

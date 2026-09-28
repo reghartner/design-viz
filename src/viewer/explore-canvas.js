@@ -1,7 +1,7 @@
 /* Standalone Explore uses the entire browser (or embedding frame). Curated
    standard views keep their document layout. Navigation never edits the spec. */
 function initViewerExploreCanvas(ctl,view){
-  var active=null,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
+  var active=null,detailRoot=null,detailOriginExplore=false,pageOnly=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
@@ -29,26 +29,41 @@ function initViewerExploreCanvas(ctl,view){
   }
   sections.addEventListener('change',function(){
     var rec=ctl.sections.find(function(r){return r.number===Number(sections.value);});if(!rec)return;
+    pageOnly=false;detailRoot=null;
     if(ctl.details)ctl.details.showSection(rec.reference);
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
     ctl.activeTarget={kind:'diagram',section:rec.number};
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   });
-  back.addEventListener('click',function(){var rec=active;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
+  back.addEventListener('click',function(){var rec=active;pageOnly=true;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
   function viewChanged(ev){
-    var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});if(rec)show(rec);
+    var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});
+    if(rec){pageOnly=false;show(rec);}
+    else if(ctl.details && ctl.details.activeSections().some(function(r){return r.sectionEl.contains(ev.target);})){
+      pageOnly=false;detailChanged();
+    }
   }
   view.addEventListener('diagram-view-change',viewChanged);
   function detailChanged(){
-    if(!active)return;
-    var detail=ctl.details && ctl.details.activeSection && ctl.details.activeSection();
-    if(detail){detail.viewport.setWorkbenchCanvas(true);show(detail);}
-    else{var target=ctl.activeTarget;show(ctl.sections.find(function(r){return r.number===target.section;}));}
+    if(pageOnly)return;
+    var stack=ctl.details && ctl.details.activeSections?ctl.details.activeSections():[];
+    if(stack.length>1){
+      if(detailRoot!==stack[0]){detailRoot=stack[0];detailOriginExplore=active===detailRoot;}
+      var inherited=detailOriginExplore;
+      stack.slice(1).forEach(function(rec){
+        var p=rec.presentation,id=p && p.viewId && p.viewId(),definition=rec.viewport && rec.viewport.viewDefinition();
+        var explicit=definition && !definition.legacy && p && p.views && p.views().some(function(v){return v.id===id;});
+        rec.viewport.setWorkbenchCanvas(!explicit && inherited);inherited=rec.viewport.isExplore();
+      });
+      show(stack[stack.length-1]);
+    }else if(detailRoot){var root=detailRoot;detailRoot=null;show(detailOriginExplore?root:null);}
+    else if(active){var target=ctl.activeTarget;show(ctl.sections.find(function(r){return target && r.number===target.section;}));}
   }
   view.addEventListener('detail-navigation',detailChanged);
   function navigationChanged(){
     var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
+    pageOnly=false;detailRoot=null;
     var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
     if(rec!==active)show(rec);
   }

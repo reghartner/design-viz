@@ -101,19 +101,8 @@ questions appropriate to the selected audience. `authoring/` is the version-matc
 VIZ directory. It includes the skill, references, recipes, validator, compatibility
 stamper and state walker. Browser checks remain separate and must not be claimed.
 
-For an update, resolve the intended target, scope and meaning before proposing it.
-A request relying on selection that names a different object, ambiguous names,
-missing units, unclear deletion
-scope or unsupported outcomes need a focused question through `reply`; leave the
-dependent change unapplied. An explicit, unambiguous named target takes precedence
-over selection. A request to guess or avoid questions does not settle
-those decisions. Use the captured selection, not later clicks. A fully specified
-small edit needs no extra confirmation. If stale work's original target has
-disappeared or changed role, ask instead of substituting a similar target.
-Validation, dry runs, review and Undo do not establish intent; full replacement
-must not bypass an unclear request or rejected reference.
-
-The helper supports these commands (run from anywhere, using its absolute path):
+Claude writes the complete updated document to `candidate.spec.json` for each
+edit. The helper supports these commands (run from anywhere, using its absolute path):
 
 ```sh
 python3 /path/to/session/folder-agent.py watch --minutes 25
@@ -170,6 +159,12 @@ requires the exact saved source and refuses a recent active editor lease. It
 starts a new connection identity, restores the conversation, refreshes the helper
 and authoring kit, and requires new connection instructions in Claude. These
 files are refreshed only after the resume is accepted. Old pending work is not replayed automatically.
+Sessions created with the retired operation API need this refresh and fresh
+connection instructions before continuing with complete document proposals.
+Reload the updated workbench, resume the exchange, paste its fresh instructions
+into Claude, and start the new watch. That watch refreshes the bundled skill and
+removes retired API guidance before emitting requests. It does not erase earlier
+messages from the Claude conversation.
 Use the saved ledger to continue with another person or agent.
 
 The initial experiment supports one editor/Claude session on local disk. Avoid

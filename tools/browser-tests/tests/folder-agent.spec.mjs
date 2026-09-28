@@ -207,6 +207,11 @@ test('refused resume preserves the paired agent instructions; successful resume 
     await chooseFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    h.run('prepare');
+    const skillFile=path.join(h.session,'authoring/.claude/skills/hld-to-page/SKILL.md');
+    await writeFile(skillFile,'Stale skill: use the old API');
+    await writeFile(path.join(h.session,'authoring/docs/agent-operations.md'),'Stale operation guidance');
+    await writeFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'),'Stale planner');
     await disconnect(page);
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
     await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
@@ -224,6 +229,12 @@ test('refused resume preserves the paired agent instructions; successful resume 
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toBe(await readFile(path.join(root,'tools/folder-agent.py'),'utf8'));
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).not.toMatch(/--operations|--dry-run|Semantic operations/);
+    // watch() performs this same preparation before emitting any request.
+    h.run('prepare');
+    expect(await readFile(skillFile,'utf8')).toBe(await readFile(path.join(root,'.claude/skills/hld-to-page/SKILL.md'),'utf8'));
+    await expect(readFile(path.join(h.session,'authoring/docs/agent-operations.md'))).rejects.toMatchObject({code:'ENOENT'});
+    await expect(readFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'))).rejects.toMatchObject({code:'ENOENT'});
     await disconnect(page);
     await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
     await chooseFolder(page);
@@ -381,7 +392,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
 });
 
 
-test('semantic dry run, reviewed apply, exact receipt Undo and cancelled late proposals use the real folder transport',async({page})=>{
+test('full-document reviewed apply, exact receipt Undo and cancelled late proposals use the real folder transport',async({page})=>{
   const h=await setup(page);
   try{
     const spec=JSON.parse(source);spec.page.blocks[0].id='delivery';const original=JSON.stringify(spec,null,2);
@@ -389,15 +400,12 @@ test('semantic dry run, reviewed apply, exact receipt Undo and cancelled late pr
     await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
     async function send(text){await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();return publishedRequest(h,text);}
     const request=await send('Rename the delivery service'),current=await h.read('state.json');
-    const operations=[{op:'updateNode',sectionId:'delivery',nodeId:'b',patch:{title:'Delivery service'}}];
-    await writeFile(path.join(h.session,'operations.json'),JSON.stringify({operations,dryRun:true}));
-    h.run('propose','--request',request.id,'--revision',current.revision,'--operations','operations.json','--summary','Check a focused rename');
-    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('validated');await expect(page.locator('#src')).toHaveValue(original);
     await page.locator('#folder-agent-focus-summary').click();await page.locator('#folder-agent-review-mode').check();await page.locator('#folder-agent-focus-summary').click();
-    await writeFile(path.join(h.session,'operations.json'),JSON.stringify(operations));
-    h.run('propose','--request',request.id,'--revision',current.revision,'--operations','operations.json','--summary','Rename one service');
+    spec.page.blocks[0].diagram.nodes.b.title='Delivery service';
+    await writeFile(path.join(h.session,'candidate.spec.json'),JSON.stringify(spec,null,2));
+    h.run('propose','--request',request.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Rename one service');
     await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
-    await page.locator('#folder-agent-review-accept').click();await expect.poll(async()=> (await h.read('result.json')).status).toBe('applied');
+    await page.locator('#folder-agent-review-accept').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe('applied');
     await expect(page.locator('#src')).toHaveValue(/Delivery service/);h.run('reply','--request',request.id,'--text','Renamed the service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await page.getByRole('button',{name:'Undo change',exact:true}).click();await expect(page.locator('#src')).toHaveValue(original);
     const cancelled=await send('This turn will be stopped'),state=await h.read('state.json');await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();

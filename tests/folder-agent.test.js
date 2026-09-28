@@ -268,8 +268,8 @@ test('review content is inert and stable across polls, and a changed payload inc
   const h=harness();await h.client.start();h.client.setReviewMode(true);await h.client.send('Inspect');h.proposal();await h.client.poll();
   const version=h.last.review.version;assert.equal(h.client.reviewContent(),'{"title":"after"}');
   await h.client.poll();assert.equal(h.last.review.version,version);
-  h.proposal({source:undefined,operations:[{op:'updateNode',sectionId:'$root',nodeId:'n',patch:{label:'New'}}],dryRun:true});
-  await h.client.poll();assert.ok(h.last.review.version>version);assert.equal(JSON.parse(h.client.reviewContent()).operations[0].nodeId,'n');
+  h.proposal({source:'{"title":"Changed proposal"}'});
+  await h.client.poll();assert.ok(h.last.review.version>version);assert.equal(JSON.parse(h.client.reviewContent()).title,'Changed proposal');
   await h.client.cancel();assert.equal(h.client.reviewContent(),'');
 });
 test('cancellation persists an applied receipt after the initial receipt storage failed',async()=>{

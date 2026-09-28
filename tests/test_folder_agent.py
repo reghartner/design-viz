@@ -87,6 +87,30 @@ class FolderAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'checksum'):
             helper.prepare(self.folder)
 
+    def test_prepare_refreshes_skill_and_removes_only_retired_bundle_files(self):
+        skill = '.claude/skills/hld-to-page/SKILL.md'
+        retired = ['docs/agent-operations.md', 'docs/agent-intent-testing.md', 'src/workbench/agent-operations.js']
+        self.kit({skill: 'Old skill', **dict.fromkeys(retired, 'Old API guidance')})
+        helper.prepare(self.folder)
+        note = self.folder/'authoring/operator-notes.md'
+        note.write_text('Keep my notes')
+        self.kit({skill: 'Restored full-document skill'})
+        helper.prepare(self.folder)
+        self.assertEqual((self.folder/'authoring'/skill).read_text(), 'Restored full-document skill')
+        self.assertTrue(all(not (self.folder/'authoring'/name).exists() for name in retired))
+        self.assertEqual(note.read_text(), 'Keep my notes')
+        # Cleanup cannot follow a retired file or parent symlink outside the kit.
+        link = self.folder/'authoring/docs/agent-operations.md'
+        link.symlink_to(note)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            helper.prepare(self.folder)
+        self.assertEqual(note.read_text(), 'Keep my notes')
+        link.unlink()
+        (self.folder/'authoring/docs').rmdir()
+        (self.folder/'authoring/docs').symlink_to(self.folder, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, 'symlink'):
+            helper.prepare(self.folder)
+
     def test_watcher_notifies_once_and_renewal_skips_completed_request(self):
         run = self.run_helper('watch', '--minutes', '.01', '--interval', '.1')
         self.assertEqual(run.returncode, 0, run.stderr)
@@ -178,28 +202,19 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertFalse(json.loads(run.stdout)['ready'])
 
-    def test_semantic_operations_and_dry_run_use_exact_revision_without_reading_arbitrary_paths(self):
-        operations = [{'op': 'updateNode', 'sectionId': 'journey', 'nodeId': 'customer', 'patch': {'label': 'Client'}}]
-        self.put('operations.json', {'operations': operations, 'dryRun': True})
-        run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', 'operations.json')
+    def test_retired_operation_flags_never_publish_a_proposal(self):
+        self.put('candidate.spec.json', {'title': 'Complete document'})
+        for flags in [('--operations', 'candidate.spec.json'), ('--file', 'candidate.spec.json', '--dry-run')]:
+            run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', *flags)
+            self.assertNotEqual(run.returncode, 0)
+            self.assertFalse((self.folder/'proposal.json').exists())
+        run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--file', 'candidate.spec.json')
         self.assertEqual(run.returncode, 0, run.stderr)
         proposal = helper.read(self.folder, 'proposal.json')
-        self.assertEqual(proposal['operations'], operations)
-        self.assertTrue(proposal['dryRun'])
-        self.assertNotIn('source', proposal)
+        self.assertEqual(proposal['source'], (self.folder/'candidate.spec.json').read_text())
         self.assertEqual(proposal['baseRevision'], 'revision-1')
-        self.put('result.json', {**self.owner, 'id': proposal['id'], 'status': 'validated'})
-        for invalid in [[], operations*101, [{'op': 'executeScript'}], {'operations': operations, 'dryRun': 'yes'},
-                        {'operations': operations, 'source': '{}'}]:
-            self.put('operations.json', invalid)
-            invalid_run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', 'operations.json')
-            self.assertNotEqual(invalid_run.returncode, 0, invalid)
-            self.assertEqual(helper.read(self.folder, 'proposal.json')['id'], proposal['id'])
-        escaped = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', '../operations.json')
-        self.assertIn('plain filename', escaped.stderr)
-        self.put('operations.json', operations)
-        stale = self.run_helper('propose', '--request', 'request', '--revision', 'revision-old', '--operations', 'operations.json')
-        self.assertIn('Document changed', stale.stderr)
+        self.assertNotIn('operations', proposal)
+        self.assertNotIn('dryRun', proposal)
 
     def test_permission_needed_progress_preserves_reported_phase(self):
         run = self.run_helper('progress', '--request', 'request', '--text', 'Waiting for approval in Claude.', '--phase', 'permission-needed')

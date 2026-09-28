@@ -107,3 +107,15 @@ test('closed project and invalid proposal are refused, identical source adds no 
   e.receive({proposal},sent);assert.equal(e.request().result.status,'unchanged');assert.equal(h.writes.length,0);
   h.setOpen(false);e.receive({proposal:{...proposal,id:'closed'}},e.request());assert.equal(e.request().result.status,'rejected');
 });
+
+test('retired operation and dry-run envelopes never apply, including envelopes carrying valid full source',async()=>{
+  for(const extra of [{operations:[]},{operations:null},{operations:undefined},{dryRun:true},{dryRun:false},{dryRun:'true'},{dryRun:undefined}]){
+    const h=await exchangeHarness(),e=h.exchange,sent=e.request();
+    e.receive({proposal:{id:'legacy',baseRevision:sent.snapshot.revision,source:'{"title":"agent"}',...extra}},sent);
+    assert.equal(e.request().result.status,'rejected');assert.match(e.request().result.message,/complete updated document/);
+    assert.equal(h.writes.length,0);assert.equal(e.request().snapshot.source,sent.snapshot.source);assert.equal(e.request().snapshot.revision,sent.snapshot.revision);
+    e.receive({acknowledged:'legacy'},e.request());
+    e.receive({proposal:{id:'replacement',baseRevision:sent.snapshot.revision,source:'{"title":"agent"}'}},e.request());
+    assert.equal(e.request().result.status,'applied');assert.equal(h.writes.length,1);
+  }
+});

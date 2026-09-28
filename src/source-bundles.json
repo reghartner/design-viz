@@ -55,7 +55,6 @@
     "workbench/field-values.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
-    "workbench/agent-operations.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",
     "workbench/agent-recovery.js",

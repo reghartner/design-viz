@@ -64,6 +64,12 @@ async function resumeFolder(page){
   if(!await page.locator('#folder-agent-resume').isVisible())await page.getByText('Resume an existing exchange',{exact:true}).click();
   await page.locator('#folder-agent-resume').click();
 }
+async function publishedRequest(h,text){
+  // Send disables while its file write is pending, before Claude can read it.
+  // Synchronize on the exact published turn so a previous request cannot pass.
+  await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe(text);
+  return h.read('request.json');
+}
 async function disconnect(page){
   await closeGuide(page);
   if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();
@@ -84,7 +90,7 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
     await expect(page.locator('#folder-agent-context')).toContainText('a');
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
-    await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');expect(request.selection[0].id).toBe('a');
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await publishedRequest(h,'Tell the customer story');expect(request.selection[0].id).toBe('a');
     // Simulated agent asks a real protocol question; text must stay inert.
     await writeFile(path.join(h.session,'answer.txt'),'What should the customer learn? <img src=x onerror=alert(1)>');
     h.run('reply','--request',request.id,'--file','answer.txt');
@@ -92,7 +98,7 @@ test('editor conversation uses real local files and helper; changes render with 
     await expect(page.locator('#folder-agent-messages img')).toHaveCount(0);
     await closeGuide(page);await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(3);
-    const next=await h.read('request.json'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
+    const next=await publishedRequest(h,'They can receive camera updates.'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
     await page.locator('#folder-agent-input').focus(); // Composer focus must allow diagram updates.
     h.run('propose','--request',next.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Customer story updated');
@@ -167,7 +173,7 @@ test('Claude activity streams before the final answer and remains visible withou
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain our customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
     await expect(page.locator('#folder-agent-progress')).toContainText('has not acknowledged');
-    const request=await h.read('request.json');
+    const request=await publishedRequest(h,'Explain our customer story');
     h.run('progress','--request',request.id,'--text','Reading your customer story.');
     h.run('progress','--request',request.id,'--text','Checking the paths. <img src=x onerror=alert(1)>');
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
@@ -247,8 +253,7 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     for(let i=0;i<50;i++){
       await closeGuide(page);await page.locator('#folder-agent-input').fill('Measured request '+i);await page.locator('#folder-agent-send').click();
       await expect(page.locator('#folder-agent-send')).toBeDisabled();
-      await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch{return null;}}).toBe('Measured request '+i);
-      const request=await h.read('request.json');
+      const request=await publishedRequest(h,'Measured request '+i);
       const at=events.has(request.id)?events.get(request.id):await new Promise(resolve=>waiting.set(request.id,resolve));
       detections.push(at-request.at);
       const reply='Measured reply '+i;await writeFile(path.join(h.session,'answer.txt'),reply);h.run('reply','--request',request.id,'--file','answer.txt');
@@ -318,7 +323,7 @@ test('agent context names the selection before pairing and freezes it beside the
     await chooseFolder(page);await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
-    const request=await h.read('request.json');expect(request.selection[0].label).toBe('Doorbell');
+    const request=await publishedRequest(h,'Explain this');expect(request.selection[0].label).toBe('Doorbell');
     await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('[data-dv-node="b"]').first().click();
     h.run('progress','--request',request.id,'--text','Reading the selected doorbell.');
@@ -378,7 +383,7 @@ test('semantic dry run, reviewed apply, exact receipt Undo and cancelled late pr
     const spec=JSON.parse(source);spec.page.blocks[0].id='delivery';const original=JSON.stringify(spec,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
-    async function send(text){await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch{return null;}}).toBe(text);return h.read('request.json');}
+    async function send(text){await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();return publishedRequest(h,text);}
     const request=await send('Rename the delivery service'),current=await h.read('state.json');
     const operations=[{op:'updateNode',sectionId:'delivery',nodeId:'b',patch:{title:'Delivery service'}}];
     await writeFile(path.join(h.session,'operations.json'),JSON.stringify({operations,dryRun:true}));

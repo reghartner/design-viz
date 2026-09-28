@@ -43,16 +43,17 @@ function initWorkbenchWorkspace(){
   }
   function paintAll(){names.forEach(paint);}
   function front(name){prefs.tool=name;windows[name].style.zIndex=++z;names.forEach(function(n){tabs[n].tabIndex=n===name?0:-1;});}
+  function focusTab(name){tabs[name].focus({preventScroll:true});tabs[name].scrollIntoView({block:'nearest',inline:'nearest'});}
   function showTool(name,options){
     if(!windows[name])return false;
     if(hidden)setHidden(false);
     if(name==='agent' && document.getElementById('guide').hidden){prefs.windows.inspect.open=false;paint('inspect');}
     prefs.windows[name].open=true;front(name);paint(name);
     var section=document.getElementById(name==='json'?'sec-source':'sec-'+name);if(section)section.open=true;
-    if(options && options.focus)tabs[name].focus({preventScroll:true});
+    if(options && options.focus)focusTab(name);
     persist();return true;
   }
-  function close(name){prefs.windows[name].open=false;paint(name);persist();tabs[name].focus({preventScroll:true});}
+  function close(name){prefs.windows[name].open=false;paint(name);persist();focusTab(name);}
   function finish(cancel){
     if(!gesture)return;
     var g=gesture;gesture=null;

@@ -42,3 +42,30 @@ test('invalid authored graphs cannot be packaged as a successful viewable handof
   const downloads=[];page.on('download',event=>downloads.push(event));await page.locator('#workspace-prepare-review').click();await page.locator('#editor-brief').getByRole('button',{name:'Prepare engineering handoff',exact:true}).click();
   await expect(page.locator('.story-brief-status')).toContainText('Repair the story');await expect(page.locator('.story-brief-status')).toContainText('missing');expect(downloads).toHaveLength(0);
 });
+
+test('compact chrome keeps Add, appearance and workspace controls independently reachable',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
+  for(const width of [1050,850,720,640,390]){
+    await page.setViewportSize({width,height:800});
+    const controls=await page.evaluate(()=>['diagram-add','file-save','folder-agent-indicator','workspace-preset'].map(id=>{
+      const node=document.getElementById(id),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      return {id,inside:r.left>=0 && r.right<=innerWidth,reachable:hit===node || node.contains(hit)};
+    }));
+    for(const control of controls)expect(control,JSON.stringify(control)+' at '+width+'px').toMatchObject({inside:true,reachable:true});
+    await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeVisible();await page.keyboard.press('Escape');
+    await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#sk-pastel')).toBeVisible();
+    await page.locator('#workspace-appearance>summary').click();await page.locator('#workspace-preset').selectOption('present');
+  }
+});
+
+test('short-height rail scrolls to every tool with pointer and keyboard access',async({page,server})=>{
+  await page.setViewportSize({width:640,height:360});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
+  const rail=page.locator('.workspace-rail');
+  expect(await rail.evaluate(el=>el.scrollHeight>el.clientHeight)).toBe(true);
+  await page.locator('#editor-tab-json').click();await expect(page.locator('#editor-tab-json')).toBeInViewport();await expect(page.locator('#workspace-window-json')).toBeVisible();
+  await page.locator('#editor-tab-file').click();await expect(page.locator('#editor-tab-file')).toBeInViewport();await expect(page.locator('#workspace-window-file')).toBeVisible();
+  await page.locator('#editor-tab-agent').focus();await page.keyboard.press('End');
+  await expect(page.locator('#editor-tab-file')).toBeFocused();await expect(page.locator('#editor-tab-file')).toBeInViewport();
+  await page.keyboard.press('Home');await expect(page.locator('#editor-tab-agent')).toBeFocused();await expect(page.locator('#editor-tab-agent')).toBeInViewport();
+  const r=await rail.boundingBox();expect(r.y+r.height).toBeLessThanOrEqual(360);
+});

@@ -94,6 +94,18 @@ questions appropriate to the selected audience. `authoring/` is the version-matc
 VIZ directory. It includes the skill, references, recipes, validator, compatibility
 stamper and state walker. Browser checks remain separate and must not be claimed.
 
+For an update, resolve the intended target, scope and meaning before proposing it.
+A request relying on selection that names a different object, ambiguous names,
+missing units, unclear deletion
+scope or unsupported outcomes need a focused question through `reply`; leave the
+dependent change unapplied. An explicit, unambiguous named target takes precedence
+over selection. A request to guess or avoid questions does not settle
+those decisions. Use the captured selection, not later clicks. A fully specified
+small edit needs no extra confirmation. If stale work's original target has
+disappeared or changed role, ask instead of substituting a similar target.
+Validation, dry runs, review and Undo do not establish intent; full replacement
+must not bypass an unclear request or rejected reference.
+
 The helper supports these commands (run from anywhere, using its absolute path):
 
 ```sh

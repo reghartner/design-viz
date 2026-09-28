@@ -18,6 +18,8 @@ function createWorkbenchAgentExchange(opts){
       var current=snapshot();
       var description=null;
       function result(status,message){pending={id:proposal.id,baseRevision:proposal.baseRevision,status:status,message:message,revision:current.revision};if(description)pending.description=description;return message;}
+      if(Object.prototype.hasOwnProperty.call(proposal,'dryRun') && typeof proposal.dryRun!=='boolean')
+        return result('rejected','dryRun must be true or false. The proposal was not applied.');
       if(!current.open)return result('rejected','Open a project before applying agent changes.');
       if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
       if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';

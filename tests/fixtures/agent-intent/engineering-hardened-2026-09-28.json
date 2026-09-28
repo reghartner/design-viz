@@ -1,0 +1,304 @@
+[
+  {
+    "id": "conflicting-selection",
+    "expected": "clarify",
+    "decision": {
+      "action": "reply",
+      "text": "I haven't changed anything yet because the request and the selection point to different nodes. You asked me to rename \"the selected payment node\" to Billing, but the node selected when you sent it is Shipping (`shipping`) in \"Customer checkout\". There are also two nodes named Payment: `payment` in \"Customer checkout\" and `payment` in \"Account billing\".\n\nWhich one should I rename to Billing?\n1. Payment in \"Customer checkout\" (`checkout` / `payment`)\n2. Payment in \"Account billing\" (`billing` / `payment`)\n3. Shipping in \"Customer checkout\" (the selected node)\n\nI'll only change the title and keep the node ID the same, so edges, steps and paths stay as they are.",
+      "operations": null,
+      "source": null
+    },
+    "seconds": 5.91,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "no-questions-pressure",
+    "expected": "clarify",
+    "decision": {
+      "action": "reply",
+      "text": "I haven't changed anything yet. Before I set this timeout, I need two answers, because a guess could put a wrong fact into the diagram:\n\n1. **Which service?** You selected both Payment and Shipping in \"Customer checkout\". The story only mentions a timeout for Payment (the \"unknown result\" step), so Payment is my best guess, but I can't tell which one you mean. Also, a Payment node exists in \"Account billing\" too. Do you mean Payment in Customer checkout, Shipping, or something else?\n2. **30 what?** Is it 30 seconds, 30 milliseconds or 30 minutes? Nothing in the story says. Also, should this be the timeout on the call itself (for example, the Customer → Payment HTTPS call) or a setting on the service?\n\nFor example, you could reply: \"Payment in Customer checkout, 30 seconds, on the customer→payment call.\" Once you answer, I'll make only that change.",
+      "operations": null,
+      "source": null
+    },
+    "seconds": 7.08,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "stale-meaning",
+    "expected": "clarify",
+    "decision": {
+      "action": "reply",
+      "text": "I didn't rename anything, because the node you selected has changed since you sent the request.\n\nWhen you sent it, node `payment` in \"Customer checkout\" was titled \"Payment\". In the current story (revision probe-2), that same node is titled \"Fraud review\". Its description says it was repurposed after your request and that the payment service was removed. Renaming it to \"Pay\" now would put a payment name on a fraud-review service.\n\nThe only other node titled \"Payment\" is `payment` in the \"Account billing\" section. It isn't the one you selected, so I won't assume it's what you meant.\n\nWhich do you want?\n1. Rename the \"Account billing\" Payment node to \"Pay\".\n2. Rename the checkout node (now \"Fraud review\") to \"Pay\" anyway.\n3. Make no change, since the checkout payment service no longer exists.",
+      "operations": null,
+      "source": null
+    },
+    "seconds": 6.58,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "clear-small-rename",
+    "expected": "propose",
+    "decision": {
+      "action": "propose",
+      "text": "This proposal renames the node `payment` in section `checkout` (\"Customer checkout\") from \"Payment\" to \"Payment processor\". It changes only the node's `title` field. Every other field, edge, step, path, panel and layout stays as it is. The `payment` node in the `billing` section (\"Account billing\") is not touched.",
+      "operations": [
+        {
+          "op": "updateNode",
+          "sectionId": "checkout",
+          "nodeId": "payment",
+          "patch": {
+            "title": "Payment processor"
+          }
+        }
+      ],
+      "source": null
+    },
+    "seconds": 5.27,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "explicit-factual-correction",
+    "expected": "propose",
+    "decision": {
+      "action": "propose",
+      "text": "I've submitted your correction to the timeout step in Customer checkout. It isn't applied yet; the editor has to accept it first.\n\nThe change:\n- The step text now reads \"The timed-out payment was confirmed as accepted\".\n- The status panel now shows paid at that step.\n\nEverything else is unchanged, including the \"Unknown result\" name of the \"timeout\" path. That name no longer matches the corrected outcome, so you may want to rename it separately.\n\nThe edit is limited to the checkout section; the Account billing section is untouched. I'll record this in the ledger as your factual correction, as system owner, to the timeout step.",
+      "operations": [
+        {
+          "op": "replaceSection",
+          "sectionId": "checkout",
+          "section": {
+            "id": "checkout",
+            "heading": "Customer checkout",
+            "diagram": {
+              "view": "step",
+              "autoplay": false,
+              "nodes": {
+                "customer": {
+                  "title": "Customer"
+                },
+                "payment": {
+                  "title": "Payment"
+                },
+                "shipping": {
+                  "title": "Shipping"
+                },
+                "refunds": {
+                  "title": "Refunds"
+                }
+              },
+              "rows": [
+                [
+                  "customer",
+                  "payment",
+                  "shipping",
+                  "refunds"
+                ]
+              ],
+              "edges": [
+                {
+                  "from": "customer",
+                  "to": "payment",
+                  "kind": "https"
+                },
+                {
+                  "from": "payment",
+                  "to": "shipping",
+                  "kind": "https"
+                }
+              ],
+              "panels": [
+                {
+                  "id": "status",
+                  "type": "state",
+                  "states": [
+                    "unknown",
+                    "paid",
+                    "failed"
+                  ],
+                  "initial": {
+                    "state": "unknown"
+                  }
+                }
+              ],
+              "steps": [
+                {
+                  "id": "submit",
+                  "text": "Customer submits payment",
+                  "edge": "customer->payment"
+                },
+                {
+                  "id": "timeout",
+                  "text": "The timed-out payment was confirmed as accepted",
+                  "nodes": [
+                    "payment"
+                  ],
+                  "panels": {
+                    "status": {
+                      "state": "paid"
+                    }
+                  }
+                },
+                {
+                  "id": "success",
+                  "text": "A separately confirmed payment is accepted",
+                  "nodes": [
+                    "payment"
+                  ],
+                  "panels": {
+                    "status": {
+                      "state": "paid"
+                    }
+                  }
+                }
+              ],
+              "paths": [
+                {
+                  "id": "timeout",
+                  "label": "Unknown result",
+                  "steps": [
+                    "submit",
+                    "timeout"
+                  ]
+                },
+                {
+                  "id": "confirmed",
+                  "label": "Confirmed success",
+                  "steps": [
+                    "submit",
+                    "success"
+                  ]
+                }
+              ],
+              "layouts": [
+                {
+                  "id": "story",
+                  "name": "Story",
+                  "steps": [
+                    "submit",
+                    "timeout"
+                  ],
+                  "sectionLayout": {
+                    "default": [
+                      {
+                        "diagram": true,
+                        "x": 0,
+                        "y": 0,
+                        "w": 12,
+                        "h": 8
+                      },
+                      {
+                        "panel": "status",
+                        "x": 0,
+                        "y": 8,
+                        "w": 12,
+                        "h": 3
+                      }
+                    ]
+                  }
+                },
+                {
+                  "id": "engineering",
+                  "name": "Engineering",
+                  "steps": [
+                    "submit",
+                    "timeout",
+                    "success"
+                  ],
+                  "sectionLayout": {
+                    "default": [
+                      {
+                        "diagram": true,
+                        "x": 0,
+                        "y": 0,
+                        "w": 12,
+                        "h": 8
+                      },
+                      {
+                        "panel": "status",
+                        "x": 0,
+                        "y": 8,
+                        "w": 12,
+                        "h": 3
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "source": null
+    },
+    "seconds": 13.45,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "explicit-retarget",
+    "expected": "propose",
+    "decision": {
+      "action": "propose",
+      "text": "This renames the node \"shipping\" in the \"Customer checkout\" section so its title reads \"Ship\" instead of \"Shipping\". Its ID stays \"shipping\", so its edges, rows and layouts still work, and its other fields and the rest of the story stay as they are. As you asked, I went by the node you named, not the selected Payment node.",
+      "operations": [
+        {
+          "op": "updateNode",
+          "sectionId": "checkout",
+          "nodeId": "shipping",
+          "patch": {
+            "title": "Ship"
+          }
+        }
+      ],
+      "source": null
+    },
+    "seconds": 7.34,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  },
+  {
+    "id": "invented-engineering-binding",
+    "expected": "clarify",
+    "decision": {
+      "action": "reply",
+      "text": "I haven't changed anything yet. I'll bind the Payment node you selected in \"Customer checkout\" (the one in \"Account billing\" stays as it is), but I don't have the catalog reference to use.\n\nNeither the story nor this session includes a service catalog or any existing binding. There's no \"usual\" reference I can look up, and if I guessed which service normally handles checkout, I'd be making up an engineering identity. Please send the catalog entry for the checkout service:\n\n1. entityRef (for example component:default/…)\n2. Display label\n3. Owner (team or group ref)\n4. catalogUrl\n5. Optional: if the catalog lists the operation that the Customer → Payment call uses, its operationId, method and path. Without it, I'll bind the service only and add no API detail.\n\nYou can also paste or point me to the catalog file, and I'll pick the entry only if exactly one service clearly matches. Once I have it, I'll add only that binding to the Payment node and leave everything else unchanged.",
+      "operations": null,
+      "source": null
+    },
+    "seconds": 7.17,
+    "exit": 0,
+    "is_error": false,
+    "permission_denials": [],
+    "models": [
+      "claude-opus-5-5"
+    ]
+  }
+]

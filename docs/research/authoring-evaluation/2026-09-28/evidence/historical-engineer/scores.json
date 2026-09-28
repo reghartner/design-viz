@@ -1,0 +1,49 @@
+{
+  "run": "ba-after-opus-b1-overnight-engineer",
+  "judgments": [
+    {
+      "questions": 10,
+      "level": 8,
+      "time": 17,
+      "edges": 5,
+      "panels": 15,
+      "backstage": 13,
+      "fidelity": 15,
+      "total": 83
+    },
+    {
+      "questions": 10,
+      "level": 8,
+      "time": 14,
+      "edges": 15,
+      "panels": 15,
+      "backstage": 15,
+      "fidelity": 15,
+      "total": 92
+    },
+    {
+      "questions": 10,
+      "level": 8,
+      "time": 14,
+      "edges": 13,
+      "panels": 15,
+      "backstage": 15,
+      "fidelity": 15,
+      "total": 90
+    }
+  ],
+  "median": {
+    "questions": 10,
+    "level": 8,
+    "time": 14,
+    "edges": 13,
+    "panels": 15,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 90
+  },
+  "spread": [
+    83,
+    92
+  ]
+}

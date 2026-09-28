@@ -1,0 +1,100 @@
+{
+  "problems": [],
+  "metrics": {
+    "questionsFile": true,
+    "questionCount": 8,
+    "ledger": true,
+    "html": true,
+    "buildOk": true,
+    "buildWarnings": 0,
+    "diagrams": 1,
+    "field:phone.battery:normal": [
+      "25|(default)|ready|Updated just now",
+      "25|(default)|ready|Updated 2 h ago",
+      "25|(default)|ready|Updated 5 h ago",
+      "25|(default)|ready|Updated 8 h ago",
+      "25|(default)|ready|Updated 8 h ago",
+      "25|(default)|ready|Updated 9 h ago",
+      "21|battery-low|ready|Updated 11 min ago"
+    ],
+    "field:phone.power:normal": [
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Solar charging|solar|ready|"
+    ],
+    "field:phone.online:normal": [
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|"
+    ],
+    "field:phone.lastEvent:normal": [
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "Package delivered|package|ready|8:10 AM \u00b7 clip opened"
+    ],
+    "battery:batt:normal": "25 25 20 17.17 17.75 20.83 20.89",
+    "clock:phone:normal": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:11 Fri, Oct 2",
+    "field:phone.battery:wifidown": [
+      "25|(default)|ready|Updated just now",
+      "25|(default)|ready|Updated 2 h ago",
+      "25|(default)|ready|Updated 5 h ago",
+      "25|(default)|ready|Updated 8 h ago",
+      "25|(default)|ready|Updated 8 h ago",
+      "25|(default)|ready|Updated 9 h ago",
+      "25|(default)|ready|Updated 9 h ago",
+      "25|(default)|ready|Updated 9 h ago"
+    ],
+    "field:phone.power:wifidown": [
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|"
+    ],
+    "field:phone.online:wifidown": [
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|"
+    ],
+    "field:phone.lastEvent:wifidown": [
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|"
+    ],
+    "battery:batt:wifidown": "25 25 20 17.17 17.75 20.83 20.95 21.42",
+    "clock:phone:wifidown": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:12 Fri, Oct 2 | 8:20 Fri, Oct 2",
+    "boundNodes": 1,
+    "codeRefNodes": 2,
+    "codeRefSteps": 7,
+    "totalSteps": 10,
+    "emptySteps": 0,
+    "edgeSteps": 9,
+    "codeEvidenceUsed": "7/7"
+  },
+  "problemCounts": {}
+}

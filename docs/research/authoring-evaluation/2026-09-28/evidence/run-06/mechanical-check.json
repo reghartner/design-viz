@@ -1,0 +1,91 @@
+{
+  "problems": [
+    {
+      "kind": "static-panel",
+      "msg": "page.page.blocks[0].diagram path happy: panel sd (queue) never changes"
+    }
+  ],
+  "metrics": {
+    "questionsFile": true,
+    "questionCount": 7,
+    "ledger": true,
+    "html": true,
+    "buildOk": true,
+    "buildWarnings": 0,
+    "diagrams": 1,
+    "battery:batt:happy": "25 24 20 17.17 17.75 20.54 20.66",
+    "field:phone.battery:happy": [
+      "25|(default)|ready|Last report 10:30 PM",
+      "25|(default)|ready|Last report 1:00 AM",
+      "20|battery-low|ready|Last report 4:00 AM",
+      "18|battery-low|ready|Last report 6:30 AM",
+      "18|battery-low|ready|Last report 7:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM"
+    ],
+    "field:phone.power:happy": [
+      "Battery \u00b7 not charging|(default)|ready|Last report 10:30 PM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 1:00 AM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 4:00 AM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 6:30 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 7:00 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:00 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:00 AM"
+    ],
+    "field:phone.online:happy": [
+      "Online|(default)|ready|Last report 10:30 PM",
+      "Online|(default)|ready|Last report 1:00 AM",
+      "Online|(default)|ready|Last report 4:00 AM",
+      "Online|(default)|ready|Last report 6:30 AM",
+      "Online|(default)|ready|Last report 7:00 AM",
+      "Online|(default)|ready|Last report 8:00 AM",
+      "Online|(default)|ready|Last report 8:00 AM"
+    ],
+    "clock:phone:happy": "10:30 Thu, Sep 24 | 1:10 Fri, Sep 25 | 4:00 Fri, Sep 25 | 6:50 Fri, Sep 25 | 7:00 Fri, Sep 25 | 8:05 Fri, Sep 25 | 8:07 Fri, Sep 25",
+    "battery:batt:wifi-down": "25 24 20 17.17 17.75 20.54 20.78 21.13 21.13",
+    "field:phone.battery:wifi-down": [
+      "25|(default)|ready|Last report 10:30 PM",
+      "25|(default)|ready|Last report 1:00 AM",
+      "20|battery-low|ready|Last report 4:00 AM",
+      "18|battery-low|ready|Last report 6:30 AM",
+      "18|battery-low|ready|Last report 7:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:15 AM",
+      "21|battery-low|ready|Last report 8:15 AM"
+    ],
+    "field:phone.power:wifi-down": [
+      "Battery \u00b7 not charging|(default)|ready|Last report 10:30 PM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 1:00 AM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 4:00 AM",
+      "Battery \u00b7 not charging|(default)|ready|Last report 6:30 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 7:00 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:00 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:00 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:15 AM",
+      "Solar \u00b7 charging|solar|ready|Last report 8:15 AM"
+    ],
+    "field:phone.online:wifi-down": [
+      "Online|(default)|ready|Last report 10:30 PM",
+      "Online|(default)|ready|Last report 1:00 AM",
+      "Online|(default)|ready|Last report 4:00 AM",
+      "Online|(default)|ready|Last report 6:30 AM",
+      "Online|(default)|ready|Last report 7:00 AM",
+      "Online|(default)|ready|Last report 8:00 AM",
+      "Online|(default)|ready|Last report 8:00 AM",
+      "Online|(default)|ready|Last report 8:15 AM",
+      "Online|(default)|ready|Last report 8:15 AM"
+    ],
+    "clock:phone:wifi-down": "10:30 Thu, Sep 24 | 1:10 Fri, Sep 25 | 4:00 Fri, Sep 25 | 6:50 Fri, Sep 25 | 7:00 Fri, Sep 25 | 8:05 Fri, Sep 25 | 8:09 Fri, Sep 25 | 8:15 Fri, Sep 25 | 8:15 Fri, Sep 25",
+    "boundNodes": 5,
+    "codeRefNodes": 5,
+    "codeRefSteps": 8,
+    "totalSteps": 11,
+    "emptySteps": 0,
+    "edgeSteps": 9,
+    "codeEvidenceUsed": "7/7"
+  },
+  "problemCounts": {
+    "static-panel": 1
+  }
+}

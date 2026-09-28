@@ -1,5 +1,8 @@
 # Editor API authoring experiment
 
+The [September 28 results](2026-09-28/README.md) preserve all six accepted
+stories, the original startup failures, all judgments and the CLI comparison.
+
 The [predeclared comparison](api-comparison-plan.md) uses six independent Claude
 Opus 5.5 sessions: three business readers and three engineers. The author uses
 the real folder helper and editor update API. A coordinator operates the editor

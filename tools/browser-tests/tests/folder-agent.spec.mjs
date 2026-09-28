@@ -91,6 +91,9 @@ test('editor conversation uses real local files and helper; changes render with 
     await expect(page.locator('#folder-agent-context')).toContainText('a');
     await closeGuide(page);await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await publishedRequest(h,'Tell the customer story');expect(request.selection[0].id).toBe('a');
+    expect(request.technicalLevel).toBe('story');
+    await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');
+    expect(await h.read('request.json')).toEqual(request); // This control configures the next request only.
     // Simulated agent asks a real protocol question; text must stay inert.
     await writeFile(path.join(h.session,'answer.txt'),'What should the customer learn? <img src=x onerror=alert(1)>');
     h.run('reply','--request',request.id,'--file','answer.txt');
@@ -99,6 +102,7 @@ test('editor conversation uses real local files and helper; changes render with 
     await closeGuide(page);await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(3);
     const next=await publishedRequest(h,'They can receive camera updates.'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
+    expect(next.technicalLevel).toBe('engineering');
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
     await page.locator('#folder-agent-input').focus(); // Composer focus must allow diagram updates.
     h.run('propose','--request',next.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Customer story updated');

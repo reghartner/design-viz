@@ -18,6 +18,7 @@ import time
 import uuid
 
 LIMIT = 8 * 1024 * 1024
+PROGRESS_LIMIT = 100
 
 
 def read(folder, name):
@@ -41,6 +42,32 @@ def identity(folder):
     if manifest.get('protocol') != 'flowview-folder-v1':
         raise ValueError('Unsupported Flowview folder protocol')
     return {key: manifest[key] for key in ('sessionId', 'connectionId')}
+
+
+def progress_history(folder, value):
+    """Keep bursts of updates between browser polls; only retain this request."""
+    try:
+        previous = read(folder, 'progress.json')
+    except (OSError, ValueError):
+        previous = {}
+    if not isinstance(previous, dict):
+        previous = {}
+    events = []
+    if all(previous.get(key) == value[key] for key in ('sessionId', 'connectionId', 'requestId')):
+        events = previous.get('events', [previous])
+        if not isinstance(events, list):
+            events = []
+    events = [event for event in events[-PROGRESS_LIMIT:] if isinstance(event, dict) and
+              isinstance(event.get('id'), str) and isinstance(event.get('text'), str) and
+              len(event['text']) <= 32000]
+    events = [{key: event.get(key) for key in ('id', 'at', 'text')} for event in events[-(PROGRESS_LIMIT-1):]] + [
+        {key: value[key] for key in ('id', 'at', 'text')}]
+    sizes = [len(json.dumps(event, ensure_ascii=False).encode('utf-8')) for event in events]
+    total = sum(sizes)
+    while len(events) > 1 and total > 512 * 1024:
+        total -= sizes.pop(0)
+        events.pop(0)
+    return events
 
 
 def prepare(folder):
@@ -139,7 +166,10 @@ def main():
     for name in ('reply', 'progress', 'propose'):
         command = commands.add_parser(name)
         command.add_argument('--request', required=True)
-        command.add_argument('--file', required=True, help='UTF-8 file inside the session folder')
+        content = command.add_mutually_exclusive_group(required=True)
+        content.add_argument('--file', help='UTF-8 file inside the session folder')
+        if name != 'propose':
+            content.add_argument('--text', help='Short plain-text update; quote as a shell argument')
         if name == 'propose':
             command.add_argument('--revision', required=True, help='Revision read BEFORE planning the edit')
             command.add_argument('--summary', default='Updated the story.')
@@ -160,12 +190,15 @@ def main():
             time.time() * 1000 - editor.get('at', 0) > 15000 or
             any(request.get(k) != v or editor.get(k) != v for k, v in owner.items())):
         raise ValueError('Request is no longer current or editor is disconnected. Reread the session.')
-    if not re.fullmatch(r'[A-Za-z0-9_.-]+', args.file) or args.file in ('.', '..'):
-        raise ValueError('Use a plain filename inside the session folder')
-    target = folder / args.file
-    if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
-        raise ValueError('Input must be a regular session file within the size limit')
-    text = target.read_text(encoding='utf-8')
+    if args.file:
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+', args.file) or args.file in ('.', '..'):
+            raise ValueError('Use a plain filename inside the session folder')
+        target = folder / args.file
+        if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
+            raise ValueError('Input must be a regular session file within the size limit')
+        text = target.read_text(encoding='utf-8')
+    else:
+        text = args.text
     value = {**owner, 'id': uuid.uuid4().hex, 'requestId': args.request, 'at': int(time.time() * 1000)}
     if args.command in ('propose', 'reply'):
         try:
@@ -193,6 +226,8 @@ def main():
             raise ValueError('Reply must be at most 32000 characters')
         value['text'] = text
         filename = args.command + '.json'
+        if args.command == 'progress':
+            value['events'] = progress_history(folder, value)
     write(folder, filename, value)
     print(json.dumps({'written': filename, 'id': value['id']}))
 

@@ -60,8 +60,25 @@ Claude stops the connection. Normal permission prompts are handled in Claude.
 Send one message at a time from the editor. Each request includes the authored
 selection, current path/view/step, and the chosen Story detail level. Change that
 level to Engineering when enriching the same story. Selection or detail changes after Send do not change
-that request. Claude explicitly writes progress, questions and final replies
-through the helper; its ordinary terminal text is not mirrored automatically.
+that request. The editor shows a timestamped **Claude activity** feed while a
+request is pending and keeps it visible with the final answer. It distinguishes
+waiting for Claude's first acknowledgment from receiving an update. After 30
+seconds without an update, it says so; a watcher heartbeat alone never claims
+the model is working. If the watcher stops, the editor reports that separately.
+
+Claude must immediately acknowledge each request with `progress`, then report
+each meaningful phase (reading, planning, editing, validating), errors, and any
+upcoming permission prompt. For longer work, send an update at the next tool
+boundary after roughly 20 seconds. Use brief observable actions and results,
+not private reasoning. Send all questions, blockers and final answers through
+`reply` so the user can answer in the editor. Its ordinary terminal text is not
+mirrored automatically. Permission approvals still take place in Claude.
+
+Progress is retained as up to 100 updates (with a 512 KiB history budget) for the
+current request, so rapid updates survive between browser polls. The UI retains
+the latest turn's activity until the next message. It renders all text literally.
+The browser reads this activity only from the selected exchange folder; it does
+not read terminal scrollback or unrelated Claude conversations.
 
 For a new story, follow the current hld-to-page worksheet and ask unresolved story
 questions before authoring. Store the reviewable worksheet, operator answers,
@@ -74,13 +91,15 @@ The helper supports these commands (run from anywhere, using its absolute path):
 
 ```sh
 python3 /path/to/session/folder-agent.py watch --minutes 25
+python3 /path/to/session/folder-agent.py progress --request REQUEST_ID --text 'Reading the customer story.'
 python3 /path/to/session/folder-agent.py progress --request REQUEST_ID --file progress.txt
 python3 /path/to/session/folder-agent.py reply --request REQUEST_ID --file answer.txt
 python3 /path/to/session/folder-agent.py propose --request REQUEST_ID --revision BASE_REVISION --file candidate.spec.json --summary "What changed"
 ```
 
 Text/candidate input files must be regular files directly inside the session
-folder. Keep the base revision read **before** planning the edit. The helper
+folder. `progress` and `reply` also accept `--text` for short updates; use normal
+shell-safe quoting. Keep the base revision read **before** planning the edit. The helper
 rejects stale publication. Reconcile against the latest state; never substitute
 a fresh revision onto an old replacement. Wait for result.json before submitting
 another proposal or sending the final reply. All authored document replacements
@@ -99,7 +118,7 @@ are validated by the editor and accepted through its ordinary Undo history.
 | transcript.json | Editor | Last 100 user/assistant messages for handoff |
 | story.spec.json | Editor | Latest exact source checkpoint, including recoverable invalid handwriting |
 | listener.json | Watcher | Watcher identity and heartbeat; not model completion |
-| progress.json / reply.json | Claude helper | Text for the current request |
+| progress.json / reply.json | Claude helper | Bounded progress history / final text for the current request |
 | proposal.json | Claude helper | Full replacement JSON, request ID and base revision |
 | result.json | Editor | Applied/unchanged/rejected acknowledgement and resulting revision |
 | story.ledger.md | Claude | Saved worksheet, answers, evidence, assumptions and open work |
@@ -122,8 +141,9 @@ Use Claude in the original working folder (or the exchange folder itself).
 Open `story.spec.json` with the ordinary workbench file opener, then use
 **Resume a session folder** and choose the saved session subfolder itself. Resume
 requires the exact saved source and refuses a recent active editor lease. It
-starts a new connection identity, restores the conversation, and requires new
-connection instructions in Claude. Old pending work is not replayed automatically.
+starts a new connection identity, restores the conversation, refreshes the helper
+and authoring kit, and requires new connection instructions in Claude. These
+files are refreshed only after the resume is accepted. Old pending work is not replayed automatically.
 Use the saved ledger to continue with another person or agent.
 
 The initial experiment supports one editor/Claude session on local disk. Avoid

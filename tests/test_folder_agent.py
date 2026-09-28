@@ -102,6 +102,32 @@ class FolderAgentTests(unittest.TestCase):
         self.put('editor.json', {**self.owner, 'connectionId': 'old', 'connected': True, 'at': time.time()*1000})
         self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
 
+    def test_progress_accumulates_short_text_and_file_updates_for_only_the_current_request(self):
+        for args in [('--text', 'Reading the story'), ('--file', 'answer.txt')]:
+            run = self.run_helper('progress', '--request', 'request', *args)
+            self.assertEqual(run.returncode, 0, run.stderr)
+        progress = helper.read(self.folder, 'progress.json')
+        self.assertEqual([event['text'] for event in progress['events']], ['Reading the story', 'Our customer is ready.'])
+        self.assertEqual(progress['text'], 'Our customer is ready.')  # Older editor compatibility.
+        self.put('request.json', {**self.owner, 'id': 'next'})
+        run = self.run_helper('progress', '--request', 'next', '--text', 'Starting next turn')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(len(helper.read(self.folder, 'progress.json')['events']), 1)
+        self.assertIn('no longer current', self.run_helper('progress', '--request', 'request', '--text', 'Too late').stderr)
+
+    def test_progress_history_has_count_and_byte_bounds(self):
+        value = {**self.owner, 'requestId': 'request', 'id': 'latest', 'at': 1, 'text': 'New'}
+        self.put('progress.json', [])
+        self.assertEqual(len(helper.progress_history(self.folder, value)), 1)
+        self.put('progress.json', {**value, 'events': [{'id': str(i), 'at': 0, 'text': str(i)} for i in range(120)]})
+        events = helper.progress_history(self.folder, value)
+        self.assertEqual(len(events), 100)
+        self.assertEqual(events[-1]['id'], 'latest')
+        self.put('progress.json', {**value, 'events': [{'id': str(i), 'text': '\x01'*32000} for i in range(10)]})
+        events = helper.progress_history(self.folder, value)
+        self.assertLess(len(json.dumps(events).encode()), 513*1024)
+        self.assertEqual(events[-1]['text'], 'New')
+
 
 if __name__ == '__main__':
     unittest.main()

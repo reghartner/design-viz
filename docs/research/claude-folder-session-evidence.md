@@ -66,6 +66,27 @@ npx --prefix tools/browser-tests playwright test --config tools/browser-tests/pl
 
 ## Measured file transport, excluding model work
 
+### Activity feed follow-up
+
+The editor now retains timestamped progress for the current turn, distinguishes
+watcher liveness from a Claude acknowledgment, and reports 30 seconds of silence.
+The connection prompt and bundled authoring skill require immediate acknowledgment,
+phase updates and editor-delivered questions/final answers. The helper supports
+short `--text` messages and retains bounded progress history between polls.
+Accepted resumes refresh the helper and authoring kit; rejected resumes preserve
+the existing files.
+
+Validation for this follow-up: 20 focused JavaScript tests, 8 Python helper tests,
+12 build tests, and 5 browser tests passed. Browser coverage includes a real local
+watcher, progress before a final reply, retained ordered updates, inert text,
+clearing on the next request, helper upgrades on resume, and another 50 file
+exchanges. The activity screenshot was inspected. Claude was simulated in these
+tests; a real Claude session following the updated reporting instructions still
+needs live acceptance. Normal terminal output and permission prompts are not
+automatically captured.
+
+### Initial timing sample
+
 50 sequential requests/replies, foreground test browser, 250 ms poll interval.
 The actual Python watcher emitted request events; a deterministic test wrote
 replies through the helper. Browser directory handles were injected adapters

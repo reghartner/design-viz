@@ -98,6 +98,38 @@ test('new-story entry, picker cancellation and unsupported browser have useful s
   }finally{await page.close();await h.cleanup();}
 });
 
+test('Claude activity streams before the final answer and remains visible without duplicate or executable text',async({page},info)=>{
+  const h=await setup(page);let watcher;
+  try{
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
+    await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
+    await expect(page.locator('#folder-agent-setup')).not.toHaveAttribute('open','');
+    await page.locator('#folder-agent-input').fill('Explain our customer story');await page.locator('#folder-agent-send').click();
+    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
+    await expect(page.locator('#folder-agent-progress')).toContainText('has not acknowledged');
+    const request=await h.read('request.json');
+    h.run('progress','--request',request.id,'--text','Reading your customer story.');
+    h.run('progress','--request',request.id,'--text','Checking the paths. <img src=x onerror=alert(1)>');
+    await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
+    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Claude sent an update');
+    await expect(page.locator('#folder-agent-activity-log li').first()).toContainText('Reading your customer story.');
+    await expect(page.locator('#folder-agent-activity-log img')).toHaveCount(0);
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();
+    await page.locator('#folder-agent-activity').scrollIntoViewIfNeeded();
+    await page.screenshot({path:info.outputPath('claude-activity-live.png')});
+    h.run('reply','--request',request.id,'--text','Who is the customer?');
+    await expect(page.locator('#folder-agent-messages')).toContainText('Who is the customer?');
+    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Claude finished this turn');
+    await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
+    await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.locator('#folder-agent-input').fill('A new member');await page.locator('#folder-agent-send').click();
+    await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(0);
+    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
+    await page.locator('#folder-agent-disconnect').click();expect(h.errors).toEqual([]);
+  }finally{watcher?.kill();await page.close();await h.cleanup();}
+});
 
 
 test('refused resume preserves the paired agent instructions; successful resume issues a new connection',async({page})=>{
@@ -109,11 +141,13 @@ test('refused resume preserves the paired agent instructions; successful resume 
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
     await page.locator('#folder-agent-disconnect').click();
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
+    await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
     await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:true,at:Date.now()}));
     await page.locator('#folder-agent-resume').click();
     await expect(page.locator('#folder-agent-status')).toContainText('still connected to another editor');
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
+    expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toContain('# Old helper preserved');
     expect((await h.read('editor.json')).connected).toBe(true);
     expect((await h.read('session.json')).connectionId).toBe(before.connectionId);
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
@@ -121,6 +155,7 @@ test('refused resume preserves the paired agent instructions; successful resume 
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/selected exchange folder/);
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
+    expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toBe(await readFile(path.join(root,'tools/folder-agent.py'),'utf8'));
     await page.locator('#folder-agent-disconnect').click();
     await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
     await page.locator('#folder-agent-connect').click();

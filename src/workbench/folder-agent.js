@@ -23,8 +23,14 @@ function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null;
   var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),chain=Promise.resolve();
+  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
-  function publish(state){if(!disposed && opts.changed)opts.changed(Object.assign({connected:connected,pending:pending,transcript:transcript.slice()},state));}
+  function publish(state){
+    var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
+    var phase=!connected?'disconnected':!pending?(activity.length?'complete':'idle'):quietSeconds>=30?'quiet':lastAgentAt===null?'waiting':'responding';
+    if(!disposed && opts.changed)opts.changed(Object.assign({connected:connected,pending:pending,transcript:transcript.slice(),
+      activity:activity.slice(),activityPhase:phase,quietSeconds:quietSeconds,agentResponded:lastAgentAt!==null},state));
+  }
   function envelope(value){return Object.assign({sessionId:manifest.sessionId,connectionId:manifest.connectionId},value);}
   function belongs(value){return value && value.sessionId===manifest.sessionId && value.connectionId===manifest.connectionId;}
   function alive(token){return connected && !disposed && token===epoch;}
@@ -77,15 +83,25 @@ function createFolderAgentClient(opts){
         await snapshot(token);if(!alive(token))return;
       }else if(message)publish({status:message});
     }
+    // Read accumulated progress before a final reply so a fast turn cannot hide
+    // updates that were written between two browser polls.
+    var progress=await readOptional('progress.json');if(!alive(token))return;
+    if(belongs(progress) && pending && progress.requestId===pending){
+      var updated=false;
+      var entries=Array.isArray(progress.events)?progress.events.slice(-100):[progress];
+      entries.forEach(function(item){
+        if(!validText(item) || activitySeen.has(item.id))return;
+        activitySeen.add(item.id);lastAgentAt=now();updated=true;
+        activity.push({id:item.id,text:item.text,at:Number.isFinite(item.at)?item.at:now()});
+      });
+      activity=activity.slice(-100);
+      if(updated)publish({status:'Claude sent an update.'});
+    }
     var reply=await readOptional('reply.json');if(!alive(token))return;
     if((!belongs(proposal) || proposal.requestId!==pending || seen.has(proposal.id)) && belongs(reply) && validText(reply) && pending && reply.requestId===pending && !seen.has(reply.id)){
       seen.add(reply.id);transcript.push({role:'assistant',text:reply.text,requestId:pending});
       pending=null;publish({status:'Reply received. You can continue the conversation.',progress:''});
       await saveTranscript();if(!alive(token))return;
-    }
-    var progress=await readOptional('progress.json');if(!alive(token))return;
-    if(belongs(progress) && validText(progress) && pending && progress.requestId===pending && !seen.has(progress.id)){
-      seen.add(progress.id);publish({status:'Claude is working…',progress:progress.text});
     }
     var listener=await readOptional('listener.json');if(!alive(token))return;
     var listening=belongs(listener) && listener.listening===true && now()-listener.at>=0 && now()-listener.at<5000;
@@ -113,6 +129,7 @@ function createFolderAgentClient(opts){
       if(disposed)return;
       manifest={protocol:'flowview-folder-v1',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:now()};
       project=snap.project;connected=true;epoch++;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
+      activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply});
       try{
         await files.write('session.json',manifest);
@@ -131,6 +148,7 @@ function createFolderAgentClient(opts){
         selection:sent.snapshot.selection,views:sent.snapshot.views,project:sent.snapshot.project,technicalLevel:opts.level?opts.level():'story'});
       await files.write('request.json',request);if(!alive(token))return;
       pending=id;transcript.push({role:'user',text:text,requestId:id});
+      activity=[];activitySeen.clear();requestAt=now();lastAgentAt=null;
       publish({status:'Message saved — waiting for Claude.',progress:''});
       await saveTranscript();
     });},

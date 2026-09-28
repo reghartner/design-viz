@@ -149,7 +149,11 @@
           <p id="folder-agent-status" role="status">For a new connection, choose the working folder itself. Flowview creates the exchange subfolder after you grant access.</p>
           <details id="folder-agent-setup"><summary>Connection instructions</summary><p>Read the full instructions, then paste them into your visible Claude Code session. The instructions locate the exchange inside Claude’s current working folder. Paste into that same session. Your existing permissions still apply. For a fresh Claude session with browser integrations disabled:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><textarea id="folder-agent-instructions" readonly rows="10" aria-label="Full Claude connection instructions"></textarea><button type="button" class="bbtn" id="folder-agent-copy" disabled>Copy connection instructions</button><p>To resume: use Claude in the same working folder, open the exchange’s story.spec.json in the editor, then choose “Resume a session folder” and select that exchange subfolder. Copy the fresh connection instructions into Claude.</p></details>
           <div id="folder-agent-messages" class="folder-agent-messages" role="log" aria-label="Conversation with Claude" aria-live="polite"></div>
-          <p id="folder-agent-progress" aria-live="polite"></p>
+          <section id="folder-agent-activity" class="folder-agent-activity" aria-label="Claude activity" hidden>
+            <b id="folder-agent-activity-title" role="status">Waiting for Claude</b>
+            <p id="folder-agent-progress" class="folder-agent-hint"></p>
+            <ol id="folder-agent-activity-log" role="log" aria-label="Updates from Claude" aria-live="polite" aria-relevant="additions"></ol>
+          </section>
           <p id="folder-agent-context" class="folder-agent-hint">Included with your message: the current story.</p>
           <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" maxlength="16000" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
           <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your session folder keeps the conversation, story, and authoring notes.</p>

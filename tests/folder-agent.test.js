@@ -76,3 +76,38 @@ test('directory adapter reacquires externally replaced files and aborts failed w
   const files=h.context.createFolderAgentFiles(directory);assert.equal((await files.read('a')).v,1);content='{"v":2}';assert.equal((await files.read('a')).v,2);assert.equal(reads,2);
   await assert.rejects(files.write('a',{}),/disk full/);assert.equal(aborted,true);
 });
+test('progress bursts survive the final reply, stay ordered, and never replay on a new request',async()=>{
+  const h=harness();await h.client.start();await h.client.send('Explain');
+  const requestId=h.last.pending;
+  h.disk.set('progress.json',h.envelope({requestId,events:[
+    {id:'first',at:100000,text:'Reading the story'},
+    {id:'second',at:100001,text:'Checking the customer path'}]}));
+  h.reply();await h.client.poll();
+  assert.deepEqual(h.last.activity.map(x=>x.text),['Reading the story','Checking the customer path']);
+  assert.equal(h.last.activityPhase,'complete');assert.equal(h.last.pending,null);
+  await h.client.poll();assert.equal(h.last.activity.length,2);
+  await h.client.send('Next');await h.client.poll();
+  assert.equal(h.last.activity.length,0);assert.equal(h.last.activityPhase,'waiting');
+});
+test('listener liveness never claims a model response; silence and new progress update the activity state',async()=>{
+  const h=harness();await h.client.start();await h.client.send('Explain');
+  h.disk.set('listener.json',h.envelope({listening:true,at:100000}));await h.client.poll();
+  assert.equal(h.last.listening,true);assert.equal(h.last.agentResponded,false);assert.equal(h.last.activityPhase,'waiting');
+  h.advance(31000);await h.client.poll();assert.equal(h.last.activityPhase,'quiet');assert.equal(h.last.quietSeconds,31);
+  h.disk.set('progress.json',h.envelope({id:'legacy',requestId:h.last.pending,text:'Reading'}));await h.client.poll();
+  assert.equal(h.last.activityPhase,'responding');assert.equal(h.last.agentResponded,true);
+  h.advance(31000);await h.client.poll();assert.equal(h.last.activityPhase,'quiet');assert.equal(h.last.activity.length,1);
+  await h.client.disconnect();assert.equal(h.last.activityPhase,'disconnected');
+});
+test('activity refuses foreign connections, wrong requests and malformed entries, and bounds retained updates',async()=>{
+  const h=harness();await h.client.start();await h.client.send('Explain');
+  const event={id:'update',text:'Reading'},requestId=h.last.pending;
+  for(const extra of [{connectionId:'old'},{sessionId:'other'},{requestId:'other'}]){
+    h.disk.set('progress.json',h.envelope({requestId,events:[event],...extra}));await h.client.poll();
+    assert.equal(h.last.activity.length,0);
+  }
+  h.disk.set('progress.json',h.envelope({requestId,events:[null,{id:'bad',text:{}},{id:'big',text:'x'.repeat(32001)},event,event]}));
+  await h.client.poll();assert.equal(h.last.activity.length,1);
+  h.disk.set('progress.json',h.envelope({requestId,events:Array.from({length:120},(_,n)=>({id:'event-'+n,text:String(n)}))}));
+  await h.client.poll();assert.equal(h.last.activity.length,100);assert.equal(h.last.activity[0].text,'20');
+});

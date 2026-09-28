@@ -326,7 +326,11 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   whose protocol is `flowview-folder-v1`, read its `CONNECT.md` and follow
   [folder sessions](../../../docs/folder-agent-session.md). This is a local
   session with a different transport. Use its reply/progress/proposal helper
-  so the user receives questions and answers inside the editor. Preserve the
+  so the user receives questions and answers inside the editor. Immediately
+  acknowledge every request with `progress`, report each work phase and errors,
+  and send longer-work updates at tool boundaries roughly every 20 seconds.
+  Report observable actions; terminal-only output is invisible to this user.
+  Route every question, blocker and final answer through `reply`. Preserve the
   worksheet and decisions in `story.ledger.md` in that folder. The bundled
   `authoring/` directory is VIZ; use its validator and state-walk tools, without
   an OUT build. Browser access is unavailable: never claim visual inspection.

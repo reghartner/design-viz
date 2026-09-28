@@ -160,6 +160,12 @@ class AuthorEvalTests(unittest.TestCase):
         self.assertNotIn('Bash', allowed)
         self.assertNotIn('Write(./**)', allowed)
         self.assertIn('Write(./story.ledger.md)', allowed)
+        self.assertNotIn('Write(./operations.json)', allowed)
+        for phase in (1, 2):
+            prompt = eval.author_prompt(OWNER, 'request-1', phase)
+            self.assertIn('--file candidate.spec.json', prompt)
+            self.assertNotIn('--operations', prompt)
+            self.assertNotIn('agent-operations.md', prompt)
         self.assertIn('Bash(python3 folder-agent.py propose *)', allowed)
         self.assertIn('Bash(python3 author-tools.py walk *)', allowed)
         self.assertIn('Bash(python3 author-tools.py stamp)', allowed)

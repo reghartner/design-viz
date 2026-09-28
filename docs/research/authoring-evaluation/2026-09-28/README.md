@@ -1,5 +1,7 @@
 # Claude editor API versus the saved CLI experiment
 
+> **Subsequent product decision:** after this experiment, the user requested removal of the granular update API and recent skill requirements. These records describe the earlier constrained trial. Future harness prompts now request a complete document; the saved author inputs and outputs below are unchanged.
+
 > **Score reconciliation:** the original ratings below contained factual and counting errors. Use the [audited reference scores and explanation](adjudication/README.md) for the comparison: current mean 79.3 versus saved CLI 90.5. The original table and exact evidence remain preserved.
 
 The six Opus 5.5 authors all delivered an accepted story through the real editor after a documented startup-harness repair. The independently adjudicated comparison below is linked above; the initial rating table is retained for provenance. The file transport was fast; content fidelity, visible app state and authoring UX still need work.

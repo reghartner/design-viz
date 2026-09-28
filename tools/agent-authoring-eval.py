@@ -296,14 +296,13 @@ def author_prompt(owner, request_id, phase):
         'CONNECT.md, README.md, session.json, state.json, editor.json, request.json, '
         'story.spec.json, transcript.json, changes.json, result.json or cancel.json. '
         'Only the helper writes progress/reply/proposal envelopes. Author files may be '
-        'candidate.spec.json, stamped.spec.json, operations.json, answer.txt, progress.txt '
+        'candidate.spec.json, stamped.spec.json, answer.txt, progress.txt '
         'and story.ledger.md.\n\n'
-        'Prefer semantic operations when they express the required edit: read '
-        'authoring/docs/agent-operations.md. For a new complete story, a validated full '
-        'candidate is supported. Keep the state revision read BEFORE planning; never '
+        'Write the complete story document in candidate.spec.json. Keep the state '
+        'revision read BEFORE planning; never '
         'retag stale work. Propose through python3 folder-agent.py propose --request '
-        f'{request_id} --revision BASE_REVISION --operations operations.json --summary '
-        '"Describe the change" (or --file candidate.spec.json). Read matching result.json '
+        f'{request_id} --revision BASE_REVISION --file candidate.spec.json --summary '
+        '"Describe the change". Read matching result.json '
         'before another proposal or final reply. The accepted editor source is story.spec.json. '
         'A rejected/stale/cancelled result is not success. Stop when the request or identities '
         'change. Run local tooling ONLY through the trusted session wrapper; its output '
@@ -332,7 +331,7 @@ def claude_command(session_id=None):
     # File tools are confined to cwd by --restricted. Author writes are limited
     # to named scratch files; helper scripts have specific command prefixes.
     allowed = ['Read(./**)', 'Glob(./**)', 'Grep(./**)']
-    for name in ['candidate.spec.json', 'stamped.spec.json', 'operations.json', 'answer.txt', 'progress.txt', 'story.ledger.md']:
+    for name in ['candidate.spec.json', 'stamped.spec.json', 'answer.txt', 'progress.txt', 'story.ledger.md']:
         allowed.extend([f'Write(./{name})', f'Edit(./{name})'])
     allowed += [f'Bash(python3 folder-agent.py {command} *)' for command in ['progress', 'reply', 'propose']]
     allowed += [

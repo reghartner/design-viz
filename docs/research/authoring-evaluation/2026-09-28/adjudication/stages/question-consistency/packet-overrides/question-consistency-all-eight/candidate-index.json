@@ -1,0 +1,52 @@
+{
+  "candidates": [
+    {
+      "candidateId": "specimen-f4d35ae7d929",
+      "questionFile": "candidates/specimen-f4d35ae7d929/questions.md",
+      "ledgerFile": "candidates/specimen-f4d35ae7d929/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-f4d35ae7d929/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-5395841c704d",
+      "questionFile": "candidates/specimen-5395841c704d/questions.md",
+      "ledgerFile": "candidates/specimen-5395841c704d/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-5395841c704d/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-87e36f6ebc2e",
+      "questionFile": "candidates/specimen-87e36f6ebc2e/questions.md",
+      "ledgerFile": "candidates/specimen-87e36f6ebc2e/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-87e36f6ebc2e/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-7036a4f62b32",
+      "questionFile": "candidates/specimen-7036a4f62b32/questions.md",
+      "ledgerFile": "candidates/specimen-7036a4f62b32/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-7036a4f62b32/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-3d313b05cc71",
+      "questionFile": "candidates/specimen-3d313b05cc71/questions.md",
+      "ledgerFile": "candidates/specimen-3d313b05cc71/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-3d313b05cc71/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-8abdbcba1a1f",
+      "questionFile": "candidates/specimen-8abdbcba1a1f/questions.md",
+      "ledgerFile": "candidates/specimen-8abdbcba1a1f/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-8abdbcba1a1f/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-fba9ebbeb297",
+      "questionFile": "candidates/specimen-fba9ebbeb297/questions.md",
+      "ledgerFile": "candidates/specimen-fba9ebbeb297/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-fba9ebbeb297/subsequent-answers.md"
+    },
+    {
+      "candidateId": "specimen-8c365a9d184d",
+      "questionFile": "candidates/specimen-8c365a9d184d/questions.md",
+      "ledgerFile": "candidates/specimen-8c365a9d184d/story.ledger.md",
+      "subsequentAnswersFile": "candidates/specimen-8c365a9d184d/subsequent-answers.md"
+    }
+  ]
+}

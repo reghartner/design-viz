@@ -1,0 +1,12 @@
+{
+  "scope": "Final targeted evidence appeal under unchanged frozen rules; no desired score supplied.",
+  "challenges": [
+    {
+      "id": "PHONE-PRESENTATION",
+      "deductionIds": [
+        "D004"
+      ],
+      "counterevidence": "Question 6 asks \u201cShould it show the phone?\u201d The HLD establishes phone behavior and notifications, but does not explicitly require a drawing of a phone versus another presentation. Frozen rule 1 distinguishes unanswered presentation choices from already-supplied behavior. Determine whether this particular decision repeats an established behavior or asks how to depict it; do not treat phone participation by itself as an explicit depiction requirement."
+    }
+  ]
+}

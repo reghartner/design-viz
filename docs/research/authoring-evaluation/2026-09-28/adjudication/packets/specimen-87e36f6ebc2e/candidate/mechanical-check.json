@@ -1,0 +1,100 @@
+{
+  "problems": [],
+  "metrics": {
+    "questionsFile": true,
+    "questionCount": 8,
+    "ledger": true,
+    "html": true,
+    "buildOk": true,
+    "buildWarnings": 0,
+    "diagrams": 1,
+    "field:phone.battery:normal": [
+      "25|(default)|ready|Updated just now",
+      "25|(default)|ready|Updated 5 min ago",
+      "20|battery-low|ready|Updated just now",
+      "18|battery-low|ready|Updated 20 min ago",
+      "18|battery-low|ready|Updated just now",
+      "21|battery-low|ready|Updated 5 min ago",
+      "21|battery-low|ready|Updated 7 min ago"
+    ],
+    "field:phone.power:normal": [
+      "Battery \u00b7 not charging|(default)|ready|Updated just now",
+      "Battery \u00b7 not charging|(default)|ready|Updated 2 h ago",
+      "Battery \u00b7 not charging|(default)|ready|Updated 5 h ago",
+      "Battery \u00b7 not charging|(default)|ready|Updated 8 h ago",
+      "Solar \u00b7 charging|solar|ready|Updated just now",
+      "Solar \u00b7 charging|solar|ready|Updated 1 h ago",
+      "Solar \u00b7 charging|solar|ready|Updated 1 h ago"
+    ],
+    "field:phone.status:normal": [
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 5 min ago",
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 20 min ago",
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 5 min ago",
+      "Online|(default)|ready|Updated 7 min ago"
+    ],
+    "field:phone.event:normal": [
+      "|(default)|unknown|",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated just now",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 2 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 5 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 5 h ago",
+      "Package \u00b7 alert sent|(default)|ready|Updated just now",
+      "Package \u00b7 alert sent|(default)|ready|Updated 2 min ago"
+    ],
+    "battery:batt:normal": "25 25 20 17.17 17.67 19.92 20.02",
+    "clock:phone:normal": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:05 Fri, Oct 2 | 8:07 Fri, Oct 2",
+    "field:phone.battery:wifi": [
+      "25|(default)|ready|Updated just now",
+      "25|(default)|ready|Updated 5 min ago",
+      "20|battery-low|ready|Updated just now",
+      "18|battery-low|ready|Updated 20 min ago",
+      "18|battery-low|ready|Updated just now",
+      "21|battery-low|ready|Updated 5 min ago",
+      "21|battery-low|ready|Updated 7 min ago",
+      "20|battery-low|ready|Updated just now"
+    ],
+    "field:phone.power:wifi": [
+      "Battery \u00b7 not charging|(default)|ready|Updated just now",
+      "Battery \u00b7 not charging|(default)|ready|Updated 2 h ago",
+      "Battery \u00b7 not charging|(default)|ready|Updated 5 h ago",
+      "Battery \u00b7 not charging|(default)|ready|Updated 8 h ago",
+      "Solar \u00b7 charging|solar|ready|Updated just now",
+      "Solar \u00b7 charging|solar|ready|Updated 1 h ago",
+      "Solar \u00b7 charging|solar|ready|Updated 1 h ago",
+      "Solar \u00b7 charging|solar|ready|Updated 1 h ago"
+    ],
+    "field:phone.status:wifi": [
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 5 min ago",
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 20 min ago",
+      "Online|(default)|ready|Updated just now",
+      "Online|(default)|ready|Updated 5 min ago",
+      "Online|(default)|ready|Updated 7 min ago",
+      "Online|(default)|ready|Updated just now"
+    ],
+    "field:phone.event:wifi": [
+      "|(default)|unknown|",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated just now",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 2 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 5 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 5 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 7 h ago",
+      "Animal \u00b7 saved, no alert|(default)|ready|Updated 7 h ago",
+      "Package \u00b7 alert sent late|(default)|ready|Updated just now"
+    ],
+    "battery:batt:wifi": "25 25 20 17.17 17.67 19.92 20.02 20.42",
+    "clock:phone:wifi": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:05 Fri, Oct 2 | 8:07 Fri, Oct 2 | 8:15 Fri, Oct 2",
+    "boundNodes": 2,
+    "codeRefNodes": 3,
+    "codeRefSteps": 7,
+    "totalSteps": 10,
+    "emptySteps": 0,
+    "edgeSteps": 9,
+    "codeEvidenceUsed": "7/7"
+  },
+  "problemCounts": {}
+}

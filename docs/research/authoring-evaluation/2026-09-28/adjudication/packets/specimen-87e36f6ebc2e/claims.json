@@ -1,0 +1,319 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "question 7",
+      "explanation": "A business reader was asked to decide whether to add a separate engineering view."
+    },
+    {
+      "id": "C002",
+      "criterion": "time",
+      "points": 2,
+      "location": "retry",
+      "explanation": "The stale 7:00 AM power freshness remains visible while the caption relies on the 8:00 AM check-in."
+    },
+    {
+      "id": "C003",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Automated count is 8, exceeding the 7-question limit."
+    },
+    {
+      "id": "C004",
+      "criterion": "time",
+      "points": 2,
+      "location": "`wifi-back`",
+      "explanation": "Power remains dated 7:00 AM even though the caption says a new heartbeat is sent at 8:15 AM."
+    },
+    {
+      "id": "C005",
+      "criterion": "time",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "Power says \u201cUpdated 8 h ago,\u201d contradicting the caption\u2019s 6:30 AM not-charging report."
+    },
+    {
+      "id": "C006",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already specified both the normal and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C007",
+      "criterion": "level",
+      "points": 2,
+      "location": "node `push` title",
+      "explanation": "\u201cPhone push\u201d is a technical mechanism exposed at Story level."
+    },
+    {
+      "id": "C008",
+      "criterion": "time",
+      "points": 2,
+      "location": "wifi-back",
+      "explanation": "The reconnect heartbeat includes charging state, but power still displays the 7:00 AM freshness."
+    },
+    {
+      "id": "C009",
+      "criterion": "time",
+      "points": 2,
+      "location": "wifi-down",
+      "explanation": "Power remains timestamped 7:00 AM despite the pre-outage 8:00 AM heartbeat."
+    },
+    {
+      "id": "C010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "wifi-down",
+      "explanation": "The carried-forward porch signal depicts an active camera-to-router connection while Wi\u2011Fi is explicitly down."
+    },
+    {
+      "id": "C011",
+      "criterion": "time",
+      "points": 3,
+      "location": "`raccoon`",
+      "explanation": "Explicitly holds actual battery at 25%, inventing a zero-drain intermediate value despite idle drain and clip cost; the documented conflict only protects a direct anchor jump."
+    },
+    {
+      "id": "C012",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`open`",
+      "explanation": "The caption says the package clip is playing, but the phone only switches to the generic app/device page and never shows playback."
+    },
+    {
+      "id": "C013",
+      "criterion": "time",
+      "points": 2,
+      "location": "`courier`",
+      "explanation": "Power remains dated 7:00 AM despite the asserted 8:00 AM heartbeat."
+    },
+    {
+      "id": "C014",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 5",
+      "explanation": "The design already specified bedtime, 25% battery, and not charging."
+    },
+    {
+      "id": "C015",
+      "criterion": "time",
+      "points": 2,
+      "location": "`retry`",
+      "explanation": "Power still shows the false 7:00 AM freshness after the 8:00 AM heartbeat."
+    },
+    {
+      "id": "C016",
+      "criterion": "time",
+      "points": 2,
+      "location": "`lowbatt`",
+      "explanation": "Power says \u201cUpdated 5 h ago,\u201d although the 4:00 AM heartbeat includes charging state."
+    },
+    {
+      "id": "C017",
+      "criterion": "time",
+      "points": 2,
+      "location": "`wifi-down`",
+      "explanation": "Power remains dated 7:00 AM despite the depicted 8:00 AM heartbeat."
+    },
+    {
+      "id": "C018",
+      "criterion": "time",
+      "points": 2,
+      "location": "open",
+      "explanation": "The stale 7:00 AM power freshness remains visible after the 8:00 AM heartbeat."
+    },
+    {
+      "id": "C019",
+      "criterion": "time",
+      "points": 2,
+      "location": "`lowbatt`",
+      "explanation": "Power says \u201cUpdated 5 h ago\u201d despite the current 4:00 AM heartbeat."
+    },
+    {
+      "id": "C020",
+      "criterion": "panels",
+      "points": 3,
+      "location": "retry",
+      "explanation": "The active camera-to-router signal remains visible while the retry is explicitly blocked."
+    },
+    {
+      "id": "C021",
+      "criterion": "level",
+      "points": 2,
+      "location": "`push` node subtitle",
+      "explanation": "\u201cApple / Google push\u201d exposes service/platform names at Story level."
+    },
+    {
+      "id": "C022",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`open`",
+      "explanation": "The camera-to-router signal remains visible after the camera changes to sleeping and only app/cloud clip retrieval is occurring."
+    },
+    {
+      "id": "C023",
+      "criterion": "time",
+      "points": 2,
+      "location": "`wifi-back`",
+      "explanation": "The reconnect heartbeat reports charging state, but power still appears last updated at 7:00 AM."
+    },
+    {
+      "id": "C024",
+      "criterion": "questions",
+      "points": 2,
+      "location": "Question 7",
+      "explanation": "Asked a business reader to decide whether to add an engineering view."
+    },
+    {
+      "id": "C025",
+      "criterion": "level",
+      "points": 2,
+      "location": "`push` node title",
+      "explanation": "\u201cPhone push\u201d exposes technical delivery terminology at Story level."
+    },
+    {
+      "id": "C026",
+      "criterion": "time",
+      "points": 2,
+      "location": "`courier`",
+      "explanation": "Power remains dated 7:00 AM despite the depicted 8:00 AM heartbeat."
+    },
+    {
+      "id": "C027",
+      "criterion": "level",
+      "points": 2,
+      "location": "node `push` subtitle",
+      "explanation": "\u201cApple / Google push\u201d exposes named technical infrastructure at Story level."
+    },
+    {
+      "id": "C028",
+      "criterion": "questions",
+      "points": 1,
+      "location": "Question 4",
+      "explanation": "The design already requires both normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "C029",
+      "criterion": "time",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "Power says \u201cUpdated 2 h ago,\u201d although the 1:00 AM heartbeat included charging state."
+    },
+    {
+      "id": "C030",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`sunrise`",
+      "explanation": "The camera-to-router signal carries forward while the caption says no new report has reached the app."
+    },
+    {
+      "id": "C031",
+      "criterion": "time",
+      "points": 2,
+      "location": "lowbatt",
+      "explanation": "Power remains timestamped from bedtime despite the current 4:00 AM heartbeat reporting charging state."
+    },
+    {
+      "id": "C032",
+      "criterion": "time",
+      "points": 2,
+      "location": "`open`",
+      "explanation": "The false 7:00 AM power freshness carries forward."
+    },
+    {
+      "id": "C033",
+      "criterion": "time",
+      "points": 3,
+      "location": "`raccoon`",
+      "explanation": "The invented 25% in-between value holds the battery at an unstated 0% drain rate; the documented anchor-conflict exception only protects the direct anchor jump."
+    },
+    {
+      "id": "C034",
+      "criterion": "time",
+      "points": 2,
+      "location": "`wifi-down`",
+      "explanation": "Power remains dated 7:00 AM despite the asserted 8:00 AM heartbeat."
+    },
+    {
+      "id": "C035",
+      "criterion": "time",
+      "points": 2,
+      "location": "`raccoon`",
+      "explanation": "Power says \u201cUpdated 2 h ago\u201d despite the asserted 1:00 AM heartbeat reporting charging state."
+    },
+    {
+      "id": "C036",
+      "criterion": "time",
+      "points": 2,
+      "location": "`sunrise`",
+      "explanation": "Power says \u201cUpdated 8 h ago\u201d although the caption says the 6:30 AM heartbeat reported not charging."
+    },
+    {
+      "id": "C037",
+      "criterion": "time",
+      "points": 2,
+      "location": "`open`",
+      "explanation": "Power still shows the false 7:00 AM freshness after the 8:00 AM heartbeat."
+    },
+    {
+      "id": "C038",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight questions were asked, exceeding the limit of seven."
+    },
+    {
+      "id": "C039",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already required both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "C040",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight distinct questions were asked, exceeding the limit of seven."
+    },
+    {
+      "id": "C041",
+      "criterion": "time",
+      "points": 2,
+      "location": "`raccoon`",
+      "explanation": "Power says \u201cUpdated 2 h ago,\u201d although the depicted 1:00 AM heartbeat reported charging state."
+    },
+    {
+      "id": "C042",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon",
+      "explanation": "The battery is explicitly held at 25%, creating an invented in-between value with an unstated zero-drain rate despite the documented idle and clip drain."
+    },
+    {
+      "id": "C043",
+      "criterion": "time",
+      "points": 2,
+      "location": "`retry`",
+      "explanation": "The false 7:00 AM power freshness carries forward."
+    },
+    {
+      "id": "C044",
+      "criterion": "time",
+      "points": 2,
+      "location": "courier",
+      "explanation": "Power remains timestamped 7:00 AM despite the documented 8:00 AM heartbeat."
+    },
+    {
+      "id": "C045",
+      "criterion": "time",
+      "points": 2,
+      "location": "`sunrise`",
+      "explanation": "Power says \u201cUpdated 8 h ago,\u201d contradicting the caption\u2019s 6:30 AM not-charging report."
+    }
+  ]
+}

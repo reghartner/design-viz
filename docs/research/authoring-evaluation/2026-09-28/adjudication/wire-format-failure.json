@@ -1,0 +1,117 @@
+{
+  "attempts": [
+    {
+      "candidateId": "specimen-3d313b05cc71",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "ea8ae45044b0789d06b5a9a98d438d336159030d4ad17ce78ed7ffe621e23ea3"
+    },
+    {
+      "candidateId": "specimen-3d313b05cc71",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "aa4ad96cf80016073135710d867b276d5a5bd2292e91a70fa0a122572ffefc52"
+    },
+    {
+      "candidateId": "specimen-5395841c704d",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "23d5bb3d1b404d4c515f376555e404733151d9ff74dd3562538912c764cab585"
+    },
+    {
+      "candidateId": "specimen-5395841c704d",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "37c96cfd03cf98d6562549852f9f11f3174053f134cb87323363e444e1875962"
+    },
+    {
+      "candidateId": "specimen-7036a4f62b32",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "34e86f2218767c19c7d28014d59e026ba3a77431651e46c3c821397825ebd1f5"
+    },
+    {
+      "candidateId": "specimen-7036a4f62b32",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "a68993be81d06bca7d2688619e8da4c6d4f977c3333708e94e6154c77c6a9d57"
+    },
+    {
+      "candidateId": "specimen-87e36f6ebc2e",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "f376df25f3894fa83bc1aab1b683ec2a5c06c88859678e0556bb7855bb027892"
+    },
+    {
+      "candidateId": "specimen-87e36f6ebc2e",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "03136fc5f60fab43c1643d8560ffcb47a5746880d156a25cc4ba788bce01c468"
+    },
+    {
+      "candidateId": "specimen-8abdbcba1a1f",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "664c7c9647bdfd376e72e17ae07d77c0d8eb14d7156c42266c68107d6c0c4b66"
+    },
+    {
+      "candidateId": "specimen-8abdbcba1a1f",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "05e02b9f66b4050d615692686e1d6e63addb0f1f7da390b6417deb8247dcfe3a"
+    },
+    {
+      "candidateId": "specimen-8c365a9d184d",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "b29d8455392f02f41dbbcc3fb28e0648783ff79767c249787da7f41bfd38d982"
+    },
+    {
+      "candidateId": "specimen-8c365a9d184d",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "973e66889dfd4e7114374adc8aae6590c5cd975018688d315e7ca4fd0a7fdc5d"
+    },
+    {
+      "candidateId": "specimen-f4d35ae7d929",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "6101623025f5e185d8ff7b9429b35f37a67a7f7f6864ead1df2e7e9cc1f249d5"
+    },
+    {
+      "candidateId": "specimen-f4d35ae7d929",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "6e28b946fc8c9d05f0a3750acdf991073c14295814ffe95704a5af40acbac009"
+    },
+    {
+      "candidateId": "specimen-fba9ebbeb297",
+      "judge": 1,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "fbce218e97aef9719c4f78f4a4c132d920b2ed602acdd87ba345141f23e68751"
+    },
+    {
+      "candidateId": "specimen-fba9ebbeb297",
+      "judge": 2,
+      "status": "failed",
+      "reason": "API400 invalid_json_schema: uniqueItems unsupported; no generation",
+      "resultSha256": "faf53bf353180118888e8d51e1434cd90ad13341dc5b3f01db0816d60e8961bc"
+    }
+  ],
+  "modelJudgmentsGenerated": 0
+}

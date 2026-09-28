@@ -1,0 +1,445 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "fidelity",
+      "points": 3,
+      "location": "b-sdcard",
+      "explanation": "The caption invents that Wi-Fi dropped specifically after the 8:00 AM check-in; the design only says it is down during delivery."
+    },
+    {
+      "id": "C002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q5",
+      "explanation": "The design already gives the starting situation: bedtime, 25% battery, and not charging."
+    },
+    {
+      "id": "C003",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / batt",
+      "explanation": "The physical battery is held at an invented 25% between conflicting anchors, using an unstated zero-drain rate."
+    },
+    {
+      "id": "C004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q4",
+      "explanation": "The design already specifies both endings, including opening the clip only on the normal path."
+    },
+    {
+      "id": "C005",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The caption and phone patch introduce a 6:30 AM check-in, but its hops are not lit."
+    },
+    {
+      "id": "C006",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q4",
+      "explanation": "The design already specifies both endings and that only the normal ending includes opening the clip."
+    },
+    {
+      "id": "C007",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q5",
+      "explanation": "The design already specifies the 25%, not-charging, online, no-alert starting state."
+    },
+    {
+      "id": "C008",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q4",
+      "explanation": "The design already specifies both endings and that the alternate stops after the late alert."
+    },
+    {
+      "id": "C009",
+      "criterion": "level",
+      "points": 2,
+      "location": "node `push`",
+      "explanation": "\u201cPhone alert service\u201d exposes an additional service-level component in a Story-level diagram."
+    },
+    {
+      "id": "C010",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q7",
+      "explanation": "The design already supplies an appropriate title."
+    },
+    {
+      "id": "C011",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The phone advances to an 8:00 AM check-in, but no check-in hops are lit."
+    },
+    {
+      "id": "C012",
+      "criterion": "time",
+      "points": 3,
+      "location": "`raccoon`",
+      "explanation": "The intermediate 25% battery value holds charge at an unstated 0% drain rate between conflicting anchors; the documented conflict permits a direct anchor jump, not an invented intermediate value."
+    },
+    {
+      "id": "C013",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The phone advances to a 6:30 AM check-in, but no check-in hops are lit."
+    },
+    {
+      "id": "C014",
+      "criterion": "fidelity",
+      "points": 3,
+      "location": "`b-sdcard`",
+      "explanation": "\u201cWi-Fi \u2026 dropped after the 8:00 AM check-in\u201d invents an outage-start fact not supplied by the design or operator."
+    },
+    {
+      "id": "C015",
+      "criterion": "level",
+      "points": 2,
+      "location": "nodes.push",
+      "explanation": "\u201cPhone alert service \u00b7 Apple / Google\u201d exposes technical service/provider infrastructure despite the requested Story level."
+    },
+    {
+      "id": "C016",
+      "criterion": "panels",
+      "points": 3,
+      "location": "b-sdcard / home.signals",
+      "explanation": "The prior camera-to-router signal carries forward while the caption and Wi-Fi-off icon say that link is down."
+    },
+    {
+      "id": "C017",
+      "criterion": "questions",
+      "points": 1,
+      "location": "questions.md Q5",
+      "explanation": "The design already specifies the starting battery, charging, connectivity, and alert state."
+    },
+    {
+      "id": "C018",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The caption and phone patch introduce an 8:00 AM check-in, but its hops are not lit."
+    },
+    {
+      "id": "C019",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / phone.battery",
+      "explanation": "The invented 1:00 AM report also holds 25%, using the same unstated rate."
+    },
+    {
+      "id": "A001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md: entire question batch",
+      "explanation": "The batch requests more than seven independently answerable decisions, including level, audience, takeaway, timing, ending treatment, several starting-state choices, panel content, and title."
+    },
+    {
+      "id": "A002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5: starting battery 25%",
+      "explanation": "Q5 asks for confirmation of the 25% starting battery even though the design already supplies it."
+    },
+    {
+      "id": "A003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5: starting charging state",
+      "explanation": "Q5 separately asks for confirmation that charging is off even though the design already supplies that state."
+    },
+    {
+      "id": "A004",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push title/sub",
+      "explanation": "The separate visible \u201cPhone alert service \u00b7 Apple / Google\u201d infrastructure node exceeds the requested customer-focused Story level."
+    },
+    {
+      "id": "A005",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (raccoon physical battery)",
+      "explanation": "The explicit 25% physical charge at 1:04 AM is an intermediate value using an unstated zero-drain rate. The noted anchor conflict permits a direct jump to 20% at 4:00 AM, not this intermediate override."
+    },
+    {
+      "id": "A006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phone/battery value/reportedAt (raccoon 1:00 AM report)",
+      "explanation": "The newly authored 1:00 AM report of 25% is independently inconsistent with the stated drain rate and clip use; it is not merely a carried cached value."
+    },
+    {
+      "id": "A007",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/text and panels/phone (bedtime battery/power display)",
+      "explanation": "The caption promises the reported 25% and not-charging state on the phone, but the home screen hides all device field cards."
+    },
+    {
+      "id": "A008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/3/text and panels/phone/battery (sunrise 6:30 AM report)",
+      "explanation": "The promised 6:30 AM report is stored but not visibly shown because the phone remains on its home screen."
+    },
+    {
+      "id": "A009",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and panels/phone/power (charging-report solar state)",
+      "explanation": "The caption expressly promises a visible solar-charging state, but the authored phone screen hides that field card."
+    },
+    {
+      "id": "A010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/5/text and panels/phone/battery (courier 8:00 AM report)",
+      "explanation": "The promised 8:00 AM report is not visible on the home screen."
+    },
+    {
+      "id": "A011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and folded phone fields (b-sdcard 8:00 AM/Online display)",
+      "explanation": "The Wi-Fi-down caption promises visible cached check-in and Online state, but both field cards remain hidden."
+    },
+    {
+      "id": "A012",
+      "criterion": "fidelity",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/7/panels/phone/clear (a-open notification dismissal)",
+      "explanation": "The step clears the notification stack as part of opening the clip, although the approved behavior does not establish dismissal and opening the app does not automatically clear notifications."
+    },
+    {
+      "id": "B001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 independent decision count across Q1\u2013Q7",
+      "explanation": "The batch requests more than seven independently answerable decisions; Q2 and the multi-part timing, ending, starting-state, and panel prompts contain separable choices."
+    },
+    {
+      "id": "B002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4 \u2014 decision to depict two endings",
+      "explanation": "The normal and Wi-Fi-down outcomes were already supplied. The separate question about whether the alternate should stop at the late alert was not answered explicitly and is not deducted."
+    },
+    {
+      "id": "B003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 starting battery decision",
+      "explanation": "The proposed starting battery value repeats the supplied 25% value."
+    },
+    {
+      "id": "B004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 starting charging-state decision",
+      "explanation": "The proposed starting not-charging state repeats the supplied state."
+    },
+    {
+      "id": "B005",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push title/sub",
+      "explanation": "The visible \u201cPhone alert service \u00b7 Apple / Google\u201d node exposes provider/service infrastructure in the requested Story view."
+    },
+    {
+      "id": "B006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (raccoon physical battery)",
+      "explanation": "The explicit 25% physical value at 1:04 AM is an invented intermediate hold inconsistent with the stated drain and clip cost. The anchor-conflict exception permits the direct jump to 20%, not this intermediate value."
+    },
+    {
+      "id": "B007",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phone/battery value/reportedAt (1:00 AM report)",
+      "explanation": "The newly authored 1:00 AM report independently asserts 25%, another intermediate value requiring an unstated zero-drain rate."
+    },
+    {
+      "id": "B008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/panels/phone/battery (bedtime promised battery display)",
+      "explanation": "The caption says the phone shows the reported 25%, but the home screen hides the battery field card."
+    },
+    {
+      "id": "B009",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/panels/2/initial/power at step bedtime",
+      "explanation": "The caption says the phone shows that the camera is not charging, but the home screen hides the Power card."
+    },
+    {
+      "id": "B010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/3/panels/phone/battery (sunrise 6:30 report display)",
+      "explanation": "The caption promises that the phone still shows the 6:30 AM check-in, but the report card is hidden on the home screen."
+    },
+    {
+      "id": "B011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/panels/phone/power (charging-report solar display)",
+      "explanation": "The caption says the phone now shows solar charging, but the Power card is hidden."
+    },
+    {
+      "id": "B012",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/panels/phone/battery (charging-report low-battery mark)",
+      "explanation": "The caption promises that the phone's low-battery mark remains, but the battery card and its icon are not rendered on the home screen."
+    },
+    {
+      "id": "B013",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/5/panels/phone/battery (courier 8:00 report display)",
+      "explanation": "The caption says the phone still shows the 8:00 AM check-in, but that field card is hidden."
+    },
+    {
+      "id": "B014",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8 text; phone.battery at b-sdcard",
+      "explanation": "The Wi-Fi-down caption again promises a visible 8:00 AM check-in, but the battery/report card remains hidden."
+    },
+    {
+      "id": "B015",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8 text; phone.online at b-sdcard",
+      "explanation": "The caption says the phone still says Online, but the Online card is not rendered on the home screen."
+    },
+    {
+      "id": "B016",
+      "criterion": "fidelity",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/7/panels/phone/clear (a-open notifications)",
+      "explanation": "Opening the app/clip does not automatically dismiss notifications, yet clear:true removes the entire notification stack without a stated dismissal action or source behavior."
+    },
+    {
+      "id": "R001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md Q1-Q7 \u2014 entire batch",
+      "explanation": "The batch contains more than seven independently answerable decisions, including separate choices about level, audience, takeaway, timing, outcomes, starting fields, panel content, and title."
+    },
+    {
+      "id": "R002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4 \u2014 whether to depict two outcomes",
+      "explanation": "The HLD already requires the normal morning and Wi-Fi-down alternate. Whether the alternate should include a later clip-opening action remains unanswered and is not deducted."
+    },
+    {
+      "id": "R003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 starting battery value",
+      "explanation": "The requested confirmation of a 25% starting battery repeats a supplied fact."
+    },
+    {
+      "id": "R004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 starting charging state",
+      "explanation": "The requested confirmation that the camera starts not charging repeats a supplied fact."
+    },
+    {
+      "id": "R005",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push title/sub",
+      "explanation": "The visible \u201cPhone alert service \u00b7 Apple / Google\u201d node exposes service/provider infrastructure in the requested customer-focused Story view."
+    },
+    {
+      "id": "R006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon physical battery",
+      "explanation": "The explicit 25% physical charge at 1:04 AM creates an intermediate zero-drain hold. The documented anchor conflict permits a direct jump to the 4:00 AM anchor, not this intermediate value."
+    },
+    {
+      "id": "R007",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phone/battery value/reportedAt \u2014 1:00 AM report",
+      "explanation": "The newly authored 1:00 AM report independently asserts 25%, inconsistent with the stated drain rate; it is not merely a carried cached report."
+    },
+    {
+      "id": "R008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/text and /panels/phone/battery \u2014 bedtime battery display",
+      "explanation": "The caption promises that the phone shows the reported 25%, but the home screen hides the battery field card."
+    },
+    {
+      "id": "R009",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/text and /page/blocks/0/diagram/panels/2/initial/power \u2014 bedtime charging display",
+      "explanation": "The caption promises that the phone shows the not-charging state, but the home screen hides the Power card."
+    },
+    {
+      "id": "R010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/3/text and panels/phone/battery \u2014 sunrise 6:30 AM report",
+      "explanation": "The promised 6:30 AM report is stored but not visibly shown."
+    },
+    {
+      "id": "R011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and panels/phone/power \u2014 charging-report solar state",
+      "explanation": "The caption promises a visible solar-charging state, but the Power card is hidden."
+    },
+    {
+      "id": "R012",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and panels/phone/battery \u2014 charging-report low-battery mark",
+      "explanation": "The caption promises that the phone's low-battery mark remains visible, but the battery card and icon are hidden."
+    },
+    {
+      "id": "R013",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/5/text and panels/phone/battery \u2014 courier 8:00 AM report",
+      "explanation": "The promised 8:00 AM report is not visibly shown."
+    },
+    {
+      "id": "R014",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and folded phone.battery \u2014 b-sdcard cached report",
+      "explanation": "The Wi-Fi-down caption promises a visible cached check-in, but the battery/report card is hidden."
+    },
+    {
+      "id": "R015",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and folded phone.online \u2014 b-sdcard Online state",
+      "explanation": "The caption promises a visible Online state, but the Online card is hidden."
+    },
+    {
+      "id": "R016",
+      "criterion": "fidelity",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/7/panels/phone/clear \u2014 a-open notification stack",
+      "explanation": "The step clears the entire notification stack without a supported dismissal action; opening the app or clip does not automatically dismiss notifications."
+    }
+  ]
+}

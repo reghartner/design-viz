@@ -1,0 +1,200 @@
+{
+  "claims": [
+    {
+      "id": "Q001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-f4d35ae7d929 :: candidate/questions.md independent decisions in Q1, Q2 (span; display format), Q3 (audience; takeaway), Q4, Q5, Q6 (app-page visibility; separate physical meter), and Q7",
+      "explanation": "The seven numbered prompts request ten independent answers, exceeding the seven-question limit."
+    },
+    {
+      "id": "Q002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-f4d35ae7d929 :: candidate/questions.md Q4 ending-selection decision",
+      "explanation": "Q4 requests an outcome choice already fixed by the supplied design."
+    },
+    {
+      "id": "Q003",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-5395841c704d :: candidate/questions.md \u2014 independent decisions in Questions 1\u20137, including Q1 technical level, Q2 start/end/clock-date presentation, Q3 multiple event times, Q4 rate semantics, Q5 outage timing, Q6 alternate ending, and Q7 audience/takeaway",
+      "explanation": "The batch requests substantially more than seven independently answerable decisions; apply the penalty once."
+    },
+    {
+      "id": "Q004",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-87e36f6ebc2e :: candidate/questions.md \u2014 independent-decision count across questions 1\u20137",
+      "explanation": "The batch contains ten independently answerable decisions, exceeding seven."
+    },
+    {
+      "id": "Q005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-87e36f6ebc2e :: candidate/questions.md \u2014 question 4, whether both endings should be shown",
+      "explanation": "This outcome-selection decision was already answered by the design."
+    },
+    {
+      "id": "Q006",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-87e36f6ebc2e :: candidate/questions.md \u2014 question 5, device-page 25% and not-charging clause",
+      "explanation": "The supplied battery and charging facts are redundant; the lock-screen and presentation preferences are not."
+    },
+    {
+      "id": "Q007",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-7036a4f62b32 :: candidate/questions.md Q1\u2013Q7 \u2014 independent-decision count",
+      "explanation": "There are eight independently answerable decisions: technical level, timing, audience, takeaway, endings, required moments, phone depiction, and normal-ending treatment."
+    },
+    {
+      "id": "Q008",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-7036a4f62b32 :: candidate/questions.md Q4 \u2014 endings decision",
+      "explanation": "The HLD already requires both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "Q009",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-7036a4f62b32 :: candidate/questions.md Q5 \u2014 must-see-moments decision",
+      "explanation": "The five proposed moments repeat scenario beats already specified by the HLD."
+    },
+    {
+      "id": "Q010",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-7036a4f62b32 :: candidate/questions.md Q6 \u2014 phone-depiction decision",
+      "explanation": "The design already establishes the phone as the surface for notifications and the normal-path clip opening."
+    },
+    {
+      "id": "Q011",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-7036a4f62b32 :: candidate/questions.md Q7 \u2014 normal-ending treatment",
+      "explanation": "The HLD explicitly supplies the normal-path ending."
+    },
+    {
+      "id": "Q012",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-3d313b05cc71 :: candidate/questions.md Q1-Q7 \u2014 entire batch",
+      "explanation": "The batch contains more than seven independently answerable decisions, including separate choices about level, audience, takeaway, timing, outcomes, starting fields, panel content, and title."
+    },
+    {
+      "id": "Q013",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidate/questions.md Q4 \u2014 whether to depict two outcomes",
+      "explanation": "The HLD already requires the normal morning and Wi-Fi-down alternate. Whether the alternate should include a later clip-opening action remains unanswered and is not deducted."
+    },
+    {
+      "id": "Q014",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidate/questions.md Q5 \u2014 starting battery value",
+      "explanation": "The requested confirmation of a 25% starting battery repeats a supplied fact."
+    },
+    {
+      "id": "Q015",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidate/questions.md Q5 \u2014 starting charging state",
+      "explanation": "The requested confirmation that the camera starts not charging repeats a supplied fact."
+    },
+    {
+      "id": "Q016",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-8abdbcba1a1f :: candidate/questions.md \u2014 independent decisions in questions 1\u20136",
+      "explanation": "The batch requests eight independent decisions: technical level; audience; takeaway; timing changes; endings; starting phone state; views to include/drop; and a standout moment."
+    },
+    {
+      "id": "Q017",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8abdbcba1a1f :: candidate/questions.md question 4 \u2014 ending selection",
+      "explanation": "The HLD already requires both the normal delivery ending and the Wi-Fi-down alternate."
+    },
+    {
+      "id": "Q018",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-fba9ebbeb297 :: candidate/questions.md \u2014 independent decisions across questions 1\u20136",
+      "explanation": "The batch asks more than seven independently answerable decisions; the legacy questionCount metric is not controlling."
+    },
+    {
+      "id": "Q019",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidate/questions.md#question-4 \u2014 \u201cShould both endings be shown?\u201d",
+      "explanation": "The HLD already requires both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "Q020",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidate/questions.md#question-4 \u2014 \u201cshould either one end differently?\u201d",
+      "explanation": "The HLD already specifies that the normal path includes opening the clip and the alternate ends with the late push."
+    },
+    {
+      "id": "Q021",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidate/questions.md#question-6 \u2014 starting battery 25% decision",
+      "explanation": "The HLD already states that the bedtime battery is 25%."
+    },
+    {
+      "id": "Q022",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidate/questions.md#question-6 \u2014 starting not-charging decision",
+      "explanation": "The HLD already states that the camera is not charging at bedtime."
+    },
+    {
+      "id": "Q023",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md \u2014 independently answerable decisions across questions 1\u20137",
+      "explanation": "The seven numbered prompts contain more than seven independently answerable decisions."
+    },
+    {
+      "id": "Q024",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md question 4 \u2014 decision to show both normal and Wi-Fi-down outcomes",
+      "explanation": "Both outcomes were already required."
+    },
+    {
+      "id": "Q025",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md question 5 \u2014 25% bedtime starting-state clause",
+      "explanation": "Only the supplied 25% bedtime-state clause is redundant; the alert and additional-context choices are not."
+    },
+    {
+      "id": "Q026",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md question 6 \u2014 highlighted required scenario beats",
+      "explanation": "The requested scenario-beat set was already specified; the separate porch-view preference was not."
+    },
+    {
+      "id": "Q027",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md question 7 \u2014 normal-path ending decision",
+      "explanation": "The normal-path ending was already specified."
+    },
+    {
+      "id": "Q028",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidate/questions.md question 7 \u2014 Wi-Fi-down-path ending decision",
+      "explanation": "The supplied scenario already settles the alternate ending."
+    }
+  ]
+}

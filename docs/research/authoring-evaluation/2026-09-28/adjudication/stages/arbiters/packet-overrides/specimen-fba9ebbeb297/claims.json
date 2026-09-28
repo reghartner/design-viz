@@ -1,0 +1,270 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon-rec",
+      "explanation": "Invented intermediate 25% value holds the battery flat despite stated idle and clip drain; only a direct jump between conflicting anchors is exempt."
+    },
+    {
+      "id": "C002",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The caption and panels claim a 6:30 AM heartbeat, but its hops are not lit."
+    },
+    {
+      "id": "C003",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram edges",
+      "explanation": "Engineering view omits the Kestrel app \u2192 device-shadow read hop."
+    },
+    {
+      "id": "C004",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier-rec",
+      "explanation": "The caption and panels claim an 8:00 AM heartbeat, but its hops are not lit."
+    },
+    {
+      "id": "C005",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon-rec, physical battery",
+      "explanation": "The invented 25% intermediate value holds the battery flat despite the stated idle drain and clip cost."
+    },
+    {
+      "id": "C006",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier-rec",
+      "explanation": "The caption and panels introduce the 8:00 AM heartbeat report without lighting its hops."
+    },
+    {
+      "id": "C007",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon-rec / raccoon-upload",
+      "explanation": "The invented 1:00\u20131:10 AM value holds battery at 25% using an unstated zero-drain rate instead of jumping directly between the conflicting operator anchors."
+    },
+    {
+      "id": "C008",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "event-ingest binding / heartbeat steps",
+      "explanation": "The node is bound to `postEvent`, which does not match its `POST /heartbeats` calls."
+    },
+    {
+      "id": "C009",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "event-ingest binding / heartbeat steps",
+      "explanation": "The node is bound to `postEvent`, which does not match its `POST /heartbeats` calls."
+    },
+    {
+      "id": "C010",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "clip-store binding / open-clip",
+      "explanation": "The node is bound to `uploadClip`, which does not match the `GET /clips/{clipId}` call."
+    },
+    {
+      "id": "C011",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon-rec",
+      "explanation": "The caption and panels claim a 1:00 AM heartbeat, but its camera \u2192 router \u2192 event-ingest \u2192 device-shadow hops are not lit."
+    },
+    {
+      "id": "C012",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md, question 4",
+      "explanation": "The design already specifies both the happy and Wi-Fi-down outcomes and their endings."
+    },
+    {
+      "id": "C013",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram-wide",
+      "explanation": "The design says the Kestrel app reads device-shadow, but the app\u2194device-shadow service hop is absent."
+    },
+    {
+      "id": "C014",
+      "criterion": "level",
+      "points": 2,
+      "location": "Diagram-wide",
+      "explanation": "The app\u2019s read from device-shadow is a designed service hop, but no app\u2194device-shadow edge is present."
+    },
+    {
+      "id": "C015",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md #6",
+      "explanation": "The design already specifies bedtime at 25% and not charging."
+    },
+    {
+      "id": "C016",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 4",
+      "explanation": "The design already specifies both endings and their outcomes."
+    },
+    {
+      "id": "C017",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "clip-store binding / open-clip",
+      "explanation": "The node is bound to `uploadClip`, which does not match the depicted `GET /clips/{clipId}` call."
+    },
+    {
+      "id": "C018",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md #4",
+      "explanation": "The design already requires both the happy and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C019",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon-rec",
+      "explanation": "The caption and panels claim a 1:00 AM heartbeat report, but its hops are not lit."
+    },
+    {
+      "id": "C020",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon-rec, 1:00 AM report",
+      "explanation": "The invented 25% heartbeat value uses the same unstated zero-drain rate between conflicting anchors."
+    },
+    {
+      "id": "C021",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The caption and panels introduce the 6:30 AM heartbeat report without lighting its hops."
+    },
+    {
+      "id": "A001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 independent decisions across questions 1\u20136",
+      "explanation": "The batch requests well over seven independently answerable decisions, including separate audience/takeaway, timing, ending, panel, and starting-state choices."
+    },
+    {
+      "id": "A002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-4 \u2014 \u201cShould both endings be shown?\u201d",
+      "explanation": "The HLD already requires both the normal delivery and Wi-Fi-down alternate."
+    },
+    {
+      "id": "A003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-4 \u2014 \u201cshould either one end differently?\u201d",
+      "explanation": "The HLD already specifies that the normal path includes opening the clip and the alternate ends with the late push."
+    },
+    {
+      "id": "A004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-6 \u2014 starting battery 25%",
+      "explanation": "The HLD already states that the bedtime battery is 25%."
+    },
+    {
+      "id": "A005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-6 \u2014 starting state not charging",
+      "explanation": "The HLD already states that the camera is not charging at bedtime."
+    },
+    {
+      "id": "A006",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing Kestrel app\u2192device-shadow dependency",
+      "explanation": "The engineering topology omits the design-established app-to-device-shadow read dependency."
+    },
+    {
+      "id": "A007",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon-rec physical battery",
+      "explanation": "The explicit 25% physical value at 1:10 AM is an invented intermediate anchor that holds the battery flat despite the stated idle drain; the conflict exception permits only a direct jump between the conflicting operator anchors."
+    },
+    {
+      "id": "A008",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/app/battery/value and /page/blocks/0/diagram/steps/1/panels/shadow/rows/0/cells/value \u2014 1:00 AM reported battery",
+      "explanation": "The newly authored 1:00 AM shadow/app report of 25% is a separate inconsistent intermediate state, rather than a carried cached report."
+    },
+    {
+      "id": "A009",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/10/panels/app/lastEvent/detail \u2014 open-clip",
+      "explanation": "The required clip-opening event is only narrated and recorded as device-page detail; no still, thumbnail, clip screen, or other clear open-clip visual is supplied."
+    },
+    {
+      "id": "B001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md, independent decisions across questions 1\u20136",
+      "explanation": "The batch contains more than seven independently answerable decisions."
+    },
+    {
+      "id": "B002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md, question 4 decision \u201cShould both endings be shown?\u201d",
+      "explanation": "The supplied design already requires both outcomes."
+    },
+    {
+      "id": "B003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md, question 4 decision \u201cshould either one end differently?\u201d",
+      "explanation": "The design already specifies both endings."
+    },
+    {
+      "id": "B004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md, question 6 decision confirming \u201cBattery 25% \u2026 not charging\u201d",
+      "explanation": "The battery and charging portion of this compound confirmation was already answered; its other starting-state clauses were not."
+    },
+    {
+      "id": "B005",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges, missing Kestrel app \u2192 device-shadow dependency",
+      "explanation": "The engineering diagram omits the design-established app-to-device-shadow service dependency."
+    },
+    {
+      "id": "B006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge, step raccoon-rec, physical battery",
+      "explanation": "The explicit intermediate physical value holds the battery at 25% through 2h40m of idle drain and the raccoon recording. The conflicting-anchor exception permits a direct anchor-to-anchor jump, not this invented intermediate value."
+    },
+    {
+      "id": "B007",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/app/battery/value, step raccoon-rec, newly reported 1:00 AM battery",
+      "explanation": "The newly authored 1:00 AM report of 25% is a distinct inconsistent intermediate reported-state value."
+    },
+    {
+      "id": "B008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/10/panels/app, step open-clip, required clip-opening visual",
+      "explanation": "The step narrates and logs the fetch but supplies no clip or clear open-clip visual state."
+    }
+  ]
+}

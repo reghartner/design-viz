@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "description": "Fictional b1-overnight brief and unchanged latest weekend 100-point rubric. Authors receive input files only; operator answers arrive in turn two; judge-only files stay outside author sessions.",
+  "source": "Weekend authoring experiment referenced by PR242; frozen locally September 28, 2026.",
+  "originalManifestSha256": "59906bc02557e61bb553dcf53b1afab5420e5c9792dabf05445b56c35c42d0f2",
+  "files": [
+    {
+      "path": "input/hld.md",
+      "bytes": 3474,
+      "sha256": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5"
+    },
+    {
+      "path": "input/catalog.json",
+      "bytes": 4261,
+      "sha256": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2"
+    },
+    {
+      "path": "input/code-evidence.md",
+      "bytes": 2612,
+      "sha256": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36"
+    },
+    {
+      "path": "operator/answers-business.md",
+      "bytes": 985,
+      "sha256": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f"
+    },
+    {
+      "path": "operator/answers-engineer.md",
+      "bytes": 972,
+      "sha256": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba"
+    },
+    {
+      "path": "judge-only/facts.md",
+      "bytes": 1841,
+      "sha256": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7"
+    },
+    {
+      "path": "judge-only/judge2-prompt.md",
+      "bytes": 4664,
+      "sha256": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+    }
+  ]
+}

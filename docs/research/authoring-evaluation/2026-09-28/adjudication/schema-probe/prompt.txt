@@ -1,0 +1,1 @@
+This is only a structured-output format probe, not a story judgment. Return exactly: {"deductions":[],"claimDecisions":[],"unresolved":[]}. No tools needed.

@@ -1,0 +1,617 @@
+{
+  "date": "2026-09-28",
+  "target": "b1-overnight",
+  "authorModel": "claude-opus-5-5",
+  "judgeModel": "gpt-5.6-sol",
+  "judgeEffort": "medium",
+  "rubricSha256": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9",
+  "originalBundleManifestSha256": "59906bc02557e61bb553dcf53b1afab5420e5c9792dabf05445b56c35c42d0f2",
+  "currentSkillSha256": "7ed4f47901d632b37d79b27a3d9fd5944d63f4091421a875a25679f4f5db1d32",
+  "authoringCodeCommit": "1ba9991",
+  "originalStartup": {
+    "completed": 0,
+    "failed": 6,
+    "questionsDisplayed": 6,
+    "permissionDenialRuns": 2,
+    "missingHistoryHarnessFailures": 4
+  },
+  "continuation": {
+    "completed": 6,
+    "sameSessions": true,
+    "originalEvidenceUnchanged": true,
+    "cleanTrial": false,
+    "proposals": 6,
+    "sourceProposals": 6,
+    "operationsProposals": 0
+  },
+  "judgments": {
+    "attempted": 18,
+    "valid": 17,
+    "invalid": 1,
+    "invalidReason": "run-01 judge3 criterion scores sum to 73 but total says 83; no official median for run-01. No replacement judgment."
+  },
+  "baselines": [
+    {
+      "id": "historical-business",
+      "audience": "business",
+      "score": 96,
+      "range": [
+        96,
+        96
+      ],
+      "seconds": 399,
+      "model": "claude-opus-5-5",
+      "authors": 1,
+      "judgments": 3,
+      "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882"
+    },
+    {
+      "id": "historical-engineer",
+      "audience": "engineering",
+      "score": 90,
+      "range": [
+        83,
+        92
+      ],
+      "seconds": 511,
+      "model": "claude-opus-5-5",
+      "authors": 1,
+      "judgments": 3,
+      "sourceSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174"
+    }
+  ],
+  "runs": [
+    {
+      "id": "run-01",
+      "audience": "business",
+      "status": "completed",
+      "qualityStatus": "incomplete",
+      "score": null,
+      "range": null,
+      "validJudges": 2,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 5,
+            "level": 10,
+            "time": 1,
+            "edges": 15,
+            "panels": 9,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 70
+          },
+          "finalSha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "seconds": 157.58
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 5,
+            "level": 6,
+            "time": 1,
+            "edges": 15,
+            "panels": 6,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 63
+          },
+          "finalSha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "seconds": 151.63
+        },
+        {
+          "judge": 3,
+          "status": "invalid",
+          "exit": 0,
+          "error": "Total does not equal the seven criterion scores.",
+          "seconds": 132.24
+        }
+      ],
+      "medianDimensions": null,
+      "dimensionMedianSum": null,
+      "dimensionMedianSumEqualsMedianTotal": null,
+      "activeSeconds": 604.599,
+      "phaseSeconds": [
+        94.287,
+        510.312
+      ],
+      "applyMs": 441,
+      "ackSeconds": 15.093,
+      "largestProgressGapSeconds": 119.444,
+      "sourceSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+      "questionWords": 494,
+      "numberedQuestions": 7,
+      "startupPermissionDenials": 0,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "Reported app state stays hidden during charging/outage; Power freshness is stale; the clip-open ending shows health cards."
+    },
+    {
+      "id": "run-02",
+      "audience": "business",
+      "status": "completed",
+      "qualityStatus": "complete",
+      "score": 80,
+      "range": {
+        "min": 76,
+        "max": 95
+      },
+      "validJudges": 3,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 4,
+            "level": 10,
+            "time": 17,
+            "edges": 15,
+            "panels": 0,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 76
+          },
+          "finalSha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "seconds": 125.08
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 5,
+            "level": 10,
+            "time": 20,
+            "edges": 15,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 95
+          },
+          "finalSha256": "aa6b712169df11382463ba2dbbd346ec5140bcb19aaf28bd564271e16e16f891",
+          "seconds": 127.75
+        },
+        {
+          "judge": 3,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 4,
+            "level": 8,
+            "time": 20,
+            "edges": 15,
+            "panels": 3,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 80
+          },
+          "finalSha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "seconds": 130.69
+        }
+      ],
+      "medianDimensions": {
+        "questions": 4,
+        "level": 10,
+        "time": 20,
+        "edges": 15,
+        "panels": 3,
+        "backstage": 15,
+        "fidelity": 15
+      },
+      "dimensionMedianSum": 82,
+      "dimensionMedianSumEqualsMedianTotal": false,
+      "activeSeconds": 557.446,
+      "phaseSeconds": [
+        96.437,
+        461.009
+      ],
+      "applyMs": 164,
+      "ackSeconds": 10.708,
+      "largestProgressGapSeconds": 131.745,
+      "sourceSha256": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+      "questionWords": 441,
+      "numberedQuestions": 7,
+      "startupPermissionDenials": 1,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "Reported app state stays hidden; outage-path report values do not refresh; the clip-open ending shows health cards."
+    },
+    {
+      "id": "run-03",
+      "audience": "business",
+      "status": "completed",
+      "qualityStatus": "complete",
+      "score": 88,
+      "range": {
+        "min": 85,
+        "max": 90
+      },
+      "validJudges": 3,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 7,
+            "level": 8,
+            "time": 20,
+            "edges": 11,
+            "panels": 12,
+            "backstage": 15,
+            "fidelity": 12,
+            "total": 85
+          },
+          "finalSha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "seconds": 165.4
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 8,
+            "level": 10,
+            "time": 14,
+            "edges": 11,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 88
+          },
+          "finalSha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "seconds": 110.04
+        },
+        {
+          "judge": 3,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 8,
+            "level": 8,
+            "time": 17,
+            "edges": 15,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 12,
+            "total": 90
+          },
+          "finalSha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "seconds": 122.96
+        }
+      ],
+      "medianDimensions": {
+        "questions": 8,
+        "level": 8,
+        "time": 17,
+        "edges": 11,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 12
+      },
+      "dimensionMedianSum": 86,
+      "dimensionMedianSumEqualsMedianTotal": false,
+      "activeSeconds": 503.859,
+      "phaseSeconds": [
+        85.621,
+        418.238
+      ],
+      "applyMs": 162,
+      "ackSeconds": 16.859,
+      "largestProgressGapSeconds": 117.582,
+      "sourceSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+      "questionWords": 568,
+      "numberedQuestions": 7,
+      "startupPermissionDenials": 0,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "Reported app state stays hidden at key moments; porch labels collide. It does provide a camera scene at the ending."
+    },
+    {
+      "id": "run-04",
+      "audience": "engineering",
+      "status": "completed",
+      "qualityStatus": "complete",
+      "score": 80,
+      "range": {
+        "min": 79,
+        "max": 81
+      },
+      "validJudges": 3,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 7,
+            "level": 8,
+            "time": 20,
+            "edges": 1,
+            "panels": 15,
+            "backstage": 13,
+            "fidelity": 15,
+            "total": 79
+          },
+          "finalSha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "seconds": 122.7
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 7,
+            "level": 8,
+            "time": 14,
+            "edges": 7,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 81
+          },
+          "finalSha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "seconds": 156.05
+        },
+        {
+          "judge": 3,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 7,
+            "level": 8,
+            "time": 20,
+            "edges": 7,
+            "panels": 9,
+            "backstage": 14,
+            "fidelity": 15,
+            "total": 80
+          },
+          "finalSha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "seconds": 152.92
+        }
+      ],
+      "medianDimensions": {
+        "questions": 7,
+        "level": 8,
+        "time": 20,
+        "edges": 7,
+        "panels": 15,
+        "backstage": 14,
+        "fidelity": 15
+      },
+      "dimensionMedianSum": 86,
+      "dimensionMedianSumEqualsMedianTotal": false,
+      "activeSeconds": 720.201,
+      "phaseSeconds": [
+        106.483,
+        613.718
+      ],
+      "applyMs": 218,
+      "ackSeconds": 9.998,
+      "largestProgressGapSeconds": 154.368,
+      "sourceSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+      "questionWords": 567,
+      "numberedQuestions": 6,
+      "startupPermissionDenials": 1,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "The app-to-device-shadow read connection is omitted. Source identities and anchors check out."
+    },
+    {
+      "id": "run-05",
+      "audience": "engineering",
+      "status": "completed",
+      "qualityStatus": "complete",
+      "score": 87,
+      "range": {
+        "min": 83,
+        "max": 92
+      },
+      "validJudges": 3,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 9,
+            "level": 8,
+            "time": 17,
+            "edges": 15,
+            "panels": 15,
+            "backstage": 13,
+            "fidelity": 15,
+            "total": 92
+          },
+          "finalSha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "seconds": 103.5
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 9,
+            "level": 8,
+            "time": 14,
+            "edges": 9,
+            "panels": 15,
+            "backstage": 13,
+            "fidelity": 15,
+            "total": 83
+          },
+          "finalSha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "seconds": 128.04
+        },
+        {
+          "judge": 3,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 8,
+            "level": 8,
+            "time": 17,
+            "edges": 9,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 87
+          },
+          "finalSha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "seconds": 122.07
+        }
+      ],
+      "medianDimensions": {
+        "questions": 9,
+        "level": 8,
+        "time": 17,
+        "edges": 9,
+        "panels": 15,
+        "backstage": 13,
+        "fidelity": 15
+      },
+      "dimensionMedianSum": 86,
+      "dimensionMedianSumEqualsMedianTotal": false,
+      "activeSeconds": 625.329,
+      "phaseSeconds": [
+        98.967,
+        526.362
+      ],
+      "applyMs": 227,
+      "ackSeconds": 13.908,
+      "largestProgressGapSeconds": 120.347,
+      "sourceSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+      "questionWords": 537,
+      "numberedQuestions": 6,
+      "startupPermissionDenials": 0,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "The app-to-device-shadow read connection is omitted. Source identities and anchors check out."
+    },
+    {
+      "id": "run-06",
+      "audience": "engineering",
+      "status": "completed",
+      "qualityStatus": "complete",
+      "score": 79,
+      "range": {
+        "min": 78,
+        "max": 80
+      },
+      "validJudges": 3,
+      "judgments": [
+        {
+          "judge": 1,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 8,
+            "level": 8,
+            "time": 14,
+            "edges": 3,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 78
+          },
+          "finalSha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "seconds": 136.51
+        },
+        {
+          "judge": 2,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 8,
+            "level": 8,
+            "time": 14,
+            "edges": 5,
+            "panels": 15,
+            "backstage": 15,
+            "fidelity": 15,
+            "total": 80
+          },
+          "finalSha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "seconds": 148.92
+        },
+        {
+          "judge": 3,
+          "status": "valid",
+          "exit": 0,
+          "score": {
+            "questions": 6,
+            "level": 8,
+            "time": 14,
+            "edges": 7,
+            "panels": 15,
+            "backstage": 14,
+            "fidelity": 15,
+            "total": 79
+          },
+          "finalSha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "seconds": 84.55
+        }
+      ],
+      "medianDimensions": {
+        "questions": 8,
+        "level": 8,
+        "time": 14,
+        "edges": 5,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 15
+      },
+      "dimensionMedianSum": 80,
+      "dimensionMedianSumEqualsMedianTotal": false,
+      "activeSeconds": 586.089,
+      "phaseSeconds": [
+        107.575,
+        478.514
+      ],
+      "applyMs": 279,
+      "ackSeconds": 13.204,
+      "largestProgressGapSeconds": 109.19,
+      "sourceSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+      "questionWords": 526,
+      "numberedQuestions": 7,
+      "startupPermissionDenials": 0,
+      "proposalTypes": {
+        "source": 1,
+        "operations": 0,
+        "unknown": 0
+      },
+      "findings": "The app-to-device-shadow read connection is omitted; stale app values stay hidden on the alternate; clip-open shows health cards."
+    }
+  ],
+  "limits": [
+    "Current skill, renderer, prompts, permission wrapper and concurrency differ from historical CLI runs. This is descriptive, not a causal transport experiment.",
+    "Current active subprocess timing excludes the coordinator repair interval. Historical time is native harness end-to-end elapsed time; instrumentation differs.",
+    "Three current authors per audience versus one historical author per audience. Three judgments are score repetitions, not three historical authors.",
+    "One-shot delivery and native directory-handle adapter exercise the real editor/helper but do not test native pairing consent or Monitor setup.",
+    "All six new-story submissions used full-source proposals. This is not a six-session benchmark of granular semantic operations.",
+    "Judges received neutral labels and no historical scores. Authored text could reveal workflow; label blinding is not perfect blinding.",
+    "All exact stories are preserved. Build validity, rubric quality and visual usability are reported separately."
+  ]
+}

@@ -1,0 +1,704 @@
+{
+  "assessments": [
+    {
+      "label": "A",
+      "assessment": {
+        "deductions": [
+          {
+            "id": "D-Q-COUNT-001",
+            "criterion": "questions",
+            "points": 2,
+            "location": "candidate/questions.md \u2014 independent decisions across questions 1\u20136",
+            "rule": "questions.too_many",
+            "evidence": [
+              "interpretations.json#1-questions",
+              "candidate/questions.md questions 1\u20136"
+            ],
+            "explanation": "The batch requests well over seven independently answerable decisions, including separate audience/takeaway, timing, ending, panel, and starting-state choices."
+          },
+          {
+            "id": "D-Q-REDUNDANT-004A",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md#question-4 \u2014 \u201cShould both endings be shown?\u201d",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md question 4",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "explanation": "The HLD already requires both the normal delivery and Wi-Fi-down alternate."
+          },
+          {
+            "id": "D-Q-REDUNDANT-004B",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md#question-4 \u2014 \u201cshould either one end differently?\u201d",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md question 4",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "explanation": "The HLD already specifies that the normal path includes opening the clip and the alternate ends with the late push."
+          },
+          {
+            "id": "D-Q-REDUNDANT-006A",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md#question-6 \u2014 starting battery 25%",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md question 6",
+              "brief/hld.md#Scenario-to-depict"
+            ],
+            "explanation": "The HLD already states that the bedtime battery is 25%."
+          },
+          {
+            "id": "D-Q-REDUNDANT-006B",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md#question-6 \u2014 starting state not charging",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md question 6",
+              "brief/hld.md#Scenario-to-depict"
+            ],
+            "explanation": "The HLD already states that the camera is not charging at bedtime."
+          },
+          {
+            "id": "D-LEVEL-HOP-001",
+            "criterion": "level",
+            "points": 2,
+            "location": "/page/blocks/0/diagram/edges \u2014 missing Kestrel app\u2192device-shadow dependency",
+            "rule": "level.engineering_hop",
+            "evidence": [
+              "brief/answers.md: Technical level = Engineering",
+              "brief/hld.md: device-shadow holds state and the app reads this",
+              "interpretations.json#3-edges",
+              "evidence/renderer.json topology"
+            ],
+            "explanation": "The engineering topology omits the design-established app-to-device-shadow read dependency."
+          },
+          {
+            "id": "D-TIME-PHYSICAL-0110",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon-rec physical battery",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/panels/0/drainPerHour = 1",
+              "/page/blocks/0/diagram/steps/1/panels/batt/charge = 25",
+              "evidence/renderer.json: raccoon-rec physical charge 25 at 01:10",
+              "interpretations.json#2-time"
+            ],
+            "explanation": "The explicit 25% physical value at 1:10 AM is an invented intermediate anchor that holds the battery flat despite the stated idle drain; the conflict exception permits only a direct jump between the conflicting operator anchors."
+          },
+          {
+            "id": "D-TIME-REPORT-0100",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/app/battery/value and /page/blocks/0/diagram/steps/1/panels/shadow/rows/0/cells/value \u2014 1:00 AM reported battery",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/1/panels/app/battery/value = 25",
+              "/page/blocks/0/diagram/steps/1/panels/app/battery/reportedAt = 01:00",
+              "/page/blocks/0/diagram/steps/1/panels/shadow/rows/0/cells/value = 25",
+              "interpretations.json#2-time"
+            ],
+            "explanation": "The newly authored 1:00 AM shadow/app report of 25% is a separate inconsistent intermediate state, rather than a carried cached report."
+          },
+          {
+            "id": "D-PANEL-OPENCLIP-001",
+            "criterion": "panels",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/10/panels/app/lastEvent/detail \u2014 open-clip",
+            "rule": "panels.missing_event",
+            "evidence": [
+              "brief/hld.md#Scenario-to-depict: Resident opens the clip",
+              "/page/blocks/0/diagram/steps/10/text",
+              "/page/blocks/0/diagram/steps/10/panels/app/lastEvent/detail",
+              "evidence/renderer.json: open-clip phoneScreen remains app with only device-page field cards",
+              "interpretations.json#4-panels"
+            ],
+            "explanation": "The required clip-opening event is only narrated and recorded as device-page detail; no still, thumbnail, clip screen, or other clear open-clip visual is supplied."
+          }
+        ],
+        "claimDecisions": [
+          {
+            "claimId": "C001",
+            "verdict": "uphold",
+            "evidence": [
+              "evidence/renderer.json: raccoon-rec physical charge 25 at 01:10",
+              "interpretations.json#2-time"
+            ],
+            "reason": "The explicit physical 25% intermediate anchor violates the stated drain rate despite the documented anchor conflict.",
+            "deductionIds": [
+              "D-TIME-PHYSICAL-0110"
+            ]
+          },
+          {
+            "claimId": "C002",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: sunrise resolved report time 06:30 with no current edges"
+            ],
+            "reason": "\u201cLast report 6:30 AM\u201d is historical report context at the 6:50 step, not a claimed current heartbeat requiring lit hops.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C003",
+            "verdict": "uphold",
+            "evidence": [
+              "brief/hld.md: the app reads device-shadow",
+              "evidence/renderer.json topology",
+              "interpretations.json#3-edges"
+            ],
+            "reason": "The engineering topology omits the established app-to-device-shadow dependency.",
+            "deductionIds": [
+              "D-LEVEL-HOP-001"
+            ]
+          },
+          {
+            "claimId": "C004",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: courier-rec resolved report time 08:00 at an 08:05 step"
+            ],
+            "reason": "The 8:00 heartbeat is historical context; the 8:05 step does not claim that heartbeat executes then.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C005",
+            "verdict": "uphold",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/1/panels/batt/charge",
+              "evidence/renderer.json: physical charge 25 at 01:10"
+            ],
+            "reason": "The authored physical battery is improperly held at 25% at the intermediate raccoon step.",
+            "deductionIds": [
+              "D-TIME-PHYSICAL-0110"
+            ]
+          },
+          {
+            "claimId": "C006",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: courier-rec has no current heartbeat claim"
+            ],
+            "reason": "Introducing an older report as context does not require lighting that report's hops at the later step.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C007",
+            "verdict": "partial",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/1/panels/batt/charge",
+              "/page/blocks/0/diagram/steps/1/panels/app/battery/value",
+              "interpretations.json#2-time"
+            ],
+            "reason": "Both the physical 1:10 value and the newly authored 1:00 report are inconsistent, but raccoon-upload merely carries them and creates no additional unit.",
+            "deductionIds": [
+              "D-TIME-PHYSICAL-0110",
+              "D-TIME-REPORT-0100"
+            ]
+          },
+          {
+            "claimId": "C008",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json: event-ingest operations postEvent and postHeartbeat",
+              "interpretations.json#6-backstage"
+            ],
+            "reason": "A binding may identify one correct catalog operation without enumerating every operation; the explicit POST /heartbeats call matches approved postHeartbeat.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C009",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json: event-ingest operations postEvent and postHeartbeat",
+              "interpretations.json#6-backstage"
+            ],
+            "reason": "This duplicates C008, and the alleged mismatch is false under the fixed binding interpretation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C010",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json: clip-store getClip GET /clips/{clipId}",
+              "interpretations.json#6-backstage"
+            ],
+            "reason": "The explicit GET call matches the approved getClip operation; the node binding need not enumerate both uploadClip and getClip.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C011",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: raccoon-rec reports historical 01:00 at 01:10"
+            ],
+            "reason": "The 1:00 report is historical context, not a current 1:10 heartbeat execution claim.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C012",
+            "verdict": "partial",
+            "evidence": [
+              "candidate/questions.md question 4",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "reason": "The allegation is directionally correct, but question 4 contains two independently redundant decisions: whether to show both endings and whether to change their specified endpoints.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004A",
+              "D-Q-REDUNDANT-004B"
+            ]
+          },
+          {
+            "claimId": "C013",
+            "verdict": "uphold",
+            "evidence": [
+              "brief/hld.md: the app reads device-shadow",
+              "interpretations.json#3-edges",
+              "evidence/renderer.json topology"
+            ],
+            "reason": "The app-to-shadow dependency is absent from the engineering diagram.",
+            "deductionIds": [
+              "D-LEVEL-HOP-001"
+            ]
+          },
+          {
+            "claimId": "C014",
+            "verdict": "uphold",
+            "evidence": [
+              "brief/hld.md: the app reads device-shadow",
+              "interpretations.json#3-edges",
+              "evidence/renderer.json topology"
+            ],
+            "reason": "This repeats the same supported missing engineering hop and therefore references the existing deduction.",
+            "deductionIds": [
+              "D-LEVEL-HOP-001"
+            ]
+          },
+          {
+            "claimId": "C015",
+            "verdict": "partial",
+            "evidence": [
+              "candidate/questions.md question 6",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "reason": "The HLD separately supplies both the 25% battery and not-charging starting attributes, producing two redundant decision units rather than the single alleged unit.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-006A",
+              "D-Q-REDUNDANT-006B"
+            ]
+          },
+          {
+            "claimId": "C016",
+            "verdict": "partial",
+            "evidence": [
+              "candidate/questions.md question 4",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "reason": "Question 4 redundantly asks two independently answerable matters already settled by the HLD.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004A",
+              "D-Q-REDUNDANT-004B"
+            ]
+          },
+          {
+            "claimId": "C017",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json: clip-store getClip GET /clips/{clipId}",
+              "interpretations.json#6-backstage"
+            ],
+            "reason": "This duplicates C010; the depicted GET is an approved clip-store operation and need not be the binding's single displayed API operation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C018",
+            "verdict": "partial",
+            "evidence": [
+              "candidate/questions.md question 4",
+              "brief/hld.md#Scenario-to-depict",
+              "interpretations.json#1-questions"
+            ],
+            "reason": "Showing both paths is redundant, and the same compound prompt also redundantly asks whether their already specified endings should change.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004A",
+              "D-Q-REDUNDANT-004B"
+            ]
+          },
+          {
+            "claimId": "C019",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: raccoon-rec activeEdges is empty but report time is historical 01:00"
+            ],
+            "reason": "Historical last-report context does not assert a current message at the raccoon step.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C020",
+            "verdict": "uphold",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/1/panels/app/battery/value = 25",
+              "/page/blocks/0/diagram/steps/1/panels/app/battery/reportedAt = 01:00",
+              "interpretations.json#2-time"
+            ],
+            "reason": "The newly authored 1:00 heartbeat report is a distinct inconsistent reported-state value.",
+            "deductionIds": [
+              "D-TIME-REPORT-0100"
+            ]
+          },
+          {
+            "claimId": "C021",
+            "verdict": "reject",
+            "evidence": [
+              "interpretations.json#3-edges",
+              "evidence/renderer.json: sunrise caption and fields describe a 06:30 last report at 06:50"
+            ],
+            "reason": "The 6:30 report is historical context and does not claim a current heartbeat at sunrise.",
+            "deductionIds": []
+          }
+        ],
+        "unresolved": []
+      }
+    },
+    {
+      "label": "B",
+      "assessment": {
+        "deductions": [
+          {
+            "id": "D-Q-TOO-MANY",
+            "criterion": "questions",
+            "points": 2,
+            "location": "candidate/questions.md, independent decisions across questions 1\u20136",
+            "rule": "questions.too_many",
+            "evidence": [
+              "interpretations.json rule 1-questions: count independently answerable decisions, not question marks or numbered bullets",
+              "candidate/questions.md asks distinct decisions about technical level; audience; takeaway; multiple times; two outcome choices; panel contents; and starting-state facts"
+            ],
+            "explanation": "The batch contains more than seven independently answerable decisions."
+          },
+          {
+            "id": "D-Q4-OUTCOMES",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md, question 4 decision \u201cShould both endings be shown?\u201d",
+            "rule": "questions.redundant",
+            "evidence": [
+              "brief/hld.md Scenario to depict requires the normal delivery and a Wi-Fi-down alternate",
+              "candidate/questions.md question 4 asks whether both endings should be shown"
+            ],
+            "explanation": "The supplied design already requires both outcomes."
+          },
+          {
+            "id": "D-Q4-ENDINGS",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md, question 4 decision \u201cshould either one end differently?\u201d",
+            "rule": "questions.redundant",
+            "evidence": [
+              "brief/hld.md specifies that the happy path ends with the resident opening the clip",
+              "brief/hld.md specifies that the alternate sends the package push after reconnect",
+              "candidate/questions.md question 4 separately asks whether either ending should change"
+            ],
+            "explanation": "The design already specifies both endings."
+          },
+          {
+            "id": "D-Q6-START",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md, question 6 decision confirming \u201cBattery 25% \u2026 not charging\u201d",
+            "rule": "questions.redundant",
+            "evidence": [
+              "brief/hld.md Scenario to depict: \u201cBattery is 25%, not charging.\u201d",
+              "candidate/questions.md question 6 asks whether the app should show 25% and not charging"
+            ],
+            "explanation": "The battery and charging portion of this compound confirmation was already answered; its other starting-state clauses were not."
+          },
+          {
+            "id": "D-L-APP-SHADOW",
+            "criterion": "level",
+            "points": 2,
+            "location": "/page/blocks/0/diagram/edges, missing Kestrel app \u2192 device-shadow dependency",
+            "rule": "level.engineering_hop",
+            "evidence": [
+              "brief/answers.md selects Engineering and requests every service hop",
+              "brief/hld.md: device-shadow holds the state and \u201cThe app reads this\u201d",
+              "evidence/renderer.json topology contains no app/device-shadow edge"
+            ],
+            "explanation": "The engineering diagram omits the design-established app-to-device-shadow service dependency."
+          },
+          {
+            "id": "D-T-RACCOON-PHYSICAL",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge, step raccoon-rec, physical battery",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/panels/0 sets drainPerHour=1",
+              "brief/hld.md states idle drain is about 1%/h and each clip costs about 1%",
+              "evidence/renderer.json resolves the physical battery to an explicit 25% at 1:10 AM from a 25% 10:30 PM start"
+            ],
+            "explanation": "The explicit intermediate physical value holds the battery at 25% through 2h40m of idle drain and the raccoon recording. The conflicting-anchor exception permits a direct anchor-to-anchor jump, not this invented intermediate value."
+          },
+          {
+            "id": "D-T-RACCOON-REPORT",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/app/battery/value, step raccoon-rec, newly reported 1:00 AM battery",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/1/panels/app/battery authors value=25 and reportedAt=01:00",
+              "evidence/renderer.json resolves this as a new 1:00 AM report, not merely carried cached state",
+              "brief/hld.md states about 1%/h idle drain from the 25% 10:30 PM start"
+            ],
+            "explanation": "The newly authored 1:00 AM report of 25% is a distinct inconsistent intermediate reported-state value."
+          },
+          {
+            "id": "D-P-OPEN-CLIP",
+            "criterion": "panels",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/10/panels/app, step open-clip, required clip-opening visual",
+            "rule": "panels.missing_event",
+            "evidence": [
+              "brief/hld.md happy-path scenario requires \u201cResident opens the clip.\u201d",
+              "interpretations.json rule 4-panels requires a still, thumbnail, or other clear open-clip state",
+              "evidence/renderer.json shows the device-app remains on phoneScreen=app and only changes lastEvent.detail to \u201cClip opened 8:06 AM\u201d"
+            ],
+            "explanation": "The step narrates and logs the fetch but supplies no clip or clear open-clip visual state."
+          }
+        ],
+        "claimDecisions": [
+          {
+            "claimId": "C001",
+            "verdict": "uphold",
+            "evidence": [
+              "The explicit raccoon-rec physical charge is 25% despite the authored 1%/h drain and clip cost."
+            ],
+            "reason": "This is the inconsistent intermediate physical-state value identified by D-T-RACCOON-PHYSICAL.",
+            "deductionIds": [
+              "D-T-RACCOON-PHYSICAL"
+            ]
+          },
+          {
+            "claimId": "C002",
+            "verdict": "reject",
+            "evidence": [
+              "The sunrise caption says the app still shows the historical 6:30 AM heartbeat.",
+              "evidence/renderer.json shows no active edges at sunrise, consistent with historical context."
+            ],
+            "reason": "A cached last-report reference is not a current heartbeat execution claim.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C003",
+            "verdict": "uphold",
+            "evidence": [
+              "The HLD establishes that the app reads device-shadow, while the topology has no app/device-shadow edge."
+            ],
+            "reason": "At Engineering level this is one missing design service hop.",
+            "deductionIds": [
+              "D-L-APP-SHADOW"
+            ]
+          },
+          {
+            "claimId": "C004",
+            "verdict": "reject",
+            "evidence": [
+              "courier-rec says the app shows the 8:00 AM heartbeat; it does not claim that heartbeat executes at 8:05 AM."
+            ],
+            "reason": "Historical report context does not require current-step message edges.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C005",
+            "verdict": "uphold",
+            "evidence": [
+              "The physical battery is explicitly reset to 25% at raccoon-rec despite elapsed drain and recording cost."
+            ],
+            "reason": "Duplicate allegation of D-T-RACCOON-PHYSICAL.",
+            "deductionIds": [
+              "D-T-RACCOON-PHYSICAL"
+            ]
+          },
+          {
+            "claimId": "C006",
+            "verdict": "reject",
+            "evidence": [
+              "The 8:00 AM report is presented as already received history at the 8:05 AM recording step."
+            ],
+            "reason": "No current heartbeat is asserted at courier-rec.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C007",
+            "verdict": "uphold",
+            "evidence": [
+              "The explicit raccoon-rec physical state holds at 25% instead of applying the stated drain."
+            ],
+            "reason": "The carried state at raccoon-upload adds no separate unit; the authored physical defect is D-T-RACCOON-PHYSICAL.",
+            "deductionIds": [
+              "D-T-RACCOON-PHYSICAL"
+            ]
+          },
+          {
+            "claimId": "C008",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves event-ingest postHeartbeat POST /heartbeats.",
+              "interpretations.json rule 6-backstage says a binding's single api operation need not enumerate every endpoint."
+            ],
+            "reason": "The heartbeat call matches an approved operation; binding the node to another correct operation is not a mismatch.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C009",
+            "verdict": "reject",
+            "evidence": [
+              "The catalog approves POST /heartbeats for event-ingest, and a node binding need not enumerate every operation."
+            ],
+            "reason": "Duplicate factually unsupported binding allegation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C010",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves clip-store getClip GET /clips/{clipId}.",
+              "interpretations.json rule 6-backstage permits the node binding to name one different correct operation."
+            ],
+            "reason": "The depicted GET call matches an approved clip-store operation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C011",
+            "verdict": "reject",
+            "evidence": [
+              "The raccoon-rec caption describes the app showing a past 1:00 AM report at 1:10 AM."
+            ],
+            "reason": "It does not claim a current heartbeat at that step, so no execution edges are required.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C012",
+            "verdict": "uphold",
+            "evidence": [
+              "The HLD already specifies both the happy and Wi-Fi-down outcomes."
+            ],
+            "reason": "The \u201cshould both endings be shown?\u201d decision is redundant; a separate question-4 ending-change defect is also recorded independently.",
+            "deductionIds": [
+              "D-Q4-OUTCOMES"
+            ]
+          },
+          {
+            "claimId": "C013",
+            "verdict": "uphold",
+            "evidence": [
+              "The app/device-shadow dependency is stated in the HLD and absent from renderer topology."
+            ],
+            "reason": "Duplicate allegation of the single structural Engineering-level omission.",
+            "deductionIds": [
+              "D-L-APP-SHADOW"
+            ]
+          },
+          {
+            "claimId": "C014",
+            "verdict": "uphold",
+            "evidence": [
+              "No app/device-shadow topology edge appears despite the HLD's explicit read dependency."
+            ],
+            "reason": "Duplicate allegation of D-L-APP-SHADOW.",
+            "deductionIds": [
+              "D-L-APP-SHADOW"
+            ]
+          },
+          {
+            "claimId": "C015",
+            "verdict": "uphold",
+            "evidence": [
+              "The HLD already supplies bedtime battery 25% and not-charging state."
+            ],
+            "reason": "Only that answered clause is redundant; the question's no-alert and other starting-state clauses are not treated as supplied facts.",
+            "deductionIds": [
+              "D-Q6-START"
+            ]
+          },
+          {
+            "claimId": "C016",
+            "verdict": "uphold",
+            "evidence": [
+              "The HLD requires both delivery outcomes."
+            ],
+            "reason": "Duplicate allegation of the redundant question-4 outcome decision.",
+            "deductionIds": [
+              "D-Q4-OUTCOMES"
+            ]
+          },
+          {
+            "claimId": "C017",
+            "verdict": "reject",
+            "evidence": [
+              "clip-store's approved catalog operations include getClip GET /clips/{clipId}."
+            ],
+            "reason": "The explicit call is approved; uploadClip being the binding's displayed operation does not invalidate it.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C018",
+            "verdict": "uphold",
+            "evidence": [
+              "The supplied scenario already requires the normal and Wi-Fi-down paths."
+            ],
+            "reason": "Duplicate allegation of D-Q4-OUTCOMES.",
+            "deductionIds": [
+              "D-Q4-OUTCOMES"
+            ]
+          },
+          {
+            "claimId": "C019",
+            "verdict": "reject",
+            "evidence": [
+              "The 1:00 AM heartbeat is historical report context shown at 1:10 AM."
+            ],
+            "reason": "No current report execution is claimed at raccoon-rec.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C020",
+            "verdict": "uphold",
+            "evidence": [
+              "raccoon-rec newly authors app battery=25 with reportedAt=01:00 despite the stated idle-drain rate."
+            ],
+            "reason": "This is the distinct inconsistent newly reported value identified by D-T-RACCOON-REPORT.",
+            "deductionIds": [
+              "D-T-RACCOON-REPORT"
+            ]
+          },
+          {
+            "claimId": "C021",
+            "verdict": "reject",
+            "evidence": [
+              "At sunrise the 6:30 AM timestamp identifies the cached report the app still shows."
+            ],
+            "reason": "Historical report context does not require a heartbeat to be lit at 6:50 AM.",
+            "deductionIds": []
+          }
+        ],
+        "unresolved": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "problems": [],
+  "metrics": {
+    "questionsFile": true,
+    "questionCount": 4,
+    "ledger": true,
+    "html": true,
+    "buildOk": true,
+    "buildWarnings": 0,
+    "diagrams": 1,
+    "battery:batt:normal": "25 25 20 17.17 17.75 20.83 20.89 20.95",
+    "field:phone.battery:normal": [
+      "25|(default)|ready|Last report 10:30 PM",
+      "25|(default)|ready|Last report 1:00 AM",
+      "20|battery-low|ready|Last report 4:00 AM",
+      "18|battery-low|ready|Last report 6:30 AM",
+      "18|battery-low|ready|Last report 7:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM"
+    ],
+    "field:phone.power:normal": [
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|"
+    ],
+    "field:phone.online:normal": [
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|"
+    ],
+    "field:phone.lastEvent:normal": [
+      "|(default)||",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Package \u00b7 8:10 AM|package|ready|",
+      "Package \u00b7 8:10 AM|package|ready|"
+    ],
+    "clock:phone:normal": "10:30 Thu, Oct 1 | 1:04 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:11 Fri, Oct 2 | 8:12 Fri, Oct 2",
+    "battery:batt:wifi-down": "25 25 20 17.17 17.75 20.83 20.89 21.42",
+    "field:phone.battery:wifi-down": [
+      "25|(default)|ready|Last report 10:30 PM",
+      "25|(default)|ready|Last report 1:00 AM",
+      "20|battery-low|ready|Last report 4:00 AM",
+      "18|battery-low|ready|Last report 6:30 AM",
+      "18|battery-low|ready|Last report 7:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:00 AM",
+      "21|battery-low|ready|Last report 8:20 AM"
+    ],
+    "field:phone.power:wifi-down": [
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Battery \u00b7 not charging|(default)|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|",
+      "Solar charging|solar|ready|"
+    ],
+    "field:phone.online:wifi-down": [
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|",
+      "Online|(default)|ready|"
+    ],
+    "field:phone.lastEvent:wifi-down": [
+      "|(default)||",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Animal \u00b7 1:04 AM \u00b7 no alert|(default)|ready|",
+      "Package \u00b7 8:10 AM|package|ready|"
+    ],
+    "clock:phone:wifi-down": "10:30 Thu, Oct 1 | 1:04 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:11 Fri, Oct 2 | 8:20 Fri, Oct 2",
+    "boundNodes": 1,
+    "codeRefNodes": 2,
+    "codeRefSteps": 6,
+    "totalSteps": 10,
+    "emptySteps": 0,
+    "edgeSteps": 8,
+    "codeEvidenceUsed": "7/7"
+  },
+  "problemCounts": {}
+}

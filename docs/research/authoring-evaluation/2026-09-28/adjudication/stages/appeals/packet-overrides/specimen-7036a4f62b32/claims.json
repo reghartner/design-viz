@@ -1,0 +1,347 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 7",
+      "explanation": "The design already says the resident opens the clip in the normal outcome."
+    },
+    {
+      "id": "C002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q7",
+      "explanation": "The design explicitly says the resident opens the normal-path clip."
+    },
+    {
+      "id": "C003",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/mechanical-check.json",
+      "explanation": "Eight questions were counted, exceeding the seven-question limit."
+    },
+    {
+      "id": "C004",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon",
+      "explanation": "Battery is held at 25%, creating an invented intermediate value using an unstated zero-drain rate between conflicting anchors."
+    },
+    {
+      "id": "C005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q6",
+      "explanation": "The design already requires phone notifications and the resident opening the clip."
+    },
+    {
+      "id": "C006",
+      "criterion": "panels",
+      "points": 3,
+      "location": "a-open",
+      "explanation": "The delivery-upload homemap signal remains after the upload ends and the camera returns to sleep."
+    },
+    {
+      "id": "C007",
+      "criterion": "questions",
+      "points": 1,
+      "location": "Question 4",
+      "explanation": "The HLD already specifies both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "C008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "sunrise",
+      "explanation": "The camera-to-router homemap signal carries forward even though no report occurs yet."
+    },
+    {
+      "id": "C009",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 6",
+      "explanation": "The design already requires phone alerts and opening the clip."
+    },
+    {
+      "id": "C010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`sunrise`",
+      "explanation": "The home panel carries forward the previous camera-to-router signal despite the caption saying nothing is reported yet."
+    },
+    {
+      "id": "C011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "a-open",
+      "explanation": "The package-notification banner is not cleared after the resident taps it and enters the app."
+    },
+    {
+      "id": "C012",
+      "criterion": "questions",
+      "points": 1,
+      "location": "Question 7",
+      "explanation": "The HLD already states that the resident opens the clip on the normal path."
+    },
+    {
+      "id": "C013",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already specifies both normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "C014",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`a-open`",
+      "explanation": "The camera-to-router signal remains after the delivery upload, although this step only depicts the resident opening the clip."
+    },
+    {
+      "id": "C015",
+      "criterion": "level",
+      "points": 2,
+      "location": "node `push`",
+      "explanation": "Visible \u201cApple / Google\u201d service/platform label is inappropriate for the requested story-level customer view."
+    },
+    {
+      "id": "C016",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`b-retry`",
+      "explanation": "The stale camera-to-router signal remains while the caption says Wi-Fi is still down and the retry fails."
+    },
+    {
+      "id": "C017",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5",
+      "explanation": "The scenario already specifies the required story moments."
+    },
+    {
+      "id": "C018",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight question prompts were asked, exceeding seven."
+    },
+    {
+      "id": "C019",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Asked 8 questions, exceeding the limit of 7."
+    },
+    {
+      "id": "C020",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4",
+      "explanation": "The design already specifies both normal and Wi-Fi-down endings."
+    },
+    {
+      "id": "C021",
+      "criterion": "panels",
+      "points": 3,
+      "location": "b-retry",
+      "explanation": "The successful signal remains visible during another blocked retry."
+    },
+    {
+      "id": "C022",
+      "criterion": "panels",
+      "points": 3,
+      "location": "b-deliver",
+      "explanation": "A successful camera-to-router signal remains visible while Wi-Fi is down and nothing is sent."
+    },
+    {
+      "id": "C023",
+      "criterion": "panels",
+      "points": 3,
+      "location": "`b-deliver`",
+      "explanation": "The carried-forward camera-to-router signal contradicts the Wi-Fi-down state and blocked link."
+    },
+    {
+      "id": "C024",
+      "criterion": "questions",
+      "points": 1,
+      "location": "Question 5",
+      "explanation": "The HLD already specifies the proposed must-see story moments."
+    },
+    {
+      "id": "C025",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 5",
+      "explanation": "The design already lists the required story moments."
+    },
+    {
+      "id": "A001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 independent-decision count",
+      "explanation": "The batch requests eight independent decisions: technical level, timing schedule, audience, takeaway, endings, must-see moments, phone depiction, and normal-ending treatment."
+    },
+    {
+      "id": "A002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4 \u2014 endings decision",
+      "explanation": "The HLD already requires both proposed endings."
+    },
+    {
+      "id": "A003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 must-see-moments decision",
+      "explanation": "The proposed moments repeat the scenario beats already specified by the HLD."
+    },
+    {
+      "id": "A004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q6 \u2014 phone-depiction decision",
+      "explanation": "The source already establishes the phone/app as the surface for alerts and the normal-path clip opening."
+    },
+    {
+      "id": "A005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q7 \u2014 normal-ending treatment",
+      "explanation": "The HLD explicitly states that the resident opens the normal-path clip."
+    },
+    {
+      "id": "A006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 step raccoon, physical battery",
+      "explanation": "The authored 25% intermediate physical value holds the 10:30 PM anchor unchanged through 1:05 AM and omits the raccoon clip drain. Only a direct anchor-to-anchor jump is exempt."
+    },
+    {
+      "id": "A007",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push/sub \u2014 visible node label",
+      "explanation": "The visible Apple/Google platform-service label exceeds the requested customer-focused Story level."
+    },
+    {
+      "id": "A008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone \u2014 step a-open, clip-opening event",
+      "explanation": "The phone remains a camera device-page view and provides no still, thumbnail, or other clear open-clip screen state; the field detail saying \u201cclip opened\u201d does not depict the required opening."
+    },
+    {
+      "id": "B001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 complete question batch (Q1\u2013Q7)",
+      "explanation": "The batch contains eight independently answerable decisions, exceeding seven."
+    },
+    {
+      "id": "B002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4 \u2014 \u201cWhich endings should it show?\u201d",
+      "explanation": "The design had already specified both endings."
+    },
+    {
+      "id": "B003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 \u201cWhich moments must viewers see?\u201d",
+      "explanation": "The proposed must-see moments were already supplied by the scenario."
+    },
+    {
+      "id": "B004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q6 \u2014 \u201cShould it show the phone?\u201d",
+      "explanation": "The supplied design already made the phone necessary to depict the requested events."
+    },
+    {
+      "id": "B005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q7 \u2014 \u201cHow should the Wi-Fi-works ending finish?\u201d",
+      "explanation": "The design explicitly supplied the normal-path ending."
+    },
+    {
+      "id": "B006",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push/sub \u2014 node push visible label",
+      "explanation": "The visible platform/service names are backend delivery detail inappropriate to the requested customer-level story."
+    },
+    {
+      "id": "B007",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 step raccoon, physical battery",
+      "explanation": "The explicit 25% intermediate value at 1:05 AM suppresses both elapsed idle drain and the raccoon clip drain, implying an unsupported rate between the 25% and 20% anchors."
+    },
+    {
+      "id": "B008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone \u2014 step a-open, promised clip-open event",
+      "explanation": "The step narrates the required clip opening but depicts only the camera device page; the \u201cclip opened\u201d field detail is a textual assertion, not a clip-open scene."
+    },
+    {
+      "id": "R001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md Q1\u2013Q7 \u2014 independent-decision count",
+      "explanation": "There are eight independently answerable decisions: technical level, timing, audience, takeaway, endings, required moments, phone depiction, and normal-ending treatment."
+    },
+    {
+      "id": "R002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4 \u2014 endings decision",
+      "explanation": "The HLD already requires both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "R003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q5 \u2014 must-see-moments decision",
+      "explanation": "The five proposed moments repeat scenario beats already specified by the HLD."
+    },
+    {
+      "id": "R004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q6 \u2014 phone-depiction decision",
+      "explanation": "The design already establishes the phone as the surface for notifications and the normal-path clip opening."
+    },
+    {
+      "id": "R005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q7 \u2014 normal-ending treatment",
+      "explanation": "The HLD explicitly supplies the normal-path ending."
+    },
+    {
+      "id": "R006",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 step raccoon, physical battery",
+      "explanation": "The explicit 25% intermediate value at 1:05 AM suppresses elapsed idle drain and the raccoon clip drain. The conflicting-anchor exception permits the direct 25%-to-20% jump, not an invented intermediate value using zero drain."
+    },
+    {
+      "id": "R007",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push/sub \u2014 visible label",
+      "explanation": "The visible platform/service label exceeds the requested customer-focused Story level and contradicts the final report's assertion that no service names are visible."
+    },
+    {
+      "id": "R008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone \u2014 step a-open, clip-opening event",
+      "explanation": "The caption promises the required clip opening, but the phone depicts only device-page fields. The textual detail \u201cclip opened\u201d is not a still, thumbnail, or other clear open-clip state."
+    }
+  ]
+}

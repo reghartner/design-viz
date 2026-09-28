@@ -1,0 +1,221 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight questions were asked, exceeding the limit of seven."
+    },
+    {
+      "id": "C002",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight questions were asked, exceeding the limit of seven."
+    },
+    {
+      "id": "C003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The HLD already specifies both the normal and Wi-Fi-down endings."
+    },
+    {
+      "id": "C004",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The 6:30 AM heartbeat changes reported state, but none of its hops are lit."
+    },
+    {
+      "id": "C005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already specifies both the normal and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C006",
+      "criterion": "level",
+      "points": 2,
+      "location": "device-shadow \u2192 Kestrel app",
+      "explanation": "Engineering view omits the design\u2019s app-read service hop."
+    },
+    {
+      "id": "C007",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "Caption claims the 8:00 AM heartbeat report, but that report\u2019s complete hops are not lit."
+    },
+    {
+      "id": "C008",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "The claimed 1:00 AM heartbeat updates device-shadow/app state without lighting `ingest->shadow`."
+    },
+    {
+      "id": "C009",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md",
+      "explanation": "Eight questions were asked, exceeding seven."
+    },
+    {
+      "id": "C010",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram topology",
+      "explanation": "The engineering view omits the design\u2019s device-shadow \u2192 Kestrel app state-read hop."
+    },
+    {
+      "id": "C011",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The claimed 8:00 AM heartbeat updates reported state without lighting `ingest->shadow`."
+    },
+    {
+      "id": "C012",
+      "criterion": "edges",
+      "points": 2,
+      "location": "bedtime",
+      "explanation": "Caption claims the device page reads the new state, but no device-shadow \u2192 app hop is lit."
+    },
+    {
+      "id": "C013",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already specifies both the happy and Wi-Fi-down endings."
+    },
+    {
+      "id": "C014",
+      "criterion": "edges",
+      "points": 2,
+      "location": "hb-charging",
+      "explanation": "Caption claims the device page receives charging state, but its read hop is absent."
+    },
+    {
+      "id": "C015",
+      "criterion": "panels",
+      "points": 3,
+      "location": "b-courier",
+      "explanation": "The camera\u2019s SD queue labels the clip \u201cpackage\u201d before the server-side classifier can run."
+    },
+    {
+      "id": "C016",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "node ingest",
+      "explanation": "Binding selects `postEvent`, but heartbeat steps call `postHeartbeat`."
+    },
+    {
+      "id": "C017",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "Caption claims a scheduled 6:30 AM heartbeat report with no corresponding lit hops."
+    },
+    {
+      "id": "C018",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "node shadow / app source",
+      "explanation": "Binding selects `putState`, while the depicted app read calls `getState`."
+    },
+    {
+      "id": "C019",
+      "criterion": "edges",
+      "points": 2,
+      "location": "hb-low",
+      "explanation": "Caption claims the device page receives the 20% state, but its read hop is absent."
+    },
+    {
+      "id": "C020",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "Caption claims the 8:00 AM heartbeat report with no corresponding successful hops."
+    },
+    {
+      "id": "C021",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "The alternate path\u2019s 8:00 AM heartbeat changes reported state, but its hops are not lit."
+    },
+    {
+      "id": "C022",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "Caption claims a scheduled 1:00 AM heartbeat report whose hops are not lit."
+    },
+    {
+      "id": "C023",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon",
+      "explanation": "The physical battery is again held at 25% at 1:10 AM, including across a clip, using the unstated zero-drain rate."
+    },
+    {
+      "id": "C024",
+      "criterion": "panels",
+      "points": 3,
+      "location": "raccoon-label",
+      "explanation": "The app\u2019s event card updates while the caption says nothing reaches the phone."
+    },
+    {
+      "id": "C025",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram edges",
+      "explanation": "The engineering view omits the Kestrel app\u2019s read from device-shadow."
+    },
+    {
+      "id": "C026",
+      "criterion": "time",
+      "points": 3,
+      "location": "1:00 AM reported state",
+      "explanation": "The invented 25% intermediate heartbeat uses an unstated zero-drain rate between conflicting anchors."
+    },
+    {
+      "id": "C027",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "The claimed successful 8:00 AM heartbeat has no heartbeat hops lit."
+    },
+    {
+      "id": "C028",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "The claimed 1:00 AM heartbeat updates device-shadow, but `ingest->shadow` is not lit."
+    },
+    {
+      "id": "C029",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The claimed 6:30 AM heartbeat/report has none of its hops lit."
+    },
+    {
+      "id": "C030",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "ingest binding / heartbeat steps",
+      "explanation": "The bound API operation is `postEvent`, not the `postHeartbeat` operation used by these calls."
+    },
+    {
+      "id": "C031",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The 8:00 AM heartbeat changes reported state, but `ingest->shadow` is not lit."
+    }
+  ]
+}

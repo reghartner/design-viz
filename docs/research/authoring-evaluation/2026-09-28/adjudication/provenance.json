@@ -1,0 +1,1416 @@
+{
+  "records": [
+    {
+      "story": "historical-business",
+      "candidateId": "specimen-f4d35ae7d929",
+      "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+      "factsSha256": "ed819e9bb0547e7164951e47e6f3f1c785f3a91075760c69bd24fff71cb4718e",
+      "packetHashes": {
+        "brief/answers.md": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "f868f338a23de0bb00ab43b148315f6b07821d91a71dd546f378ffc06d571fd3",
+        "candidate/mechanical-check.json": "55f9443075a623352f3696f38826508f3b49dde1420ecf07f4e1874515b9e0a5",
+        "candidate/questions.md": "06468459c793c9abad86df936a87ef5f090ebce1cf8b043373f5889659437f10",
+        "candidate/story.ledger.md": "034a2e5a5e381435c9e9891f5608b798b79abcdc39be13d7f5e11f259712a4db",
+        "candidate/story.spec.json": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+        "claims.json": "9787d71f65fada4ab70cb0003f467784316edf1ab557914488ccd907a6d97654",
+        "evidence/renderer.json": "bf5f03d41bf62cbe79e4fc939f10a5970b85f4bafec9f2766f84d07304b5e03e",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "historical-business/judge-1.md",
+          "sha256": "ec2df89f1db0388949f8c0fd83b85324610d8984924e6636e5eba590fda2486d",
+          "line": 2
+        },
+        {
+          "claimId": "C002",
+          "file": "historical-business/judge-3.md",
+          "sha256": "ecd57c39baa340e7e8447135385af7bf601beff5e869b2f107f326f529cd5e52",
+          "line": 3
+        },
+        {
+          "claimId": "C003",
+          "file": "historical-business/judge-3.md",
+          "sha256": "ecd57c39baa340e7e8447135385af7bf601beff5e869b2f107f326f529cd5e52",
+          "line": 4
+        },
+        {
+          "claimId": "C004",
+          "file": "historical-business/judge-2.md",
+          "sha256": "7ca88d17fb240bdd56bd48dbbe71eaf9ca75df4bd01478621ae51fc5127d2821",
+          "line": 2
+        },
+        {
+          "claimId": "C005",
+          "file": "historical-business/judge-3.md",
+          "sha256": "ecd57c39baa340e7e8447135385af7bf601beff5e869b2f107f326f529cd5e52",
+          "line": 1
+        },
+        {
+          "claimId": "C006",
+          "file": "historical-business/judge-2.md",
+          "sha256": "7ca88d17fb240bdd56bd48dbbe71eaf9ca75df4bd01478621ae51fc5127d2821",
+          "line": 3
+        },
+        {
+          "claimId": "C007",
+          "file": "historical-business/judge-2.md",
+          "sha256": "7ca88d17fb240bdd56bd48dbbe71eaf9ca75df4bd01478621ae51fc5127d2821",
+          "line": 1
+        },
+        {
+          "claimId": "C008",
+          "file": "historical-business/judge-3.md",
+          "sha256": "ecd57c39baa340e7e8447135385af7bf601beff5e869b2f107f326f529cd5e52",
+          "line": 2
+        },
+        {
+          "claimId": "C009",
+          "file": "historical-business/judge-1.md",
+          "sha256": "ec2df89f1db0388949f8c0fd83b85324610d8984924e6636e5eba590fda2486d",
+          "line": 4
+        },
+        {
+          "claimId": "C010",
+          "file": "historical-business/judge-2.md",
+          "sha256": "7ca88d17fb240bdd56bd48dbbe71eaf9ca75df4bd01478621ae51fc5127d2821",
+          "line": 4
+        },
+        {
+          "claimId": "C011",
+          "file": "historical-business/judge-1.md",
+          "sha256": "ec2df89f1db0388949f8c0fd83b85324610d8984924e6636e5eba590fda2486d",
+          "line": 1
+        },
+        {
+          "claimId": "C012",
+          "file": "historical-business/judge-1.md",
+          "sha256": "ec2df89f1db0388949f8c0fd83b85324610d8984924e6636e5eba590fda2486d",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "story": "historical-engineer",
+      "candidateId": "specimen-5395841c704d",
+      "sourceSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+      "factsSha256": "43db7a06a8058502f3fa5a5fc2e96be8dcf23dacd316727a70cea8c9940149a4",
+      "packetHashes": {
+        "brief/answers.md": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "082d81ea6e024b4e2efeb64268edfb6711027110573929f02866a240fa27bba5",
+        "candidate/mechanical-check.json": "056038bfc20cb57d9e7a34e3af944d287f6e7fa62f73df6e7aede5d6a5f3614a",
+        "candidate/questions.md": "c0cd784b405299dcc63312de8cbf70e0754c5d56afd77879e437ef7f3a1691f2",
+        "candidate/story.ledger.md": "54c5867f25d6cc205aad935d726790b695b37942b7fa2496c787a69559deb853",
+        "candidate/story.spec.json": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+        "claims.json": "decae49516efc5cd9308c131bd73bb0b9188abd29ef62a38518b87193358ed6f",
+        "evidence/renderer.json": "8b6e06ea1a6200f2e30aeec8928e66d1917a76e56d5f8a2f9984508df5d01e2b",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 7
+        },
+        {
+          "claimId": "C002",
+          "file": "historical-engineer/judge-2.md",
+          "sha256": "106288e86bdd3ebe7bb91f49f4bf40b057028329b11094656f6e0dbc1f58c276",
+          "line": 1
+        },
+        {
+          "claimId": "C003",
+          "file": "historical-engineer/judge-3.md",
+          "sha256": "3bd600fb80d4674f01283deecc5c17f0d42b27ebf178e6d8ae74b0c280ca2a71",
+          "line": 3
+        },
+        {
+          "claimId": "C004",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 6
+        },
+        {
+          "claimId": "C005",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 9
+        },
+        {
+          "claimId": "C006",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 5
+        },
+        {
+          "claimId": "C007",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 8
+        },
+        {
+          "claimId": "C008",
+          "file": "historical-engineer/judge-3.md",
+          "sha256": "3bd600fb80d4674f01283deecc5c17f0d42b27ebf178e6d8ae74b0c280ca2a71",
+          "line": 1
+        },
+        {
+          "claimId": "C009",
+          "file": "historical-engineer/judge-2.md",
+          "sha256": "106288e86bdd3ebe7bb91f49f4bf40b057028329b11094656f6e0dbc1f58c276",
+          "line": 2
+        },
+        {
+          "claimId": "C010",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 4
+        },
+        {
+          "claimId": "C011",
+          "file": "historical-engineer/judge-2.md",
+          "sha256": "106288e86bdd3ebe7bb91f49f4bf40b057028329b11094656f6e0dbc1f58c276",
+          "line": 3
+        },
+        {
+          "claimId": "C012",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 3
+        },
+        {
+          "claimId": "C013",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 2
+        },
+        {
+          "claimId": "C014",
+          "file": "historical-engineer/judge-3.md",
+          "sha256": "3bd600fb80d4674f01283deecc5c17f0d42b27ebf178e6d8ae74b0c280ca2a71",
+          "line": 4
+        },
+        {
+          "claimId": "C015",
+          "file": "historical-engineer/judge-1.md",
+          "sha256": "bb15e5d29b1f17f28f5134195a0a56035b3973cfa1e6f6aa1fa312fe35f26c3d",
+          "line": 1
+        },
+        {
+          "claimId": "C016",
+          "file": "historical-engineer/judge-3.md",
+          "sha256": "3bd600fb80d4674f01283deecc5c17f0d42b27ebf178e6d8ae74b0c280ca2a71",
+          "line": 2
+        }
+      ]
+    },
+    {
+      "story": "run-01",
+      "candidateId": "specimen-87e36f6ebc2e",
+      "sourceSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+      "factsSha256": "59154e8aa209fa5123531340081d99a42527b69802965681f920927b353e4e64",
+      "packetHashes": {
+        "brief/answers.md": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "bdd870e8cc8b40a0556ef8fae096a61c548f85104f80f4651c36430eab2ee99d",
+        "candidate/mechanical-check.json": "1fdcfe11f0e036a42f7a0105ace6d3fe0929f34222c723848e377b20a0fa955f",
+        "candidate/questions.md": "cead52bd98cc981373c118b64a3d56aa8a76e5497b6dd0abd920f62e851bc928",
+        "candidate/story.ledger.md": "415babcb23ab80ac68a60202f436b7a8dea0b8fc33f1cf0ed05282f2c3ad44b3",
+        "candidate/story.spec.json": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+        "claims.json": "21fdb9ad028aef3f22a38e5a8c752ad7dafd29b653448ec9bfc458530ab49146",
+        "evidence/renderer.json": "6da51c59c5745307bb3bff884c5f12d6ac18f199ed544492ad4965b403388363",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 3
+        },
+        {
+          "claimId": "C002",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 11
+        },
+        {
+          "claimId": "C003",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 1
+        },
+        {
+          "claimId": "C004",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 14
+        },
+        {
+          "claimId": "C005",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 7
+        },
+        {
+          "claimId": "C006",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 2
+        },
+        {
+          "claimId": "C007",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 4
+        },
+        {
+          "claimId": "C008",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 12
+        },
+        {
+          "claimId": "C009",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 10
+        },
+        {
+          "claimId": "C010",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 13
+        },
+        {
+          "claimId": "C011",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 6
+        },
+        {
+          "claimId": "C012",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 17
+        },
+        {
+          "claimId": "C013",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 10
+        },
+        {
+          "claimId": "C014",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 3
+        },
+        {
+          "claimId": "C015",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 13
+        },
+        {
+          "claimId": "C016",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 8
+        },
+        {
+          "claimId": "C017",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 12
+        },
+        {
+          "claimId": "C018",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 9
+        },
+        {
+          "claimId": "C019",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 8
+        },
+        {
+          "claimId": "C020",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 14
+        },
+        {
+          "claimId": "C021",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 5
+        },
+        {
+          "claimId": "C022",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 16
+        },
+        {
+          "claimId": "C023",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 14
+        },
+        {
+          "claimId": "C024",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 2
+        },
+        {
+          "claimId": "C025",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 4
+        },
+        {
+          "claimId": "C026",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 10
+        },
+        {
+          "claimId": "C027",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 5
+        },
+        {
+          "claimId": "C028",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 3
+        },
+        {
+          "claimId": "C029",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 5
+        },
+        {
+          "claimId": "C030",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 15
+        },
+        {
+          "claimId": "C031",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 6
+        },
+        {
+          "claimId": "C032",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 11
+        },
+        {
+          "claimId": "C033",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 6
+        },
+        {
+          "claimId": "C034",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 12
+        },
+        {
+          "claimId": "C035",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 7
+        },
+        {
+          "claimId": "C036",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 9
+        },
+        {
+          "claimId": "C037",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 11
+        },
+        {
+          "claimId": "C038",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 1
+        },
+        {
+          "claimId": "C039",
+          "file": "run-01/judge-3.md",
+          "sha256": "fc613486e8cf7ca3aea0eded029ba8bca5b52aa2891798feeda031ca285268dc",
+          "line": 2
+        },
+        {
+          "claimId": "C040",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 1
+        },
+        {
+          "claimId": "C041",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 7
+        },
+        {
+          "claimId": "C042",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 4
+        },
+        {
+          "claimId": "C043",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 13
+        },
+        {
+          "claimId": "C044",
+          "file": "run-01/judge-1.md",
+          "sha256": "5ba5fe3a8aab8449975e0bc76ea3bfc8368b939aa041e915dbc07db404a90a17",
+          "line": 8
+        },
+        {
+          "claimId": "C045",
+          "file": "run-01/judge-2.md",
+          "sha256": "7cf5d7737725b4ebb2ec27d3d4a927c5ee50d3556d1dbbe40ff37d670bf36ff2",
+          "line": 9
+        }
+      ]
+    },
+    {
+      "story": "run-02",
+      "candidateId": "specimen-7036a4f62b32",
+      "sourceSha256": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+      "factsSha256": "c85f7d0f893e893d88b3a08cde398a69d882e568b4d9e66840d5a7c9020f3019",
+      "packetHashes": {
+        "brief/answers.md": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "08addc181903032b257a2207cc25c5be3f0a76052b32bf27628a3187c4a66220",
+        "candidate/mechanical-check.json": "bfe0abb9106f7c68a1b84eaed882fcd1b0d09e690ce0e057a6fbff4bada37aa8",
+        "candidate/questions.md": "af1910573423642995d0ab8dfc1cd927956dcb6717782e9c649387903f93bdab",
+        "candidate/story.ledger.md": "174444f47019d3b2dcf1131f52275ef09271ebf452856714bdc7da740b4ed336",
+        "candidate/story.spec.json": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+        "claims.json": "d842d81310139e63bb51c969395104770d825c170bd04d46ab05323270def2d4",
+        "evidence/renderer.json": "353bd153f775d9745d1fa8a3f39ac9bcde13f931ca6e7d7fb0a3822ad83edcaa",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 5
+        },
+        {
+          "claimId": "C002",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 5
+        },
+        {
+          "claimId": "C003",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 1
+        },
+        {
+          "claimId": "C004",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 6
+        },
+        {
+          "claimId": "C005",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 4
+        },
+        {
+          "claimId": "C006",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 8
+        },
+        {
+          "claimId": "C007",
+          "file": "run-02/judge-2.md",
+          "sha256": "aa6b712169df11382463ba2dbbd346ec5140bcb19aaf28bd564271e16e16f891",
+          "line": 2
+        },
+        {
+          "claimId": "C008",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 7
+        },
+        {
+          "claimId": "C009",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 4
+        },
+        {
+          "claimId": "C010",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 7
+        },
+        {
+          "claimId": "C011",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 11
+        },
+        {
+          "claimId": "C012",
+          "file": "run-02/judge-2.md",
+          "sha256": "aa6b712169df11382463ba2dbbd346ec5140bcb19aaf28bd564271e16e16f891",
+          "line": 4
+        },
+        {
+          "claimId": "C013",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 2
+        },
+        {
+          "claimId": "C014",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 8
+        },
+        {
+          "claimId": "C015",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 6
+        },
+        {
+          "claimId": "C016",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 10
+        },
+        {
+          "claimId": "C017",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 3
+        },
+        {
+          "claimId": "C018",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 1
+        },
+        {
+          "claimId": "C019",
+          "file": "run-02/judge-2.md",
+          "sha256": "aa6b712169df11382463ba2dbbd346ec5140bcb19aaf28bd564271e16e16f891",
+          "line": 1
+        },
+        {
+          "claimId": "C020",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 2
+        },
+        {
+          "claimId": "C021",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 10
+        },
+        {
+          "claimId": "C022",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 9
+        },
+        {
+          "claimId": "C023",
+          "file": "run-02/judge-3.md",
+          "sha256": "891c13e1f121778d0725d971b552a84e355a9b864d1b278803cf7023a156d314",
+          "line": 9
+        },
+        {
+          "claimId": "C024",
+          "file": "run-02/judge-2.md",
+          "sha256": "aa6b712169df11382463ba2dbbd346ec5140bcb19aaf28bd564271e16e16f891",
+          "line": 3
+        },
+        {
+          "claimId": "C025",
+          "file": "run-02/judge-1.md",
+          "sha256": "72c7e0a1ada652f39a7d16fc48990d27cc40131dcf3c895946100e31fb2f8e81",
+          "line": 3
+        }
+      ]
+    },
+    {
+      "story": "run-03",
+      "candidateId": "specimen-3d313b05cc71",
+      "sourceSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+      "factsSha256": "ec442565abcefebd070490f1a5d0ff61b85a1db537ba6fc5170cd19db3a57a7a",
+      "packetHashes": {
+        "brief/answers.md": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "c41ba1d5df7a9e0a97e0d45faee94484bd60568337b9a5933a9f53876e576a84",
+        "candidate/mechanical-check.json": "a9685d80be5edce2d45421cc69be02d36a217d86831594bf9b63f176470402c4",
+        "candidate/questions.md": "808d1fc17f22c6b308f7d82e6d2b17cc3f28935b89d04191985c41a4627da1b3",
+        "candidate/story.ledger.md": "1519321d0da5c50d5e0be11ff6e5ccaaeacdd656a036df1bac1f3e3487a25256",
+        "candidate/story.spec.json": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+        "claims.json": "0117c494363ca885c85ad13a8cb806ee29f87ba6f63e74ade3c16bb60f30fd53",
+        "evidence/renderer.json": "91b11f29f3cf46e53d150a0231d200ae24967feb92c125b55534caa590510e95",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 8
+        },
+        {
+          "claimId": "C002",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 2
+        },
+        {
+          "claimId": "C003",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 3
+        },
+        {
+          "claimId": "C004",
+          "file": "run-03/judge-3.md",
+          "sha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "line": 1
+        },
+        {
+          "claimId": "C005",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 5
+        },
+        {
+          "claimId": "C006",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 1
+        },
+        {
+          "claimId": "C007",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 2
+        },
+        {
+          "claimId": "C008",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 1
+        },
+        {
+          "claimId": "C009",
+          "file": "run-03/judge-3.md",
+          "sha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "line": 3
+        },
+        {
+          "claimId": "C010",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 3
+        },
+        {
+          "claimId": "C011",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 6
+        },
+        {
+          "claimId": "C012",
+          "file": "run-03/judge-3.md",
+          "sha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "line": 4
+        },
+        {
+          "claimId": "C013",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 5
+        },
+        {
+          "claimId": "C014",
+          "file": "run-03/judge-3.md",
+          "sha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "line": 5
+        },
+        {
+          "claimId": "C015",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 4
+        },
+        {
+          "claimId": "C016",
+          "file": "run-03/judge-1.md",
+          "sha256": "7d9ff1584a4baac586ff286ec18f80e51e13430cf2ffcea95348722ac92ebc34",
+          "line": 7
+        },
+        {
+          "claimId": "C017",
+          "file": "run-03/judge-3.md",
+          "sha256": "165b4e3b6505b7f3476072098cf01a10c520d339cfbe5170adab7bd3f3244abe",
+          "line": 2
+        },
+        {
+          "claimId": "C018",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 6
+        },
+        {
+          "claimId": "C019",
+          "file": "run-03/judge-2.md",
+          "sha256": "2422259684ebf92e1ab0f2683bd8264da619f5535b92d61b13af6e7d049255e5",
+          "line": 4
+        }
+      ]
+    },
+    {
+      "story": "run-04",
+      "candidateId": "specimen-8abdbcba1a1f",
+      "sourceSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+      "factsSha256": "30106e42934c18c9ea41b7446c2d78c7d301204a7118bd6b180af64ddcf53112",
+      "packetHashes": {
+        "brief/answers.md": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "dd0f7eccd6df6f23b3178e833572ad3c89a094908aaac416c238942a5ee1e44e",
+        "candidate/mechanical-check.json": "cab8363105d3bb91cfd3d789ec50b13246d573f0f36d3462b027126d2f8a38ae",
+        "candidate/questions.md": "8f86fcc3e4daaf966c3d41dbd3b905da673a261761ce0ed36ee462bbe7121356",
+        "candidate/story.ledger.md": "a5b0aa347a7a979c5dd4d4df2662e5e55a44ebd549a88d27cf17725a9bf10e9e",
+        "candidate/story.spec.json": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+        "claims.json": "665e3fa11d775d777c13f42f12a90cf57c7cadde22520840ab76b0c0bb132575",
+        "evidence/renderer.json": "1e07ada2ce81ff88e7beb7a262878241e13dcb56a13a695701b5c456b4015175",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 1
+        },
+        {
+          "claimId": "C002",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 1
+        },
+        {
+          "claimId": "C003",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 2
+        },
+        {
+          "claimId": "C004",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 7
+        },
+        {
+          "claimId": "C005",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 2
+        },
+        {
+          "claimId": "C006",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 3
+        },
+        {
+          "claimId": "C007",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 9
+        },
+        {
+          "claimId": "C008",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 4
+        },
+        {
+          "claimId": "C009",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 1
+        },
+        {
+          "claimId": "C010",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 3
+        },
+        {
+          "claimId": "C011",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 6
+        },
+        {
+          "claimId": "C012",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 4
+        },
+        {
+          "claimId": "C013",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 2
+        },
+        {
+          "claimId": "C014",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 8
+        },
+        {
+          "claimId": "C015",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 9
+        },
+        {
+          "claimId": "C016",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 11
+        },
+        {
+          "claimId": "C017",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 7
+        },
+        {
+          "claimId": "C018",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 12
+        },
+        {
+          "claimId": "C019",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 6
+        },
+        {
+          "claimId": "C020",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 10
+        },
+        {
+          "claimId": "C021",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 9
+        },
+        {
+          "claimId": "C022",
+          "file": "run-04/judge-1.md",
+          "sha256": "b8cf9c02bda22b61a2f1004b753cf5920b440b51e8c3db95dc3f358c71bd2e30",
+          "line": 5
+        },
+        {
+          "claimId": "C023",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 5
+        },
+        {
+          "claimId": "C024",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 8
+        },
+        {
+          "claimId": "C025",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 3
+        },
+        {
+          "claimId": "C026",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 4
+        },
+        {
+          "claimId": "C027",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 7
+        },
+        {
+          "claimId": "C028",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 6
+        },
+        {
+          "claimId": "C029",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 5
+        },
+        {
+          "claimId": "C030",
+          "file": "run-04/judge-3.md",
+          "sha256": "364877c250555c8dc0aff7403d36dc816f8b99f2520aab6fb094826729b4ad5d",
+          "line": 10
+        },
+        {
+          "claimId": "C031",
+          "file": "run-04/judge-2.md",
+          "sha256": "a04c3d8b1c67dabbdbf6f55e603c111b2144a0742c9db10fd3ff14333812103d",
+          "line": 8
+        }
+      ]
+    },
+    {
+      "story": "run-05",
+      "candidateId": "specimen-fba9ebbeb297",
+      "sourceSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+      "factsSha256": "f7dca51d98f38075b39973aa0eb541325b823e2ca922d27e490604a1a8ce89a7",
+      "packetHashes": {
+        "brief/answers.md": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "7a015e8db1b06d2ac061053b674d22600e47b1f213828d7727314d5bee095a2b",
+        "candidate/mechanical-check.json": "154f48e8b1e804a7c697f1a47987f9cff3a103f4e7ae7afd992fc3e0cbff59de",
+        "candidate/questions.md": "794d4db7b6dff391146a882225bc9cc9262b8f6ea0768b68694cafe527c37439",
+        "candidate/story.ledger.md": "282827683bfb8228f2a0b6d456cc9f40cfc91613870b39f7ffdfa08d596f6908",
+        "candidate/story.spec.json": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+        "claims.json": "a8bade9b96531939da7f7a3e2a35a160806fe107e7274194fc20dd174a681d89",
+        "evidence/renderer.json": "6e02cc618c00ec2578d4fb712e82f9203bc3d855848a41d8e011a932f2d26b4e",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 4
+        },
+        {
+          "claimId": "C002",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 6
+        },
+        {
+          "claimId": "C003",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 3
+        },
+        {
+          "claimId": "C004",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 7
+        },
+        {
+          "claimId": "C005",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 3
+        },
+        {
+          "claimId": "C006",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 7
+        },
+        {
+          "claimId": "C007",
+          "file": "run-05/judge-1.md",
+          "sha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "line": 3
+        },
+        {
+          "claimId": "C008",
+          "file": "run-05/judge-1.md",
+          "sha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "line": 4
+        },
+        {
+          "claimId": "C009",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 8
+        },
+        {
+          "claimId": "C010",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 9
+        },
+        {
+          "claimId": "C011",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 5
+        },
+        {
+          "claimId": "C012",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 1
+        },
+        {
+          "claimId": "C013",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 2
+        },
+        {
+          "claimId": "C014",
+          "file": "run-05/judge-1.md",
+          "sha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "line": 2
+        },
+        {
+          "claimId": "C015",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 2
+        },
+        {
+          "claimId": "C016",
+          "file": "run-05/judge-1.md",
+          "sha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "line": 1
+        },
+        {
+          "claimId": "C017",
+          "file": "run-05/judge-1.md",
+          "sha256": "acc49363a5d7e4e470e871c2dce469bd04025846dd9ea9b5f0357be867588473",
+          "line": 5
+        },
+        {
+          "claimId": "C018",
+          "file": "run-05/judge-3.md",
+          "sha256": "0cd009d98dd44922671608d4c395c0154a73db9701cd204bbf49ca12fa5eb4d4",
+          "line": 1
+        },
+        {
+          "claimId": "C019",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 5
+        },
+        {
+          "claimId": "C020",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 4
+        },
+        {
+          "claimId": "C021",
+          "file": "run-05/judge-2.md",
+          "sha256": "0a7d33940b6219b5e287bcc936183ba482210213894a40811574edff6bd59c75",
+          "line": 6
+        }
+      ]
+    },
+    {
+      "story": "run-06",
+      "candidateId": "specimen-8c365a9d184d",
+      "sourceSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+      "factsSha256": "180ad4fb4be6cbf51c55582a4fbfd8fe9f0bcbc3d897334979576947814c35a9",
+      "packetHashes": {
+        "brief/answers.md": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba",
+        "brief/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+        "brief/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+        "brief/facts.md": "da2a78360efefdf7e93bc24ed69ba8e6fe8760204b09b2134de4abda200972b7",
+        "brief/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+        "candidate/final-report.md": "91d9fca104bffebd080278829c90be3ec74302d8d31af60c21b195385b12ba54",
+        "candidate/mechanical-check.json": "d57a4ca2787b7ba510b32d42b290b62af90c54c60a74b25cd8934c721541a464",
+        "candidate/questions.md": "487208c1c7840b675d58dfc096423220a9003c81f2ff7cec8e175df8c170e059",
+        "candidate/story.ledger.md": "3e83bd363b20cffcff05a2adc1d9085d07c13a21538b1dfec30aac33d52dfa76",
+        "candidate/story.spec.json": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+        "claims.json": "54d633e1aa4117fe9255721842880dc52f0065598a595a158a0f9c5b7f439367",
+        "evidence/renderer.json": "b3a50af0dbd41527709a29f9fb3eec57921b5c2caefb73df319895a6f71b4ec0",
+        "evidence-guide.md": "b8c6cdf6d598a6386327c032775fdb86f4392954a21b75f6d7e733e61e7ccfad",
+        "interpretations.json": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+        "rubric.md": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9"
+      },
+      "claimOrigins": [
+        {
+          "claimId": "C001",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 9
+        },
+        {
+          "claimId": "C002",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 4
+        },
+        {
+          "claimId": "C003",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 3
+        },
+        {
+          "claimId": "C004",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 11
+        },
+        {
+          "claimId": "C005",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 5
+        },
+        {
+          "claimId": "C006",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 4
+        },
+        {
+          "claimId": "C007",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 6
+        },
+        {
+          "claimId": "C008",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 2
+        },
+        {
+          "claimId": "C009",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 3
+        },
+        {
+          "claimId": "C010",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 2
+        },
+        {
+          "claimId": "C011",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 2
+        },
+        {
+          "claimId": "C012",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 4
+        },
+        {
+          "claimId": "C013",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 1
+        },
+        {
+          "claimId": "C014",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 1
+        },
+        {
+          "claimId": "C015",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 9
+        },
+        {
+          "claimId": "C016",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 10
+        },
+        {
+          "claimId": "C017",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 7
+        },
+        {
+          "claimId": "C018",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 7
+        },
+        {
+          "claimId": "C019",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 8
+        },
+        {
+          "claimId": "C020",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 8
+        },
+        {
+          "claimId": "C021",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 6
+        },
+        {
+          "claimId": "C022",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 3
+        },
+        {
+          "claimId": "C023",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 11
+        },
+        {
+          "claimId": "C024",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 12
+        },
+        {
+          "claimId": "C025",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 10
+        },
+        {
+          "claimId": "C026",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 8
+        },
+        {
+          "claimId": "C027",
+          "file": "run-06/judge-1.md",
+          "sha256": "1b524bc28d19d458e5cb495e4995fc4d303c1e2912605539fcd804c6c31146f7",
+          "line": 5
+        },
+        {
+          "claimId": "C028",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 5
+        },
+        {
+          "claimId": "C029",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 6
+        },
+        {
+          "claimId": "C030",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 9
+        },
+        {
+          "claimId": "C031",
+          "file": "run-06/judge-2.md",
+          "sha256": "55109f90141eebe79969bd238aecb5c7644d621be56786c693dab8d42b0d7b6a",
+          "line": 10
+        },
+        {
+          "claimId": "C032",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 1
+        },
+        {
+          "claimId": "C033",
+          "file": "run-06/judge-3.md",
+          "sha256": "c74f65119292938c5ac039e3cf6877d29d2e375736090ab031fa9a5ae0afeeb5",
+          "line": 7
+        }
+      ]
+    }
+  ]
+}

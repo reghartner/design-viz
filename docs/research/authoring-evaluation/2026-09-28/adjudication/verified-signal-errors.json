@@ -1,0 +1,160 @@
+{
+  "claims": [
+    {
+      "story": "run-02",
+      "judge": "judge-1.md",
+      "claimId": "run-02-judge-1-L7",
+      "points": 3,
+      "allegation": "The camera-to-router homemap signal carries forward even though no report occurs yet.",
+      "states": [
+        {
+          "path": "normal",
+          "step": "sunrise",
+          "pointer": "/page/blocks/0/diagram/steps/3",
+          "signals": []
+        },
+        {
+          "path": "wifidown",
+          "step": "sunrise",
+          "pointer": "/page/blocks/0/diagram/steps/3",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-1.md",
+      "claimId": "run-02-judge-1-L8",
+      "points": 3,
+      "allegation": "The delivery-upload homemap signal remains after the upload ends and the camera returns to sleep.",
+      "states": [
+        {
+          "path": "normal",
+          "step": "a-open",
+          "pointer": "/page/blocks/0/diagram/steps/6",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-1.md",
+      "claimId": "run-02-judge-1-L9",
+      "points": 3,
+      "allegation": "A successful camera-to-router signal remains visible while Wi-Fi is down and nothing is sent.",
+      "states": [
+        {
+          "path": "wifidown",
+          "step": "b-deliver",
+          "pointer": "/page/blocks/0/diagram/steps/7",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-1.md",
+      "claimId": "run-02-judge-1-L10",
+      "points": 3,
+      "allegation": "The successful signal remains visible during another blocked retry.",
+      "states": [
+        {
+          "path": "wifidown",
+          "step": "b-retry",
+          "pointer": "/page/blocks/0/diagram/steps/8",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-3.md",
+      "claimId": "run-02-judge-3-L7",
+      "points": 3,
+      "allegation": "The home panel carries forward the previous camera-to-router signal despite the caption saying nothing is reported yet.",
+      "states": [
+        {
+          "path": "normal",
+          "step": "sunrise",
+          "pointer": "/page/blocks/0/diagram/steps/3",
+          "signals": []
+        },
+        {
+          "path": "wifidown",
+          "step": "sunrise",
+          "pointer": "/page/blocks/0/diagram/steps/3",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-3.md",
+      "claimId": "run-02-judge-3-L8",
+      "points": 3,
+      "allegation": "The camera-to-router signal remains after the delivery upload, although this step only depicts the resident opening the clip.",
+      "states": [
+        {
+          "path": "normal",
+          "step": "a-open",
+          "pointer": "/page/blocks/0/diagram/steps/6",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-3.md",
+      "claimId": "run-02-judge-3-L9",
+      "points": 3,
+      "allegation": "The carried-forward camera-to-router signal contradicts the Wi-Fi-down state and blocked link.",
+      "states": [
+        {
+          "path": "wifidown",
+          "step": "b-deliver",
+          "pointer": "/page/blocks/0/diagram/steps/7",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-02",
+      "judge": "judge-3.md",
+      "claimId": "run-02-judge-3-L10",
+      "points": 3,
+      "allegation": "The stale camera-to-router signal remains while the caption says Wi-Fi is still down and the retry fails.",
+      "states": [
+        {
+          "path": "wifidown",
+          "step": "b-retry",
+          "pointer": "/page/blocks/0/diagram/steps/8",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    },
+    {
+      "story": "run-03",
+      "judge": "judge-1.md",
+      "claimId": "run-03-judge-1-L7",
+      "points": 3,
+      "allegation": "The prior camera-to-router signal carries forward while the caption and Wi-Fi-off icon say that link is down.",
+      "states": [
+        {
+          "path": "wifi-down",
+          "step": "b-sdcard",
+          "pointer": "/page/blocks/0/diagram/steps/8",
+          "signals": []
+        }
+      ],
+      "ruling": "False premise: homemap signals are step-local and absent at the cited step."
+    }
+  ]
+}

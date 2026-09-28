@@ -1,0 +1,100 @@
+{
+  "problems": [],
+  "metrics": {
+    "questionsFile": true,
+    "questionCount": 7,
+    "ledger": true,
+    "html": true,
+    "buildOk": true,
+    "buildWarnings": 0,
+    "diagrams": 1,
+    "field:app.battery:normal": [
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "21|(default)|ready|Updated 8:00 AM"
+    ],
+    "field:app.power:normal": [
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Charging from sun|solar|ready|Updated 8:00 AM"
+    ],
+    "field:app.online:normal": [
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 8:00 AM"
+    ],
+    "field:app.event:normal": [
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "Package|package|ready|8:10 AM \u00b7 clip playing"
+    ],
+    "battery:batt:normal": "25 25 20 17.17 17.67 20.17 20.27",
+    "clock:app:normal": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:12 Fri, Oct 2",
+    "field:app.battery:wifi-down": [
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM",
+      "25|(default)|ready|Updated 10:30 PM"
+    ],
+    "field:app.power:wifi-down": [
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging",
+      "Battery only|(default)|ready|Not charging"
+    ],
+    "field:app.online:wifi-down": [
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM",
+      "Online|(default)|ready|Last check-in 10:30 PM"
+    ],
+    "field:app.event:wifi-down": [
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|",
+      "|(default)|unknown|"
+    ],
+    "battery:batt:wifi-down": "25 25 20 17.17 17.67 20.17 20.67 20.67",
+    "clock:app:wifi-down": "10:30 Thu, Oct 1 | 1:05 Fri, Oct 2 | 4:00 Fri, Oct 2 | 6:50 Fri, Oct 2 | 7:00 Fri, Oct 2 | 8:10 Fri, Oct 2 | 8:20 Fri, Oct 2 | 8:20 Fri, Oct 2",
+    "boundNodes": 5,
+    "codeRefNodes": 5,
+    "codeRefSteps": 8,
+    "totalSteps": 10,
+    "emptySteps": 0,
+    "edgeSteps": 9,
+    "codeEvidenceUsed": "7/7"
+  },
+  "problemCounts": {}
+}

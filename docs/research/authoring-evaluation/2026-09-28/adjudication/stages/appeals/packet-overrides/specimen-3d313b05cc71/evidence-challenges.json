@@ -1,0 +1,19 @@
+{
+  "scope": "Final targeted evidence appeal under unchanged frozen rules; no desired score supplied.",
+  "challenges": [
+    {
+      "id": "EXPLICIT-CLEAR",
+      "deductionIds": [
+        "DF001"
+      ],
+      "counterevidence": "The exact /page/blocks/0/diagram/steps/7/panels/phone/clear is true. This is an explicitly authored dismissal, not an assumed automatic effect of opening the app. Frozen rule 5 allows a notification to remain unless an authored step or the source explicitly dismisses it or changes its state. The HLD and approved answers specify no retention/dismissal contract. The prior explanation argues against automatic dismissal but identifies no source-established behavior contradicted by this explicit clear. Apply the existing allowance and fidelity criterion; do not invent a mandatory retention rule."
+    },
+    {
+      "id": "LOW-MARK-OWNERSHIP",
+      "deductionIds": [
+        "DP005"
+      ],
+      "counterevidence": "Exact step4 text says the phone now shows solar charging, then \u201cThe battery is still under 30%, so the low-battery mark stays.\u201d It does not say phone low-battery card/icon. The HLD locates low_battery in device-shadow; the visible low-battery notification remains. DP004 covers the clearly promised hidden solar display and is unchallenged. Determine whether DP005 adds a separately promised phone-card depiction supported by actual wording, rather than importing phone ownership into an unlocated low-battery state statement."
+    }
+  ]
+}

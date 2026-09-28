@@ -1,0 +1,26 @@
+{
+  "scope": "Final targeted evidence appeal under unchanged frozen rules; no desired score supplied.",
+  "challenges": [
+    {
+      "id": "PAGE-READS-TEXT",
+      "deductionIds": [
+        "D-E-001"
+      ],
+      "counterevidence": "Exact step0 sentence: \u201cThe device page now reads **Battery 25%**, last report 10:30 PM.\u201d Its grammatical subject is page and its object is displayed text. It does not say app fetches/reads from device-shadow. The separately described camera heartbeat through router/ingest/shadow is lit. Frozen rule3 distinguishes a current read from representation. The missing engineering topology deduction D-L-001 is unchallenged; the question is only whether this caption additionally claims a current fetch. Historical specimen-5395841c704d uses \u201cThe device page reads 25%\u201d and its reviewed result treats it as display wording. Decide based on actual grammar, without introducing a refresh cadence."
+    },
+    {
+      "id": "ANIMAL-NO-PUSH-SCOPE",
+      "deductionIds": [
+        "D-P-001"
+      ],
+      "counterevidence": "Exact step2 caption first says \u201cAnimal events are saved to the timeline with no push (default user setting)\u201d then only person/package go to notify-service, \u201cso nothing reaches the phone.\u201d The visible app event is Animal 1:10 AM, detail Saved to timeline \u00b7 no push, and notifications count is zero. The literal all-phone-data reading conflicts with the event card; the immediately preceding notification-clause reading means no push and matches the display. Rule application must acknowledge both readings and decide whether an actual contradiction is established by this contextual sentence. Do not state the renderer sent an animal alert."
+    },
+    {
+      "id": "QUEUE-CONTENT-LABEL",
+      "deductionIds": [
+        "D-P-002"
+      ],
+      "counterevidence": "At step10, the SD queue label is Clip 8:05 AM (package), from PIR \u00b7 ~20 s clip, state enqueue. There is no typed classification/status field asserting a classifier response. Caption explicitly says the clip cannot reach event-ingest or clip-store; step13 explicitly defers motion-classifier package classification until 08:16 after reconnect. A clip label can describe scene content known to the viewer without asserting on-device classification. Determine whether the supplied renderer/source actually makes this queue label a classifier result. Preserve actual evidence instead of assuming the label establishes an unsupported execution."
+    }
+  ]
+}

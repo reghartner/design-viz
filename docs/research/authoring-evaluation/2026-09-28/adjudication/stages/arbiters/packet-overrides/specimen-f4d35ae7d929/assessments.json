@@ -1,0 +1,389 @@
+{
+  "assessments": [
+    {
+      "label": "A",
+      "assessment": {
+        "deductions": [
+          {
+            "id": "D-Q-TOO-MANY-001",
+            "criterion": "questions",
+            "points": 2,
+            "location": "candidate/questions.md question-unit decision",
+            "rule": "questions.too_many",
+            "evidence": [
+              "interpretations.json rule 1-questions: count independently answerable decisions, not numbered bullets",
+              "candidate/questions.md Q2 separately asks for the story span and time-display format; Q3 separately asks for audience and takeaway; Q6 separately asks about showing the app page and a separate real-battery meter",
+              "These compound decisions plus Q1, Q4, Q5, and Q7 produce more than seven independent requested answers"
+            ],
+            "explanation": "The seven numbered prompts contain more than seven independently answerable decisions."
+          },
+          {
+            "id": "D-Q-REDUNDANT-004",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md Q4",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md Q4 asks which endings should be switchable",
+              "brief/hld.md Scenario to depict specifies the normal morning and the Wi-Fi-down alternate",
+              "brief/answers.md Outcomes likewise names the normal morning and the Wi-Fi-down morning"
+            ],
+            "explanation": "The two required outcomes were already specified, so asking the operator to select them was redundant."
+          },
+          {
+            "id": "D-TIME-RATE-RACCOON-001",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (shared step raccoon, physical battery)",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/panels/1 sets drainPerHour=1 and initial charge=25 at 10:30 PM",
+              "brief/hld.md says idle drain is about 1%/h and each recorded clip uses about 1%",
+              "/page/blocks/0/diagram/steps/1 at 1:05 AM explicitly resets physical charge to 25 while its caption says a clip was recorded",
+              "interpretations.json rule 2-time permits the noted direct anchor-to-anchor jump but treats each inconsistent intermediate authored value separately"
+            ],
+            "explanation": "The explicit intermediate 25% physical value ignores roughly 2.6 hours of idle drain and the raccoon clip's drain. The noted anchor conflict protects the direct 25%-to-20% jump, not this inserted intermediate value."
+          },
+          {
+            "id": "D-PANELS-CHARGING-001",
+            "criterion": "panels",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/4/text (charging; app panel phoneScreen carried from /page/blocks/0/diagram/panels/0/initial/phoneScreen)",
+            "rule": "panels.missing_event",
+            "evidence": [
+              "/page/blocks/0/diagram/steps/4/text says: \"From now on the app's camera page shows the solar charging icon\"",
+              "evidence/renderer.json normal/charging and wifi-down/charging: phoneScreen=home; power field renderedAsCard=false with hiddenReason=\"phoneScreen=home\"",
+              "evidence/renderer.json normal/charging: stored power remains \"Battery only\" with no rendered field card",
+              "interpretations.json rule 4-panels: promised charging/status visibility while phoneScreen remains home is one missing panel event"
+            ],
+            "explanation": "At the step promising the solar-charging display, the phone remains on its home screen and no camera-page field or solar icon is rendered."
+          }
+        ],
+        "claimDecisions": [
+          {
+            "claimId": "C001",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/ingest/binding/api correctly identifies approved postEvent",
+              "brief/catalog.json also approves postHeartbeat for the same event-ingest service",
+              "interpretations.json rule 6-backstage says a single binding.api need not enumerate every endpoint"
+            ],
+            "reason": "A correct identity binding may select one approved operation; the heartbeat captions do not assert a mismatched HTTP method/path.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C002",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/shadow/binding/api correctly identifies approved putState",
+              "brief/catalog.json approves getState for device-shadow",
+              "interpretations.json rule 6-backstage says omission of another approved operation from the single binding is not a defect"
+            ],
+            "reason": "The a-open read is supported by getState; selecting putState in the identity binding does not misstate that read.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C003",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/clipstore/binding/api correctly identifies approved uploadClip",
+              "brief/catalog.json approves getClip for clip-store",
+              "interpretations.json rule 6-backstage says the single binding operation need not enumerate all calls"
+            ],
+            "reason": "Clip playback is supported by getClip, and the uploadClip identity binding does not convert it into a mismatched call.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C004",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves both postEvent and postHeartbeat for event-ingest",
+              "interpretations.json rule 6-backstage distinguishes a node identity binding from per-step call assertions"
+            ],
+            "reason": "The binding's approved postEvent selection need not enumerate postHeartbeat.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C005",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 asks the operator to choose the endings",
+              "brief/hld.md already specifies both normal and Wi-Fi-down outcomes"
+            ],
+            "reason": "Q4 repeats an already supplied outcome decision.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C006",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves getClip for clip-store",
+              "/page/blocks/0/diagram/steps/6 describes playback without asserting uploadClip as the playback call",
+              "interpretations.json rule 6-backstage says a single binding.api need not enumerate every endpoint"
+            ],
+            "reason": "The step's playback behavior is supported; the node's approved upload binding is not a claim that playback uses uploadClip.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C007",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 asks which endings to show",
+              "brief/hld.md Scenario to depict already includes the normal and alternate endings"
+            ],
+            "reason": "This repeats the same supported Q4 redundancy defect.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C008",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/ingest/binding/api is an approved postEvent operation",
+              "brief/catalog.json independently approves postHeartbeat",
+              "interpretations.json rule 6-backstage rejects requiring one binding to enumerate every endpoint"
+            ],
+            "reason": "No explicit heartbeat call is assigned a wrong operation; the allegation mistakes an identity binding for a complete operation list.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C009",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves device-shadow getState",
+              "/page/blocks/0/diagram/steps/6 lights app->shadow and shadow->app for the read",
+              "interpretations.json rule 6-backstage allows the binding to select a different approved operation"
+            ],
+            "reason": "The read is supported and is not asserted to execute putState.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C010",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json lists getState on the bound device-shadow identity",
+              "interpretations.json rule 6-backstage says absence of a second operation from binding.api is not an operation mismatch"
+            ],
+            "reason": "The claim imposes an unsupported requirement that the identity binding enumerate the read operation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C011",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 requests a choice already fixed by brief/hld.md Scenario to depict"
+            ],
+            "reason": "This is another allegation of the same single redundant-question unit.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C012",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json lists getClip for the correctly bound clip-store identity",
+              "/page/blocks/0/diagram/steps/6 asserts a supported clip read/play operation without an incompatible method or path",
+              "interpretations.json rule 6-backstage permits one approved operation in binding.api"
+            ],
+            "reason": "The clip read is supported; binding.api selecting uploadClip is not evidence that the read was assigned that operation.",
+            "deductionIds": []
+          }
+        ],
+        "unresolved": []
+      }
+    },
+    {
+      "label": "B",
+      "assessment": {
+        "deductions": [
+          {
+            "id": "D-Q-COUNT-001",
+            "criterion": "questions",
+            "points": 2,
+            "location": "candidate/questions.md decisions: Q1; Q2 timing; Q2 display format; Q3 audience; Q3 takeaway; Q4; Q5; Q6 app-page visibility; Q6 separate physical meter; Q7",
+            "rule": "questions.too_many",
+            "evidence": [
+              "candidate/questions.md contains 10 independently answerable decisions.",
+              "interpretations.json rule 1-questions requires counting independent decisions rather than numbered items or question marks."
+            ],
+            "explanation": "The batch requests more than seven independent answers."
+          },
+          {
+            "id": "D-Q-REDUNDANT-004",
+            "criterion": "questions",
+            "points": 1,
+            "location": "candidate/questions.md Q4",
+            "rule": "questions.redundant",
+            "evidence": [
+              "candidate/questions.md Q4 asks which endings should be available.",
+              "brief/hld.md Scenario to depict already specifies the normal delivery and Wi-Fi-down alternate.",
+              "brief/answers.md Outcomes confirms the same two outcomes."
+            ],
+            "explanation": "Q4 asks the operator to choose outcomes already fixed by the design."
+          },
+          {
+            "id": "D-TIME-RATE-RACCOON",
+            "criterion": "time",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (step raccoon; shared by normal and wifi-down)",
+            "rule": "time.rate",
+            "evidence": [
+              "/page/blocks/0/diagram/panels/1 sets drainPerHour=1 and initial charge=25 at 10:30 PM.",
+              "/page/blocks/0/diagram/steps/1 fixes physical charge at 25 at 1:05 AM despite elapsed idle drain and the recorded clip's approximately 1% cost.",
+              "brief/hld.md Power use states idle drain is about 1% per hour and each recorded clip uses about 1%.",
+              "interpretations.json rule 2-time permits the direct 25%-to-20% anchor jump but penalizes an inconsistent intermediate physical value."
+            ],
+            "explanation": "The explicit 1:05 AM physical 25% override is an inconsistent intermediate value; only the later direct jump between conflicting operator anchors is exempt."
+          },
+          {
+            "id": "D-PANELS-CHARGING-ICON",
+            "criterion": "panels",
+            "points": 3,
+            "location": "/page/blocks/0/diagram/steps/4/text (step charging; promised app.power event)",
+            "rule": "panels.missing_event",
+            "evidence": [
+              "The charging caption says, \"From now on the app's camera page shows the solar charging icon.\"",
+              "evidence/renderer.json at charging resolves phoneScreen=home, app.power renderedAsCard=false, and the stored power field remains \"Battery only\" with no solar icon.",
+              "interpretations.json rule 4-panels treats promised charging/status display while phoneScreen remains home as one missing panel event."
+            ],
+            "explanation": "The charging step promises the app-page solar indication, but the renderer shows only the home screen and no power card or solar icon."
+          }
+        ],
+        "claimDecisions": [
+          {
+            "claimId": "C001",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/ingest/binding/api is an approved postEvent operation.",
+              "interpretations.json rule 6-backstage says a binding's single API operation need not enumerate every endpoint handled by the service."
+            ],
+            "reason": "The correct identity binding is not defective merely because heartbeat steps use another approved operation; no mismatched explicit HTTP call is authored.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C002",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/shadow/binding/api is the approved putState operation.",
+              "brief/catalog.json also approves getState for device-shadow.",
+              "interpretations.json rule 6-backstage says omission of another operation from the single binding is not an operation mismatch."
+            ],
+            "reason": "The a-open read does not make the node's correct putState binding defective.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C003",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/clipstore/binding/api is the approved uploadClip operation.",
+              "brief/catalog.json also approves getClip for clip-store.",
+              "interpretations.json rule 6-backstage says one correct bound operation need not enumerate every service endpoint."
+            ],
+            "reason": "Clip playback does not invalidate the correct uploadClip identity binding.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C004",
+            "verdict": "reject",
+            "evidence": [
+              "/page/blocks/0/diagram/nodes/ingest/binding/api correctly identifies event-ingest with approved postEvent.",
+              "interpretations.json rule 6-backstage rejects requiring a single binding to list every operation."
+            ],
+            "reason": "This duplicates C001's unsupported operation-enumeration requirement.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C005",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 asks which endings to provide.",
+              "brief/hld.md already specifies normal and Wi-Fi-down outcomes."
+            ],
+            "reason": "Q4 is a redundant requested decision.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C006",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves both uploadClip and getClip for clip-store.",
+              "interpretations.json rule 6-backstage distinguishes a correct single-operation binding from an explicit mismatched call."
+            ],
+            "reason": "No explicit method/path assertion at a-open mismatches the approved getClip behavior; the binding need not enumerate it.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C007",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 repeats the two outcomes already established in brief/hld.md."
+            ],
+            "reason": "This is the same authored redundant question as C005 and shares its single deduction.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C008",
+            "verdict": "reject",
+            "evidence": [
+              "The event-ingest entity and postEvent operation in /page/blocks/0/diagram/nodes/ingest/binding are approved.",
+              "interpretations.json rule 6-backstage states that another operation's absence from the binding alone is insufficient."
+            ],
+            "reason": "Heartbeat behavior does not require a second operation to be enumerated in the node binding.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C009",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json approves device-shadow getState.",
+              "/page/blocks/0/diagram/steps/6 lights app->shadow and shadow->app without asserting an incorrect HTTP method or path.",
+              "interpretations.json rule 6-backstage permits a correct single-operation identity binding."
+            ],
+            "reason": "The approved status read is not contradicted by the node carrying putState as its representative bound operation.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C010",
+            "verdict": "reject",
+            "evidence": [
+              "The shadow binding fields are approved in evidence/renderer.json.",
+              "interpretations.json rule 6-backstage does not require every approved operation to appear in binding.api."
+            ],
+            "reason": "This repeats C002/C009's unsupported enumeration requirement.",
+            "deductionIds": []
+          },
+          {
+            "claimId": "C011",
+            "verdict": "uphold",
+            "evidence": [
+              "candidate/questions.md Q4 asks for an outcome choice already answered by brief/hld.md Scenario to depict."
+            ],
+            "reason": "This repeats the valid redundancy allegation and references the same scoring unit.",
+            "deductionIds": [
+              "D-Q-REDUNDANT-004"
+            ]
+          },
+          {
+            "claimId": "C012",
+            "verdict": "reject",
+            "evidence": [
+              "brief/catalog.json lists getClip as an approved clip-store operation.",
+              "interpretations.json rule 6-backstage says a correct uploadClip binding need not also enumerate getClip."
+            ],
+            "reason": "The a-open playback is supported behavior and does not create a binding-operation mismatch.",
+            "deductionIds": []
+          }
+        ],
+        "unresolved": []
+      }
+    }
+  ]
+}

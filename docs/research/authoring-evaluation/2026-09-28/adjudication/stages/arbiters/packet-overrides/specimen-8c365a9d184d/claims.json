@@ -1,0 +1,396 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The claimed 8:00 AM heartbeat/report is not fully lit through `ingest->shadow` and the app read."
+    },
+    {
+      "id": "C002",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon",
+      "explanation": "Physical battery is held at 25% until the clip and then set to 24%, using an unstated zero-drain rate between operator anchors."
+    },
+    {
+      "id": "C003",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram topology",
+      "explanation": "Engineering-level diagram omits the design-specified `device-shadow` \u2192 Kestrel app read hop."
+    },
+    {
+      "id": "C004",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "The caption and panels claim an 8:00 AM heartbeat report with no successful heartbeat hops lit."
+    },
+    {
+      "id": "C005",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram topology",
+      "explanation": "The design says the app reads device-shadow, but no device-shadow \u2192 Kestrel app service hop is drawn."
+    },
+    {
+      "id": "C006",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / 1:00 AM report",
+      "explanation": "Invented 25% intermediate value holds battery flat, using an unstated zero-drain rate despite the stated ~1%/h drain."
+    },
+    {
+      "id": "C007",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "The claimed 1:00 AM heartbeat/report is not fully lit through `ingest->shadow` and the app read."
+    },
+    {
+      "id": "C008",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 7",
+      "explanation": "The design already specified opening the clip on the normal path and ending the alternate with the late push."
+    },
+    {
+      "id": "C009",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 6",
+      "explanation": "The highlighted raccoon, low-battery, charging, package, and outage moments are already specified."
+    },
+    {
+      "id": "C010",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 5",
+      "explanation": "The design already specifies the bedtime starting state."
+    },
+    {
+      "id": "C011",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 7",
+      "explanation": "The HLD already says the happy path opens the clip and the alternate ends with the late push."
+    },
+    {
+      "id": "C012",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 7",
+      "explanation": "The design already says the resident opens the happy-path clip and does not specify that action for the alternate."
+    },
+    {
+      "id": "C013",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "Both happy and Wi-Fi-down endings were already specified by the design."
+    },
+    {
+      "id": "C014",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The HLD already specifies both the happy and Wi-Fi-down endings."
+    },
+    {
+      "id": "C015",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The caption and panels introduce the 6:30 AM heartbeat report with no heartbeat hops lit."
+    },
+    {
+      "id": "C016",
+      "criterion": "edges",
+      "points": 2,
+      "location": "openclip",
+      "explanation": "The displayed device-state report lacks the design-specified `device-shadow` \u2192 app read hop."
+    },
+    {
+      "id": "C017",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The claimed 6:30 AM heartbeat/report has no lit hops."
+    },
+    {
+      "id": "C018",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "The 6:30 AM heartbeat report is introduced without any of its hops lit."
+    },
+    {
+      "id": "C019",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "The caption and panels claim a scheduled 1:00 AM heartbeat report, but the ingest \u2192 shadow hop is not lit."
+    },
+    {
+      "id": "C020",
+      "criterion": "edges",
+      "points": 2,
+      "location": "chargerpt",
+      "explanation": "Caption says the app now displays the charging report, but no `device-shadow` \u2192 app hop is lit."
+    },
+    {
+      "id": "C021",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "The caption and panels claim a 1:00 AM heartbeat report, but its complete path through device-shadow is not lit."
+    },
+    {
+      "id": "C022",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram topology",
+      "explanation": "The explicit device-shadow \u2192 Kestrel app read hop is missing."
+    },
+    {
+      "id": "C023",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "The claimed 8:00 AM heartbeat/report has no lit successful delivery hops."
+    },
+    {
+      "id": "C024",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "ingest node binding",
+      "explanation": "The node is used for both `/events` and `/heartbeats`, but its attached API operation is only `postEvent`, so it does not match heartbeat calls."
+    },
+    {
+      "id": "C025",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The caption and panels claim an 8:00 AM heartbeat report, but the ingest \u2192 shadow hop is not lit."
+    },
+    {
+      "id": "C026",
+      "criterion": "edges",
+      "points": 2,
+      "location": "chargerpt",
+      "explanation": "The caption says the app now shows the reported charging state, but the device-shadow \u2192 app hop is not lit."
+    },
+    {
+      "id": "C027",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / physical battery",
+      "explanation": "Invented 24% intermediate value likewise suspends idle drain before applying the 1% clip cost."
+    },
+    {
+      "id": "C028",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / 1:00 AM report",
+      "explanation": "The invented 25% heartbeat value uses the same unstated zero-drain rate."
+    },
+    {
+      "id": "C029",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / batt",
+      "explanation": "The invented 24% intermediate value holds the battery flat before applying the clip cost, using an unstated rate between conflicting anchors."
+    },
+    {
+      "id": "C030",
+      "criterion": "edges",
+      "points": 2,
+      "location": "courier",
+      "explanation": "The 8:00 AM heartbeat report is introduced without its complete path through device-shadow lit."
+    },
+    {
+      "id": "C031",
+      "criterion": "edges",
+      "points": 2,
+      "location": "b-courier",
+      "explanation": "The alternate path introduces the 8:00 AM heartbeat report with no report hops lit."
+    },
+    {
+      "id": "C032",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already requires both the happy and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C033",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / phone and record",
+      "explanation": "The invented 1:00 AM heartbeat remains at 25%, likewise implying an unstated zero drain rate."
+    },
+    {
+      "id": "A001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md question batch (independent decisions across questions 1\u20137)",
+      "explanation": "The batch contains more than seven independently answerable decisions."
+    },
+    {
+      "id": "A002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 4 \u2014 whether to show both specified outcomes",
+      "explanation": "The HLD already requires both the normal and Wi-Fi-down outcomes."
+    },
+    {
+      "id": "A003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 5 \u2014 confirmation of the 25% bedtime battery state",
+      "explanation": "The 25% bedtime battery clause repeats the HLD; the separate no-alert/additional-context request is not penalized."
+    },
+    {
+      "id": "A004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 6 \u2014 confirmation of the specified scenario moments",
+      "explanation": "Confirming the already-required scenario beats is redundant; the separate porch-view presentation preference is not."
+    },
+    {
+      "id": "A005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 7 \u2014 normal-path ending",
+      "explanation": "The normal path's open-clip ending was already specified."
+    },
+    {
+      "id": "A006",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md question 7 \u2014 Wi-Fi-down-path ending",
+      "explanation": "The alternate's late-push ending was already settled by the supplied design evidence."
+    },
+    {
+      "id": "A007",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing device-shadow\u2192Kestrel app dependency",
+      "explanation": "At the selected engineering level, the design-established device-shadow-to-app dependency is missing from the topology."
+    },
+    {
+      "id": "A008",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (raccoon physical battery)",
+      "explanation": "The explicit 24% physical value applies only the clip cost and suppresses roughly 2 hours 40 minutes of stated idle drain; it is an inconsistent intermediate value between the acknowledged conflicting anchors."
+    },
+    {
+      "id": "A009",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/record/rows/0/cells/value (raccoon 1:00 AM battery report; mirrored by phone battery reportedAt)",
+      "explanation": "The newly authored 1:00 AM report remains 25% despite the stated idle drain, creating a second inconsistent intermediate state distinct from the physical 1:10 AM value."
+    },
+    {
+      "id": "A010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/panels/phone (chargerpt solar icon)",
+      "explanation": "The caption promises a visibly shown charging icon, but the home screen hides all device-app field cards, including the solar field."
+    },
+    {
+      "id": "A011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone (openclip clip view)",
+      "explanation": "The required open-clip event is narrated, but the panel only opens the generic device-app field view and supplies no still, thumbnail, or other clear open-clip state."
+    },
+    {
+      "id": "B001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md#independent-question-count",
+      "explanation": "The seven numbered prompts contain more than seven independent requested decisions."
+    },
+    {
+      "id": "B002",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-4/outcomes",
+      "explanation": "The requested outcomes were already specified."
+    },
+    {
+      "id": "B003",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-5/battery-and-charging-start-state",
+      "explanation": "The battery/not-charging portion repeated the supplied starting state."
+    },
+    {
+      "id": "B004",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-6/highlighted-moments",
+      "explanation": "The requested highlight set repeated the design's scenario beats."
+    },
+    {
+      "id": "B005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-7/normal-path-ending",
+      "explanation": "The normal-path ending was already specified."
+    },
+    {
+      "id": "B006",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md#question-7/alternate-path-ending",
+      "explanation": "The alternate ending was already settled by the supplied scenario."
+    },
+    {
+      "id": "B007",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges (missing device-shadow/Kestrel-app dependency)",
+      "explanation": "The engineering topology omits the design-established device-shadow/app dependency."
+    },
+    {
+      "id": "B008",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (raccoon physical battery)",
+      "explanation": "The authored 24% physical value suspends the stated idle drain before applying the clip cost."
+    },
+    {
+      "id": "B009",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/record/rows/0/cells/value and /page/blocks/0/diagram/steps/1/panels/phone/battery/reportedAt (raccoon 1:00 report)",
+      "explanation": "The invented 1:00 AM 25% report implies an unstated zero-drain rate."
+    },
+    {
+      "id": "B010",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and /page/blocks/0/diagram/steps/4/panels/phone (chargerpt solar icon)",
+      "explanation": "The promised visible solar-charging event is not rendered at the step."
+    },
+    {
+      "id": "B011",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and /page/blocks/0/diagram/steps/8 (b-retry phone status)",
+      "explanation": "The caption promises a visible cached-state/older-time display, but the field cards remain hidden."
+    },
+    {
+      "id": "B012",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone/phoneScreen (openclip clip visual)",
+      "explanation": "The normal-path clip opening is narrated but not visibly depicted."
+    }
+  ]
+}

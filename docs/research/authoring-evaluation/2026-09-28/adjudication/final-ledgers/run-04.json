@@ -1,0 +1,113 @@
+{
+  "story": "run-04",
+  "candidateId": "specimen-8abdbcba1a1f",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+  "assessmentHashes": {
+    "nonQuestions": "550ccd1299c91dd9cacc793e0fcd3937a3eee7891182e49b2e332374207b44dd",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "D-L-001",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing device-shadow\u2192app dependency",
+      "rule": "level.engineering_hop",
+      "evidence": [
+        "brief/answers.md: Engineering; show every service hop",
+        "brief/hld.md Components: device-shadow \u2014 the app reads this",
+        "candidate/story.spec.json /page/blocks/0/diagram/edges",
+        "interpretations.json rule 3-edges"
+      ],
+      "explanation": "The selected engineering topology omits the design-established device-shadow-to-app read dependency."
+    },
+    {
+      "id": "D-T-001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon physical battery",
+      "rule": "time.rate",
+      "evidence": [
+        "brief/hld.md Behavior 5: idle ~1%/h and each clip ~1%",
+        "candidate/story.spec.json /page/blocks/0/diagram/steps/1/panels/batt/charge = 25",
+        "evidence/renderer.json raccoon physicalBattery.charge = 25",
+        "interpretations.json rule 2-time"
+      ],
+      "explanation": "The explicit intermediate 25% physical value at 1:10 AM suppresses elapsed idle drain and the raccoon clip. The conflicting-anchor exception permits the direct anchor jump, not this invented intermediate hold."
+    },
+    {
+      "id": "D-T-002",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/shadow battery row and /panels/app/battery \u2014 1:00 AM report",
+      "rule": "time.rate",
+      "evidence": [
+        "candidate/story.spec.json /page/blocks/0/diagram/steps/1/panels/shadow: battery 25%, heartbeat 1:00 AM",
+        "candidate/story.spec.json /page/blocks/0/diagram/steps/1/panels/app/battery/reportedAt = 01:00",
+        "evidence/renderer.json raccoon app battery 25% reported at 1:00 AM",
+        "interpretations.json rule 2-time"
+      ],
+      "explanation": "The newly authored 1:00 AM report remains 25%, independently relying on the unstated zero-drain hold. Shadow and app depict the same report, so this is one unit."
+    },
+    {
+      "id": "QC-8AB-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-8abdbcba1a1f :: candidates/specimen-8abdbcba1a1f/questions.md Q1\u2013Q6 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Independent decisions include Q1 level; Q2 audience and takeaway; Q3 approvals for several event times; Q4 outcomes; Q5 lock-screen and app starting state; and Q6 view selection and standout-moment emphasis.",
+        "interpretations.json rule 1-questions counts these answerable clauses independently."
+      ],
+      "explanation": "The six numbered prompts contain more than seven independent decisions."
+    },
+    {
+      "id": "QC-8AB-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8abdbcba1a1f :: candidates/specimen-8abdbcba1a1f/questions.md Q4 \u2014 which endings to show",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks whether both the normal and Wi-Fi-down endings should be shown.",
+        "brief/hld.md \u00a7Scenario to depict already includes both."
+      ],
+      "explanation": "The outcome choice repeats the HLD."
+    },
+    {
+      "id": "QC-8AB-START-BATTERY",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8abdbcba1a1f :: candidates/specimen-8abdbcba1a1f/questions.md Q5 \u2014 app starting battery 25% clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 directly asks what the phone should show initially and proposes Battery 25%.",
+        "brief/hld.md \u00a7Scenario to depict supplies the 25% bedtime battery.",
+        "The locked-phone presentation remains a separate unanswered preference."
+      ],
+      "explanation": "The starting battery clause repeats a supplied fact."
+    },
+    {
+      "id": "QC-8AB-START-CHARGING",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8abdbcba1a1f :: candidates/specimen-8abdbcba1a1f/questions.md Q5 \u2014 app starting not-charging clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 separately proposes that the app show the camera as not charging.",
+        "brief/hld.md \u00a7Scenario to depict states that the camera starts not charging."
+      ],
+      "explanation": "The starting charging-state clause repeats a supplied fact."
+    }
+  ],
+  "score": {
+    "questions": 5,
+    "level": 8,
+    "time": 14,
+    "edges": 15,
+    "panels": 15,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 87
+  }
+}

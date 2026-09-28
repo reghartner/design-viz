@@ -1,0 +1,1263 @@
+{
+  "page": {
+    "title": "Kestrel Porch Cam: overnight on battery",
+    "contract": "1",
+    "protocols": {
+      "wifi": {
+        "label": "Wi-Fi",
+        "color": "#A78BFA"
+      },
+      "push": {
+        "label": "Apple/Google push",
+        "color": "#F472B6"
+      },
+      "unspec": {
+        "label": "Transport unspecified",
+        "color": "#94A3B8"
+      }
+    },
+    "blocks": [
+      {
+        "id": "kestrel-overnight",
+        "heading": "One night on battery: raccoon, low battery, solar, package",
+        "text": [
+          "Source: Kestrel Porch Cam HLD (input/hld.md, reviewed design, Kestrel Home platform team), operator answers, the approved Backstage catalog snapshot and reviewed code locations. For camera-platform and device-state engineers: which service acts at each moment, how the app's device page lags the camera's real battery, and how a Wi-Fi outage delays the package push.",
+          "Operator times: start 10:30 PM, raccoon 1:10 AM, low-battery heartbeat 4:00 AM, sunrise 6:50 AM, courier 8:05 AM. Other minutes (7:00 AM charging heartbeat, 8:03 Wi-Fi drop, retries, 8:06 open, 8:16 late push) and the app values from heartbeats not shown are illustrative. Solar charge is shown as +3.5 %/h net (the HLD says 3–4 %/h).",
+          "The given times and the HLD's ~1 %/h drain disagree: from 25% at 10:30 PM, 1 %/h plus the raccoon clip would reach 20% around 2:30 AM, not 4:00 AM. The battery is therefore held at 25% until the 4:00 AM report instead of inventing an in-between rate.",
+          "device-shadow's offline rule (two missed heartbeats, 60 min) is linked on its node but never fires: the outage lasts about 12 minutes and misses no heartbeat."
+        ],
+        "diagram": {
+          "view": "step",
+          "storyTime": {
+            "start": "2026-09-24T22:30",
+            "end": "2026-09-25T08:30",
+            "clock": "12h",
+            "date": "short"
+          },
+          "groups": {
+            "home": {
+              "title": "Porch & home Wi-Fi",
+              "icon": "house"
+            }
+          },
+          "nodes": {
+            "cam": {
+              "title": "Porch Cam",
+              "sub": "battery + solar",
+              "icon": "doorbell",
+              "tint": "dev",
+              "group": "home"
+            },
+            "router": {
+              "title": "Home router",
+              "sub": "Wi-Fi · not Kestrel",
+              "icon": "router",
+              "tint": "dev",
+              "group": "home"
+            },
+            "ingest": {
+              "title": "event-ingest",
+              "sub": "events · heartbeats",
+              "icon": "server",
+              "tint": "cmd",
+              "binding": {
+                "entityRef": "component:default/event-ingest",
+                "label": "Event ingest",
+                "owner": "group:default/camera-platform",
+                "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/event-ingest",
+                "telemetry": {
+                  "serviceName": "event-ingest"
+                },
+                "api": {
+                  "entityRef": "api:default/event-ingest",
+                  "title": "Event ingest API",
+                  "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/event-ingest/definition",
+                  "endpoints": {
+                    "production": "https://event-ingest.kestrel.example.test"
+                  },
+                  "operationId": "postEvent",
+                  "method": "POST",
+                  "path": "/events"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "ingest.heartbeat",
+                  "label": "heartbeat route",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/heartbeat.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "// flow:heartbeat:start",
+                    "end": "// flow:heartbeat:end"
+                  },
+                  "startLine": 18,
+                  "endLine": 44,
+                  "purpose": "Accepts a heartbeat and writes battery/charging to device-shadow"
+                },
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                }
+              ]
+            },
+            "classifier": {
+              "title": "motion-classifier",
+              "sub": "ML team · unbound",
+              "icon": "detection",
+              "tint": "cmd"
+            },
+            "clips": {
+              "title": "clip-store",
+              "sub": "clips",
+              "icon": "db",
+              "tint": "data",
+              "binding": {
+                "entityRef": "component:default/clip-store",
+                "label": "Clip store",
+                "owner": "group:default/camera-platform",
+                "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/clip-store",
+                "telemetry": {
+                  "serviceName": "clip-store"
+                },
+                "api": {
+                  "entityRef": "api:default/clip-store",
+                  "title": "Clip store API",
+                  "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/clip-store/definition",
+                  "endpoints": {
+                    "production": "https://clip-store.kestrel.example.test"
+                  },
+                  "operationId": "uploadClip",
+                  "method": "PUT",
+                  "path": "/clips/{clipId}"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "clips.upload",
+                  "label": "clip upload",
+                  "repository": "https://github.kestrel.example.test/kestrel/clip-store",
+                  "path": "src/upload.rs",
+                  "revision": "fc642217b0d93e1bd231ed4d9fd969b1415833de",
+                  "anchor": {
+                    "start": "// flow:upload:start",
+                    "end": "// flow:upload:end"
+                  },
+                  "startLine": 15,
+                  "endLine": 62,
+                  "purpose": "Stores an uploaded clip, including late uploads from SD card queues"
+                }
+              ]
+            },
+            "shadow": {
+              "title": "device-shadow",
+              "sub": "last reported state",
+              "icon": "db",
+              "tint": "data",
+              "binding": {
+                "entityRef": "component:default/device-shadow",
+                "label": "Device shadow",
+                "owner": "group:default/device-state",
+                "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/device-shadow",
+                "telemetry": {
+                  "serviceName": "device-shadow"
+                },
+                "api": {
+                  "entityRef": "api:default/device-shadow",
+                  "title": "Device shadow API",
+                  "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/device-shadow/definition",
+                  "endpoints": {
+                    "production": "https://device-shadow.kestrel.example.test"
+                  },
+                  "operationId": "putState",
+                  "method": "PUT",
+                  "path": "/devices/{deviceId}/state"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "shadow.lowbattery",
+                  "label": "low-battery rule",
+                  "repository": "https://github.kestrel.example.test/kestrel/device-shadow",
+                  "path": "src/rules/lowBattery.go",
+                  "revision": "e69b820b1ed193a5c961cacb200492a7b6d51a55",
+                  "anchor": {
+                    "start": "// rule:low-battery:start",
+                    "end": "// rule:low-battery:end"
+                  },
+                  "startLine": 9,
+                  "endLine": 37,
+                  "purpose": "Marks low_battery at <=20% and re-arms above 30%; triggers one low-battery push"
+                },
+                {
+                  "id": "shadow.offline",
+                  "label": "offline rule",
+                  "repository": "https://github.kestrel.example.test/kestrel/device-shadow",
+                  "path": "src/rules/offline.go",
+                  "revision": "e69b820b1ed193a5c961cacb200492a7b6d51a55",
+                  "anchor": {
+                    "start": "// rule:offline:start",
+                    "end": "// rule:offline:end"
+                  },
+                  "startLine": 11,
+                  "endLine": 29,
+                  "purpose": "Marks a device offline after two missed heartbeats (60 min)"
+                }
+              ]
+            },
+            "notify": {
+              "title": "notify-service",
+              "sub": "push decisions",
+              "icon": "server",
+              "tint": "cmd",
+              "binding": {
+                "entityRef": "component:default/notify-service",
+                "label": "Notify service",
+                "owner": "group:default/engagement",
+                "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/notify-service",
+                "telemetry": {
+                  "serviceName": "notify-service"
+                },
+                "api": {
+                  "entityRef": "api:default/notify-service",
+                  "title": "Notify service API",
+                  "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/notify-service/definition",
+                  "endpoints": {
+                    "production": "https://notify-service.kestrel.example.test"
+                  },
+                  "operationId": "sendPush",
+                  "method": "POST",
+                  "path": "/notifications"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "notify.push",
+                  "label": "send_push",
+                  "repository": "https://github.kestrel.example.test/kestrel/notify-service",
+                  "path": "lib/push/send.py",
+                  "revision": "2fb55bedb2130e15b05eb2675aec70aed75874d3",
+                  "anchor": {
+                    "start": "def send_push(",
+                    "end": "# flow:push:end"
+                  },
+                  "startLine": 40,
+                  "endLine": 88,
+                  "purpose": "Sends push through APNs/FCM; animal events are skipped by default preference"
+                }
+              ]
+            },
+            "pushgw": {
+              "title": "Apple/Google push",
+              "sub": "APNs · FCM",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "app": {
+              "title": "Kestrel app",
+              "sub": "resident phone",
+              "icon": "phone",
+              "tint": "dev",
+              "binding": {
+                "entityRef": "component:default/kestrel-app",
+                "label": "Kestrel app",
+                "owner": "group:default/mobile",
+                "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/kestrel-app",
+                "telemetry": {
+                  "serviceName": "kestrel-app"
+                }
+              },
+              "codeRefs": [
+                {
+                  "id": "app.devicepage",
+                  "label": "DevicePage",
+                  "repository": "https://github.kestrel.example.test/kestrel/kestrel-app",
+                  "path": "app/screens/DevicePage.tsx",
+                  "revision": "35715c5be4b5abc83e15d8dc51d216b7119657cd",
+                  "anchor": {
+                    "start": "export function DevicePage(",
+                    "end": "// screen:device:end"
+                  },
+                  "startLine": 12,
+                  "endLine": 140,
+                  "purpose": "Device page: battery %, charging icon, 'updated <time>', online/offline"
+                }
+              ]
+            }
+          },
+          "rows": [
+            [
+              "cam",
+              "router",
+              "ingest",
+              "classifier"
+            ],
+            [
+              "app",
+              "pushgw",
+              "notify",
+              "shadow",
+              "clips"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "cam",
+              "to": "router",
+              "kind": "wifi",
+              "label": "Wi-Fi"
+            },
+            {
+              "from": "router",
+              "to": "ingest",
+              "kind": "https",
+              "label": "POST /events · /heartbeats"
+            },
+            {
+              "from": "router",
+              "to": "clips",
+              "kind": "https",
+              "label": "PUT /clips/{clipId}"
+            },
+            {
+              "from": "ingest",
+              "to": "classifier",
+              "kind": "unspec",
+              "label": "label?"
+            },
+            {
+              "from": "classifier",
+              "to": "ingest",
+              "kind": "unspec",
+              "ret": true,
+              "label": "label"
+            },
+            {
+              "from": "ingest",
+              "to": "shadow",
+              "kind": "https",
+              "label": "PUT /devices/{deviceId}/state"
+            },
+            {
+              "from": "shadow",
+              "to": "notify",
+              "kind": "https",
+              "label": "low battery"
+            },
+            {
+              "from": "ingest",
+              "to": "notify",
+              "kind": "https",
+              "label": "POST /notifications"
+            },
+            {
+              "from": "notify",
+              "to": "pushgw",
+              "kind": "push",
+              "label": "push"
+            },
+            {
+              "from": "pushgw",
+              "to": "app",
+              "kind": "push",
+              "label": "push"
+            },
+            {
+              "from": "app",
+              "to": "clips",
+              "kind": "https",
+              "label": "GET /clips/{clipId}"
+            },
+            {
+              "from": "clips",
+              "to": "app",
+              "kind": "https",
+              "ret": true,
+              "label": "clip"
+            }
+          ],
+          "panels": [
+            {
+              "id": "batt",
+              "type": "battery",
+              "title": "Porch Cam battery (device)",
+              "low": 20,
+              "crit": 10,
+              "drainPerHour": 1,
+              "chargePerHour": 3.5,
+              "initial": {
+                "charge": 25,
+                "source": "cells",
+                "trend": "draining",
+                "note": "idle ~1%/h · clip ~1% (HLD)"
+              }
+            },
+            {
+              "id": "phoneapp",
+              "type": "deviceapp",
+              "title": "Kestrel app: Porch Cam device page",
+              "device": "Porch Cam",
+              "appName": "Kestrel",
+              "sources": [
+                {
+                  "id": "devshadow",
+                  "label": "device-shadow",
+                  "node": "shadow",
+                  "endpoint": "GET /devices/{deviceId}/state",
+                  "detail": "Last reported state from heartbeats: battery %, charging, online, low_battery"
+                },
+                {
+                  "id": "clipstore",
+                  "label": "clip-store",
+                  "node": "clips",
+                  "endpoint": "GET /clips/{clipId}",
+                  "detail": "Recorded clips"
+                }
+              ],
+              "fields": [
+                {
+                  "id": "battery",
+                  "label": "Battery",
+                  "kind": "battery",
+                  "source": "devshadow"
+                },
+                {
+                  "id": "power",
+                  "label": "Power",
+                  "source": "devshadow"
+                },
+                {
+                  "id": "link",
+                  "label": "Connection",
+                  "icon": "wifi",
+                  "source": "devshadow"
+                },
+                {
+                  "id": "lastevent",
+                  "label": "Last event",
+                  "icon": "recorded"
+                },
+                {
+                  "id": "clipcard",
+                  "label": "Clip",
+                  "icon": "recorded",
+                  "source": "clipstore"
+                }
+              ],
+              "initial": {
+                "phoneScreen": "app",
+                "note": "Device page as rendered from device-shadow",
+                "battery": {
+                  "value": 25,
+                  "status": "ready",
+                  "detail": "Updated 10:30 PM"
+                },
+                "power": {
+                  "value": "Battery · not charging",
+                  "status": "ready",
+                  "detail": "Updated 10:30 PM"
+                },
+                "link": {
+                  "value": "Online",
+                  "status": "ready",
+                  "detail": "Updated 10:30 PM"
+                },
+                "lastevent": {
+                  "value": null,
+                  "status": "unknown"
+                },
+                "clipcard": {
+                  "visible": false
+                }
+              }
+            },
+            {
+              "id": "clip",
+              "type": "screen",
+              "title": "Porch Cam view (delivery clip)",
+              "scene": "package-drop",
+              "visible": false,
+              "initial": {
+                "mode": "off"
+              }
+            },
+            {
+              "id": "camlog",
+              "type": "log",
+              "title": "Porch Cam (on the device)",
+              "tags": {
+                "HB": "#38BDF8",
+                "CAM": "#FB923C",
+                "NET": "#EF4444",
+                "PWR": "#22C55E"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "bed",
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "ingest->shadow"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.heartbeat",
+                  "label": "heartbeat route",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/heartbeat.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "// flow:heartbeat:start",
+                    "end": "// flow:heartbeat:end"
+                  },
+                  "startLine": 18,
+                  "endLine": 44,
+                  "purpose": "Accepts a heartbeat and writes battery/charging to device-shadow"
+                }
+              ],
+              "text": "10:30 PM Thu. The resident goes to bed. The Porch Cam's scheduled heartbeat (battery %, charging yes/no, firmware) goes over Wi-Fi through the home router to event-ingest (`POST /heartbeats`), which writes it to device-shadow. The device page reads **25% · not charging · updated 10:30 PM**.",
+              "panels": {
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "HB",
+                      "text": "10:30 PM heartbeat → battery 25%, charging no"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "raccoon",
+              "time": "2026-09-25T01:10",
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "router->clips"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                },
+                {
+                  "id": "clips.upload",
+                  "label": "clip upload",
+                  "repository": "https://github.kestrel.example.test/kestrel/clip-store",
+                  "path": "src/upload.rs",
+                  "revision": "fc642217b0d93e1bd231ed4d9fd969b1415833de",
+                  "anchor": {
+                    "start": "// flow:upload:start",
+                    "end": "// flow:upload:end"
+                  },
+                  "startLine": 15,
+                  "endLine": 62,
+                  "purpose": "Stores an uploaded clip, including late uploads from SD card queues"
+                }
+              ],
+              "text": "1:10 AM. A raccoon crosses the porch. PIR wakes the camera; it records a ~20 s clip and uploads it: `POST /events` to event-ingest, then the clip to clip-store (`PUT /clips/{clipId}`). The app still shows the 1:00 AM heartbeat. Battery held at 25%: see the note on times vs the 1 %/h rate.",
+              "panels": {
+                "batt": {
+                  "charge": 25,
+                  "note": "held at 25%: operator 4:00 AM time vs HLD 1%/h"
+                },
+                "phoneapp": {
+                  "battery": {
+                    "detail": "Updated 1:00 AM"
+                  },
+                  "power": {
+                    "detail": "Updated 1:00 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 1:00 AM"
+                  }
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "CAM",
+                      "text": "1:10 AM PIR motion → record ~20 s clip"
+                    },
+                    {
+                      "tag": "CAM",
+                      "text": "POST /events · PUT /clips/{clipId}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "raccoon-label",
+              "edges": [
+                "ingest->classifier",
+                "classifier->ingest"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                }
+              ],
+              "text": "1:10 AM. event-ingest asks motion-classifier for a label: **animal**. The event is saved to the timeline with **no push** (default user setting). notify-service is not called; the phone stays quiet.",
+              "panels": {
+                "phoneapp": {
+                  "lastevent": {
+                    "value": "Animal · 1:10 AM",
+                    "status": "ready",
+                    "detail": "Saved to timeline · no push"
+                  }
+                }
+              }
+            },
+            {
+              "id": "lowbatt",
+              "time": "2026-09-25T04:00",
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "ingest->shadow",
+                "shadow->notify",
+                "notify->pushgw",
+                "pushgw->app"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.heartbeat",
+                  "label": "heartbeat route",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/heartbeat.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "// flow:heartbeat:start",
+                    "end": "// flow:heartbeat:end"
+                  },
+                  "startLine": 18,
+                  "endLine": 44,
+                  "purpose": "Accepts a heartbeat and writes battery/charging to device-shadow"
+                },
+                {
+                  "id": "shadow.lowbattery",
+                  "label": "low-battery rule",
+                  "repository": "https://github.kestrel.example.test/kestrel/device-shadow",
+                  "path": "src/rules/lowBattery.go",
+                  "revision": "e69b820b1ed193a5c961cacb200492a7b6d51a55",
+                  "anchor": {
+                    "start": "// rule:low-battery:start",
+                    "end": "// rule:low-battery:end"
+                  },
+                  "startLine": 9,
+                  "endLine": 37,
+                  "purpose": "Marks low_battery at <=20% and re-arms above 30%; triggers one low-battery push"
+                },
+                {
+                  "id": "notify.push",
+                  "label": "send_push",
+                  "repository": "https://github.kestrel.example.test/kestrel/notify-service",
+                  "path": "lib/push/send.py",
+                  "revision": "2fb55bedb2130e15b05eb2675aec70aed75874d3",
+                  "anchor": {
+                    "start": "def send_push(",
+                    "end": "# flow:push:end"
+                  },
+                  "startLine": 40,
+                  "endLine": 88,
+                  "purpose": "Sends push through APNs/FCM; animal events are skipped by default preference"
+                }
+              ],
+              "text": "4:00 AM. The heartbeat reports **20%**. device-shadow marks the camera `low_battery` and notify-service sends one **\"Porch Cam battery low\"** push through Apple/Google push. It will not be sent again until battery goes above 30%.",
+              "panels": {
+                "batt": {
+                  "charge": 20,
+                  "note": "20% reported at 4:00 AM (operator time)"
+                },
+                "phoneapp": {
+                  "battery": {
+                    "value": 20,
+                    "status": "ready",
+                    "icon": "battery-low",
+                    "detail": "Updated 4:00 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "detail": "Updated 4:00 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 4:00 AM"
+                  },
+                  "notify": {
+                    "app": "Kestrel",
+                    "title": "Porch Cam battery low"
+                  }
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "HB",
+                      "text": "4:00 AM heartbeat → battery 20%, charging no"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "sunrise",
+              "time": "2026-09-25T06:50",
+              "nodes": [
+                "cam"
+              ],
+              "text": "6:50 AM. Sunrise: the solar panel produces power and the battery starts charging. Nothing reports it yet: the device page still shows the 6:30 AM heartbeat, **not charging**.",
+              "panels": {
+                "batt": {
+                  "trend": "charging",
+                  "source": "solar",
+                  "note": "solar ~3.5%/h net (assumed from HLD 3–4%/h)"
+                },
+                "phoneapp": {
+                  "battery": {
+                    "value": 18,
+                    "detail": "Updated 6:30 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "detail": "Updated 6:30 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 6:30 AM"
+                  }
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "PWR",
+                      "text": "6:50 AM solar panel producing power → charging"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "charging",
+              "time": "2026-09-25T07:00",
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "ingest->shadow"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.heartbeat",
+                  "label": "heartbeat route",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/heartbeat.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "// flow:heartbeat:start",
+                    "end": "// flow:heartbeat:end"
+                  },
+                  "startLine": 18,
+                  "endLine": 44,
+                  "purpose": "Accepts a heartbeat and writes battery/charging to device-shadow"
+                }
+              ],
+              "text": "7:00 AM. The next heartbeat reports **charging=yes**; event-ingest writes it to device-shadow and the device page shows the solar charging icon. Battery is still under 30%, so `low_battery` stays set.",
+              "panels": {
+                "phoneapp": {
+                  "battery": {
+                    "value": 18,
+                    "detail": "Updated 7:00 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "value": "Solar · charging",
+                    "icon": "solar",
+                    "detail": "Updated 7:00 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 7:00 AM"
+                  }
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "HB",
+                      "text": "7:00 AM heartbeat → battery 18%, charging yes"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "h-courier",
+              "time": "2026-09-25T08:05",
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "router->clips"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                },
+                {
+                  "id": "clips.upload",
+                  "label": "clip upload",
+                  "repository": "https://github.kestrel.example.test/kestrel/clip-store",
+                  "path": "src/upload.rs",
+                  "revision": "fc642217b0d93e1bd231ed4d9fd969b1415833de",
+                  "anchor": {
+                    "start": "// flow:upload:start",
+                    "end": "// flow:upload:end"
+                  },
+                  "startLine": 15,
+                  "endLine": 62,
+                  "purpose": "Stores an uploaded clip, including late uploads from SD card queues"
+                }
+              ],
+              "panelVisibility": {
+                "clip": true
+              },
+              "text": "8:05 AM. A courier drops a package. The camera records ~20 s and uploads: `POST /events` to event-ingest, then the clip to clip-store. The device page shows the 8:00 AM heartbeat.",
+              "panels": {
+                "batt": {
+                  "drain": 1
+                },
+                "phoneapp": {
+                  "battery": {
+                    "value": 21,
+                    "detail": "Updated 8:00 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "detail": "Updated 8:00 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 8:00 AM"
+                  }
+                },
+                "clip": {
+                  "mode": "rec"
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "CAM",
+                      "text": "8:05 AM PIR motion → record ~20 s clip"
+                    },
+                    {
+                      "tag": "CAM",
+                      "text": "POST /events · PUT /clips/{clipId}"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "h-push",
+              "edges": [
+                "ingest->classifier",
+                "classifier->ingest",
+                "ingest->notify",
+                "notify->pushgw",
+                "pushgw->app"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                },
+                {
+                  "id": "notify.push",
+                  "label": "send_push",
+                  "repository": "https://github.kestrel.example.test/kestrel/notify-service",
+                  "path": "lib/push/send.py",
+                  "revision": "2fb55bedb2130e15b05eb2675aec70aed75874d3",
+                  "anchor": {
+                    "start": "def send_push(",
+                    "end": "# flow:push:end"
+                  },
+                  "startLine": 40,
+                  "endLine": 88,
+                  "purpose": "Sends push through APNs/FCM; animal events are skipped by default preference"
+                }
+              ],
+              "text": "8:05 AM. motion-classifier labels the clip **package**; event-ingest forwards it to notify-service, which pushes **\"Package delivered at front door\"** through Apple/Google push.",
+              "panels": {
+                "phoneapp": {
+                  "notify": {
+                    "app": "Kestrel",
+                    "title": "Package delivered at front door"
+                  },
+                  "lastevent": {
+                    "value": "Package · 8:05 AM",
+                    "status": "ready",
+                    "icon": "package",
+                    "detail": "Push sent 8:05 AM"
+                  }
+                },
+                "clip": {
+                  "mode": "save",
+                  "banner": "Clip uploaded · package"
+                }
+              }
+            },
+            {
+              "id": "h-open",
+              "time": "+1m",
+              "edges": [
+                "app->clips",
+                "clips->app"
+              ],
+              "text": "8:06 AM. The resident opens the clip: the Kestrel app fetches it from clip-store (`GET /clips/{clipId}`).",
+              "panels": {
+                "phoneapp": {
+                  "clipcard": {
+                    "visible": true,
+                    "value": "Package · 8:05 AM",
+                    "status": "ready",
+                    "detail": "Playing · ~20 s"
+                  }
+                },
+                "clip": {
+                  "banner": "Opened in the Kestrel app 8:06 AM"
+                }
+              }
+            },
+            {
+              "id": "w-courier",
+              "time": "2026-09-25T08:05",
+              "failures": {
+                "cam->router": "blocked"
+              },
+              "tone": {
+                "router": "alert"
+              },
+              "nodes": [
+                "cam"
+              ],
+              "panelVisibility": {
+                "clip": true
+              },
+              "text": "8:05 AM. Home Wi-Fi went down at 8:03. The courier drops the package; the camera records ~20 s to its **SD card** but cannot reach the router, so `POST /events` is never sent. device-shadow still holds the 8:00 AM heartbeat: **Online**.",
+              "panels": {
+                "batt": {
+                  "drain": 1
+                },
+                "phoneapp": {
+                  "battery": {
+                    "value": 21,
+                    "detail": "Updated 8:00 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "detail": "Updated 8:00 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 8:00 AM"
+                  }
+                },
+                "clip": {
+                  "mode": "rec"
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "8:03 AM Wi-Fi: router unreachable"
+                    },
+                    {
+                      "tag": "CAM",
+                      "text": "8:05 AM PIR motion → record ~20 s clip → SD card (queue: 1)"
+                    },
+                    {
+                      "tag": "NET",
+                      "text": "POST /events not sent: no Wi-Fi"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "w-retry",
+              "time": "08:11",
+              "failures": {
+                "cam->router": "blocked"
+              },
+              "nodes": [
+                "cam"
+              ],
+              "text": "8:11 AM. The camera retries every 2 minutes (8:07, 8:09, 8:11); each attempt fails at the Wi-Fi hop. No heartbeat has been missed yet and offline needs two misses (60 minutes), so the device page still shows **Online · updated 8:00 AM**.",
+              "panels": {
+                "clip": {
+                  "mode": "save",
+                  "banner": "Saved to SD card · upload queued"
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "8:07 AM retry → router unreachable"
+                    },
+                    {
+                      "tag": "NET",
+                      "text": "8:09 AM retry → router unreachable"
+                    },
+                    {
+                      "tag": "NET",
+                      "text": "8:11 AM retry → router unreachable"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "w-reconnect",
+              "time": "08:15",
+              "tone": {
+                "router": "ok"
+              },
+              "edges": [
+                "cam->router",
+                "router->ingest",
+                "router->clips",
+                "ingest->shadow"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                },
+                {
+                  "id": "clips.upload",
+                  "label": "clip upload",
+                  "repository": "https://github.kestrel.example.test/kestrel/clip-store",
+                  "path": "src/upload.rs",
+                  "revision": "fc642217b0d93e1bd231ed4d9fd969b1415833de",
+                  "anchor": {
+                    "start": "// flow:upload:start",
+                    "end": "// flow:upload:end"
+                  },
+                  "startLine": 15,
+                  "endLine": 62,
+                  "purpose": "Stores an uploaded clip, including late uploads from SD card queues"
+                },
+                {
+                  "id": "ingest.heartbeat",
+                  "label": "heartbeat route",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/heartbeat.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "// flow:heartbeat:start",
+                    "end": "// flow:heartbeat:end"
+                  },
+                  "startLine": 18,
+                  "endLine": 44,
+                  "purpose": "Accepts a heartbeat and writes battery/charging to device-shadow"
+                }
+              ],
+              "text": "8:15 AM. Wi-Fi returns, about 10 minutes after the delivery. The camera uploads its queued clip (`POST /events`, then `PUT /clips/{clipId}` to clip-store) and sends a heartbeat, which event-ingest writes to device-shadow.",
+              "panels": {
+                "phoneapp": {
+                  "battery": {
+                    "value": 21,
+                    "detail": "Updated 8:15 AM · low_battery until above 30%"
+                  },
+                  "power": {
+                    "detail": "Updated 8:15 AM"
+                  },
+                  "link": {
+                    "detail": "Updated 8:15 AM"
+                  }
+                },
+                "clip": {
+                  "banner": "Queued clip uploaded 8:15 AM"
+                },
+                "camlog": {
+                  "log": [
+                    {
+                      "tag": "NET",
+                      "text": "8:15 AM Wi-Fi back"
+                    },
+                    {
+                      "tag": "CAM",
+                      "text": "upload queue: POST /events · PUT /clips/{clipId} (queue: 0)"
+                    },
+                    {
+                      "tag": "HB",
+                      "text": "8:15 AM heartbeat → battery 21%, charging yes"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "w-latepush",
+              "time": "+1m",
+              "edges": [
+                "ingest->classifier",
+                "classifier->ingest",
+                "ingest->notify",
+                "notify->pushgw",
+                "pushgw->app"
+              ],
+              "codeRefs": [
+                {
+                  "id": "ingest.event",
+                  "label": "postEvent",
+                  "repository": "https://github.kestrel.example.test/kestrel/event-ingest",
+                  "path": "src/routes/events.ts",
+                  "revision": "232a7fae7a1b9c1a2cc709bbfb2b2f28ec579359",
+                  "anchor": {
+                    "start": "export async function postEvent(",
+                    "end": "// flow:event:end"
+                  },
+                  "startLine": 22,
+                  "endLine": 81,
+                  "purpose": "Accepts a motion event, requests a classification label, and forwards person/package events to notify-service"
+                },
+                {
+                  "id": "notify.push",
+                  "label": "send_push",
+                  "repository": "https://github.kestrel.example.test/kestrel/notify-service",
+                  "path": "lib/push/send.py",
+                  "revision": "2fb55bedb2130e15b05eb2675aec70aed75874d3",
+                  "anchor": {
+                    "start": "def send_push(",
+                    "end": "# flow:push:end"
+                  },
+                  "startLine": 40,
+                  "endLine": 88,
+                  "purpose": "Sends push through APNs/FCM; animal events are skipped by default preference"
+                }
+              ],
+              "text": "8:16 AM. motion-classifier labels the clip **package**; notify-service pushes **\"Package delivered at front door\"**, about 11 minutes after the courier left it.",
+              "panels": {
+                "phoneapp": {
+                  "notify": {
+                    "app": "Kestrel",
+                    "title": "Package delivered at front door"
+                  },
+                  "lastevent": {
+                    "value": "Package · 8:05 AM",
+                    "status": "ready",
+                    "icon": "package",
+                    "detail": "Uploaded 8:15 AM · push 8:16 AM"
+                  }
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "happy",
+              "label": "Package push on time",
+              "steps": [
+                "bed",
+                "raccoon",
+                "raccoon-label",
+                "lowbatt",
+                "sunrise",
+                "charging",
+                "h-courier",
+                "h-push",
+                "h-open"
+              ]
+            },
+            {
+              "id": "wifi",
+              "label": "Wi-Fi down at delivery",
+              "steps": [
+                "bed",
+                "raccoon",
+                "raccoon-label",
+                "lowbatt",
+                "sunrise",
+                "charging",
+                "w-courier",
+                "w-retry",
+                "w-reconnect",
+                "w-latepush"
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "flowview": {
+      "authoredWith": "0.1.0",
+      "minVersion": "0.1.0",
+      "features": [
+        "content.deviceapp",
+        "content.deviceapp-navigation",
+        "flow.alternates",
+        "flow.drilldown",
+        "flow.failures",
+        "flow.panel-visibility",
+        "flow.story-time",
+        "media.shared-icons",
+        "panel.battery",
+        "panel.deviceapp",
+        "panel.log",
+        "panel.screen"
+      ]
+    }
+  }
+}

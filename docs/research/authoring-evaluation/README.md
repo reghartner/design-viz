@@ -9,8 +9,9 @@ setup.
 
 The fictional overnight-camera brief, operator sheets and original 100-point
 rubric are preserved in `tests/fixtures/authoring-evaluation/overnight`. Authors
-receive only `input/`; answers arrive in the second request. Judge evidence and
-historical scores never enter the author session. Keep research reports here:
+receive only `input/`; answers arrive in the second request. This experiment's
+judge evidence and historical scores never enter the author session. The kit
+still contains unrelated September 17 evaluation documentation. Keep new research reports here:
 the normal authoring-kit builder excludes `docs/research`.
 
 ## Run the authors

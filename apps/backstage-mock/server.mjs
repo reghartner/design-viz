@@ -62,6 +62,9 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         return send(200,url.pathname.endsWith('/spec')?entry.spec:entry);
       }
       if(url.pathname==='/api/canon/catalog')return send(200,catalog);
+      if(url.pathname==='/workbench/catalog.json')return send(200,catalog);
+      if(url.pathname==='/workbench/starters.json')return send(200,[]);
+      if(url.pathname==='/workbench/diagrams.json')return send(200,{version:1,diagrams:specs().map(spec=>({id:spec.page.canon.id,title:spec.page.title,spec}))});
       if(url.pathname==='/api/canon/entity-diagrams'){
         const index=buildEntityDiagramIndex(specs(),{publicBaseUrl:origin});
         return send(200,diagramsForEntity(index,url.searchParams.get('entityRef')));

@@ -31,9 +31,16 @@ function initWorkbenchLibrary(opts){
   function load(){
     if(pending)return pending;
     pending=(async function(){
+      if(opts.handoff && opts.handoff.error)throw new Error(opts.handoff.error);
       var raw=opts.builtin;published=false;
       origin='Fictional example · no company library configured';
-      if(location.protocol!=='file:'){
+      if(opts.legacyCanon){
+        if(opts.legacyCanon!==opts.handoff.id)throw new Error('The diagram address and Backstage link do not match.');
+        var contextResponse=await fetch('/api/canon/context?id='+encodeURIComponent(opts.legacyCanon),{cache:'no-cache'});
+        if(!contextResponse.ok)throw new Error('Company story unavailable ('+contextResponse.status+').');
+        var context=await contextResponse.json();
+        raw={version:1,diagrams:[{id:opts.legacyCanon,spec:context.spec}]};published=true;origin='Company repository snapshot';
+      }else if(location.protocol!=='file:'){
         var response=await fetch('diagrams.json',{cache:'no-cache'});
         if(response.status!==404){
           if(!response.ok)throw new Error('Library unavailable ('+response.status+').');
@@ -77,16 +84,20 @@ function initWorkbenchLibrary(opts){
       if(opts.shareable() && !published)throw new Error('No published diagram library is available at this address. Publish the site’s diagrams.json and retry.');
       current=entries.find(function(entry){return entry.id===id;});
       if(!current)throw new Error('This diagram is no longer in the published library. Return to Canon diagrams to choose another.');
+      var handoff=opts.handoff && (opts.handoff.error || opts.handoff.id===id)?opts.handoff:null;
+      await verifyWorkspaceHandoff(current.spec,handoff,window.crypto);if(token!==sequence)return;
       title.textContent=current.title;
-      document.getElementById('canon-reader-origin').textContent=origin+' · Reading does not change your draft.';
+      document.getElementById('canon-reader-origin').textContent=origin+(handoff?' · Opened from '+(handoff.entity || 'Backstage'):'')+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
       ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
-      exploreCanvas=initViewerExploreCanvas(ctl,reader);
+      if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
+      edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
+      if(!handoff || handoff.action==='view')exploreCanvas=initViewerExploreCanvas(ctl,reader);
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
     }catch(ex){
       if(token!==sequence)return;
-      current=null;edit.disabled=true;
+      current=null;edit.disabled=true;copy.disabled=true;retireViewer();reader.replaceChildren();
       if(screen==='library'){grid.replaceChildren();status.textContent='Could not load canon diagrams. '+ex.message;retry.hidden=false;}
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
@@ -96,7 +107,7 @@ function initWorkbenchLibrary(opts){
   retry.addEventListener('click',refresh);readerRetry.addEventListener('click',refresh);
   edit.addEventListener('click',function(){
     if(!current)return;
-    try{opts.edit(JSON.parse(JSON.stringify(current.spec)));}
+    try{opts.edit(JSON.parse(JSON.stringify(current.spec)),opts.handoff && opts.handoff.id===current.id?opts.handoff:null);}
     catch(ex){error.textContent=ex.message;error.hidden=false;}
   });
   window.addEventListener('pagehide',function(){sequence++;retireViewer();});

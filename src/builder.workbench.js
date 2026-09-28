@@ -1135,6 +1135,13 @@ function initWorkbenchBuilder(opts){
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
+    navigate:function(target){
+      var parsed=session.snapshot();if(parsed.error)return;
+      var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
+      session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
+      if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
+      if(stepList)stepList.sync();
+    },
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),

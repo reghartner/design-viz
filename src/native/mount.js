@@ -21,6 +21,45 @@ function mountNativeSpec(environment, spec, options){
     link.setAttribute('target','_blank');link.setAttribute('rel','noopener noreferrer');
   }
   var navigating=false;
+  var canvas=false,canvasSection=null,canvasFrame=0,canvasSeen=new Set(),canvasNav=null,canvasSelect=null;
+  function createCanvasNavigation(){
+    canvasNav=document.createElement('label');canvasNav.className='native-canvas-story';canvasNav.textContent='Story ';
+    canvasSelect=document.createElement('select');canvasSelect.setAttribute('aria-label','Explore story');canvasNav.appendChild(canvasSelect);
+    controller.sections.filter(function(rec){return rec.viewport;}).forEach(function(rec){
+      var option=document.createElement('option');option.value=rec.reference;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent || rec.reference;canvasSelect.appendChild(option);
+    });
+    canvasSelect.addEventListener('change',function(){
+      var rec=controller.sections.find(function(r){return r.reference===canvasSelect.value;});if(!rec)return;
+      if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
+      controller.activeTarget={kind:'diagram',section:rec.number};canvasSync();changed();
+    });
+  }
+  function canvasSync(){
+    if(!canvas && !canvasSection)return;
+    if(!canvasNav)createCanvasNavigation();
+    var target=controller.activeTarget || {};
+    var next=canvas && (controller.sections.find(function(rec){return rec.viewport &&
+      (rec.number===target.section || target.kind==='tab' && rec.tabBlock===target.tabBlock && rec.tab===target.tab);}) || canvasSection || controller.sections.find(function(rec){return rec.viewport;}));
+    if(canvasSection && canvasSection!==next){
+      canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
+      canvasSection.sectionEl.classList.remove('explore-active-section');
+    }
+    canvasSection=next || null;view.classList.toggle('explore-full-window',!!canvasSection);
+    environment.body.classList.toggle('native-canvas',!!canvasSection);
+    if(!canvasSection){canvasNav.remove();return;}
+    if(canvasSection.tabBlock!=null)controller.tabBlocks[canvasSection.tabBlock-1].select(canvasSection.tab,false,false);
+    controller.activeTarget={kind:'diagram',section:canvasSection.number};
+    canvasSection.sectionEl.classList.add('explore-active-section');
+    // Reuse the transient diagram canvas: opening it never changes the authored
+    // presentation, including a curated Home view's saved primary panel.
+    canvasSection.viewport.setWorkbenchCanvas(true);canvasSection.viewport.setReaderCanvas(true);
+    canvasSection.sectionEl.querySelector('.diagram-views').prepend(canvasNav);canvasSelect.value=canvasSection.reference;
+    var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+definition.id;
+    if(!canvasSeen.has(key)){
+      canvasSeen.add(key);cancelAnimationFrame(canvasFrame);var rec=canvasSection;
+      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:165,bottom:190});});
+    }
+  }
   function snapshot(){
     var active=controller.activeTarget || {}, section=(controller.sections || []).find(function(s){return s.number===active.section;});
     if(!section && active.kind==='tab')section=controller.sections.find(function(s){return s.tabBlock===active.tabBlock && s.tab===active.tab && s.hasDiagram;});
@@ -33,7 +72,7 @@ function mountNativeSpec(environment, spec, options){
     if(drilldown)target.drilldown=drilldown;
     return target;
   }
-  function changed(){if(environment.disposed || navigating)return;protectLinks();if(options.onChange)options.onChange(snapshot());}
+  function changed(){if(environment.disposed || navigating)return;canvasSync();protectLinks();if(options.onChange)options.onChange(snapshot());}
   controller.onChange=changed;
   environment.listen(view,'click',linkClick,true);environment.listen(view,'auxclick',linkClick,true);
   var size=new ResizeObserver(function(){if(options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));});size.observe(view);
@@ -44,6 +83,11 @@ function mountNativeSpec(environment, spec, options){
   return {
     root:environment.root, controller:controller, warnings:findings.warnings,
     resources:environment.resources,
+    snapshot:snapshot,
+    setCanvas:function(on){
+      if(environment.disposed)throw new Error('This viewer has been destroyed.');
+      if(canvas===!!on)return;canvas=!!on;changed();
+    },
     navigate:function(target){
       if(environment.disposed)throw new Error('This viewer has been destroyed.');
       var destination=records.find(function(r){return r.reference===target.section;}) || records.find(function(r){return r.aliases && r.aliases.indexOf(target.section)>=0;});
@@ -68,10 +112,10 @@ function mountNativeSpec(environment, spec, options){
           }else if(!sp.selectPath(resolved.path.id))throw new Error('This path has no visible steps in the current view. Select a view that includes it.');
         }
         if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
-        if(options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
+        if(!canvas && options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
       }finally{navigating=false;changed();}
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
-    destroy:function(){if(environment.disposed)return;try{controller.destroy();}finally{environment.destroy();}}
+    destroy:function(){if(environment.disposed)return;if(canvasFrame)cancelAnimationFrame(canvasFrame);try{controller.destroy();}finally{environment.destroy();}}
   };
 }

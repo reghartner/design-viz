@@ -118,12 +118,6 @@ export function FlowviewEntityDiagrams({
               · {selected.owner}
             </p>
             <p style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-              <EvidenceLink url={selected.viewerUrl}>
-                Open standalone viewer
-              </EvidenceLink>
-              <EvidenceLink url={selected.editUrl}>
-                Edit in workbench
-              </EvidenceLink>
               {selected.designDocument && (
                 <EvidenceLink url={selected.designDocument.url}>
                   {selected.designDocument.label}
@@ -180,6 +174,7 @@ export function FlowviewEntityDiagrams({
               loadSpec={loadSpec}
               resolveDiagramLink={resolveDiagramLink}
               target={target}
+              entityRef={entityRef}
             />
           </article>
         </>

@@ -48,7 +48,13 @@ for a **Diagrams** tab on Component and API pages, or mount the mock portal as a
 development preview. The package's `/backend` entry derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
 The tab renders canonical flows and HLD designs inline with jumps to relevant happy
-and alternate steps, and refreshes automatically. Editing stays external. The
+and alternate steps, and refreshes automatically. Explore canvas expands the same
+live viewer to fill the browser, with floating panels and a return to the entity.
+Editing stays external: Edit in workbench and Build with Claude carry the selected
+story revision and root section/view/path/step to the hosted workbench. The workbench
+checks its own published snapshot before offering a local draft. See the
+[handoff contract](../apps/backstage/README.md#explore-and-build-with-claude).
+The
 company plugin reads spec JSON from GitHub and passes inert data to its statically
 bundled native renderer. Each viewer owns a ShadowRoot; no
 iframe, remote code or runtime code compilation is used. See the plugin guide's

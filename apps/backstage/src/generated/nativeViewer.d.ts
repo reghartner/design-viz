@@ -57,6 +57,10 @@ export interface NativeViewer {
   readonly root: ShadowRoot;
   readonly warnings: string[];
   navigate(target: NativeViewerTarget): void;
+  /** Current section/view/path/step. Does not change host routing. */
+  snapshot(): NativeViewerTarget | null;
+  /** Transient diagram canvas. The host must supply a full-window surface and exit control. */
+  setCanvas(active: boolean): void;
   pause(): void;
   destroy(): void;
 }

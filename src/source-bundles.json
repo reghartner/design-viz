@@ -27,6 +27,7 @@
     "viewer/path-timeline.js",
     "viewer/explore.js",
     "viewer/explore-canvas.js",
+    "viewer/workspace-handoff.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

@@ -19,6 +19,8 @@ workbench owns editing; the bundled Flowview runtime owns rendering.
 | Selection and service/step presentation | `src/FlowviewEntityDiagrams.tsx` |
 | Loading, compatibility, error and native host presentation | `src/InlineFlowview.tsx` |
 | Safe explicit evidence links | `src/components/EvidenceLink.tsx` |
+| Host-owned modal and persistent viewer subtree | `src/components/CanvasFrame.tsx` |
+| Checked workspace handoff URL | `src/viewer/workspaceLink.ts`, `../../src/viewer/workspace-handoff.js` |
 | Host navigation target type | `src/viewer/protocol.ts` |
 | Portable renderer artifact and declarations | `src/generated/nativeViewer.js`, `nativeViewer.d.ts` |
 | Upstream native ownership, navigation and link protection | `../../src/native/` |
@@ -31,7 +33,8 @@ viewer and its service-step target. Refreshing a revision discards that target.
 ## Native mount contract
 
 The hook passes original inert JSON into the trusted static `mountNativeViewer`
-export. The returned handle supports `navigate`, `pause` and idempotent `destroy`.
+export. The returned handle supports `navigate`, `snapshot`, `setCanvas`, `pause`
+and idempotent `destroy`. The host supplies the full-window surface for `setCanvas`.
 The host uses normal document layout for sizing. A failed jump leaves a valid
 diagram visible. Exact step jumps use shared core identity/source lookup and
 preview the raw source step before applying any path-only visibility gate. The

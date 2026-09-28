@@ -64,8 +64,9 @@ function createWelcomeNavigation(win, initial, changed){
   var current=read(win.history.state), retiredVisits=new Set();
   if(!current)current={v:1,screen:initial,visit:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),depth:0,canon:!!new URL(win.location.href).searchParams.get('canon')};
   var linked=new URL(win.location.href).searchParams;
-  if(linked.has('diagram')){
-    current=Object.assign({},current,{screen:'reader',diagram:linked.get('diagram'),shareable:true,canon:false});
+  var handoff=readWorkspaceHandoff(win.location.hash);
+  if(linked.has('diagram') || handoff){
+    current=Object.assign({},current,{screen:'reader',diagram:handoff ? handoff.id : linked.get('diagram'),shareable:true,canon:false});
   }
   function wasRetired(route){
     var retired=!!route.retired || retiredVisits.has(route.visit);
@@ -101,8 +102,13 @@ function createWelcomeNavigation(win, initial, changed){
     var url=new URL(win.location.href);
     var fields=url.search.slice(1).split('&').filter(function(field){
       var params=new URLSearchParams(field);
+      if(handoff && (params.has('canon') || params.has('review')))
+        return screen==='reader' && handoff.id===selected && params.has('canon');
       return field && !params.has('diagram') && (screen!=='reader' || !params.has('canon') && !params.has('review'));
     });
+    if(handoff && screen!=='reader'){
+      var fragment=new URLSearchParams(url.hash.slice(1));fragment.delete('fv');url.hash=fragment.toString();
+    }
     if(screen==='reader' && published && typeof selected==='string')fields.push('diagram='+encodeURIComponent(selected));
     win.history[replace?'replaceState':'pushState'](stateWith(current),'',url.pathname+(fields.length?'?'+fields.join('&'):'')+url.hash);
     cleanCanon();
@@ -361,8 +367,14 @@ function initWorkbenchWelcome(opts){
     navigator.clipboard.writeText(text).then(function(){ el('welcome-copy-status').textContent = 'Copied. Paste into your agent and attach your sources.'; }, fallback);
   });
   renderTemplates(); updatePrompt();
+  var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec){builder.loadSpec(spec);enterEditor();}});
+  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request){
+    builder.loadSpec(spec);
+    if(request){var url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('fv');url.hash=hash.toString();history.replaceState(history.state,'',url.pathname+url.search+url.hash);}
+    enterEditor();
+    if(request){builder.navigate(request.target);if(request.action==='build')document.getElementById('editor-tab-agent').click();}
+  }});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
   return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,

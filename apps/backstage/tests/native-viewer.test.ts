@@ -115,6 +115,30 @@ it('keeps sibling mounts independent and supports destroy/remount on the same ho
   expect(remount.root.querySelector('.stepid')?.textContent).toBe('persist');
   expect(b.root.querySelector('.stepid')?.textContent).not.toBe('failure');
 });
+it('expands a curated view transiently and restores it without changing its story or sibling',()=>{
+  const raw=spec(),before=JSON.stringify(raw),a=boot(raw),b=boot();
+  a.navigate({section:'recording',view:'business',path:'happy',step:'persist'});
+  const position=a.snapshot();a.setCanvas(true);
+  expect(a.root.querySelector('.native-canvas .viewer-diagram-canvas')).toBeTruthy();
+  expect(b.root.querySelector('.native-canvas')).toBeNull();
+  expect(a.snapshot()).toEqual(position);
+  a.setCanvas(false);
+  expect(a.root.querySelector('.native-canvas')).toBeNull();
+  expect(a.root.querySelector('.explore-stage')?.hasAttribute('hidden')).toBe(true);
+  expect(a.snapshot()).toEqual(position);expect(JSON.stringify(raw)).toBe(before);
+});
+it('expands the active diagram tab rather than the first diagram in the document',()=>{
+  const section=spec().page.sections[0];
+  const viewer=boot({page:{title:'Tabs',blocks:[{tabs:[
+    {label:'First',sections:[{...section,heading:'First story'}]},
+    {label:'Second',sections:[{...section,heading:'Second story'}]},
+  ]}]}});
+  const tabs=Array.from(viewer.root.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
+  expect(tabs).toHaveLength(2);tabs[1].click();
+  viewer.setCanvas(true);
+  expect(viewer.snapshot()?.section).toBe('second-story');
+  expect(viewer.root.querySelector('.explore-active-section .sec-h')?.textContent?.trim()).toBe('Second story');
+});
 it('protects dynamic SVG and HTML links and refuses unsafe image declarations before mounting',()=>{
   const viewer=boot(),view=viewer.root.querySelector('.docview')!;
   for(const svg of [false,true]){

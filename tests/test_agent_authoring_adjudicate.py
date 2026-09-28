@@ -148,6 +148,20 @@ class AdjudicationTests(unittest.TestCase):
         value = answer(); value['deductions'].append(deduction())
         with self.assertRaisesRegex(ValueError, 'Duplicate deduction ID'): adj.validate_output(value)
 
+    def test_wire_schema_omits_unsupported_unique_items_but_host_still_rejects_duplicates(self):
+        def inspect(value):
+            if isinstance(value, dict):
+                self.assertNotIn('uniqueItems', value)
+                for child in value.values(): inspect(child)
+            elif isinstance(value, list):
+                for child in value: inspect(child)
+        inspect(adj.OUTPUT_SCHEMA)
+        refs = adj.OUTPUT_SCHEMA['properties']['claimDecisions']['items']['properties']['deductionIds']
+        self.assertEqual(refs, {'type':'array', 'items':adj.IDENTITY})
+        value = answer(); value['claimDecisions'][0]['deductionIds'] = ['d1','d1']
+        with self.assertRaisesRegex(ValueError, 'duplicate deduction references'):
+            adj.validate_output(value, ['c1'])
+
     def test_all_records_require_nonempty_evidence_and_reasons(self):
         for empty in [[], [''], ['  '], None, 'source:1']:
             for key in ['deductions', 'claimDecisions']:

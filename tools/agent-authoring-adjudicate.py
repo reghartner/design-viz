@@ -254,7 +254,7 @@ OUTPUT_SCHEMA = object_schema({
     'claimDecisions': {'type': 'array', 'maxItems': 1024, 'items': object_schema({
         'claimId': IDENTITY, 'verdict': {'type': 'string', 'enum': ['uphold', 'reject', 'partial', 'unresolved']},
         'evidence': EVIDENCE, 'reason': TEXT,
-        'deductionIds': {'type': 'array', 'uniqueItems': True, 'items': IDENTITY}})},
+        'deductionIds': {'type': 'array', 'items': IDENTITY}})},
     'unresolved': {'type': 'array', 'maxItems': 256, 'items': object_schema({
         'id': IDENTITY, 'evidence': EVIDENCE, 'reason': TEXT})},
 })

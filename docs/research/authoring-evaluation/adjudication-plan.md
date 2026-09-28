@@ -59,3 +59,14 @@ adjudicated scores are a separately labelled assessment under the disclosed
 interpretations and richer factual evidence. They must not silently overwrite
 the first-round numbers. No product or authored-story change, and no merge, is
 part of this investigation.
+
+## Wire-format amendment, before any story adjudication
+
+The first 16 requests were rejected by the service with `invalid_json_schema`:
+the wire schema used unsupported `uniqueItems`. No story judgment or final
+response was generated. Every failed request remains in `paired/`; no score is
+discarded. Remove that wire-only keyword while retaining the same duplicate
+reference check in the host validator. The rubric, interpretations, full prompts,
+packets, model and reasoning level are unchanged. Verify the corrected schema
+with an empty-output format probe, then prepare the same eight pairs in a new
+`paired-v2/` directory. This is a format repair, not a scoring retry.

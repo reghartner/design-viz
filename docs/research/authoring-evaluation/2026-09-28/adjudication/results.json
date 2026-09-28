@@ -281,6 +281,7 @@
     "Six current authors versus one historical author per audience; current skill, prompts, permissions and concurrency differ, so this is not a causal API regression estimate.",
     "Original scores, invalid arithmetic, all attempted calls and author sources are preserved separately.",
     "The all-eight consistency pass resolves compound-question counting and distinguishes presentation preferences from supplied behavior; different original grammar readings are retained in earlier assessments.",
-    "The run03 low-marker phone-placement interpretation survives appeal; removing it would not change its capped panel score or total."
+    "The run03 low-marker phone-placement interpretation survives appeal; removing it would not change its capped panel score or total.",
+    "The supplied authoring skill explicitly instructed intermediate charge holds when anchors conflict with the stated rate; the frozen judging interpretation penalized those holds and some new reports derived from them. These timing deductions reflect an instruction-versus-rubric tension, not an unambiguous measure of author error. Exact skill quotes, trial hashes and author evidence are in reviews/skill-rate-tension.md; all scores and deduction ledgers are preserved."
   ]
 }

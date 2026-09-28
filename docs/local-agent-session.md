@@ -1,5 +1,10 @@
 # Design together through local files
 
+For a hosted workbench with no localhost server, see the experimental
+[Claude folder conversation](folder-agent-session.md). This page describes the
+existing optional HTTP helper.
+
+
 The local session connects an open workbench to an agent that can read source
 repositories and write files. The agent needs no browser automation, screenshots,
 extension, MCP server, or HTTP access. A small Node helper serves the workbench;

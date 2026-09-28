@@ -9,8 +9,11 @@ export function useInlineViewer(
   diagram: AssociatedDiagram,
   loadSpec: SpecLoader,
   target?: ViewerTarget,
-  resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink']
+  resolveDiagramLink?: NativeViewerOptions['resolveDiagramLink'],
+  expanded = false,
+  onNavigate?: (target: NativeViewerTarget | null) => void
 ) {
+  const notify = useRef(onNavigate); notify.current = onNavigate;
   const [attempt, setAttempt] = useState(0);
   // The request identity also gates rendering: an old response cannot mount for
   // a new revision during the render before its loading effect runs.
@@ -62,8 +65,10 @@ export function useInlineViewer(
         onWarning: message => { if (active) setRenderError(message); },
         onChange: next => {
           const owned = mounted.current;
-          if (active && owned?.viewer === viewer)
+          if (active && owned?.viewer === viewer) {
             navigation.current = next ? { request, state: next, target: owned.target } : undefined;
+            notify.current?.(next);
+          }
         },
       });
     } catch (error) {
@@ -72,6 +77,7 @@ export function useInlineViewer(
       return;
     }
     mounted.current = { request, viewer, navigated: false };
+    notify.current?.(viewer.snapshot());
     setRendered(true);
     const pause = () => { if (active) viewer.pause(); };
     const visibility = () => { if (document.hidden) pause(); };
@@ -102,6 +108,9 @@ export function useInlineViewer(
     try { owned.viewer.navigate(next); setRenderError(''); }
     catch (error) { setRenderError(error instanceof Error ? error.message : 'Unable to navigate diagram.'); }
   }, [navigationTarget, rendered, request, resolveDiagramLink]);
+  useEffect(() => {
+    if (rendered && mounted.current?.request === request) mounted.current.viewer.setCanvas(expanded);
+  }, [expanded, rendered, request, resolveDiagramLink]);
   return {
     state: state.request === request ? state : { loading: true },
     renderError, rendered, host,

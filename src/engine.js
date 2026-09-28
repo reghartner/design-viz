@@ -1859,7 +1859,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
     flowToggle.setAttribute('aria-expanded',String(showDiagram));
-    board.hidden=active && !showDiagram ? true : boardHidden;
+    viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
@@ -1888,6 +1888,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
+    if(!quiet)viewport.setView({id:'flow',presentation:'standard'},[],layout.grid);
     if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
   }
@@ -1962,7 +1963,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       if(id==='flow'){setMode('flow');return true;}
       return false;
     },
-    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
+    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
@@ -2270,7 +2271,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
     var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize);
-    if(composition)result.presentation=composition;
+    if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
       /* Expansion also belongs to ordinary diagrams without authored views. */
       var surface=document.createElement('div');surface.className='standard-view-surface';

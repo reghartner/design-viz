@@ -507,7 +507,7 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
-    refreshInsertion:function(){if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();},
+    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
       if(diffbox && !diffbox.hidden){hideDiff();diffBtn.focus();return true;}
@@ -589,8 +589,12 @@ function initWorkbenchBuilder(opts){
   }
   /* Session owns history and persistence; controls retain DOM/focus policy. */
   var redoBtn = document.getElementById('redo-builder');
-  function doUndo(){return session.undo();}
-  function doRedo(){return session.redo();}
+  function agentHistory(action){
+    var keepChat=opts.workspace && opts.workspace.tool()==='agent',result=action();
+    if(keepChat)opts.workspace.showTool('agent');return result;
+  }
+  function doUndo(){return agentHistory(function(){return session.undo();});}
+  function doRedo(){return agentHistory(function(){return session.redo();});}
   if (undoBtn) life.listen(undoBtn,'click', doUndo);
   if (redoBtn) life.listen(redoBtn,'click', doRedo);
   life.listen(src,'input', function(){
@@ -1074,7 +1078,7 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
-  var agentSession=typeof initWorkbenchAgentSession==='function' ? initWorkbenchAgentSession({document:document,
+  var agentOptions={document:document,
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
       var previewCurrent=snap.renderedText===snap.text;
@@ -1083,19 +1087,29 @@ function initWorkbenchBuilder(opts){
         previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
           var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
             if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];
-          });if(Array.isArray(target.bulletPath))clean.bulletPath=target.bulletPath.slice();return clean;
+          });if(Array.isArray(target.bulletPath))clean.bulletPath=target.bulletPath.slice();
+          var path=builderTargetPath(snap.raw,target),value=path?specValueAt(snap.raw,path):null;
+          var label=typeof value==='string'?value:value && (value.title || value.heading || value.text || value.label || value.id);
+          clean.label=String(label || target.id || (target.kind+' '+(typeof target.index==='number'?target.index+1:target.section+1))).slice(0,180);
+          clean.sectionLabel=(builderInsertTargetText(snap.raw,target.section) || '').replace(/^into /,'');return clean;
         }):[],
         views:open && previewCurrent?((ctl && ctl.sections) || []).map(function(rec){
-          return {section:rec.number-1,view:rec.presentation && rec.presentation.viewId?rec.presentation.viewId():null,
+          var result={section:rec.number-1,view:rec.presentation && rec.presentation.viewId?rec.presentation.viewId():null,
             mode:rec.stepper && rec.stepper.mode?rec.stepper.mode():null,
             path:rec.stepper && rec.stepper.path?rec.stepper.path():null,
             sourceStep:rec.stepper && rec.stepper.sourceIndex?rec.stepper.sourceIndex():null};
+          var record=specSectionPaths(snap.raw)[rec.number-1],diagram=record?specValueAt(snap.raw,record.diagram):null;
+          if(diagram){
+            var layout=(diagram.layouts || []).find(function(item){return item.id===result.view;}),route=(diagram.paths || []).find(function(item){return item.id===result.path;});
+            if(layout)result.viewLabel=layout.name || layout.id;if(route)result.pathLabel=route.label || route.id;
+          }
+          return result;
         }):[]};
     },
     busy:function(){
       var active=document.activeElement;
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
-        !!(active && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
+        !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     apply:function(text,expected){
       var snapshot=session.snapshot();
@@ -1112,11 +1126,28 @@ function initWorkbenchBuilder(opts){
       }});
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
     }
-  }) : null;
+  };
+  var agentSession=typeof initWorkbenchAgentSession==='function'?initWorkbenchAgentSession(agentOptions):null;
+  agentOptions.show=function(){if(opts.workspace)opts.workspace.showTool('agent');};
+  var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   if(agentSession)life.own(function(){agentSession.destroy();});
+  if(agentChat)life.own(function(){agentChat.destroy();});
+  function navigateWorkspace(target){
+    var parsed=session.snapshot();if(parsed.error)return;
+    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
+    session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
+    if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
+    if(stepList)stepList.sync();
+  }
+  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
+    startAgent:function(){if(agentChat)agentChat.openSetup();},
+    preserveDraft:life.guard(session.preserveDraft),
+    earlierDrafts:session.earlierDrafts,
+    restoreEarlierDraft:life.guard(function(entry){return session.restoreEarlierDraft(entry,projectHooks());}),
+    navigate:navigateWorkspace,
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),

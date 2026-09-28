@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 const block=(title,span=6)=>({title,span,fields:[{k:'event_id',v:title,g:'The **stable** identity of this event.'},{k:'status',v:'accepted',g:'Available after receipt.',revealAt:1}],note:'Use `event_id` when joining records.'});

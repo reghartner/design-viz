@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {raw,source,code,caption} from '../fixtures/prose-spec.mjs';
 

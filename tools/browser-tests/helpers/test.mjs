@@ -82,3 +82,30 @@ export async function pointerTo(page,from,to,{release=true}={}){
   if(release)await page.mouse.up();
 }
 export async function resources(page){return page.evaluate(()=>__resourceCounts());}
+
+// Layout/prose contracts explicitly exercise the exported-page surface.
+export async function pagePreview(page){
+  const appearance=page.locator('#workspace-appearance');
+  if(await appearance.getAttribute('open')===null)await appearance.locator(':scope > summary').click();
+  await page.locator('#workspace-view').selectOption('page');
+  await appearance.locator(':scope > summary').click();
+  await closeTools(page);
+}
+export async function closeTools(page){
+  for(const name of ['agent','inspect','steps','outline','json','file']){
+    const close=page.locator('#workspace-window-'+name+' .workspace-window-close');
+    if(await close.isVisible()){await page.locator('#editor-tab-'+name).click();await close.click();}
+  }
+}
+
+export async function inspectPageElement(page,element){
+  await closeTools(page);await element.click();
+  if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
+}
+
+// Curated widget/prose contracts explicitly choose Page preview; canvas tests
+// continue using paste() and the product's default Diagram canvas.
+export async function pastePage(page,text){
+  await paste(page,text);await pagePreview(page);
+  await page.locator('#editor-tab-inspect').click();
+}

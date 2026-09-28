@@ -69,6 +69,21 @@ test('project replacement owns selection invalidation and pending recovered draf
   s.undo();assert.equal(h.text,saved.text);s.redo();assert.equal(h.text,next);
   s.target={kind:'step',section:0,index:0};s.invalidateProject();assert.equal(s.target,null);
 });
+test('direct handoffs preserve exact earlier drafts and baselines across reload and restore',()=>{
+  const draft=' \n{ unfinished',baseline='{"title":"Before"}',storage=new Map([
+    ['dv-workbench-draft',JSON.stringify({text:draft,at:1})],['dv-workbench-baseline',JSON.stringify({text:baseline,draftText:draft})]
+  ]);
+  const h=harness({storage,deferInitialSave:true});h.session.preserveDraft();h.session.preserveDraft();
+  assert.equal(h.session.earlierDrafts().length,1);
+  h.session.replaceProject('{"title":"Backstage story"}');
+  const next=harness({storage,deferInitialSave:true});
+  next.session.restoreEarlierDraft(next.session.earlierDrafts()[0]);
+  assert.equal(next.text,draft);assert.equal(next.session.baseline(),baseline);
+  assert.equal(next.session.earlierDrafts().length,2,'the replaced story is also recoverable');
+  const blocked=harness({blocked:true});
+  assert.throws(()=>blocked.session.preserveDraft(),/earlier draft could not be saved/);
+  assert.equal(blocked.writes.length,0);
+});
 test('replacement cancels old saves, typing wins over pending recovery, and destroy neutralizes queued callbacks',()=>{
   const h=harness({deferInitialSave:true,storage:new Map([['dv-workbench-draft',JSON.stringify({text:'old recovery'})]])}),s=h.session;
   h.type(' typed invalid');s.noteInput();const retired=[...h.timers.values()][0];

@@ -40,14 +40,16 @@ function initSectionLayoutEditor(opts){
   var widthLabel=el('label',null,'Width '),width=el('input');width.type='number';width.min='320';width.max='1920';width.step='10';width.setAttribute('aria-label','Preview width in pixels');widthLabel.appendChild(width);toolbar.appendChild(widthLabel);
   var note=el('span','fnote');note.setAttribute('role','status');toolbar.appendChild(note);
   var stage=el('div','layout-preview-stage'),frame=el('div','layout-preview-frame');
-  view.parentNode.insertBefore(toolbar,view);view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
+  var appearance=document.getElementById('workspace-appearance-body');
+  if(appearance)appearance.appendChild(toolbar);else view.parentNode.insertBefore(toolbar,view);
+  view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
   function feedback(text){note.textContent=text;note.title=text;}
   function setFrame(){
     var host=target.value;frame.setAttribute('data-target',host);
     width.disabled=host==='default';width.value=host==='default'?'':widths[host];
     frame.style.width=host==='default'?'100%':widths[host]+'px';
     view.style.setProperty('--home-max-height',host==='confluence'?'560px':'70vh');
-    feedback(host==='default'?'Responsive to the editor split.':host+' content-area simulation · actual host widths vary · scroll to inspect wide previews.');
+    feedback(host==='default'?'Full story canvas.':host+' content-area simulation · actual host widths vary · scroll to inspect wide previews.');
   }
   function rawDiagram(index){
     try{var raw=JSON.parse(opts.src.value),rec=specSectionPaths(raw)[index];return rec&&specValueAt(raw,rec.diagram);}catch(ex){return null;}

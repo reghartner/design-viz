@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
@@ -29,13 +29,13 @@ test('visual icon picker searches, filters, chooses one transaction, and closes 
 test('company logo upload is shared across panels with override, opt-out and Undo',async({page,server},info)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
  const root=page.locator('#docview');await expect(root.locator('.fv-brand-name').first()).toHaveText('Cedar');
- await root.locator('.pt-deviceapp .ptitle').click();
+ await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
  const guide=page.locator('#guide'),brand=guide.locator('.fv-brand-editor');await brand.evaluate(el=>{el.open=true;});
  await brand.getByLabel('Company logo file').setInputFiles({name:'logo.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
  await expect(root.locator('.pt-deviceapp .fv-brand img')).toHaveCount(1);await expect(root.locator('.pt-screen .fv-brand img')).toHaveCount(1);await expect(root.locator('.pt-security .fv-brand img')).toHaveCount(1);
  const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.sections[0].diagram.brand.logoImage).toContain('data:image/png;base64,');expect(raw.page.sections[0].diagram.brand.icon).toBeUndefined();
  await page.locator('#undo-builder').click();await expect(root.locator('.fv-brand img')).toHaveCount(0);
- await root.locator('.pt-deviceapp .ptitle').click();await brand.evaluate(el=>{el.open=true;});
+ await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));await brand.evaluate(el=>{el.open=true;});
  await brand.getByLabel('Branding scope').selectOption('none');await expect(root.locator('.pt-deviceapp .fv-brand')).toHaveCount(0);await expect(root.locator('.pt-screen .fv-brand')).toHaveCount(1);
  await page.screenshot({path:info.outputPath('shared-branding.png')});
 });
@@ -69,7 +69,7 @@ test('step icon picker changes a device card and Inherit removes only that step 
 for(const local of [false,true])test((local?'Panel':'Diagram')+' malformed brand is preserved until explicit repair, with exact Undo',async({page,server})=>{
   const raw=fixture(),d=raw.page.sections[0].diagram;if(local)d.panels[0].brand=[];else d.brand=[];
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
-  await page.locator('#docview .pt-deviceapp .ptitle').click();
+  await inspectPageElement(page,page.locator('#docview .pt-deviceapp .ptitle'));
   const brand=page.locator('#guide .fv-brand-editor');await brand.locator('summary').click();
   await expect(brand).toContainText('Repair it in JSON');await expect(brand.getByLabel('Company logo file')).toHaveCount(0);
   const before=await page.locator('#src').inputValue();await brand.getByRole('button',{name:'Reset invalid branding'}).click();

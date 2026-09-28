@@ -20,7 +20,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     if(frame.rec.destroy)frame.rec.destroy();
     frame.rec.sectionEl.remove();
   }
-  function pause(frame){if(frame && frame.rec.stepper)frame.rec.stepper.pause();}
+  function pause(frame){if(!frame)return;if(frame.rec.viewport)frame.rec.viewport.snapshotReaderState();if(frame.rec.stepper)frame.rec.stepper.pause();}
   function notice(frame,message){
     var box=frame.rec.sectionEl.querySelector(':scope > .detail-notice');
     if(!box){box=document.createElement('p');box.className='detail-notice';box.setAttribute('role','status');frame.rec.sectionEl.prepend(box);}
@@ -36,6 +36,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     ctl.detailHistoryPush=!!navigation;
     if(session)ctl.activeTarget={kind:'diagram',section:session.root.rec.number};
     if(ctl.onChange)ctl.onChange();
+    ctl.view.dispatchEvent(new CustomEvent('detail-navigation'));
     if(options.onDetailNavigate)options.onDetailNavigate(snapshot());
   }
   function restoreOriginal(frame){
@@ -75,7 +76,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     });
     if(options.authoring && frame.page===page){
       var edit=document.createElement('button');edit.type='button';edit.textContent='Edit detail section';edit.className='detail-edit';
-      edit.addEventListener('click',function(){var ref=sectionRecords(page).find(function(r){return r.section===frame.section;});if(!ref)return;close(true);var original=liveRoots.get(ref.reference);if(original){original.rec.sectionEl.hidden=false;original.rec.sectionEl.scrollIntoView({block:'start'});}});nav.appendChild(edit);
+      edit.addEventListener('click',function(){var ref=sectionRecords(page).find(function(r){return r.section===frame.section;});if(!ref)return;close(true);var original=liveRoots.get(ref.reference);if(original){original.rec.sectionEl.hidden=false;original.rec.sectionEl.scrollIntoView({block:'start'});ctl.view.dispatchEvent(new CustomEvent('detail-edit-section',{detail:{reference:ref.reference}}));}});nav.appendChild(edit);
     }
     frame.rec.sectionEl.prepend(nav);
     if(frame.originStep){var context=document.createElement('p');context.className='detail-context';context.textContent='From '+frame.originStep;nav.after(context);}
@@ -137,6 +138,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
       function(){changed(false);},null,Object.assign({},options,{autoplay:false}));}
     catch(error){host.remove();throw error;}
     var el=built.sectionEl;host.replaceWith(el);
+    built.reference=el.id;built.number=serial;
     el.setAttribute('data-dv-detail-preview','');
     var eyebrow=el.querySelector('.sec-eyebrow');if(eyebrow)eyebrow.textContent='Detail flow';
     el.querySelectorAll('.embedcopy').forEach(function(b){b.remove();});
@@ -232,13 +234,14 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
         restoring=false;
       }
     }catch(error){if(!disposed && request===generation)notice(current() || root,error.message || 'Unable to restore the detail flow.');}
-    finally{restoring=false;if(request===generation){restoreValue=null;if(ctl.onChange)ctl.onChange();}}
+    finally{restoring=false;if(request===generation){restoreValue=null;if(ctl.onChange)ctl.onChange();ctl.view.dispatchEvent(new CustomEvent('detail-navigation'));}}
   }
   function cancelInteraction(){if(pending){cancel();changed(false);}}
   ctl.view.addEventListener('pointerdown',cancelInteraction,true);
 
   return {snapshot:snapshot,restore:restore,close:close,
     showSection:function(reference){close(true);liveRoots.forEach(function(f){restoreOriginal(f);});var frame=liveRoots.get(reference);if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
+    activeSection:function(){return session && session.stack.length>1?current().rec:null;},
     activeStepper:function(){return current() && current().rec.stepper;},
     pause:function(){if(session)session.stack.forEach(pause);},
     destroy:function(){disposed=true;close(true);ctl.view.removeEventListener('click',gesture,true);ctl.view.removeEventListener('keydown',gesture,true);ctl.view.removeEventListener('pointerdown',cancelInteraction,true);}

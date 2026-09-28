@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/app-screens/phone-dates.spec.json'),'utf8'),raw=JSON.parse(source);
 const diagram=value=>value.page.sections[0].diagram;
@@ -60,7 +60,7 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
   const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
   for(const [type,id,selector] of panels){
-    await step(root,0);await panel(root,type).locator('.ptitle').click();
+    await step(root,0);await inspectPageElement(page,panel(root,type).locator('.ptitle'));
     const original=await src.inputValue(),date=guide.getByLabel('Starting date',{exact:true});
     await date.fill('Wed, Sep 23');await date.press('Tab');
     await expect(panel(root,type).locator(selector)).toHaveText('Wed, Sep 23');
@@ -70,12 +70,12 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
     await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
     await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
     if(type==='appscreens'){
-      await panel(root,type).locator('.ptitle').click();
+      await inspectPageElement(page,panel(root,type).locator('.ptitle'));
       const time=guide.getByLabel('Starting time',{exact:true});await time.fill('10:05');await time.press('Tab');
       await expect(panel(root,type).locator('.appscreen-clock')).toHaveText('10:05');
       await page.locator('#undo-builder').click();await expect(src).toHaveValue(edited);
     }
-    await panel(root,type).locator('.ptitle').click();await date.fill('');await date.press('Tab');
+    await inspectPageElement(page,panel(root,type).locator('.ptitle'));await date.fill('');await date.press('Tab');
     await expect(panel(root,type).locator(selector)).toHaveCount(0);
     await page.locator('#undo-builder').click();await expect(src).toHaveValue(edited);
     await inspectStep(page,1);
@@ -99,7 +99,7 @@ test('starting and step date edits preserve other state with exact Undo/Redo',as
       await page.locator('#undo-builder').click();await expect(src).toHaveValue(changed);await inspectStep(page,1);
       await guide.getByRole('button',{name:'Hide date',exact:true}).click();await expect(panel(root,type).locator(selector)).toHaveCount(0);
       await guide.getByRole('button',{name:'Inherit date',exact:true}).click();await expect(panel(root,type).locator(selector)).toHaveText('Wed, Sep 23');
-      await panel(root,type).locator('.ptitle').click();await guide.getByLabel('Frame',{exact:true}).selectOption('none');
+      await inspectPageElement(page,panel(root,type).locator('.ptitle'));await guide.getByLabel('Frame',{exact:true}).selectOption('none');
       await expect(panel(root,type).locator(selector)).toHaveCount(0);
       await guide.getByLabel('Frame',{exact:true}).selectOption('phone');await expect(panel(root,type).locator(selector)).toHaveText('Wed, Sep 23');
     }

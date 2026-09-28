@@ -11,6 +11,7 @@ var backlinkData = parseBacklinks(backlinkBlock ? backlinkBlock.textContent : nu
 var deepLinkChannel = null;
 var pendingLinkBase = null;
 var bootFailed = false;
+var workspaceRequest=readWorkspaceHandoff(window.location.hash);
 window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
   return applySkinClasses(document.body, view, name);
@@ -136,6 +137,7 @@ function boot(raw){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
     pendingLinkBase = null;
   }
+  initViewerExploreCanvas(ctl,view);
   wirePresenter(ctl, view, window);
   /* First-run guided tour: a page's own page.tour replaces the built-in
      default wholesale; an unusable override falls back to the default so a
@@ -163,7 +165,7 @@ if (specParam && (isDemo || parseErr)){
   fetch(specUrl).then(function(r){
     if (!r.ok) throw new Error('HTTP ' + r.status);
     return r.json();
-  }).then(boot).catch(function(ex){
+  }).then(async function(spec){await verifyWorkspaceHandoff(spec,workspaceRequest,window.crypto);boot(spec);}).catch(function(ex){
     fail(['?spec fetch "' + specUrl + '": ' + ex.message,
           'The ?spec= mode works only on http(s)-served pages — file:// cannot fetch.',
           'For a file that opens anywhere, inject the spec instead: tools/inject.py <spec.json> <template> <out.html>.']);
@@ -171,5 +173,6 @@ if (specParam && (isDemo || parseErr)){
 } else if (parseErr){
   fail([parseErr]);
 } else {
-  boot(raw);
+  if(workspaceRequest)verifyWorkspaceHandoff(raw,workspaceRequest,window.crypto).then(function(){boot(raw);},function(ex){fail([ex.message]);});
+  else boot(raw);
 }

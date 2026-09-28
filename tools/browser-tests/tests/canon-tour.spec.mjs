@@ -105,3 +105,14 @@ test('the offline Canon example shares the complete default tour and its styling
   expect(finished).toBe(true);await expect(page.locator('.dv-tour')).toBeHidden();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 });
+
+test('Canon Explore fills the browser and retires its canvas before editing the story',async({page,server})=>{
+  const data=library(),d=data.diagrams[0].spec.page.blocks[0].diagram;
+  d.layouts.push({...structuredClone(d.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});d.defaultLayout='explore';
+  await publish(page,data);await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  await page.locator('#workspace-home').click();await openReader(page);
+  const size=page.viewportSize();await expect(page.locator('#canon-reader .viewer-diagram-canvas')).toBeVisible();
+  expect(await page.locator('#canon-reader .explore-board').boundingBox()).toEqual({x:0,y:0,width:size.width,height:size.height});
+  await page.getByRole('button',{name:'Back to page',exact:true}).click();await page.locator('#canon-reader-edit').click();
+  await expect(page.locator('#workspace-canvas .explore-board')).toBeVisible();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+});

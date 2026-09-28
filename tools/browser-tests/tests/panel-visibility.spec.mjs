@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -62,7 +62,7 @@ test('editor exposes every panel without a patch; Show Hide Inherit and starting
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
  await visibility.selectOption('hide');await expect(page.locator('#docview .pt-phone')).toHaveClass(/panel-step-hidden/);
  await visibility.selectOption('inherit');await expect(source).toHaveValue(before);
- await page.locator('#docview .pt-homemap .ptitle').click();await guide.getByLabel('Starting panel visibility').selectOption('hide');
+ await inspectPageElement(page,page.locator('#docview .pt-homemap .ptitle'));await guide.getByLabel('Starting panel visibility').selectOption('hide');
  await expect(page.locator('#docview .pt-homemap')).toHaveClass(/panel-step-hidden/);
  expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[1].visible).toBe(false);
 });

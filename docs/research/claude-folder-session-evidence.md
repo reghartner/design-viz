@@ -1,0 +1,178 @@
+# Claude folder experiment: evidence and live acceptance
+
+Date: September 27, 2026. Branch: `codex/claude-folder-session`.
+No merge. The production Flowview deployment is unchanged.
+
+## Delivered
+
+The static workbench has an Agent pane and a new-story entry. A browser folder
+grant creates an inspectable helper, current authoring skill/toolkit, and visible
+copy/paste instructions. Messages, progress, replies, source changes and receipts
+travel through local files. No local server, agent backend, browser tools for
+Claude, automatic Claude launch, or account credential handling is part of the
+product. Source changes reuse editor validation and one-action Undo/Redo. Chat
+stays open during Undo/Redo. A story ledger carries the worksheet and engineering
+gaps into a later session.
+
+A separate owner-private test copy is deployed at
+https://flowview-claude-folder-trial.costa-chuck.chatgpt.site . Its private sign-in
+is access control for this temporary copy, not the proposed Claude authentication
+flow. Open the page in desktop Chrome or Edge for the live folder trial.
+
+The experiment supports one active user message and one pending proposal at a
+time. Resume keeps the last 100 conversation messages, verifies exact saved
+source, changes connection identity and does not automatically replay old work.
+Same-origin tabs use a Web Lock; other origins/browser profiles rely on identity
+and heartbeat checks and must not connect concurrently to the same folder.
+
+## Canvas and conversation polish
+
+The editor now uses the diagram itself as a full-window Explore surface. Agent,
+Inspect, Steps, Outline, JSON and File are independent movable/resizable windows.
+The selection card names items before Send and each sent message retains frozen
+context. Claude activity remains visible in a toolbar indicator while Agent is
+closed. The user reported the real Claude workflow working before this polish.
+
+Canvas camera/panel state stays separate from authored Explore defaults and
+survives matched-section rerenders. Page preview retains prose, export layout
+arranging and host previews. Standalone and Canon Explore views fill the browser;
+Home/standard views retain their curated layouts. Tour narration avoids the
+floating player. Browser checks explicitly measure the diagram board against the
+full viewport and cover navigation, edits, Undo/Redo, cross-tab sections, working
+indicators, named context, camera retention, curated views and tour restoration.
+
+The latest unit run passed 1,294 JavaScript tests with one existing skip. The
+12 Python build/kit tests and 60 focused browser contracts pass (9 folder-agent,
+30 editor/authoring, 16 Explore/tour, 5 Canon reader), with two additional checks
+after improving Fit around floating panels. Screenshots of the editor and standalone diagram
+canvas were inspected. The private trial also includes `explore.html`, a reading
+demo of the named-layouts starter with Explore selected by default.
+
+## Automated evidence
+
+- Full JavaScript suite completed successfully after updating the build-fixture
+  inputs for the new packaging helper: 1,296 tests, including one existing skip.
+- Full Python suite: 180 tests passed. The subsequently added kit-integrity
+  assertion passes in the focused 12-test build suite.
+- New protocol tests cover exact source revisions, human typing, deferred
+  application, receipt-write retry after an applied edit, wrong identity/request,
+  incomplete JSON, invalid proposal IDs, UTF-8 size limits, disconnect during a
+  read, ownership loss, source reconciliation on resume, filesystem failures,
+  listener expiry and externally replaced files.
+- Six Python helper tests cover atomic envelopes, pending proposal receipts,
+  stale/disconnected requests, filename escape, symlinks, toolkit checksum/path
+  checks, watcher deduplication, bounded watch expiry and a renewed watcher
+  skipping a completed request.
+- Three browser contracts pass against the built HTML on Chromium 153.0.8010.12:
+  question/answer, source change, actual rendering, Undo/Redo, inert reply text,
+  selected context, picker cancellation, unsupported capability, and 50 measured
+  exchanges. Only the picker/directory handles are substituted; they are backed
+  by actual disk files and the actual delivered Python helper. There is no
+  localhost server. Requests are limited to static editor/catalog/starter assets.
+- An extracted authoring kit independently stamps and validates the audio-story
+  starter with zero errors/warnings, runs its complete state walk, and supplies
+  battery widget documentation without repository dependencies.
+
+The browser tests and protocol tests simulate the agent. They do not prove a
+native folder grant, Claude model behavior, or permission ergonomics.
+
+Reproduce the focused checks:
+
+```sh
+python3 tools/build.py
+node --test tests/folder-agent.test.js tests/agent-session.test.js
+python3 -m unittest discover -s tests -p test_folder_agent.py
+python3 -m unittest discover -s tests -p test_build.py
+npm ci --prefix tools/browser-tests --no-fund --no-audit
+npx --prefix tools/browser-tests playwright test --config tools/browser-tests/playwright.folder-agent.config.mjs
+```
+
+## Measured file transport, excluding model work
+
+### Activity feed follow-up
+
+The editor now retains timestamped progress for the current turn, distinguishes
+watcher liveness from a Claude acknowledgment, and reports 30 seconds of silence.
+The connection prompt and bundled authoring skill require immediate acknowledgment,
+phase updates and editor-delivered questions/final answers. The helper supports
+short `--text` messages and retains bounded progress history between polls.
+Accepted resumes refresh the helper and authoring kit; rejected resumes preserve
+the existing files.
+
+Validation for this follow-up: 20 focused JavaScript tests, 8 Python helper tests,
+12 build tests, and 5 browser tests passed. Browser coverage includes a real local
+watcher, progress before a final reply, retained ordered updates, inert text,
+clearing on the next request, helper upgrades on resume, and another 50 file
+exchanges. The activity screenshot was inspected. Claude was simulated in these
+tests; the user subsequently reported the real Claude workflow working well. Normal terminal output and permission prompts are not
+automatically captured.
+
+### Initial timing sample
+
+50 sequential requests/replies, foreground test browser, 250 ms poll interval.
+The actual Python watcher emitted request events; a deterministic test wrote
+replies through the helper. Browser directory handles were injected adapters
+backed by local disk. This is not a native File System Access performance claim.
+
+| Direction | Median | 95th percentile | Maximum |
+| --- | ---: | ---: | ---: |
+| Request file publication → watcher event | 102 ms | 246 ms | 253 ms |
+| Reply file publication → editor display | 89 ms | 163 ms | 284 ms |
+
+Artifact: the browser test attaches `file-transport-latency` and writes
+`latency.json` under its ignored test-results directory. No CI assertion is made
+about absolute timing. Claude processing and tool approval add separate latency;
+background browser throttling or sleeping can delay both directions.
+
+## User-reported live acceptance
+
+Claude Code 2.1.283 is installed and its existing subscription login was confirmed
+without reading credentials. A visible terminal was opened with `--no-chrome`,
+empty strict MCP configuration, and an explicit local-tool list. No prompt was
+submitted to Claude by this implementation session. Its actual offered tools,
+Monitor availability, wake-up, and renewal have not been observed.
+
+The private site deployed successfully, and its sign-in screen was reached in
+the in-app browser. The user was asked to perform the native Chrome/Edge folder
+grant and paste the complete prompt into the visible Claude session. The user subsequently completed the trial and reported that it works functionally.
+This report is distinct from direct instrumented observation of Claude permissions,
+Monitor renewals and native browser file replacement behavior.
+
+Remaining instrumented checks for production confidence:
+
+1. Native browser grant on the deployed HTTPS page; read an externally replaced
+   file and write one Claude can read. Verify cancellation/revocation and network
+   activity. Test downloaded HTML separately; it is not yet verified.
+2. Inspect Claude's offered tools. Confirm no browser integrations and that
+   Monitor is present. Keep normal permission prompts. If Monitor is unavailable,
+   report it rather than adding a hidden process, server, or permission bypass.
+3. Three real conversation turns, including a question answered inside the
+   editor and a follow-up after an idle period. Example: explain a subscription
+   order to business readers, add a failed-payment branch, then ask an engineer
+   to enrich that same story without changing its meaning.
+4. Observe proposal receipt, rendered result, Undo/Redo, saved story ledger,
+   disconnect, and resume with the exact source. Confirm no old turn replays.
+5. Observe bounded Monitor expiration and renewal. An instruction to renew is
+   not evidence that renewal works. Measure model latency separately.
+
+The implementation is ready for this paired trial, not a completed business-user
+adoption study or a production rollout.
+
+## Working-folder pairing correction
+
+The chooser now explicitly asks for the existing Claude session's working/project
+folder. The copied prompt locates its unique exchange subfolder relative to that
+working directory and verifies both session and connection IDs before using it.
+It requires Claude to report a mismatch instead of guessing an absolute path or
+searching the disk. All subsequent filenames resolve inside that verified
+exchange. No existing live trial files were moved or edited for this correction.
+
+A rejected resume leaves the active pairing instructions untouched; instruction
+files are replaced only after claiming the session. A failed instruction write
+disconnects that attempted connection, disables Send/Copy, and allows a retry.
+
+Validation for this correction: 34 focused JavaScript tests, 12 build tests and
+three browser scenarios passed. The browser scenarios run the actual helper
+relative to the selected working folder, preserve a project README, verify
+prompt identities, exercise rejected/successful resume and recover from an
+instruction-file write failure. Claude Monitor acceptance remains separate.

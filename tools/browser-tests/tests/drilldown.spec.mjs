@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,paste as pasteCanvas} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8');
 const root=page=>page.locator('#section-doorbell-domains');
@@ -22,7 +22,7 @@ async function flow(page){
   await active(page).locator('.detail-breadcrumb button').first().click();await expect(initial).toBeVisible();
 }
 test('workbench drilldowns and legacy expansion references preserve authored source and restore the original controls',async({page,server})=>{
- await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
  const initial=root(page);await initial.locator('.schip[data-step-source="1"]').first().click();
  const caption=await initial.locator('.stepline').innerText();await flow(page);
  await expect(initial.locator('.stepline')).toHaveText(caption,{useInnerText:true});await expect(page.locator('#src')).toHaveValue(source);
@@ -113,7 +113,7 @@ test('native nested context maps stay usable at embedded widths across every ski
  await page.evaluate(()=>__viewer.destroy());
 });
 test('overview maps preserve context at each depth and return with keyboard without changing source',async({page,server})=>{
- await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
  const initial=root(page);await initial.locator('.schip[data-step-source="1"]').first().click();
  const caption=await initial.locator('.stepline').innerText();
  await initial.locator('[data-dv-detail="connectivity"]').click();
@@ -142,7 +142,7 @@ test('overview maps preserve context at each depth and return with keyboard with
 });
 test('the node inspector creates a detail section in one Undo action and configures an existing reference',async({page,server})=>{
  const spec={page:{title:'Author a domain',sections:[{heading:'Overview',diagram:{nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a','b']],edges:[{from:'a',to:'b'}]}}]}};
- const text=JSON.stringify(spec,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,text);
+ const text=JSON.stringify(spec,null,2);await page.goto(server.origin+'/workbench.html');await pasteCanvas(page,text);
  await page.locator('[data-dv-node="b"]').click();await page.getByRole('button',{name:'Create detail flow',exact:true}).click();
  let result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections).toHaveLength(2);expect(result.page.sections[0].diagram.nodes.b.detail).toEqual({section:'b-detail',mode:'focus'});
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await page.locator('#redo-builder').click();

@@ -14,7 +14,7 @@ const owners:Array<{navigate:ReturnType<typeof vi.fn>;pause:ReturnType<typeof vi
 beforeEach(()=>{
   owners.length=0;mount.mockReset();
   mount.mockImplementation(host=>{
-    const owner={root:host.shadowRoot || host.attachShadow({mode:'open'}),warnings:[],navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
+    const owner={root:host.shadowRoot || host.attachShadow({mode:'open'}),warnings:[],snapshot:vi.fn(()=>null),setCanvas:vi.fn(),navigate:vi.fn(),pause:vi.fn(),destroy:vi.fn()};
     owners.push(owner);return owner;
   });
 });

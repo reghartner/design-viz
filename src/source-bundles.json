@@ -26,6 +26,8 @@
     "viewer/contracts.js",
     "viewer/path-timeline.js",
     "viewer/explore.js",
+    "viewer/explore-canvas.js",
+    "viewer/workspace-handoff.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",
@@ -54,6 +56,8 @@
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/agent-session.js",
+    "workbench/folder-agent.js",
+    "workbench/agent-chat.js",
     "workbench/controls.js",
     "workbench/notifications.js",
     "workbench/vocabulary.js",
@@ -81,6 +85,7 @@
   ],
   "workspace.workbench.js": [
     "workbench/preview.js",
+    "workbench/canvas.js",
     "workspace.workbench.js"
   ],
   "entrypoints": {

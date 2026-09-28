@@ -45,6 +45,6 @@ describe('loader-injected public API',()=>{
     expect(inputs.some(file=>file.endsWith('src/generated/nativeViewer.js'))).toBe(true);
     expect(inputs.some(file=>/api\/client\.|EntityFlowviewContent|plugin\.tsx|reference-proxy/.test(file))).toBe(false);
     const external=new Set(Object.values(bundled.metafile!.outputs).flatMap(output=>output.imports.map(item=>item.path)));
-    expect([...external].sort()).toEqual(['react','react/jsx-runtime']);
+    expect([...external].sort()).toEqual(['react','react-dom','react/jsx-runtime']);
   });
 });

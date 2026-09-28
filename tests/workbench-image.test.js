@@ -5,6 +5,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {execFileSync,spawnSync}=require('node:child_process');
 const ROOT=path.join(__dirname,'..');
+const {probeHttp}=require('./helpers/http-probe.js');
 const dockerAvailable=spawnSync('docker',['info','--format','{{.ServerVersion}}'],{encoding:'utf8',timeout:10000}).status===0;
 
 test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{
@@ -38,15 +39,15 @@ test('nginx image publishes central canon membership and replaces a stale librar
   const url='http://127.0.0.1:'+port+'/workbench/diagrams.json';
   let response;
   for(let attempt=0;attempt<20;attempt++){
-    try{response=await fetch(url,{signal:AbortSignal.timeout(2000)});break;}
+    try{response=await probeHttp(url,2000);break;}
     catch(error){if(attempt===19)throw error;await new Promise(resolve=>setTimeout(resolve,100));}
   }
-  assert.equal(response.status,200);assert.match(response.headers.get('cache-control'),/no-cache/);
-  const library=await response.json();assert.equal(library.version,1);
+  assert.equal(response.status,200);assert.match(response.headers['cache-control'],/no-cache/);
+  const library=JSON.parse(response.body);assert.equal(library.version,1);
   const expected=structuredClone(spec);expected.page.canon.id='feature';expected.page.canon.kind='canonical';
   assert.deepEqual(library.diagrams.map(d=>d.spec),[expected]);
-  const canonResponse=await fetch('http://127.0.0.1:'+port+'/canon.json');
-  assert.deepEqual(await canonResponse.json(),manifest);assert.match(canonResponse.headers.get('cache-control'),/no-cache/);
-  assert.equal((await fetch('http://127.0.0.1:'+port+'/diagrams/feature/feature.html')).status,200);
+  const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
+  assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
+  assert.equal((await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.html',2000)).status,200);
   assert.deepEqual(JSON.parse(fs.readFileSync(source)),spec);
 });

@@ -1,7 +1,7 @@
 /* Draft storage and its single debounce lifetime. Browser APIs are injected;
    project/baseline policy belongs to the session, and no DOM is accessed here. */
 function createBuilderPersistence(options){
-  var draftKey='dv-workbench-draft', baselineKey='dv-workbench-baseline';
+  var draftKey='dv-workbench-draft', baselineKey='dv-workbench-baseline', archiveKey='dv-workbench-earlier-drafts';
   var timer=null, generation=0, disposed=false;
   function read(){
     var draft=null, baseline=null;
@@ -31,6 +31,22 @@ function createBuilderPersistence(options){
   }
   return {
     read:read,save:save,
+    archived:function(){
+      try{var entries=JSON.parse(options.storage().getItem(archiveKey) || '[]');return Array.isArray(entries)?entries.filter(function(entry){return entry && typeof entry.text==='string';}):[];}catch(ex){return [];}
+    },
+    preserve:function(text,baseline){
+      if(disposed || typeof text!=='string')return;
+      // A direct Build handoff must not overwrite recovery data unless this
+      // durable copy succeeds. Keep the exact text, including unfinished JSON.
+      try{
+        var storage=options.storage(),entries=JSON.parse(storage.getItem(archiveKey) || '[]');
+        if(!Array.isArray(entries))throw Error('Invalid earlier drafts');
+        if(!entries.some(function(entry){return entry && entry.text===text && entry.baseline===baseline;})){
+          entries.unshift({text:text,baseline:baseline,at:options.now()});
+          storage.setItem(archiveKey,JSON.stringify(entries));
+        }
+      }catch(ex){throw Error('Your earlier draft could not be saved. Save it to a file or free browser storage, then retry Build.');}
+    },
     clear:function(){
       if(disposed)return;
       try {var storage=options.storage();storage.removeItem(draftKey);storage.removeItem(baselineKey);}catch(ex){}

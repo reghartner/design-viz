@@ -111,6 +111,14 @@ export function FlowviewEntityDiagrams({
             </select>
           </label>
           <article style={{ minWidth: 0 }}>
+            <InlineFlowview
+              key={entityRef + '|' + selected.id + '|' + selected.revision}
+              diagram={selected}
+              loadSpec={loadSpec}
+              resolveDiagramLink={resolveDiagramLink}
+              target={target}
+              entityRef={entityRef}
+            />
             <p>
               <strong>
                 {selected.kind === 'canonical' ? 'CANONICAL' : 'HLD / DESIGN'}
@@ -118,12 +126,6 @@ export function FlowviewEntityDiagrams({
               · {selected.owner}
             </p>
             <p style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
-              <EvidenceLink url={selected.viewerUrl}>
-                Open standalone viewer
-              </EvidenceLink>
-              <EvidenceLink url={selected.editUrl}>
-                Edit in workbench
-              </EvidenceLink>
               {selected.designDocument && (
                 <EvidenceLink url={selected.designDocument.url}>
                   {selected.designDocument.label}
@@ -174,13 +176,6 @@ export function FlowviewEntityDiagrams({
                 </section>
               ))}
             </details>
-            <InlineFlowview
-              key={entityRef + '|' + selected.id + '|' + selected.revision}
-              diagram={selected}
-              loadSpec={loadSpec}
-              resolveDiagramLink={resolveDiagramLink}
-              target={target}
-            />
           </article>
         </>
       )}

@@ -13,7 +13,7 @@ function result(entityRef=ref,title='Doorbell recording'):EntityDiagrams{return 
 it('shows matched flows and links directly to an alternate step, with safe evidence URLs',async()=>{
   const data=result();data.diagrams[0].editUrl='javascript:alert(1)';
   render(<FlowviewEntityDiagrams loadSpec={loadSpec} entityRef={ref} loadDiagrams={async()=>data}/>);
-  expect(await screen.findByText('Doorbell recording')).toBeTruthy();
+  expect(await screen.findByRole('heading',{name:'Doorbell recording'})).toBeTruthy();
   fireEvent.click(screen.getByText(/Where this service appears/));
   expect(screen.getByRole('button',{name:'3. No delivery'})).toBeTruthy();
   expect(screen.getByLabelText('Inline diagram viewer')).toBeTruthy();
@@ -30,14 +30,14 @@ it('empty service pages explain automatic association and do not show unrelated 
 it('refreshes automatically and retains results with a visible stale warning on failure',async()=>{
   vi.useFakeTimers();const loader=vi.fn().mockResolvedValue(result());
   await act(async()=>{render(<FlowviewEntityDiagrams loadSpec={loadSpec} entityRef={ref} loadDiagrams={loader} refreshMs={1000}/>);});
-  expect(screen.getByText('Doorbell recording')).toBeTruthy();
+  expect(screen.getByRole('heading',{name:'Doorbell recording'})).toBeTruthy();
   loader.mockResolvedValue(result(ref,'Updated recording'));
   await act(async()=>{vi.advanceTimersByTime(1000);});
-  expect(screen.getByText('Updated recording')).toBeTruthy();
+  expect(screen.getByRole('heading',{name:'Updated recording'})).toBeTruthy();
   loader.mockRejectedValue(new Error('Offline'));
   await act(async()=>{fireEvent.focus(window);});
   expect(screen.getByRole('alert').textContent).toContain('last successful results');
-  expect(screen.getByText('Updated recording')).toBeTruthy();
+  expect(screen.getByRole('heading',{name:'Updated recording'})).toBeTruthy();
   loader.mockResolvedValue({...result(),diagrams:[]});
   await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'Refresh diagrams'}));});
   expect(screen.getByText(/No diagrams reference this entity yet/)).toBeTruthy();
@@ -48,9 +48,9 @@ it('entity changes abort old lookups and cannot display a late response from the
   const loader=vi.fn((entityRef:string,signal:AbortSignal)=>{if(entityRef===ref){oldSignal=signal;return new Promise<EntityDiagrams>(resolve=>{resolveOld=resolve;});}return Promise.resolve(result(entityRef,'Another service flow'));});
   const view=render(<FlowviewEntityDiagrams loadSpec={loadSpec} entityRef={ref} loadDiagrams={loader}/>);
   view.rerender(<FlowviewEntityDiagrams loadSpec={loadSpec} entityRef="component:other/recording" loadDiagrams={loader}/>);
-  expect(await screen.findByText('Another service flow')).toBeTruthy();expect(oldSignal?.aborted).toBe(true);
+  expect(await screen.findByRole('heading',{name:'Another service flow'})).toBeTruthy();expect(oldSignal?.aborted).toBe(true);
   await act(async()=>{resolveOld(result());});
-  expect(screen.queryByText('Doorbell recording')).toBeNull();expect(screen.getByText('Another service flow')).toBeTruthy();
+  expect(screen.queryByRole('heading',{name:'Doorbell recording'})).toBeNull();expect(screen.getByRole('heading',{name:'Another service flow'})).toBeTruthy();
 });
 
 describe('Backstage authenticated proxy client',()=>{

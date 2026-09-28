@@ -91,6 +91,15 @@ function createBuilderSession(options){
     saveInitial:function(){if(!options.deferInitialSave && (!initialDraft || initialDraft.text===text()))save();},
     discardDraft:function(){if(disposed)return;persistence.clear();initialDraft=null;save();},
     draft:function(){return initialDraft?{text:initialDraft.text,at:initialDraft.at}:null;},
+    preserveDraft:function(){
+      if(projectOpen)persistence.preserve(text(),baselineText);
+      else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline);
+    },
+    earlierDrafts:persistence.archived,
+    restoreEarlierDraft:function(entry,hooks){
+      if(!entry || typeof entry.text!=='string')return false;
+      this.preserveDraft();return replaceProject(entry.text,entry.baseline,hooks);
+    },
     isProjectOpen:function(){return projectOpen;},
     invalidateProject:invalidateProject,replaceProject:replaceProject,
     restoreDraft:function(hooks){

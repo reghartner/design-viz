@@ -13,7 +13,7 @@ test('browser navigation follows entry screens, retains unfinished input and can
   await page.goto(server.origin+'/workbench.html?layout=backstage#host-fragment');
   await expect(home(page)).toBeVisible();
   await page.locator('#welcome-new').click();await expect(screen(page,'new')).toBeVisible();
-  await page.locator('#welcome-new-agent').click();await expect(screen(page,'agent')).toBeVisible();
+  await page.locator('#welcome-new-prompt').click();await expect(screen(page,'agent')).toBeVisible();
   await page.locator('#welcome-brief').fill('Private draft: compare the recording paths');
   await page.locator('#welcome-agent-paste').click();
   await page.locator('#welcome-json').fill('{"unfinished":');
@@ -73,7 +73,7 @@ test('template navigation returns to the picker and Forward retains the same pro
   await page.goBack();await expect(screen(page,'new')).toBeVisible();
   await page.goForward();await expect(editor(page)).toBeVisible();await expect(src).toHaveValue(changed);
   await page.waitForFunction(text=>JSON.parse(localStorage.getItem('dv-workbench-draft'))?.text===text,changed);
-  await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();
+  await page.locator('#workspace-home').click();await page.locator('#welcome-agent-prompt').click();
   await page.reload();await expect(screen(page,'agent')).toBeVisible();
   await page.locator('[data-welcome-back]:visible').click();await expect(home(page)).toBeVisible();
   await page.locator('#welcome-resume').click();await expect(editor(page)).toBeVisible();await expect(src).toHaveValue(changed);

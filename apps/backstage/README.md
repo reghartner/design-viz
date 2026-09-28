@@ -18,8 +18,13 @@ list, catalog annotation, or manual Backstage link maintenance is required.
 
 The tab renders the selected diagram inline with playback, alternate paths, Home,
 panels and node evidence links. Service step buttons jump inside that viewer.
-It also shows canonical/design status, owner and design-document links. **Edit in
-workbench** opens the external editor in a new tab. The list refreshes every
+It also shows canonical/design status, owner and design-document links. **Explore
+canvas** opens the same live viewer in a full-window modal, with floating panels,
+playback and a **Back to entity** action. Escape returns to the inline view;
+opening/closing does not reload the spec or change the authored Home layout.
+**Edit in workbench** and **Build with Claude** open the external editor in a new
+tab with the diagram ID, spec digest, entity, section, named view, path and step.
+The list refreshes every
 60 seconds while visible, on focus, and on demand. Changing services cancels old
 requests. Failed refreshes retain the last result with a visible warning.
 
@@ -34,6 +39,44 @@ the exported host-independent checker, and the company release checklist.
 Walk through the [current platform presentation](../../docs/diagrams/platform/index.html)
 for the GitHub-backed company topology. The [earlier lifecycle guide](../../docs/diagrams/backstage/backstage.html)
 retains the reference adapter's read-API topology.
+
+## Explore and Build with Claude
+
+The host owns the full-window modal; the renderer stays in its isolated root.
+The live subtree moves into the modal and back without a second read or mount.
+Changing the diagram/revision or leaving the entity retires the old viewer and
+closes its modal. `mountNativeViewer` also exposes `snapshot()` and
+`setCanvas(boolean)` for custom hosts; those hosts must provide the expanded
+surface and an accessible exit. Canvas camera/panels are temporary reader state.
+
+Configure `diagramUrls` with destinations running the matching Flowview build.
+For a static company workbench, both destinations may point at
+`https://designs.example.test/workbench/flowspec.html?diagram=<id>`.
+The plugin adds the ordinary section/view/path/step fragment and a versioned `fv`
+fragment containing `{version:1,id,revision,entity,action}`. The digest is the index's
+SHA-256 of `JSON.stringify(materializedSpec)`, not a Git SHA. The receiver loads
+its own authorized published snapshot and verifies the ID and digest. A stale
+or different story fails visibly; it cannot replace a saved draft.
+
+**Build with Claude** opens the checked story directly as a local draft at the
+same position and opens the connection guide. The previous draft is saved under
+Earlier drafts on Home. Ordinary viewing links keep the read-only story. No folder
+permission, agent connection or publication happens automatically. The local
+folder pairing remains the user's visible copy/paste into their Claude session.
+Backstage login is independent of Claude login and filesystem access. The local
+reference `?canon=` destination is also supported as a checked draft handoff;
+publication from this flow remains the company's repository review process.
+
+These links expect Flowview's fragment contract; custom destination routers must
+translate that contract. Navigation metadata contains no spec, credentials, local
+paths or executable prompts. It is context, never authorization. Drill-down frames
+are not transferred; handoffs currently preserve the root story section/view/step.
+
+Rebuild the native artifact and package, upgrade the pinned Backstage dependency,
+and deploy the corresponding workbench. Updating the workbench alone does not
+update the plugin installed in Backstage. The local preview and browser fixtures
+verify this interaction with fictional data; company SSO and installed-host
+acceptance still need the company's environment.
 
 ## Try the mock
 
@@ -79,8 +122,8 @@ package. Both ESM and CommonJS entry points have matching declaration exports.
 | `@flowview/backstage-plugin/new-frontend` | Optional default/named `flowviewPlugin` registering the reference-proxy tab |
 | `@flowview/backstage-plugin/backend` | `buildEntityDiagramIndex`, `diagramsForEntity` and index/options types |
 
-The root import has no Backstage dependency or proxy transport. React is the
-required frontend peer. Backstage peers are optional; install the peers needed by
+The root import has no Backstage dependency or proxy transport. React and React DOM
+are the required frontend peers. Backstage peers are optional; install the peers needed by
 the adapter you choose and align them with the host's Backstage release. Only the
 `/new-frontend` entry requires the new frontend registration API. Its default
 plugin deliberately uses the reference proxy, so the company GitHub integration

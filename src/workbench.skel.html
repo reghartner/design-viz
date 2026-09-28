@@ -19,14 +19,15 @@
     <button class="bbtn" id="workspace-home" type="button">← New / open</button>
     <div class="workspace-create">
         <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
-        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+        <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
     </div>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
+    <div class="workspace-save"><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
   </div>
 </header>
 
 {{HUMAN_GUIDE}}
+<script type="application/json" id="flowview-folder-kit">{{FOLDER_AGENT_KIT}}</script>
 
 <main>
   <section class="welcome" id="workbench-welcome" aria-label="Welcome to Flowview">
@@ -36,6 +37,8 @@
           <p class="welcome-kicker">A clearer way to explain</p>
           <h1 tabindex="-1">Give your system<br>a story.</h1>
           <p>Turn architecture, processes, and everyday interactions into diagrams people can follow. Bring your JSON, or begin with an idea.</p>
+          <button type="button" class="welcome-button welcome-button-primary welcome-build" id="welcome-agent">✧ Build with Claude</button>
+          <p class="welcome-note">Your Claude account. Your story. Talk together right on the canvas.</p>
         </div>
         <div class="welcome-story" aria-hidden="true">
           <div class="welcome-story-top"><span><i></i> A request, explained</span><span>01 / 03</span></div>
@@ -56,9 +59,10 @@
         <button type="button" class="welcome-action welcome-action-primary" id="welcome-new"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">+</span><span class="welcome-action-copy"><strong>Start new project</strong><span>A useful example or a blank canvas.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
       </div>
       <button type="button" class="welcome-resume" id="welcome-resume" hidden><span class="welcome-resume-icon" aria-hidden="true">↶</span><span><strong id="welcome-resume-title">Resume your draft</strong><span id="welcome-resume-detail"></span></span><span aria-hidden="true">Continue →</span></button>
+      <details id="welcome-earlier-drafts" hidden><summary>Earlier drafts saved before switching stories</summary><div id="welcome-earlier-list"></div></details>
       <button type="button" class="welcome-library-entry" id="welcome-library"><span><b>Canon diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
       <div class="welcome-bottom">
-        <button type="button" class="welcome-agent-card" id="welcome-agent"><span class="welcome-agent-spark" aria-hidden="true">✧</span><span><span class="welcome-kicker">An idea is enough to begin</span><strong>Build it with your agent.</strong><span>Give your agent the right instructions. Bring the result back here.</span></span><span class="welcome-arrow" aria-hidden="true">→</span></button>
+        <button type="button" class="welcome-agent-card" id="welcome-agent-prompt"><span class="welcome-agent-spark" aria-hidden="true">✧</span><span><span class="welcome-kicker">Using another agent?</span><strong>Take a brief to your agent.</strong><span>Copy authoring instructions and bring the result back here.</span></span><span class="welcome-arrow" aria-hidden="true">→</span></button>
         <div class="welcome-principles"><p><b>Show how it works.</b> Animate connections and walk through each step.</p><p><b>Keep the whole story.</b> Explore happy paths, failures, and what changes.</p></div>
       </div>
     </div>
@@ -93,9 +97,10 @@
 
     <div id="welcome-new-screen" class="welcome-screen" hidden>
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
-      <div class="welcome-screen-heading"><div><p class="welcome-kicker">Make it your own</p><h1 tabindex="-1">Every story starts somewhere.</h1><p class="welcome-description">Start simple, explore a complete example, or make space for something new.</p></div><button type="button" id="welcome-new-agent" class="welcome-button">Build with your agent <span aria-hidden="true">↗</span></button></div>
+      <div class="welcome-screen-heading"><div><p class="welcome-kicker">Make it your own</p><h1 tabindex="-1">Every story starts somewhere.</h1><p class="welcome-description">Start simple, explore a complete example, or make space for something new.</p></div><button type="button" id="welcome-new-agent" class="welcome-button">Build with Claude <span aria-hidden="true">↗</span></button></div>
       <div id="welcome-template-filters" class="welcome-filters" role="group" aria-label="Filter templates"></div>
       <button type="button" id="welcome-new-catalog" class="welcome-button">Start from your service catalog →</button>
+      <button type="button" id="welcome-new-prompt" class="welcome-text-button">Take a brief to another agent →</button>
       <p class="welcome-note" id="welcome-template-status" role="status"></p>
       <div class="welcome-template-grid" id="welcome-templates"></div>
       <div id="welcome-company-templates" hidden><div class="welcome-company-heading"><h2>From your team</h2><p class="welcome-note">Templates provided with this workbench.</p></div><div class="welcome-template-grid" id="welcome-company-grid"></div></div>
@@ -105,6 +110,7 @@
 
     <div id="welcome-agent-screen" class="welcome-screen" hidden>
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
+      <div class="welcome-agent-return"><span><b>Talk to Claude inside the editor</b> · Local folder experiment</span><button type="button" id="welcome-agent-live" class="welcome-button welcome-button-primary">Start with Claude →</button><span class="welcome-note">Connect your own visible Claude Code session. No local server.</span></div>
       <p class="welcome-kicker">From idea to explanation</p><h1 tabindex="-1">A good brief goes a long way.</h1><p class="welcome-description">Use your preferred coding agent. This prompt points it to Flowview’s authoring skill and helps it build a story from your sources.</p>
       <ol class="welcome-agent-steps"><li><span>1</span><b>Shape your brief</b>Choose a starting point below.</li><li><span>2</span><b>Give it to your agent</b>Attach your design, docs, or code.</li><li><span>3</span><b>Bring your JSON here</b>Preview, refine, and share.</li></ol>
       <div class="welcome-agent-layout">
@@ -127,6 +133,7 @@
   <div id="workbench-workspace" hidden>
   <div class="workwrap">
     <nav class="editor-tabs workspace-rail" role="tablist" aria-label="Editor tools" aria-orientation="vertical">
+      <button type="button" role="tab" id="editor-tab-agent" aria-controls="editor-agent" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">✧</span>Agent</button>
       <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
       <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
       <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
@@ -134,6 +141,26 @@
       <button type="button" role="tab" id="editor-tab-file" aria-controls="editor-file" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▱</span>File</button>
     </nav>
     <section class="specbox" id="spec-editor" aria-label="Editing workspace">
+      <div class="editor-pane" id="editor-agent" role="tabpanel" aria-labelledby="editor-tab-agent" hidden>
+        <div class="folder-agent-shell">
+          <div class="folder-agent-actions"><button type="button" class="bbtn" id="folder-agent-open-setup">Connect Claude</button></div>
+          <details id="folder-agent-pairing"><summary>Connection details</summary>
+          <p id="folder-agent-connection">Not connected</p><p id="folder-agent-folder" class="folder-agent-folder"></p>
+          <button type="button" class="bbtn" id="folder-agent-disconnect" disabled>Disconnect</button>
+          </details>
+          <p id="folder-agent-panel-status" class="folder-agent-hint" role="status">Connect your Claude session to start talking here.</p>
+          <div id="folder-agent-messages" class="folder-agent-messages" role="log" aria-label="Conversation with Claude" aria-live="polite"></div>
+          <section id="folder-agent-activity" class="folder-agent-activity" aria-label="Claude activity" hidden>
+            <b id="folder-agent-activity-title" role="status">Waiting for Claude</b>
+            <p id="folder-agent-progress" class="folder-agent-hint"></p>
+            <ol id="folder-agent-activity-log" role="log" aria-label="Updates from Claude" aria-live="polite" aria-relevant="additions"></ol>
+          </section>
+          <section class="folder-agent-context-card" aria-label="Context for your next message"><b id="folder-agent-context-heading">Your next message includes</b><div id="folder-agent-context" aria-live="polite"></div><p class="folder-agent-hint">The whole story is shared. Your selection tells Claude where to focus.</p></section>
+          <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
+          <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" maxlength="16000" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
+          <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your session folder keeps the conversation, story, and authoring notes.</p>
+        </div>
+      </div>
       <div class="draftbar" id="draftbar" hidden></div>
         <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
       <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
@@ -269,18 +296,33 @@
         <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
         <div id="editor-company"></div>
-        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset editor width</button></div><p class="fnote">Drag the divider to resize the editor. Double-click it for an even split.</p></details>
+        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset panel layout</button></div><p class="fnote">Drag a panel by its title to move it; drag its bottom corner to resize. Close panels to reveal more canvas. Your layout is remembered in this browser.</p></details>
       </div>
       <ul class="msgs" id="msgs" aria-live="polite"></ul>
     </section>
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
-    <div class="workmain">
+    <details id="workspace-appearance" class="workspace-appearance"><summary>Canvas appearance</summary><div id="workspace-appearance-body">
+      <label class="workspace-view-label">View <select id="workspace-view"><option value="diagram">Diagram canvas</option><option value="page">Page preview</option></select></label>
+      <p class="fnote">Use Page preview to edit text and arrange the exported page.</p>
       <div class="toolrow">
         <span class="lab">SKIN</span>
         <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
       </div>
 
-      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+    </div></details>
+    <div class="workmain" id="workspace-canvas" aria-label="Diagram canvas" tabindex="-1">
+      <div id="workspace-canvas-space"><div id="workspace-canvas-world">
+        <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+      </div></div>
+    </div>
+    <button type="button" id="folder-agent-selection" class="workspace-selection">Select on the canvas to focus your message</button>
+    <div class="workspace-canvas-controls" role="toolbar" aria-label="Canvas navigation">
+      <button type="button" id="workspace-pan" class="bbtn" aria-pressed="false" title="Drag the canvas; hold Space for temporary pan">Pan</button>
+      <button type="button" id="workspace-zoom-out" class="bbtn" aria-label="Zoom canvas out">−</button>
+      <button type="button" id="workspace-zoom" class="bbtn" title="Reset canvas to 100%">100%</button>
+      <button type="button" id="workspace-zoom-in" class="bbtn" aria-label="Zoom canvas in">+</button>
+      <button type="button" id="workspace-fit" class="bbtn">Fit diagram</button>
+      <button type="button" id="workspace-panels" class="bbtn" aria-pressed="false">Hide tools</button>
     </div>
 
   </div>
@@ -460,6 +502,41 @@
     </div>
   </div>
   <div class="reuse-footer"><p id="reuse-feedback" role="status"></p><button class="bbtn" id="reuse-cancel">Cancel</button><button class="rbtn" id="reuse-apply" disabled>Copy steps</button></div>
+</dialog>
+
+<dialog id="folder-agent-guide" class="folder-agent-guide" aria-labelledby="folder-agent-guide-title">
+  <header class="folder-agent-guide-header"><span>✧ Your Claude · Your account</span><button type="button" class="bbtn" id="folder-agent-close-guide" aria-label="Connect later">×</button></header>
+  <ol class="folder-agent-guide-steps" aria-label="Connection progress"><li data-agent-stage="folder">Choose folder</li><li data-agent-stage="review">Paste in Claude</li><li data-agent-stage="waiting">Connect</li></ol>
+  <h2 id="folder-agent-guide-title">Let’s connect your Claude.</h2>
+  <div id="folder-agent-guide-folder">
+    <p>Keep your Claude Code session open. Choose the folder it’s working in to bring the conversation here.</p>
+    <pre class="folder-agent-command">Claude’s working folder ← choose this folder
+└─ flowview-session-…   created for you</pre>
+    <details><summary>Not sure which folder?</summary><p id="folder-agent-folder-help">Ask Claude: <b>“What is the full path to your current working folder?”</b> Choose that exact folder, not its parent or an exchange subfolder.</p></details>
+    <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><p>Use your own account and normal permission prompts. The session must offer Monitor. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
+    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose Claude’s exact working folder</button><button type="button" class="welcome-text-button" data-agent-later>Connect later</button></div>
+    <p class="folder-agent-hint">Your browser will ask for folder access. Flowview creates an exchange subfolder inside it.</p>
+    <details><summary>Resume an existing exchange</summary><p>Open its story.spec.json in the editor first, then select that exchange subfolder. Paste fresh instructions into Claude in the same working folder.</p><button type="button" class="bbtn" id="folder-agent-resume">Resume a session folder</button></details>
+  </div>
+  <div id="folder-agent-guide-review" hidden>
+    <p>Copy these instructions into your open Claude session. Everything you’ll send is visible below.</p>
+    <p id="folder-agent-guide-folder-name" class="folder-agent-folder"></p>
+    <label for="folder-agent-instructions">Full connection instructions</label><textarea id="folder-agent-instructions" readonly spellcheck="false" rows="12" aria-label="Full Claude connection instructions"></textarea>
+    <div class="folder-agent-guide-actions"><button type="button" class="welcome-text-button" data-agent-change-folder>Change folder</button><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-copy" disabled>Copy connection instructions</button></div>
+    <p class="folder-agent-hint">Your story is shared with your Claude session. Claude keeps its own permission prompts.</p>
+  </div>
+  <div id="folder-agent-guide-waiting" hidden>
+    <p>Paste the instructions into Claude and approve its request when prompted. This guide closes when the folder listener responds.</p>
+    <ol class="folder-agent-wait-list"><li>✓ Exchange folder is ready</li><li>✓ Instructions copied</li><li>Waiting for Claude’s folder listener…</li></ol>
+    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button" id="folder-agent-show-copy">Show instructions again</button><button type="button" class="welcome-text-button" id="folder-agent-folder-missing">Claude can’t find the folder</button></div>
+    <p class="folder-agent-hint">Any permission approval happens in Claude. You can keep working here while it connects.</p><button type="button" class="welcome-text-button" data-agent-later>Back to canvas</button>
+  </div>
+  <div id="folder-agent-guide-help" hidden>
+    <p>The folder you choose here must be the one Claude is already working in.</p><p class="folder-agent-command">Ask Claude: “What is the full path to your current working folder?”</p>
+    <p>Choose that exact folder. We’ll prepare fresh instructions for you to paste.</p>
+    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button" id="folder-agent-help-back">Back</button><button type="button" class="welcome-button welcome-button-primary" data-agent-change-folder>Choose a different folder</button></div>
+  </div>
+  <p id="folder-agent-status" class="folder-agent-hint" role="status"></p>
 </dialog>
 
 <dialog id="catalog-picker" class="catalog-picker" aria-labelledby="catalog-heading" aria-describedby="catalog-destination">

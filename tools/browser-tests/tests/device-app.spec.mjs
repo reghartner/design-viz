@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/device-app-notifications/device-app-notifications.spec.json'),'utf8');
 const raw=JSON.parse(source);
@@ -32,7 +32,7 @@ test('source visibility and notifications edit independently with Undo and Redo'
  const root=page.locator('#docview'),guide=page.locator('#guide');
  await expect(app(root).locator('.da-provenance')).toBeVisible();
  await app(root).locator('[data-da-field=battery]').click();await expect(root.locator('[data-dv-node=events]')).toHaveClass(/da-node-focus/);
- await app(root).locator('.ptitle').click();
+ await inspectPageElement(page,app(root).locator('.ptitle'));
  await guide.getByRole('combobox',{name:'Show data sources',exact:true}).selectOption('Hide');
  await expect(app(root).locator('.da-provenance')).toHaveCount(0);await expect(root.locator('.da-node-focus')).toHaveCount(0);
  const edited=JSON.parse(await page.locator('#src').inputValue());expect(diagram(edited).panels[0].sources).toEqual(p.sources);
@@ -135,10 +135,10 @@ test('home/app navigation and card visibility keep one phone frame in standalone
 test('workbench edits the starting screen and per-step cards with independent Undo/Redo',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,navigationSource);
  const root=page.locator('#docview'),guide=page.locator('#guide');
- await app(root).locator('.ptitle').click();await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('app');
+ await inspectPageElement(page,app(root).locator('.ptitle'));await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('app');
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(navigationSource);
- await app(root).locator('.ptitle').click();
+ await inspectPageElement(page,app(root).locator('.ptitle'));
  const initialClip=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^clip$/})});
  await initialClip.getByRole('combobox',{name:'Card visibility',exact:true}).selectOption('true');
  let updated=diagram(JSON.parse(await page.locator('#src').inputValue()));
@@ -278,7 +278,7 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  const original=JSON.stringify(spec,null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,original);
  const root=page.locator('#docview'),guide=page.locator('#guide');
- await app(root).locator('.ptitle').click();
+ await inspectPageElement(page,app(root).locator('.ptitle'));
  const battery=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^battery$/})});
  await battery.getByLabel('value',{exact:true}).fill('42');await battery.getByLabel('value',{exact:true}).press('Tab');
  await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
@@ -287,7 +287,7 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  expect(edited.panels[0].initial.custom).toBe('keep top');expect(edited.steps).toEqual(d.steps);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
  await page.locator('#redo-builder').click();await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
- await root.locator('.pt-screen .ptitle').click();
+ await inspectPageElement(page,root.locator('.pt-screen .ptitle'));
  await guide.locator('.initialedit').getByLabel('mode',{exact:true}).selectOption('live');
  edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(edited.panels[1].initial).toEqual({mode:'live',banner:'Ready',custom:17});expect(edited.steps).toEqual(d.steps);

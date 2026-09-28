@@ -1,158 +1,125 @@
-/* Workspace preferences belong to the browser, never the authored spec. */
+/* Floating editor windows are browser preferences, never authored geometry. */
 function workspacePrefs(raw){
-  var prefs = {editor:440, tool:'inspect'}, value;
-  try { value = JSON.parse(raw); } catch (ex){ return prefs; }
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return prefs;
-  if (typeof value.editor === 'number' && Number.isFinite(value.editor)) prefs.editor = Math.max(320, Math.min(1100, value.editor));
-  if (['inspect','steps','outline','json','file'].indexOf(value.tool) >= 0) prefs.tool = value.tool;
+  var prefs={tool:'inspect',windows:{}},value;
+  try{value=JSON.parse(raw);}catch(ex){return prefs;}
+  if(!value || typeof value!=='object' || Array.isArray(value))return prefs;
+  if(['agent','inspect','steps','outline','json','file'].includes(value.tool))prefs.tool=value.tool;
+  Object.keys(value.windows || {}).forEach(function(name){
+    if(!['agent','inspect','steps','outline','json','file'].includes(name))return;
+    var saved=value.windows[name];if(!saved || typeof saved!=='object')return;
+    var rect={open:saved.open===true};
+    ['x','y','w','h'].forEach(function(key){if(Number.isFinite(saved[key]))rect[key]=saved[key];});
+    prefs.windows[name]=rect;
+  });
   return prefs;
 }
-function workspaceEditorBounds(contentWidth){
-  return {min:320, max:Math.max(320, Math.min(1100, Math.floor(contentWidth - 300 - 24 - 72)))};
+function workspacePanelRect(rect,width,height){
+  var minW=Math.min(300,Math.max(1,width-24)),minH=Math.min(240,Math.max(1,height-96));
+  var w=Math.max(minW,Math.min(width-24,Number.isFinite(rect.w)?rect.w:380));
+  var h=Math.max(minH,Math.min(height-96,Number.isFinite(rect.h)?rect.h:640));
+  return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
+    y:Math.max(72,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
 function initWorkbenchWorkspace(){
-  var wrap = document.querySelector('.workwrap');
-  var cols = document.getElementById('workspace-columns');
-  var editor = document.getElementById('spec-editor');
-  var focus = document.getElementById('workspace-focus');
-  var reset = document.getElementById('workspace-reset');
-  var toolbar = document.querySelector('.workbench-header');
-  var src = document.getElementById('src');
-  var guide = document.getElementById('guide');
-  if (!wrap || !cols || !editor || !focus || !reset || !toolbar || !src) return null;
-  var names = ['inspect','steps','outline','json','file'], tabs = {}, panes = {}, scrolls = {};
-  names.forEach(function(name){
-    tabs[name] = document.getElementById('editor-tab-' + name);
-    panes[name] = document.getElementById('editor-' + name);
-  });
-  if (names.some(function(name){ return !tabs[name] || !panes[name]; })) return null;
-  var key = 'dv-workbench-layout-v2', raw = null;
-  try { raw = localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v1'); } catch (ex){}
-  var prefs = workspacePrefs(raw), drag = null, pageScroll = 0;
-  function persist(){
-    try { localStorage.setItem(key, JSON.stringify(prefs)); } catch (ex){}
+  var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
+  if(!wrap || !editor)return null;
+  var names=['agent','inspect','steps','outline','json','file'],labels={agent:'Agent · Claude',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
+  var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false;
+  try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
+  var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0;
+  document.body.classList.add('workspace-canvas');
+  var rail=document.querySelector('.workspace-rail');rail.setAttribute('role','toolbar');
+  rail.removeAttribute('aria-orientation');
+  function persist(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(ex){}}
+  function defaults(name){return {x:name==='agent'?84:Math.max(84,innerWidth-408),y:name==='agent'?84:118,w:name==='json'?500:380,h:Math.min(700,innerHeight-150),open:false};}
+  function rect(name){return workspacePanelRect(prefs.windows[name],innerWidth,innerHeight);}
+  function paint(name){
+    var win=windows[name],r=rect(name),open=prefs.windows[name].open;
+    win.style.left=r.x+'px';win.style.top=r.y+'px';win.style.width=r.w+'px';win.style.height=r.h+'px';
+    win.hidden=!open || hidden;panes[name].hidden=!open;
+    tabs[name].setAttribute('aria-pressed',String(open && !hidden));tabs[name].setAttribute('aria-expanded',String(open && !hidden));
+    tabs[name].tabIndex=name===prefs.tool?0:-1;
   }
-  function bounds(){
-    var style = getComputedStyle(wrap);
-    return workspaceEditorBounds(wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0));
+  function paintAll(){names.forEach(paint);}
+  function front(name){prefs.tool=name;windows[name].style.zIndex=++z;names.forEach(function(n){tabs[n].tabIndex=n===name?0:-1;});}
+  function showTool(name,options){
+    if(!windows[name])return false;
+    if(hidden)setHidden(false);
+    if(name==='agent' && document.getElementById('guide').hidden){prefs.windows.inspect.open=false;paint('inspect');}
+    prefs.windows[name].open=true;front(name);paint(name);
+    var section=document.getElementById(name==='json'?'sec-source':'sec-'+name);if(section)section.open=true;
+    if(options && options.focus)tabs[name].focus({preventScroll:true});
+    persist();return true;
   }
-  function effectiveWidth(){
-    var b = bounds(); return Math.max(b.min, Math.min(b.max, prefs.editor));
-  }
-  function paint(){
-    var b = bounds(), width = effectiveWidth();
-    wrap.style.setProperty('--workspace-editor', width + 'px');
-    document.body.style.setProperty('--workspace-toolbar', toolbar.getBoundingClientRect().height + 'px');
-    cols.setAttribute('aria-valuemin', b.min);
-    cols.setAttribute('aria-valuemax', b.max);
-    cols.setAttribute('aria-valuenow', Math.round(width));
-    cols.setAttribute('aria-valuetext', Math.round(width) + ' pixels of editor width');
-  }
-  /* Show/hide existing panes; do not rebuild a form, source textarea, or
-     preview. Keep both editor scroll positions and native text selection. */
-  function showTool(name, options){
-    if (names.indexOf(name) < 0) return false;
-    options = options || {};
-    var changed = prefs.tool !== name;
-    if (changed){
-      scrolls[prefs.tool] = {pane:panes[prefs.tool].scrollTop, source:src.scrollTop,
-        inspector:guide ? guide.scrollTop : 0, form:guide && guide.firstChild};
-      prefs.tool = name;
-    }
-    names.forEach(function(n){
-      var active = n === name;
-      tabs[n].setAttribute('aria-selected', String(active));
-      tabs[n].tabIndex = active ? 0 : -1;
-      panes[n].hidden = !active;
-    });
-    var section = document.getElementById(name === 'json' ? 'sec-source' : 'sec-' + name);
-    if (section) section.open = true;
-    if (changed && scrolls[name]){
-      panes[name].scrollTop = scrolls[name].pane;
-      if (name === 'json') src.scrollTop = scrolls[name].source;
-      if (name === 'inspect' && guide)
-        guide.scrollTop = guide.firstChild === scrolls[name].form ? scrolls[name].inspector : 0;
-    }
-    if (options.focus) tabs[name].focus({preventScroll:true});
-    if (changed) persist();
-    return true;
-  }
-  names.forEach(function(name, index){
-    tabs[name].addEventListener('click', function(){ showTool(name, {closeUtilities:true}); });
-    tabs[name].addEventListener('keydown', function(ev){
-      if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
-      var next;
-      if (ev.key === 'ArrowDown' || ev.key === 'ArrowRight') next = (index + 1) % names.length;
-      else if (ev.key === 'ArrowUp' || ev.key === 'ArrowLeft') next = (index + names.length - 1) % names.length;
-      else if (ev.key === 'Home') next = 0;
-      else if (ev.key === 'End') next = names.length - 1;
-      else return;
-      ev.preventDefault(); ev.stopPropagation();
-      showTool(names[next], {focus:true, closeUtilities:true});
-    });
-  });
-  function assign(value){
-    var b = bounds(); prefs.editor = Math.max(b.min, Math.min(b.max, Math.round(value))); paint();
-  }
+  function close(name){prefs.windows[name].open=false;paint(name);persist();tabs[name].focus({preventScroll:true});}
   function finish(cancel){
-    if (!drag) return;
-    var done = drag; drag = null;
-    if (cancel) prefs.editor = done.before;
-    document.body.classList.remove('workspace-dragging');
-    document.body.style.cursor = done.cursor;
-    if (cols.hasPointerCapture(done.id)) cols.releasePointerCapture(done.id);
-    paint();
-    if (!cancel) persist();
+    if(!gesture)return;
+    var g=gesture;gesture=null;
+    if(cancel)prefs.windows[g.name]=g.before;
+    document.body.classList.remove('workspace-dragging');document.body.style.cursor='';
+    if(g.handle.hasPointerCapture(g.id))g.handle.releasePointerCapture(g.id);
+    paint(g.name);if(!cancel)persist();
   }
-  cols.addEventListener('pointerdown', function(ev){
-    if (ev.button !== 0 || !ev.isPrimary || drag) return;
-    ev.preventDefault(); cols.focus({preventScroll:true});
-    drag = {id:ev.pointerId, before:prefs.editor, start:ev.clientX,
-      value:effectiveWidth(), cursor:document.body.style.cursor};
-    cols.setPointerCapture(ev.pointerId);
-    document.body.classList.add('workspace-dragging'); document.body.style.cursor = 'col-resize';
-  });
-  cols.addEventListener('pointermove', function(ev){
-    if (drag && drag.id === ev.pointerId) assign(drag.value + ev.clientX - drag.start);
-  });
-  cols.addEventListener('pointerup', function(ev){ if (drag && drag.id === ev.pointerId) finish(false); });
-  cols.addEventListener('pointercancel', function(ev){ if (drag && drag.id === ev.pointerId) finish(true); });
-  cols.addEventListener('lostpointercapture', function(){ if (drag) finish(true); });
-  cols.addEventListener('keydown', function(ev){
-    if (ev.altKey || ev.ctrlKey || ev.metaKey) return;
-    var value = effectiveWidth(), amount = ev.shiftKey ? 50 : 20;
-    if (ev.key === 'Home') value = bounds().min;
-    else if (ev.key === 'End') value = bounds().max;
-    else if (ev.key === 'ArrowLeft') value -= amount;
-    else if (ev.key === 'ArrowRight') value += amount;
-    else return;
-    ev.preventDefault(); ev.stopPropagation(); assign(value); persist();
-  });
-  cols.addEventListener('dblclick', function(){
-    var style = getComputedStyle(wrap);
-    assign((wrap.clientWidth - parseFloat(style.paddingLeft || 0) - parseFloat(style.paddingRight || 0) - 24 - 72) / 2);
-    persist();
-  });
-  function setFocus(on){
-    var was = document.body.classList.contains('workspace-focus');
-    if (on === was) return;
-    if (on) pageScroll = window.scrollY;
-    document.body.classList.toggle('workspace-focus', on);
-    focus.setAttribute('aria-pressed', String(on)); focus.textContent = on ? 'Exit focus' : 'Focus workspace';
-    paint(); window.scrollTo(0, on ? 0 : pageScroll);
+  function begin(ev,name,kind,handle){
+    if(ev.button!==0 || !ev.isPrimary || gesture)return;
+    ev.preventDefault();front(name);handle.focus({preventScroll:true});
+    gesture={id:ev.pointerId,name:name,kind:kind,handle:handle,x:ev.clientX,y:ev.clientY,rect:rect(name),before:Object.assign({},prefs.windows[name])};
+    handle.setPointerCapture(ev.pointerId);document.body.classList.add('workspace-dragging');document.body.style.cursor=kind==='move'?'grabbing':'nwse-resize';
   }
-  focus.addEventListener('click', function(){
-    finish(true);
-    setFocus(!document.body.classList.contains('workspace-focus'));
-  });
-  reset.addEventListener('click', function(){
-    finish(true); prefs.editor = 440; paint(); persist();
-  });
-  window.addEventListener('resize', function(){ finish(true); paint(); });
-  window.addEventListener('blur', function(){ finish(true); });
-  if (typeof ResizeObserver !== 'undefined'){
-    var observer = new ResizeObserver(paint); observer.observe(wrap); observer.observe(toolbar);
+  function move(ev){
+    if(!gesture || ev.pointerId!==gesture.id)return;
+    var g=gesture,r=Object.assign({},g.rect),dx=ev.clientX-g.x,dy=ev.clientY-g.y;
+    if(g.kind==='move'){r.x+=dx;r.y+=dy;}else{r.w+=dx;r.h+=dy;}
+    Object.assign(prefs.windows[g.name],workspacePanelRect(r,innerWidth,innerHeight));paint(g.name);
   }
-  showTool(prefs.tool); paint();
-  return {showTool:showTool, tool:function(){return prefs.tool;}};
+  function keyMove(ev,name,kind){
+    if(ev.altKey || ev.ctrlKey || ev.metaKey || !/^Arrow(Left|Right|Up|Down)$/.test(ev.key))return;
+    ev.preventDefault();ev.stopPropagation();var r=rect(name),amount=ev.shiftKey?50:10;
+    var axis=/Left|Right/.test(ev.key)?(kind==='move'?'x':'w'):(kind==='move'?'y':'h');
+    r[axis]+=/Left|Up/.test(ev.key)?-amount:amount;
+    Object.assign(prefs.windows[name],workspacePanelRect(r,innerWidth,innerHeight));paint(name);persist();
+  }
+  names.forEach(function(name,index){
+    var pane=panes[name]=document.getElementById('editor-'+name),tab=tabs[name]=document.getElementById('editor-tab-'+name);
+    var win=document.createElement('section');win.className='workspace-window';win.id='workspace-window-'+name;win.setAttribute('aria-label',labels[name]);
+    var head=document.createElement('div');head.className='workspace-window-header';
+    var grip=document.createElement('button');grip.type='button';grip.className='workspace-window-grip';grip.textContent=labels[name];
+    grip.setAttribute('aria-label','Move '+labels[name]+' panel');grip.title='Drag to move · arrow keys move · Shift moves farther';
+    var hide=document.createElement('button');hide.type='button';hide.className='workspace-window-close';hide.textContent='×';hide.setAttribute('aria-label','Close '+labels[name]+' panel');
+    var resize=document.createElement('button');resize.type='button';resize.className='workspace-window-resize';resize.textContent='◢';resize.setAttribute('aria-label','Resize '+labels[name]+' panel');resize.title='Drag to resize · arrow keys resize';
+    head.append(grip,hide);pane.before(win);win.append(head,pane,resize);pane.removeAttribute('role');
+    windows[name]=win;prefs.windows[name]=Object.assign(defaults(name),prefs.windows[name]);
+    tab.setAttribute('role','button');tab.removeAttribute('aria-selected');tab.setAttribute('aria-controls',win.id);
+    tab.addEventListener('click',function(){showTool(name);});
+    tab.addEventListener('keydown',function(ev){
+      if(ev.altKey || ev.ctrlKey || ev.metaKey)return;
+      var next=ev.key==='ArrowDown'||ev.key==='ArrowRight'?(index+1)%names.length:ev.key==='ArrowUp'||ev.key==='ArrowLeft'?(index+names.length-1)%names.length:ev.key==='Home'?0:ev.key==='End'?names.length-1:-1;
+      if(next<0)return;ev.preventDefault();showTool(names[next],{focus:true});
+    });
+    hide.addEventListener('click',function(){close(name);});
+    win.addEventListener('pointerdown',function(){front(name);});
+    win.addEventListener('focusin',function(){front(name);});
+    [[grip,'move'],[resize,'resize']].forEach(function(pair){
+      var handle=pair[0],kind=pair[1];
+      handle.addEventListener('pointerdown',function(ev){begin(ev,name,kind,handle);});handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',function(ev){if(gesture && ev.pointerId===gesture.id)finish(false);});
+      handle.addEventListener('pointercancel',function(){finish(true);});handle.addEventListener('lostpointercapture',function(){finish(true);});
+      handle.addEventListener('keydown',function(ev){keyMove(ev,name,kind);});
+    });
+  });
+  // Keep shared editing notices with Inspect, and source validation with JSON.
+  ['draftbar','msgs'].forEach(function(id){var el=document.getElementById(id);if(el)panes.json.appendChild(el);});
+  var insertion=editor.querySelector('.editor-add-status');if(insertion)panes.inspect.prepend(insertion);
+  function setHidden(on){hidden=on;paintAll();var button=document.getElementById('workspace-panels');button.textContent=on?'Show tools':'Hide tools';button.setAttribute('aria-pressed',String(on));}
+  document.getElementById('workspace-panels').addEventListener('click',function(){setHidden(!hidden);});
+  document.getElementById('workspace-focus').addEventListener('click',function(){setHidden(true);});
+  document.getElementById('workspace-reset').addEventListener('click',function(){
+    finish(true);names.forEach(function(name){var open=prefs.windows[name].open;prefs.windows[name]=Object.assign(defaults(name),{open:open});});paintAll();persist();
+  });
+  window.addEventListener('keydown',function(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();finish(true);}},true);
+  window.addEventListener('blur',function(){finish(true);});window.addEventListener('resize',function(){finish(true);paintAll();});
+  if(!hasSaved)prefs.windows[prefs.tool].open=true;
+  front(prefs.tool);paintAll();
+  var canvas=initWorkbenchCanvas();
+  return {showTool:showTool,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
 }

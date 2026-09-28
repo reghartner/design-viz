@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 
 for(const type of ['screen','phone'])test(type+' temporary state editing preserves carried state and supports exact Undo',async({page,server},info)=>{
  const panel={id:'p',title:'Resident '+type,type,initial:{audio:{output:'silent'}}};
@@ -22,7 +22,7 @@ for(const type of ['screen','phone'])test(type+' temporary state editing preserv
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="'+i+'"]').click();await page.locator('#editor-tab-inspect').click();
   if(await patch.getAttribute('open')===null)await patch.locator(':scope > summary').click();
  }
- await root.locator('.ptitle').click();await expect(guide.locator('[aria-label$=" duration"]')).toHaveCount(0);
+ await inspectPageElement(page,root.locator('.ptitle'));await expect(guide.locator('[aria-label$=" duration"]')).toHaveCount(0);
  await selectStep(1);
  await expect(patch.locator('[aria-label$=" duration"]')).toHaveCount(type==='screen'?6:1);
  await expect(patch.getByLabel('audio duration',{exact:true})).toHaveValue('both');

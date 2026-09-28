@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/app-screens/app-screens.spec.json'),'utf8');
 const raw=JSON.parse(source), diagram=value=>value.page.sections[0].diagram;
@@ -10,7 +10,7 @@ const upload=id=>({name:id+'.png',mimeType:'image/png',buffer:Buffer.from(assets
 const panel=root=>root.locator('.pt-appscreens');
 const chip=(root,id)=>root.locator('.schip[data-step-source="'+id+'"]').first();
 async function screen(root,id){await expect(panel(root).locator('.appscreen-current')).toHaveAttribute('data-screen-id',id);await expect.poll(()=>panel(root).locator('.appscreen-current').evaluate(el=>el.complete && el.naturalWidth>0)).toBe(true);}
-async function inspect(page){await panel(page.locator('#docview')).locator('.ptitle').click();}
+async function inspect(page){await pagePreview(page);await panel(page.locator('#docview')).locator('.ptitle').click();await page.locator('#editor-tab-inspect').click();}
 async function inspectStep(page,index){await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="'+index+'"]').click();await page.locator('#editor-tab-inspect').click();}
 async function publish(server,name,content=source){
   await writeFile(path.join(server.root,name+'.json'),content);

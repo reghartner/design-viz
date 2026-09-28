@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 const board=()=>({nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a'],['b']],edges:[{from:'a',to:'b',bend:30}],steps:[]});
 
 test('section routing preserves imported lanes, changes only the selected diagram, and supports Undo/Redo',async({page,server},testInfo)=>{

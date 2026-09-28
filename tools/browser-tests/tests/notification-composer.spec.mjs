@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 
 for(const type of ['phone','deviceapp'])test(type+' notification composer edits initial and step stacks with Undo',async({page,server},testInfo)=>{
  const panel={id:'resident',type,title:'Resident phone',appName:'Home',brand:{app:'Home'},fields:[],initial:{phoneScreen:'home',clock:'9:41',notify:{app:'Home',title:'Earlier'}}};
@@ -12,7 +12,7 @@ for(const type of ['phone','deviceapp'])test(type+' notification composer edits 
  const source=async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram;
  await page.goto(server.origin+'/workbench.html');await paste(page,original);
  const root=page.locator('#docview'),guide=page.locator('#guide');
- await root.locator('.ptitle').click();
+ await inspectPageElement(page,root.locator('.ptitle'));
  const initial=guide.locator('.initialedit');
  await initial.getByLabel('Title',{exact:true}).fill('Welcome');await initial.getByLabel('Title',{exact:true}).press('Tab');
  await expect(root.locator('.phonetitle')).toHaveText('Welcome');expect((await source()).steps).toEqual(d.steps);

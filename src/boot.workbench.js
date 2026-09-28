@@ -258,8 +258,8 @@ var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow spec */
 var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
-  beforeReplace:function(request){if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
-  completed:function(outcome){if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
+  beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
+  completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
 });
 
 /* one button per skin, generated from SKIN_NAMES so a new skin appears
@@ -361,6 +361,7 @@ applySkinClasses(document.body, view, currentSkin(null));
 /* builder: click any rendered node/edge/label/coin/panel/section to jump to
    its definition in the editor; INSERT buttons splice ready-made snippets */
 var workspace = initWorkbenchWorkspace();
+workspace.canvas.bind(workbenchPreview.controller,workbenchPreview.page);
 var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
   catalog:function(){return canonContext && canonContext.catalog;},
@@ -368,6 +369,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
   beforeProjectLoad:function(){
+    workspace.canvas.reset();
     workbenchPreview.forgetDocument();
     if(!loadingCanon){
       if(welcome && welcome.localProjectOpened)welcome.localProjectOpened();
@@ -378,7 +380,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   ctl:workbenchPreview.controller});
 var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
-canonContext=initCanonWorkbench({src:src,catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
+canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
   loadingCanon=true;
   try{var result=workbenchBuilder.loadSpec(raw);welcome.canonicalLoaded();return result;}
   finally{loadingCanon=false;}

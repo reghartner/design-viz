@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=await readFile(path.join(repo,'examples/story-time/story-time.spec.json'),'utf8');
 const chip=(root,index)=>root.locator('.schip[data-step-source="'+index+'"]').first();
@@ -107,7 +107,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
   await page.locator('#guide').screenshot({path:testInfo.outputPath('story-time-step-inspector.png')});
 
   // Panel constant overrides the diagram default.
-  await root.locator('.pt-battery .ptitle').click();
+  await inspectPageElement(page,root.locator('.pt-battery .ptitle'));
   const own=guide.getByRole('textbox',{name:'Drain % per hour',exact:true});
   await expect(own).toHaveAttribute('placeholder','Diagram default · 2 %/h');
   await own.fill('0');await own.press('Tab');
@@ -177,7 +177,7 @@ test('workbench device app report time: mark reported at this step, derived fres
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(marked);
 
   // Starting state: reported at story start.
-  await root.locator('.pt-deviceapp .ptitle').click();
+  await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
   const start=guide.getByRole('button',{name:'battery: reported at story start',exact:true});
   await start.click();
   await expect.poll(async()=>d(await spec()).panels[0].initial.battery).toEqual({value:60,status:'ready',reportedAt:'now'});

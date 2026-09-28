@@ -19,7 +19,7 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   await page.locator('#editor-tab-json').click();
   await target.selectOption('2');
   await expect(page.locator('#tab-1-1')).toHaveAttribute('aria-selected','true');
-  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-pressed','true');
   await expect(target.locator('option:checked')).toContainText('Operations');
   await add.focus();await page.keyboard.press('Enter');
   await expect(page.locator('#diagram-add-menu')).toBeVisible();
@@ -42,8 +42,8 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   await target.selectOption('0');await open(page,'edge');
   await expect(page.locator('#diagram-add-menu')).toBeHidden();
   await expect(add).toBeDisabled();await expect(target).toBeDisabled();
-  // A source outside the selected section cannot silently retarget the addition.
-  await page.locator('[data-dv-node=y]').click();await expect(page.locator('#btarget')).toContainText('section 1');
+  // Other sections cannot retarget an addition while this diagram owns the canvas.
+  await expect(page.locator('[data-dv-node=y]')).toBeHidden();await expect(target).toHaveValue('0');
   await page.locator('[data-dv-node=b]').click();await page.locator('[data-dv-node=c]').click();
   expect((await spec(page)).page.blocks[0].diagram.edges).toHaveLength(2);
   await expect(add).toBeEnabled();
@@ -98,7 +98,8 @@ test('chooser cancels cleanly, blocks stale/invalid source, and retires on build
 
 test('Add UI stays within a narrow editor and its modal fits supported skins',async({page,server},testInfo)=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
-  await page.locator('#workspace-columns').focus();await page.keyboard.press('Home');
+  await page.locator('#workspace-window-inspect .workspace-window-resize').focus();await page.keyboard.press('Shift+ArrowLeft');
+  await page.locator('#workspace-appearance>summary').click();
   const box=await page.locator('.workspace-tools').boundingBox();
   for(const id of ['diagram-add','diagram-add-target']){
     const child=await page.locator('#'+id).boundingBox();expect(child.x+child.width).toBeLessThanOrEqual(box.x+box.width);

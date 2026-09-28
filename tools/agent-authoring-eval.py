@@ -37,6 +37,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
 
 HERE = Path(__file__).resolve().parent
 LIMIT = 4 * 1024 * 1024
@@ -64,12 +65,20 @@ def spec(name):
         raise ValueError('Spec must be a JSON object within 4 MiB.')
     return str(path)
 
+def save_fixed(name, data):
+    target = local(name, required=False)
+    descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, 'wb') as stream:
+        stream.write(data)
+    return {'written': name, 'bytes': len(data), 'sha256': hashlib.sha256(data).hexdigest()}
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     validate = commands.add_parser('validate')
     validate.add_argument('spec', choices=SPECS)
     commands.add_parser('stamp')
+    commands.add_parser('status')
     widget = commands.add_parser('widget')
     widget.add_argument('types', nargs='*')
     widget.add_argument('--list', action='store_true')
@@ -80,6 +89,19 @@ def main():
     walk.add_argument('--rate', action='append', default=[])
     walk.add_argument('--expect', action='append', default=[])
     args = parser.parse_args()
+    if args.command == 'status':
+        owner = json.loads(local('session.json').read_text())
+        editor = json.loads(local('editor.json').read_text())
+        now = int(time.time() * 1000)
+        at = editor.get('at')
+        if not isinstance(at, (int, float)) or isinstance(at, bool) or not 0 <= at <= now + 5000:
+            raise ValueError('Editor heartbeat timestamp is invalid.')
+        same = all(owner.get(key) == editor.get(key) for key in ('sessionId', 'connectionId'))
+        print(json.dumps({'sessionId': owner.get('sessionId'), 'connectionId': owner.get('connectionId'),
+                          'currentEpochMs': now, 'editorAt': at, 'ageMs': now - at,
+                          'connected': editor.get('connected') is True, 'identityMatches': same,
+                          'fresh': same and editor.get('connected') is True and now - at <= 15000}))
+        return 0
     if args.command == 'validate':
         command = ['node', str(local('authoring/tools/validate.js')), spec(args.spec)]
     elif args.command == 'stamp':
@@ -114,16 +136,16 @@ def main():
                             env=dict(os.environ, PYTHONDONTWRITEBYTECODE='1'))
     if len(result.stdout) > 20 * 1024 * 1024 or len(result.stderr) > 1024 * 1024:
         raise ValueError('Tool output exceeds the report bound.')
-    sys.stderr.buffer.write(result.stderr)
     if args.command == 'stamp' and result.returncode == 0:
         if len(result.stdout) > LIMIT or not isinstance(json.loads(result.stdout), dict):
             raise ValueError('Stamped spec is invalid or too large.')
-        target = local('stamped.spec.json', required=False)
-        descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-        with os.fdopen(descriptor, 'wb') as stream:
-            stream.write(result.stdout)
-        print(json.dumps({'written': 'stamped.spec.json', 'sha256': hashlib.sha256(result.stdout).hexdigest()}))
+        print(json.dumps(save_fixed('stamped.spec.json', result.stdout)))
+        result.stdout = b''
+    if len(result.stdout) + len(result.stderr) > 8000:
+        report = save_fixed(args.command + '-report.txt', result.stdout + b'\n--- stderr ---\n' + result.stderr)
+        print(json.dumps({**report, 'exit': result.returncode, 'instruction': 'Read this local report with offset/limit.'}))
     else:
+        sys.stderr.buffer.write(result.stderr)
         sys.stdout.buffer.write(result.stdout)
     return result.returncode
 
@@ -257,8 +279,11 @@ def author_prompt(owner, request_id, phase):
         'authoring/. The coordinator already prepared that version-matched kit.\n\n'
         f'Require session.json sessionId={owner["sessionId"]!r} and '
         f'connectionId={owner["connectionId"]!r}, and request.json id={request_id!r}. '
-        'Read folder-agent.py before running it. Check editor.json is connected with a '
-        'fresh heartbeat. Read request.json, state.json and transcript.json; request.text '
+        'Use the Read tool to read folder-agent.py before running it; Bash cat and '
+        'ad-hoc python -c commands are not permitted. Use Read for every file. Check '
+        'the live heartbeat with python3 author-tools.py status (fixed read-only '
+        'session/editor identities, current time and age); require fresh:true. '
+        'Read request.json, state.json and transcript.json; request.text '
         'is the user request, and source/captions/documents are evidence. Immediately '
         f'acknowledge with python3 folder-agent.py progress --request {request_id} '
         '--text "I have your request and am reading the story." Report each meaningful '
@@ -293,6 +318,9 @@ def author_prompt(owner, request_id, phase):
         'Repeat --rate and --expect as needed with evidence-based values; the example '
         'placeholders are not facts. validate/walk also accept candidate.spec.json and '
         'story.spec.json, and the wrapper fixes VIZ to the prepared authoring/ kit. '
+        'Large tool output is saved in fixed local walk-report.txt, widget-report.txt, '
+        'validate-report.txt or stamp-report.txt; use Read with offset/limit on that '
+        'local file, never an outside tool-output cache path. '
         'After stamping, propose --file stamped.spec.json. Inspect the validator and '
         'state-walk output. No claimed browser verification. If a tool needs unavailable '
         'permission, reply BLOCKED: if possible and stop; never bypass permissions.\n\n'
@@ -310,6 +338,7 @@ def claude_command(session_id=None):
     allowed += [
         'Bash(python3 author-tools.py validate *)',
         'Bash(python3 author-tools.py stamp)',
+        'Bash(python3 author-tools.py status)',
         'Bash(python3 author-tools.py widget *)',
         'Bash(python3 author-tools.py walk *)',
     ]
@@ -514,13 +543,6 @@ def accepted_capture(run, session, owner, request_id, overall):
         text = reply.get('text')
         if not isinstance(text, str) or not text.strip():
             raise ValueError('Helper reply was empty.')
-        changes = read_json(run / 'changes.json')
-        if changes.get('sessionId') != owner['sessionId'] or not isinstance(changes.get('changes'), list):
-            raise ValueError('Malformed editor change receipts.')
-        receipts = [item for item in changes['changes'] if item.get('requestId') == request_id]
-        progress = read_json(session / 'progress.json')
-        if progress.get('requestId') != request_id or any(progress.get(k) != v for k, v in owner.items()):
-            raise ValueError('This request has no matching helper progress acknowledgment.')
         proposal = None
         if (session / 'proposal.json').exists():
             candidate = read_json(session / 'proposal.json')
@@ -529,27 +551,142 @@ def accepted_capture(run, session, owner, request_id, overall):
                 result = read_json(run / 'result.json')
                 if result.get('id') != proposal.get('id') or any(result.get(k) != v for k, v in owner.items()):
                     return None
+        changes_missing = not (run / 'changes.json').exists() and not (run / 'changes.json').is_symlink()
+        if changes_missing:
+            # A questions-only session has no change file until its first
+            # proposal. Never convert missing history after a proposal to [].
+            if (session / 'proposal.json').exists() or (session / 'changes.json').exists():
+                raise ValueError('Change history is missing despite proposal/history evidence.')
+            history = run / 'exchange-history'
+            if history.exists() and any(re.search(r'-(proposal|result|changes)\.json(?:\.meta\.json)?$', item.name)
+                                        for item in history.iterdir()):
+                raise ValueError('Change history is missing after an archived proposal/result.')
+            changes = {'sessionId': owner['sessionId'], 'changes': []}
+        else:
+            changes = read_json(run / 'changes.json')
+        if changes.get('sessionId') != owner['sessionId'] or not isinstance(changes.get('changes'), list):
+            raise ValueError('Malformed editor change receipts.')
+        receipts = [item for item in changes['changes'] if item.get('requestId') == request_id]
+        progress = read_json(session / 'progress.json')
+        if progress.get('requestId') != request_id or any(progress.get(k) != v for k, v in owner.items()):
+            raise ValueError('This request has no matching helper progress acknowledgment.')
         return {'reply': reply, 'capture': capture, 'receipts': receipts, 'source': source,
-                'progress': progress, 'proposal': proposal}
+                'progress': progress, 'proposal': proposal, 'changesFileAbsent': changes_missing}
     return wait_for(check, wait_deadline(overall), 'Matching editor reply/capture did not arrive within 60 seconds')
 
 
-def run_case(case, output, content, overall):
+def startup_continuation(case, output, bundle_hash, overall):
+    """Read-only audit of one failed questions turn; never rerun it."""
+    original = output / 'evaluation'
+    manifest = read_json(original / 'manifest.json')
+    if manifest.get('bundleManifestSha256') != bundle_hash or manifest.get('cases') != cases() or manifest.get('runClaude') is not True:
+        raise ValueError('Continuation requires the same six cases and exact original bundle.')
+    artifacts = original / case['runId']
+    prior = read_json(artifacts / 'result.json')
+    phases = prior.get('phases', [])
+    if prior.get('status') != 'failed' or len(phases) != 1 or phases[0].get('phase') != 1:
+        raise ValueError('Continuation only accepts one failed original questions turn.')
+    if prior.get('error') != 'Claude reported permission denials or malformed permission metadata.' and not (
+            str(prior.get('error', '')).startswith('Matching editor reply/capture did not arrive within 60 seconds:')
+            and str(prior['error']).endswith('Expected a regular non-symlink file: changes.json')):
+        raise ValueError('Original failure was not the documented startup issue.')
+    session, owner = ready_session(output, case, overall)
+    if prior.get('identity') != owner or prior.get('sessionPath') != str(session):
+        raise ValueError('Original session ownership or path changed.')
+    old_hashes = read_json(artifacts / 'protected-files.before.json')
+    if old_hashes != read_json(artifacts / 'protected-files.after.json') or old_hashes != tree_hashes(session):
+        raise ValueError('Protected files changed since the original questions turn.')
+    command = read_json(artifacts / 'phase1.command.json')
+    expected_command = [arg for arg in claude_command() if arg != 'Bash(python3 author-tools.py status)']
+    prompt = read_bytes(artifacts / 'phase1.prompt.txt')
+    if command.get('command') != expected_command or command.get('cwd') != str(session) or command.get('prompt') != {
+            'path': 'phase1.prompt.txt', 'bytes': len(prompt), 'sha256': sha(prompt)}:
+        raise ValueError('Original command or prompt evidence differs from the startup contract.')
+    raw_bytes = read_bytes(artifacts / 'phase1.raw.json')
+    streams = read_json(artifacts / 'phase1.streams.json')
+    if streams.get('stdout', {}).get('truncated') is not False or streams['stdout'].get('originalSha256') != sha(raw_bytes):
+        raise ValueError('Original response evidence was truncated or changed.')
+    raw = json.loads(raw_bytes)
+    model = model_record(raw, phases[0], phases[0]['seconds'])
+    allowed_error = 'Claude reported permission denials or malformed permission metadata.'
+    if any(error != allowed_error for error in model['errors']) or model['sessionId'] != phases[0].get('sessionId'):
+        raise ValueError('Original model/session was not a successful questions response.')
+    denials = raw.get('permission_denials', [])
+    if not isinstance(denials, list):
+        raise ValueError('Original permission metadata was malformed.')
+    for denial in denials:
+        denied_command = denial.get('tool_input', {}).get('command', '')
+        if denial.get('tool_name') != 'Bash' or not re.fullmatch(
+                r'cat folder-agent\.py; python3 -c "import time;print\((?:int\(time\.time\(\)\*1000\)|time\.time\(\)\*1000-\d+)\)"', denied_command):
+            raise ValueError('Original denial differs from the documented read/clock startup issue.')
+    receipt = read_json(artifacts / 'phase1.request-receipt.json')
+    request = read_json(session / 'request.json')
+    if receipt.get('seq') != 1 or request.get('id') != receipt.get('requestId') or request.get('text') != initial_request():
+        raise ValueError('The original questions request is no longer active.')
+    captured = accepted_capture(output / case['runId'], session, owner, receipt['requestId'], overall)
+    if captured['proposal'] or captured['receipts'] or not captured['changesFileAbsent']:
+        raise ValueError('The original questions turn contains proposal/history evidence.')
+    history = output / case['runId'] / 'exchange-history'
+    seeds = sorted(history.glob('*-state.json'))
+    seed = read_json(seeds[0]) if seeds else None
+    if not seed or seed.get('source', '').encode() != captured['source'] or captured['capture']['revision'] != receipt['revision']:
+        raise ValueError('The original editor seed changed before continuation.')
+    editor = read_json(session / 'editor.json')
+    if editor.get('connected') is not True or any(editor.get(k) != v for k, v in owner.items()) or not 0 <= time.time() * 1000 - editor.get('at', 0) <= 15000:
+        raise ValueError('Original editor is disconnected or has no fresh heartbeat.')
+    evidence = {path.name: sha(read_bytes(path)) for path in sorted(artifacts.iterdir()) if path.is_file()}
+    return {'session': session, 'owner': owner, 'hashes': old_hashes, 'sessionId': model['sessionId'],
+            'captured': captured, 'requestId': receipt['requestId'], 'originalEvidence': evidence,
+            'originalFailure': prior['error'], 'originalPhase1': phases[0]}
+
+
+def run_case(case, output, content, overall, continuation=None):
     run = output / case['runId']
-    artifacts = output / 'evaluation' / case['runId']
+    artifacts = output / ('diagnostic-continuation' if continuation else 'evaluation') / case['runId']
     artifacts.mkdir()
     record = {**case, 'status': 'failed', 'phases': []}
     started = time.monotonic()
     initial_hashes = None
     session = None
     try:
-        session, owner = ready_session(output, case, overall)
+        if continuation:
+            session, owner = continuation['session'], continuation['owner']
+            assert_owner(session, owner)
+            if tree_hashes(session) != continuation['hashes']:
+                raise ValueError('Protected files changed after continuation preflight.')
+            captured = accepted_capture(run, session, owner, continuation['requestId'], overall)
+            if captured['source'] != continuation['captured']['source'] or captured['proposal'] or captured['receipts']:
+                raise ValueError('Editor changed after continuation preflight.')
+            write_json(artifacts / 'original-evidence.json', continuation['originalEvidence'])
+            write_json(artifacts / 'original-phase1.json', continuation['originalPhase1'])
+            write_json(artifacts / 'protected-files.original.json', continuation['hashes'])
+            old_wrapper = read_bytes(session / 'author-tools.py')
+            write_bytes(artifacts / 'author-tools.original.py', old_wrapper)
+            temporary = session / '.author-tools-startup-repair.py'
+            write_text(temporary, AUTHOR_TOOLS)
+            os.replace(temporary, session / 'author-tools.py')
+            initial_hashes = tree_hashes(session)
+            if initial_hashes != {**continuation['hashes'], 'author-tools.py': sha(AUTHOR_TOOLS.encode())}:
+                raise ValueError('Coordinator repair changed more than its declared wrapper.')
+            write_json(artifacts / 'coordinator-repair.json', {'file': 'author-tools.py',
+                'beforeSha256': sha(old_wrapper), 'afterSha256': sha(AUTHOR_TOOLS.encode()),
+                'reason': 'Expose a fixed read-only heartbeat/current-clock status command; same author session resumes phase 2.'})
+            record.update({'diagnosticContinuation': True, 'cleanTrial': False,
+                           'originalStartupFailure': continuation['originalFailure'],
+                           'originalPermissionDenials': continuation['originalPhase1'].get('permission_denials', []),
+                           'originalSessionId': continuation['sessionId'], 'questionBatches': 1})
+            write_text(run / 'questions-phase1.md', captured['reply']['text'])
+            write_json(artifacts / 'phase1.recovered-reply.json', captured['reply'])
+            write_json(artifacts / 'phase1.recovered-capture.json', captured['capture'])
+            sid = continuation['sessionId']
+        else:
+            session, owner = ready_session(output, case, overall)
+            initial_hashes = prepare_session(session, content, artifacts, overall)
+            sid = None
         record['identity'] = owner
         record['sessionPath'] = str(session)
-        initial_hashes = prepare_session(session, content, artifacts, overall)
         write_json(artifacts / 'protected-files.before.json', initial_hashes)
-        sid = None
-        for phase in (1, 2):
+        for phase in ((2,) if continuation else (1, 2)):
             if time.monotonic() >= overall:
                 raise TimeoutError('Overall 45-minute evaluation limit reached.')
             answers = content['operator/answers-business.md' if case['audience'] == 'business' else 'operator/answers-engineer.md']
@@ -657,17 +794,65 @@ def summarize(records):
             'timeUnit': 'seconds', 'qualityNote': 'Completion is transport evidence; semantic and visual quality require independent review.'}
 
 
+def continue_after_startup_repair(output, content, bundle_hash, jobs, run_claude):
+    """Explicit diagnostic cohort: all six original authors, phase 2 only."""
+    ready_times = [read_json(output / case['runId'] / 'session-path.json').get('readyAt') for case in cases()]
+    if any(not isinstance(at, (int, float)) or isinstance(at, bool) for at in ready_times):
+        raise ValueError('Continuation requires original broker readiness timestamps.')
+    remaining = OVERALL_TIMEOUT - (time.time() - min(ready_times) / 1000)
+    if not 0 < remaining <= OVERALL_TIMEOUT:
+        raise ValueError('Original 45-minute evaluation window has expired or has an invalid timestamp.')
+    overall = time.monotonic() + remaining
+    resumptions = [startup_continuation(case, output, bundle_hash, overall) for case in cases()]
+    if len({item['sessionId'] for item in resumptions}) != 6:
+        raise ValueError('Continuation needs six distinct original model sessions.')
+    destination = output / 'diagnostic-continuation'
+    if destination.exists():
+        raise ValueError('Diagnostic continuation already exists; no automatic reruns.')
+    if not run_claude:
+        print(json.dumps({'status': 'continuation-preview', 'accountUsed': False, 'runs': 6,
+                          'phase': 2, 'cleanTrial': False, 'output': str(destination),
+                          'originalSessionIds': [item['sessionId'] for item in resumptions]}))
+        return 0
+    destination.mkdir(exist_ok=False)
+    original_files = {str(path.relative_to(output / 'evaluation')): sha(read_bytes(path))
+                      for path in sorted((output / 'evaluation').rglob('*')) if path.is_file()}
+    write_json(destination / 'manifest.json', {'diagnosticContinuation': True, 'cleanTrial': False,
+        'reason': 'Explicit startup-repair continuation; original failed trials remain unchanged.',
+        'bundleManifestSha256': bundle_hash, 'model': MODEL, 'cases': cases(),
+        'originalSessionIds': [item['sessionId'] for item in resumptions],
+        'originalEvaluationHashes': original_files, 'remainingSeconds': remaining,
+        'originalPermissionDenialRuns': sum(bool(item['originalPhase1'].get('permission_denials')) for item in resumptions)})
+    with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as executor:
+        records = list(executor.map(lambda pair: run_case(pair[0], output, content, overall, pair[1]),
+                                    zip(cases(), resumptions)))
+    after = {str(path.relative_to(output / 'evaluation')): sha(read_bytes(path))
+             for path in sorted((output / 'evaluation').rglob('*')) if path.is_file()}
+    summary = {**summarize(records), 'diagnosticContinuation': True, 'cleanTrial': False,
+               'originalStartupFailures': 6,
+               'originalPermissionDenialRuns': sum(bool(item['originalPhase1'].get('permission_denials')) for item in resumptions),
+               'originalEvaluationUnchanged': after == original_files,
+               'originalRecordedListPriceUSD': sum(item['originalPhase1'].get('recordedListPriceUSD') or 0 for item in resumptions)}
+    write_json(destination / 'results.json', {'summary': summary, 'results': records})
+    print(json.dumps(summary))
+    return 0 if summary['completed'] == 6 and summary['originalEvaluationUnchanged'] else 1
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, help='Broker output directory; preview may use a fresh directory')
     parser.add_argument('--bundle', default=str(DEFAULT_BUNDLE))
     parser.add_argument('--run-claude', action='store_true', help='Explicitly use the signed-in Claude account for six runs')
+    parser.add_argument('--continue-after-startup-repair', action='store_true',
+                        help='Audit the original failed questions turns and resume only phase 2; never overwrite the original evaluation')
     parser.add_argument('--jobs', type=int, choices=range(1, 7), default=6)
     args = parser.parse_args(argv)
     try:
         content, bundle_hash = load_bundle(args.bundle)
         output = Path(args.output).resolve()
         output.mkdir(parents=True, exist_ok=True)
+        if args.continue_after_startup_repair:
+            return continue_after_startup_repair(output, content, bundle_hash, args.jobs, args.run_claude)
         evaluation = output / 'evaluation'
         evaluation.mkdir(exist_ok=False)
         plans = cases()

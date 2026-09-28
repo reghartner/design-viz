@@ -3,6 +3,7 @@ import {mkdtemp, readFile, writeFile, readdir, rm, mkdir} from 'node:fs/promises
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
+import {fileURLToPath} from 'node:url';
 import {createSession, defaultSource, validateControl, runBroker} from '../../agent-authoring-workbench.mjs';
 
 test('authoring broker connects the real editor, sends once, applies helper output and captures exact evidence without a model', async ({page}) => {
@@ -59,6 +60,46 @@ test('authoring broker connects the real editor, sends once, applies helper outp
     await session.close();
     expect(JSON.parse(await readFile(path.join(outDir, 'editor-final.json'), 'utf8')).connected).toBe(false);
     await expect(createSession(page, outDir)).rejects.toThrow(/EEXIST/);
+  } finally {
+    if (session) await session.close();
+    await rm(directory, {recursive: true, force: true});
+  }
+});
+
+test('question-only first turn integrates with the author runner before any change history exists', async ({page}) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'flowview-authoring-questions-'));
+  const outDir = path.join(directory, 'run-01');
+  let session;
+  try {
+    session = await createSession(page, outDir);
+    const sent = await session.sendControl({seq: 1, text: 'Ask me who this story is for before making any changes.', technicalLevel: 'story'});
+    const helper = (...args) => JSON.parse(execFileSync('python3', [path.join(session.sessionPath, 'folder-agent.py'), ...args], {cwd: session.sessionPath, encoding: 'utf8'}));
+    helper('progress', '--request', sent.requestId, '--text', 'I am reading the story before asking questions.');
+    const question = 'Who is the audience, and should the story focus on business outcomes or engineering details?';
+    const reply = helper('reply', '--request', sent.requestId, '--text', question);
+    await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await expect(page.locator('#folder-agent-messages')).toContainText(question);
+    await session.capture();
+    for (const filename of ['changes.json', 'proposal.json', 'result.json']) {
+      await expect(readFile(path.join(session.sessionPath, filename), 'utf8')).rejects.toMatchObject({code: 'ENOENT'});
+      await expect(readFile(path.join(outDir, filename), 'utf8')).rejects.toMatchObject({code: 'ENOENT'});
+    }
+    const runner = fileURLToPath(new URL('../../agent-authoring-eval.py', import.meta.url));
+    const captured = JSON.parse(execFileSync('python3', ['-c', `
+import importlib.util, json, pathlib, sys, time
+spec = importlib.util.spec_from_file_location('author_eval', sys.argv[1])
+runner = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(runner)
+run, session = pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
+manifest = json.loads((session / 'session.json').read_text())
+owner = {key: manifest[key] for key in ['sessionId', 'connectionId']}
+captured = runner.accepted_capture(run, session, owner, sys.argv[4], time.monotonic() + 2)
+print(json.dumps({'replyId': captured['reply']['id'], 'source': captured['source'].decode(),
+                  'receipts': captured['receipts'], 'proposal': captured['proposal']}))
+`, runner, outDir, session.sessionPath, sent.requestId], {encoding: 'utf8', timeout: 5000}));
+    expect(captured).toEqual({replyId: reply.id, source: defaultSource, receipts: [], proposal: null});
+    expect(session.errors).toEqual([]);
+    expect(session.unexpectedRequests).toEqual([]);
   } finally {
     if (session) await session.close();
     await rm(directory, {recursive: true, force: true});

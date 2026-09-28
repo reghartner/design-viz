@@ -76,7 +76,7 @@ class AuthorEvalTests(unittest.TestCase):
         session.mkdir(parents=True)
         put(session / 'session.json', {'protocol': 'flowview-folder-v1', **OWNER})
         put(run / 'session-path.json', {'runId': 'run-01', 'status': 'ready',
-            'projectPath': str(session.parent), 'sessionPath': str(session)})
+            'projectPath': str(session.parent), 'sessionPath': str(session), 'readyAt': int(time.time() * 1000)})
         return output, run, session
 
     def capture_files(self, run, session):
@@ -304,6 +304,37 @@ class AuthorEvalTests(unittest.TestCase):
             self.assertEqual(self.run.call_args.args[0],
                              [eval.sys.executable, str(session / 'authoring/tools/widget_doc.py'), *args])
 
+    def test_wrapper_status_reads_only_fixed_identity_and_heartbeat_without_bash_clock(self):
+        session, invoke = self.wrapper()
+        put(session / 'session.json', OWNER)
+        put(session / 'editor.json', {**OWNER, 'connected': True, 'at': 99000})
+        with mock.patch.object(eval.time, 'time', return_value=100), mock.patch('builtins.print') as output:
+            self.assertEqual(invoke('status')[0], 0)
+        status = json.loads(output.call_args.args[0])
+        self.assertTrue(status['fresh'])
+        self.assertEqual(status['ageMs'], 1000)
+        self.assertEqual(status['currentEpochMs'], 100000)
+        with self.assertRaises(SystemExit):
+            invoke('status', '/outside/editor.json')
+        self.run.assert_not_called()
+
+    def test_large_wrapper_output_stays_in_fixed_local_report_with_symlink_protection(self):
+        session, invoke = self.wrapper()
+        self.run.side_effect = None
+        self.run.return_value = subprocess.CompletedProcess([], 0, b'X' * 9000, b'diagnostic')
+        with mock.patch('builtins.print') as output:
+            self.assertEqual(invoke('widget', '--list'), (0, b'', b''))
+        report = json.loads(output.call_args.args[0])
+        self.assertEqual(report['written'], 'widget-report.txt')
+        self.assertEqual(report['sha256'], eval.sha((session / 'widget-report.txt').read_bytes()))
+        (session / 'widget-report.txt').unlink()
+        outside = self.root / 'outside-report'
+        outside.write_text('untouched')
+        (session / 'widget-report.txt').symlink_to(outside)
+        with self.assertRaisesRegex(ValueError, 'Symlinks'):
+            invoke('widget', '--list')
+        self.assertEqual(outside.read_text(), 'untouched')
+
     def test_send_requires_matching_sequence_text_level_and_owner(self):
         output, run, session = self.session()
         request = {'id': 'request-1', 'text': 'Visible request', 'technicalLevel': 'story', **OWNER}
@@ -342,6 +373,26 @@ class AuthorEvalTests(unittest.TestCase):
             put(run / 'result.json', {'id': 'proposal-2', **OWNER})
             put(session / 'reply.json', {'id': 'reply-2', 'requestId': 'earlier-request', 'text': 'COMPLETE: Old story', **OWNER})
             with self.assertRaises(TimeoutError):
+                eval.accepted_capture(run, session, OWNER, 'request-2', time.monotonic() + 10)
+
+    def test_question_only_capture_accepts_absent_history_but_never_malformed_or_lost_history(self):
+        _, run, session = self.session()
+        source = self.capture_files(run, session)
+        for path in [session / 'proposal.json', run / 'changes.json', run / 'result.json']:
+            path.unlink()
+        with mock.patch.object(eval, 'wait_for', side_effect=immediate):
+            captured = eval.accepted_capture(run, session, OWNER, 'request-2', time.monotonic() + 10)
+            self.assertEqual(captured['source'], source)
+            self.assertEqual(captured['receipts'], [])
+            self.assertTrue(captured['changesFileAbsent'])
+            self.assertIsNone(captured['proposal'])
+            self.assertFalse((run / 'changes.json').exists())
+            (run / 'changes.json').write_text('not json')
+            with self.assertRaises(ValueError):
+                eval.accepted_capture(run, session, OWNER, 'request-2', time.monotonic() + 10)
+            (run / 'changes.json').unlink()
+            put(run / 'exchange-history/000001-result.json', {'status': 'applied'})
+            with self.assertRaisesRegex(ValueError, 'archived proposal'):
                 eval.accepted_capture(run, session, OWNER, 'request-2', time.monotonic() + 10)
 
     def test_capture_needs_clean_browser_snapshot_even_with_matching_hash(self):
@@ -400,6 +451,110 @@ class AuthorEvalTests(unittest.TestCase):
         invoke = manager.enter_context(mock.patch.object(eval, 'invoke_claude', return_value=process()))
         manager.enter_context(mock.patch.object(eval, 'accepted_capture', side_effect=capture))
         return manager, output, run, session, content, send, invoke, hashes
+
+    def startup_fixture(self, denials=None):
+        output, run, session = self.session()
+        source = self.capture_files(run, session)
+        for path in [session / 'proposal.json', run / 'changes.json', run / 'result.json']:
+            path.unlink()
+        for name in ['folder-agent.py', 'authoring-kit.json', 'CONNECT.md', 'README.md', 'author-tools.py',
+                     'authoring/skill.md', 'input/hld.md']:
+            path = session / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('original protected ' + name)
+        put(session / 'request.json', {'id': 'request-2', 'text': eval.initial_request(), **OWNER})
+        put(session / 'reply.json', {'id': 'reply-2', 'requestId': 'request-2', 'text': 'Which audience?', **OWNER})
+        put(session / 'editor.json', {**OWNER, 'connected': True, 'at': int(time.time() * 1000)})
+        put(run / 'exchange-history/000001-state.json', {'source': source.decode()})
+        artifacts = output / 'evaluation/run-01'
+        artifacts.mkdir(parents=True)
+        put(output / 'evaluation/manifest.json', {'bundleManifestSha256': 'bundle-hash', 'cases': eval.cases(), 'runClaude': True})
+        old_hashes = eval.tree_hashes(session)
+        for name in ['protected-files.before.json', 'protected-files.after.json']:
+            put(artifacts / name, old_hashes)
+        raw = response(permission_denials=denials or [])
+        phase = {**eval.model_record(raw, process(), 2), 'phase': 1, 'requestId': 'request-2'}
+        prior = {'status': 'failed', 'phases': [phase], 'identity': OWNER, 'sessionPath': str(session.resolve()),
+                 'error': 'Claude reported permission denials or malformed permission metadata.' if denials else
+                 'Matching editor reply/capture did not arrive within 60 seconds: Expected a regular non-symlink file: changes.json'}
+        put(artifacts / 'result.json', prior)
+        prompt = b'Original immutable phase-one prompt'
+        (artifacts / 'phase1.prompt.txt').write_bytes(prompt)
+        command = [arg for arg in eval.claude_command() if arg != 'Bash(python3 author-tools.py status)']
+        put(artifacts / 'phase1.command.json', {'command': command, 'cwd': str(session.resolve()),
+              'prompt': {'path': 'phase1.prompt.txt', 'bytes': len(prompt), 'sha256': eval.sha(prompt)}})
+        raw_bytes = json.dumps(raw).encode()
+        (artifacts / 'phase1.raw.json').write_bytes(raw_bytes)
+        put(artifacts / 'phase1.streams.json', {'stdout': {'truncated': False, 'originalSha256': eval.sha(raw_bytes)}})
+        put(artifacts / 'phase1.request-receipt.json', {'seq': 1, 'requestId': 'request-2', 'revision': 'new-revision'})
+        return output, run, session, artifacts
+
+    def test_startup_audit_preserves_denial_and_refuses_changed_prompt_seed_or_protected_files(self):
+        denials = [{'tool_name': 'Bash', 'tool_input': {'command':
+            'cat folder-agent.py; python3 -c "import time;print(int(time.time()*1000))"'}}]
+        output, run, session, artifacts = self.startup_fixture(denials)
+        def audit():
+            return eval.startup_continuation(eval.cases()[0], output, 'bundle-hash', time.monotonic() + 5)
+        with mock.patch.object(eval, 'wait_for', side_effect=immediate):
+            continuation = audit()
+            self.assertEqual(continuation['sessionId'], SID)
+            self.assertEqual(continuation['originalPhase1']['permission_denials'], denials)
+            old = (artifacts / 'phase1.prompt.txt').read_bytes()
+            (artifacts / 'phase1.prompt.txt').write_text('changed')
+            with self.assertRaisesRegex(ValueError, 'command or prompt'):
+                audit()
+            (artifacts / 'phase1.prompt.txt').write_bytes(old)
+            put(run / 'exchange-history/000001-state.json', {'source': 'different seed'})
+            with self.assertRaisesRegex(ValueError, 'seed changed'):
+                audit()
+            (session / 'authoring/skill.md').write_text('tampered')
+            with self.assertRaisesRegex(ValueError, 'Protected'):
+                audit()
+        self.popen.assert_not_called()
+
+    def test_diagnostic_case_runs_only_phase_two_same_sid_and_preserves_original_evidence(self):
+        output, run, session, artifacts = self.startup_fixture()
+        with mock.patch.object(eval, 'wait_for', side_effect=immediate):
+            continuation = eval.startup_continuation(eval.cases()[0], output, 'bundle-hash', time.monotonic() + 5)
+        original = {p.name: p.read_bytes() for p in artifacts.iterdir()}
+        (output / 'diagnostic-continuation').mkdir()
+        _, content = self.bundle()
+        (session / 'story.ledger.md').write_text('Story coverage')
+        captured = {**continuation['captured'], 'reply': {'id': 'final', 'text': 'COMPLETE: Delivered'},
+                    'receipts': [{'status': 'applied', 'revision': 'new-revision'}], 'proposal': {'source': '{}'}}
+        with mock.patch.object(eval, 'accepted_capture', side_effect=[continuation['captured'], captured]), \
+                mock.patch.object(eval, 'send_request', return_value={'requestId': 'phase2', 'revision': 'old'}) as send, \
+                mock.patch.object(eval, 'invoke_claude', return_value=process()) as invoke:
+            record = eval.run_case(eval.cases()[0], output, content, time.monotonic() + 10, continuation)
+        self.assertEqual(record['status'], 'completed', record)
+        self.assertFalse(record['cleanTrial'])
+        self.assertTrue(record['diagnosticContinuation'])
+        self.assertEqual([phase['phase'] for phase in record['phases']], [2])
+        self.assertEqual(invoke.call_count, 1)
+        self.assertEqual(invoke.call_args.args[0][-2:], ['--resume', SID])
+        self.assertEqual(send.call_args.args[3:6], (2, content['operator/answers-business.md'].decode().strip(), 'story'))
+        self.assertEqual(original, {p.name: p.read_bytes() for p in artifacts.iterdir()})
+        repaired = output / 'diagnostic-continuation/run-01'
+        self.assertTrue((repaired / 'coordinator-repair.json').exists())
+        self.assertEqual((run / 'questions-phase1.md').read_text(), 'Which audience?')
+        self.assertEqual((run / 'operator-answers.md').read_bytes(), content['operator/answers-business.md'])
+
+    def test_continuation_audits_all_six_before_any_execution_and_preview_has_no_mutation(self):
+        output = self.root / 'cohort'
+        for case in eval.cases():
+            put(output / case['runId'] / 'session-path.json', {'readyAt': int(time.time() * 1000)})
+        audits = [{'sessionId': f'{index:08}-1234-4234-8234-123456789abc'} for index in range(1, 7)]
+        with mock.patch.object(eval, 'startup_continuation', side_effect=audits) as audit, \
+                mock.patch.object(eval, 'run_case', side_effect=AssertionError('No model turns during preview')):
+            self.assertEqual(eval.continue_after_startup_repair(output, {}, 'bundle', 6, False), 0)
+        self.assertEqual(audit.call_count, 6)
+        self.assertFalse((output / 'diagnostic-continuation').exists())
+        with mock.patch.object(eval, 'startup_continuation', side_effect=[audits[0], ValueError('Changed owner')]), \
+                mock.patch.object(eval, 'run_case') as run:
+            with self.assertRaisesRegex(ValueError, 'Changed owner'):
+                eval.continue_after_startup_repair(output, {}, 'bundle', 6, True)
+        run.assert_not_called()
+        self.assertFalse((output / 'diagnostic-continuation').exists())
 
     def test_two_turn_orchestration_resumes_and_exports_exact_judge_files(self):
         manager, output, run, session, content, send, invoke, _ = self.mocked_case()

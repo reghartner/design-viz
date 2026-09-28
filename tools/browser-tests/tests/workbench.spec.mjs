@@ -35,5 +35,7 @@ test('committed editor preserves exact source, focused edits, hidden paths, poin
   await page.waitForFunction(()=>!!window.__heldRead);await page.locator('#workspace-home').click();
   const replacement=source.replace('Browser contract','Replacement project');await paste(page,replacement);
   await page.evaluate(()=>__releaseRead());await expect(src).toHaveValue(replacement);
-  await undo.click();await expect(src).toHaveValue(handwritten);await redo.click();await expect(src).toHaveValue(replacement);
+  await expect(undo).toBeDisabled();await expect(redo).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(entry=>entry.text))).toContain(handwritten);
+  await page.locator('#editor-tab-json').focus();await page.keyboard.press('ControlOrMeta+z');await expect(src).toHaveValue(replacement);
 });

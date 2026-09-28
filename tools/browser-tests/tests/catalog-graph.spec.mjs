@@ -34,11 +34,20 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   await expect(page.locator('#docview [data-dv-node]')).toHaveCount(3);
   await expect(page.locator('#docview')).toContainText('Catalog relationship');
   await testInfo.attach('catalog-seeded-diagram',{body:await page.locator('#docview').screenshot(),contentType:'image/png'});
+  const createdText=await page.locator('#src').inputValue();
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
   await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();await page.locator('#welcome-new-catalog').click();
+  await page.locator('#catalog-project-title').fill('Doorbell without connections');
   await choose(page,'Doorbell gateway');await choose(page,'Recording service');await page.locator('#catalog-edges').uncheck();
   await expect(page.locator('#catalog-preview')).toContainText('0 new connections');await page.locator('#catalog-add').click();
   expect((await spec(page)).page.blocks[0].diagram.edges).toEqual([]);
-  await page.locator('#undo-builder').click();expect((await spec(page)).page.title).toBe('Doorbell platform');
+  expect((await spec(page)).page.title).toBe('Doorbell without connections');
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts'))))
+    .toContainEqual(expect.objectContaining({text:createdText,baseline:createdText}));
+  await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
+  await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Doorbell platform ·/}).click();
+  await expect(page.locator('#src')).toHaveValue(createdText);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
 test('Add seeds only the destination, reuses nodes and supports one-action undo without duplicate inserts',async({page,server})=>{

@@ -560,8 +560,10 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                 self.assertLessEqual(clip["y"], part["top"])
                 self.assertGreaterEqual(clip["x"] + clip["width"], part["right"])
                 self.assertGreaterEqual(clip["y"] + clip["height"], part["bottom"])
-            self.assertGreater(clip["y"], state["heading"]["bottom"])
-            self.assertGreater(clip["y"], state["toolbar"]["bottom"])
+            # Explore now owns the browser canvas, including its floating toolbar.
+            self.assertEqual(clip["x"], 0)
+            self.assertEqual(clip["y"], 0)
+            self.assertLessEqual(clip["y"], state["toolbar"]["top"])
             self.assertLessEqual(clip["height"], state["stage"]["height"] + 33)
             # Exercise the production frame path too: view verification must
             # accept a hidden authored grid, and capture more than the step bar.

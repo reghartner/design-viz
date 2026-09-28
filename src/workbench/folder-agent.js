@@ -108,8 +108,9 @@ function createFolderAgentClient(opts){
     publish({listening:listening});
   }
   return {
-    start:function(resume){return serial(async function(){
-      if(disposed)throw Error('Session was closed.');
+    start:function(resume){var started=epoch;return serial(async function(){
+      if(disposed || started!==epoch)throw Error('Session was closed.');
+      var opening=opts.snapshot();
       if(connected)throw Error('Disconnect before starting another session.');
       var existing=await files.read('session.json'),lease=await files.read('editor.json');
       if(resume && !existing)throw Error('Choose an existing Flowview session folder.');
@@ -117,7 +118,7 @@ function createFolderAgentClient(opts){
       if(existing && (!validId(existing.sessionId) || !validId(existing.connectionId)))throw Error('Invalid saved session identity.');
       if(existing && existing.protocol!=='flowview-folder-v1')throw Error('Unsupported saved session.');
       if(existing && lease && lease.connected && now()-lease.at<15000)throw Error('This folder is still connected to another editor. Disconnect it first.');
-      var snap=opts.snapshot();if(!snap.open)throw Error('Open a project before connecting.');
+      var snap=opts.snapshot();if(!snap.open || !opening.open || snap.project!==opening.project)throw Error('Open the same project before connecting.');
       if(existing){
         var previous=await files.read('state.json');
         if(!previous || previous.source!==snap.source)throw Error('Open story.spec.json from this folder before resuming its conversation.');
@@ -126,14 +127,16 @@ function createFolderAgentClient(opts){
           return item && ['user','assistant'].includes(item.role) && typeof item.text==='string' && item.text.length<=32000;
         }).slice(-100);
       }
-      if(disposed)return;
+      if(disposed || started!==epoch)throw Error('Session was closed.');
+      if(opts.snapshot().project!==opening.project || !opts.snapshot().open)throw Error('Project changed during connection.');
       manifest={protocol:'flowview-folder-v1',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:now()};
       project=snap.project;connected=true;epoch++;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply});
       try{
-        await files.write('session.json',manifest);
-        await snapshot(epoch);
+        var token=epoch;await files.write('session.json',manifest);
+        if(!alive(token))throw Error('Session was closed.');
+        await snapshot(token);
         if(!connected)throw Error('Folder ownership changed during connection.');
       }catch(ex){connected=false;epoch++;publish({listening:false});throw ex;}
       publish({status:'Paste the connection instructions into Claude.',listening:false});

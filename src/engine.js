@@ -1859,7 +1859,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
     flowToggle.setAttribute('aria-expanded',String(showDiagram));
-    board.hidden=active && !showDiagram ? true : boardHidden;
+    viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
@@ -1888,6 +1888,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
+    if(!quiet)viewport.setView({id:'flow',presentation:'standard'},[],layout.grid);
     if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
   }

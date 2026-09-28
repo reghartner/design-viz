@@ -87,6 +87,11 @@ function initWorkbenchLibrary(opts){
       var handoff=opts.handoff && (opts.handoff.error || opts.handoff.id===id)?opts.handoff:null;
       await verifyWorkspaceHandoff(current.spec,handoff,window.crypto);if(token!==sequence)return;
       if(handoff && handoff.action==='build' && !openedBuild){
+        // Validate the exact target against the actual renderer before saving
+        // or switching projects. A bad fragment leaves the existing draft intact.
+        var checked=normalize(JSON.parse(JSON.stringify(current.spec)));
+        ctl=renderPage(reader,checked,current.spec.page.skin,null,{autoplay:false});
+        applyWorkspaceTarget(ctl,checked,handoff.target);retireViewer();
         opts.edit(JSON.parse(JSON.stringify(current.spec)),handoff,true);openedBuild=true;return;
       }
       title.textContent=current.title;

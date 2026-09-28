@@ -58,8 +58,9 @@ SHA-256 of `JSON.stringify(materializedSpec)`, not a Git SHA. The receiver loads
 its own authorized published snapshot and verifies the ID and digest. A stale
 or different story fails visibly; it cannot replace a saved draft.
 
-The workbench first offers the checked story read-only. Choosing **Build with
-Claude** there opens a local draft at the same position and opens Agent. No folder
+**Build with Claude** opens the checked story directly as a local draft at the
+same position and opens the connection guide. The previous draft is saved under
+Earlier drafts on Home. Ordinary viewing links keep the read-only story. No folder
 permission, agent connection or publication happens automatically. The local
 folder pairing remains the user's visible copy/paste into their Claude session.
 Backstage login is independent of Claude login and filesystem access. The local

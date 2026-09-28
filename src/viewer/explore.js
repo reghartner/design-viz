@@ -5,6 +5,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
+  var panelSource=grid;
   var moved=[], windows=[], gesture=null, z=1, zoom=null, lastWidth=0, lastHeight=0;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
@@ -234,9 +235,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     active=true;memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
-    var cards=Array.prototype.slice.call(grid.querySelectorAll('.pwidget[data-dv-panel]'));
+    var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
-    board.classList.add('explore-board');if(workbenchCanvas){canvasBoardHidden=board.hidden;board.hidden=false;}fitHeight();
+    board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};panelWindow(card,panel,it,index);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
@@ -315,18 +316,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   return {
     isWorkbenchCanvas:function(){return workbenchCanvas;},
+    setBoardHidden:function(hidden){canvasBoardHidden=hidden;board.hidden=workbenchCanvas?false:hidden;},
     isExplore:function(){return active;},
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
-      leave();var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
+      leave();if(on)canvasBoardHidden=board.hidden;var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
       if(!definition)definition={id:'flow',presentation:'standard'};
       enter();
     },
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,.15,4);sizeGraph(true);},
     fitCanvas:fitCanvas,
-    setView:function(view,tiles){leave();definition=view;items=tiles || [];var fresh=!memories[view.id];enter();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
+    setView:function(view,tiles,sourceGrid){leave();definition=view;items=tiles || [];panelSource=sourceGrid || grid;var fresh=!memories[view.id];enter();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){

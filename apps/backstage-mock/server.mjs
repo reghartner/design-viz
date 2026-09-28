@@ -18,6 +18,8 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
   const server=http.createServer(async(req,res)=>{
     const origin='http://'+req.headers.host,url=new URL(req.url,origin);
     function send(status,data,type='application/json'){res.writeHead(status,{'Content-Type':type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(Buffer.isBuffer(data)?data:type==='application/json'?JSON.stringify(data,(_,value)=>typeof value==='string'?value.replace(/^http:\/\/localhost:8766(?=\/(catalog|apis|issues)\/)/,origin):value):data);}
+    // Public association hashes describe the exact origin-adjusted bytes readers fetch.
+    function publicSpec(spec){return JSON.parse(JSON.stringify(spec,(_,value)=>typeof value==='string'?value.replace(/^http:\/\/localhost:8766(?=\/(catalog|apis|issues)\/)/,origin):value));}
     async function body(){let text='';for await(const chunk of req){text+=chunk;if(text.length>2_000_000)throw new Error('Request exceeds 2 MB.');}return JSON.parse(text || '{}');}
     try{
       // A freshly read registry makes added/removed diagrams visible without a
@@ -66,11 +68,11 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
       if(url.pathname==='/workbench/starters.json')return send(200,[]);
       if(url.pathname==='/workbench/diagrams.json')return send(200,{version:1,diagrams:specs().map(spec=>({id:spec.page.canon.id,title:spec.page.title,spec}))});
       if(url.pathname==='/api/canon/entity-diagrams'){
-        const index=buildEntityDiagramIndex(specs(),{publicBaseUrl:origin});
+        const index=buildEntityDiagramIndex(specs().map(publicSpec),{publicBaseUrl:origin});
         return send(200,diagramsForEntity(index,url.searchParams.get('entityRef')));
       }
       if(url.pathname==='/api/canon/services'){
-        const index=buildEntityDiagramIndex(specs(),{publicBaseUrl:origin});
+        const index=buildEntityDiagramIndex(specs().map(publicSpec),{publicBaseUrl:origin});
         return send(200,{version:1,services:catalog.services.map(s=>({...s,diagramCount:diagramsForEntity(index,s.entityRef).diagrams.length}))});
       }
       if(url.pathname==='/api/canon/registry')return send(200,{simulated:true,diagrams:specs().map(s=>({id:s.page.canon.id,title:s.page.title,owner:s.page.canon.owner,revision:digest(s),sections:C.sections(s).map((section,index)=>({index,title:section.heading || 'Diagram '+(index+1),hasReference:!!section.diagram.referenceTrace}))})),incidents:Object.values(state.incidents || {}).map(i=>({id:i.id,diagramId:i.diagramId,traceId:i.trace.traceId,createdAt:i.createdAt})),reviews:Object.values(state.reviews),audit:state.audit});
@@ -90,7 +92,7 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
       }
       if(url.pathname.startsWith('/api/canon/specs/')){
         const spec=find(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length)));
-        if(url.searchParams.has('revision') && url.searchParams.get('revision')!==digest(spec))
+        if(url.searchParams.has('revision') && url.searchParams.get('revision')!==digest(publicSpec(spec)))
           return send(409,{error:'Diagram changed. Refresh the association list.'});
         return send(200,spec);
       }

@@ -274,7 +274,7 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
     await page.locator('#editor-tab-agent').click();await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this draft while I inspect');
     expect((await win.boundingBox()).width).toBeCloseTo(moved.width,0);
     await page.locator('#workspace-panels').click();await expect(win).toBeHidden();await expect(page.locator('#workspace-window-inspect')).toBeHidden();
-    const canvas=await page.locator('#workspace-canvas').boundingBox();expect(canvas).toEqual({x:0,y:0,width:1440,height:1000});
+    const canvas=await page.locator('#workspace-canvas').boundingBox();expect(canvas).toEqual({x:0,y:0,...page.viewportSize()});
     await page.locator('#workspace-panels').click();await expect(win).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
     await page.screenshot({path:info.outputPath('floating-agent-and-inspect.png')});
     await page.reload();await expect(win).toBeVisible();expect((await win.boundingBox()).x).toBeCloseTo(moved.x,0);
@@ -289,7 +289,7 @@ test('diagram itself fills the browser and pans and zooms without editing source
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
     const canvas=page.locator('.workspace-active-section .explore-board');
-    expect(await canvas.boundingBox()).toEqual({x:0,y:0,width:1440,height:1000});
+    expect(await canvas.boundingBox()).toEqual({x:0,y:0,...page.viewportSize()});
     await expect(page.locator('#docview .doc-title')).toBeHidden();
     const position=()=>canvas.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
     const before=await position(),node=page.locator('[data-dv-node="a"]').first(),n=await node.boundingBox();
@@ -337,7 +337,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await page.locator('#workspace-fit').click();
     await page.locator('#diagram-add-target').selectOption('1');
     const other=page.locator('.workspace-active-section .explore-board');
-    expect(await other.boundingBox()).toEqual({x:0,y:0,width:1440,height:1000});
+    expect(await other.boundingBox()).toEqual({x:0,y:0,...page.viewportSize()});
     await expect(page.locator('[data-dv-node="customer"]')).toBeInViewport();
     await expect(page.locator('[data-dv-node="a"]')).toBeHidden();
     await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();

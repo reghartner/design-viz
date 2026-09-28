@@ -1,7 +1,7 @@
 /* Standalone Explore uses the entire browser (or embedding frame). Curated
    standard views keep their document layout. Navigation never edits the spec. */
 function initViewerExploreCanvas(ctl,view){
-  var active=null,seen=new Set(),frame=0;
+  var active=null,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
@@ -27,6 +27,8 @@ function initViewerExploreCanvas(ctl,view){
   sections.addEventListener('change',function(){
     var rec=ctl.sections.find(function(r){return r.number===Number(sections.value);});if(!rec)return;
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
+    ctl.activeTarget={kind:'diagram',section:rec.number};
+    if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   });
   back.addEventListener('click',function(){var rec=active;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
@@ -34,8 +36,17 @@ function initViewerExploreCanvas(ctl,view){
     var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});if(rec)show(rec);
   }
   view.addEventListener('diagram-view-change',viewChanged);
+  function navigationChanged(){
+    var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
+    var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
+    if(rec!==active)show(rec);
+  }
+  var priorChange=ctl.onChange;
+  function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
+  ctl.onChange=changed;
+  window.addEventListener('hashchange',navigationChanged);
   var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
   if(!initial)initial=ctl.sections.find(function(r){return r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);
-  return {destroy:function(){view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
+  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
 }

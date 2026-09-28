@@ -150,6 +150,8 @@ export default async function prepare(){
     await mkdir(path.join(output,'native'));
     await build({absWorkingDir:app,stdin:{resolveDir:app,loader:'tsx',contents:await readFile(fixture('native-host.tsx'),'utf8')},bundle:true,format:'iife',outfile:path.join(output,'native/app.js'),define:{'process.env.NODE_ENV':'"production"'},minify:true});
     await cp(fixture('native-host.html'),path.join(output,'native/index.html'));
+    const {prepareBackstageWorkspace}=await import('./prepare-backstage.mjs');
+    await prepareBackstageWorkspace(output);
   } catch(error) {await rm(output,{recursive:true,force:true});throw error;}
   return ()=>rm(output,{recursive:true,force:true});
 }

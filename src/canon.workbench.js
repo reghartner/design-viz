@@ -36,8 +36,8 @@ function initCanonWorkbench(opts){
       .catch(function(){if(!catalogPriority)catalogStatus.textContent='Bundled catalog unavailable. Existing bindings are preserved; you can import a catalog JSON snapshot.';});
   }else catalogStatus.textContent='Offline editor · import a catalog JSON snapshot to choose company services.';
   var params=new URLSearchParams(location.search), id=params.get('canon');
-  // A Backstage handoff is a checked read-only offer. Its explicit Open action
-  // owns draft replacement; the legacy boot must not load a second copy here.
+  // The checked Backstage handoff owns draft replacement; the legacy boot
+  // must not load a second copy here.
   if(opts.handoff)return context;
   if(!id) return context;
   var review=params.get('review'), attached=true;

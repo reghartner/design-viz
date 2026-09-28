@@ -156,16 +156,19 @@ function initWorkbenchAgentChat(opts){
       var parent=await window.showDirectoryPicker({mode:'readwrite',id:'flowview-agent'});
       if(!life.alive() || token!==generation)return;
       var directory=resume?parent:await parent.getDirectoryHandle('flowview-session-'+crypto.randomUUID().slice(0,8),{create:true});
+      if(!life.alive() || token!==generation)return;
       var files=createFolderAgentFiles(directory);
       if(navigator.locks){
         // Prevent simultaneous resume attempts within this hosted origin.
-        releaseLock=await new Promise(function(resolve,reject){
+        var acquiredLock=await new Promise(function(resolve,reject){
           navigator.locks.request('flowview-folder-'+directory.name,{ifAvailable:true},function(lock){
             if(!lock){reject(Error('This session is already open in another tab.'));return;}
             return new Promise(function(release){resolve(release);});
           }).catch(reject);
         });
       }
+      if(!life.alive() || token!==generation){if(acquiredLock)acquiredLock();return;}
+      releaseLock=acquiredLock || null;
       if(!kit)kit=JSON.parse(kitNode.textContent);
       client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,level:function(){return get('level').value;},changed:paint});
       var identity=await client.start(resume);

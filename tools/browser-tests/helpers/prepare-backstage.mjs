@@ -13,6 +13,14 @@ export default async function prepare(){
     await mkdir(path.join(output,'native'));
     await build({absWorkingDir:app,stdin:{resolveDir:app,loader:'tsx',contents:await readFile(path.join(repo,'tools/browser-tests/fixtures/native-host.tsx'),'utf8')},bundle:true,format:'iife',outfile:path.join(output,'native/app.js'),define:{'process.env.NODE_ENV':'"production"'}});
     await cp(path.join(repo,'tools/browser-tests/fixtures/native-host.html'),path.join(output,'native/index.html'));
+    await prepareBackstageWorkspace(output);
+  } catch(error){await cleanup();throw error;}
+  return cleanup;
+}
+
+export async function prepareBackstageWorkspace(output){
+  const app=path.join(repo,'apps/backstage');
+  const {build}=await import(pathToFileURL(path.join(app,'node_modules/esbuild/lib/main.js')));
     const spec=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
     spec.page.canon={version:1,id:'backstage-story',kind:'design',owner:'group:default/team'};
     let first;
@@ -34,6 +42,4 @@ window.__backstage={spec,list,requests};
 createRoot(document.getElementById('app')).render(<FlowviewEntityDiagrams entityRef=${JSON.stringify(entityRef)} loadDiagrams={async()=>list} loadSpec={loadSpec}/>);
 `},bundle:true,format:'iife',outfile:path.join(output,'backstage/app.js'),define:{'process.env.NODE_ENV':'"production"'}});
     await writeFile(path.join(output,'backstage/index.html'),`<!doctype html><html><head><meta charset="utf-8"><link rel="icon" href="data:,"><style>body{font:15px system-ui;margin:0;background:#f3f5fa}header{padding:20px;background:#182439;color:white}button,select{font:inherit}#app{padding:16px}a{color:#305da8}</style></head><body><header>Backstage · Recording service</header><div id="app"></div><script src="./app.js"></script></body></html>`);
-  } catch(error){await cleanup();throw error;}
-  return cleanup;
 }

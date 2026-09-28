@@ -95,3 +95,17 @@ test('direct Build preserves an earlier draft through reload and makes it recove
   await page.getByRole('button',{name:/Earlier customer story ·/}).click();
   await expect(page.locator('#src')).toHaveValue(before);
 });
+
+test('an unavailable Build target fails visibly before replacing the saved draft',async({page,server})=>{
+  await page.goto(server.origin+'/backstage/index.html');
+  const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
+  const url=new URL(await link.getAttribute('href')),hash=new URLSearchParams(url.hash.slice(1));
+  hash.set('d','missing-section');url.hash=hash.toString();
+  const before=JSON.stringify({text:'unfinished JSON {',at:1});
+  await page.evaluate(value=>localStorage.setItem('dv-workbench-draft',value),before);
+  await page.goto(url.href);
+  await expect(page.locator('#canon-reader-error')).toContainText('linked story section is unavailable');
+  await expect(page.locator('#canon-reader-edit')).toBeDisabled();
+  expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(before);
+  expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBeNull();
+});

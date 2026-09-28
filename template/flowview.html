@@ -26205,6 +26205,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
+  var panelSource=grid;
   var moved=[], windows=[], gesture=null, z=1, zoom=null, lastWidth=0, lastHeight=0;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
@@ -26434,9 +26435,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     active=true;memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
-    var cards=Array.prototype.slice.call(grid.querySelectorAll('.pwidget[data-dv-panel]'));
+    var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
-    board.classList.add('explore-board');if(workbenchCanvas){canvasBoardHidden=board.hidden;board.hidden=false;}fitHeight();
+    board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};panelWindow(card,panel,it,index);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
@@ -26515,18 +26516,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   return {
     isWorkbenchCanvas:function(){return workbenchCanvas;},
+    setBoardHidden:function(hidden){canvasBoardHidden=hidden;board.hidden=workbenchCanvas?false:hidden;},
     isExplore:function(){return active;},
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
-      leave();var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
+      leave();if(on)canvasBoardHidden=board.hidden;var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
       if(!definition)definition={id:'flow',presentation:'standard'};
       enter();
     },
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,.15,4);sizeGraph(true);},
     fitCanvas:fitCanvas,
-    setView:function(view,tiles){leave();definition=view;items=tiles || [];var fresh=!memories[view.id];enter();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
+    setView:function(view,tiles,sourceGrid){leave();definition=view;items=tiles || [];panelSource=sourceGrid || grid;var fresh=!memories[view.id];enter();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){
@@ -26581,7 +26583,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
 /* Standalone Explore uses the entire browser (or embedding frame). Curated
    standard views keep their document layout. Navigation never edits the spec. */
 function initViewerExploreCanvas(ctl,view){
-  var active=null,seen=new Set(),frame=0;
+  var active=null,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
@@ -26607,6 +26609,8 @@ function initViewerExploreCanvas(ctl,view){
   sections.addEventListener('change',function(){
     var rec=ctl.sections.find(function(r){return r.number===Number(sections.value);});if(!rec)return;
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
+    ctl.activeTarget={kind:'diagram',section:rec.number};
+    if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   });
   back.addEventListener('click',function(){var rec=active;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
@@ -26614,10 +26618,19 @@ function initViewerExploreCanvas(ctl,view){
     var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});if(rec)show(rec);
   }
   view.addEventListener('diagram-view-change',viewChanged);
+  function navigationChanged(){
+    var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
+    var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
+    if(rec!==active)show(rec);
+  }
+  var priorChange=ctl.onChange;
+  function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
+  ctl.onChange=changed;
+  window.addEventListener('hashchange',navigationChanged);
   var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
   if(!initial)initial=ctl.sections.find(function(r){return r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);
-  return {destroy:function(){view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
+  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
 }
 /* ---- src/viewer/workspace-handoff.js ---- */
 /* Explicit host-to-workbench navigation. Metadata is not authorization and
@@ -28522,7 +28535,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
     flowToggle.setAttribute('aria-expanded',String(showDiagram));
-    board.hidden=active && !showDiagram ? true : boardHidden;
+    viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
     var visible=items.filter(function(it){return !(dock && it.controls==='steps') && (!it.hidden || sectionLayoutKey(it)==='diagram');});
@@ -28551,6 +28564,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     active=false;Object.keys(buttons).forEach(function(id){buttons[id].setAttribute('aria-pressed','false');});
     paintFlow();
     if(standard)standard.setAttribute('aria-pressed','true');
+    if(!quiet)viewport.setView({id:'flow',presentation:'standard'},[],layout.grid);
     if(changed && !quiet)changed(base && base.mode()==='panel' ? layout.primaryHost : layout.diagramCol || board);
     if(base)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view-focus')===base.mode()));});
   }

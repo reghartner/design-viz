@@ -111,3 +111,14 @@ test('activity refuses foreign connections, wrong requests and malformed entries
   h.disk.set('progress.json',h.envelope({requestId,events:Array.from({length:120},(_,n)=>({id:'event-'+n,text:String(n)}))}));
   await h.client.poll();assert.equal(h.last.activity.length,100);assert.equal(h.last.activity[0].text,'20');
 });
+
+test('cancelled startup and project changes during reads never publish a connected session',async()=>{
+  for(const action of ['disconnect','destroy','project']){
+    const h=harness();let release,reached;const hit=new Promise(r=>reached=r);
+    h.gate(name=>name==='session.json'?new Promise(r=>{release=r;reached();}):null);
+    const starting=h.client.start();await hit;
+    let closing;if(action==='project')h.project();else closing=h.client[action]();
+    h.gate(null);release();await assert.rejects(starting,/closed|same project|Project changed/);await closing;
+    assert.equal(h.disk.size,0,action+' must leave no source or session files');
+  }
+});

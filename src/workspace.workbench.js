@@ -98,6 +98,7 @@ function initWorkbenchWorkspace(){
     });
     hide.addEventListener('click',function(){close(name);});
     win.addEventListener('pointerdown',function(){front(name);});
+    win.addEventListener('focusin',function(){front(name);});
     [[grip,'move'],[resize,'resize']].forEach(function(pair){
       var handle=pair[0],kind=pair[1];
       handle.addEventListener('pointerdown',function(ev){begin(ev,name,kind,handle);});handle.addEventListener('pointermove',move);

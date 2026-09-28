@@ -246,7 +246,9 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     const detections=[],deliveries=[];
     for(let i=0;i<50;i++){
       await closeGuide(page);await page.locator('#folder-agent-input').fill('Measured request '+i);await page.locator('#folder-agent-send').click();
-      await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');
+      await expect(page.locator('#folder-agent-send')).toBeDisabled();
+      await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch{return null;}}).toBe('Measured request '+i);
+      const request=await h.read('request.json');
       const at=events.has(request.id)?events.get(request.id):await new Promise(resolve=>waiting.set(request.id,resolve));
       detections.push(at-request.at);
       const reply='Measured reply '+i;await writeFile(path.join(h.session,'answer.txt'),reply);h.run('reply','--request',request.id,'--file','answer.txt');
@@ -365,6 +367,36 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     expect(await camera()).toEqual(prior);
     await expect(page.locator('#src')).toHaveValue(input.replace('"Backend"','"Customer support"'));
     await page.screenshot({path:info.outputPath('full-diagram-canvas.png')});
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+
+test('semantic dry run, reviewed apply, exact receipt Undo and cancelled late proposals use the real folder transport',async({page})=>{
+  const h=await setup(page);
+  try{
+    const spec=JSON.parse(source);spec.page.blocks[0].id='delivery';const original=JSON.stringify(spec,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
+    async function send(text){await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch{return null;}}).toBe(text);return h.read('request.json');}
+    const request=await send('Rename the delivery service'),current=await h.read('state.json');
+    const operations=[{op:'updateNode',sectionId:'delivery',nodeId:'b',patch:{title:'Delivery service'}}];
+    await writeFile(path.join(h.session,'operations.json'),JSON.stringify({operations,dryRun:true}));
+    h.run('propose','--request',request.id,'--revision',current.revision,'--operations','operations.json','--summary','Check a focused rename');
+    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('validated');await expect(page.locator('#src')).toHaveValue(original);
+    await page.locator('#folder-agent-focus-summary').click();await page.locator('#folder-agent-review-mode').check();await page.locator('#folder-agent-focus-summary').click();
+    await writeFile(path.join(h.session,'operations.json'),JSON.stringify(operations));
+    h.run('propose','--request',request.id,'--revision',current.revision,'--operations','operations.json','--summary','Rename one service');
+    await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
+    await page.locator('#folder-agent-review-accept').click();await expect.poll(async()=> (await h.read('result.json')).status).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(/Delivery service/);h.run('reply','--request',request.id,'--text','Renamed the service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.getByRole('button',{name:'Undo change',exact:true}).click();await expect(page.locator('#src')).toHaveValue(original);
+    const cancelled=await send('This turn will be stopped'),state=await h.read('state.json');await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    const manifest=await h.read('session.json');await writeFile(path.join(h.session,'proposal.json'),JSON.stringify({...manifest,id:'late-cancelled',requestId:cancelled.id,baseRevision:state.revision,source:original.replace('Doorbell','Wrong old reply')}));
+    await send('Keep this new turn separate');await expect(page.locator('#folder-agent-messages')).toContainText('Keep this new turn separate');await expect(page.locator('#src')).toHaveValue(original);
+    // Switching projects must retire both pending work and old conversation receipts.
+    await page.locator('#file-input').setInputFiles({name:'new.spec.json',mimeType:'application/json',buffer:Buffer.from(original.replace('Browser contract','Separate story'))});
+    await expect(page.locator('#folder-agent-messages')).not.toContainText('Rename the delivery service');await expect(page.locator('#folder-agent-messages [data-change-id]')).toHaveCount(0);await expect(page.locator('#folder-agent-input')).toHaveValue('');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

@@ -115,3 +115,36 @@ test('builder history caps new actions at thirty while keeping current handwritt
   assert.equal(undone,30);assert.equal(h.text,JSON.stringify({i:4}));
   h.type('{ handwritten');s.redo();s.undo();assert.equal(h.text,'{ handwritten');
 });
+test('view geometry interleaves with source history without writes, renders, saves or selection changes',()=>{
+  const h=harness(),s=h.session,initial=h.text;
+  let rect={x:10,w:300};const before=rect,after={x:90,w:420};rect=after;
+  s.target={kind:'node',id:'a'};
+  assert.equal(s.rememberView({before,after,restore(value){rect=value;}}),true);
+  assert.deepEqual(h.events,['history']);assert.equal(s.historyType(),'view');
+  s.accept({text:'{"title":"edited"}'});assert.equal(s.historyType(),'source');
+  s.undo();assert.equal(h.text,initial);assert.deepEqual(rect,after);
+  s.target={kind:'node',id:'a'};const renders=h.renders,writes=h.writes.length,saved=h.storage.get('dv-workbench-draft');
+  s.undo();assert.deepEqual(rect,before);assert.equal(h.text,initial);assert.equal(s.target.id,'a');
+  assert.equal(h.renders,renders);assert.equal(h.writes.length,writes);assert.equal(h.storage.get('dv-workbench-draft'),saved);
+  s.redo();assert.deepEqual(rect,after);assert.equal(h.text,initial);
+  s.redo();assert.equal(h.text,'{"title":"edited"}');
+});
+test('view no-ops preserve Redo; rejected restores and retired owners do not advance history',()=>{
+  const h=harness(),s=h.session;
+  s.accept({text:'{}'});s.undo();
+  assert.equal(s.rememberView({before:{x:1},after:{x:1},restore(){throw Error('noop');}}),false);assert.equal(s.canRedo(),true);
+  let allowed=false,restores=0;
+  s.rememberView({before:{x:1},after:{x:2},restore(){restores++;return allowed;}});assert.equal(s.canRedo(),false);
+  assert.equal(s.undo(),false);assert.equal(s.historyType(),'view');assert.equal(s.canRedo(),false);
+  allowed=true;assert.equal(s.undo(),true);assert.equal(s.historyType(true),'view');
+  s.invalidateProject();assert.notEqual(s.historyType(true),'view');assert.equal(s.redo(),false);
+  s.destroy();assert.equal(s.rememberView({before:1,after:2,restore(){}}),false);assert.equal(s.undo(),false);assert.equal(restores,2);
+});
+
+test('removed view targets retire their entry without blocking earlier source history',()=>{
+  const h=harness(),s=h.session,initial=h.text;
+  s.accept({text:'{"title":"edited"}'});
+  s.rememberView({before:{x:1},after:{x:2},restore(){return 'expired';}});
+  assert.equal(s.undo(),true);assert.equal(h.text,initial);assert.equal(s.canUndo(),false);
+  assert.equal(s.historyType(true),'source');assert.equal(s.redo(),true);assert.equal(h.text,'{"title":"edited"}');assert.equal(s.canRedo(),false);
+});

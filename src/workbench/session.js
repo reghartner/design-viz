@@ -24,6 +24,13 @@ function createBuilderSession(options){
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
+    var entry=from[from.length-1];
+    if(typeof entry!=='string'){
+      var restored=entry.restore(entry.before);if(restored===false)return false;
+      if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
+      from.pop();to.push({restore:entry.restore,before:entry.after,after:entry.before});
+      historyVersion++;historyChanged();return true;
+    }
     historyVersion++;
     to.push(text());options.source.write(from.pop());historyChanged();target=null;
     var outcome=render('history');
@@ -32,6 +39,9 @@ function createBuilderSession(options){
   }
   function invalidateProject(){
     if(disposed)return;
+    // Temporary geometry belongs to this project/lifetime, never a later one.
+    undoStack=undoStack.filter(function(entry){return typeof entry==='string';});
+    redoStack=redoStack.filter(function(entry){return typeof entry==='string';});historyChanged();
     project++;
     if(options.invalidateProject)options.invalidateProject();
     target=null;
@@ -70,6 +80,12 @@ function createBuilderSession(options){
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
       return true;
     },
+    rememberView:function(change){
+      if(disposed || !change || typeof change.restore!=='function' || JSON.stringify(change.before)===JSON.stringify(change.after))return false;
+      projectUndoText=null;
+      pushUndo({restore:change.restore,before:change.before,after:change.after});return true;
+    },
+    historyType:function(redo){var stack=redo?redoStack:undoStack;return !stack.length?null:typeof stack[stack.length-1]==='string'?'source':'view';},
     importText:function(value,hooks){
       if(disposed)return false;
       pushUndo(text());options.source.write(value);
@@ -112,6 +128,6 @@ function createBuilderSession(options){
       replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,hooks);
       return {missingBaseline:missingBaseline};
     },
-    destroy:function(){if(disposed)return;disposed=true;project++;persistence.destroy();}
+    destroy:function(){if(disposed)return;disposed=true;project++;undoStack.length=redoStack.length=0;persistence.destroy();}
   };
 }

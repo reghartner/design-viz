@@ -166,7 +166,10 @@ state remembered independently for each view while the viewer is mounted.
 They do not rewrite the authored diagram or create Undo entries. Explore uses
 the selected host profile's saved visibility, while its floating positions and
 sizes are independent of the profile's grid geometry.
-**In the workbench**, moving or resizing a panel or step controls, panning,
+In the workbench's **Diagram canvas**, panel and step-control moves/resizes are
+temporary geometry with Undo/Redo; they do not change the saved layout. See
+[workspace controls](workbench-workspace.md).
+**In the workbench's Page preview**, moving or resizing a panel or step controls, panning,
 zooming, and choosing **Stack at edge** save defaults in the selected view. Each
 completed gesture is one Undo/Redo action; Escape cancels a drag. **Arrange
 section** keeps Explore visible. Saving a move, resize, pan, or zoom keeps the

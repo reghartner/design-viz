@@ -1,6 +1,19 @@
 /* One section owns its viewing surface. Existing panels and playback DOM move
    into it. Readers keep session overrides; the workbench supplies an explicit
    commit seam for undoable authored defaults. */
+/* Restore only temporary panel geometry, including a view not visited since a
+   preview rebuild. This never selects the view or changes its camera. */
+function restoreCanvasPanelMemory(d, memories, id, value){
+  var view=id==='flow'?{id:'flow'}:diagramLayoutViews(d).find(function(v){return v.id===id;});
+  if(!view)return false;
+  var saved=memories[id] || (memories[id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:JSON.parse(JSON.stringify(view.exploreLayout || {}))});
+  Object.keys(value.panels).forEach(function(key){
+    if(!(d.panels || []).some(function(panel){return panel.id===key;}))return;
+    saved.panels[key]=Object.assign(saved.panels[key] || {hidden:false},value.panels[key]);
+  });
+  saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
+  return true;
+}
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
@@ -19,7 +32,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
   var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
-  var stack=button('Stack at edge',function(){var token=beginEdit();if(token===false)return;windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
+  var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
   var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
   var zoomOut=button('−',function(){changeZoom(.8);},tools);zoomOut.setAttribute('aria-label','Zoom out');
@@ -36,16 +49,21 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
   var legend=board.querySelector('.lg');
   function copy(value){return JSON.parse(JSON.stringify(value));}
-  function beginEdit(){
+  function panelGeometry(value){
+    var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
+    return {panels:panels,controls:value.controls?copy(value.controls):null};
+  }
+  function beginEdit(panels){
     if(!active || retired)return false;
     var authored=author && !workbenchCanvas;
     var token=authored?author.begin(definition.id):null;if(token===false)return false;
-    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom};
+    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom,panels:workbenchCanvas && panels?panelGeometry(memory):null};
   }
   function publish(token){
     if(retired || !active || token===false)return false;
     var ok=!token.authored || !author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
     if(!ok){memory.layout=token.layout;zoom=token.zoom;sizeGraph(false);positionCamera(token.camera);}
+    if(ok && token.panels){var after=panelGeometry(memory);if(JSON.stringify(token.panels)!==JSON.stringify(after))shell.dispatchEvent(new CustomEvent('workbench-panel-geometry',{bubbles:true,detail:{view:definition.id,before:token.panels,after:after}}));}
     return ok;
   }
   function relative(r){var b=bounds(),out={};['x','y','w','h'].forEach(function(k){out[k]=Math.round(clamp(r[k]/(k==='x'||k==='w'?b.w:b.h),0,1)*1000000)/1000000;});return out;}
@@ -167,6 +185,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     if(g.kind==='pan'){
       if(cancel){board.scrollLeft=g.left;board.scrollTop=g.top;}
     }else{
+      if(['x','y','w','h'].every(function(key){return Math.abs(g.w.rect[key]-g.rect[key])<.01;}))g.changed=false;
       if(cancel || !g.changed){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;}
       else if(g.kind==='move' && g.w!==playerWindow)g.w.state.stacked=g.w.rect.x+g.w.rect.w>=stage.clientWidth-36;
       paint();
@@ -180,7 +199,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function begin(ev,w,kind,handle){
     if(!active || ev.button!==0 || gesture)return;
-    clearScrollEdit();var token=beginEdit();if(token===false)return;
+    clearScrollEdit();var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=Object.assign({},r);
@@ -198,7 +217,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function keyboard(ev,w,kind){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
-    var token=beginEdit();if(token===false)return;
+    var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
     if(w===playerWindow)memory.controls=w.state=Object.assign({},w.rect);
     var n=ev.shiftKey?24:8,r=w.rect;
@@ -351,6 +370,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     restoreCanvasState:function(saved){
       if(workbenchCanvas){leave();memories=Object.assign(Object.create(null),copy(saved));enter();}
       else otherMemories=Object.assign(Object.create(null),copy(saved));
+    },
+    restoreCanvasPanelGeometry:function(id,value){
+      if(retired)return false;
+      finish(true);
+      if(!restoreCanvasPanelMemory(d,workbenchCanvas?memories:otherMemories,id,value))return false;
+      if(workbenchCanvas && active && definition.id===id)paint();
+      return true;
     },
     snapshotReaderState:function(){
       if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}

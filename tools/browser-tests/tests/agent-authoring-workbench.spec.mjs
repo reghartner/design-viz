@@ -19,9 +19,12 @@ test('authoring broker connects the real editor, sends once, applies helper outp
     const read = async name => JSON.parse(await readFile(path.join(session.sessionPath, name), 'utf8'));
     const helper = (...args) => JSON.parse(execFileSync('python3', [path.join(session.sessionPath, 'folder-agent.py'), ...args], {cwd: session.sessionPath, encoding: 'utf8'}));
     const control = {seq: 1, text: 'Set the page title to Customer onboarding.', technicalLevel: 'story'};
+    await expect(page.locator('#folder-agent-detail-summary')).toBeVisible();
+    await expect(page.locator('#folder-agent-level')).toBeHidden();
     await writeFile(path.join(outDir, 'control.json'), JSON.stringify(control));
     const sent = await session.pollControl();
     expect(sent).toMatchObject({seq: 1, status: 'sent'});
+    await expect(page.locator('#folder-agent-level')).toBeHidden();
     const request = await read('request.json');
     expect(request).toMatchObject({id: sent.requestId, text: control.text, technicalLevel: 'story'});
     expect(await session.pollControl()).toBeNull();
@@ -98,6 +101,25 @@ print(json.dumps({'replyId': captured['reply']['id'], 'source': captured['source
                   'receipts': captured['receipts'], 'proposal': captured['proposal']}))
 `, runner, outDir, session.sessionPath, sent.requestId], {encoding: 'utf8', timeout: 5000}));
     expect(captured).toEqual({replyId: reply.id, source: defaultSource, receipts: [], proposal: null});
+    // Sending collapses Detail again. The next turn must reopen the real UI
+    // and publish the newly selected level, while an already open control
+    // remains usable as well.
+    for (const [index, technicalLevel] of ['engineering', 'mixed'].entries()) {
+      await expect(page.locator('#folder-agent-level')).toBeHidden();
+      if (technicalLevel === 'mixed') {
+        await page.locator('#folder-agent-detail-summary').click();
+        await expect(page.locator('#folder-agent-level')).toBeVisible();
+      }
+      const text = 'Keep the story unchanged and discuss it at ' + technicalLevel + ' detail.';
+      const next = await session.sendControl({seq: index + 2, text, technicalLevel});
+      expect(JSON.parse(await readFile(path.join(session.sessionPath, 'request.json'), 'utf8')))
+        .toMatchObject({id: next.requestId, text, technicalLevel});
+      expect(next.requestId).not.toBe(sent.requestId);
+      await expect(page.locator('#folder-agent-level')).toBeHidden();
+      helper('reply', '--request', next.requestId, '--text', 'The story is unchanged.');
+      await expect(page.locator('#folder-agent-send')).toBeEnabled();
+      await expect(page.locator('#src')).toHaveValue(defaultSource);
+    }
     expect(session.errors).toEqual([]);
     expect(session.unexpectedRequests).toEqual([]);
   } finally {

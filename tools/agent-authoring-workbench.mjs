@@ -238,7 +238,11 @@ export async function createSession(page, outDir, options = {}) {
     lastSequence = control.seq;
     await waitFor(() => page.locator('#folder-agent-send').isEnabled(), 'previous reply', 15000);
     const previous = await readJson(path.join(sessionPath, 'request.json'));
-    await page.locator('#folder-agent-level').selectOption(control.technicalLevel);
+    const level = page.locator('#folder-agent-level');
+    // The editor keeps next-message settings collapsed between sends. Use the
+    // same visible disclosure as a person before interacting with its select.
+    if (!await level.isVisible()) await page.locator('#folder-agent-detail-summary').click();
+    await level.selectOption(control.technicalLevel);
     await page.locator('#folder-agent-input').fill(control.text);
     await page.locator('#folder-agent-send').click();
     const request = await waitFor(async () => {

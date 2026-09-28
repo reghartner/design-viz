@@ -2009,7 +2009,7 @@ function renderInspector(){
           sharedNote.textContent = 'Shared step — edits apply to: ' + sharing.map(function(route){return route.label;}).join(', ') + '.';
           guide.appendChild(sharedNote);
           var independent = actionButton('Make independent here', function(){ modes.editPathStep('independent'); });
-          independent.disabled = !!modes.adding() || !!modes.connecting(); guide.appendChild(independent);
+          independent.disabled = !!modes.adding() || !!modes.connecting();
         }
       }
       if(t.kind==='node'){
@@ -2122,9 +2122,12 @@ function renderInspector(){
       var armedHere = !!(modes.adding() && t.kind === 'step' &&
                          modes.adding().section === t.section && modes.adding().step === t.index);
       if (t.kind === 'step'){
+        acts.setAttribute('role', 'group');
+        acts.setAttribute('aria-label', 'Step actions');
         acts.appendChild(actionButton(armedHere ? '✕ DONE adding (Esc)' : 'ADD TO STEP', function(){
           modes.toggleAdding(t);
         }, armedHere ? 'bexit-inline' : ''));
+        if (independent) acts.appendChild(independent);
       }
       if (t.kind === 'step' && !armedHere){
         if (ctx.diagram && ctx.diagram.paths){
@@ -2148,7 +2151,8 @@ function renderInspector(){
       }
       if (!armedHere)
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
-      guide.appendChild(acts);
+      if (t.kind === 'step') guide.insertBefore(acts, form);
+      else guide.appendChild(acts);
     }
 
     /* the pass-1 field guidance, tucked under a details fold */

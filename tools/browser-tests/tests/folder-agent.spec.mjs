@@ -31,7 +31,8 @@ async function setup(page){
         return {async getFile(){const text=await window.folderDisk('read',file);return new File([text],child);},
           async createWritable(){let value;return {async write(text){value=text;},async close(){await window.folderDisk('write',file,value);},async abort(){}};}};
       }};}
-    window.showDirectoryPicker=async()=>{if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.resumeFolder?'/'+window.resumeFolder:'');};
+    window.pickerCalls=0;
+    window.showDirectoryPicker=async()=>{window.pickerCalls++;if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.resumeFolder?'/'+window.resumeFolder:'');};
   });
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
@@ -45,7 +46,20 @@ async function setup(page){
     run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
     cleanup:()=>rm(folder,{recursive:true,force:true})};
 }
+async function closeGuide(page){
+  if(await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-close-guide').click();
+}
+async function chooseFolder(page){
+  if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
+  await page.locator('#folder-agent-connect').click();
+}
+async function resumeFolder(page){
+  if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
+  if(!await page.locator('#folder-agent-resume').isVisible())await page.getByText('Resume an existing exchange',{exact:true}).click();
+  await page.locator('#folder-agent-resume').click();
+}
 async function disconnect(page){
+  await closeGuide(page);
   if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();
   await page.locator('#folder-agent-disconnect').click();
 }
@@ -55,7 +69,7 @@ test('editor conversation uses real local files and helper; changes render with 
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);
     await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('[data-dv-node="a"]').click();await page.locator('#editor-tab-agent').click();
-    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
+    await chooseFolder(page);await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const manifest=await h.read('session.json'),prompt=await page.locator('#folder-agent-instructions').inputValue();
     expect(prompt).toContain(JSON.stringify('./'+path.basename(h.session)));
@@ -63,14 +77,14 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(prompt).toContain(manifest.sessionId);expect(prompt).toContain(manifest.connectionId);
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
     await expect(page.locator('#folder-agent-context')).toContainText('a');
-    await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('Tell the customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');expect(request.selection[0].id).toBe('a');
     // Simulated agent asks a real protocol question; text must stay inert.
     await writeFile(path.join(h.session,'answer.txt'),'What should the customer learn? <img src=x onerror=alert(1)>');
     h.run('reply','--request',request.id,'--file','answer.txt');
     await expect(page.locator('#folder-agent-messages')).toContainText('What should the customer learn?');
     await expect(page.locator('#folder-agent-messages img')).toHaveCount(0);
-    await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('They can receive camera updates.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(3);
     const next=await h.read('request.json'),current=await h.read('state.json'),edited=source.replace('"title": "Doorbell"','"title": "Customer camera"');
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
@@ -83,7 +97,6 @@ test('editor conversation uses real local files and helper; changes render with 
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
     await expect(page.locator('#editor-agent')).toBeVisible();
-    if(await page.locator('#folder-agent-setup summary').isVisible())await page.locator('#folder-agent-setup summary').click();
     await page.screenshot({path:info.outputPath('folder-conversation.png')});
     await disconnect(page);await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
@@ -93,24 +106,59 @@ test('editor conversation uses real local files and helper; changes render with 
 test('new-story entry, picker cancellation and unsupported browser have useful states',async({page})=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
+    await page.locator('#welcome-agent').click();
     await expect(page.locator('#editor-agent')).toBeVisible();
-    await page.evaluate(()=>window.cancelPicker=true);await page.locator('#folder-agent-connect').click();
+    await page.evaluate(()=>window.cancelPicker=true);await chooseFolder(page);
     await expect(page.locator('#folder-agent-status')).toHaveText('Folder selection cancelled.');
-    await page.evaluate(()=>window.showDirectoryPicker=undefined);await page.locator('#folder-agent-connect').click();
+    await page.evaluate(()=>window.showDirectoryPicker=undefined);await chooseFolder(page);
     await expect(page.locator('#folder-agent-status')).toContainText('Chrome or Edge');expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
+});
+
+test('one Build click guides visible copying and folder recovery, then the listener opens chat',async({page},info)=>{
+  const h=await setup(page);let watcher;
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-agent').click();
+    await expect(page.getByRole('dialog',{name:'Let’s connect your Claude.'})).toBeVisible();
+    expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);
+    await page.screenshot({path:info.outputPath('claude-centered-start.png')});
+    await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    const oldFolder=h.session,prompt=await page.locator('#folder-agent-instructions').inputValue();
+    await page.locator('#folder-agent-copy').click();
+    await expect(page.locator('#folder-agent-guide-waiting')).toBeVisible();
+    expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe(prompt);
+    await expect(page.locator('#folder-agent-guide')).toBeVisible();
+    await page.locator('#folder-agent-folder-missing').click();
+    await expect(page.locator('#folder-agent-guide-help')).toBeVisible();
+    await page.locator('#folder-agent-guide-help [data-agent-change-folder]').click();
+    await expect.poll(async()=>JSON.parse(await readFile(path.join(oldFolder,'editor.json'),'utf8')).connected).toBe(false);
+    await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    expect(h.session).not.toBe(oldFolder);
+    await page.locator('#folder-agent-copy').click();
+    await page.screenshot({path:info.outputPath('claude-centered-wait.png')});
+    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
+    await expect(page.locator('#folder-agent-guide')).not.toBeVisible();
+    await expect(page.locator('#folder-agent-input')).toBeFocused();
+    await expect(page.locator('#folder-agent-indicator-text')).toHaveText('Claude ready');
+    await page.getByRole('button',{name:'Close Agent · Claude panel',exact:true}).click();
+    await page.locator('#folder-agent-indicator').click();
+    await expect(page.locator('#folder-agent-input')).toBeFocused();
+    await expect(page.locator('#folder-agent-guide')).not.toBeVisible();
+    expect(await page.evaluate(()=>window.pickerCalls)).toBe(2);
+    await disconnect(page);expect(h.errors).toEqual([]);
+  }finally{watcher?.kill();await page.close();await h.cleanup();}
 });
 
 test('Claude activity streams before the final answer and remains visible without duplicate or executable text',async({page},info)=>{
   const h=await setup(page);let watcher;
   try{
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
-    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await page.locator('#welcome-agent').click();
+    await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
     await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
-    await expect(page.locator('#folder-agent-setup')).not.toHaveAttribute('open','');
-    await page.locator('#folder-agent-input').fill('Explain our customer story');await page.locator('#folder-agent-send').click();
+    await expect(page.locator('#folder-agent-guide')).not.toBeVisible();
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain our customer story');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
     await expect(page.locator('#folder-agent-progress')).toContainText('has not acknowledged');
     const request=await h.read('request.json');
@@ -128,7 +176,7 @@ test('Claude activity streams before the final answer and remains visible withou
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Claude finished this turn');
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
     await expect(page.locator('#folder-agent-send')).toBeEnabled();
-    await page.locator('#folder-agent-input').fill('A new member');await page.locator('#folder-agent-send').click();
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('A new member');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(0);
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
     await disconnect(page);expect(h.errors).toEqual([]);
@@ -139,8 +187,8 @@ test('Claude activity streams before the final answer and remains visible withou
 test('refused resume preserves the paired agent instructions; successful resume issues a new connection',async({page})=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
-    await page.locator('#folder-agent-connect').click();
+    await page.locator('#welcome-agent').click();
+    await chooseFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
     await disconnect(page);
@@ -148,21 +196,21 @@ test('refused resume preserves the paired agent instructions; successful resume 
     await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
     await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:true,at:Date.now()}));
-    await page.locator('#folder-agent-resume').click();
+    await resumeFolder(page);
     await expect(page.locator('#folder-agent-status')).toContainText('still connected to another editor');
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toContain('# Old helper preserved');
     expect((await h.read('editor.json')).connected).toBe(true);
     expect((await h.read('session.json')).connectionId).toBe(before.connectionId);
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
-    await page.locator('#folder-agent-resume').click();
+    await resumeFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/selected exchange folder/);
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toBe(await readFile(path.join(root,'tools/folder-agent.py'),'utf8'));
     await disconnect(page);
     await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
-    await page.locator('#folder-agent-connect').click();
+    await chooseFolder(page);
     await expect(page.locator('#folder-agent-status')).toContainText('Test write failure');
     await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
     await expect(page.locator('#folder-agent-copy')).toBeDisabled();
@@ -176,8 +224,8 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
   test.setTimeout(90000);
   const h=await setup(page);let watcher;
   try{
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-agent-live').click();
-    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.locator('#welcome-agent').click();
+    await chooseFolder(page);await expect(page.locator('#folder-agent-send')).toBeEnabled();
     const events=new Map(),waiting=new Map();
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:['ignore','pipe','pipe']});
     createInterface({input:watcher.stdout}).on('line',line=>{
@@ -185,14 +233,13 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
       const at=Date.now();events.set(event.id,at);waiting.get(event.id)?.(at);
     });
     await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
-    if(await page.locator('#folder-agent-setup summary').isVisible())await page.locator('#folder-agent-setup summary').click();
     await page.evaluate(()=>{
       window.replyTimes={};const log=document.getElementById('folder-agent-messages');
       new MutationObserver(()=>{for(const el of log.querySelectorAll('article div'))if(/^Measured reply /.test(el.textContent)&&!window.replyTimes[el.textContent])window.replyTimes[el.textContent]=Date.now();}).observe(log,{childList:true,subtree:true});
     });
     const detections=[],deliveries=[];
     for(let i=0;i<50;i++){
-      await page.locator('#folder-agent-input').fill('Measured request '+i);await page.locator('#folder-agent-send').click();
+      await closeGuide(page);await page.locator('#folder-agent-input').fill('Measured request '+i);await page.locator('#folder-agent-send').click();
       await expect(page.locator('#folder-agent-send')).toBeDisabled();const request=await h.read('request.json');
       const at=events.has(request.id)?events.get(request.id):await new Promise(resolve=>waiting.set(request.id,resolve));
       detections.push(at-request.at);
@@ -212,7 +259,7 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
   const h=await setup(page);
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
+    await page.locator('#editor-tab-agent').click();await closeGuide(page);await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
     await page.locator('#editor-tab-inspect').click();
     await expect(page.locator('#editor-agent')).toBeVisible();await expect(page.locator('#editor-inspect')).toBeVisible();
     const before=await page.locator('#src').inputValue(),win=page.locator('#workspace-window-agent'),grip=win.locator('.workspace-window-grip');
@@ -260,8 +307,8 @@ test('agent context names the selection before pairing and freezes it beside the
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('[data-dv-node="a"]').first().click();await page.locator('#editor-tab-agent').click();
     await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
-    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
-    await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
+    await chooseFolder(page);await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
     const request=await h.read('request.json');expect(request.selection[0].label).toBe('Doorbell');
     await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');

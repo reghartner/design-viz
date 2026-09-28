@@ -52,7 +52,12 @@ and alternate steps, and refreshes automatically. Explore canvas expands the sam
 live viewer to fill the browser, with floating panels and a return to the entity.
 Editing stays external: Edit in workbench and Build with Claude carry the selected
 story revision and root section/view/path/step to the hosted workbench. The workbench
-checks its own published snapshot before offering a local draft. See the
+checks its own published snapshot before opening a local draft. Build with Claude
+goes straight to the canvas and a centered connection guide; Edit in workbench
+keeps the read-only checkpoint. Before a direct Build replaces an existing draft,
+the editor saves an exact recovery copy under Home → Earlier drafts. If that copy
+cannot be saved, Build stops without replacing the draft. Folder access and the
+visible paste into Claude remain separate user actions. See the
 [handoff contract](../apps/backstage/README.md#explore-and-build-with-claude).
 The
 company plugin reads spec JSON from GitHub and passes inert data to its statically

@@ -42,13 +42,9 @@ test('Build with Claude carries the actual view and step into a checked workbenc
   expect(JSON.parse(address.get('fv')).revision).toMatch(/^[a-f0-9]{64}$/);
   const source=await page.evaluate(()=>JSON.stringify(__backstage.spec));
   const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'Build with Claude',exact:true}).click();const editor=await popupPromise;
-  await expect(editor.locator('#canon-reader-origin')).toContainText('component:default/recording');
-  await expect(editor.locator('#workbench-workspace')).toBeHidden();
-  await expect(editor.locator('#canon-reader [data-view-id]')).toHaveAttribute('data-view-id','service-flow');
-  await expect(editor.locator('#canon-reader .stepid')).toHaveText(address.get('s'));
-  await editor.getByRole('button',{name:'Build with Claude →',exact:true}).click();
   await expect(editor.locator('#workbench-workspace')).toBeVisible();
   await expect(editor.locator('#editor-agent')).toBeVisible();
+  await expect(editor.getByRole('dialog',{name:'Let’s connect your Claude.'})).toBeVisible();
   expect(await editor.locator('#src').inputValue().then(JSON.parse)).toEqual(JSON.parse(source));
   await expect(editor.locator('#docview [data-view-id]')).toHaveAttribute('data-view-id','service-flow');
   await expect(editor.locator('#docview .stepid')).toHaveText(address.get('s'));
@@ -70,7 +66,7 @@ test('a changed published story fails the handoff without replacing the existing
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(before);
 });
 
-test('the existing canon adapter link offers a checked draft without an automatic write',async({page,server})=>{
+test('the canon adapter opens Build directly and reload restores the draft without another fetch',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
   const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
   const url=new URL(await link.getAttribute('href')),spec=await page.evaluate(()=>__backstage.spec);
@@ -78,13 +74,24 @@ test('the existing canon adapter link offers a checked draft without an automati
   const reads=[];
   await page.route('**/api/canon/context?*',route=>{reads.push(route.request().url());return route.fulfill({json:{spec,catalog:{version:1,services:[]}}});});
   await page.goto(url.href);
-  await expect(page.getByRole('button',{name:'Build with Claude →',exact:true})).toBeEnabled();
+  await expect(page.locator('#folder-agent-guide')).toBeVisible();
   expect(reads).toHaveLength(1);
   await page.reload();
-  await expect(page.getByRole('button',{name:'Build with Claude →',exact:true})).toBeEnabled();
-  expect(reads).toHaveLength(2);
-  await expect(page.locator('#workbench-workspace')).toBeHidden();
-  await page.getByRole('button',{name:'Build with Claude →',exact:true}).click();
+  await expect(page.locator('#workbench-workspace')).toBeVisible();
+  expect(reads).toHaveLength(1);
   await expect(page.locator('#editor-agent')).toBeVisible();
   expect(new URL(page.url()).searchParams.has('canon')).toBe(false);
+});
+
+test('direct Build preserves an earlier draft through reload and makes it recoverable from Home',async({page,server})=>{
+  await page.goto(server.origin+'/backstage/index.html');
+  const url=await page.getByRole('link',{name:'Build with Claude',exact:true}).getAttribute('href');
+  const before=' {"page":{"title":"Earlier customer story","blocks":[]}}\n';
+  await page.evaluate(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:1})),before);
+  await page.goto(url);await expect(page.locator('#folder-agent-guide')).toBeVisible();
+  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts'))[0].text)).toBe(before);
+  await page.reload();await page.locator('#workspace-home').click();
+  await page.locator('#welcome-earlier-drafts summary').click();
+  await page.getByRole('button',{name:/Earlier customer story ·/}).click();
+  await expect(page.locator('#src')).toHaveValue(before);
 });

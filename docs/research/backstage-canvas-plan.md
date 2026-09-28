@@ -8,9 +8,10 @@ Work on `codex/claude-folder-session`; do not merge.
    focus, renderer and revision state on entity changes and unmount.
 2. Carry diagram ID, spec digest, entity and current navigation to the existing
    standalone/workbench destinations. The receiving workbench checks the digest
-   before offering a draft, applies the navigation, and opens the Agent panel for
+   before opening a draft, applies the navigation, and opens the Agent panel for
    Build with Claude. No automatic folder access, agent startup or publication.
-   Preserve the user's existing draft until they explicitly open the offered story.
+   Build now opens directly after verification, preserving the prior draft in
+   durable browser recovery storage before replacement.
 3. Regenerate the bundled native renderer; verify package types/tests, native
    browser behavior and the complete hosted-workbench handoff using fictional
    fixtures. Build a local plugin preview for inspection. Company SSO/GitHub and
@@ -24,8 +25,8 @@ This increment reuses the hosted editor and adds native expanded reading.
 - Host-owned full-window canvas, same native renderer instance and loaded spec,
   floating tools, Escape/Back to entity, active-tab selection and lifecycle cleanup.
 - Checked external viewer/editor links with root section, view, path and step.
-  Build with Claude offers the story before replacing a draft, opens Agent, and
-  leaves pairing and publication explicit. Static library and legacy canon reads
+  Build with Claude opens the checked story directly, opens Agent and its centered
+  setup guide, and leaves pairing and publication explicit. Static library and legacy canon reads
   are covered, including refreshing the legacy link.
 - Native bundle, workbench and standalone artifacts rebuilt. Local actual-plugin
   preview is served at `http://localhost:8766/backstage-preview/index.html`.
@@ -47,3 +48,25 @@ This increment reuses the hosted editor and adds native expanded reading.
 No merge or company deployment. Production adoption requires the company to
 upgrade its pinned package, deploy the matching workbench, and verify its real
 GitHub loaders/SSO. Root story navigation transfers; drill-down frames do not yet.
+
+## Streamlined opening and connection
+
+The accepted clickable mockup is implemented: Build is a primary welcome action
+and sits beside the Backstage story title. It opens the canvas in one click. The
+centered guide covers the exact working folder, the complete copyable connection
+instructions, waiting for the listener, folder mismatch recovery, cancellation,
+and manual connection later. An active listener closes the guide and focuses the
+floating chat. Reopening that connected chat does not repeat setup. Leaving the
+project still follows the existing disconnect policy.
+
+Earlier drafts and their baselines survive direct Build and reload; Home offers
+their recovery. An archive write failure stops the handoff before replacement.
+Story revision checks still fail before any draft writes.
+
+Verified: 42 plugin tests and TypeScript checks; root Node suite; 12 Backstage and
+welcome browser contracts; all 10 folder-agent browser contracts across the main
+run and focused rerun. The folder tests use real files and the Python listener
+with a picker adapter and simulated agent output, not a driven Claude session.
+An additional smoke run through the actual localhost:8766 mock Backstage plugin
+opened the guide directly without page or HTTP errors. Desktop and 390px layouts
+were inspected. No merge or deployment.

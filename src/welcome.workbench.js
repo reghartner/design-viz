@@ -180,6 +180,15 @@ function initWorkbenchWelcome(opts){
     var date = draft && new Date(draft.savedAt);
     el('welcome-resume-detail').textContent = current ? 'Your current project is still here, including its undo history.' :
       'Saved in this browser' + (date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : '') + '.';
+    var earlier=el('welcome-earlier-drafts'),list=el('welcome-earlier-list'),drafts=builder.earlierDrafts();
+    earlier.hidden=!drafts.length;list.replaceChildren();
+    drafts.forEach(function(entry){
+      var name='Unfinished diagram';try{var raw=JSON.parse(entry.text);name=(raw.page || raw).title || name;}catch(ex){}
+      var button=document.createElement('button');button.type='button';button.className='welcome-button';
+      button.textContent=name+' · '+new Date(entry.at).toLocaleString();
+      button.addEventListener('click',function(){try{builder.restoreEarlierDraft(entry);enterEditor();}catch(ex){error('welcome-file-error',ex.message);}});
+      list.appendChild(button);
+    });
   }
   function selectScreen(name, focus){
     retireRead();
@@ -238,13 +247,13 @@ function initWorkbenchWelcome(opts){
   ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
     el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
   });
-  ['welcome-agent', 'welcome-new-agent'].forEach(function(id){ el(id).addEventListener('click', function(){ navigation.go('agent'); }); });
+  ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('agent');});});
+  function buildWithClaude(){
+    if(!builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
+    enterEditor();builder.startAgent();
+  }
+  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',buildWithClaude);});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
-  if(el('welcome-agent-live'))el('welcome-agent-live').addEventListener('click',function(){
-    if(!builder.isProjectOpen())builder.loadSpec(welcomeBlankSpec('My story'));
-    enterEditor();
-    var agentTab=document.getElementById('editor-tab-agent');if(agentTab)agentTab.click();
-  });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
   el('welcome-paste-form').addEventListener('submit', function(ev){
@@ -369,11 +378,12 @@ function initWorkbenchWelcome(opts){
   renderTemplates(); updatePrompt();
   var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request){
+  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct){
+    if(direct)builder.preserveDraft();
     builder.loadSpec(spec);
     if(request){var url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('fv');url.hash=hash.toString();history.replaceState(history.state,'',url.pathname+url.search+url.hash);}
-    enterEditor();
-    if(request){builder.navigate(request.target);if(request.action==='build')document.getElementById('editor-tab-agent').click();}
+    if(direct)navigation.replace('editor',true);else enterEditor();
+    if(request){builder.navigate(request.target);if(request.action==='build')builder.startAgent();}
   }});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});

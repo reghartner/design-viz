@@ -46,15 +46,18 @@ export function InlineFlowview({
       <CanvasFrame expanded={expanded} onClose={close} title={diagram.title}>
       <div style={expanded ? {position:'absolute',top:12,left:12,right:12,zIndex:100,
         display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'none'} :
-        {display:'flex',alignItems:'center',gap:16,flexWrap:'wrap',marginBottom:16}}>
+        {display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
+        {!expanded && <h3 style={{margin:0,fontSize:22}}>{diagram.title}</h3>}
         <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',
           background:'#fff',border:'1px solid #dce1f1',borderRadius:10,padding:8,boxShadow:expanded?'0 4px 18px #14244212':undefined}}>
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Explore canvas'}
           </button>
-          <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
-          <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in workbench</EvidenceLink>
-          <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'build')}>Build with Claude</EvidenceLink>
+          <EvidenceLink prominent url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'build')}>Build with Claude</EvidenceLink>
+          <details style={{position:'relative'}}><summary style={{cursor:'pointer'}}>More</summary><div style={{position:'absolute',right:0,top:'100%',zIndex:120,minWidth:190,display:'grid',gap:12,padding:14,border:'1px solid #dce1f1',borderRadius:8,background:'#fff',boxShadow:'0 4px 18px #14244212'}}>
+            <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
+            <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in workbench</EvidenceLink>
+          </div></details>
         </div>
       </div>
       <div style={expanded ? {position:'absolute',left:12,bottom:12,zIndex:110,maxWidth:540,maxHeight:'35vh',overflow:'auto',background:'#fff',borderRadius:8} : undefined}>

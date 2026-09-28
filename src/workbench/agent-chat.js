@@ -51,11 +51,33 @@ function initWorkbenchAgentChat(opts){
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
   var kitNode=doc.getElementById('flowview-folder-kit'),kit=null;
   function setText(id,text){var node=get(id);if(node.textContent!==text)node.textContent=text;}
-  function status(text){setText('status',text);}
+  var guide=get('guide'),guideStage='folder';
+  function status(text){setText('status',text);setText('panel-status',text);}
+  function stage(name){
+    guideStage=name;
+    ['folder','review','waiting','help'].forEach(function(key){get('guide-'+key).hidden=key!==name;});
+    get('guide-title').textContent={folder:'Let’s connect your Claude.',review:'One paste, then talk here.',waiting:'Waiting for Claude.',help:'Let’s match the folders.'}[name];
+    guide.querySelectorAll('[data-agent-stage]').forEach(function(item){
+      if(item.dataset.agentStage===(name==='help'?'review':name))item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');
+    });
+  }
+  function openSetup(){
+    if(opts.show)opts.show();
+    if(state.listening){get('input').focus();return;}
+    stage(state.connected?(guideStage==='waiting'?'waiting':'review'):'folder');
+    if(!guide.open)guide.showModal();
+    get(guideStage==='folder'?'connect':guideStage==='review'?'copy':'show-copy').focus();
+  }
+  function closeGuide(){if(guide.open)guide.close();}
   function paint(update){
     if(!life.alive())return;
-    if(update.listening && !state.listening){get('setup').open=false;get('pairing').open=false;}
+    var justListening=update.listening && !state.listening;
     Object.assign(state,update);
+    if(justListening){
+      get('pairing').open=false;
+      if(guide.open){closeGuide();if(opts.show)opts.show();get('input').focus();}
+      status('Claude is connected. Describe the story in your own words.');
+    }
     if(update.status)status(update.status);
     get('connection').textContent=state.connected?(state.listening?'Claude listener active':'Waiting for Claude listener'):'Not connected';
     get('send').disabled=connecting || !state.connected || !!state.pending;
@@ -63,6 +85,8 @@ function initWorkbenchAgentChat(opts){
     get('disconnect').disabled=!state.connected;
     get('connect').disabled=connecting || state.connected;
     get('resume').disabled=connecting || state.connected;
+    guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){button.disabled=connecting;});
+    setText('open-setup',state.listening?'Connection settings':state.connected?'Finish connecting Claude':'Connect Claude');
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
     root.dataset.connected=String(state.connected);
     get('indicator').dataset.phase=state.pending?phase:state.listening?'ready':'idle';
@@ -114,10 +138,12 @@ function initWorkbenchAgentChat(opts){
   }
   async function disconnect(){
     generation++;life.cancelDelay(timer);
-    var old=client;client=null;
-    if(old){try{await old.disconnect();}catch(ex){status('Disconnected. Could not update the folder: '+ex.message);}old.destroy();}
+    var old=client,message='Disconnected. Connect Claude when you’re ready.';client=null;
+    if(old){try{await old.disconnect();}catch(ex){message='Disconnected. Could not update the folder: '+ex.message;}old.destroy();}
     if(releaseLock){releaseLock();releaseLock=null;}
+    if(!life.alive())return;
     paint({connected:false,pending:null,listening:false,progress:''});
+    stage('folder');status(message);
   }
   async function connect(resume){
     if(connecting || state.connected)return;
@@ -156,8 +182,10 @@ function initWorkbenchAgentChat(opts){
       if(!life.alive() || token!==generation){await disconnect();return;}
       await files.write('README.md',instructions+'\n');
       if(!life.alive() || token!==generation){await disconnect();return;}
-      get('instructions').value=instructions;get('setup').open=true;
+      get('instructions').value=instructions;
       get('folder').textContent=resume?'Exchange folder: '+directory.name:'Selected folder: '+parent.name+' · Exchange: ./'+directory.name;
+      get('guide-folder-name').textContent=get('folder').textContent;
+      stage('review');
       status('Paste the connection instructions into Claude.');
       get('copy').disabled=false;
       tick(token);
@@ -177,11 +205,19 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('connect'),'click',function(){connect(false);});
   life.listen(get('resume'),'click',function(){connect(true);});
   life.listen(get('disconnect'),'click',disconnect);
-  life.listen(get('indicator'),'click',function(){if(opts.show)opts.show();});
+  life.listen(get('indicator'),'click',openSetup);
+  life.listen(get('open-setup'),'click',function(){if(state.listening)get('pairing').open=!get('pairing').open;else openSetup();});
+  life.listen(get('close-guide'),'click',closeGuide);
+  guide.querySelectorAll('[data-agent-later]').forEach(function(button){life.listen(button,'click',closeGuide);});
+  guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){life.listen(button,'click',async function(){await disconnect();if(life.alive()){get('connect').focus();status('Choose the exact folder Claude reported, then copy fresh instructions.');}});});
+  life.listen(get('show-copy'),'click',function(){stage('review');get('copy').focus();});
+  life.listen(get('folder-missing'),'click',function(){stage('help');});
+  life.listen(get('help-back'),'click',function(){stage('waiting');});
   life.listen(get('selection'),'click',function(){if(opts.show)opts.show();get('input').focus();});
   life.listen(get('copy'),'click',async function(){
-    try{await navigator.clipboard.writeText(get('instructions').value);status('Copied. Paste into the Claude session working in the folder you selected. The instructions use its current working directory.');}
-    catch(ex){get('instructions').focus();get('instructions').select();status('Press ⌘C or Ctrl+C to copy the selected instructions.');}
+    var token=generation;
+    try{await navigator.clipboard.writeText(get('instructions').value);if(!life.alive() || token!==generation || state.listening)return;stage('waiting');get('show-copy').focus();status('Copied. Paste into the Claude session working in the folder you selected.');}
+    catch(ex){if(!life.alive() || token!==generation || state.listening)return;get('instructions').focus();get('instructions').select();status('Press ⌘C or Ctrl+C to copy the selected instructions.');}
   });
   async function send(event){
     if(event)event.preventDefault();
@@ -193,7 +229,7 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('form'),'submit',send);
   life.listen(get('input'),'keydown',function(event){if(event.key==='Enter' && (event.metaKey || event.ctrlKey))send(event);});
   life.listen(window,'pagehide',function(){disconnect();});
-  life.own(function(){generation++;life.cancelDelay(timer);if(client){client.disconnect().catch(function(){});client.destroy();client=null;}if(releaseLock){releaseLock();releaseLock=null;}});
+  life.own(function(){closeGuide();generation++;life.cancelDelay(timer);if(client){client.disconnect().catch(function(){});client.destroy();client=null;}if(releaseLock){releaseLock();releaseLock=null;}});
   var contextTimer=null;
   function contextTick(){
     contextTimer=null;if(!life.alive())return;
@@ -206,12 +242,12 @@ function initWorkbenchAgentChat(opts){
     if(!doc.body.classList.contains('welcome-active'))contextTimer=life.delay(contextTick,350);
   }
   var contextVisibility=new MutationObserver(function(){
-    if(doc.body.classList.contains('welcome-active')){life.cancelDelay(contextTimer);contextTimer=null;}
+    if(doc.body.classList.contains('welcome-active')){closeGuide();life.cancelDelay(contextTimer);contextTimer=null;}
     else if(contextTimer===null)contextTick();
   });
   contextVisibility.observe(doc.body,{attributes:true,attributeFilter:['class']});
   life.own(function(){contextVisibility.disconnect();});
   contextTick();
-  paint({});
-  return {destroy:life.destroy};
+  stage('folder');paint({});
+  return {destroy:life.destroy,openSetup:openSetup};
 }

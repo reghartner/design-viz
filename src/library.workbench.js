@@ -18,7 +18,7 @@ function initWorkbenchLibrary(opts){
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
-  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,active=null,sequence=0,current=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,active=null,sequence=0,current=null,openedBuild=false;
   function retireViewer(){
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
     if(tour)tour.destroy();tour=null;
@@ -86,6 +86,9 @@ function initWorkbenchLibrary(opts){
       if(!current)throw new Error('This diagram is no longer in the published library. Return to Canon diagrams to choose another.');
       var handoff=opts.handoff && (opts.handoff.error || opts.handoff.id===id)?opts.handoff:null;
       await verifyWorkspaceHandoff(current.spec,handoff,window.crypto);if(token!==sequence)return;
+      if(handoff && handoff.action==='build' && !openedBuild){
+        opts.edit(JSON.parse(JSON.stringify(current.spec)),handoff,true);openedBuild=true;return;
+      }
       title.textContent=current.title;
       document.getElementById('canon-reader-origin').textContent=origin+(handoff?' · Opened from '+(handoff.entity || 'Backstage'):'')+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));

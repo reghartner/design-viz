@@ -2034,7 +2034,7 @@ function renderInspector(){
         t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
-      guide.appendChild(form);
+      if (t.kind !== 'step') guide.appendChild(form);
 
       var acts = document.createElement('div');
       acts.className = 'iacts';
@@ -2151,8 +2151,8 @@ function renderInspector(){
       }
       if (!armedHere)
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
-      if (t.kind === 'step') guide.insertBefore(acts, form);
-      else guide.appendChild(acts);
+      guide.appendChild(acts);
+      if (t.kind === 'step') guide.appendChild(form);
     }
 
     /* the pass-1 field guidance, tucked under a details fold */

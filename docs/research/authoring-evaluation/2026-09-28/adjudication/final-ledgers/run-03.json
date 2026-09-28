@@ -1,0 +1,205 @@
+{
+  "story": "run-03",
+  "candidateId": "specimen-3d313b05cc71",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+  "assessmentHashes": {
+    "nonQuestions": "11b8489e6db53dcd2442e34550c5ab433d8f3b6e382081ae783a8578fcfcb0bb",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "DL001",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push title/sub",
+      "rule": "level.story_technical",
+      "evidence": [
+        "brief/answers.md Technical level: Story; no service names or APIs on screen",
+        "candidate/story.spec.json /page/blocks/0/diagram/nodes/push"
+      ],
+      "explanation": "The visible \u201cPhone alert service \u00b7 Apple / Google\u201d node exposes service/provider infrastructure in the requested customer-focused Story view."
+    },
+    {
+      "id": "DT001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon physical battery",
+      "rule": "time.rate",
+      "evidence": [
+        "brief/hld.md Power use: idle about 1%/h and each clip about 1%",
+        "evidence/renderer.json raccoon physicalBattery charge=25",
+        "interpretations.json rule 2-time"
+      ],
+      "explanation": "The explicit 25% physical charge at 1:04 AM creates an intermediate zero-drain hold. The documented anchor conflict permits a direct jump to the 4:00 AM anchor, not this intermediate value."
+    },
+    {
+      "id": "DT002",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phone/battery value/reportedAt \u2014 1:00 AM report",
+      "rule": "time.rate",
+      "evidence": [
+        "brief/hld.md heartbeat cadence and power-use rates",
+        "evidence/renderer.json raccoon phone battery value=25 and resolvedReportTime=2026-10-02T01:00",
+        "interpretations.json rule 2-time"
+      ],
+      "explanation": "The newly authored 1:00 AM report independently asserts 25%, inconsistent with the stated drain rate; it is not merely a carried cached report."
+    },
+    {
+      "id": "DP001",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/text and /panels/phone/battery \u2014 bedtime battery display",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json bedtime text: \u201cthat is what the phone shows\u201d",
+        "evidence/renderer.json bedtime battery renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The caption promises that the phone shows the reported 25%, but the home screen hides the battery field card."
+    },
+    {
+      "id": "DP002",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/0/text and /page/blocks/0/diagram/panels/2/initial/power \u2014 bedtime charging display",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json bedtime text: phone shows 25% and not charging",
+        "evidence/renderer.json bedtime power renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The caption promises that the phone shows the not-charging state, but the home screen hides the Power card."
+    },
+    {
+      "id": "DP003",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/3/text and panels/phone/battery \u2014 sunrise 6:30 AM report",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json sunrise text: phone \u201cstill shows the 6:30 AM check-in\u201d",
+        "evidence/renderer.json sunrise battery renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The promised 6:30 AM report is stored but not visibly shown."
+    },
+    {
+      "id": "DP004",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and panels/phone/power \u2014 charging-report solar state",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json charging-report text: phone \u201cnow shows solar charging\u201d",
+        "evidence/renderer.json charging-report power renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The caption promises a visible solar-charging state, but the Power card is hidden."
+    },
+    {
+      "id": "DP005",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and panels/phone/battery \u2014 charging-report low-battery mark",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json charging-report text: \u201cthe low-battery mark stays\u201d",
+        "evidence/renderer.json charging-report battery icon=battery-low but renderedAsCard=false"
+      ],
+      "explanation": "The caption promises that the phone's low-battery mark remains visible, but the battery card and icon are hidden."
+    },
+    {
+      "id": "DP006",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/5/text and panels/phone/battery \u2014 courier 8:00 AM report",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json courier text: phone \u201cstill shows the 8:00 AM check-in\u201d",
+        "evidence/renderer.json courier battery renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The promised 8:00 AM report is not visibly shown."
+    },
+    {
+      "id": "DP007",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and folded phone.battery \u2014 b-sdcard cached report",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json b-sdcard text: phone \u201cstill shows the 8:00 AM check-in\u201d",
+        "evidence/renderer.json b-sdcard battery renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The Wi-Fi-down caption promises a visible cached check-in, but the battery/report card is hidden."
+    },
+    {
+      "id": "DP008",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text and folded phone.online \u2014 b-sdcard Online state",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json b-sdcard text: phone \u201cstill says Online\u201d",
+        "evidence/renderer.json b-sdcard online renderedAsCard=false because phoneScreen=home"
+      ],
+      "explanation": "The caption promises a visible Online state, but the Online card is hidden."
+    },
+    {
+      "id": "QC-3D-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-3d313b05cc71 :: candidates/specimen-3d313b05cc71/questions.md Q1\u2013Q7 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Independent decisions include Q1 level; Q2 audience and takeaway; Q3 date and several event times; Q4 outcomes and alternate-path stopping point; Q5 multiple starting-state choices; Q6 panel/content selection; and Q7 title.",
+        "interpretations.json rule 1-questions counts independent clauses rather than numbered prompts."
+      ],
+      "explanation": "The batch requests more than seven independent answers."
+    },
+    {
+      "id": "QC-3D-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidates/specimen-3d313b05cc71/questions.md Q4 \u2014 whether to depict two outcomes",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 proposes depicting the normal morning and Wi-Fi-down alternate and asks for confirmation.",
+        "brief/hld.md \u00a7Scenario to depict already supplies both outcomes.",
+        "Whether to add a later clip-opening action to the alternate remains unanswered and is not deducted."
+      ],
+      "explanation": "Only the outcome-selection decision is redundant."
+    },
+    {
+      "id": "QC-3D-START-BATTERY",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidates/specimen-3d313b05cc71/questions.md Q5 \u2014 starting battery 25% clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 requests confirmation of a 25% starting battery.",
+        "brief/hld.md \u00a7Scenario to depict states Battery is 25% in the evening."
+      ],
+      "explanation": "The starting battery value was already supplied."
+    },
+    {
+      "id": "QC-3D-START-CHARGING",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-3d313b05cc71 :: candidates/specimen-3d313b05cc71/questions.md Q5 \u2014 starting not-charging clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 separately requests confirmation that the camera starts not charging.",
+        "brief/hld.md \u00a7Scenario to depict states the camera is not charging."
+      ],
+      "explanation": "The starting charging state was already supplied."
+    }
+  ],
+  "score": {
+    "questions": 5,
+    "level": 8,
+    "time": 14,
+    "edges": 15,
+    "panels": 0,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 72
+  }
+}

@@ -1,0 +1,255 @@
+{
+  "node": "v24.21.0",
+  "browser": "153.0.8010.12",
+  "viewport": {
+    "width": 1800,
+    "height": 1200
+  },
+  "renderer": {
+    "file": "src/panels/types/screen.js",
+    "sha256": "e31d6cff0ec263e80629c8fc4ed81701ab12445f8b7150e27bc1ed5d3c11be2d",
+    "references": [
+      "src/panels/types/screen.js:341",
+      "src/panels/types/screen.js:360",
+      "src/panels/types/screen.js:380",
+      "src/core/state.js:60"
+    ]
+  },
+  "stories": [
+    {
+      "story": "historical-business",
+      "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+      "htmlSha256": "6bb180569107dd3637b4720e5f6242c3a1a016ac773fc6229f7b54f67966402e",
+      "route": "normal",
+      "step": "a-open",
+      "stepPointer": "/page/blocks/0/diagram/steps/6",
+      "screenDeclarationPointer": "/page/blocks/0/diagram/panels/2",
+      "screenVisibilityOrigin": "/page/blocks/0/diagram/steps/5/panelVisibility/porch",
+      "screenPatchPointer": "/page/blocks/0/diagram/steps/6/panels/porch",
+      "screenState": {
+        "mode": "save",
+        "scenePlayback": "playing",
+        "banner": "Clip playing in the Kestrel app",
+        "log": []
+      },
+      "sceneDom": {
+        "frameClasses": "pwidget pt-screen",
+        "screenClasses": "screenbox m-save",
+        "sceneSvgCount": 1,
+        "sceneVectorElementCount": 34,
+        "banner": "Clip playing in the Kestrel app",
+        "videoElements": 0,
+        "imageElements": 0,
+        "rect": {
+          "width": 318,
+          "height": 213.75
+        }
+      },
+      "phoneBeforeScroll": {
+        "screen": "app",
+        "scrollTop": 0,
+        "scrollHeight": 610,
+        "clientHeight": 489,
+        "sceneSvgsInsidePhone": 0,
+        "videoElementsInsidePhone": 0,
+        "fields": [
+          {
+            "id": "battery",
+            "value": "21%",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 119.71875,
+            "height": 119.71875
+          },
+          {
+            "id": "power",
+            "value": "Charging from sun",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 97.25,
+            "height": 109.8125
+          },
+          {
+            "id": "online",
+            "value": "Online",
+            "detail": "Last check-in 8:00 AM",
+            "visibleHeight": 97.25,
+            "height": 109.8125
+          },
+          {
+            "id": "event",
+            "value": "Package",
+            "detail": "8:10 AM · clip playing",
+            "visibleHeight": 0,
+            "height": 94.4375
+          }
+        ]
+      },
+      "phoneAfterScroll": {
+        "screen": "app",
+        "scrollTop": 121,
+        "scrollHeight": 610,
+        "clientHeight": 489,
+        "sceneSvgsInsidePhone": 0,
+        "videoElementsInsidePhone": 0,
+        "fields": [
+          {
+            "id": "battery",
+            "value": "21%",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 119.71875,
+            "height": 119.71875
+          },
+          {
+            "id": "power",
+            "value": "Charging from sun",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 109.8125,
+            "height": 109.8125
+          },
+          {
+            "id": "online",
+            "value": "Online",
+            "detail": "Last check-in 8:00 AM",
+            "visibleHeight": 109.8125,
+            "height": 109.8125
+          },
+          {
+            "id": "event",
+            "value": "Package",
+            "detail": "8:10 AM · clip playing",
+            "visibleHeight": 94.4375,
+            "height": 94.4375
+          }
+        ]
+      },
+      "screenshots": {
+        "scene": "historical-business/ending-camera-scene.png",
+        "phoneScrolled": "historical-business/ending-phone-scrolled.png",
+        "fullPage": "historical-business/normal-a-open.png"
+      }
+    },
+    {
+      "story": "historical-engineer",
+      "sourceSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+      "htmlSha256": "51e06db70c7489a1809494a1932cef44ad4ce45c0cf521207acde7f6f0589a53",
+      "route": "happy",
+      "step": "h-open",
+      "stepPointer": "/page/blocks/0/diagram/steps/8",
+      "screenDeclarationPointer": "/page/blocks/0/diagram/panels/2",
+      "screenVisibilityOrigin": "/page/blocks/0/diagram/steps/6/panelVisibility/clip",
+      "screenPatchPointer": "/page/blocks/0/diagram/steps/8/panels/clip",
+      "screenState": {
+        "mode": "save",
+        "banner": "Opened in the Kestrel app 8:06 AM",
+        "log": []
+      },
+      "sceneDom": {
+        "frameClasses": "pwidget pt-screen",
+        "screenClasses": "screenbox m-save",
+        "sceneSvgCount": 1,
+        "sceneVectorElementCount": 34,
+        "banner": "Opened in the Kestrel app 8:06 AM",
+        "videoElements": 0,
+        "imageElements": 0,
+        "rect": {
+          "width": 318,
+          "height": 213.75
+        }
+      },
+      "phoneBeforeScroll": {
+        "screen": "app",
+        "scrollTop": 0,
+        "scrollHeight": 612,
+        "clientHeight": 489,
+        "sceneSvgsInsidePhone": 0,
+        "videoElementsInsidePhone": 0,
+        "fields": [
+          {
+            "id": "battery",
+            "value": "21%",
+            "detail": "Updated 8:00 AM · low_battery until above 30%",
+            "visibleHeight": 125.09375,
+            "height": 125.09375
+          },
+          {
+            "id": "power",
+            "value": "Solar · charging",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          },
+          {
+            "id": "link",
+            "value": "Online",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          },
+          {
+            "id": "lastevent",
+            "value": "Package · 8:05 AM",
+            "detail": "Push sent 8:05 AM",
+            "visibleHeight": 0,
+            "height": 115.1875
+          },
+          {
+            "id": "clipcard",
+            "value": "Package · 8:05 AM",
+            "detail": "Playing · ~20 s",
+            "visibleHeight": 0,
+            "height": 115.1875
+          }
+        ]
+      },
+      "phoneAfterScroll": {
+        "screen": "app",
+        "scrollTop": 123,
+        "scrollHeight": 612,
+        "clientHeight": 489,
+        "sceneSvgsInsidePhone": 0,
+        "videoElementsInsidePhone": 0,
+        "fields": [
+          {
+            "id": "battery",
+            "value": "21%",
+            "detail": "Updated 8:00 AM · low_battery until above 30%",
+            "visibleHeight": 125.09375,
+            "height": 125.09375
+          },
+          {
+            "id": "power",
+            "value": "Solar · charging",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          },
+          {
+            "id": "link",
+            "value": "Online",
+            "detail": "Updated 8:00 AM",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          },
+          {
+            "id": "lastevent",
+            "value": "Package · 8:05 AM",
+            "detail": "Push sent 8:05 AM",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          },
+          {
+            "id": "clipcard",
+            "value": "Package · 8:05 AM",
+            "detail": "Playing · ~20 s",
+            "visibleHeight": 115.1875,
+            "height": 115.1875
+          }
+        ]
+      },
+      "screenshots": {
+        "scene": "historical-engineer/ending-camera-scene.png",
+        "phoneScrolled": "historical-engineer/ending-phone-scrolled.png",
+        "fullPage": "historical-engineer/happy-h-open.png"
+      }
+    }
+  ]
+}

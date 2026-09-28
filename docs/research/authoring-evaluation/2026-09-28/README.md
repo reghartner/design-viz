@@ -1,6 +1,8 @@
 # Claude editor API versus the saved CLI experiment
 
-The six Opus 5.5 authors all delivered an accepted story through the real editor after a documented startup-harness repair. **This batch did not match the saved CLI output quality.** The file transport was fast; content fidelity, visible app state and authoring UX still need work.
+> **Score reconciliation:** the original ratings below contained factual and counting errors. Use the [audited reference scores and explanation](adjudication/README.md) for the comparison: current mean 79.3 versus saved CLI 90.5. The original table and exact evidence remain preserved.
+
+The six Opus 5.5 authors all delivered an accepted story through the real editor after a documented startup-harness repair. The independently adjudicated comparison below is linked above; the initial rating table is retained for provenance. The file transport was fast; content fidelity, visible app state and authoring UX still need work.
 
 Same target: the weekend’s fictional **b1-overnight** camera story, with three business and three engineering authors. The original source, answer sheets and 100-point rubric were frozen before generation. [Plan](../api-comparison-plan.md) · [startup amendment](../startup-amendment.md) · [machine-readable results](results.json).
 

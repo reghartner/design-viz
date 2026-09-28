@@ -1,0 +1,172 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "edges",
+      "points": 2,
+      "location": "h-courier",
+      "explanation": "Caption and panel introduce an 8:00 AM heartbeat report without lighting its full path through device-shadow."
+    },
+    {
+      "id": "C002",
+      "criterion": "level",
+      "points": 2,
+      "location": "app \u2194 device-shadow",
+      "explanation": "Engineering view omits the app\u2019s service hop for reading device-shadow."
+    },
+    {
+      "id": "C003",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / batt",
+      "explanation": "Sets physical battery to 25% at 1:10 AM using that unstated hold rate, also absorbing the clip\u2019s stated ~1% cost."
+    },
+    {
+      "id": "C004",
+      "criterion": "edges",
+      "points": 2,
+      "location": "charging",
+      "explanation": "Caption says the device page shows the new charging state, but the device-shadow/app read hop is absent."
+    },
+    {
+      "id": "C005",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "clip-store binding / h-open",
+      "explanation": "Bound API operation is `uploadClip`, while this step calls `getClip`."
+    },
+    {
+      "id": "C006",
+      "criterion": "edges",
+      "points": 2,
+      "location": "sunrise",
+      "explanation": "Caption and panel introduce a 6:30 AM heartbeat report with none of its hops lit."
+    },
+    {
+      "id": "C007",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "event-ingest binding / heartbeat steps",
+      "explanation": "Bound API operation is `postEvent`, which does not match the node\u2019s `POST /heartbeats` calls."
+    },
+    {
+      "id": "C008",
+      "criterion": "level",
+      "points": 2,
+      "location": "device-shadow \u2192 Kestrel app",
+      "explanation": "Engineering-level diagram omits the service hop by which the app reads device-shadow."
+    },
+    {
+      "id": "C009",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / phoneapp battery",
+      "explanation": "Invented 1:00 AM reading of 25% uses an unstated zero-drain rate between conflicting anchors."
+    },
+    {
+      "id": "C010",
+      "criterion": "edges",
+      "points": 2,
+      "location": "raccoon",
+      "explanation": "Caption and panel introduce a 1:00 AM heartbeat report without lighting its full path through device-shadow."
+    },
+    {
+      "id": "C011",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / batt panel",
+      "explanation": "Invented 1:10 AM physical value of 25%, including no clip drain, uses an unstated zero-drain rate instead of a direct anchor jump."
+    },
+    {
+      "id": "C012",
+      "criterion": "edges",
+      "points": 2,
+      "location": "bed",
+      "explanation": "Caption says the device page reads the reported state, but no device-shadow/app read hop is lit."
+    },
+    {
+      "id": "C013",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon",
+      "explanation": "The invented 1:00/1:10 AM value holds at 25%, using an unstated 0%/h rate between conflicting anchors instead of only jumping directly between them."
+    },
+    {
+      "id": "C014",
+      "criterion": "edges",
+      "points": 2,
+      "location": "bed",
+      "explanation": "Caption says the device page reads the state, but no device-shadow \u2192 app hop is lit or defined."
+    },
+    {
+      "id": "C015",
+      "criterion": "level",
+      "points": 2,
+      "location": "diagram-wide",
+      "explanation": "The design says the app reads device-shadow, but this engineering-level diagram omits that service hop."
+    },
+    {
+      "id": "C016",
+      "criterion": "time",
+      "points": 3,
+      "location": "raccoon / phoneapp",
+      "explanation": "Invents a 1:00 AM heartbeat value of 25% using the unstated zero-drain \u201chold\u201d rate between operator anchors."
+    },
+    {
+      "id": "A001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 independent decisions across Questions 1\u20134",
+      "explanation": "The first four prompts alone contain more than seven independently answerable decisions, so the more-than-seven penalty applies once."
+    },
+    {
+      "id": "A002",
+      "criterion": "level",
+      "points": 2,
+      "location": "candidate/story.spec.json#/page/blocks/0/diagram/edges \u2014 missing device-shadow/Kestrel-app dependency",
+      "explanation": "The engineering diagram omits the design-established service dependency by which the Kestrel app reads device-shadow."
+    },
+    {
+      "id": "A003",
+      "criterion": "time",
+      "points": 3,
+      "location": "candidate/story.spec.json#/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 step raccoon, physical battery",
+      "explanation": "The noted anchor conflict permits a direct 25%\u219220% jump, but the separately authored 25% physical value at 1:10 AM is an inconsistent intermediate state and also absorbs the raccoon clip drain."
+    },
+    {
+      "id": "A004",
+      "criterion": "time",
+      "points": 3,
+      "location": "candidate/story.spec.json#/page/blocks/0/diagram/steps/1/text and /page/blocks/0/diagram/steps/1/panels/phoneapp/battery/detail \u2014 step raccoon, 1:00 AM reported battery",
+      "explanation": "The story authors a new 1:00 AM heartbeat report of 25%, an independently inconsistent intermediate reported value under the stated drain rate."
+    },
+    {
+      "id": "B001",
+      "criterion": "questions",
+      "points": 2,
+      "location": "candidate/questions.md \u2014 independently answerable decisions across Q1\u2013Q7",
+      "explanation": "The batch contains more than seven independent decisions: technical level; span; clock/date presentation; several key-event times; solar-rate interpretation; outage timing and heartbeat impact; alternate ending; audience; and takeaway."
+    },
+    {
+      "id": "B002",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing Kestrel app/device-shadow dependency",
+      "explanation": "The engineering diagram has no topology edge representing the design-established app/device-shadow read dependency. This is one structural service-hop unit."
+    },
+    {
+      "id": "B003",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 step raccoon, physical battery",
+      "explanation": "At 1:10 AM the story explicitly resets physical charge to 25%, despite elapsed idle drain and the raccoon clip. The noted anchor conflict permits the direct 25%\u219220% anchor jump, but not this invented intermediate physical value."
+    },
+    {
+      "id": "B004",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phoneapp/battery/detail \u2014 step raccoon, newly reported 1:00 AM battery field",
+      "explanation": "The authored 1:00 AM heartbeat newly reports 25%, an intermediate reported-state value inconsistent with the stated drain. Physical charge and a newly reported app/shadow value are separate units."
+    }
+  ]
+}

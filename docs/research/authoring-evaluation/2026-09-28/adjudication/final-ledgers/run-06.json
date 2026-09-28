@@ -1,0 +1,155 @@
+{
+  "story": "run-06",
+  "candidateId": "specimen-8c365a9d184d",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+  "assessmentHashes": {
+    "nonQuestions": "636fc40b648ba3b4d57e0d110381797596ba340e6bb9b121f967c8d07e3f564f",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "D-LVL-HOP-001",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing device-shadow\u2192Kestrel app dependency",
+      "rule": "level.engineering_hop",
+      "evidence": [
+        "brief/answers.md selects Engineering and requests every service hop",
+        "brief/hld.md Components: device-shadow holds state and the app reads it",
+        "evidence/renderer.json topology has no shadow-to-app edge",
+        "interpretations.json rule 3-edges"
+      ],
+      "explanation": "The engineering topology omits the design-established device-shadow/app service dependency."
+    },
+    {
+      "id": "D-TIME-RATE-001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon physical battery",
+      "rule": "time.rate",
+      "evidence": [
+        "/page/blocks/0/diagram/panels/0 sets drainPerHour=1 and initial charge=25 at 10:30 PM",
+        "/page/blocks/0/diagram/steps/1 explicitly sets physical charge=24 at 1:10 AM",
+        "evidence/renderer.json happy/raccoon physicalBattery resolves to 24 with an explicit charge anchor",
+        "interpretations.json rule 2-time"
+      ],
+      "explanation": "The 24% intermediate physical value applies the clip cost while suppressing about 2 hours 40 minutes of stated idle drain."
+    },
+    {
+      "id": "D-TIME-RATE-002",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/record/rows/0/cells/value \u2014 1:00 AM battery report, mirrored by phone.battery reportedAt",
+      "rule": "time.rate",
+      "evidence": [
+        "/page/blocks/0/diagram/steps/1 authors a 1:00 AM report that remains 25%",
+        "brief/hld.md states about 1% per hour idle drain",
+        "evidence/renderer.json happy/raccoon resolves the reported battery as 25% at 1:00 AM",
+        "interpretations.json rule 2-time treats a newly reported state separately from physical charge"
+      ],
+      "explanation": "The newly authored 1:00 AM 25% report implies an unstated zero-drain interval."
+    },
+    {
+      "id": "D-PANEL-EVENT-001",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text and /page/blocks/0/diagram/steps/4/panels/phone/power \u2014 chargerpt solar icon",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "The chargerpt caption says the app's device page now shows the solar charging icon",
+        "evidence/renderer.json happy/chargerpt has phoneScreen=home and power renderedAsCard=false",
+        "interpretations.json rule 4-panels"
+      ],
+      "explanation": "The caption promises a visible charging icon, but the home screen hides the device-app field card."
+    },
+    {
+      "id": "D-PANEL-EVENT-002",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6/panels/phone/phoneScreen \u2014 openclip clip view",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "brief/hld.md requires the resident to open the normal-path package clip",
+        "/page/blocks/0/diagram/steps/6 only changes phoneScreen to app",
+        "evidence/renderer.json happy/openclip renders battery, power, and online cards but no clip, thumbnail, or open-clip state",
+        "interpretations.json rule 4-panels"
+      ],
+      "explanation": "The required clip opening is narrated without any clear clip or open-clip visual."
+    },
+    {
+      "id": "D-PANEL-EVENT-003",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8/text \u2014 b-retry cached app state; phone fields under /page/blocks/0/diagram/panels/3",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "The b-retry caption says the app still shows the last state with an older updated time",
+        "evidence/renderer.json wifi-down/b-retry keeps phoneScreen=home and all device fields have renderedAsCard=false",
+        "brief/hld.md says the app keeps the last state with an older updated time during the short outage",
+        "interpretations.json rule 4-panels"
+      ],
+      "explanation": "The promised cached-state and older-time display is hidden because the phone remains on its home screen."
+    },
+    {
+      "id": "QC-8C-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-8c365a9d184d :: candidates/specimen-8c365a9d184d/questions.md Q1\u2013Q7 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Independent decisions include Q1 level; Q2 audience and takeaway; Q3 date and several event-time approvals; Q4 outcomes; Q5 starting phone/app choices; Q6 highlighted moments and porch-view treatment; and Q7 normal and alternate ending treatment.",
+        "interpretations.json rule 1-questions requires independent-decision counting."
+      ],
+      "explanation": "The batch requests more than seven independent answers."
+    },
+    {
+      "id": "QC-8C-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidates/specimen-8c365a9d184d/questions.md Q4 \u2014 decision to show both outcomes",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks whether to show the normal delivery and Wi-Fi-down alternate.",
+        "brief/hld.md \u00a7Scenario to depict already requires both."
+      ],
+      "explanation": "The outcome-selection decision repeats the source."
+    },
+    {
+      "id": "QC-8C-START-BATTERY",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidates/specimen-8c365a9d184d/questions.md Q5 \u2014 app starting battery 25% clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 proposes that the app camera page show Battery 25% at bedtime.",
+        "brief/hld.md \u00a7Scenario to depict states that the starting battery is 25%.",
+        "The no-unread-alerts and additional-context choices are not supplied facts and are not deducted."
+      ],
+      "explanation": "Only the 25% starting-state clause is redundant."
+    },
+    {
+      "id": "QC-8C-NORMAL-END",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-8c365a9d184d :: candidates/specimen-8c365a9d184d/questions.md Q7 \u2014 normal-path ending at clip opening",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q7 asks whether the normal path should end when the resident opens the clip.",
+        "brief/hld.md \u00a7Scenario to depict explicitly says the resident opens the normal-path clip.",
+        "The source does not specify a post-alert resident action on the alternate path."
+      ],
+      "explanation": "The normal-path ending was already supplied; the alternate stopping preference was not."
+    }
+  ],
+  "score": {
+    "questions": 5,
+    "level": 8,
+    "time": 14,
+    "edges": 15,
+    "panels": 6,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 78
+  }
+}

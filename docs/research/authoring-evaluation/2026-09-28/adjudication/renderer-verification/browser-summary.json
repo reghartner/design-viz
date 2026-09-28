@@ -1,0 +1,67 @@
+{
+  "node": "v24.21.0",
+  "browser": "153.0.8010.12",
+  "viewport": {
+    "width": 1800,
+    "height": 1200
+  },
+  "reducedMotion": "reduce",
+  "stories": [
+    {
+      "story": "run-01",
+      "steps": 15,
+      "screenshots": 0,
+      "errors": [],
+      "output": "run-01/browser.json"
+    },
+    {
+      "story": "run-02",
+      "steps": 15,
+      "screenshots": 5,
+      "errors": [],
+      "output": "run-02/browser.json"
+    },
+    {
+      "story": "run-03",
+      "steps": 16,
+      "screenshots": 2,
+      "errors": [],
+      "output": "run-03/browser.json"
+    },
+    {
+      "story": "run-04",
+      "steps": 21,
+      "screenshots": 0,
+      "errors": [],
+      "output": "run-04/browser.json"
+    },
+    {
+      "story": "run-05",
+      "steps": 24,
+      "screenshots": 0,
+      "errors": [],
+      "output": "run-05/browser.json"
+    },
+    {
+      "story": "run-06",
+      "steps": 16,
+      "screenshots": 0,
+      "errors": [],
+      "output": "run-06/browser.json"
+    },
+    {
+      "story": "historical-business",
+      "steps": 15,
+      "screenshots": 3,
+      "errors": [],
+      "output": "historical-business/browser.json"
+    },
+    {
+      "story": "historical-engineer",
+      "steps": 19,
+      "screenshots": 2,
+      "errors": [],
+      "output": "historical-engineer/browser.json"
+    }
+  ]
+}

@@ -70,3 +70,33 @@ reference check in the host validator. The rubric, interpretations, full prompts
 packets, model and reasoning level are unchanged. Verify the corrected schema
 with an empty-output format probe, then prepare the same eight pairs in a new
 `paired-v2/` directory. This is a format repair, not a scoring retry.
+## Evidence appeal after the third assessments
+
+Independent factual review identified specific disputed premises that survived
+third-party arbitration: explicitly authored notification clearing, the ownership
+of a low-battery marker, a queue content label interpreted as a classifier result,
+notification wording interpreted as all phone data, and “page now reads [text]”
+interpreted as a network fetch. A presentation-question deduction and any remaining
+cross-story scoring-unit inconsistencies are also checked against the frozen rules.
+These are applications of the existing rules, not new rubric interpretations.
+
+Submit each affected story once more to SOL/medium/Fast with its unchanged full
+packet, the exact preceding ledger, both the original rationale and the precise
+counterevidence. Name the challenged units before the call; supply no target score.
+Require an explicit ruling and retain the previously reviewed, unchallenged units.
+All prior assessments remain preserved. Record any residual interpretive sensitivity
+in the final report instead of rerunning until a preferred score appears.
+
+### Cross-story question-unit consistency
+
+The evidence review found the same compound starting-state confirmation counted
+as one redundant question in one story and as two in others. Before publishing,
+a single SOL/medium/Fast consistency pass will assess only the questions criterion
+for all eight exact question batches together, with the unchanged HLD and frozen
+independent-decision rule. It sees previous question deductions and contrary
+readings, without totals or workflow identities. Its result replaces only that
+criterion's deduction units consistently across all eight stories; the other six
+criteria retain their reviewed arbiter/appeal ledgers. Preserve the original and
+intermediate question rulings. This is a consistency check of the existing rule,
+not a newly introduced rubric or a repeated attempt to obtain a desired score.
+

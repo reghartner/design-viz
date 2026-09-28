@@ -1,0 +1,920 @@
+{
+  "candidates": [
+    {
+      "candidateId": "specimen-f4d35ae7d929",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-TOO-MANY-001",
+          "finalSha256": "f630bd1554fc3fef486b20509282d616119e84c10025202ac38979c4e597f41b"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-004",
+          "finalSha256": "f630bd1554fc3fef486b20509282d616119e84c10025202ac38979c4e597f41b"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-TIME-RATE-RACCOON-001",
+          "finalSha256": "f630bd1554fc3fef486b20509282d616119e84c10025202ac38979c4e597f41b"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-PANELS-CHARGING-001",
+          "finalSha256": "f630bd1554fc3fef486b20509282d616119e84c10025202ac38979c4e597f41b"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-COUNT-001",
+          "finalSha256": "3c2b1740dbc14b6c0f81300142af65fde5cc393cbfba69041272396cab60d56d"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q-REDUNDANT-004",
+          "finalSha256": "3c2b1740dbc14b6c0f81300142af65fde5cc393cbfba69041272396cab60d56d"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-TIME-RATE-RACCOON",
+          "finalSha256": "3c2b1740dbc14b6c0f81300142af65fde5cc393cbfba69041272396cab60d56d"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-PANELS-CHARGING-ICON",
+          "finalSha256": "3c2b1740dbc14b6c0f81300142af65fde5cc393cbfba69041272396cab60d56d"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-5395841c704d",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-001",
+          "finalSha256": "1a244824636f5a57cfc5363c80d4dbccee593d8a237fe680fd8f43647071f175"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-L-001",
+          "finalSha256": "1a244824636f5a57cfc5363c80d4dbccee593d8a237fe680fd8f43647071f175"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-T-001",
+          "finalSha256": "1a244824636f5a57cfc5363c80d4dbccee593d8a237fe680fd8f43647071f175"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-T-002",
+          "finalSha256": "1a244824636f5a57cfc5363c80d4dbccee593d8a237fe680fd8f43647071f175"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-001",
+          "finalSha256": "fdc3fffe1d621d0253a0c649b7da5acb9122bb1165343d35fd84d2b1ce207a69"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-L-001",
+          "finalSha256": "fdc3fffe1d621d0253a0c649b7da5acb9122bb1165343d35fd84d2b1ce207a69"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-T-001",
+          "finalSha256": "fdc3fffe1d621d0253a0c649b7da5acb9122bb1165343d35fd84d2b1ce207a69"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-T-002",
+          "finalSha256": "fdc3fffe1d621d0253a0c649b7da5acb9122bb1165343d35fd84d2b1ce207a69"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-87e36f6ebc2e",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-COUNT",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-Q4",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-Q5",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-LVL-PUSH-TITLE",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "D-LVL-PUSH-SUBTITLE",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "D-TIME-RACCOON-RATE",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "D-TIME-OPEN-POWER-FRESHNESS",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "D-PANEL-RACCOON-POWER",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A009",
+          "assessment": "A",
+          "deductionId": "D-PANEL-LOWBATT-POWER",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A010",
+          "assessment": "A",
+          "deductionId": "D-PANEL-SUNRISE-POWER",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A011",
+          "assessment": "A",
+          "deductionId": "D-PANEL-SOLAR-ICON",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A012",
+          "assessment": "A",
+          "deductionId": "D-PANEL-WIFIDOWN-POWER",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A013",
+          "assessment": "A",
+          "deductionId": "D-PANEL-RETRY-ONLINE",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A014",
+          "assessment": "A",
+          "deductionId": "D-PANEL-WIFIBACK-POWER",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "A015",
+          "assessment": "A",
+          "deductionId": "D-PANEL-OPEN-CLIP",
+          "finalSha256": "f3f685d8c6c2a0487912196775bd38ffbde19983a6d5f056affd85b4e86925d6"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-01",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q-02",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-Q-03",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-L-01",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "D-L-02",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "D-T-01",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B007",
+          "assessment": "B",
+          "deductionId": "D-T-02",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B008",
+          "assessment": "B",
+          "deductionId": "D-T-03",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B009",
+          "assessment": "B",
+          "deductionId": "D-P-01",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B010",
+          "assessment": "B",
+          "deductionId": "D-P-02",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B011",
+          "assessment": "B",
+          "deductionId": "D-P-03",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B012",
+          "assessment": "B",
+          "deductionId": "D-P-04",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B013",
+          "assessment": "B",
+          "deductionId": "D-P-05",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B014",
+          "assessment": "B",
+          "deductionId": "D-P-06",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B015",
+          "assessment": "B",
+          "deductionId": "D-P-07",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B016",
+          "assessment": "B",
+          "deductionId": "D-P-08",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        },
+        {
+          "claimId": "B017",
+          "assessment": "B",
+          "deductionId": "D-P-09",
+          "finalSha256": "f6473a11d0771809d77904957de6284fac7e3d7cab70acc8057b7ed3806e238e"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-7036a4f62b32",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D001",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D002",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D003",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D004",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "D005",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "D006",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "D007",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "D008",
+          "finalSha256": "80fb458db3ec9557119d797e27449698ba6007577dec55e6e1efba16e4d24609"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-COUNT",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q4-REDUNDANT",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-Q5-REDUNDANT",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-Q6-REDUNDANT",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "D-Q7-REDUNDANT",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "D-LVL-PUSH-LABEL",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B007",
+          "assessment": "B",
+          "deductionId": "D-TIME-RACCOON-RATE",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        },
+        {
+          "claimId": "B008",
+          "assessment": "B",
+          "deductionId": "D-PANEL-OPEN-CLIP",
+          "finalSha256": "0323ccf701f1558ffba6fd9ff69165cb67be95845847e0b7a6329809c4b5a12f"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-3d313b05cc71",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "DQ001",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "DQ002",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "DQ003",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "DL001",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "DT001",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "DT002",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "DP001",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "DP002",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A009",
+          "assessment": "A",
+          "deductionId": "DP003",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A010",
+          "assessment": "A",
+          "deductionId": "DP004",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A011",
+          "assessment": "A",
+          "deductionId": "DP005",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "A012",
+          "assessment": "A",
+          "deductionId": "DF001",
+          "finalSha256": "2c0cd1e448e437729b8d8bb70b69308500129bed2005dbd019e92485b8c7b716"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-COUNT-01",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q-Q4-OUTCOMES",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-Q-Q5-BATTERY",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-Q-Q5-CHARGING",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "D-L-PUSH-NODE",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "D-T-RACCOON-PHYSICAL",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B007",
+          "assessment": "B",
+          "deductionId": "D-T-RACCOON-REPORT",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B008",
+          "assessment": "B",
+          "deductionId": "D-P-BEDTIME-BATTERY",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B009",
+          "assessment": "B",
+          "deductionId": "D-P-BEDTIME-POWER",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B010",
+          "assessment": "B",
+          "deductionId": "D-P-SUNRISE-REPORT",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B011",
+          "assessment": "B",
+          "deductionId": "D-P-CHARGING-POWER",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B012",
+          "assessment": "B",
+          "deductionId": "D-P-CHARGING-LOWMARK",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B013",
+          "assessment": "B",
+          "deductionId": "D-P-COURIER-REPORT",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B014",
+          "assessment": "B",
+          "deductionId": "D-P-SDCARD-REPORT",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B015",
+          "assessment": "B",
+          "deductionId": "D-P-SDCARD-ONLINE",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        },
+        {
+          "claimId": "B016",
+          "assessment": "B",
+          "deductionId": "D-F-OPEN-CLEAR",
+          "finalSha256": "930ce689260dfc432da573bea468e480b457d01d66b94c8b8bf406efa0b6b0a8"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-8abdbcba1a1f",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-001",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-Q-002",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-L-001",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-E-001",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "D-T-001",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "D-T-002",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "D-P-001",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "D-P-002",
+          "finalSha256": "bad73f4de4ac7f6ee669f512fbe065608ee0539a8a474356926a0d9f219a6833"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-TOO-MANY-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q-REDUNDANT-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-LVL-HOP-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-EDGE-BEDTIME-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "D-TIME-PHYSICAL-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "D-TIME-REPORT-001",
+          "finalSha256": "4810697c8fbf96440c282f3e03da6a893e8b0262fa5f0a035f5f424c2092188d"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-fba9ebbeb297",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-COUNT-001",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-004A",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-004B",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-006A",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-006B",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "D-LEVEL-HOP-001",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "D-TIME-PHYSICAL-0110",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "D-TIME-REPORT-0100",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "A009",
+          "assessment": "A",
+          "deductionId": "D-PANEL-OPENCLIP-001",
+          "finalSha256": "f5a0cfaeb243c223cf2be9f11e3e5769b149636ade9dd0e248c86748ca2ae870"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "D-Q-TOO-MANY",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "D-Q4-OUTCOMES",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "D-Q4-ENDINGS",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "D-Q6-START",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "D-L-APP-SHADOW",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "D-T-RACCOON-PHYSICAL",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B007",
+          "assessment": "B",
+          "deductionId": "D-T-RACCOON-REPORT",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        },
+        {
+          "claimId": "B008",
+          "assessment": "B",
+          "deductionId": "D-P-OPEN-CLIP",
+          "finalSha256": "5d8c945c896c4dddca8112936d368240bf40cc6eb69acfc829c88afbadf3392a"
+        }
+      ]
+    },
+    {
+      "candidateId": "specimen-8c365a9d184d",
+      "newClaimOrigins": [
+        {
+          "claimId": "A001",
+          "assessment": "A",
+          "deductionId": "D-Q-COUNT-001",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A002",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-004",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A003",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-005",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A004",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-006",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A005",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-007A",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A006",
+          "assessment": "A",
+          "deductionId": "D-Q-REDUNDANT-007B",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A007",
+          "assessment": "A",
+          "deductionId": "D-LVL-HOP-001",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A008",
+          "assessment": "A",
+          "deductionId": "D-TIME-RATE-001",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A009",
+          "assessment": "A",
+          "deductionId": "D-TIME-RATE-002",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A010",
+          "assessment": "A",
+          "deductionId": "D-PANEL-EVENT-001",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "A011",
+          "assessment": "A",
+          "deductionId": "D-PANEL-EVENT-002",
+          "finalSha256": "a9e2884fc701d5c5f97dfcb147b2991120185de3d7a43a48b93cb2a0a1028ea5"
+        },
+        {
+          "claimId": "B001",
+          "assessment": "B",
+          "deductionId": "Q-001",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B002",
+          "assessment": "B",
+          "deductionId": "Q-002",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B003",
+          "assessment": "B",
+          "deductionId": "Q-003",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B004",
+          "assessment": "B",
+          "deductionId": "Q-004",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B005",
+          "assessment": "B",
+          "deductionId": "Q-005",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B006",
+          "assessment": "B",
+          "deductionId": "Q-006",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B007",
+          "assessment": "B",
+          "deductionId": "L-001",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B008",
+          "assessment": "B",
+          "deductionId": "T-001",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B009",
+          "assessment": "B",
+          "deductionId": "T-002",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B010",
+          "assessment": "B",
+          "deductionId": "P-001",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B011",
+          "assessment": "B",
+          "deductionId": "P-002",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        },
+        {
+          "claimId": "B012",
+          "assessment": "B",
+          "deductionId": "P-003",
+          "finalSha256": "702c939709833688cdead1ff1cb32522b245ecc75d7a1b3e5d008894c3dc3802"
+        }
+      ]
+    }
+  ]
+}

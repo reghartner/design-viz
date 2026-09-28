@@ -1,0 +1,135 @@
+{
+  "version": 1,
+  "source": "Kestrel Home Backstage catalog (fictional, approved snapshot)",
+  "services": [
+    {
+      "entityRef": "component:default/event-ingest",
+      "title": "Event ingest",
+      "owner": "group:default/camera-platform",
+      "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/event-ingest",
+      "telemetry": {
+        "serviceName": "event-ingest"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/event-ingest",
+          "title": "Event ingest API",
+          "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/event-ingest/definition",
+          "endpoints": {
+            "production": "https://event-ingest.kestrel.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "postEvent",
+              "method": "POST",
+              "path": "/events"
+            },
+            {
+              "operationId": "postHeartbeat",
+              "method": "POST",
+              "path": "/heartbeats"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/clip-store",
+      "title": "Clip store",
+      "owner": "group:default/camera-platform",
+      "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/clip-store",
+      "telemetry": {
+        "serviceName": "clip-store"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/clip-store",
+          "title": "Clip store API",
+          "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/clip-store/definition",
+          "endpoints": {
+            "production": "https://clip-store.kestrel.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "uploadClip",
+              "method": "PUT",
+              "path": "/clips/{clipId}"
+            },
+            {
+              "operationId": "getClip",
+              "method": "GET",
+              "path": "/clips/{clipId}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/device-shadow",
+      "title": "Device shadow",
+      "owner": "group:default/device-state",
+      "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/device-shadow",
+      "telemetry": {
+        "serviceName": "device-shadow"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/device-shadow",
+          "title": "Device shadow API",
+          "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/device-shadow/definition",
+          "endpoints": {
+            "production": "https://device-shadow.kestrel.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "putState",
+              "method": "PUT",
+              "path": "/devices/{deviceId}/state"
+            },
+            {
+              "operationId": "getState",
+              "method": "GET",
+              "path": "/devices/{deviceId}/state"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/notify-service",
+      "title": "Notify service",
+      "owner": "group:default/engagement",
+      "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/notify-service",
+      "telemetry": {
+        "serviceName": "notify-service"
+      },
+      "apis": [
+        {
+          "entityRef": "api:default/notify-service",
+          "title": "Notify service API",
+          "definitionUrl": "https://backstage.kestrel.example.test/catalog/default/api/notify-service/definition",
+          "endpoints": {
+            "production": "https://notify-service.kestrel.example.test"
+          },
+          "operations": [
+            {
+              "operationId": "sendPush",
+              "method": "POST",
+              "path": "/notifications"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "entityRef": "component:default/kestrel-app",
+      "title": "Kestrel app",
+      "owner": "group:default/mobile",
+      "catalogUrl": "https://backstage.kestrel.example.test/catalog/default/component/kestrel-app",
+      "telemetry": {
+        "serviceName": "kestrel-app"
+      },
+      "apis": []
+    }
+  ]
+}

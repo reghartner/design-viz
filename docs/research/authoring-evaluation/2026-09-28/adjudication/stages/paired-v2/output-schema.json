@@ -1,0 +1,185 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "deductions": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$"
+          },
+          "criterion": {
+            "type": "string",
+            "enum": [
+              "questions",
+              "level",
+              "time",
+              "edges",
+              "panels",
+              "backstage",
+              "fidelity"
+            ]
+          },
+          "points": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "location": {
+            "type": "string",
+            "minLength": 1
+          },
+          "rule": {
+            "type": "string",
+            "enum": [
+              "questions.none",
+              "questions.too_many",
+              "questions.missing_level",
+              "questions.technical",
+              "questions.redundant",
+              "level.story_technical",
+              "level.engineering_hop",
+              "time.missing_clock",
+              "time.backwards",
+              "time.panel_disagreement",
+              "time.caption_clock",
+              "time.moved_anchor",
+              "time.rate",
+              "time.freshness",
+              "time.midnight",
+              "edges.unlit_message",
+              "edges.invented",
+              "edges.wrong_failure",
+              "panels.contradiction",
+              "panels.icon",
+              "panels.stale",
+              "panels.missing_event",
+              "backstage.unbound",
+              "backstage.wrong_fields",
+              "backstage.operation",
+              "backstage.missing_code",
+              "backstage.nonexecuting_code",
+              "backstage.invented_identity",
+              "backstage.uncatalogued_binding",
+              "fidelity.invented",
+              "fidelity.behavior",
+              "fidelity.branch",
+              "fidelity.build"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "explanation": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "criterion",
+          "points",
+          "location",
+          "rule",
+          "evidence",
+          "explanation"
+        ]
+      }
+    },
+    "claimDecisions": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "claimId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "uphold",
+              "reject",
+              "partial",
+              "unresolved"
+            ]
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "deductionIds": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$"
+            }
+          }
+        },
+        "required": [
+          "claimId",
+          "verdict",
+          "evidence",
+          "reason",
+          "deductionIds"
+        ]
+      }
+    },
+    "unresolved": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$"
+          },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "id",
+          "evidence",
+          "reason"
+        ]
+      }
+    }
+  },
+  "required": [
+    "deductions",
+    "claimDecisions",
+    "unresolved"
+  ]
+}

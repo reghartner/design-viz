@@ -1,0 +1,210 @@
+{
+  "errors": [],
+  "stages": {
+    "paired-v2": {
+      "packetFilesChecked": 120,
+      "validJudgmentsChecked": 16
+    },
+    "arbiters": {
+      "packetFilesChecked": 128,
+      "validJudgmentsChecked": 8
+    },
+    "appeals": {
+      "packetFilesChecked": 54,
+      "validJudgmentsChecked": 3
+    },
+    "question-consistency": {
+      "packetFilesChecked": 34,
+      "validJudgmentsChecked": 1
+    }
+  },
+  "appeals": [
+    {
+      "candidateId": "specimen-3d313b05cc71",
+      "unchallengedExactCount": 14,
+      "removed": [
+        "DF001"
+      ],
+      "challengedRetained": [
+        "DP005"
+      ],
+      "unresolved": []
+    },
+    {
+      "candidateId": "specimen-7036a4f62b32",
+      "unchallengedExactCount": 7,
+      "removed": [
+        "D004"
+      ],
+      "challengedRetained": [],
+      "unresolved": []
+    },
+    {
+      "candidateId": "specimen-8abdbcba1a1f",
+      "unchallengedExactCount": 5,
+      "removed": [
+        "D-E-001",
+        "D-P-001",
+        "D-P-002"
+      ],
+      "challengedRetained": [],
+      "unresolved": []
+    }
+  ],
+  "questionPass": {
+    "deductionCount": 27,
+    "claimDecisionCount": 28,
+    "unresolved": []
+  },
+  "stories": [
+    {
+      "story": "historical-business",
+      "candidateId": "specimen-f4d35ae7d929",
+      "nonQuestionStage": "arbiters",
+      "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+      "deductionCount": 4,
+      "questionDeductionPoints": 3,
+      "referenceScore": {
+        "questions": 7,
+        "level": 10,
+        "time": 17,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 91
+      }
+    },
+    {
+      "story": "historical-engineer",
+      "candidateId": "specimen-5395841c704d",
+      "nonQuestionStage": "arbiters",
+      "sourceSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+      "deductionCount": 4,
+      "questionDeductionPoints": 2,
+      "referenceScore": {
+        "questions": 8,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 90
+      }
+    },
+    {
+      "story": "run-01",
+      "candidateId": "specimen-87e36f6ebc2e",
+      "nonQuestionStage": "arbiters",
+      "sourceSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+      "deductionCount": 17,
+      "questionDeductionPoints": 5,
+      "referenceScore": {
+        "questions": 5,
+        "level": 6,
+        "time": 12,
+        "edges": 15,
+        "panels": 0,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 68
+      }
+    },
+    {
+      "story": "run-02",
+      "candidateId": "specimen-7036a4f62b32",
+      "nonQuestionStage": "appeals",
+      "sourceSha256": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+      "deductionCount": 6,
+      "questionDeductionPoints": 4,
+      "referenceScore": {
+        "questions": 6,
+        "level": 8,
+        "time": 17,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 88
+      }
+    },
+    {
+      "story": "run-03",
+      "candidateId": "specimen-3d313b05cc71",
+      "nonQuestionStage": "appeals",
+      "sourceSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+      "deductionCount": 15,
+      "questionDeductionPoints": 5,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 0,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 72
+      }
+    },
+    {
+      "story": "run-04",
+      "candidateId": "specimen-8abdbcba1a1f",
+      "nonQuestionStage": "appeals",
+      "sourceSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+      "deductionCount": 7,
+      "questionDeductionPoints": 5,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 87
+      }
+    },
+    {
+      "story": "run-05",
+      "candidateId": "specimen-fba9ebbeb297",
+      "nonQuestionStage": "arbiters",
+      "sourceSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+      "deductionCount": 9,
+      "questionDeductionPoints": 6,
+      "referenceScore": {
+        "questions": 4,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 83
+      }
+    },
+    {
+      "story": "run-06",
+      "candidateId": "specimen-8c365a9d184d",
+      "nonQuestionStage": "arbiters",
+      "sourceSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+      "deductionCount": 10,
+      "questionDeductionPoints": 5,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 6,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 78
+      }
+    }
+  ],
+  "summary": {
+    "currentMean": 79.33333333333333,
+    "currentMedian": 80.5,
+    "baselineBalancedMean": 90.5
+  }
+}

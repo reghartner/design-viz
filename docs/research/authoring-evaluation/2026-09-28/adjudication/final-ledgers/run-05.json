@@ -1,0 +1,140 @@
+{
+  "story": "run-05",
+  "candidateId": "specimen-fba9ebbeb297",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+  "assessmentHashes": {
+    "nonQuestions": "d5efd7cdb8f1daeae79ae1e299d448025f12e1164ce39bb4de1c9890887da0ae",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "D-LEVEL-APP-SHADOW-001",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/edges \u2014 missing app\u2192device-shadow dependency",
+      "rule": "level.engineering_hop",
+      "evidence": [
+        "brief/answers.md: Technical level = Engineering; show every service hop",
+        "brief/hld.md#Components: device-shadow holds state and the app reads this",
+        "evidence/renderer.json topology",
+        "interpretations.json#3-edges"
+      ],
+      "explanation": "The Engineering topology omits the design-established Kestrel app to device-shadow read dependency."
+    },
+    {
+      "id": "D-TIME-RACCOON-PHYSICAL-001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon-rec physical battery",
+      "rule": "time.rate",
+      "evidence": [
+        "/page/blocks/0/diagram/panels/0/drainPerHour = 1",
+        "/page/blocks/0/diagram/steps/1/panels/batt/charge = 25",
+        "evidence/renderer.json: raccoon-rec physical charge 25 at 01:10",
+        "interpretations.json#2-time"
+      ],
+      "explanation": "The explicit 25% physical value is an inconsistent intermediate anchor after 2h40m of stated idle drain; the conflict exception permits only the direct jump between conflicting operator anchors."
+    },
+    {
+      "id": "D-TIME-RACCOON-REPORT-001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/app/battery/value and /page/blocks/0/diagram/steps/1/panels/shadow/rows/0/cells/value \u2014 newly authored 01:00 report",
+      "rule": "time.rate",
+      "evidence": [
+        "/page/blocks/0/diagram/steps/1/panels/app/battery/value = 25",
+        "/page/blocks/0/diagram/steps/1/panels/app/battery/reportedAt = 01:00",
+        "/page/blocks/0/diagram/steps/1/panels/shadow/rows/0/cells/value = 25",
+        "interpretations.json#2-time"
+      ],
+      "explanation": "The newly authored 01:00 shadow/app report of 25% is a distinct inconsistent intermediate reported-state value, not a carried cached report."
+    },
+    {
+      "id": "D-PANEL-OPEN-CLIP-001",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/10/panels/app/lastEvent/detail \u2014 open-clip visible event",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "brief/hld.md#Scenario-to-depict: Resident opens the clip",
+        "/page/blocks/0/diagram/steps/10/text",
+        "/page/blocks/0/diagram/steps/10/panels/app/lastEvent/detail",
+        "evidence/renderer.json: open-clip remains on phoneScreen=app with device-page field cards",
+        "interpretations.json#4-panels"
+      ],
+      "explanation": "The required opening is narrated and logged, but no still, thumbnail, clip screen, or other clear open-clip visual state is shown."
+    },
+    {
+      "id": "QC-FBA-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-fba9ebbeb297 :: candidates/specimen-fba9ebbeb297/questions.md Q1\u2013Q6 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Independent decisions include Q1 level; Q2 audience and takeaway; Q3 date plus several event times; Q4 outcome selection and path-ending treatment; Q5 view selection; and Q6 multiple starting-state choices.",
+        "interpretations.json rule 1-questions counts independent requested answers, not the six numbered prompts."
+      ],
+      "explanation": "The batch exceeds seven independent decisions."
+    },
+    {
+      "id": "QC-FBA-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidates/specimen-fba9ebbeb297/questions.md Q4 \u2014 whether both endings should be shown",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks whether both the normal and Wi-Fi-down outcomes should be shown.",
+        "brief/hld.md \u00a7Scenario to depict already includes both outcomes."
+      ],
+      "explanation": "The outcome-selection decision repeats the source."
+    },
+    {
+      "id": "QC-FBA-NORMAL-END",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidates/specimen-fba9ebbeb297/questions.md Q4 \u2014 whether the normal ending should differ from resident opening the clip",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks whether either ending should end differently and describes the normal ending as the resident opening the clip.",
+        "brief/hld.md \u00a7Scenario to depict explicitly supplies that normal-path action.",
+        "The source does not say what the resident does after the alternate's late alert, so no alternate-ending deduction is applied."
+      ],
+      "explanation": "The normal-path portion of the ending-treatment decision was already answered."
+    },
+    {
+      "id": "QC-FBA-START-BATTERY",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidates/specimen-fba9ebbeb297/questions.md Q6 \u2014 starting battery 25% clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q6 asks whether the app should show Battery 25% at bedtime.",
+        "brief/hld.md \u00a7Scenario to depict states the starting battery is 25%."
+      ],
+      "explanation": "The starting battery value was already supplied."
+    },
+    {
+      "id": "QC-FBA-START-CHARGING",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-fba9ebbeb297 :: candidates/specimen-fba9ebbeb297/questions.md Q6 \u2014 starting not-charging clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q6 separately asks whether the app should show not charging.",
+        "brief/hld.md \u00a7Scenario to depict states that the camera starts not charging."
+      ],
+      "explanation": "The starting charging state was already supplied."
+    }
+  ],
+  "score": {
+    "questions": 4,
+    "level": 8,
+    "time": 14,
+    "edges": 15,
+    "panels": 12,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 83
+  }
+}

@@ -1,0 +1,74 @@
+{
+  "story": "historical-business",
+  "candidateId": "specimen-f4d35ae7d929",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+  "assessmentHashes": {
+    "nonQuestions": "93adef39230c28aaecec2d34ad10830303642b2aa94b7d4f6e373e241e8bad7d",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "D-TIME-RATE-RACCOON-001",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge (shared raccoon step, physical battery)",
+      "rule": "time.rate",
+      "evidence": [
+        "/page/blocks/0/diagram/panels/1 sets initial charge=25 and drainPerHour=1 at 10:30 PM.",
+        "brief/hld.md states idle drain is about 1% per hour and each recorded clip uses about 1%.",
+        "/page/blocks/0/diagram/steps/1 at 1:05 AM explicitly overrides physical charge to 25 while its caption says a clip was recorded.",
+        "interpretations.json rule 2-time permits the noted direct jump between conflicting operator anchors but treats an inconsistent intermediate authored value as a separate defect."
+      ],
+      "explanation": "The explicit 1:05 AM physical value ignores elapsed idle drain and the raccoon clip cost; the anchor-conflict exception protects only the direct anchor-to-anchor jump."
+    },
+    {
+      "id": "D-PANELS-CHARGING-001",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4/text (charging step; promised app.power display)",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "The charging caption says, \"From now on the app's camera page shows the solar charging icon.\"",
+        "evidence/renderer.json resolves phoneScreen=home at charging on both paths, with app.power renderedAsCard=false and hiddenReason=\"phoneScreen=home\".",
+        "The folded app.power value at charging remains \"Battery only\" and no solar icon is rendered.",
+        "interpretations.json rule 4-panels classifies promised charging/status visibility while phoneScreen remains home as one missing panel event."
+      ],
+      "explanation": "The step promises a visible solar-charging indication, but the phone remains on its home screen and renders neither the power card nor the icon."
+    },
+    {
+      "id": "QC-F4-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-f4d35ae7d929 :: candidates/specimen-f4d35ae7d929/questions.md Q1\u2013Q7 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Q1 technical level; Q2 story span and time display; Q3 audience and takeaway; Q4 outcome selection; Q5 alternate-path follow-up; Q6 app-page visibility and separate physical meter; Q7 raccoon-timeline visibility are independently answerable decisions.",
+        "interpretations.json rule 1-questions counts independent requested answers, not numbered prompts."
+      ],
+      "explanation": "The batch requests ten independent decisions, so the more-than-seven penalty applies once."
+    },
+    {
+      "id": "QC-F4-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-f4d35ae7d929 :: candidates/specimen-f4d35ae7d929/questions.md Q4 \u2014 which endings should be switchable",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks which endings the viewer should switch between.",
+        "brief/hld.md \u00a7Scenario to depict supplies the normal morning and the Wi-Fi-down alternate."
+      ],
+      "explanation": "The requested outcome selection was already fixed by the HLD."
+    }
+  ],
+  "score": {
+    "questions": 7,
+    "level": 10,
+    "time": 17,
+    "edges": 15,
+    "panels": 12,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 91
+  }
+}

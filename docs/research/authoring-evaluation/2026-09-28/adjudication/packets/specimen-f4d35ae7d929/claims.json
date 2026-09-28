@@ -1,0 +1,88 @@
+{
+  "claims": [
+    {
+      "id": "C001",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "ingest node / heartbeat steps",
+      "explanation": "Binding selects `postEvent`, but the node also handles heartbeat calls requiring `postHeartbeat`."
+    },
+    {
+      "id": "C002",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "`nodes.shadow.binding.api` / `a-open`",
+      "explanation": "Binding selects `putState`, but the app reads status using `getState`."
+    },
+    {
+      "id": "C003",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "`nodes.clipstore.binding.api` / `a-open`",
+      "explanation": "Binding selects `uploadClip`, but clip playback uses `getClip`."
+    },
+    {
+      "id": "C004",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "ingest binding / heartbeat steps",
+      "explanation": "Bound operation is `postEvent`, but heartbeat calls require `postHeartbeat`."
+    },
+    {
+      "id": "C005",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The design already specified both normal and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C006",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "a-open / clip-store",
+      "explanation": "Bound operation is `uploadClip`, but this step plays the clip via `getClip`."
+    },
+    {
+      "id": "C007",
+      "criterion": "questions",
+      "points": 1,
+      "location": "question 4",
+      "explanation": "The HLD already specifies both normal and Wi\u2011Fi-down outcomes."
+    },
+    {
+      "id": "C008",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "`nodes.ingest.binding.api` / heartbeat steps",
+      "explanation": "Binding selects `postEvent`, but heartbeat calls use `postHeartbeat`."
+    },
+    {
+      "id": "C009",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "a-open / shadow",
+      "explanation": "Binding selects `putState`, while this step reads camera status using `getState`."
+    },
+    {
+      "id": "C010",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "a-open / device-shadow",
+      "explanation": "Bound operation is `putState`, but this step reads status via `getState`."
+    },
+    {
+      "id": "C011",
+      "criterion": "questions",
+      "points": 1,
+      "location": "candidate/questions.md Q4",
+      "explanation": "The design already specifies both the normal and Wi\u2011Fi-down endings."
+    },
+    {
+      "id": "C012",
+      "criterion": "backstage",
+      "points": 1,
+      "location": "a-open / clipstore",
+      "explanation": "Binding selects `uploadClip`, while this step reads the clip using `getClip`."
+    }
+  ]
+}

@@ -1,0 +1,193 @@
+{
+  "generatedAt": "2026-09-28T14:45:26.330Z",
+  "node": "v24.21.0",
+  "scoring": false,
+  "rendererReferences": {
+    "pathIsolation": "src/core/paths.js:56",
+    "edgeDelivery": "src/core/paths.js:17",
+    "panelVisibility": "src/core/state.js:60",
+    "fieldMerge": "src/panels/types/deviceapp.js:235",
+    "reportFreshness": "src/panels/types/deviceapp.js:159",
+    "statusLabels": "src/panels/types/deviceapp.js:399",
+    "homeVsApp": "src/panels/types/deviceapp.js:425",
+    "fieldCardVisibility": "src/panels/types/deviceapp.js:432",
+    "sourceCardIndependentOfScreen": "src/panels/types/deviceapp.js:481",
+    "batteryFold": "src/panels/types/battery.js:42",
+    "batteryDisplayRounding": "src/panels/types/battery.js:135",
+    "notificationStack": "src/panels/notifications.js:26",
+    "clockAndDate": "src/core/story-time.js:204",
+    "homemapSignals": "src/panels/types/homemap.js:279",
+    "homemapSignalMarkers": "src/panels/types/homemap.js:845"
+  },
+  "rendererFileHashes": {
+    "src/core/paths.js": "76e34175725a16071b488cc64a6cbc2f464f719a02396bd95477d6fe43322500",
+    "src/core/state.js": "33852c67f2a0605c3c0c86d42d981f08b993a3c4c06bd3ac7cffbf10cd77280e",
+    "src/panels/types/deviceapp.js": "39122585affd606162be48baba7aeadf732dee3c9a37e402068d2e108fc657c7",
+    "src/panels/types/battery.js": "99ff9548a899897b5aa0dc4cd01bbac4f0bac77a713d602dd879b729e9ac7a51",
+    "src/panels/notifications.js": "c449d72e3605685a4d93ea3f0e467b784ef79c4d16afd36d8bef4130ac9b5371",
+    "src/core/story-time.js": "37301afc373e3339503a7092cafae4c044fce9e159c4757b1a14b6ba04bd91cf",
+    "src/panels/types/homemap.js": "b2e6211f63949f4d1ec31e12dd87f196b6f44ce63f0c9edc3b93d9c4b7ecd563"
+  },
+  "runtimeBundleHashes": {
+    "compatibility.js": "69f0cfaf951da2de4a79d64abb14c5d7d72a5aaac7d38b73e67305ba79d29165",
+    "canon.js": "7cc5754b9ae54568f50a29840edca6e9a559377e803fe1fe4130f091d488e6db",
+    "validator.js": "2f991bad48e203952851d872f67712fcd0a4cb9b7011f7e5a87c4ad7c0ac87dd",
+    "engine.js": "92c5d5e0ea745bef096e4ca3fd57e37e681b5c630737c1464c5d668290c28a94"
+  },
+  "fixture": "tests/fixtures/authoring-evaluation/overnight",
+  "inputHashes": {
+    "input/hld.md": "6407b43761d0763853ebc43ecd923045d9fce2003d808ab13fdcc6cf63f829f5",
+    "input/catalog.json": "0d245130a45485da213e6df62e91bfc7bce8b716d84947d21e8341d505eb38a2",
+    "input/code-evidence.md": "ce54396562393f4cd649eba2ef392de4f1cba85d0091919edd5c5ffef8536e36",
+    "operator/answers-business.md": "6adcb0cf769294ae81ce85a6ecbe82faa4b21857ac02ef7f7e0eb0f6f90b106f",
+    "operator/answers-engineer.md": "89e53f619826f9dedcd57f181e2695b7e4b425416ac6c5ce662d393ce02883ba"
+  },
+  "approvedEvidenceReferences": {
+    "heartbeat": "input/hld.md:29-32",
+    "motionAndNotifications": "input/hld.md:33-40",
+    "solarAndPower": "input/hld.md:42-45",
+    "wifiAndOffline": "input/hld.md:46-50",
+    "normalAndAlternateEnd": "input/hld.md:54-63",
+    "businessTiming": "operator/answers-business.md:9-11",
+    "engineeringTiming": "operator/answers-engineer.md:9-11",
+    "approvedEngineeringIdentity": "operator/answers-engineer.md:15-16"
+  },
+  "stories": [
+    {
+      "story": "run-01",
+      "evidence": "run-01/evidence.json",
+      "evidenceSha256": "59154e8aa209fa5123531340081d99a42527b69802965681f920927b353e4e64",
+      "specSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+      "paths": [
+        {
+          "id": "normal",
+          "steps": 7
+        },
+        {
+          "id": "wifi",
+          "steps": 8
+        }
+      ],
+      "bytes": 168284
+    },
+    {
+      "story": "run-02",
+      "evidence": "run-02/evidence.json",
+      "evidenceSha256": "c85f7d0f893e893d88b3a08cde398a69d882e568b4d9e66840d5a7c9020f3019",
+      "specSha256": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+      "paths": [
+        {
+          "id": "normal",
+          "steps": 7
+        },
+        {
+          "id": "wifidown",
+          "steps": 8
+        }
+      ],
+      "bytes": 155784
+    },
+    {
+      "story": "run-03",
+      "evidence": "run-03/evidence.json",
+      "evidenceSha256": "ec442565abcefebd070490f1a5d0ff61b85a1db537ba6fc5170cd19db3a57a7a",
+      "specSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+      "paths": [
+        {
+          "id": "normal",
+          "steps": 8
+        },
+        {
+          "id": "wifi-down",
+          "steps": 8
+        }
+      ],
+      "bytes": 174864
+    },
+    {
+      "story": "run-04",
+      "evidence": "run-04/evidence.json",
+      "evidenceSha256": "30106e42934c18c9ea41b7446c2d78c7d301204a7118bd6b180af64ddcf53112",
+      "specSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+      "paths": [
+        {
+          "id": "happy",
+          "steps": 10
+        },
+        {
+          "id": "wifi-down",
+          "steps": 11
+        }
+      ],
+      "bytes": 244145
+    },
+    {
+      "story": "run-05",
+      "evidence": "run-05/evidence.json",
+      "evidenceSha256": "f7dca51d98f38075b39973aa0eb541325b823e2ca922d27e490604a1a8ce89a7",
+      "specSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+      "paths": [
+        {
+          "id": "happy",
+          "steps": 11
+        },
+        {
+          "id": "wifi-down",
+          "steps": 13
+        }
+      ],
+      "bytes": 258738
+    },
+    {
+      "story": "run-06",
+      "evidence": "run-06/evidence.json",
+      "evidenceSha256": "180ad4fb4be6cbf51c55582a4fbfd8fe9f0bcbc3d897334979576947814c35a9",
+      "specSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+      "paths": [
+        {
+          "id": "happy",
+          "steps": 7
+        },
+        {
+          "id": "wifi-down",
+          "steps": 9
+        }
+      ],
+      "bytes": 162797
+    },
+    {
+      "story": "historical-business",
+      "evidence": "historical-business/evidence.json",
+      "evidenceSha256": "ed819e9bb0547e7164951e47e6f3f1c785f3a91075760c69bd24fff71cb4718e",
+      "specSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+      "paths": [
+        {
+          "id": "normal",
+          "steps": 7
+        },
+        {
+          "id": "wifi-down",
+          "steps": 8
+        }
+      ],
+      "bytes": 145551
+    },
+    {
+      "story": "historical-engineer",
+      "evidence": "historical-engineer/evidence.json",
+      "evidenceSha256": "43db7a06a8058502f3fa5a5fc2e96be8dcf23dacd316727a70cea8c9940149a4",
+      "specSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+      "paths": [
+        {
+          "id": "happy",
+          "steps": 9
+        },
+        {
+          "id": "wifi",
+          "steps": 10
+        }
+      ],
+      "bytes": 210264
+    }
+  ]
+}

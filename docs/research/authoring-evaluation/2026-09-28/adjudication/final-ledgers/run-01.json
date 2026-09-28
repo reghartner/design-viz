@@ -1,0 +1,240 @@
+{
+  "story": "run-01",
+  "candidateId": "specimen-87e36f6ebc2e",
+  "composition": "Non-question criteria from the reviewed arbiter or evidence appeal; questions exclusively from the common all-eight consistency pass. No candidate changed.",
+  "sourceSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+  "assessmentHashes": {
+    "nonQuestions": "a9cce2a68590f00fef7c38c85cc77f06b7af2ebc4ea103dbfd0147b5a2d735f5",
+    "questions": "66bd6a0712cdc248fa1f0ef0afccfe7d2a68582aa5c6cd996a00b3a0a600ecc3"
+  },
+  "deductions": [
+    {
+      "id": "D-LVL-PUSH-TITLE",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push/title",
+      "rule": "level.story_technical",
+      "evidence": [
+        "brief/answers.md selects Story level and requests no service names or APIs on screen",
+        "candidate/story.spec.json labels the node \"Phone push\""
+      ],
+      "explanation": "The visible title exposes a technical delivery mechanism at Story level."
+    },
+    {
+      "id": "D-LVL-PUSH-SUBTITLE",
+      "criterion": "level",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/nodes/push/sub",
+      "rule": "level.story_technical",
+      "evidence": [
+        "brief/answers.md selects Story level",
+        "candidate/story.spec.json labels the subtitle \"Apple / Google push\""
+      ],
+      "explanation": "The subtitle names technical delivery platforms at Story level."
+    },
+    {
+      "id": "D-TIME-RACCOON-PHYSICAL",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/batt/charge \u2014 raccoon, physical battery",
+      "rule": "time.rate",
+      "evidence": [
+        "brief/hld.md specifies about 1% hourly idle drain and about 1% per recorded clip",
+        "evidence/renderer.json resolves the raccoon physical battery to an explicit 25% anchor at 1:05 AM",
+        "interpretations.json rule 2-time permits the direct conflicting-anchor jump but not inconsistent intermediate values"
+      ],
+      "explanation": "The explicit 25% physical state at 1:05 AM invents a zero-drain intermediate rate, including no cost for the clip."
+    },
+    {
+      "id": "D-TIME-RACCOON-REPORTED",
+      "criterion": "time",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1/panels/phone/battery/value \u2014 raccoon, newly reported 1:00 AM battery",
+      "rule": "time.rate",
+      "evidence": [
+        "candidate/story.spec.json authors a new 1:00 AM battery report of 25% at raccoon",
+        "brief/hld.md specifies about 1% hourly idle drain",
+        "interpretations.json rule 2-time treats newly reported app battery and physical battery as distinct state claims"
+      ],
+      "explanation": "The new 1:00 AM report remains 25% after roughly 2.5 hours of stated idle drain."
+    },
+    {
+      "id": "D-TIME-OPEN-POWER",
+      "criterion": "time",
+      "points": 2,
+      "location": "/page/blocks/0/diagram/steps/6 \u2014 open, rendered phone.power freshness",
+      "rule": "time.freshness",
+      "evidence": [
+        "evidence/renderer.json normal/open renders phone.power with reportedAt 7:00 AM and \"Updated 1 h ago\"",
+        "candidate/story.spec.json courier authors an 8:00 AM heartbeat through battery and status",
+        "brief/hld.md states every heartbeat reports charging yes/no"
+      ],
+      "explanation": "The visible power card falsely presents 7:00 AM as the latest report after the authored 8:00 AM heartbeat."
+    },
+    {
+      "id": "D-PANEL-RACCOON-POWER",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/1 \u2014 raccoon, hidden phone.power stored state",
+      "rule": "panels.contradiction",
+      "evidence": [
+        "candidate/story.spec.json authors a 1:00 AM heartbeat through battery and status",
+        "evidence/renderer.json leaves phone.power reportedAt 10:30 PM and hidden on phoneScreen=home",
+        "brief/hld.md states each heartbeat includes charging yes/no"
+      ],
+      "explanation": "The stored power field contradicts the newly authored 1:00 AM heartbeat."
+    },
+    {
+      "id": "D-PANEL-LOWBATT-POWER",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/2 \u2014 lowbatt, hidden phone.power stored state",
+      "rule": "panels.contradiction",
+      "evidence": [
+        "candidate/story.spec.json explicitly depicts a 4:00 AM heartbeat",
+        "evidence/renderer.json leaves phone.power reportedAt 10:30 PM and hidden",
+        "brief/hld.md states a heartbeat includes charging yes/no"
+      ],
+      "explanation": "The stored power report was not advanced with the explicit 4:00 AM heartbeat."
+    },
+    {
+      "id": "D-PANEL-SUNRISE-POWER",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/3 \u2014 sunrise, hidden phone.power stored state",
+      "rule": "panels.contradiction",
+      "evidence": [
+        "candidate/story.spec.json says the 6:30 AM check-in reported not charging",
+        "evidence/renderer.json leaves phone.power reportedAt 10:30 PM while battery and status use 6:30 AM",
+        "phoneScreen=home hides the field cards"
+      ],
+      "explanation": "The hidden power record contradicts the caption's explicit 6:30 AM report."
+    },
+    {
+      "id": "D-PANEL-SOLAR-ICON",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/4 \u2014 solar, promised phone charging icon",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json says the app shows the solar charging icon",
+        "evidence/renderer.json keeps phoneScreen=home and phone.power renderedAsCard=false",
+        "interpretations.json rule 4-panels treats this as a missing promised panel event"
+      ],
+      "explanation": "The caption promises a visible charging icon, but the home screen hides the field containing it."
+    },
+    {
+      "id": "D-PANEL-WIFIDOWN-POWER",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/7 \u2014 wifi-down, hidden phone.power stored state",
+      "rule": "panels.contradiction",
+      "evidence": [
+        "candidate/story.spec.json authors an 8:00 AM pre-outage heartbeat through battery and status",
+        "evidence/renderer.json leaves hidden phone.power reportedAt 7:00 AM",
+        "brief/hld.md states heartbeats include charging yes/no"
+      ],
+      "explanation": "The hidden power record contradicts the authored pre-outage 8:00 AM heartbeat."
+    },
+    {
+      "id": "D-PANEL-RETRY-STATUS",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/8 \u2014 retry, promised visible Online status",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "candidate/story.spec.json says the app still shows the camera online from 8:00 AM",
+        "evidence/renderer.json keeps phoneScreen=home and phone.status renderedAsCard=false",
+        "interpretations.json rule 4-panels covers promised visible status hidden by the home screen"
+      ],
+      "explanation": "The caption promises that the app shows Online, but the status field is not visible."
+    },
+    {
+      "id": "D-PANEL-WIFIBACK-POWER",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/9 \u2014 wifi-back, hidden phone.power stored state",
+      "rule": "panels.contradiction",
+      "evidence": [
+        "candidate/story.spec.json explicitly depicts an 8:15 AM reconnect heartbeat",
+        "evidence/renderer.json advances battery and status to 8:15 AM but leaves hidden phone.power at 7:00 AM",
+        "brief/hld.md states the reconnect heartbeat includes charging state"
+      ],
+      "explanation": "The hidden power record contradicts the explicit reconnect heartbeat."
+    },
+    {
+      "id": "D-PANEL-OPEN-CLIP",
+      "criterion": "panels",
+      "points": 3,
+      "location": "/page/blocks/0/diagram/steps/6 \u2014 open, phone clip state",
+      "rule": "panels.missing_event",
+      "evidence": [
+        "brief/hld.md requires the resident to open the package clip on the normal path",
+        "candidate/story.spec.json says the resident plays the clip",
+        "evidence/renderer.json shows generic device-app fields without a clip, thumbnail, still, or other open-clip state",
+        "interpretations.json rule 4-panels requires a clear open-clip depiction but not animation"
+      ],
+      "explanation": "The required clip-opening event is narrated but not depicted."
+    },
+    {
+      "id": "QC-87-COUNT",
+      "criterion": "questions",
+      "points": 2,
+      "location": "specimen-87e36f6ebc2e :: candidates/specimen-87e36f6ebc2e/questions.md Q1\u2013Q7 independent-decision count",
+      "rule": "questions.too_many",
+      "evidence": [
+        "Independent decisions include Q1 level; Q2 audience and takeaway; Q3 several event-time approvals; Q4 outcome selection; Q5 lock-screen presentation and device-page state; Q6 view selection/emphasis; and Q7 an additional engineering view.",
+        "interpretations.json rule 1-questions requires clause-level independent-decision counting."
+      ],
+      "explanation": "The batch exceeds seven independently answerable decisions."
+    },
+    {
+      "id": "QC-87-OUTCOMES",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-87e36f6ebc2e :: candidates/specimen-87e36f6ebc2e/questions.md Q4 \u2014 whether both endings should be shown",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q4 asks whether to show the normal and Wi-Fi-down endings.",
+        "brief/hld.md \u00a7Scenario to depict already includes both outcomes."
+      ],
+      "explanation": "The outcome-selection question repeats the supplied scenario."
+    },
+    {
+      "id": "QC-87-START-BATTERY",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-87e36f6ebc2e :: candidates/specimen-87e36f6ebc2e/questions.md Q5 \u2014 device-page starting battery 25% clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 proposes that the camera page show Battery 25% at bedtime.",
+        "brief/hld.md \u00a7Scenario to depict states that the evening battery is 25%.",
+        "The lock-screen presentation remains an unanswered presentation preference and is not deducted."
+      ],
+      "explanation": "The requested starting battery confirmation repeats a supplied fact."
+    },
+    {
+      "id": "QC-87-START-CHARGING",
+      "criterion": "questions",
+      "points": 1,
+      "location": "specimen-87e36f6ebc2e :: candidates/specimen-87e36f6ebc2e/questions.md Q5 \u2014 device-page starting not-charging clause",
+      "rule": "questions.redundant",
+      "evidence": [
+        "Q5 separately proposes that the camera page show the camera as not charging.",
+        "brief/hld.md \u00a7Scenario to depict states that the camera starts not charging.",
+        "Either the battery value or charging state could be changed while leaving the other unanswered, so interpretations.json rule 1 treats them as distinct decisions."
+      ],
+      "explanation": "The requested starting charging-state confirmation repeats a supplied fact."
+    }
+  ],
+  "score": {
+    "questions": 5,
+    "level": 6,
+    "time": 12,
+    "edges": 15,
+    "panels": 0,
+    "backstage": 15,
+    "fidelity": 15,
+    "total": 68
+  }
+}

@@ -1,0 +1,286 @@
+{
+  "date": "2026-09-28",
+  "status": "independently-reviewed-reference",
+  "model": "gpt-5.6-sol",
+  "reasoningEffort": "medium",
+  "serviceTier": "fast",
+  "rubricSha256": "c740ac21b34aae930203dfd1b40afa8bd5dfd5c271a7f868c6762daa502870a9",
+  "interpretationsSha256": "1066be7e64bec71a7f9d0c6b00cec2b8b30ea072dc4342d568c662196754118e",
+  "arithmetic": "Sum exact-cost distinct deductions within each criterion, floor each criterion at0, then add seven remaining scores. Models never provide the arithmetic.",
+  "summary": {
+    "currentMean": 79.33333333333333,
+    "currentMedian": 80.5,
+    "baselineBalancedMean": 90.5,
+    "gap": 11.166666666666671,
+    "business": {
+      "mean": 76,
+      "median": 72,
+      "baseline": 91,
+      "gap": 15,
+      "authors": 3,
+      "baselineAuthors": 1
+    },
+    "engineering": {
+      "mean": 82.66666666666667,
+      "median": 83,
+      "baseline": 90,
+      "gap": 7.333333333333329,
+      "authors": 3,
+      "baselineAuthors": 1
+    }
+  },
+  "stories": [
+    {
+      "story": "historical-business",
+      "candidateId": "specimen-f4d35ae7d929",
+      "audience": "business",
+      "sourceSha256": "e19b087830c3e7ccdf2a04d61a7c37cc724c133372e472f284f4e843e72ff882",
+      "originalScore": 96,
+      "originalRange": [
+        96,
+        96
+      ],
+      "pairedScores": [
+        91,
+        91
+      ],
+      "arbiterScore": 91,
+      "appealScoreBeforeQuestionsConsistency": null,
+      "referenceScore": {
+        "questions": 7,
+        "level": 10,
+        "time": 17,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 91
+      },
+      "ledgerFile": "final-ledgers/historical-business.json",
+      "nonQuestionAssessment": "stages/arbiters/judgments/specimen-f4d35ae7d929/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 4
+    },
+    {
+      "story": "historical-engineer",
+      "candidateId": "specimen-5395841c704d",
+      "audience": "engineering",
+      "sourceSha256": "eeae2f105e87be2e8005302d38d6268572aadeaaea312d861c0f4e16de1ef174",
+      "originalScore": 90,
+      "originalRange": [
+        83,
+        92
+      ],
+      "pairedScores": [
+        90,
+        90
+      ],
+      "arbiterScore": 90,
+      "appealScoreBeforeQuestionsConsistency": null,
+      "referenceScore": {
+        "questions": 8,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 90
+      },
+      "ledgerFile": "final-ledgers/historical-engineer.json",
+      "nonQuestionAssessment": "stages/arbiters/judgments/specimen-5395841c704d/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 4
+    },
+    {
+      "story": "run-01",
+      "candidateId": "specimen-87e36f6ebc2e",
+      "audience": "business",
+      "sourceSha256": "db36a3a45490104fbc3c8c1f446fd8119564b085880c3de0cf0f28f799325b82",
+      "originalScore": null,
+      "originalRange": null,
+      "pairedScores": [
+        72,
+        69
+      ],
+      "arbiterScore": 69,
+      "appealScoreBeforeQuestionsConsistency": null,
+      "referenceScore": {
+        "questions": 5,
+        "level": 6,
+        "time": 12,
+        "edges": 15,
+        "panels": 0,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 68
+      },
+      "ledgerFile": "final-ledgers/run-01.json",
+      "nonQuestionAssessment": "stages/arbiters/judgments/specimen-87e36f6ebc2e/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 17
+    },
+    {
+      "story": "run-02",
+      "candidateId": "specimen-7036a4f62b32",
+      "audience": "business",
+      "sourceSha256": "3972b7893e1208c7aa7c54a551628c662225aeeb9b858fb9bcd4315fce8701f3",
+      "originalScore": 80,
+      "originalRange": {
+        "min": 76,
+        "max": 95
+      },
+      "pairedScores": [
+        86,
+        86
+      ],
+      "arbiterScore": 86,
+      "appealScoreBeforeQuestionsConsistency": 87,
+      "referenceScore": {
+        "questions": 6,
+        "level": 8,
+        "time": 17,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 88
+      },
+      "ledgerFile": "final-ledgers/run-02.json",
+      "nonQuestionAssessment": "stages/appeals/judgments/specimen-7036a4f62b32/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 6
+    },
+    {
+      "story": "run-03",
+      "candidateId": "specimen-3d313b05cc71",
+      "audience": "business",
+      "sourceSha256": "2a5428591d2f04cc84703f73dc913fe0e532398d33abf5bad5ab3a6855359987",
+      "originalScore": 88,
+      "originalRange": {
+        "min": 85,
+        "max": 90
+      },
+      "pairedScores": [
+        70,
+        69
+      ],
+      "arbiterScore": 69,
+      "appealScoreBeforeQuestionsConsistency": 72,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 0,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 72
+      },
+      "ledgerFile": "final-ledgers/run-03.json",
+      "nonQuestionAssessment": "stages/appeals/judgments/specimen-3d313b05cc71/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 15
+    },
+    {
+      "story": "run-04",
+      "candidateId": "specimen-8abdbcba1a1f",
+      "audience": "engineering",
+      "sourceSha256": "b43a9b6f0632997d771d70e74145dd7324302183dd83ac7fa02b66eac19b212c",
+      "originalScore": 80,
+      "originalRange": {
+        "min": 79,
+        "max": 81
+      },
+      "pairedScores": [
+        81,
+        87
+      ],
+      "arbiterScore": 81,
+      "appealScoreBeforeQuestionsConsistency": 89,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 15,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 87
+      },
+      "ledgerFile": "final-ledgers/run-04.json",
+      "nonQuestionAssessment": "stages/appeals/judgments/specimen-8abdbcba1a1f/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 7
+    },
+    {
+      "story": "run-05",
+      "candidateId": "specimen-fba9ebbeb297",
+      "audience": "engineering",
+      "sourceSha256": "a698cec653b44873bff8d749cf7105658b9ec5224cc07b4a4141d034f08cb476",
+      "originalScore": 87,
+      "originalRange": {
+        "min": 83,
+        "max": 92
+      },
+      "pairedScores": [
+        83,
+        84
+      ],
+      "arbiterScore": 83,
+      "appealScoreBeforeQuestionsConsistency": null,
+      "referenceScore": {
+        "questions": 4,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 12,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 83
+      },
+      "ledgerFile": "final-ledgers/run-05.json",
+      "nonQuestionAssessment": "stages/arbiters/judgments/specimen-fba9ebbeb297/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 9
+    },
+    {
+      "story": "run-06",
+      "candidateId": "specimen-8c365a9d184d",
+      "audience": "engineering",
+      "sourceSha256": "65db1f294eff3c7d9bd5b97f289b14a4d2089da2b8156cb012cb643e782262f0",
+      "originalScore": 79,
+      "originalRange": {
+        "min": 78,
+        "max": 80
+      },
+      "pairedScores": [
+        79,
+        76
+      ],
+      "arbiterScore": 76,
+      "appealScoreBeforeQuestionsConsistency": null,
+      "referenceScore": {
+        "questions": 5,
+        "level": 8,
+        "time": 14,
+        "edges": 15,
+        "panels": 6,
+        "backstage": 15,
+        "fidelity": 15,
+        "total": 78
+      },
+      "ledgerFile": "final-ledgers/run-06.json",
+      "nonQuestionAssessment": "stages/arbiters/judgments/specimen-8c365a9d184d/judge-1/final.json",
+      "questionAssessment": "stages/question-consistency/judgments/question-consistency-all-eight/judge-1/final.json",
+      "deductionCount": 10
+    }
+  ],
+  "limits": [
+    "Reference scores under disclosed interpretations and one pinned current renderer, not a uniquely objective measure of quality.",
+    "Six current authors versus one historical author per audience; current skill, prompts, permissions and concurrency differ, so this is not a causal API regression estimate.",
+    "Original scores, invalid arithmetic, all attempted calls and author sources are preserved separately.",
+    "The all-eight consistency pass resolves compound-question counting and distinguishes presentation preferences from supplied behavior; different original grammar readings are retained in earlier assessments.",
+    "The run03 low-marker phone-placement interpretation survives appeal; removing it would not change its capped panel score or total."
+  ]
+}

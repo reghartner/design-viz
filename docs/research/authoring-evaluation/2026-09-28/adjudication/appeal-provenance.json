@@ -1,0 +1,28 @@
+{
+  "candidates": [
+    {
+      "story": "run-02",
+      "candidateId": "specimen-7036a4f62b32",
+      "challengedDeductionIds": [
+        "D004"
+      ]
+    },
+    {
+      "story": "run-03",
+      "candidateId": "specimen-3d313b05cc71",
+      "challengedDeductionIds": [
+        "DF001",
+        "DP005"
+      ]
+    },
+    {
+      "story": "run-04",
+      "candidateId": "specimen-8abdbcba1a1f",
+      "challengedDeductionIds": [
+        "D-E-001",
+        "D-P-001",
+        "D-P-002"
+      ]
+    }
+  ]
+}

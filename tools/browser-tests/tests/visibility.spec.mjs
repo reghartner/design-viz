@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,closeTools} from '../helpers/test.mjs';
 const spec=()=>({page:{sections:[{heading:'Visibility',bullets:['Supporting context'],contract:{fields:[{k:'result',v:'ready'}]},diagram:{view:'step',autoplay:false,routing:'lanes',nodes:{a:{title:'Source'},b:{title:'Target'}},rows:[['a'],['b']],edges:[{from:'a',to:'b',label:'Deliver'}],steps:['a','b','c','x','y','unused'].map(id=>({id,text:'Caption '+id,nodes:['a','b']})),paths:[{id:'main',label:'Main',steps:['a','b','c']},{id:'alternate',label:'Alternate',steps:['a','x','y','c']}]}}]}});
 test('visibility controls author all three fragments atomically with captions and Undo',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec(),null,2));
@@ -45,5 +45,5 @@ test('full path positions drive shared events, filtered views and routed edge un
  await root.locator('button.schip[data-step-source="3"]').click();await hidden(true);
  await root.locator('button.schip[data-step-source="4"]').click();await hidden(false);
  await root.locator('button.schip[data-step-source="2"]').click();await hidden(true);
- await root.getByRole('button',{name:'AMBIENT',exact:true}).click();await hidden(false);
+ await closeTools(page);await root.getByRole('button',{name:'AMBIENT',exact:true}).click();await hidden(false);
 });

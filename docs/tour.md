@@ -160,7 +160,7 @@ Per step:
   views already uses Standard. An explicit `view` takes precedence. A
   requested presentation that is unavailable warns and skips the lesson.
   These are reader view selections; the tour never changes a view's
-  authored Presentation setting.
+  authored View type setting.
 - `copy` — `eyebrow` (omitted = automatic "TOUR · STEP n OF m"), `heading`,
   `body`; chooser adds `choices` (`{persona, label, sub}`) and `note`.
   Optional `reducedMotionBody` replaces `body` when reduced motion is on,

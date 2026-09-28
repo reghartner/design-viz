@@ -15,11 +15,11 @@ function fixture(twoSections=false){
 }
 const section=(page,index=0)=>page.locator('#docview .doc-sec[data-dv-section="'+index+'"]');
 const settings=(page,index=0)=>section(page,index).locator('.section-view-settings');
-const presentation=(page,index=0)=>settings(page,index).getByRole('combobox',{name:'View presentation',exact:true});
+const presentation=(page,index=0)=>settings(page,index).getByRole('combobox',{name:'View type',exact:true});
 const text=page=>page.locator('#src').inputValue();
 async function open(page,server,raw=fixture()){
   const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
-  await expect(page.locator('#workspace-view')).toHaveValue('diagram');await expect(settings(page)).toBeVisible();return source;
+  await expect(page.locator('#workspace-view')).toHaveCount(0);await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(settings(page)).toBeVisible();return source;
 }
 async function options(page,index=0){
   const details=settings(page,index).locator('details');
@@ -37,11 +37,11 @@ async function reachable(control){
 
 test('canvas view settings edit only the selected sibling and save one undoable opening choice',async({page,server,context})=>{
   const raw=fixture(true),original=await open(page,server,raw);
-  await expect(presentation(page)).toHaveValue('standard');await expect(settings(page).getByRole('button',{name:'Default view',exact:true})).toBeDisabled();
+  await expect(page.locator('.workbench-diagram-canvas')).toHaveCount(0);await expect(presentation(page)).toHaveValue('standard');await expect(settings(page).getByRole('button',{name:'Default view',exact:true})).toBeDisabled();
   await section(page).getByRole('button',{name:'Engineering',exact:true}).click();
-  await expect(section(page)).toHaveAttribute('data-view-id','engineering');await expect(presentation(page)).toHaveValue('explore');
+  await expect(section(page)).toHaveAttribute('data-view-id','engineering');await expect(presentation(page)).toHaveValue('explore');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
-  await presentation(page).selectOption('standard');
+  await presentation(page).selectOption('standard');await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
   const expected=structuredClone(raw);expected.page.blocks[0].diagram.layouts[1].presentation='standard';
   expect(JSON.parse(await text(page))).toEqual(expected);const changed=await text(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -70,7 +70,7 @@ test('canvas view settings edit only the selected sibling and save one undoable 
   await reader.locator('#section-delivery').getByRole('button',{name:'Resident story',exact:true}).click();
   await expect(reader.locator('#section-delivery .explore-stage')).toBeHidden();await expect(reader.locator('body')).not.toHaveClass(/viewer-exploring/);
   await expect(page.locator('#src')).toHaveValue(saved);await reader.close();
-  await pagePreview(page);await expect(page.locator('.section-view-settings:visible')).toHaveCount(0);
+  await pagePreview(page);await expect(settings(page,1)).toBeVisible();
   await expect(section(page).getByRole('button',{name:'Arrange section',exact:true})).toBeVisible();await expect(page.locator('#src')).toHaveValue(saved);
 });
 
@@ -110,7 +110,7 @@ for(const legacy of [false,true])test('direct canvas Explore selection promotes 
   const original=await open(page,server,raw);await expect(presentation(page)).toHaveValue('standard');
   await expect(settings(page).getByRole('button',{name:'Default view',exact:true})).toBeDisabled();
   await presentation(page).selectOption('explore');const promoted=await text(page),next=JSON.parse(promoted).page.blocks[0].diagram;
-  expect(next.layouts).toHaveLength(1);expect(next.layouts[0].presentation).toBe('explore');expect(next.defaultLayout).toBe(next.layouts[0].id);
+  expect(next.layouts).toHaveLength(2);const selected=legacy?'layout':'flow';expect(next.layouts.find(v=>v.id===selected).presentation).toBe('explore');expect(next.layouts.find(v=>v.id!==selected).presentation || 'standard').toBe('standard');expect(next.defaultLayout).toBe(selected);
   if(legacy)expect(next.layouts[0].sectionLayout).toEqual(arrangement);
   const retained=structuredClone(next);delete retained.layouts;delete retained.defaultLayout;const expected=structuredClone(d);delete expected.sectionLayout;delete expected.layoutName;
   expect(retained).toEqual(expected);await expect(presentation(page)).toHaveValue('explore');
@@ -120,7 +120,7 @@ for(const legacy of [false,true])test('direct canvas Explore selection promotes 
 
 test('invalid or unrendered JSON and detached view controls cannot rewrite an unrelated story',async({page,server})=>{
   const original=await open(page,server);await section(page).getByRole('button',{name:'Engineering',exact:true}).click();await options(page);
-  const held=await settings(page).evaluateHandle(el=>({presentation:el.querySelector('[aria-label="View presentation"]'),name:el.querySelector('[aria-label="View name"]'),
+  const held=await settings(page).evaluateHandle(el=>({presentation:el.querySelector('[aria-label="View type"]'),name:el.querySelector('[aria-label="View name"]'),
     rename:[...el.querySelectorAll('button')].find(b=>b.textContent==='Rename view'),duplicate:[...el.querySelectorAll('button')].find(b=>b.textContent==='Duplicate view'),default:[...el.querySelectorAll('button')].find(b=>b.textContent==='Make default')}));
   async function staleEvents(){await held.evaluate(controls=>{
     controls.presentation.value='standard';controls.presentation.dispatchEvent(new Event('change',{bubbles:true}));
@@ -146,4 +146,35 @@ for(const size of [{width:1800,height:1200},{width:390,height:844},{width:500,he
   await expect(select).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(original);
   await makeDefault.focus();await page.keyboard.press('Enter');expect(JSON.parse(await text(page)).page.blocks[0].diagram.defaultLayout).toBe('engineering');
   await info.attach('canvas-view-default-'+size.width,{body:await page.screenshot(),contentType:'image/png'});
+});
+
+
+test('an arranging sibling cannot steal view navigation, and Back to page survives a heading edit',async({page,server})=>{
+  const input=fixture(true);delete input.page.blocks[1].id;
+  await open(page,server,input);
+  await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
+  await section(page,1).getByRole('button',{name:'Engineering',exact:true}).click();
+  await expect(section(page,1)).toHaveClass(/workspace-active-section/);
+  await expect(page.locator('#diagram-add-target')).toHaveValue('1');
+  await page.locator('#workspace-page').click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
+  const changed=JSON.parse(await text(page));changed.page.blocks[1].heading='Billing revised';
+  await writeSource(page,JSON.stringify(changed,null,2));
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await closeTools(page);
+  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(page.locator('#workspace-page')).toHaveText('Open Explore');
+  await page.locator('#workspace-page').click();await expect(section(page,1)).toHaveClass(/workspace-active-section/);
+});
+
+
+test('changing automatic Data to Explore preserves Home and its opening default',async({page,server})=>{
+  const input=fixture(),d=input.page.blocks[0].diagram;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
+  const original=await open(page,server,input);
+  await section(page).getByRole('button',{name:'Data flow',exact:true}).click();
+  await presentation(page).selectOption('explore');
+  const saved=JSON.parse(await text(page)).page.blocks[0].diagram;
+  expect(saved.defaultLayout).toBe('home');expect(saved.layouts.map(v=>v.id)).toEqual(['home','flow']);
+  expect(saved.layouts[1].presentation).toBe('explore');expect(saved.layouts[0].presentation || 'standard').toBe('standard');
+  await expect(section(page)).toHaveAttribute('data-view-id','flow');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
+  await section(page).getByRole('button',{name:'Home',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
+  await expect(presentation(page)).toHaveValue('standard');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

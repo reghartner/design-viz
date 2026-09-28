@@ -1,12 +1,12 @@
 # Arrange a section and preview its host
 
-Each named view has a **Presentation** setting: **Standard** preserves the
+Each named view has one saved **View type**: **Standard** preserves the
 authored tile arrangement; **Explore** gives the graph a full-height workspace
 with independent floating panels and pinned step controls. Omitted settings use
 Standard, so existing diagrams keep their presentation.
 
-In the workbench's **Diagram canvas**, select a section and a view using the
-buttons above the graph. **Presentation** chooses Standard or Explore for
+In the workbench, select a section and a view using the
+buttons above the graph. **View type** chooses Standard or Explore for
 that view; **Make default** saves which view opens on a fresh page. The saved
 choice reads **Default view**. Selecting a different view to inspect it does not
 change the saved default or write JSON. Expand **View options**, enter a **View
@@ -14,10 +14,14 @@ name**, and choose **Rename view** (or press Enter) to save it; **Duplicate view
 creates a separate copy. These controls let you keep a curated Standard view
 and an Explore view of the same story side by side.
 
-The editor stays a full canvas while you work. To inspect the saved reader
-presentation or arrange its tiles, choose **Canvas appearance → Page preview**.
-Page preview keeps the existing **Arrange section** controls, including view
-presentation, name, duplication and default selection.
+The editor and exported HTML show the same selected type: Standard uses the
+curated page; Explore opens across the full browser. **Back to page** reveals
+the surrounding document and the contained Explore view; **Open Explore**
+returns to the full-browser view. These navigation actions do not change the
+saved type. Selecting another view or section follows its type again.
+The same **View type** dropdown stays in the shared view header on both
+surfaces. On the page, **Arrange section** provides tile arrangement and the
+other view settings. There is no separate editor View mode.
 
 For a host preview, select **Responsive**, **Backstage**, or **Confluence** in
 **Canvas appearance**. Host previews use adjustable content widths (1080 and 760
@@ -25,7 +29,7 @@ pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-In Page preview, choose **Arrange section**. Each panel, the data-flow diagram, and any detached step controls
+To arrange a Standard view, choose **Arrange section** on the page. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a twelve-column grid. Overlapping tiles move down to remain visible. Click
 **Done arranging** to see the reader view. Diagram nodes and Home elements
@@ -113,16 +117,16 @@ in view. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
-1. On the Diagram canvas, select the existing view and choose **View options →
+1. Select the existing view and choose **View options →
    Duplicate view**. The copy becomes active. Open **View options** again and
    give it a **View name**, such as **Service flow**, then choose **Rename view**.
-2. Choose **Presentation → Explore** for the engineering copy, leaving
+2. Choose **View type → Explore** for the engineering copy, leaving
    the original in **Standard**. Each view keeps its own presentation across
    every host profile; changing it is one Undo/Redo operation.
 3. Select whichever view should open for readers and choose **Make default**.
    Switching views afterward does not change this saved opening choice.
-4. To customize the curated arrangement, choose **Canvas appearance → Page
-   preview**, select its view, and choose **Arrange section**. Select **Data
+4. To customize the curated arrangement, select its Standard view and choose
+   **Arrange section**. Select **Data
    flow** in **Layout element**, choose your Home panel in
    **Swap places with**, then click **Swap places**. Position, size and visibility
    exchange; other elements keep their places unless a collision needs packing.
@@ -136,7 +140,7 @@ To build that from an existing arrangement:
    buttons above the section.
 
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
-copies its Presentation setting, step selection and all profiles independently;
+copies its View type, step selection and all profiles independently;
 swapping, moving, sizing and visibility edit
 only the selected host profile in the active layout. Repeat a swap in other
 explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
@@ -162,12 +166,11 @@ authored default; deleting the selected view falls back to the remaining default
 
 ## Explore presentation
 
-On the Diagram canvas, select the view and choose **Presentation → Explore**.
-Move and resize its panels there to save their floating defaults.
-To inspect the saved reader presentation, use
-**Canvas appearance → Page preview**. **Arrange section → Presentation → Explore**
-remains available there, and Page preview shows the actual Explore workspace,
-including while arranging.
+Select the view and choose **View type → Explore**. The editor opens the same
+full-browser presentation used by exported HTML. Move and resize its panels
+there to save their floating defaults. **Back to page** shows the contained
+Explore workspace, including while arranging. **Open Explore** returns to the
+full-browser view without changing the saved type.
 The data-flow graph becomes the full-height workspace. Each supporting panel
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
@@ -194,13 +197,14 @@ state remembered independently for each view while the viewer is mounted.
 They do not rewrite the authored diagram or create Undo entries. Explore uses
 the selected host profile's saved visibility, while its floating positions and
 sizes are independent of the profile's grid geometry.
-In the workbench's **Diagram canvas**, an **Explore** view saves panel and
-step-control moves/resizes as its floating defaults, with one Undo/Redo action
-per gesture. Those positions and sizes survive JSON and HTML export. A
-**Standard** view's canvas panel moves/resizes remain temporary editor geometry
-with Undo/Redo; they do not change its authored tile arrangement. See
+In the workbench's full-browser **Explore** view, panel and
+step-control moves/resizes save its floating defaults, with one Undo/Redo action
+per gesture. Those positions and sizes survive JSON and HTML export.
+Panning, zooming and fitting this full-browser canvas are temporary navigation;
+they do not change the saved opening camera or add Undo entries. Standard
+shows its authored tiles on the page and has no floating canvas panels. See
 [workspace controls](workbench-workspace.md).
-**In the workbench's Page preview**, moving or resizing a panel or step controls, panning,
+**In the contained Explore view after Back to page**, moving or resizing a panel or step controls, panning,
 zooming, and choosing **Stack at edge** save defaults in the selected view. Each
 completed gesture is one Undo/Redo action; Escape cancels a drag. **Arrange
 section** keeps Explore visible. Saving a move, resize, pan, or zoom keeps the
@@ -213,7 +217,7 @@ elements** for that. Defaults are shared across host profiles and scale to the
 available viewport. Duplicating a view preserves its defaults. Returning a view to **Standard** restores its authored arrangement.
 
 Keep Standard as the default for a business presentation and add an Explore
-view for engineering inspection. The Presentation setting belongs to the named
+view for engineering inspection. The View type setting belongs to the named
 view, never to a Responsive, Backstage or Confluence profile. Duplicating the
 view preserves the setting; changing the preview host does not change it.
 

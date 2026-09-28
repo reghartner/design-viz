@@ -19,7 +19,7 @@ const source=page=>page.locator('#src').inputValue();
 async function open(page,server,raw){
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
-  await expect(page.locator('#workspace-view')).toHaveValue('diagram');
+  await expect(page.locator('#workspace-page')).toHaveText('Back to page');
   await expect(section(page)).toHaveAttribute('data-view-id','explore');await expect(panel(page)).toBeVisible();
 }
 async function drag(page,handle,dx,dy){
@@ -91,9 +91,10 @@ test('main canvas Explore gestures author one history entry each and survive sta
   await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);
   await expect(section(page)).toHaveAttribute('data-view-id','explore');await expectSavedGeometry(page,layout);
   await section(page).getByRole('button',{name:'Standard story',exact:true}).click();await expect(page.locator('#src')).toHaveValue(saved);
-  const standardBefore=await rectangle(panel(page));await drag(page,panel(page).locator('.explore-window-grip'),-120,40);
-  expect(await rectangle(panel(page))).not.toEqual(standardBefore);await expect(page.locator('#src')).toHaveValue(saved);
-  await page.locator('#undo-builder').click();await expect.poll(()=>rectangle(panel(page))).toEqual(standardBefore);
+  // Standard is the curated page, with no floating canvas geometry to edit.
+  await expect(section(page).locator('.explore-stage')).toBeHidden();await expect(panel(page)).toHaveCount(0);
+  await expect(section(page).locator('.pwidget[data-dv-panel="0"]')).toBeVisible();await expect(page.locator('#undo-builder')).toBeDisabled();
+  await section(page).getByRole('button',{name:'Explore story',exact:true}).click();await expectSavedGeometry(page,layout);
   await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 

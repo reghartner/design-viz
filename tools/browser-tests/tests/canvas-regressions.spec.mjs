@@ -6,28 +6,29 @@ import {repo} from '../helpers/prepare.mjs';
 
 const named=async()=>JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 
-test('canvas keeps the graph through playback changes and restores authored visibility on Page preview',async({page,server})=>{
-  const spec=await named();spec.page.sections[0].diagram.autoplay=false;
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));
-  const section=page.locator('#docview .workspace-active-section'),board=section.locator('.explore-board');
+test('Explore keeps the graph through playback and Standard restores authored visibility',async({page,server})=>{
+  const spec=await named();spec.page.sections[0].diagram.autoplay=false;spec.page.sections[0].diagram.defaultLayout='service-flow';
+  const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);
+  const section=page.locator('#docview .doc-sec').first(),board=section.locator('.explore-board');
   await expect(board).toBeVisible();
   await section.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(board).toBeVisible();
   await section.getByRole('button',{name:'STEP',exact:true}).click();await expect(board).toBeVisible();
-  await section.getByRole('button',{name:'Service flow',exact:true}).click();
-  await section.getByRole('button',{name:'Home story',exact:true}).click();await expect(board).toBeVisible();
-  await pagePreview(page);await expect(page.locator('#docview .board').first()).toBeHidden();
+  await section.getByRole('button',{name:'Home story',exact:true}).click();
+  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(board).toBeHidden();
+  await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);
 });
 
-test('legacy Data flow keeps an active canvas and can return to its authored layout',async({page,server})=>{
+test('legacy Data flow and saved layout remain curated until their View type changes',async({page,server})=>{
   const spec=await named(),d=spec.page.sections[0].diagram;
   d.sectionLayout=d.layouts[0].sectionLayout;delete d.layouts;delete d.defaultLayout;d.autoplay=false;
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec));
-  const section=page.locator('#docview .workspace-active-section');
+  const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);await pagePreview(page);
+  const section=page.locator('#docview .doc-sec').first();
   await section.getByRole('button',{name:'Data flow',exact:true}).click();
-  await expect(section.locator('.explore-board')).toBeVisible();
-  await expect(section.locator('.explore-stage')).toBeVisible();
+  await expect(section.locator('.board')).toBeVisible();await expect(section.locator('.explore-stage')).toBeHidden();
   await section.getByRole('button',{name:'Layout',exact:true}).click();
-  await expect(section.locator('.explore-board')).toBeVisible();
+  await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);
+  await section.getByRole('combobox',{name:'View type',exact:true}).selectOption('explore');
+  await expect(section.locator('.explore-board')).toBeVisible();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
 });
 
 test('keyboard focus raises an overlapping tool window',async({page,server})=>{

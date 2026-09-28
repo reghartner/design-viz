@@ -18,7 +18,7 @@ Selected-step edits use
 the builder's existing selection tracking. No playback state enters the JSON,
 undo history or saved layout. Standalone published pages retain autoplay.
 
-Reordering rows, inspector edits, Render and Undo/Redo keep Page preview's
+Reordering rows, inspector edits, Render and Undo/Redo keep the page's
 scroll position while it rebuilds. If an edit shortens the document past
 that position, scrolling stops at the new bottom. Opening or importing a different
 project keeps its normal navigation behavior.
@@ -36,18 +36,21 @@ source uses `\n`. Code remains literal, preserves indentation, and scrolls withi
 its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
-The diagram is the full browser canvas. Its nodes and connections pan and zoom
-without a surrounding document card. Select a **Section** in the top toolbar;
-its view choices, playback and data panels float over the canvas. Use **Pan**
-(or hold Space), zoom, and **Fit diagram** to navigate. In an **Explore** view,
-moving or resizing a data panel or the step controls saves that view's floating defaults in the
-source, so the placement survives HTML export. In a **Standard** view, those
-same canvas gestures adjust temporary editor geometry without changing the
-authored arrangement or JSON.
+Each named view has one saved **View type**: **Standard** shows the curated
+page arrangement, while **Explore** fills the browser with the diagram and
+floating panels. The editor displays the selected type just as the exported
+HTML does. Select a **Section** in the top toolbar and use its view buttons to
+switch between the saved views.
 
-Both kinds of panel moves/resizes join the same **Undo**/**Redo** history as
-story edits, one entry per completed drag or arrow-key adjustment. Temporary
-geometry Undo restores the panel without moving the camera or reopening closed
+In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate.
+Moving or resizing a data panel or the step controls saves that view's floating
+defaults in the source, so the placement survives HTML export. Standard keeps
+its panels in the authored page arrangement; use **Arrange section** to edit
+that arrangement.
+
+Explore panel edits and editor-tool moves/resizes join the same **Undo**/**Redo**
+history as story edits, one entry per completed drag or arrow-key adjustment.
+Editor-tool geometry remains temporary and its Undo does not reopen closed
 tools. Opening or closing a tool does not add history entries.
 A movement that hits an edge
 without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
@@ -59,29 +62,29 @@ start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named view
 retains its own camera for the session.
 Canvas panning, zooming and **Fit diagram** remain temporary navigation and do
-not add Undo entries or change the saved opening camera. Use Page preview to
-author that camera.
+not add Undo entries or change the saved opening camera. Use **Back to page**
+to author the camera in the contained Explore view.
 
-Choose a named view above the graph to work on it. The adjacent **Presentation**
+Choose a named view above the graph to work on it. The adjacent **View type**
 control saves **Standard** or **Explore** for that view. Keep
 both kinds in one story: open **View options → Duplicate view**, give the copy
 a **View name**, save it with **Rename view** or Enter, and choose its
-presentation independently. Changing a legacy or automatic view to Explore
+type independently. Changing a legacy or automatic view to Explore
 creates its named view in one Undo operation.
 
 **Make default** saves the selected view as the opening choice for a fresh
 published page; it then reads **Default view**. Merely selecting another view
-does not edit the source or change that default. Presentation, name, duplication
-and default changes use the normal source Undo/Redo history. The Diagram canvas
-remains the full editor canvas while you choose the reader presentation.
+does not edit the source or change that default. View type, name, duplication
+and default changes use the normal source Undo/Redo history.
 
-**Canvas appearance → Page preview** shows prose, contract cards and the authored
-page arrangement. Use it to arrange/export curated Home-centric views or simulate
-host widths. **Diagram canvas** returns to the working canvas. Explore panel and
-step-control placement can be saved from either surface. Page preview also lets
-you arrange the saved Explore framing. It retains the view
-settings under **Arrange section**; the compact canvas view controls are hidden
-there to avoid duplicate controls.
+**Back to page** reveals prose, contract cards and the contained Explore view.
+**Open Explore** returns to its full-browser view. This navigation does not
+change the saved View type. Selecting another view or section follows that view's
+type again. There is no separate editor presentation dropdown.
+Explore panel and step-control placement can be saved from either surface.
+In the contained view, panning and zooming also save the opening camera.
+**Arrange section** exposes the page arrangement and saved view settings;
+**Canvas appearance** offers host-width previews.
 
 **Add to diagram**, **Undo**, **Redo**, **User guide**, and **Save** share the
 project toolbar above the workspace. The
@@ -139,7 +142,7 @@ focus, not a limit on the data sent.
 Save, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
 story and panel fields side by side; narrower windows stack them.
 
-In Page preview, All row diagrams have their own **Auto / Fit width / Readable** controls,
+On the page, all row diagrams have their own **Auto / Fit width / Readable** controls,
 including default curved edges, explicit `routing:"curves"`, and lane routing.
 Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
 Fit width shows the whole graph. When a diagram overflows, **Scroll** buttons and

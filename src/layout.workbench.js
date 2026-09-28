@@ -70,6 +70,7 @@ function initSectionLayoutEditor(opts){
     return rec && rec.presentation;
   }
   function activeLayout(index){var p=presentation(index);return p && p.layoutId?p.layoutId():undefined;}
+  function selectedView(index){var p=presentation(index);return p && p.viewId?p.viewId():'flow';}
   function currentItems(index,d){return sectionLayoutItems(d || rawDiagram(index),target.value,activeLayout(index));}
   function forceLayout(index){
     var p=presentation(index);if(!p)return;
@@ -82,27 +83,32 @@ function initSectionLayoutEditor(opts){
     rec.viewFields.destroy();rec.viewFields=createWorkbenchLifetime();var fieldLife=rec.viewFields;controlsLife=fieldLife;
     if(!row){row=el('div','section-view-settings');row.setAttribute('role','group');row.setAttribute('aria-label','View settings');host.appendChild(row);}
     row.replaceChildren();
-    var index=Number(section.getAttribute('data-dv-section')),id=activeLayout(index),definition=sectionLayoutDefinition(d,id);
-    function current(){return row.isConnected && ready() && activeLayout(index)===id;}
+    var index=Number(section.getAttribute('data-dv-section')),id=selectedView(index),definition=diagramLayoutViews(d).find(function(v){return v.id===id || v.legacy && id==='layout';});
+    function current(){return row.isConnected && ready() && selectedView(index)===id;}
+    function activate(nextId){var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();}
+    var choices=host.querySelector('.diagram-view-choice');
+    if(choices){choices.setAttribute('role','group');choices.setAttribute('aria-label','Views');}
+    if(choices && !choices.querySelector('.workbench-views-label'))choices.prepend(el('span','workbench-views-label','Views'));
     function focusControl(selector){
       var next=view.querySelector('[data-dv-section="'+index+'"] .section-view-settings '+selector);if(!next)return;
       var options=next.closest('details');if(options){options.open=true;sectionScope(next.closest('.doc-sec')).optionsOpen=true;}
       next.focus({preventScroll:true});
     }
-    var label=el('label',null,'Presentation '),select=el('select');select.setAttribute('aria-label','View presentation');
+    var label=el('label',null,'View type '),select=el('select');select.setAttribute('aria-label','View type');
     [['standard','Standard'],['explore','Explore']].forEach(function(choice){var option=el('option',null,choice[1]);option.value=choice[0];select.appendChild(option);});
-    select.value=definition?definition.presentation:'standard';select.title='How this view opens in the built HTML. Each view can use a different presentation.';
+    select.value=definition?definition.presentation:'standard';select.title='Standard uses a curated page layout. Explore uses the full canvas. The editor and built HTML use the same view type.';
     fieldLife.listen(select,'change',function(){
       if(!current()){select.value=definition?definition.presentation:'standard';return;}
-      cancel();if(opts.setPresentation(index,id,select.value))focusControl('[aria-label="View presentation"]');
+      cancel();var nextId=opts.setPresentation(index,id,select.value);if(nextId){activate(nextId);focusControl('[aria-label="View type"]');}
     });label.appendChild(select);row.appendChild(label);
-    var isDefault=!definition || definition.legacy || sectionLayoutDefinition(d).id===id;
-    var opening=button(isDefault?'Default view':'Make default',function(){if(current())opts.makeDefault(index,id);});
+    var openingId=d.layouts && d.layouts.length?sectionLayoutDefinition(d).id:d.sectionLayout?'layout':d.primaryPanel?'home':'flow';
+    var isDefault=openingId===id;
+    var opening=button(isDefault?'Default view':'Make default',function(){if(current()){var nextId=opts.makeDefault(index,id);if(nextId)activate(nextId);}});
     opening.disabled=isDefault;opening.title=isDefault?'This view opens first in the built HTML.':'Open this view first in the built HTML.';row.appendChild(opening);
     var options=el('details','section-view-options');options.open=rec.optionsOpen;options.appendChild(el('summary',null,'View options'));
     fieldLife.listen(options,'toggle',function(){if(options.isConnected)rec.optionsOpen=options.open;});
     var body=el('div','section-view-options-body'),nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
-    name.setAttribute('aria-label','View name');name.value=definition?definition.name:(d.primaryPanel?'Home':'Data flow');
+    name.setAttribute('aria-label','View name');name.value=definition?definition.name:(id==='home'?'Home':'Data flow');
     name.disabled=!definition || definition.legacy;
     function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="View name"]');}
     fieldLife.listen(name,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();renameView();}});
@@ -116,7 +122,7 @@ function initSectionLayoutEditor(opts){
       var nextOptions=nextSection.querySelector('.section-view-options');if(nextOptions){nextOptions.open=true;sectionScope(nextSection).optionsOpen=true;}
       var nextName=nextSection.querySelector('.section-view-settings [aria-label="View name"]');if(nextName){nextName.focus({preventScroll:true});nextName.select();}
     }));
-    body.appendChild(el('p','fnote','Views share the same story and steps. Presentation and the opening view are saved with your story.'));
+    body.appendChild(el('p','fnote','Views share the same story and steps. Each view saves its type, arrangement and opening choice.'));
     options.appendChild(body);row.appendChild(options);
     fieldLife.listen(row,'click',function(ev){ev.stopPropagation();});fieldLife.listen(row,'pointerdown',function(ev){ev.stopPropagation();});
   }
@@ -216,20 +222,6 @@ function initSectionLayoutEditor(opts){
       sectionLayoutTiles(d).filter(function(t){return t.key!==selected && t.key!=='steps';}).forEach(function(t){var o=el('option',null,t.title);o.value=t.key;swap.appendChild(o);});
       row.appendChild(swap);var swapButton=button('Swap places',function(){persist(index,sectionLayoutSwap(items,selected,swap.value));});
       swapButton.disabled=!swap.options.length;swapButton.title='Exchange position, size and visibility with the selected element.';row.appendChild(swapButton);
-    }
-    if(definition && !definition.legacy){
-      var presentationLabel=el('label',null,'Presentation '),presentationSelect=el('select');
-      presentationSelect.setAttribute('aria-label','Presentation');
-      [['standard','Standard'],['explore','Explore']].forEach(function(choice){var option=el('option',null,choice[1]);option.value=choice[0];presentationSelect.appendChild(option);});
-      presentationSelect.value=definition.presentation;
-      presentationSelect.title='Applies to this view across all host profiles. Explore uses a full-height graph, floating panels and pinned step controls.';
-      fieldLife.listen(presentationSelect,'change',function(){
-        if(!ready() || activeLayout(index)!==id){presentationSelect.value=definition.presentation;return;}
-        cancel();
-        if(opts.setPresentation(index,id,presentationSelect.value))feedback('Saved view presentation · Undo restores the previous setting.');
-        else presentationSelect.value=definition.presentation;
-      });
-      presentationLabel.appendChild(presentationSelect);row.insertBefore(presentationLabel,row.firstChild);
     }
     var nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
     name.value=definition?definition.name:'';name.placeholder='View';name.setAttribute('aria-label','View name');

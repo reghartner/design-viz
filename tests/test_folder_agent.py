@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 HELPER = ROOT / 'tools/folder-agent.py'
@@ -127,6 +128,85 @@ class FolderAgentTests(unittest.TestCase):
         events = helper.progress_history(self.folder, value)
         self.assertLess(len(json.dumps(events).encode()), 513*1024)
         self.assertEqual(events[-1]['text'], 'New')
+
+    def test_cancelled_turn_rejects_all_helper_outputs_and_watcher_reports_cancellation(self):
+        self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': 'request'})
+        for command in [('propose', '--revision', 'revision-1', '--file', 'candidate.spec.json'),
+                        ('reply', '--text', 'Too late'), ('progress', '--text', 'Still going')]:
+            result = self.run_helper(command[0], '--request', 'request', *command[1:])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('turn was stopped', result.stderr)
+        self.assertFalse((self.folder/'proposal.json').exists())
+        run = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        events = [json.loads(line) for line in run.stdout.splitlines()]
+        self.assertEqual([event['event'] for event in events], ['flowview_cancel'])
+        self.assertEqual(events[0]['requestId'], 'request')
+        self.put('request.json', {**self.owner, 'id': 'next'})
+        self.assertEqual(self.run_helper('reply', '--request', 'next', '--text', 'Fresh turn').returncode, 0)
+
+    def test_foreign_cancellation_cannot_stop_this_session(self):
+        self.put('cancel.json', {**self.owner, 'connectionId': 'old', 'id': 'cancel-1', 'requestId': 'request'})
+        self.assertEqual(self.propose().returncode, 0)
+
+    def test_guard_rechecks_ownership_and_cancellation_before_publication(self):
+        self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': 'request'})
+        with self.assertRaisesRegex(ValueError, 'turn was stopped'):
+            helper.write(self.folder, 'reply.json', {'text': 'unsafe late reply'},
+                         guard=lambda: helper.active_request(self.folder, self.owner, 'request'))
+        self.assertFalse((self.folder/'reply.json').exists())
+        self.assertEqual(list(self.folder.glob('.reply.json-*')), [])
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'connectionId': 'other'})
+        with self.assertRaisesRegex(ValueError, 'ownership changed'):
+            helper.write(self.folder, 'listener.json', {}, guard=lambda: helper.assert_owner(self.folder, self.owner))
+        self.assertFalse((self.folder/'listener.json').exists())
+
+    def test_preflight_reports_existing_prerequisites_without_installing_or_claiming_monitor(self):
+        with patch.object(helper.shutil, 'which', return_value=None):
+            report = helper.preflight(self.folder)
+        checks = {check['id']: check for check in report['checks']}
+        self.assertFalse(report['ready'])
+        self.assertEqual(checks['node']['status'], 'missing')
+        self.assertEqual(checks['monitor']['status'], 'unverified')
+        self.assertEqual(checks['editor']['status'], 'ready')
+        self.assertFalse((self.folder/'authoring').exists())
+        self.assertEqual(helper.read(self.folder, 'preflight.json')['connectionId'], self.owner['connectionId'])
+        with patch.object(helper.shutil, 'which', return_value='/example/node'):
+            ready = helper.preflight(self.folder, monitor='available')
+        self.assertTrue(ready['ready'])
+        run = self.run_helper('preflight', '--monitor', 'unavailable')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertFalse(json.loads(run.stdout)['ready'])
+
+    def test_semantic_operations_and_dry_run_use_exact_revision_without_reading_arbitrary_paths(self):
+        operations = [{'op': 'updateNode', 'sectionId': 'journey', 'nodeId': 'customer', 'patch': {'label': 'Client'}}]
+        self.put('operations.json', {'operations': operations, 'dryRun': True})
+        run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', 'operations.json')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        proposal = helper.read(self.folder, 'proposal.json')
+        self.assertEqual(proposal['operations'], operations)
+        self.assertTrue(proposal['dryRun'])
+        self.assertNotIn('source', proposal)
+        self.assertEqual(proposal['baseRevision'], 'revision-1')
+        self.put('result.json', {**self.owner, 'id': proposal['id'], 'status': 'validated'})
+        for invalid in [[], operations*101, [{'op': 'executeScript'}], {'operations': operations, 'dryRun': 'yes'},
+                        {'operations': operations, 'source': '{}'}]:
+            self.put('operations.json', invalid)
+            invalid_run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', 'operations.json')
+            self.assertNotEqual(invalid_run.returncode, 0, invalid)
+            self.assertEqual(helper.read(self.folder, 'proposal.json')['id'], proposal['id'])
+        escaped = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--operations', '../operations.json')
+        self.assertIn('plain filename', escaped.stderr)
+        self.put('operations.json', operations)
+        stale = self.run_helper('propose', '--request', 'request', '--revision', 'revision-old', '--operations', 'operations.json')
+        self.assertIn('Document changed', stale.stderr)
+
+    def test_permission_needed_progress_preserves_reported_phase(self):
+        run = self.run_helper('progress', '--request', 'request', '--text', 'Waiting for approval in Claude.', '--phase', 'permission-needed')
+        self.assertEqual(run.returncode, 0, run.stderr)
+        progress = helper.read(self.folder, 'progress.json')
+        self.assertEqual(progress['phase'], 'permission-needed')
+        self.assertEqual(progress['events'][0]['phase'], 'permission-needed')
 
 
 if __name__ == '__main__':

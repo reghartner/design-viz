@@ -22,7 +22,7 @@
         <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
     </div>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
+    <div class="workspace-save"><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button type="button" class="bbtn" id="workspace-prepare-review">Prepare review</button><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Save</button></div>
   </div>
 </header>
 
@@ -134,6 +134,7 @@
   <div class="workwrap">
     <nav class="editor-tabs workspace-rail" role="tablist" aria-label="Editor tools" aria-orientation="vertical">
       <button type="button" role="tab" id="editor-tab-agent" aria-controls="editor-agent" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">✧</span>Agent</button>
+      <button type="button" role="tab" id="editor-tab-brief" aria-controls="editor-brief" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▧</span>Brief</button>
       <button type="button" role="tab" id="editor-tab-inspect" aria-controls="editor-inspect" aria-selected="true" tabindex="0"><span class="editor-tool-icon" aria-hidden="true">↖</span>Inspect</button>
       <button type="button" role="tab" id="editor-tab-steps" aria-controls="editor-steps" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">≡</span>Steps</button>
       <button type="button" role="tab" id="editor-tab-outline" aria-controls="editor-outline" aria-selected="false" tabindex="-1"><span class="editor-tool-icon" aria-hidden="true">▤</span>Outline</button>
@@ -161,6 +162,7 @@
           <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your session folder keeps the conversation, story, and authoring notes.</p>
         </div>
       </div>
+      <div class="editor-pane" id="editor-brief" role="tabpanel" aria-labelledby="editor-tab-brief" hidden></div>
       <div class="draftbar" id="draftbar" hidden></div>
         <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
       <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
@@ -301,6 +303,7 @@
       <ul class="msgs" id="msgs" aria-live="polite"></ul>
     </section>
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
+    <label class="workspace-preset">Workspace <select id="workspace-preset" aria-label="Workspace preset"><option value="custom">Custom</option><option value="story">Story</option><option value="engineering">Engineering</option><option value="present">Present</option></select></label>
     <details id="workspace-appearance" class="workspace-appearance"><summary>Canvas appearance</summary><div id="workspace-appearance-body">
       <label class="workspace-view-label">View <select id="workspace-view"><option value="diagram">Diagram canvas</option><option value="page">Page preview</option></select></label>
       <p class="fnote">Use Page preview to edit text and arrange the exported page.</p>

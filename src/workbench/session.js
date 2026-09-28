@@ -5,7 +5,7 @@ function createBuilderSession(options){
   var persistence=options.persistence, recovered=persistence.read();
   var initialDraft=recovered.draft, recoveredBaseline=recovered.baseline;
   var baselineText=options.source.read(), projectOpen=!options.deferInitialSave;
-  var undoStack=[], redoStack=[], target=null, insertSection=0;
+  var undoStack=[], redoStack=[], target=null, insertSection=0,historyVersion=0;
   var importedText=null, projectUndoText=null, project=0, disposed=false;
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;
   function text(){return options.source.read();}
@@ -15,6 +15,7 @@ function createBuilderSession(options){
   }
   function historyChanged(){if(options.historyChanged)options.historyChanged(!!undoStack.length,!!redoStack.length);}
   function pushUndo(value){
+    historyVersion++;
     importedText=null;undoStack.push(value);
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
@@ -23,6 +24,7 @@ function createBuilderSession(options){
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
+    historyVersion++;
     to.push(text());options.source.write(from.pop());historyChanged();target=null;
     var outcome=render('history');
     if(options.afterHistory)options.afterHistory(message,outcome);
@@ -80,11 +82,13 @@ function createBuilderSession(options){
     undo:function(){return historyStep(undoStack,redoStack,'undid the last builder action — board re-rendered');},
     redo:function(){return historyStep(redoStack,undoStack,'redid the builder action — board re-rendered');},
     canUndo:function(){return !!undoStack.length;},canRedo:function(){return !!redoStack.length;},
+    historyVersion:function(){return historyVersion;},
     imported:function(){return importedText!=null && text()===importedText;},
     canUndoProject:function(){return projectUndoText!=null && text()===projectUndoText && !!undoStack.length;},
     clearProjectUndo:function(){if(!disposed)projectUndoText=null;},
     noteInput:function(){
       if(disposed)return;
+      historyVersion++;
       projectOpen=true;importedText=null;persistence.schedule(save);
     },
     save:save,markSaved:function(){if(!disposed)baselineText=text();},baseline:function(){return baselineText;},

@@ -14,6 +14,8 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
+import sys
 import time
 import uuid
 
@@ -28,13 +30,18 @@ def read(folder, name):
     return json.loads(target.read_text(encoding='utf-8'))
 
 
-def write(folder, name, value):
+def write(folder, name, value, guard=None):
     temporary = folder / ('.' + name + '-' + uuid.uuid4().hex)
     with temporary.open('x', encoding='utf-8') as output:
         os.chmod(temporary, 0o600)
         json.dump(value, output, ensure_ascii=False)
         output.write('\n')
-    temporary.replace(folder / name)
+    try:
+        if guard:
+            guard()
+        temporary.replace(folder / name)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def identity(folder):
@@ -42,6 +49,57 @@ def identity(folder):
     if manifest.get('protocol') != 'flowview-folder-v1':
         raise ValueError('Unsupported Flowview folder protocol')
     return {key: manifest[key] for key in ('sessionId', 'connectionId')}
+
+
+def cancelled(folder, owner, request_id):
+    try:
+        value = read(folder, 'cancel.json')
+    except (OSError, ValueError):
+        return False
+    return (isinstance(value, dict) and value.get('requestId') == request_id and
+            all(value.get(key) == expected for key, expected in owner.items()))
+
+
+def active_request(folder, owner, request_id):
+    request = read(folder, 'request.json')
+    editor = read(folder, 'editor.json')
+    if (identity(folder) != owner or request.get('id') != request_id or not editor.get('connected') or
+            time.time() * 1000 - editor.get('at', 0) > 15000 or
+            any(request.get(k) != v or editor.get(k) != v for k, v in owner.items())):
+        raise ValueError('Request is no longer current or editor is disconnected. Reread the session.')
+    if cancelled(folder, owner, request_id):
+        raise ValueError('This turn was stopped in the editor. Do not send more changes or replies for it.')
+    return request
+
+
+def preflight(folder, monitor='unverified'):
+    """Report existing prerequisites. Do not install, run tools, or expand access."""
+    owner = identity(folder)
+    editor = read(folder, 'editor.json')
+    live = (editor.get('connected') and all(editor.get(k) == v for k, v in owner.items()) and
+            time.time() * 1000 - editor.get('at', 0) <= 15000)
+    checks = [
+        {'id': 'python', 'status': 'ready' if sys.version_info >= (3, 9) else 'missing',
+         'message': 'Python ' + '.'.join(map(str, sys.version_info[:3])) + ' is running; Python 3.9 or later is required.'},
+        {'id': 'node', 'status': 'ready' if shutil.which('node') else 'missing',
+         'message': 'Node is on PATH.' if shutil.which('node') else 'Open Claude Code with Node available before validating authored stories.'},
+        {'id': 'monitor', 'status': {'available': 'ready', 'unavailable': 'missing', 'unverified': 'unverified'}[monitor],
+         'message': 'Monitor availability is reported by the visible Claude session; this helper cannot inspect Claude tools.'},
+        {'id': 'editor', 'status': 'ready' if live else 'missing',
+         'message': 'Editor connection is live.' if live else 'Return to the workbench and reconnect this session.'},
+    ]
+    value = {**owner, 'at': int(time.time() * 1000), 'checks': checks,
+             'ready': all(check['status'] == 'ready' for check in checks)}
+    if identity(folder) != owner:
+        raise ValueError('Session ownership changed during preflight. Reconnect explicitly.')
+    write(folder, 'preflight.json', value,
+          guard=lambda: assert_owner(folder, owner))
+    return value
+
+
+def assert_owner(folder, owner):
+    if identity(folder) != owner:
+        raise ValueError('Session ownership changed. Reread the session.')
 
 
 def progress_history(folder, value):
@@ -60,8 +118,8 @@ def progress_history(folder, value):
     events = [event for event in events[-PROGRESS_LIMIT:] if isinstance(event, dict) and
               isinstance(event.get('id'), str) and isinstance(event.get('text'), str) and
               len(event['text']) <= 32000]
-    events = [{key: event.get(key) for key in ('id', 'at', 'text')} for event in events[-(PROGRESS_LIMIT-1):]] + [
-        {key: value[key] for key in ('id', 'at', 'text')}]
+    events = [{key: event.get(key) for key in ('id', 'at', 'text', 'phase')} for event in events[-(PROGRESS_LIMIT-1):]] + [
+        {key: value.get(key) for key in ('id', 'at', 'text', 'phase')}]
     sizes = [len(json.dumps(event, ensure_ascii=False).encode('utf-8')) for event in events]
     total = sum(sizes)
     while len(events) > 1 and total > 512 * 1024:
@@ -112,7 +170,8 @@ def watch(folder, interval=0.25, minutes=25):
                 break
             now = time.time()
             if now - last_heartbeat >= 1:
-                write(folder, 'listener.json', {**owner, 'at': int(now * 1000), 'listening': True})
+                write(folder, 'listener.json', {**owner, 'at': int(now * 1000), 'listening': True},
+                      guard=lambda: assert_owner(folder, owner))
                 last_heartbeat = now
             try:
                 editor = read(folder, 'editor.json')
@@ -122,13 +181,16 @@ def watch(folder, interval=0.25, minutes=25):
                     # Sleeping/hidden editor: keep the watcher alive, don't emit old work.
                     time.sleep(interval)
                     continue
-                for filename, kind in [('request.json', 'request'), ('result.json', 'result')]:
+                for filename, kind in [('cancel.json', 'cancel'), ('request.json', 'request'), ('result.json', 'result')]:
                     try:
                         value = read(folder, filename)
                         if any(value.get(k) != v for k, v in owner.items()):
                             continue
                         key = (kind, value.get('id'))
                         if not key[1] or key in seen:
+                            continue
+                        if kind in ('request', 'result') and cancelled(folder, owner, value.get('id') if kind == 'request' else value.get('requestId')):
+                            seen.add(key)
                             continue
                         if kind == 'request':
                             try:
@@ -141,7 +203,7 @@ def watch(folder, interval=0.25, minutes=25):
                                 pass
                         seen.add(key)
                         print(json.dumps({'event': 'flowview_' + kind, 'file': str(folder / filename),
-                                          'id': value['id'], **owner}), flush=True)
+                                          'id': value['id'], **({'requestId': value['requestId']} if kind == 'cancel' else {}), **owner}), flush=True)
                     except (OSError, ValueError):
                         pass  # A writer may not have finished publishing yet.
             except (OSError, ValueError):
@@ -163,6 +225,9 @@ def main():
     watching.add_argument('--interval', type=float, default=0.25)
     watching.add_argument('--minutes', type=float, default=25)
     commands.add_parser('prepare')
+    checking = commands.add_parser('preflight')
+    checking.add_argument('--monitor', choices=('available', 'unavailable', 'unverified'), default='unverified',
+                          help='Report Monitor availability after checking the visible Claude session; never inferred by this helper')
     for name in ('reply', 'progress', 'propose'):
         command = commands.add_parser(name)
         command.add_argument('--request', required=True)
@@ -170,7 +235,11 @@ def main():
         content.add_argument('--file', help='UTF-8 file inside the session folder')
         if name != 'propose':
             content.add_argument('--text', help='Short plain-text update; quote as a shell argument')
+        if name == 'progress':
+            command.add_argument('--phase', choices=('working', 'permission-needed'), default='working')
         if name == 'propose':
+            content.add_argument('--operations', help='Session JSON file: up to 100 stable-ID operations, or {operations: [...], dryRun: true}')
+            command.add_argument('--dry-run', action='store_true', help='Validate an operations transaction without applying it')
             command.add_argument('--revision', required=True, help='Revision read BEFORE planning the edit')
             command.add_argument('--summary', default='Updated the story.')
     args = parser.parse_args()
@@ -178,22 +247,21 @@ def main():
     if args.command == 'prepare':
         print(prepare(folder))
         return
+    if args.command == 'preflight':
+        print(json.dumps(preflight(folder, args.monitor)))
+        return
     if args.command == 'watch':
         if not 0.1 <= args.interval <= 5 or not 0 < args.minutes <= 30:
             parser.error('Interval must be 0.1–5 seconds; duration must be greater than 0 and at most 30 minutes.')
         watch(folder, args.interval, args.minutes)
         return
     owner = identity(folder)
-    request = read(folder, 'request.json')
-    editor = read(folder, 'editor.json')
-    if (request.get('id') != args.request or not editor.get('connected') or
-            time.time() * 1000 - editor.get('at', 0) > 15000 or
-            any(request.get(k) != v or editor.get(k) != v for k, v in owner.items())):
-        raise ValueError('Request is no longer current or editor is disconnected. Reread the session.')
-    if args.file:
-        if not re.fullmatch(r'[A-Za-z0-9_.-]+', args.file) or args.file in ('.', '..'):
+    active_request(folder, owner, args.request)
+    input_name = args.operations if args.command == 'propose' and args.operations else args.file
+    if input_name:
+        if not re.fullmatch(r'[A-Za-z0-9_.-]+', input_name) or input_name in ('.', '..'):
             raise ValueError('Use a plain filename inside the session folder')
-        target = folder / args.file
+        target = folder / input_name
         if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
             raise ValueError('Input must be a regular session file within the size limit')
         text = target.read_text(encoding='utf-8')
@@ -218,8 +286,25 @@ def main():
         state = read(folder, 'state.json')
         if state['revision'] != args.revision or any(state.get(k) != v for k, v in owner.items()):
             raise ValueError('Document changed: reread state.json and reconcile, not just the revision number.')
-        json.loads(text)
-        value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
+        parsed = json.loads(text)
+        value.update(baseRevision=args.revision, summary=args.summary[:1000])
+        if args.operations:
+            if isinstance(parsed, dict) and set(parsed) - {'operations', 'dryRun'}:
+                raise ValueError('Operation files accept only operations and dryRun keys')
+            operations = parsed.get('operations') if isinstance(parsed, dict) else parsed
+            dry_run = parsed.get('dryRun', False) if isinstance(parsed, dict) else False
+            if not isinstance(dry_run, bool):
+                raise ValueError('dryRun must be true or false')
+            if not isinstance(operations, list) or not 1 <= len(operations) <= 100:
+                raise ValueError('Supply between 1 and 100 semantic operations')
+            allowed = {'updateNode', 'insertStep', 'patchPanelState', 'addPath', 'replaceSection'}
+            if any(not isinstance(operation, dict) or operation.get('op') not in allowed for operation in operations):
+                raise ValueError('Unknown semantic operation; use updateNode, insertStep, patchPanelState, addPath, or replaceSection')
+            value.update(operations=operations, dryRun=args.dry_run or dry_run)
+        else:
+            if args.dry_run:
+                raise ValueError('--dry-run requires --operations')
+            value['source'] = text
         filename = 'proposal.json'
     else:
         if len(text) > 32000:
@@ -227,8 +312,9 @@ def main():
         value['text'] = text
         filename = args.command + '.json'
         if args.command == 'progress':
+            value['phase'] = args.phase
             value['events'] = progress_history(folder, value)
-    write(folder, filename, value)
+    write(folder, filename, value, guard=lambda: active_request(folder, owner, args.request))
     print(json.dumps({'written': filename, 'id': value['id']}))
 
 

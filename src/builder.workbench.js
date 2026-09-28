@@ -472,6 +472,7 @@ function initWorkbenchBuilder(opts){
       if(redoBtn)redoBtn.disabled=!redo;
     },
     afterHistory:function(message){
+      sourceOrigin=null;refreshProvenance();
       setSelected(null);clearMultiSelect();clearStepMarkers();inspectorMessage(message);
     },
     invalidateProject:retireProjectUI
@@ -590,8 +591,8 @@ function initWorkbenchBuilder(opts){
   /* Session owns history and persistence; controls retain DOM/focus policy. */
   var redoBtn = document.getElementById('redo-builder');
   function agentHistory(action){
-    var keepChat=opts.workspace && opts.workspace.tool()==='agent',result=action();
-    if(keepChat)opts.workspace.showTool('agent');return result;
+    var tool=opts.workspace && opts.workspace.tool(),result=action();
+    if(tool)opts.workspace.showTool(tool);return result;
   }
   function doUndo(){return agentHistory(function(){return session.undo();});}
   function doRedo(){return agentHistory(function(){return session.redo();});}
@@ -1050,7 +1051,7 @@ function initWorkbenchBuilder(opts){
     },
     afterSave:function(){if(stepList)stepList.sync();}
   };}
-  function replaceProject(text, baseline){return session.replaceProject(text,baseline,projectHooks());}
+  function replaceProject(text, baseline){var ok=session.replaceProject(text,baseline,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}
   function loadText(text){
     if(!life.alive())return false;
     var raw;
@@ -1063,6 +1064,7 @@ function initWorkbenchBuilder(opts){
   function restoreDraft(){
     var restored=session.restoreDraft(projectHooks());
     if(!restored)return false;
+    sourceOrigin=null;refreshProvenance();
     if(restored.missingBaseline)inspectorMessage('original baseline unavailable — diff starts from the recovered draft');
     return true;
   }
@@ -1078,6 +1080,29 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
+  var agentChanges=new Map(),sourceOrigin=null;
+  var changeDialog=document.createElement('dialog');changeDialog.className='workspace-change-dialog';
+  document.body.appendChild(changeDialog);life.own(function(){changeDialog.remove();});
+  function showAgentChanges(receipt){
+    changeDialog.replaceChildren();
+    var heading=document.createElement('h2');heading.textContent=receipt.summary || 'Agent change';changeDialog.appendChild(heading);
+    var entry=agentChanges.get(receipt.id),lines=entry?diffSpecTexts(entry.before,entry.after):null;
+    var messages=lines && !lines.error?lines.findings.map(function(f){return f.text;}):
+      [receipt.message || 'This receipt is from an earlier session. Exact before/after source is not retained in this browser.'];
+    if(receipt.description && receipt.description.changedSections)messages.push('Sections: '+receipt.description.changedSections.join(', '));
+    messages.slice(0,100).forEach(function(message){var p=document.createElement('p');p.textContent=message;changeDialog.appendChild(p);});
+    var close=document.createElement('button');close.type='button';close.className='bbtn';close.textContent='Close';close.onclick=function(){changeDialog.close();};changeDialog.appendChild(close);changeDialog.showModal();
+    return {ok:true};
+  }
+  function provenance(){
+    var snap=session.snapshot(),page=snap.raw && (snap.raw.page || snap.raw),canon=page && page.canon;
+    return {publication:'local-draft',title:sourceOrigin && sourceOrigin.title || canon && canon.id || null,
+      source:sourceOrigin,canon:canon || null,changes:agentChat && agentChat.recoveryInfo?agentChat.recoveryInfo().changes || []:[]};
+  }
+  function refreshProvenance(){
+    var value=provenance(),el=document.getElementById('workspace-provenance');
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Save downloads JSON; Prepare review packages a handoff. Neither publishes to your company.';}
+  }
   var agentOptions={document:document,
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
@@ -1111,7 +1136,7 @@ function initWorkbenchBuilder(opts){
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
-    apply:function(text,expected){
+    apply:function(text,expected,proposal){
       var snapshot=session.snapshot();
       if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
       var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
@@ -1124,12 +1149,57 @@ function initWorkbenchBuilder(opts){
         outcome=result;
         rehighlight();if(stepList)stepList.sync();
       }});
+      if(accepted && proposal && proposal.id){
+        agentChanges.set(proposal.id,{before:snapshot.text,after:text,project:snapshot.project,historyVersion:session.historyVersion()});
+        while(agentChanges.size>12)agentChanges.delete(agentChanges.keys().next().value);
+      }
+      if(accepted && storyBrief)storyBrief.refresh();refreshProvenance();
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
+    },
+    restoreSavedStory:function(source){session.preserveDraft();var result=agentOptions.apply(source,agentOptions.snapshot());if(result.ok){sourceOrigin=null;refreshProvenance();}return result;},
+    showChanges:showAgentChanges,
+    undoChange:function(receipt){
+      var change=agentChanges.get(receipt.id),snapshot=session.snapshot();
+      if(!change || change.project!==snapshot.project || change.after!==snapshot.text || change.historyVersion!==session.historyVersion() || !session.canUndo())return {ok:false,error:'Later edits or a reload prevent safe Undo of this receipt. Use history or compare the changes first.'};
+      var ok=agentHistory(function(){return session.undo();});if(ok)agentChanges.delete(receipt.id);return {ok:ok};
     }
   };
   var agentSession=typeof initWorkbenchAgentSession==='function'?initWorkbenchAgentSession(agentOptions):null;
   agentOptions.show=function(){if(opts.workspace)opts.workspace.showTool('agent');};
   var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
+  var handoffRequests=new Set();life.own(function(){handoffRequests.forEach(function(request){request.abort();});});
+  async function handoffHtml(source){
+    var findings=validate(normalize(JSON.parse(source)));if(findings.errors.length)throw Error('Repair the story before preparing a viewable handoff: '+findings.errors.join('\n'));
+    var request=new AbortController();handoffRequests.add(request);
+    try{
+      var paths=['../template/flowview.html','template/flowview.html','flowview.html'];
+      for(var i=0;i<paths.length;i++){
+        if(!life.alive())throw Error('Workbench closed.');
+        try{
+          var response=await fetch(paths[i],{cache:'no-store',signal:request.signal});if(!response.ok)continue;
+          var template=await response.text();if(exportTemplateOpeners(template)!==1)continue;
+          var built=buildExportHtml(template,source.replace(/</g,'\\u003c'));if(built.error)throw Error(built.error);return built.html;
+        }catch(error){if(request.signal.aborted)throw error;}
+      }
+      throw Error('The viewer template is unavailable. Open the hosted workbench, or serve it alongside template/flowview.html, then prepare review again.');
+    }finally{handoffRequests.delete(request);}
+  }
+  var storyBrief=typeof initWorkbenchStoryBrief==='function'?initWorkbenchStoryBrief({document:document,snapshot:agentOptions.snapshot,
+    readLedger:function(){return agentChat?agentChat.readLedger():null;},provenance:provenance,renderHtml:handoffHtml,
+    addEvidence:function(evidence,expected){
+      var snapshot=agentOptions.snapshot();if(snapshot.source!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'The story changed. Choose its current story moment again.'};
+      var raw;try{raw=JSON.parse(snapshot.source);}catch(error){return {ok:false,error:'Repair the JSON first.'};}
+      if(raw.storyBrief!=null && (!raw.storyBrief || typeof raw.storyBrief!=='object' || Array.isArray(raw.storyBrief)))return {ok:false,error:'Repair storyBrief in JSON first.'};
+      var brief=raw.storyBrief || {},entries=brief.evidence || [];
+      if(!Array.isArray(entries) || entries.length>=500)return {ok:false,error:'Evidence must be a list of fewer than 500 references.'};
+      if(!evidence || typeof evidence.reference!=='string' || evidence.reference.length>4000 || typeof evidence.note!=='string' || evidence.note.length>8000 || !['supports','conflicts','unverified'].includes(evidence.relationship))return {ok:false,error:'Enter a bounded reference, note, and relationship.'};
+      if(!evidence.reference.trim() || !evidence.note.trim() || !storyBriefTargets(raw).some(function(target){return JSON.stringify(target.value)===JSON.stringify(evidence.storyTarget);}))return {ok:false,error:'Choose a current story moment and enter a reference and note.'};
+      entries.push(JSON.parse(JSON.stringify(evidence)));brief.evidence=entries;raw.storyBrief=brief;
+      return agentOptions.apply(JSON.stringify(raw,null,2),snapshot);
+    }}):null;
+  if(storyBrief){life.own(storyBrief.destroy);life.listen(document,'workbench-tool-visibility',function(event){if(event.detail.name==='brief' && event.detail.open)storyBrief.refresh();});}
+  life.listen(document.getElementById('workspace-prepare-review'),'click',function(){if(opts.workspace)opts.workspace.showTool('brief');if(storyBrief)storyBrief.refresh();});
+  refreshProvenance();
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});
   function navigateWorkspace(target){
@@ -1142,11 +1212,11 @@ function initWorkbenchBuilder(opts){
   life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
   function destroy(){life.destroy();}
   return {
-    loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
+    loadSpec:function(raw,origin){var ok=life.alive() && loadText(JSON.stringify(raw,null,2));if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
     startAgent:function(){if(agentChat)agentChat.openSetup();},
     preserveDraft:life.guard(session.preserveDraft),
     earlierDrafts:session.earlierDrafts,
-    restoreEarlierDraft:life.guard(function(entry){return session.restoreEarlierDraft(entry,projectHooks());}),
+    restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),
     navigate:navigateWorkspace,
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},

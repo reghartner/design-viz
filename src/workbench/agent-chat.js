@@ -17,6 +17,13 @@ function folderAgentContextLines(context){
   if(context.technicalLevel)lines.push('Detail: '+context.technicalLevel);
   return lines;
 }
+function folderAgentContextHeadline(context){
+  var selection=context && Array.isArray(context.selection)?context.selection:[];
+  if(!selection.length)return 'Whole story';
+  if(selection.length>1)return selection.length+' items selected';
+  var item=selection[0] || {},label=String(item.label || item.id || item.kind || 'Selected item');
+  return label.length>56?label.slice(0,53)+'…':label;
+}
 function folderAgentInstructions(folderName,level,resume,identity){
   var relative=JSON.stringify('./'+folderName);
   var location=resume
@@ -60,13 +67,18 @@ function initWorkbenchAgentChat(opts){
   // Keep the public IDs and native controls; only their layout changes.
   var shell=root.querySelector('.folder-agent-shell'),header=element('div','folder-agent-header'),history=element('div','folder-agent-history'),composer=element('div','folder-agent-composer');
   history.id='folder-agent-history';history.tabIndex=0;history.setAttribute('aria-label','Conversation history');
-  var actions=root.querySelector('.folder-agent-actions');actions.appendChild(get('pairing'));header.append(actions,get('panel-status'));
+  var actions=root.querySelector('.folder-agent-actions');actions.appendChild(get('pairing'));
+  var stageStatus=element('div','folder-agent-stage'),stageIcon=doc.createElementNS('http://www.w3.org/2000/svg','svg'),stagePath=doc.createElementNS('http://www.w3.org/2000/svg','path'),stageText=element('b');
+  stageStatus.id='folder-agent-stage';stageStatus.setAttribute('role','status');stageStatus.setAttribute('aria-live','polite');stageStatus.setAttribute('aria-atomic','true');
+  stageIcon.setAttribute('viewBox','0 0 24 24');stageIcon.setAttribute('aria-hidden','true');stageIcon.appendChild(stagePath);stageStatus.append(stageIcon,stageText);
+  var headerControls=element('div','folder-agent-header-controls');headerControls.append(actions,get('panel-status'));header.append(stageStatus,headerControls);
   var recoveryCard=element('section','folder-agent-recovery'),recoveryTitle=element('b'),recoveryText=element('p'),continueButton=button('continue','Continue this conversation');
   recoveryCard.id='folder-agent-recovery';recoveryCard.hidden=true;recoveryCard.append(recoveryTitle,recoveryText,continueButton);
   var activity=get('activity'),activityDetails=element('details'),activitySummary=element('summary','', 'Activity from the latest turn');
   activityDetails.append(activitySummary,get('activity-title'),get('progress'),get('activity-log'));activity.replaceChildren(activityDetails);
-  var latest=button('latest','Jump to latest');latest.classList.add('folder-agent-latest');latest.hidden=true;
-  history.append(recoveryCard,get('messages'),activity,latest);
+  var latest=button('latest','New output · Jump to latest');latest.classList.add('folder-agent-latest');latest.hidden=true;
+  var historyFrame=element('div','folder-agent-history-frame');historyFrame.append(history,latest);
+  history.append(recoveryCard,get('messages'),activity);
   var previousContext=root.querySelector('.folder-agent-context-card'),contextDetails=element('details','folder-agent-context-card'),contextSummary=element('summary'),contextBody=element('div');
   contextSummary.id='folder-agent-focus-summary';contextBody.append(get('context-heading'),get('context'),previousContext.querySelector('.folder-agent-hint'));contextDetails.append(contextSummary,contextBody);
   var reviewLabel=element('label','folder-agent-review-toggle'),reviewMode=doc.createElement('input');reviewMode.type='checkbox';reviewMode.id='folder-agent-review-mode';
@@ -77,11 +89,19 @@ function initWorkbenchAgentChat(opts){
   reviewSource.id='folder-agent-review-source';reviewSource.readOnly=true;reviewSource.setAttribute('aria-label','Proposed change content');reviewSource.rows=8;reviewDetails.append(reviewDetailsSummary,reviewSource);
   var reviewAccept=button('review-accept','Accept change'),reviewReject=button('review-reject','Reject change');reviewCard.append(reviewTitle,reviewSummary,reviewNote,reviewDetails,reviewAccept,reviewReject);
   history.insertBefore(reviewCard,activity);
-  var levelLabel=root.querySelector('label[for="folder-agent-level"]');levelLabel.textContent='Next request detail';
+  var levelControl=get('level'),levelLabel=root.querySelector('label[for="folder-agent-level"]');levelLabel.textContent='Story detail for your next message';
+  var detailSettings=element('details','folder-agent-detail-settings'),detailSummary=element('summary'),detailBody=element('div');
+  detailSettings.id='folder-agent-detail-settings';detailSummary.id='folder-agent-detail-summary';
+  detailBody.append(levelLabel,levelControl,element('p','folder-agent-hint','Applies to your next message. A message already sent keeps its original detail.'));
+  detailSettings.append(detailSummary,detailBody);
+  var setupDetail=element('div','folder-agent-setup-detail'),setupLabel=element('label','','How much detail should Claude include?'),setupLevel=levelControl.cloneNode(true);
+  setupLevel.id='folder-agent-setup-level';setupLabel.htmlFor=setupLevel.id;
+  setupDetail.append(setupLabel,setupLevel,element('p','folder-agent-hint','Start with the story. You can add engineering detail later.'));get('guide-folder').prepend(setupDetail);
   var form=get('form'),composeActions=element('div','folder-agent-compose-actions'),cancelButton=button('cancel','Stop accepting this turn');cancelButton.hidden=true;
   cancelButton.title='Stops accepting this turn’s changes and reply. To stop Claude computing, interrupt it in its session.';
   composeActions.append(get('send'),cancelButton,form.querySelector('.folder-agent-hint'));form.appendChild(composeActions);
-  composer.append(contextDetails,levelLabel,get('level'),form);shell.replaceChildren(header,history,composer);
+  var composeSettings=element('div','folder-agent-compose-settings');composeSettings.append(contextDetails,detailSettings);
+  composer.append(composeSettings,form);shell.replaceChildren(header,historyFrame,composer);
   var prerequisites=element('details','folder-agent-prerequisites'),prerequisiteSummary=element('summary','','Is this machine ready?'),prerequisiteBody=element('div');
   prerequisiteBody.textContent='This local pilot needs desktop Chrome or Edge over HTTPS, Claude Code running in a known working folder, Python 3, and Claude’s Monitor tool. A Claude web chat alone cannot watch these files. Ask your facilitator to check those prerequisites before pairing. The helper reports runtime readiness; it does not install tools or change permissions.';
   prerequisites.append(prerequisiteSummary,prerequisiteBody);get('guide-folder').prepend(prerequisites);
@@ -91,9 +111,12 @@ function initWorkbenchAgentChat(opts){
   var conflictTitle=element('b','','Which story should continue?'),conflictText=element('p'),conflictActions=element('div','folder-agent-recovery-options');
   conflictActions.append(button('resume-saved','Open saved story'),button('resume-current','Keep my current draft'),button('resume-cancel','Cancel'));
   conflict.append(conflictTitle,conflictText,conflictActions);get('guide-folder').appendChild(conflict);
-  function scrollLatest(){history.scrollTop=history.scrollHeight;latest.hidden=true;}
+  var following=true;
+  function scrollLatest(){following=true;latest.hidden=true;history.scrollTop=history.scrollHeight;}
   function isAtLatest(){return history.scrollHeight-history.scrollTop-history.clientHeight<48;}
-  life.listen(latest,'click',scrollLatest);life.listen(history,'scroll',function(){if(isAtLatest())latest.hidden=true;});
+  life.listen(latest,'click',scrollLatest);life.listen(history,'scroll',function(){following=isAtLatest();if(following)latest.hidden=true;});
+  var historySize=new ResizeObserver(function(){if(following && life.alive())scrollLatest();});historySize.observe(history);
+  life.own(function(){historySize.disconnect();});
   function sourceTitle(source){try{var parsed=JSON.parse(source);return String((parsed.page || parsed).title || 'Untitled story').slice(0,240);}catch(ex){return 'Current draft';}}
   function saveRecovery(){
     if(!life.alive() || !cacheReady)return;
@@ -144,13 +167,14 @@ function initWorkbenchAgentChat(opts){
   }
   function renderConversation(){
     var log=get('messages'),serialized=JSON.stringify([state.transcript,state.changes]);
-    if(log.dataset.transcript===serialized)return;
-    var atLatest=isAtLatest(),previous=history.scrollTop,receipted=new Set();log.replaceChildren();
+    if(log.dataset.transcript===serialized)return false;
+    var expanded=Array.from(log.querySelectorAll('.folder-agent-sent-context')).map(function(item){return item.open;}),receipted=new Set(),contextIndex=0;log.replaceChildren();
     state.transcript.forEach(function(item){
       var message=element('article','folder-agent-message'),label=element('b','',item.role==='user'?'You':'Claude'),body=element('div','',item.text);
       message.append(label,body);
       if(item.role==='user' && item.context){
         var details=element('details','folder-agent-sent-context'),summary=element('summary','','Sent with '+((item.context.selection || []).length?'focused selection':'the whole story')),context=element('div','',folderAgentContextLines(item.context).join('\n'));
+        details.open=!!expanded[contextIndex++];
         details.append(summary,context);message.appendChild(details);
       }
       if(item.role==='user')(state.changes || []).filter(function(receipt){return receipt.requestId===item.requestId;}).forEach(function(receipt){renderReceipt(receipt,message);receipted.add(receipt.id);});
@@ -158,7 +182,22 @@ function initWorkbenchAgentChat(opts){
     });
     (state.changes || []).filter(function(receipt){return !receipted.has(receipt.id);}).forEach(function(receipt){renderReceipt(receipt,log);});
     log.dataset.transcript=serialized;
-    if(atLatest)scrollLatest();else{history.scrollTop=previous;latest.hidden=false;}
+    return true;
+  }
+  function paintDetail(){
+    var level=get('level').value;
+    detailSummary.textContent='Detail: '+({story:'Story',mixed:'Mixed',engineering:'Engineering'}[level] || 'Story');
+    setupLevel.value=level;
+    setText('context',folderAgentContextLines(Object.assign({},opts.snapshot(),{technicalLevel:level})).join('\n'));
+  }
+  function paintStage(phase){
+    var lastMessage=state.transcript[state.transcript.length-1],finished=lastMessage && lastMessage.role==='assistant';
+    var key=accessLost?'access':state.cancelling?'stopping':state.review?'review':!state.connected?'disconnected':!state.listening?'connecting':state.pending?(phase==='idle'?'waiting':phase):lastMessage && lastMessage.cancelled?'cancelled':finished?'complete':'ready';
+    var stages={disconnected:['Connect Claude','M9 3v4m6-4v4M7 7h10v3a5 5 0 0 1-10 0V7m5 8v6'],connecting:['Waiting for connection','M12 3a9 9 0 1 0 9 9M12 7v5l3 2'],waiting:['Waiting for Claude','M12 3a9 9 0 1 0 9 9M12 7v5l3 2'],responding:['Claude is working','M5 5h14v11H9l-4 4V5m4 4h6m-6 3h4'],quiet:['No recent update','M9 5v14m6-14v14'],'permission-needed':['Permission needed in Claude','M12 3 2 21h20L12 3m0 6v5m0 3v1'],review:['Ready for your review','M5 3h14v18H5V3m3 9 3 3 5-6'],complete:['Reply received','M4 12l5 5L20 6'],ready:['Ready for your message','M4 12l5 5L20 6'],access:['Folder access needs attention','M12 3 2 21h20L12 3m0 6v5m0 3v1'],stopping:['Stopping this turn','M6 6h12v12H6z']};
+    stages.cancelled=['Stopped accepting this turn','M6 6h12v12H6z'];
+    var current=stages[key] || stages.waiting;
+    stageStatus.dataset.stage=key;stagePath.setAttribute('d',current[1]);
+    if(stageText.textContent!==current[0])stageText.textContent=current[0];
   }
   function status(text){setText('status',text);setText('panel-status',text);}
   function stage(name){
@@ -179,7 +218,7 @@ function initWorkbenchAgentChat(opts){
   function closeGuide(){if(guide.open)guide.close();}
   function paint(update){
     if(!life.alive())return;
-    var previousPending=state.pending,previousReview=reviewCard.dataset.proposal,previousActivity=get('activity-log').children.length,wasAtLatest=isAtLatest(),justListening=update.listening && !state.listening;
+    var previousPending=state.pending,previousReview=reviewCard.dataset.proposal,wasAtLatest=following,previousScroll=history.scrollTop,justListening=update.listening && !state.listening;
     Object.assign(state,update);
     if(justListening){
       get('pairing').open=false;
@@ -196,6 +235,7 @@ function initWorkbenchAgentChat(opts){
     guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){button.disabled=connecting;});
     setText('open-setup',state.listening?'Connection settings':state.connected?'Finish connecting Claude':'Connect Claude');
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
+    paintStage(phase);paintDetail();
     root.dataset.connected=String(state.connected);
     get('indicator').dataset.phase=state.pending?phase:state.listening?'ready':'idle';
     setText('indicator-text',state.pending?(phase==='responding'?'Claude working':phase==='permission-needed'?'Claude · needs permission':phase==='quiet'?'Claude · no recent update':'Claude · waiting'):state.listening?'Claude ready':state.connected?'Claude · connecting':'Connect Claude');
@@ -209,16 +249,15 @@ function initWorkbenchAgentChat(opts){
       :phase==='quiet'?'No new update for '+seconds+'s. Claude may still be working or waiting for permission in its terminal.'
       :state.agentResponded?'Last update '+seconds+'s ago.'
       :'Message sent '+seconds+'s ago. The watcher is connected; Claude has not acknowledged it yet.');
-    var activityLog=get('activity-log'),ids=activity.map(function(item){return item.id;});
+    var activityLog=get('activity-log'),ids=activity.map(function(item){return item.id;}),activitySignature=JSON.stringify(activity),activityChanged=activityLog.dataset.activity!==activitySignature;
     if(activityLog.firstChild && (!activity.length || activityLog.firstChild.dataset.id!==ids[0]))activityLog.replaceChildren();
-    var atBottom=activityLog.scrollHeight-activityLog.scrollTop-activityLog.clientHeight<32;
     activity.slice(activityLog.children.length).forEach(function(item){
       var entry=doc.createElement('li'),time=doc.createElement('time'),body=doc.createElement('div'),date=new Date(item.at);
       entry.dataset.id=item.id;
       if(!isNaN(date.getTime())){time.dateTime=date.toISOString();time.textContent=date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
       body.textContent=item.text;entry.append(time,body);activityLog.appendChild(entry);
     });
-    if(atBottom)activityLog.scrollTop=activityLog.scrollHeight;
+    activityLog.dataset.activity=activitySignature;
     cancelButton.hidden=!state.pending;
     cancelButton.disabled=!!state.cancelling;
     if(previousPending!==state.pending)activityDetails.open=!!state.pending;
@@ -233,8 +272,10 @@ function initWorkbenchAgentChat(opts){
       var reviewKey=state.review.id+':'+(state.review.version || 0);
       if(reviewCard.dataset.proposal!==reviewKey){reviewCard.dataset.proposal=reviewKey;reviewSource.value='Open the proposed content to inspect it.';reviewDetails.open=false;}
     }else{reviewCard.dataset.proposal='';reviewSource.value='';}
-    renderConversation();
-    if(previousPending!==state.pending || previousReview!==reviewCard.dataset.proposal || previousActivity!==activity.length){if(wasAtLatest)scrollLatest();else latest.hidden=false;}
+    var conversationChanged=renderConversation();
+    if(conversationChanged || previousPending!==state.pending || previousReview!==reviewCard.dataset.proposal || activityChanged){
+      if(wasAtLatest)scrollLatest();else{history.scrollTop=previousScroll;latest.hidden=false;}
+    }
     paintRecovery();saveRecovery();
 
   }
@@ -415,11 +456,12 @@ function initWorkbenchAgentChat(opts){
     if(event)event.preventDefault();
     if(!client || !state.connected || state.pending)return;
     var value=get('input').value;
-    try{await client.send(value);if(get('input').value===value)get('input').value='';saveRecovery();}
+    try{await client.send(value);if(get('input').value===value)get('input').value='';scrollLatest();detailSettings.open=false;saveRecovery();}
     catch(ex){status(ex.message);}
   }
   life.listen(get('input'),'input',saveRecovery);
-  life.listen(get('level'),'change',saveRecovery);
+  life.listen(get('level'),'change',function(){paintDetail();saveRecovery();});
+  life.listen(setupLevel,'change',function(){get('level').value=setupLevel.value;paintDetail();saveRecovery();});
   life.listen(get('form'),'submit',send);
   life.listen(get('input'),'keydown',function(event){if(event.key==='Enter' && (event.metaKey || event.ctrlKey))send(event);});
   life.listen(window,'pagehide',function(){saveRecovery();disconnect();});
@@ -428,8 +470,7 @@ function initWorkbenchAgentChat(opts){
   function contextTick(){
     contextTimer=null;if(!life.alive())return;
     var current=opts.snapshot();restoreRecoveryForProject(current);
-    setText('context',folderAgentContextLines(Object.assign({},current,{technicalLevel:get('level').value})).join('\n'));
-    var focus=current.selection || [];setText('focus-summary',focus.length?focus.length+' selected · '+focus.slice(0,2).map(function(item){return item.label || item.id || item.kind;}).join(', ')+(focus.length>2?' +'+(focus.length-2):''):'Whole story · no focused selection');
+    setText('focus-summary','Focus: '+folderAgentContextHeadline(current));paintDetail();
     setText('context-heading',state.pending?'Selection for your next message':'Your next message includes');
     var selected=current.selection || [];
     setText('selection',selected.length?selected.length+' selected · '+selected.slice(0,2).map(function(item){return item.label || item.id || item.kind;}).join(', ')+(selected.length>2?' +'+(selected.length-2):'')+' · Ask Claude':'Select on the canvas to focus your message');

@@ -57,21 +57,28 @@ Claude stops the connection. Normal permission prompts are handled in Claude.
 
 ## Communicate
 
-Agent is a floating window over the diagram canvas. Inspect the named selection
-and current view/path/step before sending; expand **Sent with…** beside a sent
+Agent is a floating window over the diagram canvas. **Focus** summarizes the
+selection in one line; expand it to inspect every selected item and the current
+view/path/step before sending. Expand **Sent with…** beside a sent
 message to see its frozen receipt. The complete story is shared with Claude,
 with the selection identifying the focus. Selection changes cannot silently
 retarget an already sent request. The toolbar keeps Claude's activity state
 visible while the Agent window is closed.
 
 Send one message at a time from the editor. Each request includes the authored
-selection, current path/view/step, and the chosen Story detail level. Change that
-level to Engineering when enriching the same story. Selection or detail changes after Send do not change
+selection, current path/view/step, and the chosen Story detail level. Choose detail
+during connection setup; afterward, open the compact **Detail: Story** control
+to change it, for example to Engineering when enriching the same story.
+Selection or detail changes after Send do not change
 that request. The editor shows a timestamped **Claude activity** feed while a
 request is pending and keeps it visible with the final answer. It distinguishes
 waiting for Claude's first acknowledgment from receiving an update. After 30
 seconds without an update, it says so; a watcher heartbeat alone never claims
 the model is working. If the watcher stops, the editor reports that separately.
+The status icon and label distinguish waiting, working, permission needed,
+review-ready and finished states. Incoming output follows automatically while
+you are at the latest update. Scroll up to read without being pulled back; use
+**New output · Jump to latest** to resume following the conversation.
 
 Claude must immediately acknowledge each request with `progress`, then report
 each meaningful phase (reading, planning, editing, validating), errors, and any

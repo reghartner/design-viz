@@ -311,7 +311,15 @@ function createFolderAgentClient(opts){
       publish({status:'Paste the connection instructions into Claude.',listening:false});
       return manifest;
     });},
-    send:function(text){return serial(async function(){
+    send:function(text){
+      // Capture the user's focus at Send, before queued polling or disk I/O.
+      var captured;
+      try{
+        var focus=opts.snapshot();
+        captured=JSON.parse(JSON.stringify({source:focus.source,project:focus.project,selection:focus.selection,
+          views:focus.views,previewCurrent:focus.previewCurrent,technicalLevel:opts.level?opts.level():'story'}));
+      }catch(ex){return Promise.reject(ex);}
+      return serial(async function(){
       if(!connected || disposed)throw Error('Connect a folder first.');
       if(pending)throw Error('Wait for Claude’s reply before sending another message.');
       text=String(text).trim();if(!text || text.length>16000)throw Error('Enter a message of at most 16000 characters.');
@@ -320,8 +328,12 @@ function createFolderAgentClient(opts){
       try{
         var sent=await snapshot(token);if(!sent || !alive(token))throw Error('Project changed. Reconnect before sending.');
         if(turn!==turnEpoch)throw Error('Turn stopped before the message was sent.');
+        var current=opts.snapshot();
+        if(sent.snapshot.project!==captured.project || sent.snapshot.source!==captured.source ||
+          !current.open || current.project!==captured.project || current.source!==captured.source)
+          throw Error('The story changed while saving your message. Check the selection and send it again.');
         var request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
-          selection:sent.snapshot.selection,views:sent.snapshot.views,previewCurrent:sent.snapshot.previewCurrent,project:sent.snapshot.project,technicalLevel:opts.level?opts.level():'story'});
+          selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel});
         await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:'Message saved — waiting for Claude.',progress:''});

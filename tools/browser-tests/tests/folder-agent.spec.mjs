@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {readFile,writeFile,mkdir,mkdtemp,rm,stat} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,mkdtemp,rm,stat,rename} from 'node:fs/promises';
 import {execFileSync,spawn} from 'node:child_process';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
@@ -12,13 +12,19 @@ const origin='https://flowview-folder.test';
 // validation, rendering, history and conversation are real. It is not evidence
 // that a human granted native browser permission or that Claude's Monitor ran.
 async function setup(page){
-  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite;const requests=[],errors=[];
+  const folder=await mkdtemp(path.join(tmpdir(),'flowview-browser-folder-'));let sessionFolder,failWrite,writeId=0;const requests=[],errors=[];
   await writeFile(path.join(folder,'README.md'),'Existing agent project notes.');
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
     const target=path.resolve(folder,'.'+name);if(!target.startsWith(folder+path.sep)&&target!==folder)throw Error('Outside test folder');
     if(operation==='mkdir'){await mkdir(target,{recursive:true});sessionFolder=target;return;}
-    if(operation==='write'){if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}await writeFile(target,value);return;}
+    if(operation==='write'){
+      if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}
+      // createWritable buffers writes until close; readers see a complete file.
+      const pending=path.join(path.dirname(target),'.browser-write-'+(++writeId));
+      try{await writeFile(pending,value,{flag:'wx'});await rename(pending,target);}finally{await rm(pending,{force:true});}
+      return;
+    }
     if(operation==='read'){try{return await readFile(target,'utf8');}catch(e){if(e.code==='ENOENT')return null;throw e;}}
     if(operation==='exists'){try{await stat(target);return true;}catch{return false;}}
   });

@@ -55,7 +55,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
   const beforePanSource=await page.locator('#src').inputValue();
   const beforePan=(await raw(page)).page.sections[0].diagram.layouts[1].exploreLayout.camera;
-  const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && !hit.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step]'))return {x,y};}throw Error('No empty graph area');});
+  const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && hit.matches('.explore-board,.boardcanvas,svg,.dv-board-grid'))return {x,y};}throw Error('No empty graph area');});
   await page.mouse.move(b.x,b.y);await page.mouse.down();await expect(section(page).locator('.section-viewport')).toHaveClass(/viewport-gesturing/);await page.mouse.move(b.x+80,b.y+70,{steps:5});await page.mouse.up();
   const saved=await page.locator('#src').inputValue(),defaults=(await raw(page)).page.sections[0].diagram.layouts[1].exploreLayout;
   expect(defaults.camera.zoom).toBeGreaterThan(0);expect(defaults.camera.x).toBeLessThan(beforePan.x-.02);
@@ -106,9 +106,9 @@ for(const mode of ['default','switched','expanded','fullscreen','arranged','sele
   const originalBoard=await board.elementHandle();
   const position=()=>board.evaluate(el=>{const r=el.querySelector('svg').getBoundingClientRect();return {x:el.scrollLeft,y:el.scrollTop,svgX:r.x,svgY:r.y,width:r.width,height:r.height};});
   for(let i=0;i<3;i++){
-    const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && !hit.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step]'))return {x,y};}throw Error('No empty graph area');});
+    const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && hit.matches('.explore-board,.boardcanvas,svg,.dv-board-grid'))return {x,y};}throw Error('No empty graph area');});
     const before=await position(),source=await page.locator('#src').inputValue();
-    await page.mouse.move(b.x,b.y);await page.mouse.down();await page.mouse.move(b.x+45,b.y+45,{steps:6});
+    await page.mouse.move(b.x,b.y);await page.mouse.down();await expect(section(page).locator('.section-viewport')).toHaveClass(/viewport-gesturing/);await page.mouse.move(b.x+45,b.y+45,{steps:6});
     const held=await position();expect(held.x).toBeCloseTo(before.x-45,0);expect(held.y).toBeCloseTo(before.y-45,0);
     await page.waitForTimeout(150);expect(await position()).toEqual(held);
     if(mode==='other-pointer'){

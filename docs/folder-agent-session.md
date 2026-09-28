@@ -42,7 +42,8 @@ Claude stops the connection. Normal permission prompts are handled in Claude.
 ## Communicate
 
 Send one message at a time from the editor. Each request includes the authored
-selection and current path/view/step. Selection changes after Send do not change
+selection, current path/view/step, and the chosen Story detail level. Change that
+level to Engineering when enriching the same story. Selection or detail changes after Send do not change
 that request. Claude explicitly writes progress, questions and final replies
 through the helper; its ordinary terminal text is not mirrored automatically.
 

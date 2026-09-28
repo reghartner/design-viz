@@ -111,10 +111,14 @@ for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
 resizable, hideable panels at its edges, and pins step controls. The setting
 belongs to the named view across every host profile. It does not duplicate
-story state. In Arrange section, **Presentation** selects Standard/Explore and
-the workbench keeps Explore visible while editing. Panel and step-control moves
-and resizes, canvas pans and zoom changes save to `layouts[].exploreLayout` as
-one Undo action per gesture. Windows use viewport fractions; `camera` uses
+story state. On the main editor canvas, **Presentation** beside the view buttons
+selects Standard/Explore, and **Make default** chooses which view opens in the
+built HTML. **View options** renames or duplicates the current view. These are
+saved authoring settings; the editor itself remains a diagram canvas. Page preview
+also retains the controls under Arrange section. In an Explore view, panel and
+step-control moves and resizes save to `layouts[].exploreLayout` from either
+editor surface, with one Undo action per gesture. Use Page preview to author
+the opening camera through canvas pans and zoom changes. Windows use viewport fractions; `camera` uses
 `zoom` plus center `x`/`y` as fractions of the SVG viewBox. Duplicate view keeps
 these defaults. Reader overrides and temporary Hide panels remain session-only.
 See `docs/section-layouts.md` for the contract and an example.

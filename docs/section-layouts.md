@@ -5,13 +5,27 @@ authored tile arrangement; **Explore** gives the graph a full-height workspace
 with independent floating panels and pinned step controls. Omitted settings use
 Standard, so existing diagrams keep their presentation.
 
-Open the workbench and select **Responsive**, **Backstage**, or **Confluence**
-above the preview. Host previews use adjustable content widths (1080 and 760
+In the workbench's **Diagram canvas**, select a section and a view using the
+buttons above the graph. **Presentation** chooses Standard or Explore for
+that view; **Make default** saves which view opens on a fresh page. The saved
+choice reads **Default view**. Selecting a different view to inspect it does not
+change the saved default or write JSON. Expand **View options**, enter a **View
+name**, and choose **Rename view** (or press Enter) to save it; **Duplicate view**
+creates a separate copy. These controls let you keep a curated Standard view
+and an Explore view of the same story side by side.
+
+The editor stays a full canvas while you work. To inspect the saved reader
+presentation or arrange its tiles, choose **Canvas appearance → Page preview**.
+Page preview keeps the existing **Arrange section** controls, including view
+presentation, name, duplication and default selection.
+
+For a host preview, select **Responsive**, **Backstage**, or **Confluence** in
+**Canvas appearance**. Host previews use adjustable content widths (1080 and 760
 pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-In a section, choose **Arrange section**. Each panel, the data-flow diagram, and any detached step controls
+In Page preview, choose **Arrange section**. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a twelve-column grid. Overlapping tiles move down to remain visible. Click
 **Done arranging** to see the reader view. Diagram nodes and Home elements
@@ -68,10 +82,13 @@ Saved named views appear as the complete set of view buttons. All views reuse
 the live widgets and preserve the selected alternate, step and playback state
 when included in the destination view. Legacy single arrangements still have
 an automatic **Data flow** choice; sections without saved arrangements retain
-Home / Data flow until Arrange section converts them into named views.
+Home / Data flow until you create named views.
 
-Choose **Rename view** beside **Arrange section** to name the selected view, for example
-**Front door** or **Home**. Names are up to 40 characters and apply across that layout's host profiles. A legacy single view
+On the canvas, use **View options → View name**, then **Rename view** or Enter
+to name the selected view, for example **Front door** or **Home**. In Page
+preview, **Rename view** beside **Arrange section** opens the naming control.
+Names are up to 40 characters
+and apply across that layout's host profiles. A legacy single view
 stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
 views store it in `layouts[].name` and require a nonempty name. Renaming is one undoable edit and survives JSON/HTML export.
 
@@ -96,23 +113,27 @@ in view. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
-1. Choose **Arrange section**, then **Duplicate view**. The copy becomes the
-   active view. Give it a **View name**, such as **Service flow**. The name
-   field is first in the controls; **Rename view** also opens and focuses it.
-2. Select **Data flow** in **Layout element**, choose your Home panel in
+1. On the Diagram canvas, select the existing view and choose **View options →
+   Duplicate view**. The copy becomes active. Open **View options** again and
+   give it a **View name**, such as **Service flow**, then choose **Rename view**.
+2. Choose **Presentation → Explore** for the engineering copy, leaving
+   the original in **Standard**. Each view keeps its own presentation across
+   every host profile; changing it is one Undo/Redo operation.
+3. Select whichever view should open for readers and choose **Make default**.
+   Switching views afterward does not change this saved opening choice.
+4. To customize the curated arrangement, choose **Canvas appearance → Page
+   preview**, select its view, and choose **Arrange section**. Select **Data
+   flow** in **Layout element**, choose your Home panel in
    **Swap places with**, then click **Swap places**. Position, size and visibility
    exchange; other elements keep their places unless a collision needs packing.
-3. In **Visible elements**, uncheck **Home** (or its authored title) to hide the
+5. In **Visible elements**, uncheck **Home** (or its authored title) to hide the
    Home panel in this view. Every panel and **Data flow** has its own checkbox;
    the checklist names the selected layout. These checkboxes are independent of
    the **Layout element** dropdown, which selects what to move, size or swap.
    To replace a visible Home with a hidden diagram directly, hide the diagram
    in the original layout before duplicating and swapping.
-4. Choose **Presentation → Explore** for the engineering view, or keep
-   **Standard** for the authored arrangement. Presentation applies to this view
-   across every host profile; changing it is one Undo/Redo operation.
-5. Choose **Make default** for the view that should open on a fresh page, then
-   **Done arranging**. Readers switch using the named buttons above the section.
+   Choose **Done arranging** when finished. Readers switch using the named
+   buttons above the section.
 
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
 copies its Presentation setting, step selection and all profiles independently;
@@ -128,8 +149,11 @@ layout; deleting the last named layout restores the automatic presentation.
 left receives an automatic Responsive arrangement. **Optimize layout** preserves
 visibility and rearranges only visible elements in that profile.
 
-Arrange section, Optimize, or the first duplication converts an older
-`sectionLayout` / `layoutName` pair into named views as one undoable edit. Existing specs keep working unchanged.
+Arrange section, Optimize, the first duplication, or selecting **Explore** on
+the canvas converts an older `sectionLayout` / `layoutName` pair into named
+views as one undoable edit. A diagram without a saved arrangement can also
+become an Explore view directly; there is no separate setup step. Existing
+specs keep working unchanged until edited.
 Reader view switches do not write JSON or create undo entries. The workbench
 retains the active named view or Home / Data flow choice across property edits,
 Undo/Redo, and skin/host preview changes. Renaming nodes, sections, the page, or
@@ -138,8 +162,12 @@ authored default; deleting the selected view falls back to the remaining default
 
 ## Explore presentation
 
-Choose **Arrange section → Presentation → Explore**. The workbench previews
-the actual Explore workspace, including while arranging.
+On the Diagram canvas, select the view and choose **Presentation → Explore**.
+Move and resize its panels there to save their floating defaults.
+To inspect the saved reader presentation, use
+**Canvas appearance → Page preview**. **Arrange section → Presentation → Explore**
+remains available there, and Page preview shows the actual Explore workspace,
+including while arranging.
 The data-flow graph becomes the full-height workspace. Each supporting panel
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
@@ -166,8 +194,11 @@ state remembered independently for each view while the viewer is mounted.
 They do not rewrite the authored diagram or create Undo entries. Explore uses
 the selected host profile's saved visibility, while its floating positions and
 sizes are independent of the profile's grid geometry.
-In the workbench's **Diagram canvas**, panel and step-control moves/resizes are
-temporary geometry with Undo/Redo; they do not change the saved layout. See
+In the workbench's **Diagram canvas**, an **Explore** view saves panel and
+step-control moves/resizes as its floating defaults, with one Undo/Redo action
+per gesture. Those positions and sizes survive JSON and HTML export. A
+**Standard** view's canvas panel moves/resizes remain temporary editor geometry
+with Undo/Redo; they do not change its authored tile arrangement. See
 [workspace controls](workbench-workspace.md).
 **In the workbench's Page preview**, moving or resizing a panel or step controls, panning,
 zooming, and choosing **Stack at edge** save defaults in the selected view. Each

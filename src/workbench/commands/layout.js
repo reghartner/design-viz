@@ -320,6 +320,13 @@ function planSectionLayoutName(text,raw,section,name,layoutId){
 function planSectionViewPresentation(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(value!=='standard' && value!=='explore')return {error:'Choose Standard or Explore for this view.'};
+  if(!Array.isArray(got.d.layouts)){
+    if(layoutId!=null && layoutId!=='default')return {error:'Reselect the view before changing its presentation.'};
+    if(value==='standard')return {error:'This view already uses Standard presentation.'};
+    return builderRewrite(text,raw,got.path,function(d){
+      builderEnsureSectionView(d);d.layouts[0].presentation=value;
+    });
+  }
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
   if(index<0)return {error:'Select a named view before changing its presentation.'};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
@@ -333,14 +340,17 @@ function planSectionExploreLayout(text,raw,section,layoutId,value){
   if(warnings.length)return {error:warnings.join('\n')};
   return planSetField(text,raw,got.path.concat(['layouts',index]),'exploreLayout',value===null?null:JSON.stringify(value));
 }
+function builderEnsureSectionView(d){
+  var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
+  d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+  d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
+}
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(Array.isArray(got.d.layouts))return {error:'This diagram already has named views.'};
   return builderRewrite(text,raw,got.path,function(d){
-    var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
-    d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+    builderEnsureSectionView(d);
     if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
-    d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
   });
 }
 function planSectionViewSteps(text,raw,section,layoutId,indices){

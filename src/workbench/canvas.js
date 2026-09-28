@@ -1,5 +1,5 @@
-/* The active diagram is the editor's canvas. Its camera and floating reader
-   panels stay temporary; Page preview exposes the authored document layout. */
+/* The active diagram is the editor's canvas. Named Explore views author their
+   floating defaults; Standard views keep temporary canvas panel geometry. */
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var mode=document.getElementById('workspace-view'),getController=function(){return null;},getPage=function(){return null;};
@@ -59,6 +59,7 @@ function initWorkbenchCanvas(){
     if(innerWidth-left-right<350){left=84;right=24;}
     vp.fitCanvas({left:left,right:right,top:top,bottom:bottom});paintZoom();
   }
+  function autoFit(){var vp=viewport(),definition=vp && vp.viewDefinition();if(!(definition && definition.exploreLayout && definition.exploreLayout.camera))fit();}
   function select(index){
     finish(true);saveDetail();section=index;
     var ctl=getController(),base=records().find(function(r){return r.number===section+1;}),details=ctl && ctl.details,snapshot=details && details.snapshot();
@@ -79,7 +80,7 @@ function initWorkbenchCanvas(){
       r.sectionEl.classList.toggle('workspace-active-section',on);
       r.sectionEl.classList.toggle('workspace-empty-section',on && !r.viewport);
       if(r.viewport){var first=on && !r.viewport.isWorkbenchCanvas();r.viewport.setWorkbenchCanvas(on);
-        if(first && !r.canvasVisited){r.canvasVisited=true;cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(fit);}}
+        if(first && !r.canvasVisited){r.canvasVisited=true;cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(autoFit);}}
     });
     if(rec && diagramMode() && rec.tabBlock){var ctl=getController(),tabs=ctl.tabBlocks[rec.tabBlock-1];if(tabs && tabs.active()!==rec.tab)tabs.select(rec.tab,false,false);}
     document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;});
@@ -161,7 +162,7 @@ function initWorkbenchCanvas(){
       return current && current.viewport && current.viewport.restoreCanvasPanelGeometry(change.view,value)?true:'expired';
     }});
   });
-  surface.addEventListener('workbench-canvas-view',function(){cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(fit);});
+  surface.addEventListener('workbench-canvas-view',function(){cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(autoFit);});
   mode.addEventListener('change',function(){select(section);});
   document.getElementById('workspace-pan').addEventListener('click',function(){hand=!hand;paintHand();});
   document.getElementById('workspace-zoom-in').addEventListener('click',function(){setZoom(viewport().canvasZoom()*1.2);});

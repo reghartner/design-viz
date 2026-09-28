@@ -374,7 +374,23 @@ test('presentation edits patch exactly one named view without altering profiles,
     }
     assert.ok(ctx.planSectionViewPresentation(text,raw,0,'deleted','explore').error);
   }
-  const d=diagram();assert.ok(ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'default','explore').error);
+  const d=diagram();assert.ok(ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'retired-view','explore').error);
+});
+
+test('choosing Explore promotes legacy views in one plan while preserving story data and saved host profiles',()=>{
+  for(const saved of [false,true])for(const wrap of [d=>d,d=>({page:{title:'Untouched',sections:[{diagram:d}]}})]){
+    const d=diagram();if(saved){d.layoutName='Resident view';d.sectionLayout={default:[board,phone],confluence:[{...board,w:12,h:9}]};}
+    const raw=wrap(d),text=JSON.stringify(raw,null,3)+'\n',original=structuredClone(d);
+    const plan=ctx.planSectionViewPresentation(text,raw,0,saved?'default':undefined,'explore');assert.ok(!plan.error,plan.error);
+    const next=ctx.builderDiagram(plan.text,JSON.parse(plan.text),0).d;
+    assert.equal(next.layouts.length,1);assert.equal(next.defaultLayout,next.layouts[0].id);assert.equal(next.layouts[0].presentation,'explore');
+    if(saved){assert.deepEqual(next.layouts[0].sectionLayout,original.sectionLayout);assert.equal(next.layouts[0].name,original.layoutName);}
+    for(const key of ['nodes','rows','edges','panels','steps','paths','primaryPanel'])assert.deepEqual(next[key],original[key]);
+    assert.equal(next.sectionLayout,undefined);assert.equal(next.layoutName,undefined);
+    assert.equal(JSON.stringify(raw,null,3)+'\n',text,'planner does not mutate its input');
+    if(raw.page)assert.equal(JSON.parse(plan.text).page.title,'Untouched');
+    assert.ok(ctx.planSectionViewPresentation(text,raw,0,'removed-view','explore').error);
+  }
 });
 
 test('duplicating a view preserves explicit presentations while older omitted settings remain omitted',()=>{

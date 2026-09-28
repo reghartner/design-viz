@@ -39,12 +39,17 @@ its block. Node/edge labels and panel values remain plain text. See
 The diagram is the full browser canvas. Its nodes and connections pan and zoom
 without a surrounding document card. Select a **Section** in the top toolbar;
 its view choices, playback and data panels float over the canvas. Use **Pan**
-(or hold Space), zoom, and **Fit diagram** to navigate. Camera movements and
-floating panel positions are viewing preferences, not source edits. Panel moves
-and resizes join the same **Undo**/**Redo** history as story edits, one entry per
-completed drag or arrow-key adjustment. Undo restores geometry without moving
-the camera, reopening closed tools, or changing the JSON. Camera movement and
-opening/closing tools do not add history entries. A movement that hits an edge
+(or hold Space), zoom, and **Fit diagram** to navigate. In an **Explore** view,
+moving or resizing a data panel or the step controls saves that view's floating defaults in the
+source, so the placement survives HTML export. In a **Standard** view, those
+same canvas gestures adjust temporary editor geometry without changing the
+authored arrangement or JSON.
+
+Both kinds of panel moves/resizes join the same **Undo**/**Redo** history as
+story edits, one entry per completed drag or arrow-key adjustment. Temporary
+geometry Undo restores the panel without moving the camera or reopening closed
+tools. Opening or closing a tool does not add history entries.
+A movement that hits an edge
 without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
 panel moves keyboard focus to its handle, so the next keyboard Undo targets the
 panel. Loading another file or resuming a folder starts fresh history; recover
@@ -54,11 +59,26 @@ start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named view
 retains its own camera for the session.
 
+Choose a named view above the graph to work on it. The adjacent **Presentation**
+control saves **Standard** or **Explore** for that view. Keep
+both kinds in one story: open **View options → Duplicate view**, give the copy
+a **View name**, save it with **Rename view** or Enter, and choose its
+presentation independently. Changing a legacy or automatic view to Explore
+creates its named view in one Undo operation.
+
+**Make default** saves the selected view as the opening choice for a fresh
+published page; it then reads **Default view**. Merely selecting another view
+does not edit the source or change that default. Presentation, name, duplication
+and default changes use the normal source Undo/Redo history. The Diagram canvas
+remains the full editor canvas while you choose the reader presentation.
+
 **Canvas appearance → Page preview** shows prose, contract cards and the authored
 page arrangement. Use it to arrange/export curated Home-centric views or simulate
-host widths. **Diagram canvas** returns to the working canvas. Normal canvas
-movement does not overwrite an authored Explore layout; arrange that layout
-explicitly in Page preview to save defaults.
+host widths. **Diagram canvas** returns to the working canvas. Explore panel and
+step-control placement can be saved from either surface. Page preview also lets
+you arrange the saved Explore framing. It retains the view
+settings under **Arrange section**; the compact canvas view controls are hidden
+there to avoid duplicate controls.
 
 **Add to diagram**, **Undo**, **Redo**, **User guide**, and **Save** share the
 project toolbar above the workspace. The

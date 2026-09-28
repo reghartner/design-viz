@@ -31,6 +31,7 @@ function mountNativeSpec(environment, spec, options){
     canvasSelect.addEventListener('change',function(){
       var rec=controller.sections.find(function(r){return r.reference===canvasSelect.value;});if(!rec)return;
       if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
+      if(controller.details)controller.details.showSection(rec.reference);
       controller.activeTarget={kind:'diagram',section:rec.number};canvasSync();changed();
     });
   }
@@ -38,7 +39,8 @@ function mountNativeSpec(environment, spec, options){
     if(!canvas && !canvasSection)return;
     if(!canvasNav)createCanvasNavigation();
     var target=controller.activeTarget || {};
-    var next=canvas && (controller.sections.find(function(rec){return rec.viewport &&
+    var detail=controller.details && controller.details.activeSection && controller.details.activeSection();
+    var next=canvas && (detail || controller.sections.find(function(rec){return rec.viewport &&
       (rec.number===target.section || target.kind==='tab' && rec.tabBlock===target.tabBlock && rec.tab===target.tab);}) || canvasSection || controller.sections.find(function(rec){return rec.viewport;}));
     if(canvasSection && canvasSection!==next){
       canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
@@ -48,12 +50,12 @@ function mountNativeSpec(environment, spec, options){
     environment.body.classList.toggle('native-canvas',!!canvasSection);
     if(!canvasSection){canvasNav.remove();return;}
     if(canvasSection.tabBlock!=null)controller.tabBlocks[canvasSection.tabBlock-1].select(canvasSection.tab,false,false);
-    controller.activeTarget={kind:'diagram',section:canvasSection.number};
+    if(!detail)controller.activeTarget={kind:'diagram',section:canvasSection.number};
     canvasSection.sectionEl.classList.add('explore-active-section');
     // Reuse the transient diagram canvas: opening it never changes the authored
     // presentation, including a curated Home view's saved primary panel.
     canvasSection.viewport.setWorkbenchCanvas(true);canvasSection.viewport.setReaderCanvas(true);
-    canvasSection.sectionEl.querySelector('.diagram-views').prepend(canvasNav);canvasSelect.value=canvasSection.reference;
+    canvasSection.sectionEl.querySelector('.diagram-views').prepend(canvasNav);canvasSelect.value=detail?controller.details.snapshot().section:canvasSection.reference;
     var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+definition.id;
     if(!canvasSeen.has(key)){
       canvasSeen.add(key);cancelAnimationFrame(canvasFrame);var rec=canvasSection;

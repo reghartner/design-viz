@@ -90,3 +90,10 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
 }
 
 @media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}
+
+@media screen{
+ .explore-full-window .explore-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:108px;left:12px;z-index:90;max-width:calc(100vw - 24px);padding:8px 12px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
+ .explore-full-window .explore-active-section>.detail-head>:not(.detail-head-intro),.explore-full-window .explore-active-section>.detail-head .detail-head-intro>:not(.detail-breadcrumb):not(.sec-heading-row){display:none;}
+ .explore-full-window .explore-active-section>.detail-head .sec-h{font-size:14px;margin:4px 0 0;}
+ .explore-full-window .explore-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:12px;bottom:12px;z-index:95;max-width:calc(100vw - 24px);padding:10px 14px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
+}

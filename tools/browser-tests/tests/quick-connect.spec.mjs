@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
 
 const initial=()=>({page:{title:'Quick connections',blocks:[{id:'main',heading:'Doorbell services',diagram:{
   nodes:{a:{title:'Doorbell'},b:{title:'Gateway'},c:{title:'Recording'},f:{title:'Analytics'}},
@@ -14,7 +14,7 @@ const arrow=page=>page.locator('.dv-connect-line');
 
 test('Alt-click connects row and free nodes with a live preview, exact Undo and the edge inspector',async({page,server},testInfo)=>{
   await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial(),null,2);await paste(page,original);
-  await start(page);await expect(page.locator('.dv-connect-hint')).toContainText('Connect from Doorbell');
+  await start(page);await expect(page.locator('.dv-connect-hint')).toBeVisible();await expect(page.locator('.dv-connect-hint')).toContainText('Connect from Doorbell');
   await expect(node(page,'a')).toHaveClass(/dv-connect-source/);await expect(node(page,'b')).not.toHaveClass(/dv-connect-candidate/);
   await expect(node(page,'c')).toHaveClass(/dv-connect-candidate/);await expect(node(page,'f')).toHaveClass(/dv-connect-candidate/);
   await expect(node(page,'z')).not.toHaveClass(/dv-connect-candidate/);
@@ -31,16 +31,19 @@ test('Alt-click connects row and free nodes with a live preview, exact Undo and 
 });
 
 test('visible Connect action and the Add menu share cancellation and invalid-target protection',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial());await paste(page,original);
-  await node(page,'c').click();const button=page.getByRole('button',{name:'Connect from this node',exact:true});
+  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial());await pastePage(page,original);
+  await page.locator('#workspace-window-inspect .workspace-window-close').click();
+  await node(page,'c').click();await page.locator('#editor-tab-inspect').click();const button=page.getByRole('button',{name:'Connect from this node',exact:true});
   await button.focus();await page.keyboard.press('Enter');await expect(page.locator('.dv-connect-hint')).toContainText('Recording');
   await page.getByRole('button',{name:'Cancel connection',exact:true}).click();await clean(page);
   await button.click();await node(page,'a').click();expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'c',to:'a'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+  await page.locator('#workspace-window-inspect .workspace-window-close').click();
   for(const target of ['a','b','z']){await start(page);await node(page,target).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);}
   await start(page);await page.keyboard.press('Escape');await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await start(page);await page.locator('#docview h2').first().click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#diagram-add').click();await page.locator('[data-add-kind=edge]').click();
+  await closeTools(page);
   await node(page,'b').click();await expect(page.locator('.dv-connect-hint')).toContainText('Gateway');await node(page,'c').click();
   expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'b',to:'c'});await clean(page);
 });
@@ -49,7 +52,7 @@ test('first connections in a step-free graph keep the header clear of nodes acro
   const raw=initial(),d=raw.page.blocks[0].diagram;delete d.edges;delete d.steps;d.view='ambient-only';
   const original=JSON.stringify(raw);await page.goto(server.origin+'/workbench.html');await paste(page,original);
   for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
-    await page.locator('#sk-'+skin).click();const before=await node(page,'a').boundingBox();
+    await page.locator('#workspace-appearance > summary').click();await page.locator('#sk-'+skin).click();await page.locator('#workspace-appearance > summary').click();const before=await node(page,'a').boundingBox();
     await start(page);await node(page,'c').hover();
     const hint=await page.locator('.dv-connect-hint').boundingBox(),a=await node(page,'a').boundingBox();
     // Highlight strokes expand the painted bounds; the card's center must stay fixed.
@@ -68,7 +71,7 @@ test('source changes, blur, remount and stale inspector actions cannot publish p
   await start(page);const changed=original.replace('Doorbell services','Changed');
   await page.locator('#editor-tab-json').click();await page.locator('#src').focus();
   await page.evaluate(value=>{const s=document.querySelector('#src');s.value=value;s.dispatchEvent(new Event('input',{bubbles:true}));},changed);
-  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');await expect(page.locator('#src')).toBeFocused();
+  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#src')).toBeFocused();
   await clean(page);await node(page,'c').click();await expect(page.locator('#src')).toHaveValue(changed);
   await start(page);await clean(page);await expect(page.locator('#guide')).toContainText('Render it before connecting');
   await page.evaluate(()=>__editorTest.builder.loadSpec(JSON.parse(document.querySelector('#src').value)));
@@ -87,7 +90,16 @@ test('modifier selection, ordinary dragging and zoomed connection creation coexi
   const f=node(page,'f'),box=await f.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2-70,box.y+box.height/2-20,{steps:8});await page.mouse.up();
   expect((await diagram(page)).floats[0].x).not.toBe(850);await clean(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-  await page.locator('#docview .doc-sec').first().getByRole('button',{name:'Readable',exact:true}).click();
+  await page.locator('#workspace-zoom-in').click();
   await start(page);await node(page,'c').hover();await expect(arrow(page)).toHaveAttribute('d',/^M /);
   await node(page,'c').click();expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'a',to:'c'});await clean(page);
+});
+
+for(const width of [680,390])test('step-free canvas keeps connection feedback and cancel visible at '+width+'px',async({page,server})=>{
+  await page.setViewportSize({width,height:900});const raw=initial();delete raw.page.blocks[0].diagram.steps;
+  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw);await paste(page,original);
+  await page.getByRole('button',{name:'Hide tools',exact:true}).click();await start(page);
+  const hint=page.locator('.dv-connect-hint');await expect(hint).toBeVisible();
+  const box=await hint.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
+  await page.getByRole('button',{name:'Cancel connection',exact:true}).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);
 });

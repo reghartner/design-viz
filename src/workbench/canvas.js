@@ -3,9 +3,12 @@
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var mode=document.getElementById('workspace-view'),getController=function(){return null;},getPage=function(){return null;};
-  var section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0;
+  var section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,activeCanvas=null;
   function records(){var ctl=getController();return ctl && ctl.sections || [];}
-  function current(){return records().find(function(r){return r.number===section+1;});}
+  function current(){
+    var base=records().find(function(r){return r.number===section+1;}),ctl=getController(),details=ctl && ctl.details,snapshot=details && details.snapshot();
+    return snapshot && base && snapshot.section===base.reference && details.activeSection?details.activeSection() || base:base;
+  }
   function viewport(){var rec=current();return rec && rec.viewport;}
   function board(){var rec=current();return rec && rec.sectionEl.querySelector('.explore-board');}
   function diagramMode(){return mode.value==='diagram';}
@@ -21,10 +24,15 @@ function initWorkbenchCanvas(){
   }
   function select(index){
     finish(true);section=index;
+    var ctl=getController(),base=records().find(function(r){return r.number===section+1;}),details=ctl && ctl.details,snapshot=details && details.snapshot();
+    if(snapshot && base && snapshot.section!==base.reference)details.close(true);
     var all=records(),rec=current();if(!rec){rec=all[0];section=rec?rec.number-1:0;}
+    if(activeCanvas && all.indexOf(activeCanvas)<0 && activeCanvas!==rec){activeCanvas.sectionEl.classList.remove('workspace-active-section');if(activeCanvas.viewport)activeCanvas.viewport.setWorkbenchCanvas(false);}
+    if(rec && all.indexOf(rec)<0)all=all.concat(rec);activeCanvas=rec;
     document.body.classList.toggle('workspace-diagram',diagramMode());
     all.forEach(function(r){
       var on=diagramMode() && r===rec;
+      if(r.viewport && !on)r.viewport.setWorkbenchCanvas(false);
       r.sectionEl.classList.toggle('workspace-active-section',on);
       r.sectionEl.classList.toggle('workspace-empty-section',on && !r.viewport);
       if(r.viewport){var first=on && !r.viewport.isWorkbenchCanvas();r.viewport.setWorkbenchCanvas(on);
@@ -75,6 +83,7 @@ function initWorkbenchCanvas(){
   window.addEventListener('keyup',function(ev){if(ev.code==='Space'){spaceHeld=false;paintHand();}});
   window.addEventListener('blur',function(){spaceHeld=false;paintHand();finish(true);});
   window.addEventListener('resize',function(){finish(true);paintZoom();});
+  view.addEventListener('detail-navigation',function(){select(section);});
   surface.addEventListener('workbench-canvas-view',function(){cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(fit);});
   mode.addEventListener('change',function(){select(section);});
   document.getElementById('workspace-pan').addEventListener('click',function(){hand=!hand;paintHand();});

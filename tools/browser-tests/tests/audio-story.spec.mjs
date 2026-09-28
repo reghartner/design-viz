@@ -67,7 +67,10 @@ test('operator voice, siren confirmation and heard-alarm evidence stay independe
 });
 
 test('workbench Home audio controls edit only the selected step and Undo restores exact source',async({page,server})=>{
- await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ await page.goto(server.origin+'/workbench.html');
+ // Large multiline fixtures use the real file import instead of CDP text insertion.
+ await page.locator('#welcome-file').setInputFiles({name:'audio-story.json',mimeType:'application/json',buffer:Buffer.from(source)});
+ await expect(page.locator('#src')).toHaveValue(source);
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').first().click();
  await page.locator('#editor-tab-inspect').click();
  await page.locator('#guide summary').filter({hasText:/^Doorbell · audio$/}).click();

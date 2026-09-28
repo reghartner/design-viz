@@ -294,7 +294,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function resized(){cancel();fitHeight();paint();}
   function panStart(ev){
-    if(!active || ev.button!==0 || gesture || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step]'))return;
+    if(!active || ev.button!==0 || gesture || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     clearScrollEdit();var token=beginEdit();if(token===false)return;
     ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }

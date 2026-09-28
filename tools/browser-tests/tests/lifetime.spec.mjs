@@ -1,4 +1,4 @@
-import {test,expect,paste,pointerTo,trackResources,resources} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,closeTools,pointerTo,trackResources,resources} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 test('builder destruction retires captured gestures and old controls across same-DOM remounts',async({page,server})=>{
   await page.addInitScript(trackResources);await page.goto(server.origin+'/lifetime/index.html');await paste(page,source);
@@ -20,7 +20,7 @@ test('builder destruction retires captured gestures and old controls across same
     await page.locator('#import-mermaid').click();await page.evaluate(()=>__oldBuilder.destroy());
     await expect(page.locator('#importbox')).toBeVisible();await page.keyboard.press('Escape');await expect(page.locator('#importbox')).toBeHidden();
     if(cycle===0){
-      await page.locator('#editor-tab-inspect').click();await page.locator('.pt-homemap [data-home-layout]').click();
+      await closeTools(page);await page.locator('.pt-homemap [data-home-layout]').click();await page.locator('#editor-tab-inspect').click();
       const map=page.locator('#guide .home-layout-map'),device=map.locator('[data-device="doorbell"]');
       await device.hover();const box=await device.boundingBox(),held=await map.elementHandle();
       await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();

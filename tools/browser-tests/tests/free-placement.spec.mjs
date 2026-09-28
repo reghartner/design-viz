@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'examples/free-placement/free-placement.spec.json'),'utf8'));
 const diagram=raw=>raw.page.blocks[0].diagram;

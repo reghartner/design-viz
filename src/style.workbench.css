@@ -1235,3 +1235,12 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 
 .workspace-diagram:not(.welcome-active) .explore-tools .lg:not(:has(.mtoggle)){display:none;}
 .workspace-canvas #workbench-workspace:not([hidden]){min-height:100dvh;}
+
+/* Drill-downs keep their return path visible above the active diagram. */
+.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:124px;left:84px;z-index:90;max-width:calc(100vw - 112px);padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+.workspace-diagram .workspace-active-section>.detail-head>:not(.detail-head-intro),.workspace-diagram .workspace-active-section>.detail-head .detail-head-intro>:not(.detail-breadcrumb):not(.sec-heading-row){display:none;}
+.workspace-diagram .workspace-active-section>.detail-head .sec-h{font-size:14px;margin:4px 0 0;}
+.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:84px;bottom:72px;z-index:95;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+.dv-connect-canvas-hint{position:fixed;top:174px;left:84px;z-index:95;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+@media(max-width:700px){.workspace-canvas .workspace-history{display:flex;position:fixed;left:84px;bottom:118px;z-index:145;padding:5px;background:var(--card);border:1px solid var(--line);border-radius:9px;}}
+@media(max-width:700px){.workspace-canvas:has(.extraction-preview) .workspace-history,.workspace-canvas:has(.extraction-preview) .workspace-selection,.workspace-canvas:has(.extraction-preview) .workspace-canvas-controls{visibility:hidden;}}

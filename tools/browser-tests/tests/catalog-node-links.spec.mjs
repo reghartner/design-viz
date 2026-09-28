@@ -59,7 +59,7 @@ test('right-click release leaves node links open for an ordinary click, with exp
   await expect(destination.locator('body')).toHaveText('Saved source destination');await destination.close();
   await page.bringToFront();
   await node.click({button:'right'});await expect(menu).toBeVisible();
-  await page.locator('.doc-title').click();await expect(menu).toBeHidden();
+  await page.locator('#editor-tab-inspect').click();await expect(menu).toBeHidden();
   await trigger.focus();await trigger.press('Shift+F10');await expect(menu).toBeVisible();
   await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
   await trigger.click();await menu.getByRole('button',{name:'Close node links'}).click();await expect(menu).toBeHidden();

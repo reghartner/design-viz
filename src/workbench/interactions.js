@@ -533,20 +533,22 @@ function createBuilderInteractions(opts){
     clearConnectChrome();
     var svg=target.el && target.el.ownerSVGElement;
     if(!svg || !svg.createSVGPoint)return;
-    var board=svg.closest('.board'),legend=board && board.querySelector('.lg');if(!legend)return;
+    var board=svg.closest('.board'),viewport=svg.closest('.section-viewport');
+    var legend=(viewport || board) && (viewport || board).querySelector('.lg');if(!legend)return;
+    var canvas=viewport && viewport.classList.contains('workbench-diagram-canvas');
     var L=layout(diagram),source=L.pos[target.id];if(!source)return;
     var layer=document.createElementNS(SVG_NS,'g'),line=document.createElementNS(SVG_NS,'path'),arrow=document.createElementNS(SVG_NS,'path');
     layer.setAttribute('class','dv-connect-preview');layer.setAttribute('aria-hidden','true');
     line.setAttribute('class','dv-connect-line');arrow.setAttribute('class','dv-connect-arrow');
     layer.appendChild(line);layer.appendChild(arrow);svg.appendChild(layer);
     var hint=document.createElement('div'),label=document.createElement('span'),cancel=document.createElement('button');
-    hint.className='dv-connect-hint';label.setAttribute('role','status');
+    hint.className='dv-connect-hint'+(canvas?' dv-connect-canvas-hint':'');label.setAttribute('role','status');
     label.textContent='Connect from '+(diagram.nodes[target.id].title || target.id)+' → click a highlighted node';
     cancel.type='button';cancel.textContent='Cancel · Esc';cancel.setAttribute('aria-label','Cancel connection');
     hint.appendChild(label);hint.appendChild(cancel);
-    var replaced=Array.from(legend.querySelectorAll('.li'));
-    if(!replaced.length){var sizing=legend.querySelector('.board-size');if(sizing)replaced.push(sizing);}
-    replaced.forEach(function(el){el.classList.add('dv-connect-replaced');});legend.appendChild(hint);
+    var replaced=canvas?[]:Array.from(legend.querySelectorAll('.li'));
+    if(!canvas && !replaced.length){var sizing=legend.querySelector('.board-size');if(sizing)replaced.push(sizing);}
+    replaced.forEach(function(el){el.classList.add('dv-connect-replaced');});(canvas?viewport:legend).appendChild(hint);
     var nodes=Array.from(svg.querySelectorAll('g.node[data-dv-node]')),valid=Object.create(null);
     nodes.forEach(function(node){
       var id=node.getAttribute('data-dv-node');

@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 
 async function mousePan(page,board){
@@ -34,11 +34,11 @@ async function mousePan(page,board){
 }
 
 test('mouse scroll controls work in the workbench without editing the spec or conflicting with node gestures',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await pagePreview(page);
   const board=page.locator('.board');await mousePan(page,board);
   await expect(page.locator('#src')).toHaveValue(source);
-  await page.locator('[data-dv-node="a"]').click();await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
-  await page.locator('#workspace-columns').focus();await page.locator('#workspace-columns').press('End');
+  await page.locator('[data-dv-node="a"]').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
+  await page.setViewportSize({width:1000,height:1000});
   await board.getByRole('button',{name:'Auto',exact:true}).click();
   await expect(board.getByRole('group',{name:'Horizontal diagram scroll'})).toBeVisible();
   await expect(page.locator('#src')).toHaveValue(source);

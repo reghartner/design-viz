@@ -59,3 +59,15 @@ test('reader canvas follows same-view hash navigation and writes the story dropd
   await page.locator('#section-story0').getByRole('button',{name:'STEP',exact:true}).click();
   await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
 });
+
+
+test('a later default Explore story opens full-window without a step or deep link',async({page,server})=>{
+  const spec=await named(),story=spec.page.sections[0];story.id='front-door';delete story.diagram.steps;delete story.diagram.paths;story.diagram.defaultLayout='service-flow';
+  spec.page.sections.unshift({id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}});
+  const input=path.join(server.root,'implicit-canvas.json'),output=path.join(server.root,'implicit-canvas.html');
+  await writeFile(input,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/implicit-canvas.html#tour=0');
+  await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+  await expect(page.locator('#section-front-door')).toHaveClass(/explore-active-section/);
+  const box=await page.locator('#section-front-door .explore-board').boundingBox();expect(box.width).toBe(page.viewportSize().width);expect(box.height).toBe(page.viewportSize().height);
+});

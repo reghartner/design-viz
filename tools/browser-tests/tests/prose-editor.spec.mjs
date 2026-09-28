@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste} from '../helpers/test.mjs';
 const spec=()=>({page:{sections:[{heading:'Story',bullets:['First',{text:'Parent',sub:[{text:'Nested point',revealAt:0,custom:true},'Sibling']},'Last'],contract:{fields:[{k:'value',g:'Some context'}],note:'Contract note'},diagram:{nodes:{a:{}},rows:[['a']],steps:[{id:'one',text:'One'},{id:'two',text:'Two'}]}}]}});
 test('nested prose supports direct selection, structure changes, formatting and exact Undo',async({page,server},info)=>{
  const original=JSON.stringify(spec(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);

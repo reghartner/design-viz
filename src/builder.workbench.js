@@ -1132,6 +1132,14 @@ function initWorkbenchBuilder(opts){
   var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});
+  function navigateWorkspace(target){
+    var parsed=session.snapshot();if(parsed.error)return;
+    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
+    session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
+    if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
+    if(stepList)stepList.sync();
+  }
+  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw){ return life.alive() && loadText(JSON.stringify(raw, null, 2)); },
@@ -1139,13 +1147,7 @@ function initWorkbenchBuilder(opts){
     preserveDraft:life.guard(session.preserveDraft),
     earlierDrafts:session.earlierDrafts,
     restoreEarlierDraft:life.guard(function(entry){return session.restoreEarlierDraft(entry,projectHooks());}),
-    navigate:function(target){
-      var parsed=session.snapshot();if(parsed.error)return;
-      var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
-      session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
-      if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
-      if(stepList)stepList.sync();
-    },
+    navigate:navigateWorkspace,
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),

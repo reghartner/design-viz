@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,inspectPageElement} from '../helpers/test.mjs';
 
 const serviceRef='component:default/recording';
 const catalog={version:1,services:[
@@ -30,7 +30,7 @@ test('catalog selection seeds an empty title, preserves authored names, and undo
   await guide.getByRole('combobox',{name:'Service API',exact:true}).selectOption('api:default/recording');
   await guide.getByRole('combobox',{name:'API operation',exact:true}).selectOption('record');
   expect((await nodes()).a.title).toBeUndefined();
-  await page.locator('[data-dv-node="b"]').click();
+  await inspectPageElement(page,page.locator('[data-dv-node="b"]'));
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption(serviceRef);
   await expect(guide.getByLabel('title',{exact:true})).toHaveValue('Authored name');
   await guide.getByRole('combobox',{name:'Company service',exact:true}).selectOption('component:default/notifications');
@@ -60,6 +60,7 @@ test('right-click release leaves node links open for an ordinary click, with exp
   await page.bringToFront();
   await node.click({button:'right'});await expect(menu).toBeVisible();
   await page.locator('#editor-tab-inspect').click();await expect(menu).toBeHidden();
+  await closeTools(page);
   await trigger.focus();await trigger.press('Shift+F10');await expect(menu).toBeVisible();
   await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
   await trigger.click();await menu.getByRole('button',{name:'Close node links'}).click();await expect(menu).toBeHidden();
@@ -67,5 +68,5 @@ test('right-click release leaves node links open for an ordinary click, with exp
   await expect(menu).toBeHidden();
   await expect(page.getByRole('dialog',{name:'Links for Authored name',exact:true})).toBeVisible();
   await page.keyboard.press('Escape');
-  await node.click();await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
+  await inspectPageElement(page,node);await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
 });

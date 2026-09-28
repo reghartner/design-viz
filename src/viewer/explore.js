@@ -100,10 +100,21 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
-    if(!active || !author || gesture)return;
-    if(!scrollEdit){var token=beginEdit();if(token===false)return;scrollEdit={token:token};}
+    if(!active || retired || gesture)return false;
+    if(!author)return true;
+    if(!scrollEdit){var token=beginEdit();if(token===false)return false;scrollEdit={token:token};}
     if(scrollTimer!==null)window.clearTimeout(scrollTimer);
     scrollTimer=window.setTimeout(function(){var edit=scrollEdit;clearScrollEdit();if(active && edit && JSON.stringify(memory.layout.camera)!==JSON.stringify(camera()))saveCamera(edit.token);},250);
+    return true;
+  }
+  function wheel(ev){
+    if(!active || retired)return;
+    if(!ev.ctrlKey && !ev.metaKey){scrollIntent();return;}
+    ev.preventDefault();
+    if(!ev.deltaY || !scrollIntent())return;
+    // Pixel-mode includes trackpad pinch. Normalize line/page-mode mouse wheels.
+    var delta=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?board.clientHeight:1);
+    zoom=clamp((graphPixels || graphWidth())/graphWidth()*Math.exp(-delta*.006),.15,4);sizeGraph(true);
   }
 
   function move(node,host){
@@ -346,7 +357,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   shell.addEventListener('pointermove',pointerMove);shell.addEventListener('pointerup',pointerEnd);shell.addEventListener('pointercancel',pointerCancel);shell.addEventListener('lostpointercapture',captureLost);shell.addEventListener('keydown',keydown);
   window.addEventListener('pointerup',pointerEnd,true);
-  board.addEventListener('wheel',scrollIntent,{passive:true});board.addEventListener('keydown',scrollKey);
+  board.addEventListener('wheel',wheel,{passive:false});board.addEventListener('keydown',scrollKey);
   board.addEventListener('pointerdown',panStart);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
   function fitCanvas(insets){
       if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:180}:{left:24,right:windows.length?260:24,top:108,bottom:180});
@@ -429,6 +440,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
       menu.open=saved.menuOpen;
     },
     suspend:leave,
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',scrollIntent);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
   };
 }

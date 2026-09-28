@@ -171,7 +171,7 @@ full-browser presentation used by exported HTML. Move and resize its panels
 there to save their floating defaults. **Back to page** shows the contained
 Explore workspace, including while arranging. **Open Explore** returns to the
 full-browser view without changing the saved type.
-The data-flow graph becomes the full-height workspace. Each supporting panel
+The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph. Each supporting panel
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
 use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step

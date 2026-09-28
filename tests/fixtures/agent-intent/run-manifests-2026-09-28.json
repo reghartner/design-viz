@@ -1,0 +1,80 @@
+{
+  "baseline": {
+    "instructionsRef": "65d718f",
+    "head": "65d718f787ddf7d6e9b9b1d8e48bef8cac015c44",
+    "instructionsSha256": "268d5e42a7d9e74cecde55d0e96f9edccab23dd52b6c9d56e8428364c04a9018",
+    "caseIds": [
+      "ambiguous-pronoun",
+      "duplicate-label",
+      "conflicting-selection",
+      "destructive-euphemism",
+      "unsupported-retries",
+      "invented-success",
+      "no-questions-pressure",
+      "view-or-content",
+      "stale-meaning",
+      "casual-yes",
+      "missing-target",
+      "clear-small-rename",
+      "frozen-selection",
+      "source-injection",
+      "small-change-broad-permission",
+      "clarified-choice",
+      "clear-delete-section",
+      "explicit-factual-correction",
+      "explicit-hypothetical",
+      "delete-it-pressure",
+      "deflected-clarification",
+      "explicit-retarget"
+    ],
+    "casesSha256": "3214c5318948ad86ef002cd463b7748f1895a10e288f9b36186d248c9cf14964",
+    "cliVersion": "2.1.283 (Claude Code)"
+  },
+  "hardened": {
+    "instructionsRef": "working-tree",
+    "head": "65d718f787ddf7d6e9b9b1d8e48bef8cac015c44",
+    "instructionsSha256": "81f21f59199dc3a1e8f6104d41cbddcfc55bebdb7b666c764f004af5b1cccd49",
+    "caseIds": [
+      "ambiguous-pronoun",
+      "duplicate-label",
+      "conflicting-selection",
+      "destructive-euphemism",
+      "unsupported-retries",
+      "invented-success",
+      "no-questions-pressure",
+      "view-or-content",
+      "stale-meaning",
+      "casual-yes",
+      "missing-target",
+      "clear-small-rename",
+      "frozen-selection",
+      "source-injection",
+      "small-change-broad-permission",
+      "clarified-choice",
+      "clear-delete-section",
+      "explicit-factual-correction",
+      "explicit-hypothetical",
+      "delete-it-pressure",
+      "deflected-clarification",
+      "explicit-retarget"
+    ],
+    "casesSha256": "3214c5318948ad86ef002cd463b7748f1895a10e288f9b36186d248c9cf14964",
+    "cliVersion": "2.1.283 (Claude Code)"
+  },
+  "engineering": {
+    "instructionsRef": "working-tree",
+    "head": "65d718f787ddf7d6e9b9b1d8e48bef8cac015c44",
+    "instructionsSha256": "81f21f59199dc3a1e8f6104d41cbddcfc55bebdb7b666c764f004af5b1cccd49",
+    "caseIds": [
+      "conflicting-selection",
+      "no-questions-pressure",
+      "stale-meaning",
+      "clear-small-rename",
+      "explicit-factual-correction",
+      "explicit-retarget",
+      "invented-engineering-binding"
+    ],
+    "casesSha256": "41481c66a1733f79c09b6dcb5184c7cf3377a75408029ee25878bd124d68a965",
+    "cliVersion": "2.1.283 (Claude Code)"
+  }
+}

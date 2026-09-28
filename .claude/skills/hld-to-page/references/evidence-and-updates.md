@@ -22,8 +22,10 @@ The ledger is a deliverable with the page's lifetime — a later update agent
 starts from it. Preserve the coverage/amendment tables below; add the filled
 [storyboard worksheet](storyboard-worksheet.md) and the self-audit after them.
 Illustrative values (story times, freshness ages, battery rates) get a
-`number` row whose fact says `illustrative`. Operator questions with no answer
-get an amendment row whose answer reads `no answer; assumed: <default>`.
+`number` row whose fact says `illustrative`. Unanswered material questions stay
+open and block the dependent edit. Only allowed illustrative presentation values
+may be recorded as `no answer; illustrative: <default>` when the operator
+explicitly says no answers will come.
 Ledger layout:
 
 ```markdown
@@ -47,9 +49,10 @@ source: <source URL, path, or conversation label> | version: <vN or n/a> | updat
 | D1 | left `code-audit-log` unbound | not in supplied catalog | blocks[0].diagram.nodes.audit |
 ```
 
-"Decisions I made" lists the technical choices the author made without asking
-the operator (always at story and mixed level): catalog and code handling,
-unshown reports, protocols, delivery settings. An engineer reviews them here.
+"Decisions I made" lists evidence-grounded choices and allowed illustrative
+presentation values. Keep unknown catalog/code identity, reports, protocols and
+delivery behavior as engineering gaps; this table does not authorize guessing
+them. An engineer reviews them here.
 
 Rules that keep it parseable and durable: `class` is one of flow / contract
 / failure / service / number / permalink / amendment. `HLD anchor` is a

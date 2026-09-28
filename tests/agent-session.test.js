@@ -2,6 +2,9 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),path=require('node:path'),os=require('node:os'),vm=require('node:vm');
 const root=path.resolve(__dirname,'..');
 async function helper(t){
+  // Lease time is a protocol input, not the time spent in fetch/filesystem I/O.
+  // The test context restores this mock after the server is closed.
+  let now=Date.now();t.mock.method(Date,'now',()=>now);
   const dir=await fs.mkdtemp(path.join(os.tmpdir(),'flowview-agent-test-'));
   await fs.mkdir(path.join(dir,'workbench'));await fs.mkdir(path.join(dir,'template'));
   await fs.writeFile(path.join(dir,'workbench/flowspec.html'),'<title>Workbench</title>');
@@ -10,7 +13,7 @@ async function helper(t){
   t.after(async()=>{await server.close();await fs.rm(dir,{recursive:true,force:true});});
   const snapshot={revision:'browser-1',project:0,source:'{"nodes":{}}',open:true,selection:[],views:[]};
   const send=(body={},headers={})=>fetch(server.origin+'/__flowview_agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Flowview-Session':server.token,...headers},body:JSON.stringify({clientId:'browser',snapshot,...body})});
-  return {server,snapshot,send,read:name=>fs.readFile(path.join(server.scratch,name),'utf8').then(JSON.parse),
+  return {server,snapshot,send,advanceTime:ms=>{now+=ms;},read:name=>fs.readFile(path.join(server.scratch,name),'utf8').then(JSON.parse),
     propose:value=>fs.writeFile(path.join(server.scratch,'proposal.json'),JSON.stringify(value))};
 }
 test('local helper publishes source/selection and delivers file proposals exactly once after acknowledgement',async t=>{
@@ -52,7 +55,11 @@ test('disconnect acknowledges an applied edit; late owner acknowledgements survi
   assert.equal((await h.read('state.json')).connected,false);
   assert.deepEqual(await (await h.send({result})).json(),{acknowledged:proposal.id},'lost ack response is repeatable');
   proposal.id='before-sleep';await h.propose(proposal);await h.send();
-  await new Promise(resolve=>setTimeout(resolve,160));
+  h.advanceTime(99);
+  assert.deepEqual(await (await h.send({clientId:'other-tab',snapshot:{...h.snapshot,revision:'other-1'}})).json(),{occupied:true},
+    'another tab cannot claim an unexpired lease');
+  assert.equal((await h.read('state.json')).revision,'browser-1');
+  h.advanceTime(1);
   const other=await (await h.send({clientId:'other-tab',snapshot:{...h.snapshot,revision:'other-1'}})).json();
   assert.equal(other.proposal,undefined);assert.match(other.fileError,/previous tab/);
   await h.send({clientId:'other-tab',snapshot:{...h.snapshot,revision:'other-1'},
@@ -62,6 +69,11 @@ test('disconnect acknowledges an applied edit; late owner acknowledgements survi
   assert.deepEqual(await (await h.send({result})).json(),{occupied:true,acknowledged:proposal.id});
   assert.equal((await h.read('result.json')).status,'applied');assert.equal((await h.read('state.json')).revision,'other-1');
   assert.deepEqual(await (await h.send({clientId:'forged-owner',result:{...result,id:'not-delivered'}})).json(),{occupied:true});
+  // This is the response CI observed when real I/O outlasted the replacement
+  // owner's lease. It is permitted only after that second lease expires.
+  h.advanceTime(100);
+  assert.deepEqual(await (await h.send({result})).json(),{acknowledged:proposal.id});
+  assert.equal((await h.read('state.json')).revision,'browser-1');
 });
 test('malformed, oversized and symlink proposals never reach the browser; existing scratch is not reused',async t=>{
   const h=await helper(t);

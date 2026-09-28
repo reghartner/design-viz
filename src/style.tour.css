@@ -69,3 +69,8 @@
 
 .dv-tour-practice{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;}
 .dv-tour-practice:has(> [hidden]):not(:has(> :not([hidden]))){display:none;}
+
+.dv-tour-discovery{float:right;margin:0 8px 8px 0;border-color:#9ebbbf;background:#e9f8f7;color:#245964;font-size:11px;border-radius:999px;padding:6px 12px;cursor:pointer;}
+.dv-tour-discovery[hidden]{display:none;}
+.dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
+@media print{.dv-tour-discovery{display:none!important;}}

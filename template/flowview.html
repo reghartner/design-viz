@@ -780,6 +780,11 @@ body.sk-daylight{background:#F4F2EC;}
 
 .dv-tour-practice{display:flex;flex-wrap:wrap;gap:16px;margin:14px 0;}
 .dv-tour-practice:has(> [hidden]):not(:has(> :not([hidden]))){display:none;}
+
+.dv-tour-discovery{float:right;margin:0 8px 8px 0;border-color:#9ebbbf;background:#e9f8f7;color:#245964;font-size:11px;border-radius:999px;padding:6px 12px;cursor:pointer;}
+.dv-tour-discovery[hidden]{display:none;}
+.dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
+@media print{.dv-tour-discovery{display:none!important;}}
 /* Shared themes, containers and reusable panel primitives.
    Build merges the ordered legacy blocks with each panel module. */
 
@@ -29758,6 +29763,55 @@ function handoffNodeContent(node, position, id, prefix, options){
   if(options.authoring)return '<title>'+tooltip+'</title>'+body+'<a'+attrs+'><title>'+esc(hint)+'</title><path class="handoff-hit" d="M'+(w-tip-7)+' 0H'+(w-tip)+'L'+w+' '+h/2+'L'+(w-tip)+' '+h+'H'+(w-tip-7)+'Z"/></a>';
   return '<a'+attrs+'><title>'+tooltip+'</title>'+body+'</a>';
 }
+/* ---- src/viewer/tour-progress.js ---- */
+/* Browser-local learning history for built-in tour topics. Custom page tours
+   never share this namespace. No diagram IDs, source, or telemetry are stored. */
+var TOUR_PROGRESS_KEY = 'dv_tour_features_v1';
+var tourProgressMemory = {version:1,persona:'both',seen:[]};
+
+function tourFeatureKey(step){
+  if(!step || (step.kind || 'spot')!=='spot')return null;
+  /* The UX and engineering lessons teach the same step transport. */
+  return step.id==='controls'?'mode-step':step.id;
+}
+function parseTourProgress(text){
+  var value;
+  try{value=JSON.parse(text);}catch(ex){}
+  if(!value || value.version!==1 || !Array.isArray(value.seen))
+    return {version:1,persona:'both',seen:[]};
+  return {version:1,persona:TOUR_PERSONAS.indexOf(value.persona)>=0?value.persona:'both',
+    seen:value.seen.filter(function(id,i,all){
+      return typeof id==='string' && /^[a-z][a-z0-9-]{0,79}$/.test(id) && all.indexOf(id)===i;
+    }).slice(0,128)};
+}
+function createTourProgress(win){
+  function read(){
+    var saved;
+    try{var raw=win.localStorage.getItem(TOUR_PROGRESS_KEY);saved=raw?parseTourProgress(raw):tourProgressMemory;}
+    catch(ex){saved={version:1,persona:tourProgressMemory.persona,seen:[]};}
+    /* Keep same-page learning when storage is denied, and merge another tab's
+       newer topics before writing rather than overwriting them with a cache. */
+    return {version:1,persona:saved.persona,
+      seen:Array.from(new Set(saved.seen.concat(tourProgressMemory.seen)))};
+  }
+  function write(value){
+    tourProgressMemory=value;
+    try{win.localStorage.setItem(TOUR_PROGRESS_KEY,JSON.stringify(value));}catch(ex){}
+  }
+  return {read:read,
+    seen:function(step){
+      var id=tourFeatureKey(step);if(!id)return;
+      var value=read();if(value.seen.indexOf(id)>=0)return;
+      value.seen.push(id);write(value);
+    },
+    persona:function(persona){var value=read();value.persona=persona;write(value);}
+  };
+}
+function unseenTourSteps(steps,progress){
+  return steps.filter(function(step){
+    var id=tourFeatureKey(step);return id && progress.seen.indexOf(id)<0;
+  });
+}
 /* ---- src/tour.config.js ---- */
 /* Built-in default tour config. A page overrides it wholesale with page.tour
    (no deep-merge). The shape and the authoring contract are documented in
@@ -30003,6 +30057,9 @@ function wireTour(ctl, view, win, config, options){
   var request = options.request !== undefined ? options.request :
     tourHashRequest(win.location.hash);
 
+  var progress=config===TOUR_DEFAULT_CONFIG?createTourProgress(win):null;
+  var discoveryMode=false, discovery=null;
+
   function storageDone(){
     try { if (win.localStorage && win.localStorage.getItem(TOUR_STORAGE_KEY) === 'done') return true; }
     catch (ex) { /* storage denied: fall through to the cookie */ }
@@ -30208,7 +30265,7 @@ function wireTour(ctl, view, win, config, options){
     restoring=true;
     var result;
     try{result=restoreSnapshot();}catch(ex){snapshot=null;}
-    Promise.resolve(result).catch(function(){}).then(function(){
+    return Promise.resolve(result).catch(function(){}).then(function(){
       if(destroyed)return;
       ctl.suppressFragmentWrites=false;restoring=false;
     });
@@ -30444,9 +30501,10 @@ function wireTour(ctl, view, win, config, options){
      cause-before-effect hold and appears beside the opened menu. */
   var focusOnShow = false;
   function holdCard(){ parts.ui.classList.add('dv-tour-ui-pending'); }
-  function showCard(){
+  function showCard(track){
     if (!parts.ui.classList.contains('dv-tour-ui-pending')) return;
     parts.ui.classList.remove('dv-tour-ui-pending');
+    if(track!==false)recordTopic();
     if (focusOnShow && active) focusNext();
   }
   function fullScrim(){
@@ -30809,7 +30867,12 @@ function wireTour(ctl, view, win, config, options){
     /* a held card cannot take focus yet (visibility:hidden): focus Next when
        the card is shown instead */
     focusOnShow = !keepFocus;
+    recordTopic();
     if (focusOnShow && !parts.ui.classList.contains('dv-tour-ui-pending')) focusNext();
+  }
+  function recordTopic(){
+    if(progress && active && !parts.ui.hidden && !parts.ui.classList.contains('dv-tour-ui-pending'))
+      progress.seen(list[at]);
   }
   function focusNext(){
     focusOnShow = false;
@@ -30917,6 +30980,12 @@ function wireTour(ctl, view, win, config, options){
      authoring bug, surfaced as a console warning and passed through. */
   function buildList(){
     var steps = tourStepsForPersona(plannedConfig, persona || 'both');
+    if(discoveryMode){
+      var unseen=unseenTourSteps(steps,progress.read());
+      if(!unseen.length)return [];
+      return unseen.concat([{id:'discovery-done',kind:'done',copy:{
+        heading:'You’re caught up',body:'Keep exploring this diagram. The ? button always offers the full walkthrough.'}}]);
+    }
     /* one chooser, always first; extras are dropped (lint warns) */
     var choosers = steps.filter(function(step){ return (step.kind || 'spot') === 'chooser'; });
     return choosers.slice(0, 1).concat(steps.filter(function(step){
@@ -30925,6 +30994,7 @@ function wireTour(ctl, view, win, config, options){
   }
   function choose(which){
     persona = TOUR_PERSONAS.indexOf(which) >= 0 ? which : 'both';
+    if(progress)progress.persona(persona);
     list = buildList();
     var next = 0;
     while (next < list.length && (list[next].kind || 'spot') === 'chooser') next++;
@@ -31008,7 +31078,7 @@ function wireTour(ctl, view, win, config, options){
     at = index;
     unwatch();
     settling = false;
-    showCard(); /* chooser/done cards are static; spot steps re-hold below */
+    showCard(false); /* chooser/done cards are static; spot steps re-hold below */
     parts.hint.hidden = (step.kind || 'spot') === 'chooser'; /* arrows do nothing there */
     if ((step.kind || 'spot') === 'chooser'){
       parts.ui.classList.remove('dv-tour-ui-center');
@@ -31166,13 +31236,15 @@ function wireTour(ctl, view, win, config, options){
     doc.removeEventListener('scroll', schedule, true);
     doc.removeEventListener('fullscreenchange', fullscreenChanged);
   }
-  function start(){
+  function start(onlyNew){
     if (active || disabled || restoring || destroyed) return;
     restoreFocus = doc.activeElement;
     if (!overlay) buildOverlay();
     overlay.hidden = false;
     active = true;
-    persona = null;
+    discoveryMode=!!onlyNew && !!progress;
+    persona = discoveryMode?progress.read().persona:null;
+    if(discovery)discovery.hidden=true;
     fullScrim(); /* the overlay opens on a fully dimmed page */
     ctl.suppressFragmentWrites = true;
     takeSnapshot();
@@ -31181,7 +31253,7 @@ function wireTour(ctl, view, win, config, options){
     list = buildList();
     at = 0;
     if (!list.length){ finish(); return; }
-    if ((list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
+    if (!discoveryMode && (list[0].kind || 'spot') !== 'chooser'){ persona = 'both'; list = buildList(); }
     attach();
     go(0);
   }
@@ -31193,7 +31265,7 @@ function wireTour(ctl, view, win, config, options){
     closeDemoClick();
     markDone();
     detach();
-    restoreReader();
+    restoreReader().then(function(){if(!destroyed)updateDiscovery();});
     if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
     /* Done hands over control: the recap invites pressing ▶, so focus the
        transport of the section the tour ran in (a step arrow under reduced
@@ -31220,6 +31292,29 @@ function wireTour(ctl, view, win, config, options){
   if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
   else view.insertBefore(replay, view.firstChild);
 
+  function updateDiscovery(){
+    if(!discovery || destroyed || active || request==='suppress' || options.deepLink)return;
+    var state=progress.read();
+    var unseen=unseenTourSteps(tourStepsForPersona(plannedConfig,state.persona),state);
+    discovery.hidden=!unseen.length;
+    discovery.textContent='New features to explore · '+unseen.length;
+    discovery.title=unseen.map(function(step){return step.copy.heading;}).join(' · ');
+  }
+  function offerDiscovery(){
+    // Probe all sections/views as the normal tour does, preserving the reader's
+    // playback, position and presentation while leaving focus on the page.
+    ctl.suppressFragmentWrites=true;
+    takeSnapshot();
+    try{planDefaultTour();}
+    finally{restoreReader().then(function(){if(!destroyed)updateDiscovery();});}
+  }
+  if(progress){
+    discovery=doc.createElement('button');discovery.type='button';
+    discovery.className='tbtn dv-tour-discovery';discovery.hidden=true;
+    discovery.addEventListener('click',function(){disabled=false;guarded(function(){start(true);});});
+    replay.insertAdjacentElement('afterend',discovery);
+  }
+
   var previousStart=win.dvStartTour;
   var startPublic=function(){ if(destroyed)return false;disabled=false;guarded(start);return true; };
   win.dvStartTour=startPublic;
@@ -31232,14 +31327,17 @@ function wireTour(ctl, view, win, config, options){
     /* The owning reader retires ctl next. Do not restore playback, focus or
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
-    if(overlay)overlay.remove();replay.remove();
+    if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
     }
   }
 
   if (request === 'force') guarded(start);
-  else if (request !== 'suppress' && !options.deepLink && !storageDone()) guarded(start);
+  else if (request !== 'suppress' && !options.deepLink){
+    if(!storageDone())guarded(start);
+    else if(progress)guarded(offerDiscovery);
+  }
 
   return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy};
 }

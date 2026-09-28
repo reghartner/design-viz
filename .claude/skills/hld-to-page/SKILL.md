@@ -340,7 +340,10 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   spec and HTML together; root `canon.json` controls publication. See
   [folder conventions](../../../diagrams/README.md).
 - **Reader tour.** Standalone pages and the workbench’s read-only Canon reader
-  offer a first-visit walkthrough with a **?** replay button. Optional
+  offer a first-visit walkthrough with a **?** replay button. Returning readers
+  get an optional **New features to explore** prompt for unseen built-in topics
+  available in the diagram; progress is browser-local. Custom tours do not
+  contribute to built-in topic history. Optional
   `page.tour` lessons are described in the [tour guide](../../../docs/tour.md).
 - **Company evidence, drift and Confluence.** See
   [integrations](references/integrations.md).

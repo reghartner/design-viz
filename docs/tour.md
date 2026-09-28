@@ -22,6 +22,30 @@ or `#tour=0` to suppress automatic opening. Leaving the reader, using browser
 Back, or choosing **Edit in Workbench** disposes the tour without changing the
 draft or marking an unfinished tour complete.
 
+## New topics for returning readers
+
+After the initial tour, a **New features to explore · N** button appears when
+the current diagram can demonstrate built-in topics the reader has not seen.
+It opens a short tour of those topics, followed by a closing card. It never
+opens an overlay automatically. The **?** button and `#tour=1` still offer the
+full available walkthrough. `#tour=0` and links to a specific viewer state
+suppress the new-topic offer as well as automatic first-visit opening.
+
+A topic is learned when its narration is displayed. Skipping, navigating away,
+or choosing a different audience does not mark unvisited topics learned.
+The UX transport lesson and engineering step-mode lesson share one topic.
+Offers respect the reader’s last audience selection (UX, engineering, or both).
+A different diagram can therefore introduce branching, drill-downs or Explore
+without repeating familiar lessons.
+
+History uses `localStorage["dv_tour_features_v1"]` and stores only topic IDs and
+the audience choice. It is local to this browser and site; it does not sync
+accounts or send telemetry. Local-file storage is browser-dependent. If storage
+is denied, history survives Canon reader changes in the current page only.
+Older readers with only the completion flag get an optional offer because their
+individual learned topics are unknown. Custom `page.tour` sequences remain
+independent and do not mark built-in topics learned.
+
 ## Where the config lives
 
 - Built-in default: `src/tour.config.js` (`TOUR_DEFAULT_CONFIG`). Treat it as

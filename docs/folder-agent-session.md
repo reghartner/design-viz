@@ -57,6 +57,13 @@ Claude stops the connection. Normal permission prompts are handled in Claude.
 
 ## Communicate
 
+Agent is a floating window over the diagram canvas. Inspect the named selection
+and current view/path/step before sending; expand **Sent with…** beside a sent
+message to see its frozen receipt. The complete story is shared with Claude,
+with the selection identifying the focus. Selection changes cannot silently
+retarget an already sent request. The toolbar keeps Claude's activity state
+visible while the Agent window is closed.
+
 Send one message at a time from the editor. Each request includes the authored
 selection, current path/view/step, and the chosen Story detail level. Change that
 level to Engineering when enriching the same story. Selection or detail changes after Send do not change

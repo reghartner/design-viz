@@ -1,6 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 named.page.sections[0].diagram.autoplay=false;
@@ -8,7 +8,7 @@ const section=page=>page.locator('#docview .doc-sec').first();
 const raw=async page=>JSON.parse(await page.locator('#src').inputValue());
 
 test('Presentation is a per-view undoable edit and survives host preview changes and duplication',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await pagePreview(page);
   await expect(page.locator('#welcome-paste-error')).toBeEmpty();
   await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
   await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
@@ -21,7 +21,7 @@ test('Presentation is a per-view undoable edit and survives host preview changes
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(presentation()).toHaveValue('standard');
   await presentation().selectOption('explore');
   const explored=await page.locator('#src').inputValue();
-  await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
+  if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
   await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
   await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
   await section(page).getByRole('button',{name:'Duplicate view',exact:true}).click();
@@ -35,7 +35,7 @@ test('Presentation is a per-view undoable edit and survives host preview changes
 });
 
 test('Explore editing saves floating panels, controls and camera with Undo, reload and host scaling',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await pagePreview(page);
   await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
   await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
   const stage=section(page).locator('.explore-stage'),panel=section(page).locator('[data-explore-panel=outcome]');
@@ -61,10 +61,10 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
   expect(defaults.camera.zoom).toBeGreaterThan(0);expect(defaults.camera.x).toBeLessThan(beforePan.x-.02);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforePanSource);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);
-  await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');await expect(stage).toBeVisible();await expect(page.locator('#src')).toHaveValue(saved);
+  if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');await expect(stage).toBeVisible();await expect(page.locator('#src')).toHaveValue(saved);
   const norm=await panel.evaluate(el=>{const r=el.getBoundingClientRect(),s=el.closest('.explore-stage').getBoundingClientRect();return {w:r.width/s.width,y:(r.y-s.y)/s.height,sw:s.width};});
   expect(norm.w).toBeCloseTo(Math.max(128/norm.sw,defaults.panels[0].w),2);expect(norm.y).toBeCloseTo(defaults.panels[0].y,2);
-  await page.reload();await page.locator('#workspace-home').click();await paste(page,saved);
+  await page.reload();await page.locator('#workspace-home').click();await paste(page,saved);await pagePreview(page);
   await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await expect(panel).not.toHaveClass(/explore-stacked/);
   const restored=await board.evaluate(el=>({left:el.scrollLeft,top:el.scrollTop,width:parseFloat(el.style.getPropertyValue('--explore-width')),mx:parseFloat(el.style.getPropertyValue('--explore-margin-x')),my:parseFloat(el.style.getPropertyValue('--explore-margin-y')),cw:el.clientWidth,ch:el.clientHeight,ratio:el.querySelector('svg').viewBox.baseVal.height/el.querySelector('svg').viewBox.baseVal.width}));
   expect((restored.left+restored.cw/2-restored.mx)/restored.width).toBeCloseTo(defaults.camera.x,2);
@@ -76,7 +76,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
 });
 
 test('wheel panning saves once, while a pending pan cannot replace handwritten source',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await pagePreview(page);
   await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
   const original=await page.locator('#src').inputValue();
@@ -95,7 +95,7 @@ for(const mode of ['default','switched','expanded','fullscreen','arranged','sele
   if(mode==='lost-release')await page.addInitScript(()=>window.addEventListener('pointerup',ev=>{if(ev.target.closest('.explore-board'))ev.stopImmediatePropagation();},true));
   if(mode==='narrow')await page.setViewportSize({width:1280,height:800});
   const spec=structuredClone(named);if(mode==='default')spec.page.sections[0].diagram.defaultLayout='service-flow';
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));await pagePreview(page);
   if(mode!=='default')await section(page).getByRole('button',{name:'Service flow',exact:true}).click();
   if(mode==='arranged')await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
   if(mode==='selected')await section(page).locator('.schip').nth(2).click();

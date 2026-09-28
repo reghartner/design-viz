@@ -145,9 +145,9 @@ function createFolderAgentClient(opts){
       text=String(text).trim();if(!text || text.length>16000)throw Error('Enter a message of at most 16000 characters.');
       var token=epoch,sent=await snapshot(token);if(!sent || !alive(token))throw Error('Project changed. Reconnect before sending.');
       var id=uuid(),request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
-        selection:sent.snapshot.selection,views:sent.snapshot.views,project:sent.snapshot.project,technicalLevel:opts.level?opts.level():'story'});
+        selection:sent.snapshot.selection,views:sent.snapshot.views,previewCurrent:sent.snapshot.previewCurrent,project:sent.snapshot.project,technicalLevel:opts.level?opts.level():'story'});
       await files.write('request.json',request);if(!alive(token))return;
-      pending=id;transcript.push({role:'user',text:text,requestId:id});
+      pending=id;transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
       activity=[];activitySeen.clear();requestAt=now();lastAgentAt=null;
       publish({status:'Message saved — waiting for Claude.',progress:''});
       await saveTranscript();

@@ -4,45 +4,31 @@ import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 
 async function open(page,server){await page.goto(server.origin+'/workbench.html');await paste(page,source);}
 
-test('left rail and full-height editor share the left edge; global actions stay above all workspaces',async({page,server},testInfo)=>{
+test('floating tools leave the diagram full-window and global actions available',async({page,server})=>{
   await open(page,server);
-  const rail=await page.locator('.workspace-rail').boundingBox(),editor=await page.locator('#spec-editor').boundingBox();
-  const split=await page.locator('#workspace-columns').boundingBox(),preview=await page.locator('.workmain').boundingBox();
-  expect(rail.x+rail.width).toBeLessThanOrEqual(editor.x+1);expect(editor.x+editor.width).toBeLessThanOrEqual(split.x+1);expect(split.x+split.width).toBeLessThanOrEqual(preview.x+1);
-  await expect(page.locator('#workspace-expand')).toHaveCount(0);await expect(page.locator('#spec-editor > summary')).toHaveCount(0);
-  await expect(page.locator('#editor-tab-file')).toBeInViewport();
-  expect(editor.y+editor.height).toBeLessThanOrEqual(page.viewportSize().height);
+  const size=page.viewportSize();
+  expect(await page.locator('.explore-board').boundingBox()).toEqual({x:0,y:0,width:size.width,height:size.height});
+  await expect(page.locator('#workspace-columns')).toBeHidden();
   for(const name of ['inspect','steps','outline','json','file']){
-    await page.locator('#editor-tab-'+name).click();
-    await expect(page.locator('.editor-pane:visible')).toHaveCount(1);
-    await expect(page.locator('#editor-'+name)).toBeVisible();
-    const boxes=await Promise.all(['diagram-add','undo-builder','redo-builder','file-save'].map(id=>page.locator('#'+id).boundingBox()));
-    for(const box of boxes)expect(box.y+box.height).toBeLessThan(editor.y);
-    expect(Math.max(...boxes.map(b=>b.y+b.height/2))-Math.min(...boxes.map(b=>b.y+b.height/2))).toBeLessThan(3);
-    await expect(page.locator('.workspace-tools [data-open-human-guide]')).toBeVisible();
+    await page.locator('#editor-tab-'+name).click();await expect(page.locator('#editor-'+name)).toBeVisible();
+    for(const id of ['diagram-add','undo-builder','redo-builder','file-save'])await expect(page.locator('#'+id)).toBeInViewport();
   }
-  await page.locator('#editor-tab-inspect').click();await page.locator('[data-dv-node="a"]').click();
-  await testInfo.attach('left-editor',{body:await page.screenshot(),contentType:'image/png'});
+  await expect(page.locator('.editor-pane:visible')).toHaveCount(5);
+  await page.locator('#workspace-panels').click();await expect(page.locator('.editor-pane:visible')).toHaveCount(0);
 });
 
-test('drag and keyboard resize move the left boundary naturally without replacing the draft or preview',async({page,server})=>{
-  await open(page,server);
-  await page.locator('#editor-tab-json').click();const src=page.locator('#src'),draft=source+'\n  ';await src.fill(draft);
-  const handle=await src.elementHandle(),preview=await page.locator('#docview .doc-sec').first().elementHandle();
-  const split=page.locator('#workspace-columns'),before=Number(await split.getAttribute('aria-valuenow')),b=await split.boundingBox();
-  await page.mouse.move(b.x+b.width/2,b.y+90);await page.mouse.down();await page.mouse.move(b.x+b.width/2+100,b.y+90,{steps:8});await page.mouse.up();
-  await expect(split).toHaveAttribute('aria-valuenow',String(before+100));
-  await split.focus();await page.keyboard.press('ArrowRight');await expect(split).toHaveAttribute('aria-valuenow',String(before+120));
-  await page.keyboard.press('Shift+ArrowLeft');await expect(split).toHaveAttribute('aria-valuenow',String(before+70));
-  await expect(src).toHaveValue(draft);expect(await handle.evaluate(e=>e===document.querySelector('#src'))).toBe(true);expect(await preview.evaluate(e=>e.isConnected)).toBe(true);
-  await page.locator('[data-dv-node="a"]').click();await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');await expect(src).toHaveValue(draft);
-  await page.locator('[data-dv-node="b"]').click({modifiers:['Shift']});
-  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');
-  await page.locator('[data-dv-node="b"]').click({modifiers:['Shift']});
-  await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-selected','true');await expect(src).toHaveValue(draft);
+test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{
+  await open(page,server);await page.locator('#editor-tab-json').click();
+  const src=page.locator('#src'),draft=source+'\n  ';await src.fill(draft);
+  const sourceHandle=await src.elementHandle(),preview=await page.locator('#docview .doc-sec').first().elementHandle();
+  const win=page.locator('#workspace-window-json'),before=await win.boundingBox();
+  await win.locator('.workspace-window-resize').focus();await page.keyboard.press('Shift+ArrowLeft');
+  expect((await win.boundingBox()).width).toBeCloseTo(before.width-50,0);
+  await expect(src).toHaveValue(draft);expect(await sourceHandle.evaluate(el=>el.isConnected)).toBe(true);expect(await preview.evaluate(el=>el.isConnected)).toBe(true);
+  await win.locator('.workspace-window-close').click();await page.locator('#editor-tab-json').click();await expect(src).toHaveValue(draft);
   await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-reset').click();
-  await expect(split).toHaveAttribute('aria-valuenow','440');await expect(page.locator('#editor-tab-file')).toHaveAttribute('aria-selected','true');
-  await handle.dispose();await preview.dispose();
+  expect((await win.boundingBox()).width).toBeCloseTo(before.width,0);
+  await sourceHandle.dispose();await preview.dispose();
 });
 
 test('outline shortcut and selection stay in Outline; explicit inspection opens the selected object',async({page,server})=>{
@@ -71,7 +57,7 @@ test('File hosts company catalog, imports and exports; global Save works from JS
 test('wide step inspectors share space with nested panel controls and retain their state when changing tools',async({page,server},testInfo)=>{
   await page.setViewportSize({width:1800,height:1100});await open(page,server);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();
-  const divider=page.locator('#workspace-columns');await divider.focus();await page.keyboard.press('End');
+  const win=page.locator('#workspace-window-inspect');await win.locator('.workspace-window-grip').focus();for(let i=0;i<9;i++)await page.keyboard.press('Shift+ArrowLeft');await win.locator('.workspace-window-resize').focus();for(let i=0;i<9;i++)await page.keyboard.press('Shift+ArrowRight');
   const story=await page.locator('.step-form-story').boundingBox(),panels=await page.locator('.step-form-panels').boundingBox();
   expect(panels.x).toBeGreaterThan(story.x);expect(Math.abs(panels.y-story.y)).toBeLessThan(2);
   const sourceBefore=await page.locator('#src').inputValue();

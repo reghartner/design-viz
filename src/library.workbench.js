@@ -18,8 +18,9 @@ function initWorkbenchLibrary(opts){
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
-  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,active=null,sequence=0,current=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,active=null,sequence=0,current=null;
   function retireViewer(){
+    if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
     if(tour)tour.destroy();tour=null;
     if(ctl)ctl.destroy();ctl=null;
   }
@@ -81,6 +82,7 @@ function initWorkbenchLibrary(opts){
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
       ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      exploreCanvas=initViewerExploreCanvas(ctl,reader);
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
     }catch(ex){
       if(token!==sequence)return;

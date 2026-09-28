@@ -45,6 +45,10 @@ async function setup(page){
     run:(...args)=>execFileSync('python3',[path.relative(folder,path.join(sessionFolder,'folder-agent.py')),...args],{cwd:folder,encoding:'utf8'}),
     cleanup:()=>rm(folder,{recursive:true,force:true})};
 }
+async function disconnect(page){
+  if(!await page.locator('#folder-agent-disconnect').isVisible())await page.locator('#folder-agent-pairing>summary').click();
+  await page.locator('#folder-agent-disconnect').click();
+}
 test('editor conversation uses real local files and helper; changes render with one Undo/Redo',async({page},info)=>{
   const h=await setup(page);
   try{
@@ -79,9 +83,9 @@ test('editor conversation uses real local files and helper; changes render with 
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
     await expect(page.locator('#editor-agent')).toBeVisible();
-    await page.locator('#folder-agent-setup summary').click();
+    if(await page.locator('#folder-agent-setup summary').isVisible())await page.locator('#folder-agent-setup summary').click();
     await page.screenshot({path:info.outputPath('folder-conversation.png')});
-    await page.locator('#folder-agent-disconnect').click();await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
+    await disconnect(page);await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
     expect(h.errors).toEqual([]);expect(h.requests.filter(url=>!['/index.html','/starters.json','/catalog.json'].includes(new URL(url).pathname))).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -113,7 +117,7 @@ test('Claude activity streams before the final answer and remains visible withou
     h.run('progress','--request',request.id,'--text','Reading your customer story.');
     h.run('progress','--request',request.id,'--text','Checking the paths. <img src=x onerror=alert(1)>');
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(2);
-    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Claude sent an update');
+    await expect(page.locator('#folder-agent-activity-title')).toHaveText('Claude is working');
     await expect(page.locator('#folder-agent-activity-log li').first()).toContainText('Reading your customer story.');
     await expect(page.locator('#folder-agent-activity-log img')).toHaveCount(0);
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
@@ -127,7 +131,7 @@ test('Claude activity streams before the final answer and remains visible withou
     await page.locator('#folder-agent-input').fill('A new member');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(0);
     await expect(page.locator('#folder-agent-activity-title')).toHaveText('Waiting for Claude to respond');
-    await page.locator('#folder-agent-disconnect').click();expect(h.errors).toEqual([]);
+    await disconnect(page);expect(h.errors).toEqual([]);
   }finally{watcher?.kill();await page.close();await h.cleanup();}
 });
 
@@ -139,7 +143,7 @@ test('refused resume preserves the paired agent instructions; successful resume 
     await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
-    await page.locator('#folder-agent-disconnect').click();
+    await disconnect(page);
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);
     await writeFile(path.join(h.session,'folder-agent.py'),'# Old helper preserved until an authorized resume');
     await page.evaluate(name=>window.resumeFolder=name,path.basename(h.session));
@@ -156,7 +160,7 @@ test('refused resume preserves the paired agent instructions; successful resume 
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     expect(await page.locator('#folder-agent-instructions').inputValue()).toContain(after.connectionId);
     expect(await readFile(path.join(h.session,'folder-agent.py'),'utf8')).toBe(await readFile(path.join(root,'tools/folder-agent.py'),'utf8'));
-    await page.locator('#folder-agent-disconnect').click();
+    await disconnect(page);
     await page.evaluate(()=>window.resumeFolder=null);h.failNextWrite('CONNECT.md');
     await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-status')).toContainText('Test write failure');
@@ -181,7 +185,7 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
       const at=Date.now();events.set(event.id,at);waiting.get(event.id)?.(at);
     });
     await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
-    await page.locator('#folder-agent-setup summary').click();
+    if(await page.locator('#folder-agent-setup summary').isVisible())await page.locator('#folder-agent-setup summary').click();
     await page.evaluate(()=>{
       window.replyTimes={};const log=document.getElementById('folder-agent-messages');
       new MutationObserver(()=>{for(const el of log.querySelectorAll('article div'))if(/^Measured reply /.test(el.textContent)&&!window.replyTimes[el.textContent])window.replyTimes[el.textContent]=Date.now();}).observe(log,{childList:true,subtree:true});
@@ -200,6 +204,114 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     const report={browser:page.context().browser().version(),transport:'HTTPS route with injected directory adapter backed by real disk; actual Python watcher; no model',request_to_watcher:summary(detections),reply_to_editor:summary(deliveries)};
     await writeFile(info.outputPath('latency.json'),JSON.stringify(report,null,2));
     await info.attach('file-transport-latency',{body:JSON.stringify(report),contentType:'application/json'});
-    await page.locator('#folder-agent-disconnect').click();expect(h.errors).toEqual([]);
+    await disconnect(page);expect(h.errors).toEqual([]);
   }finally{watcher?.kill();await page.close();await h.cleanup();}
+});
+
+test('floating tools preserve drafts, coexist, move, resize, close and restore within the screen',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
+    await page.locator('#editor-tab-inspect').click();
+    await expect(page.locator('#editor-agent')).toBeVisible();await expect(page.locator('#editor-inspect')).toBeVisible();
+    const before=await page.locator('#src').inputValue(),win=page.locator('#workspace-window-agent'),grip=win.locator('.workspace-window-grip');
+    const r=await win.boundingBox();await grip.focus();await page.keyboard.press('Shift+ArrowRight');
+    expect((await win.boundingBox()).x).toBeCloseTo(r.x+50,0);
+    await win.locator('.workspace-window-resize').focus();await page.keyboard.press('Shift+ArrowRight');
+    expect((await win.boundingBox()).width).toBeCloseTo(r.width+50,0);
+    const moved=await win.boundingBox(),g=await grip.boundingBox();
+    await page.mouse.move(g.x+50,g.y+10);await page.mouse.down();await page.mouse.move(g.x+120,g.y+60);await page.keyboard.press('Escape');await page.mouse.up();
+    expect((await win.boundingBox()).x).toBeCloseTo(moved.x,0);
+    await win.getByRole('button',{name:'Close Agent · Claude panel',exact:true}).click();await expect(win).toBeHidden();
+    await page.locator('#editor-tab-agent').click();await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this draft while I inspect');
+    expect((await win.boundingBox()).width).toBeCloseTo(moved.width,0);
+    await page.locator('#workspace-panels').click();await expect(win).toBeHidden();await expect(page.locator('#workspace-window-inspect')).toBeHidden();
+    const canvas=await page.locator('#workspace-canvas').boundingBox();expect(canvas).toEqual({x:0,y:0,width:1440,height:1000});
+    await page.locator('#workspace-panels').click();await expect(win).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+    await page.screenshot({path:info.outputPath('floating-agent-and-inspect.png')});
+    await page.reload();await expect(win).toBeVisible();expect((await win.boundingBox()).x).toBeCloseTo(moved.x,0);
+    await page.setViewportSize({width:700,height:700});const small=await win.boundingBox();expect(small.x).toBeGreaterThanOrEqual(12);expect(small.x+small.width).toBeLessThanOrEqual(688);
+    expect(small.y+small.height).toBeLessThanOrEqual(688);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('diagram itself fills the browser and pans and zooms without editing source or losing the rendered nodes',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
+    const canvas=page.locator('.workspace-active-section .explore-board');
+    expect(await canvas.boundingBox()).toEqual({x:0,y:0,width:1440,height:1000});
+    await expect(page.locator('#docview .doc-title')).toBeHidden();
+    const position=()=>canvas.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+    const before=await position(),node=page.locator('[data-dv-node="a"]').first(),n=await node.boundingBox();
+    await page.locator('#workspace-pan').click();await page.mouse.move(n.x+10,n.y+10);await page.mouse.down();await page.mouse.move(n.x+90,n.y+70,{steps:5});await page.mouse.up();
+    expect((await position()).x).toBeCloseTo(before.x-80,0);expect((await position()).y).toBeCloseTo(before.y-60,0);
+    const z=await page.locator('#workspace-zoom').textContent();await page.locator('#workspace-zoom-in').click();expect(await page.locator('#workspace-zoom').textContent()).not.toBe(z);
+    await page.locator('#workspace-fit').click();await expect(node).toBeInViewport();await expect(page.locator('#src')).toHaveValue(source);
+    await page.screenshot({path:info.outputPath('diagram-canvas.png')});expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('agent context names the selection before pairing and freezes it beside the sent message',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('[data-dv-node="a"]').first().click();await page.locator('#editor-tab-agent').click();
+    await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();
+    const request=await h.read('request.json');expect(request.selection[0].label).toBe('Doorbell');
+    await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
+    await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('[data-dv-node="b"]').first().click();
+    h.run('progress','--request',request.id,'--text','Reading the selected doorbell.');
+    await expect(page.locator('#folder-agent-indicator')).toContainText('Claude working');
+    await page.locator('#folder-agent-indicator').click();
+    await expect(page.locator('#folder-agent-context')).toContainText('Backend');
+    await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
+    expect((await h.read('request.json')).selection[0].label).toBe('Doorbell');
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('diagram canvas switches sections and views, keeps its camera after edits, and preserves page preview',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    const raw=JSON.parse(source),d=raw.page.blocks[0].diagram;
+    d.layouts.push({...structuredClone(d.layouts[0]),id:'technical',name:'Technical',steps:undefined});
+    raw.page.blocks.push({tabs:[{label:'More',sections:[{id:'other',heading:'Other story',text:['Page preview prose'],diagram:{view:'step',nodes:{customer:{title:'Customer'},team:{title:'Team'}},rows:[['customer','team']],edges:[{from:'customer',to:'team'}],steps:[{edge:'customer->team',text:'Contact the team'}]}}]}]});
+    const input=JSON.stringify(raw,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#workspace-panels').click();
+    await page.locator('button[data-layout-id="technical"]').click();
+    await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
+    await page.locator('#workspace-fit').click();
+    await page.locator('#diagram-add-target').selectOption('1');
+    const other=page.locator('.workspace-active-section .explore-board');
+    expect(await other.boundingBox()).toEqual({x:0,y:0,width:1440,height:1000});
+    await expect(page.locator('[data-dv-node="customer"]')).toBeInViewport();
+    await expect(page.locator('[data-dv-node="a"]')).toBeHidden();
+    await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();
+    await page.locator('#diagram-add-target').selectOption('0');
+    await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
+    await page.locator('#workspace-zoom-out').click();
+    const camera=()=>page.locator('.workspace-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
+    const prior=await camera();
+    await page.locator('#editor-tab-json').click();
+    await page.locator('#src').fill(input.replace('"Backend"','"Customer support"'));await page.locator('#go').click();
+    await expect(page.locator('[data-dv-node="b"]')).toContainText('Customer support');
+    expect(await camera()).toEqual(prior);
+    await page.locator('#workspace-window-json .workspace-window-close').click();
+    await page.locator('#workspace-appearance>summary').click();await page.locator('#workspace-view').selectOption('page');
+    await expect(page.locator('#docview .doc-title')).toBeVisible();
+    await expect(page.locator('.workbench-diagram-canvas')).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Arrange section',exact:true}).first()).toBeVisible();
+    await page.locator('#workspace-view').selectOption('diagram');await page.locator('#workspace-appearance>summary').click();
+    expect(await camera()).toEqual(prior);
+    await expect(page.locator('#src')).toHaveValue(input.replace('"Backend"','"Customer support"'));
+    await page.screenshot({path:info.outputPath('full-diagram-canvas.png')});
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
 });

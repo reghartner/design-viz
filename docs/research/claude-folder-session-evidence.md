@@ -25,6 +25,29 @@ source, changes connection identity and does not automatically replay old work.
 Same-origin tabs use a Web Lock; other origins/browser profiles rely on identity
 and heartbeat checks and must not connect concurrently to the same folder.
 
+## Canvas and conversation polish
+
+The editor now uses the diagram itself as a full-window Explore surface. Agent,
+Inspect, Steps, Outline, JSON and File are independent movable/resizable windows.
+The selection card names items before Send and each sent message retains frozen
+context. Claude activity remains visible in a toolbar indicator while Agent is
+closed. The user reported the real Claude workflow working before this polish.
+
+Canvas camera/panel state stays separate from authored Explore defaults and
+survives matched-section rerenders. Page preview retains prose, export layout
+arranging and host previews. Standalone and Canon Explore views fill the browser;
+Home/standard views retain their curated layouts. Tour narration avoids the
+floating player. Browser checks explicitly measure the diagram board against the
+full viewport and cover navigation, edits, Undo/Redo, cross-tab sections, working
+indicators, named context, camera retention, curated views and tour restoration.
+
+The latest unit run passed 1,294 JavaScript tests with one existing skip. The
+12 Python build/kit tests and 60 focused browser contracts pass (9 folder-agent,
+30 editor/authoring, 16 Explore/tour, 5 Canon reader), with two additional checks
+after improving Fit around floating panels. Screenshots of the editor and standalone diagram
+canvas were inspected. The private trial also includes `explore.html`, a reading
+demo of the named-layouts starter with Explore selected by default.
+
 ## Automated evidence
 
 - Full JavaScript suite completed successfully after updating the build-fixture
@@ -81,8 +104,7 @@ Validation for this follow-up: 20 focused JavaScript tests, 8 Python helper test
 watcher, progress before a final reply, retained ordered updates, inert text,
 clearing on the next request, helper upgrades on resume, and another 50 file
 exchanges. The activity screenshot was inspected. Claude was simulated in these
-tests; a real Claude session following the updated reporting instructions still
-needs live acceptance. Normal terminal output and permission prompts are not
+tests; the user subsequently reported the real Claude workflow working well. Normal terminal output and permission prompts are not
 automatically captured.
 
 ### Initial timing sample
@@ -102,7 +124,7 @@ Artifact: the browser test attaches `file-transport-latency` and writes
 about absolute timing. Claude processing and tool approval add separate latency;
 background browser throttling or sleeping can delay both directions.
 
-## Live acceptance remains open
+## User-reported live acceptance
 
 Claude Code 2.1.283 is installed and its existing subscription login was confirmed
 without reading credentials. A visible terminal was opened with `--no-chrome`,
@@ -112,10 +134,11 @@ Monitor availability, wake-up, and renewal have not been observed.
 
 The private site deployed successfully, and its sign-in screen was reached in
 the in-app browser. The user was asked to perform the native Chrome/Edge folder
-grant and paste the complete prompt into the visible Claude session. Those
-interactions remain pending; the initial phase's live acceptance gate is not met.
+grant and paste the complete prompt into the visible Claude session. The user subsequently completed the trial and reported that it works functionally.
+This report is distinct from direct instrumented observation of Claude permissions,
+Monitor renewals and native browser file replacement behavior.
 
-Complete these before calling the experience proven:
+Remaining instrumented checks for production confidence:
 
 1. Native browser grant on the deployed HTTPS page; read an externally replaced
    file and write one Claude can read. Verify cancellation/revocation and network

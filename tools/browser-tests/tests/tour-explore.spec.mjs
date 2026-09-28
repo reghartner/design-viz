@@ -105,7 +105,7 @@ test('Try the controls gives keyboard arrows to the highlighted panel grip',asyn
   // after a resize or a later page click.
   await expect.poll(async()=>{
     const frame=await panel(page,'status').boundingBox(),ring=await page.locator('.dv-tour-ring').boundingBox();
-    return Math.abs(ring.x-frame.x-offset.x);
+    return ring && frame?Math.abs(ring.x-frame.x-offset.x):Infinity;
   }).toBeLessThan(1);
   const handle=await grip.boundingBox();
   await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);

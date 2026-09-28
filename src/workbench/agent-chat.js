@@ -1,4 +1,22 @@
 /* Conversation UI for an explicitly paired, user-owned Claude session. */
+function folderAgentContextLines(context){
+  context=context || {};var selection=Array.isArray(context.selection)?context.selection:[],sections=new Set();
+  var lines=selection.map(function(item){
+    if(!item || typeof item!=='object')return '';
+    sections.add(item.section);
+    return String(item.kind || 'Selection')+' · '+String(item.label || item.id || (Number.isFinite(item.index)?item.index+1:'Selected item'))+
+      (item.sectionLabel?' — '+String(item.sectionLabel):'');
+  }).filter(Boolean);
+  if(!lines.length)lines.push(context.previewCurrent===false?'Current JSON · render to include a canvas selection':'Whole story · no focused selection');
+  (Array.isArray(context.views)?context.views:[]).filter(function(view){return view && (!sections.size || sections.has(view.section));}).forEach(function(view){
+    var parts=['Section '+(Number(view.section)+1)];
+    if(view.view)parts.push('view '+(view.viewLabel || view.view));if(view.path)parts.push('path '+(view.pathLabel || view.path));
+    if(view.mode==='step' && Number.isFinite(view.sourceStep))parts.push('step '+(view.sourceStep+1));
+    if(parts.length>1)lines.push(parts.join(' · '));
+  });
+  if(context.technicalLevel)lines.push('Detail: '+context.technicalLevel);
+  return lines;
+}
 function folderAgentInstructions(folderName,level,resume,identity){
   var relative=JSON.stringify('./'+folderName);
   var location=resume
@@ -36,7 +54,7 @@ function initWorkbenchAgentChat(opts){
   function status(text){setText('status',text);}
   function paint(update){
     if(!life.alive())return;
-    if(update.listening && !state.listening)get('setup').open=false;
+    if(update.listening && !state.listening){get('setup').open=false;get('pairing').open=false;}
     Object.assign(state,update);
     if(update.status)status(update.status);
     get('connection').textContent=state.connected?(state.listening?'Claude listener active':'Waiting for Claude listener'):'Not connected';
@@ -46,9 +64,13 @@ function initWorkbenchAgentChat(opts){
     get('connect').disabled=connecting || state.connected;
     get('resume').disabled=connecting || state.connected;
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
+    root.dataset.connected=String(state.connected);
+    get('indicator').dataset.phase=state.pending?phase:state.listening?'ready':'idle';
+    setText('indicator-text',state.pending?(phase==='responding'?'Claude working':phase==='quiet'?'Claude · no recent update':'Claude · waiting'):state.listening?'Claude ready':state.connected?'Claude · connecting':'Connect Claude');
+    get('indicator').title=state.pending && activity.length?activity[activity.length-1].text:'Open the Claude panel';
     get('activity').hidden=!state.pending && !activity.length;
     get('activity').dataset.phase=phase;
-    setText('activity-title',{waiting:'Waiting for Claude to respond',responding:'Claude sent an update',quiet:'No recent update from Claude',complete:'Claude finished this turn',disconnected:'Disconnected'}[phase] || 'Claude activity');
+    setText('activity-title',{waiting:'Waiting for Claude to respond',responding:'Claude is working',quiet:'No recent update from Claude',complete:'Claude finished this turn',disconnected:'Disconnected'}[phase] || 'Claude activity');
     setText('progress',!state.pending?(state.connected?'Updates from the latest turn.':'Updates received before disconnecting.')
       :!state.listening?'The folder watcher is not responding. Start or renew it in Claude.'
       :phase==='quiet'?'No new update for '+seconds+'s. Claude may still be working or waiting for permission in its terminal.'
@@ -71,7 +93,13 @@ function initWorkbenchAgentChat(opts){
         update.transcript.forEach(function(item){
           var message=doc.createElement('article'),label=doc.createElement('b'),body=doc.createElement('div');
           message.className='folder-agent-message';label.textContent=item.role==='user'?'You':'Claude';body.textContent=item.text;
-          message.append(label,body);log.appendChild(message);
+          message.append(label,body);
+          if(item.role==='user' && item.context){
+            var details=doc.createElement('details'),summary=doc.createElement('summary'),context=doc.createElement('div');
+            details.className='folder-agent-sent-context';summary.textContent='Sent with '+((item.context.selection || []).length?'focused selection':'the whole story');
+            context.textContent=folderAgentContextLines(item.context).join('\n');details.append(summary,context);message.appendChild(details);
+          }
+          log.appendChild(message);
         });
         log.dataset.transcript=serialized;log.scrollTop=log.scrollHeight;
       }
@@ -80,8 +108,6 @@ function initWorkbenchAgentChat(opts){
   async function tick(token){
     if(!life.alive() || token!==generation || !client)return;
     try{await client.poll();
-      var selection=opts.snapshot().selection || [];
-      get('context').textContent=selection.length?'Included with your message: '+selection.map(function(item){return item.id || item.kind;}).join(', '):'Included with your message: the current story.';
     }catch(ex){status('Folder access needs attention: '+ex.message);}
     if(!state.connected && releaseLock){releaseLock();releaseLock=null;}
     if(life.alive() && token===generation && state.connected)timer=life.delay(function(){tick(token);},250);
@@ -151,6 +177,8 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('connect'),'click',function(){connect(false);});
   life.listen(get('resume'),'click',function(){connect(true);});
   life.listen(get('disconnect'),'click',disconnect);
+  life.listen(get('indicator'),'click',function(){if(opts.show)opts.show();});
+  life.listen(get('selection'),'click',function(){if(opts.show)opts.show();get('input').focus();});
   life.listen(get('copy'),'click',async function(){
     try{await navigator.clipboard.writeText(get('instructions').value);status('Copied. Paste into the Claude session working in the folder you selected. The instructions use its current working directory.');}
     catch(ex){get('instructions').focus();get('instructions').select();status('Press ⌘C or Ctrl+C to copy the selected instructions.');}
@@ -166,6 +194,24 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('input'),'keydown',function(event){if(event.key==='Enter' && (event.metaKey || event.ctrlKey))send(event);});
   life.listen(window,'pagehide',function(){disconnect();});
   life.own(function(){generation++;life.cancelDelay(timer);if(client){client.disconnect().catch(function(){});client.destroy();client=null;}if(releaseLock){releaseLock();releaseLock=null;}});
+  var contextTimer=null;
+  function contextTick(){
+    contextTimer=null;if(!life.alive())return;
+    var current=opts.snapshot();
+    setText('context',folderAgentContextLines(current).join('\n'));
+    setText('context-heading',state.pending?'Selection for your next message':'Your next message includes');
+    var selected=current.selection || [];
+    setText('selection',selected.length?selected.length+' selected · '+selected.slice(0,2).map(function(item){return item.label || item.id || item.kind;}).join(', ')+(selected.length>2?' +'+(selected.length-2):'')+' · Ask Claude':'Select on the canvas to focus your message');
+    get('selection').title=folderAgentContextLines(current).join('\n');
+    if(!doc.body.classList.contains('welcome-active'))contextTimer=life.delay(contextTick,350);
+  }
+  var contextVisibility=new MutationObserver(function(){
+    if(doc.body.classList.contains('welcome-active')){life.cancelDelay(contextTimer);contextTimer=null;}
+    else if(contextTimer===null)contextTick();
+  });
+  contextVisibility.observe(doc.body,{attributes:true,attributeFilter:['class']});
+  life.own(function(){contextVisibility.disconnect();});
+  contextTick();
   paint({});
   return {destroy:life.destroy};
 }

@@ -26,6 +26,7 @@
     "viewer/contracts.js",
     "viewer/path-timeline.js",
     "viewer/explore.js",
+    "viewer/explore-canvas.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",
@@ -83,6 +84,7 @@
   ],
   "workspace.workbench.js": [
     "workbench/preview.js",
+    "workbench/canvas.js",
     "workspace.workbench.js"
   ],
   "entrypoints": {

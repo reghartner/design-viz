@@ -7404,6 +7404,27 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
  .docview .explore-board .boardcanvas>svg{width:100%;}
 }
 
+/* Explore's reading surface is the browser, including inside an embed. */
+@media screen{
+ body.viewer-exploring{overflow:hidden;}
+ .docview.explore-full-window,.explore-full-window .doc-sec{container-type:normal;}
+ .explore-full-window .explore-active-section{position:static;}
+ .explore-full-window .viewer-diagram-canvas{position:fixed;inset:0;z-index:80;background:var(--explore-bg);}
+ .explore-full-window .viewer-diagram-canvas>.explore-stage{position:absolute;inset:0;width:100%;height:100%!important;border:0;border-radius:0;}
+ .explore-full-window .viewer-diagram-canvas>.diagram-views{position:absolute;top:12px;left:12px;right:12px;z-index:45;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;border:0;background:none;}
+ .viewer-diagram-canvas>.diagram-views>*{pointer-events:auto;}
+ .viewer-diagram-canvas .diagram-view-choice,.viewer-diagram-canvas .viewport-actions,.explore-reader-navigation{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 4px 18px #14244212;}
+ .explore-reader-navigation{display:flex;align-items:center;gap:8px;font:12px 'IBM Plex Sans',sans-serif;}
+ .explore-reader-navigation select{font:inherit;max-width:220px;padding:5px;background:var(--explore-bg);color:var(--dink);border:1px solid var(--explore-border);border-radius:6px;}
+ .viewer-diagram-canvas .explore-tools{top:78px;bottom:auto;}
+ .docview .viewer-diagram-canvas .explore-board{background-image:radial-gradient(color-mix(in srgb,var(--dtext) 16%,transparent) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
+ .viewer-diagram-canvas .explore-board::-webkit-scrollbar{display:none;}
+ .viewer-diagram-canvas:fullscreen{padding:0;}
+ .viewer-diagram-canvas .layout-flow-toggle{background:var(--explore-bg);}
+}
+
+@media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}
+
 /* Panel icons are self-contained SVG; this sheet only provides shared sizing
    and an accessible monochrome treatment when the platform forces colors. */
 .fv-icon{display:inline-block;width:1.25em;height:1.25em;flex:none;vertical-align:-.2em;overflow:visible;}
@@ -26181,9 +26202,9 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
    into it. Readers keep session overrides; the workbench supplies an explicit
    commit seam for undoable authored defaults. */
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
-  var retired=false, active=false, expanded=false, pendingFullscreen=0;
+  var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
-  var definition=null, items=[], memories=Object.create(null), memory=null;
+  var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var moved=[], windows=[], gesture=null, z=1, zoom=null, lastWidth=0, lastHeight=0;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
@@ -26203,6 +26224,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var zoomOut=button('−',function(){changeZoom(.8);},tools);zoomOut.setAttribute('aria-label','Zoom out');
   var zoomLabel=document.createElement('span');zoomLabel.className='explore-zoom';tools.appendChild(zoomLabel);
   var zoomIn=button('+',function(){changeZoom(1.25);},tools);zoomIn.setAttribute('aria-label','Zoom in');
+  button('Fit diagram',function(){fitCanvas();},tools);
   var playerGrip=button('⠿',function(){},player,'explore-player-grip');
   playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
   var playerResize=button('◢',function(){},player,'explore-window-resize');
@@ -26215,12 +26237,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function beginEdit(){
     if(!active || retired)return false;
-    var token=author?author.begin(definition.id):null;if(token===false)return false;
-    return {token:token,layout:copy(memory.layout),camera:camera(),zoom:zoom};
+    var authored=author && !workbenchCanvas;
+    var token=authored?author.begin(definition.id):null;if(token===false)return false;
+    return {token:token,authored:!!authored,layout:copy(memory.layout),camera:camera(),zoom:zoom};
   }
   function publish(token){
     if(retired || !active || token===false)return false;
-    var ok=!author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
+    var ok=!token.authored || !author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
     if(!ok){memory.layout=token.layout;zoom=token.zoom;sizeGraph(false);positionCamera(token.camera);}
     return ok;
   }
@@ -26267,7 +26290,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     /* Stable across page scroll and refresh; no document-position feedback. */
     var styles=getComputedStyle(shell),inset=parseFloat(styles.getPropertyValue('--workspace-toolbar')) || 0;
     var fixed=parseFloat(styles.getPropertyValue('--explore-height'));
-    stage.style.height=Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
+    stage.style.height=(workbenchCanvas || readerCanvas)?window.innerHeight+'px':Math.max(340,Number.isFinite(fixed) && fixed>0?fixed:window.innerHeight-inset-toolbar.getBoundingClientRect().height-36)+'px';
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */
@@ -26288,8 +26311,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
-    var total=stacked.reduce(function(n,w){return n+w.state.h;},0),room=Math.max(0,b.h-24-gap*Math.max(0,stacked.length-1));
-    var scale=Math.min(1,room/(total || 1)),y=12,maxWidth=0;
+    var insetTop=workbenchCanvas?142:readerCanvas?96:12,insetBottom=workbenchCanvas?68:12;
+    var total=stacked.reduce(function(n,w){return n+w.state.h;},0),room=Math.max(0,b.h-insetTop-insetBottom-gap*Math.max(0,stacked.length-1));
+    var scale=Math.min(1,room/(total || 1)),y=insetTop,maxWidth=0;
     windows.forEach(function(w){
       var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
       w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
@@ -26305,7 +26329,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     var controls=memory.controls;
     if(!controls){
       var height=Math.min(b.h-24,tracks+76),right=maxWidth && b.w-maxWidth>420?maxWidth+28:12;
-      controls={x:12,y:b.h-height-12,w:b.w-right-12,h:height};
+      controls=workbenchCanvas?{x:84,y:b.h-height-68,w:Math.min(760,b.w-112),h:height}:{x:12,y:b.h-height-12,w:b.w-right-12,h:height};
     }
     playerWindow.state=memory.controls || Object.assign({},controls);
     apply(playerWindow,constrain(playerWindow,controls));
@@ -26316,17 +26340,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
   function sizeGraph(preserve){
-    if(!active || retired)return;
+    if(!active || retired || !board.clientWidth || !board.clientHeight)return;
     var prior=graphPixels?camera():null,natural=graphWidth();
     var width=zoom!==null?natural*zoom:boardSize && boardSize.mode()==='readable'?natural:board.clientWidth;
     graphPixels=clamp(width,natural*.15,natural*4);
-    marginX=board.clientWidth*.25;marginY=board.clientHeight*.25;
+    marginX=board.clientWidth*2;marginY=board.clientHeight*2;
     board.style.setProperty('--explore-width',graphPixels+'px');
     board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
-    board.style.setProperty('--explore-canvas-height',(board.clientHeight+2*marginY)+'px');
+    var svg=board.querySelector('.boardcanvas>svg'),graphHeight=svg && svg.viewBox.baseVal.width?graphPixels*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width:0;
+    board.style.setProperty('--explore-canvas-height',(((workbenchCanvas || readerCanvas)?Math.max(board.clientHeight,graphHeight):board.clientHeight)+2*marginY)+'px');
     board.style.setProperty('--explore-canvas-width',(Math.max(board.clientWidth,graphPixels)+2*marginX)+'px');
     zoomLabel.textContent=Math.round(graphPixels/natural*100)+'%';
     if(preserve && prior)positionCamera(prior);
+    else if(preserve){if(memory.layout.camera)positionCamera(memory.layout.camera);else{board.scrollLeft=marginX;board.scrollTop=marginY;}}
   }
   function changeZoom(factor){
     if(!active || retired)return;clearScrollEdit();var token=beginEdit();if(token===false)return;
@@ -26362,7 +26388,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function pointerMove(ev){
     var g=gesture;if(!g || ev.pointerId!==g.id)return;
-    var dx=ev.clientX-g.startX,dy=ev.clientY-g.startY;g.changed=g.changed || Math.abs(dx)+Math.abs(dy)>2;
+    var scale=stage.offsetWidth?stage.getBoundingClientRect().width/stage.offsetWidth:1;
+    var dx=(ev.clientX-g.startX)/(scale || 1),dy=(ev.clientY-g.startY)/(scale || 1);g.changed=g.changed || Math.abs(dx)+Math.abs(dy)>2;
     if(g.kind==='pan'){board.scrollLeft=g.left-dx;board.scrollTop=g.top-dy;return;}
     if(g.kind==='move')Object.assign(g.w.state,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),{stacked:false});
     else Object.assign(g.w.state,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}));
@@ -26403,13 +26430,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
   var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
   function enter(){
-    if(active || !definition || definition.presentation!=='explore')return;
+    if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
     active=true;memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(grid.querySelectorAll('.pwidget[data-dv-panel]'));
     if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
-    board.classList.add('explore-board');fitHeight();
+    board.classList.add('explore-board');if(workbenchCanvas){canvasBoardHidden=board.hidden;board.hidden=false;}fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};panelWindow(card,panel,it,index);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
@@ -26422,11 +26449,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function leave(){
     if(!active)return;clearScrollEdit();finish(true);
-    memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;
-    stage.hidden=true;grid.hidden=false;board.classList.remove('explore-board');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
+    stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
     shell.classList.remove('viewport-explore');menu.hidden=focus.hidden=stack.hidden=true;
   }
   function isFullscreen(){return document.fullscreenElement===shell;}
@@ -26474,8 +26501,32 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   window.addEventListener('pointerup',pointerEnd,true);
   board.addEventListener('wheel',scrollIntent,{passive:true});board.addEventListener('keydown',scrollKey);
   board.addEventListener('pointerdown',panStart);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
+  function fitCanvas(insets){
+      if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:180}:{left:24,right:windows.length?260:24,top:108,bottom:180});
+      insets=Object.assign({},insets);
+      windows.filter(visible).forEach(function(win){var r=win.rect;if(!r)return;
+        if(r.x<board.clientWidth/2)insets.left=Math.max(insets.left,Math.min(board.clientWidth*.4,r.x+r.w+16));
+        else insets.right=Math.max(insets.right,Math.min(board.clientWidth*.4,board.clientWidth-r.x+16));
+      });
+      var natural=graphWidth(),svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.width?svg.viewBox.baseVal.height/svg.viewBox.baseVal.width:1;
+      var w=Math.max(240,board.clientWidth-insets.left-insets.right),h=Math.max(200,board.clientHeight-insets.top-insets.bottom);
+      zoom=clamp(Math.min(w/natural,h/(natural*ratio),1.5),.15,4);sizeGraph(false);
+      board.scrollLeft=marginX+graphPixels/2-(insets.left+w/2);board.scrollTop=marginY+graphPixels*ratio/2-(insets.top+h/2);
+  }
   return {
-    setView:function(view,tiles){leave();definition=view;items=tiles || [];enter();},
+    isWorkbenchCanvas:function(){return workbenchCanvas;},
+    isExplore:function(){return active;},
+    viewDefinition:function(){return definition;},
+    setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
+    setWorkbenchCanvas:function(on){
+      if(retired || workbenchCanvas===on)return;
+      leave();var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
+      if(!definition)definition={id:'flow',presentation:'standard'};
+      enter();
+    },
+    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,.15,4);sizeGraph(true);},
+    fitCanvas:fitCanvas,
+    setView:function(view,tiles){leave();definition=view;items=tiles || [];var fresh=!memories[view.id];enter();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){
@@ -26491,14 +26542,23 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     },
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,
+    snapshotCanvasState:function(){
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      return copy(workbenchCanvas?memories:otherMemories);
+    },
+    restoreCanvasState:function(saved){
+      if(workbenchCanvas){leave();memories=Object.assign(Object.create(null),copy(saved));enter();}
+      else otherMemories=Object.assign(Object.create(null),copy(saved));
+    },
     snapshotReaderState:function(){
-      if(active){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
-      return {memories:JSON.parse(JSON.stringify(memories)),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
     },
     restoreReaderState:function(saved){
       if(!saved || retired)return;
       leave();
-      memories=Object.assign(Object.create(null),JSON.parse(JSON.stringify(saved.memories)));
+      memories=Object.assign(Object.create(null),copy((workbenchCanvas?saved.canvasMemories:saved.memories) || {}));
+      otherMemories=Object.assign(Object.create(null),copy((workbenchCanvas?saved.memories:saved.canvasMemories) || {}));
       Object.keys(memories).forEach(function(id){memories[id].panels=Object.assign(Object.create(null),memories[id].panels);});
       enter();
       if(!saved.expanded){if(expanded)exitExpanded();}
@@ -26516,6 +26576,48 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     suspend:leave,
     destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',scrollIntent);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
   };
+}
+/* ---- src/viewer/explore-canvas.js ---- */
+/* Standalone Explore uses the entire browser (or embedding frame). Curated
+   standard views keep their document layout. Navigation never edits the spec. */
+function initViewerExploreCanvas(ctl,view){
+  var active=null,seen=new Set(),frame=0;
+  var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
+  var label=document.createElement('label');label.textContent='Story ';
+  var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
+  ctl.sections.filter(function(rec){return rec.hasDiagram;}).forEach(function(rec){
+    var option=document.createElement('option');option.value=rec.number;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent || rec.reference || 'Section '+rec.number;sections.appendChild(option);
+  });
+  var back=document.createElement('button');back.type='button';back.className='mbtn';back.textContent='Back to page';navigation.appendChild(back);
+  function show(rec){
+    var previous=active;active=rec && rec.viewport && rec.viewport.isExplore()?rec:null;
+    if(previous && previous!==active){previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);}
+    document.body.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
+    if(!active){navigation.remove();return;}
+    active.sectionEl.classList.add('explore-active-section');
+    active.sectionEl.querySelector('.diagram-views').prepend(navigation);sections.value=String(active.number);
+    active.viewport.setReaderCanvas(true);
+    var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
+    if(!seen.has(key)){
+      seen.add(key);cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
+        if(active===rec && !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
+      });
+    }
+  }
+  sections.addEventListener('change',function(){
+    var rec=ctl.sections.find(function(r){return r.number===Number(sections.value);});if(!rec)return;
+    if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
+    show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
+  });
+  back.addEventListener('click',function(){var rec=active;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
+  function viewChanged(ev){
+    var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});if(rec)show(rec);
+  }
+  view.addEventListener('diagram-view-change',viewChanged);
+  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
+  if(!initial)initial=ctl.sections.find(function(r){return r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
+  show(initial);
+  return {destroy:function(){view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
 }
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
@@ -28482,7 +28584,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       if(id==='flow'){setMode('flow');return true;}
       return false;
     },
-    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,
+    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
@@ -28790,7 +28892,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
     var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize);
-    if(composition)result.presentation=composition;
+    if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
       /* Expansion also belongs to ordinary diagrams without authored views. */
       var surface=document.createElement('div');surface.className='standard-view-surface';
@@ -30732,6 +30834,7 @@ function wireTour(ctl, view, win, config, options){
     /* the comfortable 44px margin first, then the same six spots at 16px
        — a hair of extra room often clears a ring outright */
     var candidates = spots(m).concat(spots(16));
+    if(view.querySelector('.viewer-diagram-canvas'))candidates.push({x:cx,y:(vh-uh)/2},{x:m,y:(vh-uh)/2},{x:vw-m-uw,y:(vh-uh)/2});
     function area(c, r){
       var w = Math.min(c.x + uw, r.x + r.w) - Math.max(c.x, r.x);
       var h = Math.min(c.y + uh, r.y + r.h) - Math.max(c.y, r.y);
@@ -30743,6 +30846,11 @@ function wireTour(ctl, view, win, config, options){
     });
     Array.prototype.forEach.call(parts.extras.querySelectorAll('.dv-tour-note'), function(n){
       var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    // A full-window Explore surface can be the primary ring. Its player still
+    // needs to stay usable when the narration must overlap that broad ring.
+    Array.prototype.forEach.call(view.querySelectorAll('.explore-player,.explore-tools,.explore-window,.viewport-explore>.diagram-views'),function(n){
+      if(!isRendered(n))return;var b=n.getBoundingClientRect();others.push({x:b.left,y:b.top,w:b.width,h:b.height});
     });
     var pick = null, mode = 'clear';
     if (!primary || primary.w <= 0){ pick = candidates[0]; }
@@ -30762,8 +30870,8 @@ function wireTour(ctl, view, win, config, options){
       if (best){ pick = best; mode = 'partial'; }
     }
     if (!pick){
-      var least = Infinity;
-      candidates.forEach(function(c){ var a = area(c, primary); if (a < least){ least = a; pick = c; } });
+      var least = Infinity,leastOther=Infinity;
+      candidates.forEach(function(c){var a=area(c,primary),other=others.reduce(function(sum,r){return sum+area(c,r);},0);if(a<least || a===least && other<leastOther){least=a;leastOther=other;pick=c;}});
       mode = 'covers-primary';
     }
     parts.ui.setAttribute('data-placement', mode);
@@ -31669,6 +31777,7 @@ function boot(raw){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
     pendingLinkBase = null;
   }
+  initViewerExploreCanvas(ctl,view);
   wirePresenter(ctl, view, window);
   /* First-run guided tour: a page's own page.tour replaces the built-in
      default wholesale; an unusable override falls back to the default so a

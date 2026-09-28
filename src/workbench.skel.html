@@ -19,10 +19,10 @@
     <button class="bbtn" id="workspace-home" type="button">← New / open</button>
     <div class="workspace-create">
         <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
-        <label class="editor-add-destination" for="diagram-add-target">Into <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+        <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
     </div>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
+    <div class="workspace-save"><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save">Save</button></div>
   </div>
 </header>
 
@@ -139,22 +139,23 @@
     <section class="specbox" id="spec-editor" aria-label="Editing workspace">
       <div class="editor-pane" id="editor-agent" role="tabpanel" aria-labelledby="editor-tab-agent" hidden>
         <div class="folder-agent-shell">
-          <h2>Build with Claude</h2>
+          <details id="folder-agent-pairing" open><summary>Connection &amp; permissions</summary>
           <p id="folder-agent-folder-help"><strong>Pick the exact folder Claude is working in.</strong> Ask Claude: “Show the full path to your current working folder.” Select that folder itself in the picker.</p>
           <pre class="folder-agent-command">Claude’s working folder ← select this
 └─ flowview-session-…   ← created automatically</pre>
           <div class="folder-agent-actions"><button type="button" class="bbtn" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose Claude’s exact working folder</button><button type="button" class="bbtn" id="folder-agent-resume">Resume a session folder</button><button type="button" class="bbtn" id="folder-agent-disconnect" disabled>Disconnect</button></div>
-          <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
           <p id="folder-agent-connection">Not connected</p><p id="folder-agent-folder" class="folder-agent-folder"></p>
           <p id="folder-agent-status" role="status">For a new connection, choose the working folder itself. Flowview creates the exchange subfolder after you grant access.</p>
           <details id="folder-agent-setup"><summary>Connection instructions</summary><p>Read the full instructions, then paste them into your visible Claude Code session. The instructions locate the exchange inside Claude’s current working folder. Paste into that same session. Your existing permissions still apply. For a fresh Claude session with browser integrations disabled:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><textarea id="folder-agent-instructions" readonly rows="10" aria-label="Full Claude connection instructions"></textarea><button type="button" class="bbtn" id="folder-agent-copy" disabled>Copy connection instructions</button><p>To resume: use Claude in the same working folder, open the exchange’s story.spec.json in the editor, then choose “Resume a session folder” and select that exchange subfolder. Copy the fresh connection instructions into Claude.</p></details>
+          </details>
           <div id="folder-agent-messages" class="folder-agent-messages" role="log" aria-label="Conversation with Claude" aria-live="polite"></div>
           <section id="folder-agent-activity" class="folder-agent-activity" aria-label="Claude activity" hidden>
             <b id="folder-agent-activity-title" role="status">Waiting for Claude</b>
             <p id="folder-agent-progress" class="folder-agent-hint"></p>
             <ol id="folder-agent-activity-log" role="log" aria-label="Updates from Claude" aria-live="polite" aria-relevant="additions"></ol>
           </section>
-          <p id="folder-agent-context" class="folder-agent-hint">Included with your message: the current story.</p>
+          <section class="folder-agent-context-card" aria-label="Context for your next message"><b id="folder-agent-context-heading">Your next message includes</b><div id="folder-agent-context" aria-live="polite"></div><p class="folder-agent-hint">The whole story is shared. Your selection tells Claude where to focus.</p></section>
+          <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
           <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" maxlength="16000" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
           <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your session folder keeps the conversation, story, and authoring notes.</p>
         </div>
@@ -294,18 +295,33 @@
         <div class="specrow"><button class="rbtn" id="trace-convert" disabled>Build diagram</button><button class="bbtn" id="trace-cancel">cancel</button></div>
       </div>
         <div id="editor-company"></div>
-        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset editor width</button></div><p class="fnote">Drag the divider to resize the editor. Double-click it for an even split.</p></details>
+        <details class="ssec workspace-preferences"><summary>Workspace preferences</summary><div class="specrow"><button class="bbtn" id="workspace-focus" aria-pressed="false">Focus workspace</button><button class="bbtn" id="workspace-reset">Reset panel layout</button></div><p class="fnote">Drag a panel by its title to move it; drag its bottom corner to resize. Close panels to reveal more canvas. Your layout is remembered in this browser.</p></details>
       </div>
       <ul class="msgs" id="msgs" aria-live="polite"></ul>
     </section>
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
-    <div class="workmain">
+    <details id="workspace-appearance" class="workspace-appearance"><summary>Canvas appearance</summary><div id="workspace-appearance-body">
+      <label class="workspace-view-label">View <select id="workspace-view"><option value="diagram">Diagram canvas</option><option value="page">Page preview</option></select></label>
+      <p class="fnote">Use Page preview to edit text and arrange the exported page.</p>
       <div class="toolrow">
         <span class="lab">SKIN</span>
         <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
       </div>
 
-      <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+    </div></details>
+    <div class="workmain" id="workspace-canvas" aria-label="Diagram canvas" tabindex="-1">
+      <div id="workspace-canvas-space"><div id="workspace-canvas-world">
+        <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
+      </div></div>
+    </div>
+    <button type="button" id="folder-agent-selection" class="workspace-selection">Select on the canvas to focus your message</button>
+    <div class="workspace-canvas-controls" role="toolbar" aria-label="Canvas navigation">
+      <button type="button" id="workspace-pan" class="bbtn" aria-pressed="false" title="Drag the canvas; hold Space for temporary pan">Pan</button>
+      <button type="button" id="workspace-zoom-out" class="bbtn" aria-label="Zoom canvas out">−</button>
+      <button type="button" id="workspace-zoom" class="bbtn" title="Reset canvas to 100%">100%</button>
+      <button type="button" id="workspace-zoom-in" class="bbtn" aria-label="Zoom canvas in">+</button>
+      <button type="button" id="workspace-fit" class="bbtn">Fit diagram</button>
+      <button type="button" id="workspace-panels" class="bbtn" aria-pressed="false">Hide tools</button>
     </div>
 
   </div>

@@ -9,6 +9,7 @@ import sys
 
 root=Path(sys.argv[1]).resolve()
 out=Path(sys.argv[2]).resolve()
+sys.path.insert(0,str(root/'tools'))
 spec=importlib.util.spec_from_file_location('flowview_build',root/'tools/build.py')
 build=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(build)
@@ -34,6 +35,7 @@ html=build.fill(build.read('workbench.skel.html'),{
     'WORKBENCH_TEMPLATES':build.workbench_templates(),
     'WORKBENCH_CANON':build.workbench_canon(),
     'HUMAN_GUIDE':build.read('workbench/human-guide.html'),
+    'FOLDER_AGENT_KIT':build.folder_agent_kit(root,build.canon_runtime()),
 })
 out.mkdir(parents=True,exist_ok=True)
 (out/'index.html').write_text(html)

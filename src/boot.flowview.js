@@ -136,6 +136,7 @@ function boot(raw){
     deepLinkChannel.receiveLinkBaseMessage(pendingLinkBase);
     pendingLinkBase = null;
   }
+  initViewerExploreCanvas(ctl,view);
   wirePresenter(ctl, view, window);
   /* First-run guided tour: a page's own page.tour replaces the built-in
      default wholesale; an unusable override falls back to the default so a

@@ -21,7 +21,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(4);
  const before=await page.locator('.boardcanvas>svg').count();
  const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board'));
- expect(Math.abs(board.height-stage.height)).toBeLessThan(3);
+ expect(stage).toEqual({x:0,y:0,width:page.viewportSize().width,height:page.viewportSize().height});expect(board).toEqual(stage);
  let bottom=stage.y;for(const card of await floats(page).all()){const r=await rect(card);expect(r.y).toBeGreaterThanOrEqual(bottom);expect(Math.abs(r.x+r.width-stage.x-stage.width+13)).toBeLessThan(3);bottom=r.y+r.height;}
  expect(bottom).toBeLessThan(stage.y+stage.height);
  const play=page.getByRole('button',{name:'Next step',exact:true}),pos=await rect(play);
@@ -29,10 +29,10 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.locator('.explore-board').evaluate(el=>{el.scrollLeft=1000;el.scrollTop=900;});
  const after=await rect(play);expect(after.x).toBeCloseTo(pos.x,0);expect(after.y).toBeCloseTo(pos.y,0);
  await play.click();await expect(floats(page)).toHaveCount(3);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeCloseTo(pos.y,0);
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
- await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
+ await page.getByRole('button',{name:'Fit diagram',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');

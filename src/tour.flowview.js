@@ -512,6 +512,7 @@ function wireTour(ctl, view, win, config, options){
     /* the comfortable 44px margin first, then the same six spots at 16px
        — a hair of extra room often clears a ring outright */
     var candidates = spots(m).concat(spots(16));
+    if(view.querySelector('.viewer-diagram-canvas'))candidates.push({x:cx,y:(vh-uh)/2},{x:m,y:(vh-uh)/2},{x:vw-m-uw,y:(vh-uh)/2});
     function area(c, r){
       var w = Math.min(c.x + uw, r.x + r.w) - Math.max(c.x, r.x);
       var h = Math.min(c.y + uh, r.y + r.h) - Math.max(c.y, r.y);
@@ -523,6 +524,11 @@ function wireTour(ctl, view, win, config, options){
     });
     Array.prototype.forEach.call(parts.extras.querySelectorAll('.dv-tour-note'), function(n){
       var b = n.getBoundingClientRect(); others.push({x: b.left, y: b.top, w: b.width, h: b.height});
+    });
+    // A full-window Explore surface can be the primary ring. Its player still
+    // needs to stay usable when the narration must overlap that broad ring.
+    Array.prototype.forEach.call(view.querySelectorAll('.explore-player,.explore-tools,.explore-window,.viewport-explore>.diagram-views'),function(n){
+      if(!isRendered(n))return;var b=n.getBoundingClientRect();others.push({x:b.left,y:b.top,w:b.width,h:b.height});
     });
     var pick = null, mode = 'clear';
     if (!primary || primary.w <= 0){ pick = candidates[0]; }
@@ -542,8 +548,8 @@ function wireTour(ctl, view, win, config, options){
       if (best){ pick = best; mode = 'partial'; }
     }
     if (!pick){
-      var least = Infinity;
-      candidates.forEach(function(c){ var a = area(c, primary); if (a < least){ least = a; pick = c; } });
+      var least = Infinity,leastOther=Infinity;
+      candidates.forEach(function(c){var a=area(c,primary),other=others.reduce(function(sum,r){return sum+area(c,r);},0);if(a<least || a===least && other<leastOther){least=a;leastOther=other;pick=c;}});
       mode = 'covers-primary';
     }
     parts.ui.setAttribute('data-placement', mode);

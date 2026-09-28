@@ -1,4 +1,4 @@
-# Workbench space and focus
+# Workbench canvas and floating tools
 
 For a captioned, searchable list with duplicate and reorder controls, see
 [Story steps](workbench-steps.md).
@@ -18,9 +18,8 @@ Selected-step edits use
 the builder's existing selection tracking. No playback state enters the JSON,
 undo history or saved layout. Standalone published pages retain autoplay.
 
-Reordering rows, inspector edits, Render and Undo/Redo keep the page's current
-scroll position while the preview rebuilds. In Focus workspace, the preview's
-own scroll position is retained instead. If an edit shortens the document past
+Reordering rows, inspector edits, Render and Undo/Redo keep Page preview's
+scroll position while it rebuilds. If an edit shortens the document past
 that position, scrolling stops at the new bottom. Opening or importing a different
 project keeps its normal navigation behavior.
 
@@ -37,14 +36,23 @@ source uses `\n`. Code remains literal, preserves indentation, and scrolls withi
 its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
-Use **File → Workspace preferences → Focus workspace** to hide the introduction and
-reference material. On a desktop, the preview scrolls beside a viewport-sized
-editor. **Exit focus** returns to the normal page and its previous scroll
-position. Focus mode lasts only until you exit or reload.
+The diagram is the full browser canvas. Its nodes and connections pan and zoom
+without a surrounding document card. Select a **Section** in the top toolbar;
+its view choices, playback and data panels float over the canvas. Use **Pan**
+(or hold Space), zoom, and **Fit diagram** to navigate. Camera movements and
+floating tool positions are viewing preferences, not source edits or Undo entries.
+Camera and panel state follow matched sections through source edits; new projects
+start fresh. Each named view retains its own camera for the session.
+
+**Canvas appearance → Page preview** shows prose, contract cards and the authored
+page arrangement. Use it to arrange/export curated Home-centric views or simulate
+host widths. **Diagram canvas** returns to the working canvas. Normal canvas
+movement does not overwrite an authored Explore layout; arrange that layout
+explicitly in Page preview to save defaults.
 
 **Add to diagram**, **Undo**, **Redo**, **User guide**, and **Save** share the
 project toolbar above the workspace. The
-**Into** selector names the destination section, including its tab when applicable.
+**Section** selector names the destination section, including its tab when applicable.
 Selecting a section in the preview updates this selector; choosing a destination
 here opens its tab and selects that section without switching editor tools.
 
@@ -72,66 +80,29 @@ cancel without changing the spec. Render handwritten JSON edits before starting.
 Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
 Finish **ADD TO STEP** before using the quick connection shortcut.
 
-The tool rail is on the far left, with its editor immediately beside it and
-the diagram preview on the right. One workspace fills the editor at a time:
+The left rail opens independent **Agent**, **Inspect**, **Steps**, **Outline**,
+**JSON**, and **File** windows. Multiple windows can stay open. Drag a header to
+move it, drag its corner to resize, or use arrow keys on those handles (Shift
+moves farther). Close a window with × and reopen it from the rail. Existing
+forms, drafts, selection and disclosure state remain intact.
 
-- **Inspect** edits the selected element. Choose an element in the preview,
-  then Inspect to see its fields. When already inspecting, selecting another
-  element updates its fields. The path beneath the title opens it in JSON.
-- **Steps** provides the searchable story list and path controls. Selecting a
-  beat stays in this workspace; **Inspect selected step** opens its fields.
-- **Outline** finds nodes, panels, steps, and sections across the document.
-  **⌘/Ctrl K** opens it and focuses search. Selecting a result stays in the
-  outline; **Inspect selection** opens the selected object's fields.
-- **JSON** gives the source the full pane, with **Render** and **Diff** below.
-  Validation links and explicit source jumps open it automatically. Raw edits
-  require Render before using builder actions.
-- **File** contains open/export actions, Mermaid and trace imports, Company
-  repository/catalog controls, and Workspace preferences.
+**Hide tools** clears editor windows; **Show tools** restores them. Data-panel
+visibility uses the diagram's **Panels** menu. **File → Workspace preferences →
+Reset panel layout** restores initial positions and sizes. Geometry and open
+windows persist in this browser; resizing the browser keeps their handles on
+screen. Escape, pointer cancellation and losing window focus cancel a drag.
 
-Tab into the rail, then use Up/Down or Home/End to switch tools. Changing tools
-retains existing forms, disclosure state, scroll positions, and source drafts.
-Ordinary canvas selections do not leave Steps, Outline, JSON, or File. Explicit
-creation and inspection actions can open the relevant controls. Object clipboard
-actions stay with Inspect; Save and Undo/Redo remain available in the top toolbar.
+The Agent window names the current selection and the view/path/step context.
+Each sent message retains a receipt of that exact context. A persistent Claude
+indicator shows waiting, working, quiet or finished even while Agent is closed.
+The selection pill also opens Agent. The entire story is shared; selection is
+focus, not a limit on the data sent.
 
-At widths of 800 pixels and up, drag the vertical divider's visible handle to
-change editor width. The divider is also keyboard accessible:
+**⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
+Save, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
+story and panel fields side by side; narrower windows stack them.
 
-- Tab to the divider. Left/right moves the editor boundary. Shift uses larger
-  increments.
-- Home and End choose the minimum and maximum sizes.
-- Double-click the divider for a balanced split. **File → Workspace preferences → Reset editor width** restores the
-  default 440-pixel editor width and keeps the selected tool.
-
-The editor stays between 320 and 1100 pixels wide, with at least 300 pixels
-reserved for the preview. Drag right to widen it or left to shrink it. Resizing
-does not rerender the preview or change the selected step, path, or view. Wide
-step inspectors place narrative controls beside panel changes; individual panel
-controls stay collapsible. Wide Home inspectors put the map beside its device,
-person, and signal controls. Narrow inspectors stack them. Fields stay within
-the editor even when service/API choices or field values are long.
-
-Preview panels move below the diagram when its section has 1000 pixels or
-less of usable width. This follows the space left by the editor and section
-padding, even on a wide desktop. The diagram (or Home in Home view) then gets
-the full row; supporting widgets wrap underneath. All six skins use this
-behavior in the workbench, standalone pages and embeds.
-
-Editor width and selected tool persist in this browser when local storage is
-available. Widths from the earlier layout are carried forward; the former
-inspector/JSON height split is no longer used. Focus mode is temporary.
-Resizing the window clamps the displayed editor width without losing its saved size.
-These preferences are independent of the spec, drafts and undo history.
-Cancelling a pointer drag or moving focus out of the window restores the size
-from before that drag.
-
-At smaller widths, including phones, the preview and editor stack vertically
-and the divider disappears. The five tools remain available beside the editor. Focus mode still hides reference material. The JSON
-textarea keeps native text editing and vertical resizing where the browser
-supports it. This is a browser layout, not an operating-system fullscreen mode.
-
-All row diagrams have their own **Auto / Fit width / Readable** controls,
+In Page preview, All row diagrams have their own **Auto / Fit width / Readable** controls,
 including default curved edges, explicit `routing:"curves"`, and lane routing.
 Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
 Fit width shows the whole graph. When a diagram overflows, **Scroll** buttons and
@@ -151,3 +122,8 @@ spec content and have their own per-section reset, separate from editor sizing.
 
 Contract blocks have their own width and editing controls: see
 [adding, sizing and arranging contract blocks](contract-blocks.md).
+
+Published standalone pages open an Explore view across the full browser or iframe,
+with floating data panels, playback and view choices. Switching to a curated
+standard/Home view restores its authored page layout. **Back to page** reveals
+the surrounding document. Browser fullscreen remains a separate explicit action.

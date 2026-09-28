@@ -1,13 +1,9 @@
 # Claude conversation through a local folder
 
-Status: implemented in the isolated worktree; automated protocol, helper and
-editor round trips pass. Native browser folder permission and the user-visible
-Claude Monitor conversation remain live acceptance gates. No merge authorized.
-
-The instrumented editor prototype was built while those interactive checks await
-the user. This does not count as completing Phase 1: substituted directory handles
-and a simulated agent cannot establish native permission, Monitor availability,
-model response time, or renewal.
+Status: implemented in the isolated worktree. The user reports that the real
+Claude conversation works functionally; the next iteration adds selection/activity
+feedback and a full-window diagram canvas. Automated tests use a simulated agent
+and remain separate evidence from that user-reported acceptance. No merge authorized.
 
 ## Objective and authorization
 

@@ -174,6 +174,28 @@ test('dynamic object fields preserve empty text, unknown siblings, and explicit 
   assert.equal(aria(h.guide,'Report time assignment'),null,'custom report-time actions stay authoritative');
 });
 
+test('dynamic step icon inheritance and report-time actions preserve sparse sibling state',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'app',type:'deviceapp',fields:[
+    {id:'model',label:'Camera model',icon:'camera'},{id:'battery',label:'Battery',kind:'battery'}
+  ]}],steps:[{panels:{app:{
+    model:{value:'Doorbell',icon:'cold',futureNested:4},
+    battery:{reportedAt:null,futureNested:5},futureTop:6
+  }}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+
+  const icon=aria(h.guide,'icon');icon.value='';icon.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.app,{
+    model:{value:'Doorbell',futureNested:4},battery:{reportedAt:null,futureNested:5},futureTop:6
+  });
+
+  const clear=aria(h.guide,'battery: clear report time');
+  assert.equal(clear.disabled,true,'an authored null keeps the custom Clear action disabled');
+  aria(h.guide,'battery: inherit report time').fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.app,{
+    model:{value:'Doorbell',futureNested:4},battery:{futureNested:5},futureTop:6
+  });
+});
+
 test('registered collection composers reuse shared assignment and sparse history',()=>{
   const e=environment(),shape={cols:[{k:'name',req:true},{k:'status',kind:'enum',options:['ready','hold']}]};let seen;
   e.C.PanelRegistry.define('collection-fixture',{authoring:{template:{title:'Collection'},initialFields:true,

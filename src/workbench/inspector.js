@@ -1143,11 +1143,13 @@ function panelPatchControl(pid, patch, decl, target, options){
         if(control.matches && control.matches('input,select,textarea,button'))targets.push(control);
         targets=targets.concat(Array.from(control.querySelectorAll?control.querySelectorAll('input,select,textarea,button'):[]));
         targets.forEach(function(child){
+          if(remember===false && child._flowviewIntrinsicDisabled===undefined)
+            child._flowviewIntrinsicDisabled=!!child.disabled;
           if(remember!==false){
             if(disabled)child.setAttribute('data-panel-state-value-disabled','true');
             else child.removeAttribute('data-panel-state-value-disabled');
           }
-          child.disabled=disabled || (remember===false && child.getAttribute('data-panel-state-value-disabled')==='true');
+          child.disabled=disabled || (remember===false && child._flowviewIntrinsicDisabled===true);
         });
         control.classList.toggle('panel-state-value-disabled',disabled);
       }
@@ -1194,6 +1196,7 @@ function panelPatchControl(pid, patch, decl, target, options){
           var input=fieldInput(col,nestedHas?nested[col[0]]:undefined,colMeta);
           if(col[0]==='icon' && col[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
           wireCommit(input,function(){
+            if(col[0]==='icon' && input.value==='')return commitPatch(key,{},false,[col],storage);
             var out=panelFieldAssignment(col,input.value,'set');
             if(out.error){formError(key+': '+out.error);return false;}
             var invalid=editor.validateSubfield && editor.validateSubfield(key,col,out.value);
@@ -1228,6 +1231,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         var input = fieldInput(f,cur,meta);
         if(key==='icon' && f[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
         wireCommit(input, function(){
+          if(key==='icon' && input.value==='')return commitPatch(key,undefined,false,null,storage);
           var out=panelFieldAssignment(f,input.value,'set');
           if(out.error){formError(out.error);return false;}
           return commitPatch(key,out.value,false,null,storage);

@@ -1333,3 +1333,8 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .agent-message-footer button{flex:none;}
 .agent-message-footer button:disabled{opacity:.45;cursor:default;}
 @media(max-width:760px){.welcome-message-option{flex-direction:column;align-items:flex-start;}.agent-message-context{grid-template-columns:1fr;}.agent-message-footer{flex-wrap:wrap;}.agent-message-footer p{flex-basis:100%;}}
+
+.document-settings-entry{padding:12px 16px;border-bottom:1px solid var(--line);}
+.document-source-heading{margin-top:10px;font-size:12px;}
+.document-advanced{margin-top:10px;font-size:12px;}
+.document-advanced>summary{cursor:pointer;margin-bottom:8px;}

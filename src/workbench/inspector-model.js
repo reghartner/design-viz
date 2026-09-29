@@ -127,6 +127,11 @@ function builderEffectivePanelStates(d, stepIndex, pathId){
 /* ---------------- per-element authoring guidance ---------------- */
 
 var BUILDER_GUIDES = {
+  document: {
+    title:'Document settings',
+    how:'These settings travel with Save and Export. Canvas appearance is a temporary preview.',
+    fields:[['title','page heading'],['skin','saved opening skin; omitted uses pastel'],['generatedFrom','source URL, description, version and date shown below the title'],['tour','advanced reader tour JSON; validated before committing']]
+  },
   group: {
     title: 'Group — a containment boundary',
     how: 'Select nodes and set their group to create a boundary. Select its boundary to edit or delete it.',
@@ -240,6 +245,7 @@ var BUILDER_GUIDES = {
     how: 'Edit the selected JSON, then click Render. Everything inside is optional; a section is prose, optional contract blocks, and an optional diagram.',
     fields: [
       ['heading', 'section heading'],
+      ['collapsed', 'Initially collapse prose: starts paragraphs and bullets folded; diagrams and contracts stay visible'],
       ['id', 'optional stable identity for links and node details; renaming updates local detail references'],
       ['detailOnly', 'hide this section until its detail is opened; it remains editable in the workbench'],
       ['accent', 'green blue violet amber pink cyan red slate, or "#RRGGBB"'],

@@ -372,3 +372,29 @@ test('paragraph formatting retains manual textarea size only for the same inspec
   h.session.target={kind:'para',section:0,index:1};h.inspector.render();
   assert.ok(!h.guide.querySelector('textarea').style.height,'another paragraph starts at its default size');
 });
+
+test('document inspector commits through history and retires old source controls',()=>{
+  for(const key of ['blocks','sections'])for(const wrapped of [true,false]){
+    const e=environment(),page={title:'Before',[key]:[{heading:'Flow',text:['A paragraph'],diagram:{nodes:{a:{}},rows:[['a']]}}]};
+    const h=e.mount(wrapped?{page}:page);h.session.target={kind:'document'};h.inspector.render();
+    const field=name=>h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent===name).children[1];
+    const before=h.text,title=field('Document title');title.value='After';title.fire('change');h.flush();
+    assert.equal((wrapped?JSON.parse(h.text).page:JSON.parse(h.text)).title,'After');
+    assert.equal(field('Source description').disabled,true);
+    const url=field('Source URL');url.value='https://example.test/design';url.fire('change');h.flush();
+    assert.equal(field('Source description').disabled,false);
+    const committed=h.text;url.value='https://stale.test';url.fire('change');assert.equal(h.text,committed);
+    h.session.undo();h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+    assert.ok(!h.guide.querySelectorAll('button').some(button=>button.textContent==='delete document'));
+    h.inspector.destroy();title.value='Retired';title.fire('change');assert.equal(h.text,before);
+  }
+});
+
+test('section initial prose collapse is one authored edit with exact Undo',()=>{
+  const e=environment(),h=e.mount({page:{sections:[{heading:'Flow',text:['Prose'],diagram:{nodes:{},rows:[]}}]}});
+  h.session.target={kind:'section',section:0};h.inspector.render();
+  const row=h.guide.querySelectorAll('.frow').find(row=>row.querySelector('.flab').textContent==='Initially collapse prose');
+  const before=h.text,control=row.querySelector('input');control.checked=true;control.fire('change');
+  assert.equal(JSON.parse(h.text).page.sections[0].collapsed,true);
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);h.inspector.destroy();
+});

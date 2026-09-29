@@ -15,6 +15,11 @@ explains story time: the section's start and formats, each step's time,
 battery drain rates, and device-app report times whose "Updated … ago" text the
 cards compute (see [story time](step-time.md)).
 
+**Find your way** covers **Inspect → Document settings** for the saved title,
+skin and source line, the preview-only **Canvas appearance** controls, and
+**Initially collapse prose** for section paragraphs and bullets. Document edits
+use the same Save/Export and Undo path as other inspector fields.
+
 Choose a chapter to jump within the guide. **Close** or Escape returns to your
 previous work. Reading does not change the spec, selection, undo history, or
 welcome navigation. Browser Find and normal text copying remain available.

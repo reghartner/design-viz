@@ -147,6 +147,28 @@ stated value), and the ledger must label them illustrative; when they show
 on the page, one line in the section description says so. Details:
 [honesty rules](references/honesty-rules.md).
 
+### Document settings and preview appearance
+
+`page.title` and `page.skin` are saved document defaults. `page.generatedFrom`
+uses `{url, label?, version?, at?}` for the source line below the title. In the
+workbench, **Inspect → Document settings** authors these fields with Undo; add
+the URL before its description/version/date, and clear the URL to remove the
+source line. Wrapped pages and bare pages using either `blocks` or `sections`
+keep their shape. **Outline → Document settings** is another entry. The
+**Advanced: reader tour and compatibility** group authors `page.tour` JSON with
+the shared tour validator and shows runtime/contract/feature requirements
+read-only. Clearing the tour restores the built-in reader walkthrough. Keep
+`page.flowview` metadata system-owned; Save/Export stamp it and preserve
+declared requirements. A bare diagram explicitly offers **Add document settings**
+to add a page wrapper without changing its diagram.
+**Canvas appearance** skin buttons affect only the current preview. **Use
+document default** follows the saved skin even when a host cookie selects a
+different theme; **Edit saved default…** opens Document settings. Save and Export
+use the authored default; hosting sites may override reader appearance.
+For section text/bullets, `collapsed:true` starts prose folded. Humans set this
+with **Initially collapse prose** in the section inspector; the diagram and
+contract blocks remain visible, and reader toggles do not rewrite that default.
+
 ## Phase 1: Inventory the source
 
 Read SOURCE fully. Build the coverage ledger as described in

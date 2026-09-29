@@ -54,6 +54,7 @@ function builderTargetPath(raw, target){
   /* target: {section:<zero-based ordinal>, kind, id?, index?} → path array
      into the raw editor JSON, or null. Tabs address by block index
      instead of section ordinal. */
+  if (target.kind === 'document') return raw && raw.page ? ['page'] : [];
   if (target.kind === 'tab') return builderTabPath(raw, target.block, target.tab);
   var rec = specSectionPaths(raw)[target.section];
   if (!rec) return null;

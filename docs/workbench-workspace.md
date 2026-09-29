@@ -163,6 +163,11 @@ selection: nodes, edges, steps, panels and other editor targets. Switching tabs
 preserves that draft and selection; it does not connect a folder or start Monitor.
 There is no separate toolbar message composer.
 
+The bottom-left **Copy for agent · N selected** button copies selection context
+in one click, without opening Agent or requiring a message. It briefly shows
+**Copied**. It preserves the current draft and any active request, and is disabled
+when nothing is selected. Clipboard denial opens the manual-copy fallback in Agent.
+
 **Copy request** includes your message, selected item identifiers and evidence
 references, and view context. It omits the full JSON and selected containers'
 contents, and works without a connection. The agent can read the spec and ledger

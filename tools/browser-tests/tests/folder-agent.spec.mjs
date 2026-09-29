@@ -609,6 +609,78 @@ test('Agent tabs reuse current node, step and panel selection and preserve one d
   }finally{await page.close();await h.cleanup();}
 });
 
+test('Copy for agent copies the canvas selection directly and preserves the draft and workflow',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    const quick=page.locator('#folder-agent-selection');await expect(quick).toBeDisabled();
+    await page.locator('#docview [data-dv-node="a"]').click();
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    await expect(quick).toHaveText('Copy for agent · 1 selected');await quick.click();
+    await expect(quick).toHaveText('Copied · 1 selected');await expect(page.locator('#editor-agent')).toBeHidden();
+    let copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(copied).toContain('Selection context only');expect(copied).toMatch(/"nodes",\s*"a"/);expect(copied).not.toContain(source);
+    await page.locator('#docview [data-dv-node="b"]').click({modifiers:['Shift']});
+    await expect(quick).toHaveText('Copy for agent · 2 selected');await quick.focus();await page.keyboard.press('Enter');
+    copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"nodes",\s*"a"/);expect(copied).toMatch(/"nodes",\s*"b"/);
+    await openAgent(page);await page.locator('#folder-agent-input').fill('Keep this unfinished request private.');
+    await page.locator('#folder-agent-mode-embedded').click();await page.locator('#workspace-window-agent .workspace-window-close').click();
+    await quick.click();await expect(quick).toHaveText('Copied · 2 selected');
+    expect(await page.evaluate(()=>navigator.clipboard.readText())).not.toContain('Keep this unfinished request private.');
+    await expect(page.locator('#editor-agent')).toBeHidden();
+    await page.setViewportSize({width:640,height:360});await quick.scrollIntoViewIfNeeded();
+    expect(await quick.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node;})).toBe(true);
+    await page.screenshot({path:info.outputPath('copy-for-agent-selection.png')});
+    await page.setViewportSize({width:1280,height:900});await openAgent(page);
+    await expect(page.locator('#folder-agent-mode-embedded')).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this unfinished request private.');
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+    expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);expect(h.writes).toEqual([]);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('Copy for agent opens manual copy only on denial and retires a late fallback after source replacement',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.reject(Error('denied'))}}));
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#docview [data-dv-node="a"]').click();await page.locator('#folder-agent-selection').click();
+    const preview=page.getByRole('textbox',{name:'Selected context for agent',exact:true});
+    await expect(preview).toBeVisible();await expect(preview).toBeFocused();
+    expect(await preview.inputValue()).toMatch(/"nodes",\s*"a"/);expect(await preview.inputValue()).not.toContain(source);
+    expect(await preview.evaluate(node=>node.selectionEnd-node.selectionStart)).toBe((await preview.inputValue()).length);
+    await expect(page.locator('#folder-agent-input')).toHaveValue('');
+    await page.locator('#folder-agent-copy-back').click();await page.locator('#workspace-window-agent .workspace-window-close').click();
+    await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>new Promise((resolve,reject)=>{window.rejectSelectionCopy=reject;})}}));
+    await page.locator('#folder-agent-selection').click();await expect.poll(()=>page.evaluate(()=>!!window.rejectSelectionCopy)).toBe(true);
+    await page.locator('#editor-tab-json').click();const next=source.replace('Browser contract','Replacement draft');
+    await page.locator('#src').fill(next);await page.locator('#go').click();
+    await page.evaluate(()=>window.rejectSelectionCopy(Error('late denial')));
+    await expect(page.locator('#folder-agent-copy-preview')).toBeHidden();await expect(page.locator('#editor-agent')).toBeHidden();
+    await expect(page.locator('#src')).toHaveValue(next);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('Copy for agent keeps an existing shared-folder request intact',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await openAgent(page);await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-copy').click();
+    await copyRequest(page,'Keep this request active.');const request=await h.read('request.json'),manifest=await h.read('session.json');
+    await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').click();
+    await page.locator('#folder-agent-selection').click();await expect(page.locator('#folder-agent-selection')).toHaveText('Copied · 1 selected');
+    const copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(copied).toContain(manifest.connectionId);expect(copied).toContain('.flowview-agent/CONNECT.md');
+    expect(copied).toContain('Selection context only');expect(copied).not.toContain(request.id);expect(copied).not.toContain('Keep this request active.');
+    expect(await h.read('request.json')).toEqual(request);await expect(page.locator('#editor-agent')).toBeHidden();
+    await openAgent(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this request active.');
+    await expect(page.locator('#folder-agent-cancel')).toBeVisible();expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
 test('clipboard failure offers manual copy and invalid source cannot create context',async({page},info)=>{
   const h=await setup(page);
   try{

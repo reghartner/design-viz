@@ -384,6 +384,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   references and view context, not the complete source. Read the current spec and
   ledger from the shared folder before planning. Without a shared folder, ask for
   any required source files; do not treat the copied context as a complete diagram.
+  The bottom-left **Copy for agent** action copies selection context without
+  registering or replacing a request. Wait for the user's accompanying instruction;
+  use an existing active request or the normal native `begin` flow as appropriate.
   The project is the spec and coverage ledger at the folder root; `project.json`
   names them. Existing artifacts must be preserved and read before planning.
   Connection identity is temporary and can change without changing the project.

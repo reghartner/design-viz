@@ -52,3 +52,12 @@ test('selecting a whole document, tab, section, or large panel copies addresses 
   assert.doesNotMatch(message,/UNRELATED DOCUMENT CONTENT|EMBEDDED IMAGE|data:image|"value"/);
   assert.ok(message.length<3000,'copy size follows focus metadata, not document size');
 });
+test('context-only copy works with a selection and no message, but not with an empty or stale selection',()=>{
+  const current=snapshot([{section:1,kind:'node',id:'camera'}]),before=JSON.stringify(current);
+  const message=c.workbenchAgentMessage(current,{contextOnly:true});
+  assert.match(message,/Selection context only/);assert.match(message,/capture\.js/);
+  assert.ok(!message.includes(current.source));assert.equal(JSON.stringify(current),before);
+  assert.equal(c.workbenchAgentMessage(snapshot(),{contextOnly:true}),'');
+  assert.equal(c.workbenchAgentMessage({...current,previewCurrent:false},{contextOnly:true}),'');
+  assert.equal(c.workbenchAgentMessage(current,{message:''}),'','the message composer still requires a request');
+});

@@ -131,6 +131,13 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 
 ## Conversation and request lifecycle
 
+For a quick handoff, select items and click **Copy for agent · N selected** at
+the bottom left. It copies selection identifiers, references and view context
+without opening Agent or requiring a message. **Copied** confirms success.
+This action leaves your message draft and any active request alone; it creates
+no request and sends nothing to Monitor. With no selection it is disabled.
+If clipboard access is denied, Agent opens with the selected text for manual copy.
+
 In **Agent → Copy & paste**, write the request in the shared message box;
 include additional URLs or file paths there if useful. **Copy request** includes
 your message, selected item identifiers and JSON paths, their evidence references,

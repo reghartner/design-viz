@@ -43,7 +43,9 @@ test('Build with Claude carries the actual view and step into a checked workbenc
   const source=await page.evaluate(()=>JSON.stringify(__backstage.spec));
   const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'Build with Claude',exact:true}).click();const editor=await popupPromise;
   await expect(editor.locator('#workbench-workspace')).toBeVisible();
-  await expect(editor.locator('#editor-agent')).toBeHidden();
+  await expect(editor.locator('#editor-agent')).toBeVisible();
+  await expect(editor.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
+  await expect(editor.locator('#editor-agent')).toHaveAttribute('data-connected','false');
   await expect(editor.getByRole('dialog',{name:'Choose your diagram folder.'})).toBeVisible();
   await expect(editor.locator('#folder-agent-workflow')).toHaveValue('external');
   expect(await editor.locator('#src').inputValue().then(JSON.parse)).toEqual(JSON.parse(source));
@@ -80,7 +82,9 @@ test('the canon adapter opens Build directly and reload restores the draft witho
   await page.reload();
   await expect(page.locator('#workbench-workspace')).toBeVisible();
   expect(reads).toHaveLength(1);
-  await expect(page.locator('#editor-agent')).toBeHidden();
+  await expect(page.locator('#editor-agent')).toBeVisible();
+  await expect(page.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
   expect(new URL(page.url()).searchParams.has('canon')).toBe(false);
 });
 

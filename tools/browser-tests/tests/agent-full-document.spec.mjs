@@ -1,6 +1,6 @@
 import {test,expect} from '@playwright/test';
 import {readFile,writeFile,mkdir,mkdtemp,rm,rename,stat} from 'node:fs/promises';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
@@ -11,10 +11,10 @@ const origin='https://flowview-full-source-pressure.test';
 
 // Only native directory picking/handles are substituted. The built editor,
 // folder client, exchange, renderer, history and Python
-// helper are real. No model, native permission grant or watcher is claimed.
+// helper and watcher are real. No model or native permission grant is claimed.
 async function folderSession(page){
   const folder=await mkdtemp(path.join(tmpdir(),'flowview-full-source-pressure-'));
-  let session,writeId=0;const errors=[],unexpectedRequests=[];
+  let session,writeId=0,listener;const errors=[],unexpectedRequests=[];
   page.on('pageerror',error=>errors.push(error.message));
   page.on('console',message=>{if(message.type()==='error')errors.push(message.text());});
   await page.exposeBinding('operationDisk',async(_,operation,name,value)=>{
@@ -55,7 +55,11 @@ async function folderSession(page){
       try{await writeFile(temporary,typeof value==='string'?value:JSON.stringify(value),{flag:'wx'});await rename(temporary,path.join(session,name));}finally{await rm(temporary,{force:true});}
     },
     run:(...args)=>JSON.parse(execFileSync('python3',[path.join(session,'folder-agent.py'),...args],{cwd:session,encoding:'utf8'})),
-    cleanup:()=>rm(folder,{recursive:true,force:true})};
+    listen:async()=>{
+      listener=spawn('python3',[path.join(session,'folder-agent.py'),'watch','--minutes','2'],{stdio:'ignore'});
+      await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
+    },
+    cleanup:async()=>{listener?.kill();if(listener && listener.exitCode===null)await new Promise(resolve=>listener.once('close',resolve));await rm(folder,{recursive:true,force:true});}};
 }
 
 test('retired API and invalid full source preserve exact history; a reviewed document and ledger apply once',async({page})=>{
@@ -71,8 +75,8 @@ test('retired API and invalid full source preserve exact history; a reviewed doc
     await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
     await page.locator('#editor-tab-agent').click();
     if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
-    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-send')).toBeEnabled();
-    await page.locator('#folder-agent-close-guide').click();
+    await page.locator('#folder-agent-workflow').selectOption('embedded');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await page.locator('#folder-agent-close-guide').click();await h.listen();await expect(page.locator('#folder-agent-send')).toBeEnabled();
     const text='Rename node b in section delivery to Delivery service. Preserve every other authored field.';
     await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
     await expect.poll(async()=>{try{return (await h.read('request.json')).text;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe(text);

@@ -48,6 +48,12 @@ Unavailable permissions are recorded as failures. No permission bypass flag is
 used. Create `OUTPUT/shutdown.json` to stop the broker, or let its 45-minute
 limit disconnect the editors.
 
+Each explicit broker send starts a broker-owned Python helper watch to establish
+the embedded editor's listener readiness. It runs no model or Claude Monitor;
+the evaluation runner delivers each request directly to its one-shot model
+process. The broker stops its helper watch when that session closes, including
+failed runs.
+
 ## Judge accepted output
 
 First produce a source-preserving mechanical check and standalone render of each

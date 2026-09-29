@@ -938,8 +938,29 @@ rect.tlfuture{opacity:.18;}
 });
 
 /* timeline authoring contract; merged into this panel definition by the bundle. */
+function timelineStateEditor(context) {
+  function lanes(panel) { return timelineLaneIds(panel); }
+  return { patchControl: function (field, options) {
+    var key = field[0], value = options.value, shape;
+    if (value !== undefined &&
+        (!Array.isArray(value) || value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'events') shape = { wide: true, cols: [
+      { k: 'at', label: 'Time', kind: 'clock', req: true },
+      { k: 'label', label: 'Event label' },
+      { k: 'kind', label: 'Kind', kind: 'enum', options: TIMELINE_EVENT_KINDS },
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel) }
+    ]};
+    if (key === 'miss') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel), req: true },
+      { k: 'at', label: 'Expected at', kind: 'clock', req: true }
+    ]};
+    return shape ? context.controls.rows(key, value, shape,
+      { raw: false, commitValue: options.commit }) : null;
+  }};
+}
 PanelRegistry.extend('timeline', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Heartbeat',
       span: '6h',
@@ -976,6 +997,18 @@ PanelRegistry.extend('timeline', {
       ['events', 'jsonArr'],
       ['miss', 'jsonArr'],
     ],
+    fieldMeta: {
+      span: { label: 'Timeline span', help: 'A duration such as 6h or 90m.', group: 'Timeline' },
+      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline' },
+      lanes: { label: 'Cadence lanes', help: 'Optional independent periodic tracks; declaring lanes replaces the shared cadence.', group: 'Timeline' },
+      events: { label: 'Events', setup: { label: 'Reference events', help: 'Markers that are always present on the timeline.' },
+        initial: { label: 'Starting events', help: 'Events already present before the first step.' },
+        step: { label: 'Events added here', unsetLabel: 'Add no events at this step', help: 'These markers append at this step. Earlier events remain on the timeline.' } },
+      miss: { label: 'Missed beats', initial: { help: 'Missed lane beats already known before the story starts.' },
+        step: { unsetLabel: 'Add no missed beats at this step', help: 'These misses append at this step. Earlier misses remain visible.' } },
+      now: { label: 'Current time', help: 'Moves the timeline cursor. Later steps keep this value until another valid time is set.' },
+    },
+    editor: timelineStateEditor,
     picker: {
       order: 11,
       name: 'Heartbeat timeline',

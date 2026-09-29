@@ -248,6 +248,16 @@ typed table-cell and append-event composers used by Checks, Budget, Table and
 Log. These helpers run only in the workbench; the panel module keeps its runtime
 state semantics.
 
+Panel-owned composers also need to match the runtime fold rather than treating
+every array as the same kind of state. In-flight has no starting snapshot:
+`start`, `end` and `mark` are operations on one selected step. Timeline `events`
+and `miss` append to earlier entries. X-ray `layers` and Buffer `cells` are full
+snapshots, while Buffer `mark` appends ordered range paints until a later cells
+snapshot resets the base. App screens retains its bespoke upload and step
+controls, and uses the shared assignment editor for its starting screen, date
+and time. Unsupported or ambiguous imported shapes stay editable in
+**Advanced JSON** instead of being silently normalized.
+
 The shared state editor uses a separate assignment selector. Omitted starting
 fields use the panel default; omitted step fields inherit; `null` is offered only
 when `nullLabel` declares a meaningful reset (or an imported value is already

@@ -268,8 +268,53 @@ body.sk-editorial .sk-daylight .xfoot.no{color:var(--ed-bad);}`,
 });
 
 /* xray authoring contract; merged into this panel definition by the bundle. */
+function xrayLayerEditor(context) {
+  function composer(options) {
+    var authored = options.value;
+    if (authored !== undefined &&
+        (!Array.isArray(authored) || authored.some(function (item) { return !panelObject(item); }))) return null;
+    var baseline = authored !== undefined ? authored :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var ids = Object.create(null);
+    if (baseline.some(function (item) {
+      if (!item || item.id == null) return false;
+      var id = String(item.id);if (ids[id]) return true;ids[id] = true;return false;
+    })) return null;
+    var declarations = Array.isArray(options.panel.layers) ? options.panel.layers : [];
+    var doc = context.document, wrap = doc.createElement('div');wrap.className = 'rowsedit';
+    declarations.forEach(function (layer) {
+      if (!layer || layer.id == null) return;
+      var id = String(layer.id), label = layer.label || id;
+      var current = baseline.find(function (item) { return item && String(item.id) === id; });
+      var input = context.controls.select(['sealed','open'], current && current.open === true ? 'open' : 'sealed', function (state) {
+        var source = baseline, next = source.map(function (item) { return panelObject(item) ? panelCollectionCopy(item) : item; });
+        var index = next.findIndex(function (item) { return item && String(item.id) === id; });
+        if (state === 'open') {
+          var value = index >= 0 && panelObject(next[index]) ? next[index] : { id: id };
+          value.id = layer.id;value.open = true;
+          if (index >= 0) next[index] = value;else next.push(value);
+        } else if (index >= 0) {
+          var sealed = next[index];delete sealed.open;
+          if (Object.keys(sealed).some(function (key) { return key !== 'id'; })) next[index] = sealed;
+          else next.splice(index, 1);
+        }
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', label + ' layer state');
+      wrap.appendChild(context.controls.row(label, input));
+    });
+    if (!declarations.length) {
+      var empty = doc.createElement('p');empty.className = 'fnote';empty.textContent = 'Declare layers on this panel first.';wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'layers' ? composer(options) : null;
+  }};
+}
 PanelRegistry.extend('xray', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Layers',
       layers: [
@@ -285,6 +330,13 @@ PanelRegistry.extend('xray', {
       ['layers', 'jsonArr'],
       ['hop', 'text'],
     ],
+    fieldMeta: {
+      layers: { label: 'Layer states', help: 'A complete snapshot. Layers not listed are sealed; editing an inherited state saves the complete visible snapshot.',
+        setup: { label: 'Layers', help: 'Declare the protection layers from outermost to innermost.' },
+        initial: { label: 'Starting layer states' } },
+      hop: { label: 'Current location', help: 'Names the device or boundary where readability is being evaluated.' },
+    },
+    editor: xrayLayerEditor,
     picker: {
       order: 26,
       name: 'Layer X-ray',

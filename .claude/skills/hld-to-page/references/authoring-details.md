@@ -281,6 +281,15 @@ clear the table. Log `log` appends events at that step; `[]` adds nothing rather
 than clearing history. Inherit removes the whole step field. Typed table cells
 preserve scalar types and unknown fields. Keep advanced imported shapes intact.
 
+Inflight, Timeline, X-ray, Buffer and App screens also have typed state controls,
+but their arrays do not share one fold rule. Inflight has no Starting state:
+`start`, `end` and `mark` are operations on the selected step. Timeline `events`
+and `miss` append. X-ray `layers` and Buffer `cells` are complete snapshots;
+Buffer `mark` appends ordered range paints until a later cells snapshot resets
+the base. App screens keeps its upload and per-step chooser, with explicit
+default / no-screen / set choices for the starting screen. Leave unsupported or
+ambiguous imported shapes in Advanced JSON rather than rewriting them.
+
 Camera fields and Phone audio expose carry-forward / this-step-only duration
 and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported
 carry + `enterOnce` pairs retain both assignments during ordinary value edits;

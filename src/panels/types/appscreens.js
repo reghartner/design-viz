@@ -89,6 +89,27 @@
       return context.controls.row(label, input);
     }
     function choices(panel) { return screens(panel).map(function (item) { return [item.id, text(item.label) || item.id]; }); }
+    function stateScreen(options) {
+      var input = document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', 'screen');
+      var empty = document.createElement('option');empty.value = '';empty.textContent = 'Choose a screen…';input.appendChild(empty);
+      var known = false;
+      choices(options.panel).forEach(function (pair) {
+        var option = document.createElement('option');option.value = pair[0];option.textContent = pair[1];
+        if (pair[0] === options.value) known = true;input.appendChild(option);
+      });
+      if (typeof options.value === 'string' && options.value && !known) {
+        var unknown = document.createElement('option');unknown.value = options.value;unknown.textContent = options.value + ' (unknown)';input.appendChild(unknown);
+      }
+      input.value = typeof options.value === 'string' ? options.value : '';
+      context.listen(input, 'change', function () {
+        if (!input.value) {
+          input.value = typeof options.value === 'string' ? options.value : '';
+          context.error('Choose a screen, or change the assignment to Show no screen or Use panel default.');return;
+        }
+        options.commit(input.value);
+      });
+      return input;
+    }
     function editPanel(update) {
       if (context.editingBlocked()) { context.error('Finish ADD TO STEP before editing app screens.'); return false; }
       return context.transact(function (raw) {
@@ -193,30 +214,12 @@
       return input;
     }
     return {
+      patchControl: function (field, options) { return field[0] === 'screen' ? stateScreen(options) : null; },
       setupField: function (field, panel) {
         if (field[0] === 'frame' || field[0] === 'transition') {
           var frame = field[0] === 'frame';
           return select(frame ? 'Frame' : 'Transition', frame ? [['phone','Phone'],['none','None']] : [['cut','Cut'],['crossfade','Crossfade']],
             panel[field[0]] || (frame ? 'phone' : 'cut'), function (value) { context.commit(field[0], JSON.stringify(value)); });
-        }
-        if (field[0] === 'initial') {
-          var initialBox = document.createElement('div');
-          initialBox.appendChild(select('Starting screen', [['','No screen']].concat(choices(panel)), panel.initial && panel.initial.screen || '', function (value) {
-            editPanel(function (raw, live, path) {
-              return planSetField(context.source(), raw, path, 'initial', JSON.stringify(Object.assign({}, live.initial, {screen:value || null})));
-            });
-          }));
-          [['clock','Starting time','9:41'],['date','Starting date','Thu, Sep 24']].forEach(function (field) {
-            var input = context.controls.text(panel.initial && panel.initial[field[0]], function (value) {
-              return editPanel(function (raw, live, path) {
-                var initial = Object.assign({}, live.initial);
-                if (value == null) delete initial[field[0]]; else initial[field[0]] = value;
-                return planSetField(context.source(), raw, path, 'initial', JSON.stringify(initial));
-              });
-            }, {placeholder:'Optional · ' + field[2]});
-            input.setAttribute('aria-label', field[1]); initialBox.appendChild(context.controls.row(field[1], input));
-          });
-          return initialBox;
         }
         if (field[0] !== 'screens') return;
         var box = document.createElement('div'); box.className = 'appscreen-editor';
@@ -267,9 +270,11 @@
           panelOwn(patch, 'screen') ? patch.screen === null ? '@blank' : 'id:' + patch.screen : '', function (value) {
             return update('screen', !value ? undefined : value === '@blank' ? null : value.slice(3));
           }));
-        var dateActions=document.createElement('div');dateActions.className='iacts';dateActions.setAttribute('role','group');dateActions.setAttribute('aria-label','Date actions');
+        var dateActions=document.createElement('div');dateActions.className='iacts';dateActions.setAttribute('role','group');dateActions.setAttribute('aria-label','Date and time actions');
         dateActions.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
         dateActions.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
+        dateActions.appendChild(context.controls.action('Hide time', function () { return update('clock', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit time', function () { return update('clock', undefined); }));
         box.appendChild(dateActions);
         var date = context.controls.text(patch.date, function (value) { return update('date', value == null ? undefined : value); },
           {placeholder:patch.date === '' ? 'Hidden at this step' : 'Inherit previous date'});
@@ -305,10 +310,18 @@
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, once); }); },
     storyTime:function (panel, states, steps, story) { return story ? storyTimeClockOverlay(panel, states, steps, story) : states; },
     authoring:{
+      initialFields:true,
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],
       patchFields:[['screen','text'],['date','text'],['clock','text']],
       expandPatchFields:function (panel) { return [['screen','enum',screens(panel).map(function (item) { return item.id; })],['date','text'],['clock','text']]; },
+      fieldMeta:{
+        screens:{label:'Screens',help:'Upload each exported screen once, then select it in Starting state or a step.',group:'Content'},
+        frame:{label:'Device frame',group:'Presentation'},transition:{label:'Screen transition',group:'Presentation'},
+        screen:{label:'Displayed screen',nullLabel:'Show no screen',initial:{label:'Starting screen',unsetLabel:'Use panel default'},step:{label:'App screen'}},
+        date:{label:'Date',help:'Use an empty string to hide the date while preserving a deliberate assignment.',initial:{label:'Starting date'}},
+        clock:{label:'Time',help:'Use an empty string to hide the time while preserving a deliberate assignment.',initial:{label:'Starting time'}}
+      },
       origin:function (panel, key, snapshot, context) { return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, false); }); },
       picker:{order:26, name:'App screens', category:'Devices & interfaces', tagline:'Your product screens, in step',
         description:'Upload exported Figma screens or screenshots, then change the displayed screen alongside the flow. Choose a phone frame and cut or crossfade transitions.'},

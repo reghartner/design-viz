@@ -357,18 +357,58 @@ PanelRegistry.extend('inflight', {
 });
 
 /* inflight authoring contract; merged into this panel definition by the bundle. */
+function inflightOperationEditor(context) {
+  function laneOptions(panel) {
+    return (Array.isArray(panel.lanes) ? panel.lanes : [])
+      .filter(function (lane) { return lane && typeof lane.id === 'string'; })
+      .map(function (lane) { return lane.id; });
+  }
+  function endRows(options) {
+    if (options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (lane) { return typeof lane !== 'string'; }))) return null;
+    var rows = (options.value || []).map(function (lane, index) { return { lane: lane, _sourceIndex: index }; });
+    return context.controls.rows('Finishes', rows,
+      { cols: [{ k: 'lane', label: 'Lane', kind: 'enum', options: laneOptions(options.panel), req: true }] },
+      { raw: false, commitValue: options.commit, collect: function (items) {
+        return { value: items.length ? items.map(function (item) { return item.lane; }) : undefined };
+      }});
+  }
+  return { patchControl: function (field, options) {
+    var key = field[0], lanes = laneOptions(options.panel), shape;
+    if ((key === 'start' || key === 'mark') && options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'start') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'label', label: 'Operation label' }
+    ]};
+    if (key === 'mark') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'state', label: 'Outcome', kind: 'enum', options: INFLIGHT_STATES, req: true }
+    ]};
+    if (shape) return context.controls.rows(key, options.value, shape,
+      { raw: false, commitValue: options.commit });
+    if (key === 'end') return endRows(options);
+  }};
+}
 PanelRegistry.extend('inflight', {
   authoring: {
     template: { title: 'In flight', lanes: [{ id: 'op', label: 'operation' }] },
-    setupFields: [
-      ['lanes', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
-      ['initial', 'json'],
-    ],
+    setupFields: [['lanes', 'rows', { cols: [{ k: 'id', label: 'Lane ID', req: true }, { k: 'label', label: 'Name' }] }]],
     patchFields: [
       ['start', 'jsonArr'],
       ['end', 'jsonArr'],
       ['mark', 'jsonArr'],
     ],
+    fieldMeta: {
+      lanes: { label: 'Operation lanes', help: 'Declare up to eight lanes before adding operations.', group: 'Content' },
+      start: { label: 'Start operations', unsetLabel: 'Start nothing at this step',
+        help: 'Each row starts a new operation at this step. Starting an already-open lane closes its earlier bar and begins a new one.' },
+      end: { label: 'Finish operations', unsetLabel: 'Finish nothing at this step',
+        help: 'Each lane closes its currently open operation at this step.' },
+      mark: { label: 'Mark open operations', unsetLabel: 'Mark nothing at this step',
+        help: 'Set the outcome of an operation that is still open. This is an event at this step, not an inherited snapshot.' },
+    },
+    editor: inflightOperationEditor,
     picker: {
       order: 6,
       name: 'In-flight work',
@@ -409,8 +449,6 @@ PanelRegistry.extend('inflight', {
       };
       states = [{}, {}, {}, {}, {}, {}];
       step = 5;
-
-      panel.initial = builderClone(state);
 
       return { panel: panel, state: state, states: states, step: step };
     },

@@ -529,3 +529,73 @@ test('log composer edits events at one step without rewriting accumulated earlie
   const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);assert.deepEqual(changed.steps[1].panels.log.log,[{tag:'NET',text:'acknowledged'}]);
   h.session.undo();assert.equal(h.text,before);
 });
+
+test('in-flight operations are step-local typed rows and preserve imported siblings',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'flight',type:'inflight',lanes:[{id:'request',label:'Request'}],futureDecl:true}],steps:[
+    {panels:{flight:{start:[{lane:'request',label:'send',futureRow:7}],futurePatch:{keep:true}}}}
+  ]};
+  const h=e.mount(spec);h.inspector.render();
+  assert.equal(h.guide.querySelector('.initialedit'),null,'in-flight has no unsupported starting snapshot');
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  const label=aria(h.guide,'Operation label');assert.equal(label.value,'send');label.value='retry';label.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.flight,
+    {start:[{lane:'request',label:'retry',futureRow:7}],futurePatch:{keep:true}});
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('timeline events edit only the selected append operation and keep unknown row data',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'timeline',type:'timeline',span:'2h',cadence:{every:'30m'},initial:{events:[{at:'0',label:'boot'}]}}],steps:[
+    {panels:{timeline:{events:[{at:'15m',label:'ready'}]}}},
+    {panels:{timeline:{events:[{at:'45m',label:'late',kind:'future-kind',futureRow:8}],futurePatch:true}}}
+  ]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:1};h.inspector.render();const before=h.text;
+  const label=aria(h.guide,'Event label');label.value='recovered';label.fire('change');h.flush();
+  const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);
+  assert.deepEqual(changed.steps[1].panels.timeline,
+    {events:[{at:'45m',label:'recovered',kind:'future-kind',futureRow:8}],futurePatch:true});
+  h.session.undo();assert.equal(h.text,before);
+});
+
+test('X-ray and Buffer snapshot composers start from effective state without erasing advanced values',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'xray',type:'xray',layers:[{id:'case',label:'Case'},{id:'board',label:'Board'}],initial:{layers:[{id:'case',open:true,futureRow:3},{id:'future',open:true}]},futureTop:'x'},
+    {id:'buffer',type:'buffer',segments:3,initial:{cells:['buffered','future-token','empty'],futureTop:'b'}}
+  ],steps:[{panels:{xray:{hop:'gateway',futurePatch:'x'},buffer:{mark:[[0,1,'uploaded','future-tail']],futurePatch:'b'}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  const board=aria(h.guide,'Board layer state');assert.equal(board.value,'sealed');board.value='open';board.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.xray,{hop:'gateway',futurePatch:'x',layers:[
+    {id:'case',open:true,futureRow:3},{id:'future',open:true},{id:'board',open:true}
+  ]});
+  const afterBoard=h.text;
+  const caseLayer=aria(h.guide,'Case layer state');caseLayer.value='sealed';caseLayer.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.xray.layers,[
+    {id:'case',futureRow:3},{id:'future',open:true},{id:'board',open:true}
+  ]);
+  const afterXray=h.text;h.session.undo();assert.equal(h.text,afterBoard);h.session.undo();assert.equal(h.text,before);
+  h.session.redo();assert.equal(h.text,afterBoard);h.session.redo();assert.equal(h.text,afterXray);
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const cell=aria(h.guide,'Cell 1 state');cell.value='protected';cell.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer,
+    {mark:[[0,1,'uploaded','future-tail']],futurePatch:'b',cells:['protected','future-token','empty']});
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const state=aria(h.guide,'State');state.value='dropped';state.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer.mark,[[0,1,'dropped','future-tail']]);
+  h.session.undo();assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer.mark,[[0,1,'uploaded','future-tail']]);
+});
+
+test('App screens Starting state exposes explicit default, null and set modes',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'app',type:'appscreens',screens:[
+    {id:'home',label:'Home',src:'data:image/png;base64,AA==',width:1,height:1},
+    {id:'live',label:'Live',src:'data:image/png;base64,AA==',width:1,height:1}
+  ],initial:{screen:null,date:'',futureTop:9}}],steps:[]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text;
+  const mode=aria(h.guide,'Starting screen assignment');assert.equal(mode.value,'null');
+  mode.value='set';mode.fire('change');const screen=aria(h.guide,'screen');assert.equal(screen.disabled,false);
+  screen.value='live';screen.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{screen:'live',date:'',futureTop:9});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  h.inspector.render();const blank=aria(h.guide,'screen');blank.value='';blank.fire('change');
+  assert.equal(blank.value,'live');assert.equal(h.text,changed);assert.equal(h.session.canUndo(),true);
+  const omit=aria(h.guide,'Starting screen assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{date:'',futureTop:9});
+});

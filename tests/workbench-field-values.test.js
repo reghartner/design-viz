@@ -79,8 +79,11 @@ test('panelPatchFields expands declared led tile and signal ids with the correct
 });
 
 test('simple and dynamic panels expose typed starting-state controls with authored labels', () => {
-  for (const type of ['state','gauge','queue','thermo','battery','orbit','waterfall','leds','signal','tiles','dispatch','security'])
+  for (const type of ['state','gauge','queue','thermo','battery','orbit','waterfall','leds','signal','tiles','dispatch','security',
+    'timeline','xray','buffer','appscreens'])
     assert.equal(B.PanelRegistry.get(type).authoring.initialFields,true,type);
+  assert.equal(B.PanelRegistry.get('inflight').authoring.initialFields,undefined);
+  assert.ok(!B.PANEL_SETUP_FIELDS.inflight.some(field=>field[0]==='initial'));
   assert.equal(B.panelFieldPresentation({type:'leds'},B.panelPatchFields({type:'leds',leds:[{id:'power',label:'Power'}]})[0],'initial').label,'Power');
   assert.equal(B.panelFieldPresentation({type:'dispatch'},B.panelPatchFields({type:'dispatch',responders:[{id:'patrol',label:'Patrol unit'}]}).at(-1),'step').group,'Responders');
   assert.equal(B.panelFieldPresentation({type:'security'},B.panelPatchFields({type:'security',sensors:[{id:'frontDoor',label:'Front door'}]}).at(-1),'initial').label,'Front door');

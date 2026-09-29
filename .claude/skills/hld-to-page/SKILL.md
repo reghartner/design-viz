@@ -380,7 +380,13 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   **Agent** menu has **Copy & paste** and **In workbench — Beta** tabs sharing one
   draft and the existing selection context (including steps, panels and edges).
   Switching tabs does not change the connection workflow or authorize Monitor.
-  Copied requests include the complete source; selection indicates focus only.
+  Copied requests include selected item identifiers, JSON paths, evidence
+  references and view context, not the complete source. Read the current spec and
+  ledger from the shared folder before planning. Without a shared folder, ask for
+  any required source files; do not treat the copied context as a complete diagram.
+  The bottom-left **Copy for agent** action copies selection context without
+  registering or replacing a request. Wait for the user's accompanying instruction;
+  use an existing active request or the normal native `begin` flow as appropriate.
   The project is the spec and coverage ledger at the folder root; `project.json`
   names them. Existing artifacts must be preserved and read before planning.
   Connection identity is temporary and can change without changing the project.
@@ -399,7 +405,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   **external/agent** keeps questions and interrupts in the native agent app;
   **embedded** uses helper `reply` for questions and final answers. Copied requests
   are not dispatched by Monitor; external requests use acknowledged `begin`.
-  Use `progress` for phases, errors and observable work during longer turns.
+  In Beta, use `progress` for phases, errors and observable work during longer turns.
+  For copy/paste, keep progress and errors in the native app; the workbench hides
+  the conversation and progress feed, so periodic helper progress is unnecessary.
   Wait for the proposal result before completion `reply`. Copy/paste uses no
   Monitor; direct Send and the explicitly selected Beta conversation require it.
   The bundled `authoring/` directory is VIZ; run validator and state-walk tools

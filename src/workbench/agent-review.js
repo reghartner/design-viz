@@ -21,6 +21,7 @@ function initWorkbenchAgentReview(opts){
     var source=viewing==='current'?shown.current:shown.source;
     el('source').value=source || '';
     el('ledger').textContent=(viewing==='current'?shown.currentLedger:shown.ledger) || 'No coverage ledger yet.';
+    el('ledger-summary').textContent='Coverage ledger · '+(viewing==='current'?'Current state':shown.ledger!==shown.currentLedger?'Changed in this update':'Unchanged');
     if(!source){el('view').textContent='Resolve the issues above with your agent to get a complete, valid preview.';return;}
     try{
       var page=normalize(JSON.parse(source)),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
@@ -38,7 +39,7 @@ function initWorkbenchAgentReview(opts){
     el('issues').hidden=!!next.review.ok;el('feedback').value=workbenchAgentConflictFeedback(next.review);
     draw();
   }
-  function open(){if(!state)return;if(!dialog.open)dialog.showModal();viewing='proposed';refresh();el('close').focus();}
+  function open(){if(!state)return;if(!dialog.open)dialog.showModal();el('ledger-panel').open=false;viewing='proposed';refresh();el('close').focus();}
   function update(review){
     state=review;banner.hidden=!review;
     if(review){

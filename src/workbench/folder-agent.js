@@ -242,12 +242,12 @@ function createFolderAgentClient(opts){
         activity.push({id:item.id,text:item.text,at:Number.isFinite(item.at)?item.at:now(),phase:item.phase==='permission-needed'?'permission-needed':'working'});
       });
       activity=activity.slice(-100);
-      if(updated)publish({status:'Claude sent an update.'});
+      if(updated)publish(opts.workflow==='external'?{}:{status:'Claude sent an update.'});
     }
     var reply=await readOptional('reply.json');if(!alive(token) || turn!==turnEpoch)return;
     if((!belongs(proposal) || proposal.requestId!==pending || seen.has(proposal.id)) && belongs(reply) && validText(reply) && pending && reply.requestId===pending && !seen.has(reply.id)){
       seen.add(reply.id);transcript.push({role:'assistant',text:reply.text,requestId:pending});
-      pending=null;publish({status:'Reply received. You can continue the conversation.',progress:''});
+      pending=null;publish({status:opts.workflow==='external'?'Request finished. Continue in your agent.':'Reply received. You can continue the conversation.',progress:''});
       await saveTranscript();if(!alive(token))return;
     }
     var listener=await readOptional('listener.json');if(!alive(token) || turn!==turnEpoch)return;
@@ -392,7 +392,7 @@ function createFolderAgentClient(opts){
         exchange.pin(sent.snapshot);
         await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
-        publish({status:'Message saved — waiting for Claude.',progress:''});
+        publish({status:request.delivery==='clipboard'?'Request ready to copy. Continue in your agent.':'Message saved — waiting for Claude.',progress:''});
         await saveTranscript();return request;
       }catch(ex){
         // A committed request remains pending when only its transcript failed to save.

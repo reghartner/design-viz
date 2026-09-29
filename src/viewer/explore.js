@@ -300,7 +300,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var saved=notes?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
     var state=notes?memory.prose:memory.panels[panel.id];
     if(!state){
-      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false}):{x:12,y:12,w:notes?320:220,h:notes?280:panel.type==='homemap'?250:220,stacked:true,hidden:false};
+      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false}):{x:12,y:12,w:notes?320:220,h:notes?280:panel.type==='homemap'?250:220,stacked:!(saved && saved.stacked===false),hidden:false};
       if(notes)memory.prose=state;else memory.panels[panel.id]=state;
     }
     var el=document.createElement('article');el.className='explore-window'+(notes?' explore-prose-window':'');
@@ -339,13 +339,15 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
     lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);
+    // A reader view can enter at page size before becoming full-browser. Restore the
+    // graph-relative center; raw scroll offsets describe the old viewport.
     if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
     else if(memory.layout.camera)positionCamera(memory.layout.camera);
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
   }
   function leave(){
     if(!active)return;clearScrollEdit();finish(true);
-    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera()};memory.zoom=zoom;}active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
@@ -442,7 +444,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,
     snapshotCanvasState:function(){
-      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera()};memory.zoom=zoom;}
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);
     },
     restoreCanvasState:function(saved){
@@ -457,7 +459,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       return true;
     },
     snapshotReaderState:function(){
-      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera()};memory.zoom=zoom;}
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
       return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
     },
     restoreReaderState:function(saved){

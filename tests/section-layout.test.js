@@ -533,6 +533,7 @@ test('Explore prose defaults accept independent visibility and bounded geometry 
     const next=JSON.parse(edit.text);assert.deepEqual(next.page.sections[0].text,raw.page.sections[0].text);assert.deepEqual(next.page.sections[0].bullets,raw.page.sections[0].bullets);
     const duplicate=ctx.planDuplicateSectionLayout(edit.text,next,0,'eng');assert.deepEqual(JSON.parse(duplicate.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
   }
+  assert.deepEqual(plain(ctx.sectionExploreLayout(d,{prose:{x:.2,hidden:true}})),{prose:{hidden:true}});
   for(const prose of [true,[],{x:.2},{x:0,y:0,w:0,h:.5},{hidden:'yes'},{stacked:1}]){
     const warnings=[],input={prose,controls:{x:0,y:.8,w:.8,h:.15}},before=JSON.stringify(input);
     const recovered=ctx.sectionExploreLayout(d,input,warnings);assert.ok(warnings.length);assert.deepEqual(plain(recovered.controls),input.controls);assert.equal(JSON.stringify(input),before);

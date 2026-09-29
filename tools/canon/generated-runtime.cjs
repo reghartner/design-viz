@@ -2217,7 +2217,7 @@ function sectionExploreLayout(d,value,warnings,path){
     var prose=value.prose,at=path+'.prose';
     if(!object(prose))warn(at,'expected an object with optional x/y/w/h, stacked and hidden');
     else{
-      var geometry=['x','y','w','h'].some(function(k){return prose[k]!==undefined;}),notes=geometry?rect(prose,at):{};
+      var geometry=['x','y','w','h'].some(function(k){return prose[k]!==undefined;}),notes=geometry?(rect(prose,at) || {}):{};
       ['stacked','hidden'].forEach(function(k){
         if(prose[k]!==undefined && typeof prose[k]!=='boolean')warn(at+'.'+k,'expected a boolean');
         else if(notes && prose[k]!==undefined)notes[k]=prose[k];

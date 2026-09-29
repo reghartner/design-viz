@@ -25,7 +25,7 @@ function workspacePanelRect(rect,width,height){
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;
-  var names=['agent','brief','inspect','steps','outline','json','file'],labels={agent:'Agent · Claude',brief:'Story brief',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
+  var names=['agent','brief','inspect','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
   var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false,history=null;
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
   var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0;

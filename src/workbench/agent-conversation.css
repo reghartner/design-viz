@@ -1,6 +1,6 @@
 /* The conversation scrolls; writing the next message never scrolls away. */
 #editor-agent{overflow:hidden;min-height:0;}
-#editor-agent .folder-agent-shell{height:100%;box-sizing:border-box;padding:0;gap:0;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr) auto;font-size:13px;line-height:1.45;}
+#editor-agent .folder-agent-shell{height:100%;box-sizing:border-box;padding:0;gap:0;overflow:hidden;display:grid;grid-template-rows:auto auto minmax(0,1fr);font-size:13px;line-height:1.45;}
 .folder-agent-header{padding:8px 12px;border-bottom:1px solid var(--line);min-height:0;}
 .folder-agent-header-controls{max-height:110px;overflow:auto;}
 .folder-agent-header .folder-agent-actions{align-items:center;gap:6px;}
@@ -91,3 +91,23 @@
 .agent-project-choice strong,.agent-project-choice small{display:block;overflow-wrap:anywhere;}
 .agent-project-choice small{margin-top:5px;font-size:13px;font-weight:400;line-height:1.5;color:#626e82;}
 @media(max-width:760px){.agent-project-choice{grid-template-columns:1fr;}}
+
+/* One Agent entry, one selection and one draft; delivery is an explicit choice. */
+.folder-agent-workflow-body{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;overflow:hidden;}
+.folder-agent-modes{display:flex;gap:10px;margin:0 12px;border-bottom:1px solid var(--line);}
+.folder-agent-modes .bbtn{flex:1;min-width:0;margin:0;padding:12px 2px 9px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;font-size:12px;color:var(--sub);}
+.folder-agent-modes .bbtn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);}
+.folder-agent-mode-description{margin:0;padding:10px 12px;font-size:12px;color:var(--sub);}
+.folder-agent-copy-fallback{font-size:12px;}
+.folder-agent-copy-fallback .bbtn{margin:4px 0;padding:3px 7px;font-size:11px;}
+.folder-agent-composer:has(.folder-agent-copy-fallback[open]:not([hidden]))>#folder-agent-form,
+.folder-agent-composer:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-compose-settings{display:none;}
+.folder-agent-copy-fallback textarea{box-sizing:border-box;width:100%;max-height:120px;background:var(--bg);color:var(--ink);border:1px solid var(--line);padding:8px;font:11px/1.4 monospace;resize:vertical;}
+#editor-agent[data-workflow="external"] .folder-agent-context-card{background:color-mix(in srgb,var(--accent) 8%,var(--card));border-radius:7px;padding:8px 10px;}
+@media(max-height:600px){.folder-agent-modes .bbtn{padding:5px 1px;}.folder-agent-mode-description{font-size:11px;padding:5px 9px;}.folder-agent-workflow-body .folder-agent-header-controls{max-height:44px;}.folder-agent-copy-fallback textarea{max-height:65px;}}
+@media(max-height:520px){
+  .folder-agent-mode-description{display:none;}
+  .folder-agent-workflow-body .folder-agent-header-controls{max-height:26px;}
+  #editor-agent[data-workflow="external"] .folder-agent-context-card{padding:3px 7px;}
+  .folder-agent-workflow-body{grid-template-rows:auto minmax(32px,1fr) auto;}
+}

@@ -22,7 +22,7 @@
         <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
     </div>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button class="bbtn" id="agent-message-open" type="button" aria-label="Message agent" title="Message agent" aria-haspopup="dialog"><span>Message agent</span><svg class="agent-message-icon" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3H3V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Download JSON</button></div>
+    <div class="workspace-save"><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Download JSON</button></div>
   </div>
 </header>
 <section id="agent-update-banner" class="agent-update-banner" role="status" hidden><div><strong id="agent-update-banner-title">Agent updates are ready</strong><p id="agent-update-banner-summary"></p></div><button type="button" class="rbtn" id="agent-update-open">Preview Agent Updates</button></section>
@@ -118,7 +118,7 @@
         <label><input type="radio" name="welcome-build-project" id="welcome-build-continue" value="continue" checked><span><strong id="welcome-build-continue-title">Open an existing diagram</strong><small id="welcome-build-continue-detail">Choose its diagram folder to pick up where you left off.</small></span></label>
       </fieldset>
       <div class="agent-workflow-choices">
-        <button type="button" id="welcome-build-external" class="agent-workflow-choice agent-workflow-recommended"><span class="welcome-kicker">Recommended · Copy and paste</span><strong>Work in your agent</strong><span>Talk, answer questions, and interrupt in your agent’s own app. Copy messages with selected nodes and references from the workbench.</span><b>Choose diagram folder →</b></button>
+        <button type="button" id="welcome-build-external" class="agent-workflow-choice agent-workflow-recommended"><span class="welcome-kicker">Recommended · Copy and paste</span><strong>Work in your agent</strong><span>Talk, answer questions, and interrupt in your agent’s own app. Copy requests with the workbench’s current selection: nodes, steps, panels, and more.</span><b>Choose diagram folder →</b></button>
         <button type="button" id="welcome-build-embedded" class="agent-workflow-choice"><span class="welcome-kicker">Beta · Conversation in the workbench</span><strong>Talk here with Claude</strong><span>Send messages and read replies beside the diagram through your local Claude session and Monitor.</span><b>Connect Claude →</b></button>
       </div>
       <p class="welcome-note">Both options share the current diagram through local files. New updates wait for your review. Permissions and interrupts stay in your agent.</p>
@@ -175,7 +175,7 @@
           </section>
           <section class="folder-agent-context-card" aria-label="Context for your next message"><b id="folder-agent-context-heading">Your next message includes</b><div id="folder-agent-context" aria-live="polite"></div><p class="folder-agent-hint">The whole story is shared. Your selection tells Claude where to focus.</p></section>
           <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
-          <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" maxlength="16000" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
+          <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
           <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your diagram folder keeps the spec and ledger, with workbench conversation data in .flowview-agent/.</p>
         </div>
       </div>
@@ -505,25 +505,6 @@
   <textarea id="object-clipboard-text" spellcheck="false" placeholder="Paste objects copied from another diagram or tab…"></textarea>
   <p id="object-clipboard-feedback" role="status"></p>
   <div class="story-actions"><button type="button" class="bbtn" id="object-clipboard-cancel">Cancel</button><button type="button" class="rbtn" id="object-clipboard-apply">Paste copy</button></div>
-</dialog>
-<dialog class="reuse-dialog agent-message-dialog" id="agent-message-dialog" aria-labelledby="agent-message-title" aria-describedby="agent-message-help">
-  <div class="reuse-header"><h2 id="agent-message-title">Send message from workbench</h2><p id="agent-message-help">Choose context for your agent. Send through your connected Claude folder or copy into any agent’s conversation.</p></div>
-  <div class="reuse-scroll">
-    <p id="agent-message-error" class="reuse-note" role="alert" hidden></p>
-    <label for="agent-message-text">Your message</label><textarea class="fctl" id="agent-message-text" rows="3" placeholder="Explain why these services retry, using the selected references…"></textarea>
-    <p class="reuse-note">Your canvas selection is checked below. Choose any other nodes or references to include.</p>
-    <div class="agent-message-context">
-      <fieldset><legend>Nodes</legend><div id="agent-message-nodes" class="agent-message-choices"></div></fieldset>
-      <fieldset><legend>References</legend><div id="agent-message-references" class="agent-message-choices"></div></fieldset>
-    </div>
-    <p id="agent-message-count" class="reuse-note" role="status"></p>
-    <label for="agent-message-extra">Additional references <span class="reuse-note">— optional, one URL or file path per line</span></label><textarea class="fctl" id="agent-message-extra" rows="2" placeholder="docs/recording-design.md"></textarea>
-    <label class="agent-message-source"><input type="checkbox" id="agent-message-source"> Include full diagram JSON (all nodes and references)</label>
-    <p class="reuse-note">Checkboxes choose what goes in this message. A connected Claude folder already shares the full story for editing.</p>
-    <label for="agent-message-preview">Message to send or copy</label><textarea class="fctl" id="agent-message-preview" rows="8" readonly spellcheck="false" aria-describedby="agent-message-status"></textarea>
-    <div class="agent-message-connection"><p id="agent-message-connection" class="reuse-note" role="status"></p><button type="button" class="bbtn" id="agent-message-connect">Connect shared folder</button></div>
-  </div>
-  <div class="agent-message-footer"><p id="agent-message-status" role="status"></p><button type="button" class="bbtn" id="agent-message-cancel-turn" hidden>Stop accepting this turn</button><button type="button" class="bbtn" id="agent-message-close">Close</button><button type="button" class="rbtn" id="agent-message-copy" disabled>Copy message</button><button type="button" class="bbtn" id="agent-message-send" disabled>Send to Claude</button></div>
 </dialog>
 <dialog class="reuse-dialog" id="step-reuse" aria-labelledby="reuse-title" aria-describedby="reuse-destination">
   <div class="reuse-header">

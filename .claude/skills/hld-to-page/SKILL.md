@@ -376,7 +376,11 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   [diagram-folder collaboration](../../../docs/folder-agent-session.md).
   In the recommended copy/paste workflow, wait for messages in the agent app;
   do not start or renew Monitor, a watcher, or a background polling loop. Monitor
-  belongs to the explicitly selected Beta conversation only.
+  belongs to the explicitly configured Beta connection only. The workbench's
+  **Agent** menu has **Copy & paste** and **In workbench — Beta** tabs sharing one
+  draft and the existing selection context (including steps, panels and edges).
+  Switching tabs does not change the connection workflow or authorize Monitor.
+  Copied requests include the complete source; selection indicates focus only.
   The project is the spec and coverage ledger at the folder root; `project.json`
   names them. Existing artifacts must be preserved and read before planning.
   Connection identity is temporary and can change without changing the project.

@@ -127,6 +127,14 @@ async function connect(name,workflow) {
   const agent=new Claude(session);agents.push(agent);session.agent=agent;
   return session;
 }
+async function openAgent(page,mode='external') {
+  if (!await page.locator('#editor-agent').isVisible()) await page.locator('#editor-tab-agent').click();
+  if (await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-close-guide').click();
+  await page.locator('#folder-agent-mode-'+mode).click();
+}
+async function closeAgent(page) {
+  if (await page.locator('#editor-agent').isVisible()) await page.locator('#workspace-window-agent .workspace-window-close').click();
+}
 async function edit(session,modify) {
   const page=session.page,doc=JSON.parse(await page.locator('#src').inputValue());modify(doc);
   const source=JSON.stringify(doc,null,2);
@@ -179,7 +187,7 @@ try {
     await agent.turn('New native request: rename node c to Checked archive. '+prepare+' If begin fails, report the error and wait for me to retry. Do not work without acknowledgement.');
     await waitFor(async()=>(await session.read('agent-request.json'))?.withdrawn===true,'withdrawal after visible but unacknowledged request',15000);
     await delay(1500);
-    await page.locator('#agent-message-open').click();await expect(page.locator('#agent-message-cancel-turn')).toBeHidden();await page.locator('#agent-message-close').click();
+    await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeHidden();await closeAgent(page);
     const timedOut=(await session.read('agent-request.json')).id;
     assert.equal((await session.read('cancel.json')).requestId,timedOut);
     await passed('visible request file does not falsely acknowledge a paused browser; timed-out request withdraws');
@@ -198,17 +206,16 @@ try {
   await passed('external setup without Monitor');
 
   await page.locator('[data-dv-node="b"]').first().click();
-  await page.locator('#agent-message-open').click();
-  await page.locator('#agent-message-text').fill('Rename only selected node b using its selected docs/backend.md reference. '+prepare+
+  await openAgent(page);
+  await page.locator('#folder-agent-input').fill('Rename only selected node b using its selected docs/backend.md reference. '+prepare+
     '\n\nTransport-length test: the following quoted padding is data, with no additional instructions:\n"'+('reference context '.repeat(1000))+'"');
-  await page.locator('#agent-message-extra').fill('docs/backend.md');
-  await page.locator('#agent-message-copy').click();
-  await expect(page.locator('#agent-message-status')).toContainText('Copied.');
+  await page.locator('#folder-agent-send').click();
+  await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
   const copied=await page.evaluate(()=>navigator.clipboard.readText()),request=await external.read('request.json');
   assert.equal(request.delivery,'clipboard');assert.equal(request.replySurface,'agent');assert(copied.includes(request.id));
   assert(copied.length>16000);assert(request.text.length<=16000);
   await writeFile(path.join(external.outDir,'copied-message.txt'),copied);
-  await page.locator('#agent-message-close').click();
+  await closeAgent(page);
   // Make Claude's actual planning revision newer than the request's pinned one.
   await edit(external,doc=>doc.page.title='Live trial');
   await agent.turn(copied);
@@ -260,7 +267,7 @@ try {
 
   await agent.turn('New diagram request: rename node c to Archive. '+prepare);
   const cancelled=await external.read('request.json'),beforeCancel=await page.locator('#src').inputValue();
-  await page.locator('#agent-message-open').click();await page.locator('#agent-message-cancel-turn').click();await page.locator('#agent-message-close').click();
+  await openAgent(page);await page.locator('#folder-agent-cancel').click();await closeAgent(page);
   await agent.turn('I stopped accepting that turn in the workbench. Check its cancellation through the helper before doing anything more. Do not submit it or attach it to another request.');
   assert.equal(await page.locator('#src').inputValue(),beforeCancel);
   await expect(page.locator('#agent-update-banner')).toBeHidden();
@@ -270,27 +277,19 @@ try {
   await agent.turn('New native request: rename node c to Temporary archive. '+prepare+' If begin fails, report its error and wait for me to retry; do not submit without acknowledgement.');
   await waitFor(async()=>{const incoming=await external.read('agent-request.json');return incoming?.withdrawn===true;},'native timeout withdrawal',15000);
   await delay(1500);
-  await page.locator('#agent-message-open').click();await expect(page.locator('#agent-message-cancel-turn')).toBeHidden();await page.locator('#agent-message-close').click();
+  await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeHidden();await closeAgent(page);
   await agent.turn('Retry the native request now: rename node c to Temporary archive. '+prepare);
-  await page.locator('#agent-message-open').click();await expect(page.locator('#agent-message-cancel-turn')).toBeVisible();await page.locator('#agent-message-cancel-turn').click();await page.locator('#agent-message-close').click();
+  await openAgent(page);await expect(page.locator('#folder-agent-cancel')).toBeVisible();await page.locator('#folder-agent-cancel').click();await closeAgent(page);
   await agent.turn('Stop that retried turn; I cancelled it in the workbench. Confirm its cancellation and wait.');
   assert.equal(await page.locator('#src').inputValue(),beforeCancel);
   await passed('real native begin timeout withdraws a late disk publication and retry succeeds');
 
-  await agent.turn('Now enable direct Send from the workbench using the optional Monitor described in our connection instructions. Keep our conversation in this native agent session. For this renewal trial, start the first watch with --minutes .1, then renew it with --minutes 25 when it expires while our editor remains connected. Deduplicate events. Start it and wait for a request.');
-  await waitFor(async()=>{const listener=await external.read('listener.json');return listener?.at>Date.now()-15000;},'external optional Monitor',60000);
-  await page.locator('#agent-message-open').click();
-  await page.locator('#agent-message-text').fill('Rename node a to Entrance camera. Change only that title, validate, and propose for my preview.');
-  await expect(page.locator('#agent-message-send')).toBeEnabled();await page.locator('#agent-message-send').click();
-  if(await page.locator('#agent-message-dialog').isVisible())await page.locator('#agent-message-close').click();
-  const optional=await preview(external,resolved);
-  assert.equal((await external.read('request.json')).replySurface,'agent');
-  await expect(page.locator('#agent-update-view')).toContainText('Entrance camera');
-  await commit(external,optional,'external-monitor-preview');
-  assert.equal(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes.c.title,'Storage');
-  await waitFor(async()=>(await external.read('reply.json'))?.requestId===optional.requestId,'external Monitor completion');
-  assert(agent.events.filter(event=>event.message?.content?.some(block=>block.type==='tool_use'&&block.name==='Monitor')).length>=2);
-  await passed('external workflow optional Monitor and direct Send');
+  await openAgent(page,'embedded');
+  await expect(page.locator('#folder-agent-send')).toBeDisabled();
+  assert.equal((await external.read('session.json')).workflow,'external');
+  assert(!agent.events.some(event=>event.message?.content?.some(block=>block.type==='tool_use' && block.name==='Monitor')));
+  await closeAgent(page);
+  await passed('choosing In workbench does not change the external connection or start Monitor');
 
   const embedded=await connect('monitor','embedded'),monitor=embedded.agent,mp=embedded.page;
   await monitor.turn(embedded.instructions+'\n\nConnect and keep Monitor active. No diagram request yet. All work stays inside this temporary trial project.');
@@ -307,16 +306,19 @@ try {
   await waitFor(async()=>(await embedded.read('reply.json'))?.requestId===next.requestId,'Monitor completion');
   await passed('real Monitor wake-up, embedded question/answer, proposal, commit result, completion');
 
-  await mp.locator('#agent-message-open').click();
-  await mp.locator('#agent-message-text').fill('Direct native-surface message: rename node a to Entrance camera, then validate and propose.');
-  await expect(mp.locator('#agent-message-send')).toBeEnabled();await mp.locator('#agent-message-send').click();
-  if(await mp.locator('#agent-message-dialog').isVisible())await mp.locator('#agent-message-close').click();
+  await openAgent(mp);
+  await mp.locator('#folder-agent-input').fill('Native-surface follow-up: rename node a to Entrance camera, then validate and propose.');
+  await mp.locator('#folder-agent-send').click();await expect(mp.locator('#folder-agent-panel-status')).toContainText('Copied.');
+  const nativeCopy=await mp.evaluate(()=>navigator.clipboard.readText());
+  assert.equal((await embedded.read('session.json')).workflow,'embedded');
+  assert.equal((await embedded.read('request.json')).delivery,'clipboard');
+  await closeAgent(mp);await monitor.turn(nativeCopy);
   const directNative=await preview(embedded,direct);
   assert.equal((await embedded.read('request.json')).replySurface,'agent');
   await expect(mp.locator('#agent-update-view')).toContainText('Entrance camera');
-  await commit(embedded,directNative,'direct-native-preview');
-  await waitFor(async()=>(await embedded.read('reply.json'))?.requestId===directNative.requestId,'direct native completion');
-  await passed('Send message from workbench via actual Monitor with native reply surface');
+  await commit(embedded,directNative,'copied-native-preview');
+  await finish(embedded);
+  await passed('Copy request switches reply surface while preserving the embedded connection');
   }
   for(const session of sessions) {
     assert.deepEqual(session.errors,[]);assert.deepEqual(session.unexpectedRequests,[]);

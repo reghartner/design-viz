@@ -16,8 +16,8 @@ it never reopens or overwrites a previous folder's spec, ledger, or session.
 
 Then choose where to have the conversation:
 
-- **Work in your agent — Recommended.** Copy setup and messages with selected
-  nodes/references into an agent that can read local files. Questions, permissions,
+- **Work in your agent — Recommended.** Copy setup and messages with the current
+  editor selection into an agent that can read local files. Questions, permissions,
   and interrupts stay in that agent app. The setup explicitly tells the agent
   not to start Monitor, a watcher, polling loop, or background listener.
 - **Talk here with Claude — Beta.** Claude Code and its Monitor tool deliver
@@ -25,6 +25,13 @@ Then choose where to have the conversation:
   still happen in Claude.
 
 Both choices use the same diagram folder and the same approval process.
+
+In the editor, open **Agent** in the left rail. **Copy & paste** is the default;
+**In workbench — Beta** is the other tab. Both share one draft and the existing
+selection context, including steps, panels, nodes, edges and other editor targets.
+Switching tabs preserves that context and draft. A tab switch neither connects a
+folder nor starts a listener, and does not change an active connection's workflow.
+Use the connection setup when changing how the agent listens.
 
 ## Open or create a diagram folder
 
@@ -124,11 +131,22 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 
 ## Conversation and request lifecycle
 
-**Message agent** chooses nodes and references independently, accepts additional
-URLs/file paths, and can include full source. Copy registers a request, then copies
-its ID, full message, and selected context. Long clipboard messages use a bounded
-registration placeholder; direct Send is limited to 16,000 characters. Clipboard
-requests are not dispatched by Monitor. Recopy reuses the registered request.
+In **Agent → Copy & paste**, write the request in the shared message box;
+include additional URLs or file paths there if useful. **Copy request** includes
+the complete current source plus the existing selection, view/path/step context
+and detail level. Selection focuses the request; it does not exclude the rest of
+the diagram. No folder is required to copy a request.
+
+With a connected folder, Copy registers a request and copies its ID with the
+message and context. Long clipboard messages use a bounded registration
+placeholder while preserving the complete message on the clipboard. Clipboard
+requests are not dispatched by Monitor. Recopy of the same pending request reuses
+its ID. If clipboard permission is denied, the prepared request is shown for
+manual selection and copying. Invalid JSON must be repaired before copying.
+
+**Agent → In workbench — Beta → Send to Claude** requires both a connection and
+a live listener. Direct Send is limited to 16,000 characters. Merely opening this
+tab does not start Monitor; its setup must be chosen explicitly.
 
 For a new request in the external agent conversation, use:
 

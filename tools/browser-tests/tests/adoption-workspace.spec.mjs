@@ -55,7 +55,7 @@ test('compact chrome keeps Add, appearance and workspace controls independently 
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
   for(const width of [1050,850,720,640,390]){
     await page.setViewportSize({width,height:800});
-    const controls=await page.evaluate(()=>['diagram-add','agent-message-open','file-save','editor-tab-agent'].map(id=>{
+    const controls=await page.evaluate(()=>['diagram-add','file-save','editor-tab-agent'].map(id=>{
       const node=document.getElementById(id),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
       return {id,inside:r.left>=0 && r.right<=innerWidth,reachable:hit===node || node.contains(hit)};
     }));

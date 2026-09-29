@@ -373,6 +373,52 @@ function vocabularyControl(kind,page,value,target){
     return rows;
   }
 
+function deltaControls(val){
+    var fold = document.createElement('details'), summary = document.createElement('summary');
+    fold.className = 'delta-details-editor'; fold.open = val.delta === true;
+    summary.textContent = 'Change details (optional)'; fold.appendChild(summary);
+    var hint = document.createElement('p'); hint.className = 'fnote';
+    hint.textContent = 'With the change marker enabled, clicking its triangle opens this note and any links. Clearing the marker keeps these details for later.';
+    fold.appendChild(hint);
+    fold.appendChild(frow('Delta note', textControl(val.deltaText, function(v){
+      return commitSimple('deltaText', v == null ? null : JSON.stringify(v));
+    }, {textarea:true, placeholder:'What changed, and why?'})));
+    function updateLinks(edit){
+      var parsed = parseEditor();
+      if (parsed.error){ formError(parsed.error); return false; }
+      var path = builderTargetPath(parsed.raw, session.target), current = path && specValueAt(parsed.raw, path);
+      if (!current) return false;
+      var links = edit(Array.isArray(current.deltaLinks) ? current.deltaLinks.slice() : []);
+      var ok = commitSimple('deltaLinks', links.length ? JSON.stringify(links) : null);
+      if (ok) refreshFormSoon();
+      return ok;
+    }
+    (Array.isArray(val.deltaLinks) ? val.deltaLinks : []).forEach(function(link, index){
+      var box = document.createElement('fieldset'), legend = document.createElement('legend');
+      box.className = 'delta-link-editor'; legend.textContent = 'Delta link ' + (index + 1); box.appendChild(legend);
+      ['label', 'url'].forEach(function(key){
+        box.appendChild(frow(key === 'label' ? 'Link label' : 'Link URL', textControl(link && link[key], function(v){
+          if (key === 'url' && !deltaLinkUrl(v)){ formError('Use a full https:// or http:// link.'); return false; }
+          return updateLinks(function(links){
+            links[index] = Object.assign({}, links[index]);
+            if (v == null) delete links[index][key]; else links[index][key] = v;
+            return links;
+          });
+        }, {placeholder:key === 'url' ? 'https://…' : 'Read the design decision'})));
+      });
+      box.appendChild(actionButton('Remove link ' + (index + 1), function(){
+        return updateLinks(function(links){ links.splice(index, 1); return links; });
+      }));
+      fold.appendChild(box);
+    });
+    fold.appendChild(frow('Add delta link', textControl('', function(v){
+      if (v == null) return true;
+      if (!deltaLinkUrl(v)){ formError('Use a full https:// or http:// link.'); return false; }
+      return updateLinks(function(links){ links.push({url:v}); return links; });
+    }, {placeholder:'Paste a URL, then press Enter'})));
+    return fold;
+  }
+
 function nodeForm(val, ctx){
     var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
@@ -422,7 +468,8 @@ function nodeForm(val, ctx){
       frow('icon', iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); }))),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),
-      frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); }))
+      frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
+      deltaControls(val)
     ],[handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
   }
 
@@ -608,6 +655,7 @@ function edgeForm(val, ctx){
       frowBlock('Connection type',vocabularyControl('protocols',ctx.page,val.kind || 'int',t)),
       frow('ret (response)', checkboxControl(val.ret, function(on){ return commitSimple('ret', on ? 'true' : null); })),
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
+      deltaControls(val),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
       frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
@@ -696,6 +744,7 @@ function stepForm(val, ctx){
     rows.push(frowBlock('Story lane',vocabularyControl('lanes',ctx.page,val.lane,t)));
     rows.push(frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})));
     rows.push(frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })));
+    rows.push(deltaControls(val));
 
     /* ---- the step's contract: hops, lit nodes, panel patches ---- */
     rows.push(chipRow('hops',

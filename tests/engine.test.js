@@ -987,7 +987,7 @@ test('cycle sanitation is order-independent and preserves links entering a longe
 test('nested renderer paints outer boxes before children while flat group order is unchanged', () => {
   const core = loadCore({document: {getElementById(){ return null; }}});
   const d = houseGroups();
-  const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+  const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {querySelectorAll(){ return []; }}; }};
   const order = () => {
     core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
     return [...host.html.matchAll(/<g class="grp" data-dv-group="([^"]+)"/g)].map(m => m[1]);
@@ -1002,7 +1002,7 @@ test('group renderer exposes an escaped data-dv-group selection identity', () =>
   let html = '';
   const host = {
     firstChild: null,
-    set innerHTML(value){ html = value; this.firstChild = {}; },
+    set innerHTML(value){ html = value; this.firstChild = {querySelectorAll(){ return []; }}; },
     get innerHTML(){ return html; }
   };
   const core = loadCore({document: {getElementById(){ return null; }}});
@@ -1047,7 +1047,7 @@ test('group icons render before shifted titles; omitted and non-string icons pre
   const b = core.layout(d).groups.home;
   const render = meta => {
     d.groups.home = meta;
-    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {querySelectorAll(){ return []; }}; }};
     core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
     return host.html.match(/<g class="grp"[^>]*>.*?<\/g>/)[0];
   };
@@ -1069,7 +1069,7 @@ test('six IoT glyphs validate and render on nodes', () => {
   for (const icon of ['house', 'camera', 'doorbell', 'lock', 'bulb', 'car']) {
     const d = {nodes: {a: {icon}}, rows: [['a']]};
     assert.strictEqual(core.validate(core.normalize(d)).warnings.filter(w => w.includes('.icon:')).length, 0);
-    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {}; }};
+    const host = {firstChild: null, set innerHTML(value){ this.html = value; this.firstChild = {querySelectorAll(){ return []; }}; }};
     core.renderBoard(host, d, 'test', 'aurora', core.resolveProtocols({}), null);
     assert.ok(host.html.includes('href="#i-' + icon + '"'), icon);
   }

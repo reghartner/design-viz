@@ -282,7 +282,7 @@ test('handoff inspector stages its destination fields, applies once and exposes 
   assert.equal(parent(JSON.parse(saved)).nodes.domain.link,'https://example.com/source');assert.equal(h.renders,1);
   assert.equal(h.session.undo(),true);assert.equal(h.text,initial);assert.equal(h.session.canUndo(),false);
   assert.equal(h.session.redo(),true);assert.equal(h.text,saved);h.session.target={kind:'node',section:0,id:'domain'};h.inspector.render();
-  assert.equal(h.guide.querySelector('.node-handoff-editor').open,true);assert.equal(h.button('Create detail flow'),undefined);
+  assert.equal(h.guide.querySelector('.node-handoff-editor').open,false);assert.equal(h.button('Create detail flow'),undefined);
   h.button('Remove handoff').fire('click');assert.deepEqual(parent(JSON.parse(h.text)).nodes.domain,parent(raw).nodes.domain);
   assert.equal(h.session.undo(),true);assert.equal(h.text,saved);assert.equal(h.session.redo(),true);
   assert.equal(parent(JSON.parse(h.text)).nodes.domain.handoff,undefined);

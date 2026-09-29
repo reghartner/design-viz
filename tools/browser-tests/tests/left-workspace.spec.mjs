@@ -62,7 +62,7 @@ test('wide step inspectors share space with nested panel controls and retain the
   const story=await page.locator('.step-form-story').boundingBox(),panels=await page.locator('.step-form-panels').boundingBox();
   expect(panels.x).toBeGreaterThan(story.x);expect(Math.abs(panels.y-story.y)).toBeLessThan(2);
   const sourceBefore=await page.locator('#src').inputValue();
-  const fold=page.locator('.step-form-panels .panel-step-group');await fold.evaluate(e=>{e.open=true;});
+  const fold=page.locator('.step-form-panels .panel-step-group');await fold.locator(':scope > summary').click();
   await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-inspect').click();await expect(fold).toHaveAttribute('open','');
   await expect(page.locator('#src')).toHaveValue(sourceBefore);
   await testInfo.attach('wide-step-editor',{body:await page.screenshot(),contentType:'image/png'});
@@ -72,7 +72,7 @@ test('wide step inspectors share space with nested panel controls and retain the
   expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.steps[0].text).toBe('Edited while Home is collapsed');
   await page.locator('#workspace-home').click();await paste(page,source);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();
-  await expect(page.locator('.panel-step-group')).toHaveAttribute('open','');
+  await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
   for(const width of [1280,1024,820,720]){
     await page.setViewportSize({width,height:900});
     await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),{message:'Workspace fits '+width+'px after responsive layout settles'}).toBe(true);
@@ -86,8 +86,8 @@ test('panel disclosure state is independent between sections with the same panel
     await page.locator('#editor-tab-steps').click();await page.locator('#steps-section').selectOption(String(section));
     await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();
   };
-  await inspectStep(0);await page.locator('.panel-step-group > summary').click();
-  await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
-  await inspectStep(1);await expect(page.locator('.panel-step-group')).toHaveAttribute('open','');
+  await inspectStep(0);await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
+  await page.locator('.panel-step-group > summary').click();await expect(page.locator('.panel-step-group')).toHaveAttribute('open','');
+  await inspectStep(1);await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
   await inspectStep(0);await expect(page.locator('.panel-step-group')).not.toHaveAttribute('open','');
 });

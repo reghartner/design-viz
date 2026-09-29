@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=await readFile(path.join(repo,'examples/story-time/story-time.spec.json'),'utf8');
 const chip=(root,index)=>root.locator('.schip[data-step-source="'+index+'"]').first();
@@ -55,6 +55,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
   const spec=async()=>JSON.parse(await src.inputValue());
   await expect(root.locator('.pt-phone .phoneclock')).toHaveText('');
   await page.locator('#docview h3').filter({hasText:'Night'}).click();
+  await openInspectorGroup(guide.locator('.story-time-group'));
   await expect(guide.getByRole('combobox',{name:'Clock format',exact:true})).toBeDisabled();
   const start=guide.getByRole('textbox',{name:'Story start',exact:true});
   await start.fill('tonight');await start.press('Tab');await expect(guide).toContainText('Use a start such as');
@@ -117,6 +118,7 @@ test('workbench story time, step time, battery constants and extra drain edit th
 
   // Clearing the start turns story time off and restores the legacy panels.
   await page.locator('#docview h3').filter({hasText:'Night'}).click();
+  await openInspectorGroup(guide.locator('.story-time-group'));
   await start.fill('');await start.press('Tab');
   expect(d(await spec()).storyTime).toBeUndefined();
   await expect(root.locator('.pt-phone .phoneclock')).toHaveText('');
@@ -178,6 +180,7 @@ test('workbench device app report time: mark reported at this step, derived fres
 
   // Starting state: reported at story start.
   await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
+  await openInspectorGroup(guide.locator('.initialedit'));
   const start=guide.getByRole('button',{name:'battery: reported at story start',exact:true});
   await start.click();
   await expect.poll(async()=>d(await spec()).panels[0].initial.battery).toEqual({value:60,status:'ready',reportedAt:'now'});

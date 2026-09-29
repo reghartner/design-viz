@@ -68,6 +68,11 @@ export const test=base.extend({
   },{auto:true}],
 });
 export {expect,trackResources};
+// A deliberate authoring gesture, used only when a test needs this exact group.
+export async function openInspectorGroup(group){
+  await expect(group).toHaveCount(1);
+  if(await group.getAttribute('open')===null)await group.locator(':scope > summary').click();
+}
 export async function paste(page,text){
   await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(text);
   await page.locator('#welcome-paste-form button[type=submit]').click();

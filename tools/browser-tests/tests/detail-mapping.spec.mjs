@@ -1,9 +1,9 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste} from '../helpers/test.mjs';
 const spec=()=>({page:{sections:[{id:'parent',heading:'Parent story',diagram:{view:'step',autoplay:false,nodes:{domain:{title:'Domain',detail:{section:'child',mode:'focus',path:'main',step:'a',ports:{in:'n'},future:7,stepMap:{p1:{step:2,layout:'brief',future:true}}}}},rows:[['domain']],steps:['p1','p2','p3'].map(id=>({id,text:'Parent '+id,nodes:['domain']}))}},{id:'child',heading:'Child story',detailOnly:true,diagram:{nodes:{n:{title:'Worker'}},rows:[['n']],steps:['a','b','x'].map(id=>({id,text:'Child '+id,nodes:['n']})),paths:[{id:'main',label:'Main',steps:['a','b']},{id:'alt',label:'Alternate',steps:['a','x']}],layouts:[{id:'brief',name:'Brief',steps:['a','x'],sectionLayout:{default:[{x:0,y:0,w:12,h:15},{controls:'steps',attachTo:'diagram',x:0,y:15,w:12,h:7}]}}],defaultLayout:'brief'}}]}});
 test('mapping rows preserve imports, preview hidden child events, and author/rename/remove with Undo',async({page,server},info)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec(),null,2));
  const guide=page.locator('#guide'),source=()=>page.locator('#src').inputValue(),detail=async()=>JSON.parse(await source()).page.sections[0].diagram.nodes.domain.detail;
- await page.locator('#section-parent [data-dv-node="domain"] .t1').click();
+ await page.locator('#section-parent [data-dv-node="domain"] .t1').click();await openInspectorGroup(guide.locator('.node-detail-editor'));
  const row=label=>guide.locator('.mapping-row').filter({has:page.locator('legend').filter({hasText:label})});
  await expect(row('Parent p1')).toContainText('Child b · b (imported numeric position)');
  await row('Parent p1').getByRole('button',{name:'Preview mapping',exact:true}).click();
@@ -18,7 +18,7 @@ test('mapping rows preserve imports, preview hidden child events, and author/ren
  await expect(row('Parent p2')).toBeVisible();expect((await detail()).stepMap.p2).toEqual({path:'alt',step:'x'});
  expect((await detail()).stepMap.p1).toEqual({step:2,layout:'brief',future:true});
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();
- await page.locator('#section-parent [data-dv-node="domain"] .t1').click();
+ await page.locator('#section-parent [data-dv-node="domain"] .t1').click();await openInspectorGroup(guide.locator('.node-detail-editor'));
  await row('Parent p2').getByLabel('When parent event',{exact:true}).selectOption('p3');await expect(row('Parent p3')).toBeVisible();
  expect((await detail()).stepMap.p2).toBeUndefined();expect((await detail()).stepMap.p3.step).toBe('x');
  const beforePath=await source();await row('Parent p3').getByLabel('Child path',{exact:true}).selectOption('id:main');
@@ -27,7 +27,7 @@ test('mapping rows preserve imports, preview hidden child events, and author/ren
  await expect(row('Parent p3').locator('.mapping-error')).toBeEmpty();expect((await detail()).stepMap.p3).toEqual({path:'main',step:'b'});
  const withRow=await source();await row('Parent p3').getByRole('button',{name:'Remove mapping',exact:true}).click();
  expect((await detail()).stepMap.p3).toBeUndefined();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(withRow);
- await page.locator('#section-parent [data-dv-node="domain"] .t1').click();
+ await page.locator('#section-parent [data-dv-node="domain"] .t1').click();await openInspectorGroup(guide.locator('.node-detail-editor'));
  await guide.getByLabel('Initial child step',{exact:true}).selectOption('b');
  await guide.getByRole('button',{name:'Apply detail',exact:true}).click();
  expect((await detail()).ports).toEqual({in:'n'});expect((await detail()).future).toBe(7);expect((await detail()).stepMap.p1.step).toBe(2);

@@ -258,6 +258,15 @@ with **position (%)**. See `docs/free-node-placement.md` and the executable
 
 ## Human handoff in the workbench
 
+Inspector actions sit above the form; paragraph and bullet structure actions
+precede their text. Muted disclosure headers start closed on a fresh selection
+and retain the user's choice during edits. Expand **Starting state**, a step's
+panel group, **Diagram handoff**, or **Domain detail** before editing it.
+Handoff/detail Apply and extraction Download/Apply/Cancel stay at their group
+top; ordinary fields auto-commit. Explicitly selecting or creating a Home
+element reveals its own editor. List Add stays above the items, with each
+item's remove and reorder controls kept local.
+
 Panel inspectors use **Change panel type…** to open the visual library and an
 explicit replacement review. Replacement seeds the registered template and
 instantiate hook, preserves ID/title/visibility, diagram layouts and centerpiece,

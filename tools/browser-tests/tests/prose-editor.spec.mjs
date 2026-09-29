@@ -36,7 +36,7 @@ test('blank starter creates, edits, orders and removes prose through the UI with
  await add(page,'bullet');await expect(page.locator('#docview [data-dv-bullet-path="1"]')).toHaveClass(/dv-sel/);
  const result=JSON.parse(await src.inputValue());expect(result.page.sections[0].bullets).toEqual([{text:'First point',sub:['New subpoint','New point']},'New point']);
  expect(result.page.sections[0].text).toEqual(['First with `code`','Second']);expect(result.page.sections[0].diagram).toEqual(section.diagram);
- await guide.getByRole('button',{name:'delete bullet',exact:true}).click();await expect(src).toHaveValue(nested);
+ await guide.getByRole('button',{name:'Delete point',exact:true}).click();await expect(src).toHaveValue(nested);
  await page.setViewportSize({width:720,height:800});await page.locator('#diagram-add').click();
  const menu=page.locator('#diagram-add-menu');expect(await menu.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  await page.locator('#add-paragraph').scrollIntoViewIfNeeded();await expect(page.locator('#add-paragraph')).toBeInViewport();

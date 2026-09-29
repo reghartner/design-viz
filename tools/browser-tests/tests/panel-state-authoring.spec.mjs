@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 
 const raw={page:{sections:[{heading:'Panel state',diagram:{nodes:{service:{title:'Service'}},rows:[['service']],panels:[
   {id:'reading',type:'gauge',title:'Current draw',unit:'mA',max:400,initial:{value:12,future:{keep:true}}},
@@ -13,7 +13,7 @@ test('typed starting and step state show assignment meaning, effective origin, a
   const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
   const root=page.locator('#docview'),guide=page.locator('#guide'),source=()=>page.locator('#src').inputValue();
   await inspectPageElement(page,root.locator('.pt-gauge .ptitle'));
-  const initial=guide.locator('.initialedit');
+  const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
   await expect(initial.getByLabel('Value assignment',{exact:true})).toHaveValue('set');
   await expect(initial.getByLabel('value',{exact:true})).toHaveValue('12');
   await initial.getByLabel('value',{exact:true}).fill('42');await initial.getByLabel('value',{exact:true}).press('Tab');

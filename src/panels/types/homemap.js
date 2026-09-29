@@ -2636,11 +2636,13 @@ PanelRegistry.extend('homemap', {
         var group = document.createElement('details');
         group.className = 'home-elements';
         group.open = state.open;
+        if(state.reveal!=null)group.setAttribute('data-inspector-reveal','');
         var summary = document.createElement('summary');
         summary.textContent =
           key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
         group.appendChild(summary);
         group.appendChild(context.controls.rows(key, cur, shape, homeRowOptions(key, state)));
+        delete state.reveal;
         listen(group,'toggle', function () {
           if (group.isConnected) state.open = group.open;
         });
@@ -2757,6 +2759,7 @@ PanelRegistry.extend('homemap', {
             var fold = document.createElement('details');
             fold.className = 'home-element';
             fold.open = !base || folds.items[index] === true;
+            if(folds.reveal===index)fold.setAttribute('data-inspector-reveal','');
             ref.fold = fold;
             var summary = document.createElement('summary');
             var name = document.createElement('span');
@@ -2924,7 +2927,9 @@ PanelRegistry.extend('homemap', {
                 (home[pick.field] || []).findIndex(function (x) {
                   return x.id === pick.id;
                 });
-          if (home && item >= 0)
+          if (home && item >= 0){
+            this.revealElement({section:target.section,index:target.index,field:pick.field,item:item});
+            context.inspect();
             context.selectClipboard({
               kind: 'home',
               section: target.section,
@@ -2932,6 +2937,7 @@ PanelRegistry.extend('homemap', {
               field: pick.field,
               item: item,
             });
+          }
         },
         revealElement: function (t) {
           var identity = JSON.stringify([t.section, t.index, t.field]);
@@ -2939,6 +2945,7 @@ PanelRegistry.extend('homemap', {
             homeElementFolds[identity] || (homeElementFolds[identity] = { open: true, items: [] });
           folds.open = true;
           folds.items[t.item] = true;
+          folds.reveal = t.item;
         },
         decoratePreview: function (card) {
           if (card.querySelector('[data-home-layout]')) return;

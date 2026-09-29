@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste,pagePreview,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -63,5 +63,5 @@ test('advanced reader tour validates before committing and compatibility remains
   await field.fill('{"version":2,"steps":[]}');await field.press('Tab');await expect(page.locator('#guide .ierr')).toContainText('unknown version');expect(await source(page)).toBe(before);
   const tour={version:1,steps:[{id:'end',kind:'done',copy:{heading:'Done',body:'That is the story.'}}]};await field.fill(JSON.stringify(tour));await field.press('Tab');
   await expect.poll(async()=>JSON.parse(await source(page)).page.tour).toEqual(tour);expect(JSON.parse(await source(page)).page.flowview).toEqual(raw.page.flowview);await page.locator('#guide').screenshot({path:info.outputPath('document-advanced.png')});
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await settings(page);await expect(field).toBeVisible();await field.fill('');await field.press('Tab');await expect.poll(async()=>JSON.parse(await source(page)).page.tour).toBeUndefined();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await settings(page);await openInspectorGroup(page.locator('#guide .document-advanced'));await expect(field).toBeVisible();await field.fill('');await field.press('Tab');await expect.poll(async()=>JSON.parse(await source(page)).page.tour).toBeUndefined();
 });

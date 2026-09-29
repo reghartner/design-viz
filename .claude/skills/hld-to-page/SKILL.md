@@ -173,6 +173,10 @@ For human editing, the workbench can create and reorder section paragraphs
 and bullet lists through Add and Inspect. See
 [Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
 for these controls and the existing prose syntax.
+Inspector object actions appear above their fields. Collapsible groups start
+closed for a fresh selection; open the named group before using its controls.
+Ordinary fields save as edited; handoff/detail composers have their own Apply
+at the top of the expanded group. Open groups remain open during same-object edits.
 
 When handing off a page for human editing, the workbench’s **Change panel type…**
 action reviews discarded setup and step state before replacement. See

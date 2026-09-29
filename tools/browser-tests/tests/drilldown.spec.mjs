@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste,paste as pasteCanvas,closeTools,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,pastePage as paste,paste as pasteCanvas,closeTools,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8');
 const root=page=>page.locator('#section-doorbell-domains');
@@ -149,6 +149,7 @@ test('the node inspector creates a detail section in one Undo action and configu
  await inspectPageElement(page,page.locator('[data-dv-node="b"]'));
  await expect(page.locator('#guide').getByRole('combobox',{name:'Open mode',exact:true})).toHaveCount(0);
  await expect(page.locator('#guide').getByRole('combobox',{name:'Boundary input node',exact:true})).toHaveCount(0);
+ await openInspectorGroup(page.locator('#guide .node-detail-editor'));
  await page.getByRole('button',{name:'Apply detail',exact:true}).click();result=JSON.parse(await page.locator('#src').inputValue());
  expect(result.page.sections[0].diagram.nodes.b.detail).toEqual({section:'b-detail',mode:'focus'});
  await closeTools(page);await page.locator('[data-dv-detail="b"]').click();await expect(active(page).locator('.sec-eyebrow')).toHaveText('Detail flow');

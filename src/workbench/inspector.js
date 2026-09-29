@@ -35,7 +35,7 @@ function createBuilderInspector(opts){
     var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
     if(!same){
       OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();
-      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;
+      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;OPEN_DOCUMENT_ADVANCED=false;
     }
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
@@ -43,14 +43,18 @@ function createBuilderInspector(opts){
     return previous;
   }
   function finishForm(previous){
+    /* Defaults apply to a new authored selection. Same-selection refreshes
+       restore the live DOM choice, including custom panel disclosures. */
     disclosureNodes().forEach(function(fold){
       var key=fold.getAttribute('data-inspector-disclosure');
-      if(previous.disclosures && Object.prototype.hasOwnProperty.call(previous.disclosures,key))fold.open=previous.disclosures[key];
-      else if(!previous.disclosures && !fold.hasAttribute('data-inspector-reveal'))fold.open=false;
+      if(fold.hasAttribute('data-inspector-reveal'))fold.open=true;
+      else if(previous.disclosures && Object.prototype.hasOwnProperty.call(previous.disclosures,key))fold.open=previous.disclosures[key];
+      else if(!previous.disclosures)fold.open=false;
     });
     assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
   }
   function disclosureNodes(){
+    /* Omit changing patch summaries and collection counts from the identity. */
     var counts=Object.create(null),folds=Array.from(guide.querySelectorAll('details'));
     folds.forEach(function(fold){
       var parent=fold.parentNode && fold.parentNode.closest('details'),row=fold.closest('.frow'),label=row && row.querySelector('.flab');
@@ -1802,7 +1806,6 @@ function documentForm(){
     function note(text){var p=document.createElement('p');p.className='fnote';p.textContent=text;return p;}
     if(!doc){
       rows.push(note('This is a bare diagram. Add a page wrapper to give it a title, saved appearance and source document. The diagram stays intact.'));
-      rows.push(actionButton('Add document settings',function(){return commitCascade(function(raw){return planWrapDocument(session.text(),raw);},{after:refreshFormSoon});}));
       return rows;
     }
     function setting(key,value){return commitCascade(function(raw){return planDocumentSetting(session.text(),raw,key,value);},{after:refreshFormSoon});}
@@ -1971,10 +1974,10 @@ function paraForm(val, ctx){
       button.disabled=pair[1]==='up' && target.index===0 || pair[1]==='down' && target.index===count-1;
       actions.appendChild(button);
     });
-    return [
+    return [actions,
       frowBlock('text', proseControl(val, function(v){
         return commitValue(JSON.stringify(v == null ? '' : v));
-      })),actions
+      }))
     ];
   }
 
@@ -2318,6 +2321,9 @@ function renderInspector(){
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
       var acts = actionGroup(g.title+' actions','inspector-actions');
+      if(t.kind==='document' && !builderDocumentPage(parsed.raw))acts.appendChild(actionButton('Add document settings',function(){
+        return commitCascade(function(raw){return planWrapDocument(session.text(),raw);},{after:refreshFormSoon});
+      }));
       if(clipboard() && (!clipboardToolbar() || t.kind==='panel') && ['node','section','panel'].indexOf(t.kind)>=0){
         acts.appendChild(actionButton('Copy '+t.kind,function(){clipboard().copy([t]);}));
         acts.appendChild(actionButton('Paste…',function(){opts.clipboard.clearHome();clipboard().open();}));
@@ -2332,6 +2338,7 @@ function renderInspector(){
             }});
         }));
         var connectButton=actionButton('Connect from this node',function(){modes.connectFrom(t);});
+        connectButton.className+=' node-connect-button';
         connectButton.title='Alt/Option-click a node, then click its destination. Escape cancels.';
         acts.appendChild(connectButton);
         if(!val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
@@ -2436,7 +2443,7 @@ function renderInspector(){
       }
       if (!armedHere && t.kind !== 'document')
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
-      guide.appendChild(acts);
+      if(acts.childNodes.length)guide.appendChild(acts);
       guide.appendChild(form);
     }
 

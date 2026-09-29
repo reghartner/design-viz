@@ -4,6 +4,7 @@ import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import prepareEditor from './prepare-editor.mjs';
 import {repo} from './prepare.mjs';
+import {publishLibrary} from '../../canon/library.mjs';
 import {buildEntityDiagramIndex,diagramsForEntity} from '../../canon/entity-diagrams.mjs';
 export default async function prepare(){
   execFileSync('python3',[path.join(repo,'tools/build.py')],{stdio:'inherit'});
@@ -31,7 +32,11 @@ export async function prepareBackstageWorkspace(output){
     // Relative fixture destinations become absolute in the browser. The index
     // still supplies the actual production spec digest and section identities.
     const list=diagramsForEntity(buildEntityDiagramIndex([spec],{publicBaseUrl:'http://fixture.test'}),entityRef);
-    await writeFile(path.join(output,'diagrams.json'),JSON.stringify({version:1,diagrams:[{id:'backstage-story',spec}]}));
+    const specFolder=path.join(output,'diagrams/backstage-story');await mkdir(specFolder,{recursive:true});
+    await writeFile(path.join(specFolder,'backstage-story.spec.json'),JSON.stringify(spec));
+    const registryFile=path.join(output,'registry.json');
+    await writeFile(registryFile,JSON.stringify({version:1,diagrams:[{id:'backstage-story',path:'diagrams/backstage-story/backstage-story.spec.json'}]}));
+    await publishLibrary({registryPath:registryFile,output:path.join(output,'diagrams.json')});
     await mkdir(path.join(output,'backstage'));
     await build({absWorkingDir:app,stdin:{resolveDir:app,loader:'tsx',contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';import {FlowviewEntityDiagrams} from './src/FlowviewEntityDiagrams';

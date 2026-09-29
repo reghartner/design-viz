@@ -4,7 +4,7 @@
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
   tools/canon/generated-runtime.cjs = static DOM-free backend entrypoint
-  workbench/diagrams.json = snapshot of folders listed in root canon.json
+  workbench/diagrams.json = metadata index for folders listed in root canon.json
 
 The source loader owns entrypoint expansion, exports and asset inventory.
 Deterministic: same src -> byte-identical output. Run from anywhere.

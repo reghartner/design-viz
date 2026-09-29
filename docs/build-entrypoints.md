@@ -73,7 +73,8 @@ The CLI provides `--entrypoint NAME`, `--entry-assets NAME`,
 JSON. `tools/build.py` retains its `entrypoint`, `entrypoint_assets`, `js_bundle`
 and source/style adapters by delegating to these commands. After writing the
 backend runtime, it reads root `canon.json`, validates the listed `diagrams/<name>`
-folders, and publishes the derived `workbench/diagrams.json` with that runtime.
+folders, and validates the listed specs with that runtime and publishes a metadata-only
+`workbench/diagrams.json` index pointing to those source files.
 The snapshot is ignored by Git; missing JSON/HTML, invalid specs, duplicate
 folders, and escaping paths fail publication while preserving the prior snapshot.
 

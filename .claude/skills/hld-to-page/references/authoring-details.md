@@ -281,3 +281,13 @@ inclusive, Hide starts at its bound, and ambient shows all fragments.
 Connections expose all built-in protocols and custom name/color creation; story
 lanes use the same document-wide vocabulary controls. See the workbench User
 guide → Visual panels.
+
+### Publishing the workbench Canon library
+
+Root `canon.json` selects published diagram folders and ownership. Save authored
+JSON and generated HTML together under `diagrams/<id>/`, then run the normal
+build. It validates the sources and generates `workbench/diagrams.json` as a
+metadata-only index with relative spec URLs. Never edit that generated index or
+copy diagram bodies into it. Deploy the source spec paths alongside the index;
+the workbench fetches a spec when a reader opens it. See
+`docs/workbench-canon-library.md` for direct links and deployment details.

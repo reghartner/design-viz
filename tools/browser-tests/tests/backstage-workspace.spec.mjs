@@ -58,8 +58,8 @@ test('a changed published story fails the handoff without replacing the existing
   const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
   const url=await link.getAttribute('href'),before='saved draft sentinel';
   await page.evaluate(value=>localStorage.setItem('dv-workbench-draft',value),before);
-  await page.route('**/diagrams.json',async route=>{
-    const response=await route.fetch(),data=await response.json();data.diagrams[0].spec.page.title='Changed publication';await route.fulfill({json:data});
+  await page.route('**/backstage-story.spec.json',async route=>{
+    const response=await route.fetch(),data=await response.json();data.page.title='Changed publication';await route.fulfill({json:data});
   });
   await page.goto(url);
   await expect(page.locator('#canon-reader-error')).toContainText('changed since you opened');

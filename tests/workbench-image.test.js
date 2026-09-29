@@ -43,9 +43,12 @@ test('nginx image publishes central canon membership and replaces a stale librar
     catch(error){if(attempt===19)throw error;await new Promise(resolve=>setTimeout(resolve,100));}
   }
   assert.equal(response.status,200);assert.match(response.headers['cache-control'],/no-cache/);
-  const library=JSON.parse(response.body);assert.equal(library.version,1);
+  const library=JSON.parse(response.body);assert.equal(library.version,2);
   const expected=structuredClone(spec);expected.page.canon.id='feature';expected.page.canon.kind='canonical';
-  assert.deepEqual(library.diagrams.map(d=>d.spec),[expected]);
+  assert.equal(library.diagrams[0].spec,undefined);
+  assert.deepEqual(library.diagrams[0].canon,expected.page.canon);
+  const specResponse=await probeHttp(new URL(library.diagrams[0].specUrl,url).href,2000);
+  assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
   assert.equal((await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.html',2000)).status,200);

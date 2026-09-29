@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* Publish reviewed specs as static data; no GitHub credentials in HTML. */
-import {readdir,readFile,realpath} from 'node:fs/promises';
+import {readdir,readFile,realpath,stat} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import {registry,atomicJSON,canonLibrary} from './registry.mjs';
@@ -13,23 +13,32 @@ export async function loadCanonDiagrams(file='canon.json',{authorize=()=>true,..
   return {specs,index:buildEntityDiagramIndex(specs,options)};
 }
 
-function libraryFromEntries(entries){
+async function libraryFromEntries(entries,output){
   const ids=new Map();
-  return {version:1,diagrams:entries.map(entry=>{
+  return {version:2,diagrams:await Promise.all(entries.map(async entry=>{
     const label=entry.filename || entry.id;
     if(typeof entry.id!=='string' || !entry.id.trim() || entry.id.length>200)throw new Error(label+': every library diagram needs an ID of 1–200 characters.');
     if(ids.has(entry.id))throw new Error('Duplicate canon ID '+entry.id+': '+ids.get(entry.id)+' and '+label);
     ids.set(entry.id,label);
+    if((await stat(entry.filename)).size>30*1024*1024)throw new Error(label+': diagram exceeds 30 MB.');
     const errors=C.validate(entry.spec).concat(C.validateSpec(entry.spec).errors);
     if(errors.length)throw new Error('Invalid diagram '+label+': '+errors.join('; '));
-    return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,spec:entry.spec};
-  })};
+    const counts={nodes:0,steps:0,panels:0};
+    for(const section of C.sections(entry.spec)){
+      counts.nodes+=Object.keys(section.diagram.nodes || {}).length;
+      counts.steps+=(section.diagram.steps || []).length;
+      counts.panels+=(section.diagram.panels || []).length;
+    }
+    const specUrl=path.relative(path.dirname(path.resolve(output)),(await realpath(entry.filename))).split(path.sep).map(encodeURIComponent).join('/');
+    return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
+      canon:entry.spec.page.canon,counts,specUrl};
+  }))};
 }
-export async function buildLibrary(registryPath){return libraryFromEntries((await registry(registryPath)).entries);}
+export async function buildLibrary(registryPath,output='workbench/diagrams.json'){return libraryFromEntries((await registry(registryPath)).entries,await physicalPath(output));}
 
 /* Only regular JSON files under the chosen directory are inputs. Never follow
    symlinks into another repository or publish files merely because they exist. */
-export async function buildLibraryFromDirectory(directory){
+export async function buildLibraryFromDirectory(directory,output='workbench/diagrams.json'){
   const entries=[];
   async function walk(folder){
     const children=await readdir(folder,{withFileTypes:true});
@@ -45,8 +54,8 @@ export async function buildLibraryFromDirectory(directory){
       entries.push({filename,id:spec.page.canon?.id,spec});
     }
   }
-  await walk(path.resolve(directory));
-  return libraryFromEntries(entries);
+  await walk(await realpath(directory));
+  return libraryFromEntries(entries,await physicalPath(output));
 }
 
 /* Resolve existing ancestors too: a not-yet-created output can still sit
@@ -79,11 +88,11 @@ export async function publishLibrary({registryPath,diagramsDir,output='workbench
     }
     const source=await registry(registryPath);
     if((await Promise.all(source.entries.map(entry=>realpath(entry.filename)))).includes(physicalDestination))throw new Error('Output must not overwrite a source spec.');
-    library=libraryFromEntries(source.entries);
+    library=await libraryFromEntries(source.entries,physicalDestination);
   }else{
     const directory=path.resolve(diagramsDir);
     if(withinDirectory(destination,directory) || withinDirectory(physicalDestination,await realpath(directory)))throw new Error('Output must be outside the diagram source directory.');
-    library=await buildLibraryFromDirectory(directory);
+    library=await buildLibraryFromDirectory(directory,destination);
   }
   if(Buffer.byteLength(JSON.stringify(library,null,2)+'\n')>30*1024*1024)throw new Error('Library exceeds 30 MB.');
   await atomicJSON(destination,library);

@@ -203,7 +203,9 @@ test('the real build packages the added panel into viewer, editor and the headle
   fs.writeFileSync(path.join(temp,'canon.json'),JSON.stringify({version:1,diagrams:[{folder:'diagrams/extension',owner:published.page.canon.owner}]}));
   const output=execFileSync('python3',[path.join(temp,'tools/build.py')],{cwd:temp,encoding:'utf8',timeout:30000});
   assert.match(output,/built template\/flowview.html/);
-  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(temp,'workbench/diagrams.json'))).diagrams[0].spec,published);
+  const entry=JSON.parse(fs.readFileSync(path.join(temp,'workbench/diagrams.json'))).diagrams[0];
+  assert.equal(entry.spec,undefined);assert.equal(entry.specUrl,'../diagrams/extension/extension.spec.json');
+  assert.deepEqual(entry.canon,published.page.canon);
   for (const name of ['template/flowview.html','workbench/flowspec.html']) {
     const html=fs.readFileSync(path.join(temp,name),'utf8');
     assert.ok(html.includes("PanelRegistry.define('extension-meter'"),name);

@@ -2,7 +2,7 @@
 /** Local file handoff. No browser automation, shell execution, or filesystem HTTP API. */
 import http from 'node:http';
 import {constants as fsConstants} from 'node:fs';
-import {mkdir, mkdtemp, open, readFile, rename, writeFile} from 'node:fs/promises';
+import {mkdir, mkdtemp, open, readFile, realpath, rename, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {randomBytes, timingSafeEqual} from 'node:crypto';
@@ -126,7 +126,23 @@ export async function startAgentSession({root=ROOT,scratch,port=0,leaseMs=10000}
         try{bytes=await readFile(path.join(root,'workbench/diagrams.json'));}catch(ex){if(ex.code!=='ENOENT')throw ex;bytes='{"version":1,"diagrams":[]}';}
       }else if(route==='/template/flowview.html'){
         bytes=await readFile(path.join(root,'template/flowview.html'));type='text/html; charset=utf-8';
-      }else throw error(404,'This helper serves only the workbench and its built assets.');
+      }else{
+        // Serve only spec files named by the published index, never arbitrary
+        // repository files or symlinks escaping the checkout.
+        let index;
+        try{index=JSON.parse(await readFile(path.join(root,'workbench/diagrams.json'),'utf8'));}
+        catch(ex){if(ex.code!=='ENOENT')throw ex;}
+        const base=origin+'/workbench/diagrams.json';
+        const entry=index?.version===2 && index.diagrams?.find(item=>{
+          if(typeof item.specUrl!=='string')return false;
+          const target=new URL(item.specUrl,base);
+          return target.origin===origin && target.pathname===route && !target.search && !target.hash;
+        });
+        if(!entry || !/\.json$/i.test(route))throw error(404,'This helper serves only the workbench and its published specs.');
+        const directory=await realpath(root),filename=await realpath(path.resolve(root,'.'+decodeURIComponent(route)));
+        if(!filename.startsWith(directory+path.sep))throw error(404,'Published spec must remain inside the checkout.');
+        bytes=await readFile(filename);
+      }
       res.writeHead(200,{'Content-Type':type});res.end(req.method==='HEAD'?undefined:bytes);
     };
     run().catch(ex=>{if(!res.headersSent)json(ex.status || 500,{error:ex.status?ex.message:'Local session failed.'});else res.end();});

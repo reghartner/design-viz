@@ -129,6 +129,32 @@ class FolderAgentTests(unittest.TestCase):
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertEqual(run.stdout, '')
 
+    def test_monitor_renewal_preserves_events_for_an_active_request_and_new_results(self):
+        first = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+        self.assertEqual(json.loads(first.stdout)['requestId'], 'request')
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+        self.put('result.json', {**self.owner, 'id': 'proposal', 'requestId': 'request', 'status': 'applied'})
+        result = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+        self.assertEqual(json.loads(result.stdout)['event'], 'flowview_result')
+        self.assertEqual(json.loads(result.stdout)['requestId'], 'request')
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+        self.put('request.json', {**self.owner, 'id': 'next', 'text': 'Next request'})
+        self.assertEqual(json.loads(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout)['id'], 'next')
+
+    def test_fresh_monitor_does_not_redispatch_a_completed_result(self):
+        self.put('result.json', {**self.owner, 'id': 'proposal', 'requestId': 'request', 'status': 'applied'})
+        self.put('reply.json', {**self.owner, 'requestId': 'request'})
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+
+    def test_native_begin_timeout_withdraws_its_request(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        # Deterministically cross the deadline without waiting eight real seconds.
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 9]):
+            with self.assertRaisesRegex(ValueError, 'withdrawn'):
+                helper.main()
+        self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+        self.assertEqual(helper.read(self.folder, 'agent-request.json')['expiresAt'], 0)
+
     def test_native_begin_waits_for_editor_ack_and_refuses_embedded_workflow(self):
         self.assertIn('external', self.run_helper('begin', '--text', 'Change the story').stderr.lower().replace('work in your agent', 'external'))
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
@@ -141,6 +167,9 @@ class FolderAgentTests(unittest.TestCase):
             self.assertEqual(request['text'], 'Native request')
             self.assertGreater(request['expiresAt'], time.time()*1000)
             self.put('request.json', {**request, 'revision': 'connection-1'})
+            time.sleep(.2)
+            self.assertIsNone(process.poll(), 'Publishing request.json alone must not acknowledge the turn')
+            self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id'], 'text': request['text']}]})
             output, error = process.communicate(timeout=3)
             self.assertEqual(process.returncode, 0, error)
             self.assertEqual(json.loads(output)['id'], request['id'])

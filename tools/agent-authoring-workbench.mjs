@@ -127,7 +127,9 @@ export async function createSession(page, outDir, options = {}) {
     }
     if (operation === 'write') {
       if (typeof value !== 'string' || Buffer.byteLength(value) > maximumBytes) throw new Error('Invalid exchange write.');
+      if(options.beforeWrite)await options.beforeWrite(path.basename(name),value);
       await atomicWrite(target, value);
+      if(options.afterWrite)await options.afterWrite(path.basename(name),value);
       await archive(name, value, 'write');
       return;
     }
@@ -191,8 +193,10 @@ export async function createSession(page, outDir, options = {}) {
   await page.locator('#welcome-paste-form button[type=submit]').click();
   await page.locator('#editor-tab-agent').click();
   if (!await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-open-setup').click();
+  await page.locator('#folder-agent-workflow').selectOption(options.workflow ?? 'embedded');
   await page.locator('#folder-agent-connect').click();
-  await waitFor(() => page.locator('#folder-agent-send').isEnabled(), 'connected editor');
+  await waitFor(() => page.locator('#folder-agent-copy').isEnabled(), 'connected editor');
+  const instructions = await page.locator('#folder-agent-instructions').inputValue();
   if (await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-close-guide').click();
   if (!sessionPath) throw new Error('Editor did not create its session folder.');
   const manifest = await readJson(path.join(sessionPath, 'session.json'));
@@ -281,8 +285,12 @@ export async function createSession(page, outDir, options = {}) {
       await attempt('screenshot', () => page.screenshot({path: path.join(outDir, 'final.png'), fullPage: false}));
       // A failed capture must not prevent ending the editor lease.
       await attempt('disconnect', async () => {
-        const disconnect = page.locator('#folder-agent-disconnect');
-        if (!await disconnect.isVisible()) await page.locator('#folder-agent-pairing > summary').click();
+        let disconnect = page.locator('#folder-agent-disconnect-guide');
+        if (!await page.locator('#folder-agent-guide').isVisible()) {
+          if (!await page.locator('#editor-agent').isVisible()) await page.locator('#editor-tab-agent').click();
+          disconnect = page.locator('#folder-agent-disconnect');
+          if (!await disconnect.isVisible()) await page.locator('#folder-agent-pairing > summary').click();
+        }
         if (await disconnect.isVisible() && await disconnect.isEnabled()) {
           await disconnect.click();
           await waitFor(async () => (await readJson(path.join(sessionPath, 'editor.json')))?.connected === false, 'disconnected lease');
@@ -294,7 +302,7 @@ export async function createSession(page, outDir, options = {}) {
     if (failures.length) throw new Error(failures.join('\n'));
   }
   await capture();
-  return {...identity, errors, unexpectedRequests, sendControl, pollControl, capture, close};
+  return {...identity, instructions, errors, unexpectedRequests, sendControl, pollControl, capture, close};
 }
 
 export async function runBroker({output, runs = 6, seedSource = defaultSource, maxMinutes = 45, shutdown}) {

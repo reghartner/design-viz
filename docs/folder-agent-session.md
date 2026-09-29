@@ -55,8 +55,11 @@ if unavailable, report this limitation instead of changing permissions.
 The editor shows listener liveness separately from a pending message. A fresh
 listener heartbeat means the watcher is running, not that the model has begun
 or completed the request. Monitor watches expire; the visible instructions ask
-Claude to renew a 25-minute watcher while the same connection is active. Closing
-Claude stops the connection. Normal permission prompts are handled in Claude.
+Claude to renew a 25-minute watcher while the same connection is active. Delivered
+event IDs are retained across normal renewals; agents also deduplicate IDs in
+case a process fails between notification and recording delivery. Closing Claude
+stops its watcher; disconnect in the workbench to end the folder pairing. Normal
+permission prompts are handled in Claude.
 
 ## Communicate
 
@@ -72,12 +75,19 @@ A connected folder shares the full story; message checkboxes select focus, not
 folder access. `replySurface: agent` keeps conversation in the native app even
 when a message is sent directly. Use a helper `reply` at completion to release
 the request. Do not finish a request while its proposal is awaiting review.
+Direct Send has a 16,000-character message limit. Larger copied messages retain
+their complete text on the clipboard and register a small placeholder telling
+the agent to follow the pasted message. They do not inflate the shared transcript
+with repeated full-source copies.
 
 For a new request spoken directly in the native conversation, use
 `python3 /path/to/session/folder-agent.py begin --text 'The requested change'`.
 The workbench must acknowledge it before submitting work. This is available only
-in the external workflow. An unacknowledged request expires after eight seconds;
-finish or stop the active turn and retry. Continue discussion under the active
+in the external workflow. An unacknowledged request expires after eight seconds
+and is withdrawn, including if a slow file write completes after that deadline.
+Keep the workbench active while starting a request; if its browser is suspended,
+return to the tab before retrying. Finish or stop an existing active turn before
+starting another. Continue discussion under the active
 request while resolving questions. **Stop accepting this turn** cancels acceptance
 here; interrupt the agent itself in its app if needed.
 
@@ -156,6 +166,8 @@ applies the reviewed version as one undoable local change; it is not a Git commi
 If the document or proposal changes during review, approval is invalidated and
 the preview refreshes before another commit is possible. Closing the preview
 keeps it pending; discarding returns a rejection.
+If the editor is busy when Commit is clicked, that attempt does not leave an
+approval queued for later: review and click Commit again when it is ready.
 
 The editor performs a conservative three-way merge of the baseline, current
 source and proposal. Disjoint object fields and collections with unique IDs
@@ -164,6 +176,8 @@ Same-field edits, delete-versus-edit, ambiguous ordering, unknown baselines and
 invalid combined references require a revision. Arrays without stable identities
 are treated as a unit. Nothing partially applies. The combined document is
 validated and must render before the commit button is enabled.
+Once a proposal reaches review, its planning baseline is retained even if
+continued human edits fill the recent-revision cache.
 
 **Agent update needs attention** offers **Copy feedback for your agent** with
 conflicting paths and instructions to reread the latest shared story. Copying

@@ -173,7 +173,27 @@ def prepare(folder):
 def watch(folder, interval=0.25, minutes=25):
     owner = identity(folder)
     prepare(folder)
-    seen = set()
+    seen = {}
+    try:
+        previous = read(folder, 'listener.json')
+        if all(previous.get(k) == v for k, v in owner.items()):
+            for item in previous.get('events', [])[-256:]:
+                if (isinstance(item, list) and len(item) == 2 and item[0] in ('request', 'result', 'cancel') and
+                        isinstance(item[1], str) and re.fullmatch(r'[\w-]{1,120}', item[1])):
+                    seen[tuple(item)] = True
+    except (OSError, ValueError, TypeError):
+        pass
+
+    def mark_seen(key):
+        seen[key] = True
+        while len(seen) > 256:
+            del seen[next(iter(seen))]
+
+    def heartbeat(listening=True):
+        write(folder, 'listener.json', {**owner, 'at': int(time.time() * 1000), 'listening': listening,
+                                       'events': [list(key) for key in seen]},
+              guard=lambda: assert_owner(folder, owner))
+
     deadline = time.monotonic() + minutes * 60
     last_heartbeat = 0
     try:
@@ -185,8 +205,7 @@ def watch(folder, interval=0.25, minutes=25):
                 break
             now = time.time()
             if now - last_heartbeat >= 1:
-                write(folder, 'listener.json', {**owner, 'at': int(now * 1000), 'listening': True},
-                      guard=lambda: assert_owner(folder, owner))
+                heartbeat()
                 last_heartbeat = now
             try:
                 editor = read(folder, 'editor.json')
@@ -205,23 +224,27 @@ def watch(folder, interval=0.25, minutes=25):
                         if not key[1] or key in seen:
                             continue
                         if kind in ('request', 'result') and cancelled(folder, owner, value.get('id') if kind == 'request' else value.get('requestId')):
-                            seen.add(key)
+                            mark_seen(key)
                             continue
                         if kind == 'request' and value.get('delivery') in ('clipboard', 'native'):
-                            seen.add(key)
+                            mark_seen(key)
                             continue
-                        if kind == 'request':
+                        if kind in ('request', 'result'):
                             try:
                                 reply = read(folder, 'reply.json')
-                                if (reply.get('requestId') == value['id'] and
+                                if (reply.get('requestId') == (value['id'] if kind == 'request' else value.get('requestId')) and
                                         all(reply.get(k) == v for k, v in owner.items())):
-                                    seen.add(key)
+                                    mark_seen(key)
                                     continue
                             except (OSError, ValueError):
                                 pass
-                        seen.add(key)
+                        mark_seen(key)
                         print(json.dumps({'event': 'flowview_' + kind, 'file': str(folder / filename),
-                                          'id': value['id'], **({'requestId': value['requestId']} if kind == 'cancel' else {}), **owner}), flush=True)
+                                          'id': value['id'], 'requestId': value['id'] if kind == 'request' else value.get('requestId'), **owner}), flush=True)
+                        # Preserve delivery across ordinary Monitor renewals.
+                        # A process crash between output and this write can still
+                        # repeat an event, so consumers must also deduplicate IDs.
+                        heartbeat()
                     except (OSError, ValueError):
                         pass  # A writer may not have finished publishing yet.
             except (OSError, ValueError):
@@ -230,7 +253,7 @@ def watch(folder, interval=0.25, minutes=25):
     finally:
         try:
             if identity(folder) == owner:
-                write(folder, 'listener.json', {**owner, 'at': int(time.time() * 1000), 'listening': False})
+                heartbeat(False)
         except (OSError, ValueError):
             pass
 
@@ -289,11 +312,32 @@ def main():
             assert_owner(folder, owner)
             try:
                 request = active_request(folder, owner, request_id)
-                print(json.dumps({'id': request_id, 'revision': request['revision']}))
-                return
+                # request.json can become visible before the browser's close
+                # continuation has accepted the turn. Its transcript entry is
+                # published only after that decision and the pending state.
+                transcript = read(folder, 'transcript.json')
+                acknowledged = (transcript.get('sessionId') == owner['sessionId'] and
+                                any(item.get('role') == 'user' and item.get('requestId') == request_id and
+                                    not item.get('cancelled') for item in transcript.get('messages', [])))
+                if acknowledged and time.monotonic() < deadline and request.get('expiresAt', float('inf')) > time.time() * 1000:
+                    print(json.dumps({'id': request_id, 'revision': request['revision']}))
+                    return
+                time.sleep(0.1)
             except (OSError, ValueError):
                 time.sleep(0.1)
-        raise ValueError('The workbench has not accepted this request. Finish or stop the active turn, keep the workbench open, and retry. Do not submit a proposal for an unacknowledged request.')
+        def still_ours():
+            assert_owner(folder, owner)
+            if read(folder, 'agent-request.json').get('id') != request_id:
+                raise ValueError('Another native request replaced this attempt.')
+        withdrawn = False
+        try:
+            write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text,
+                                               'expiresAt': 0, 'withdrawn': True}, guard=still_ours)
+            withdrawn = True
+        except (OSError, ValueError):
+            pass
+        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Stop accepting this turn in Message agent before retrying.'
+        raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is active, use Stop accepting this turn in Message agent. Do not submit unacknowledged work.')
     active_request(folder, owner, args.request)
     input_name = args.file
     if input_name:

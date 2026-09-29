@@ -153,13 +153,27 @@ function createFolderAgentClient(opts){
   async function poll(){
     if(!connected || disposed)return;
     var token=epoch,turn=turnEpoch,requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
-    if(opts.workflow==='external' && !pending){
+    if(opts.workflow==='external'){
       var incoming=await readOptional('agent-request.json');if(!alive(token) || turn!==turnEpoch)return;
-      if(belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
+      if(pending && nativeSeen.has(pending) && belongs(incoming) && incoming.id===pending && incoming.withdrawn===true){
+        var expiredId=pending;pending=null;turnEpoch++;clearReceipt();clearReview();activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;
+        transcript.forEach(function(item){if(item.requestId===expiredId && item.role==='user')item.cancelled=true;});
+        await files.write('cancel.json',envelope({id:uuid(),requestId:expiredId,at:now(),reason:'The agent timed out before receiving acknowledgement. Retry this request.'}));
+        if(!alive(token))return;await saveTranscript();publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;
+      }
+      if(!pending && belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
         var request=envelope({id:incoming.id,text:incoming.text,at:now(),revision:sent.snapshot.revision,selection:[],views:[],
-          technicalLevel:opts.level?opts.level():'story',replySurface:'agent',delivery:'native'});
-        exchange.pin();
-        await files.write('request.json',request,function(){if(!alive(token) || turn!==turnEpoch || now()>=incoming.expiresAt)throw Error('Native request expired before publication.');});if(!alive(token) || turn!==turnEpoch)return;
+          technicalLevel:opts.level?opts.level():'story',replySurface:'agent',delivery:'native',expiresAt:incoming.expiresAt});
+        exchange.pin(sent.snapshot);
+        try{await files.write('request.json',request,function(){
+          if(!alive(token) || turn!==turnEpoch || now()>=incoming.expiresAt){var expired=Error('Native request expired before publication.');expired.name='NativeRequestExpiredError';throw expired;}
+        });}catch(ex){if(ex.name!=='NativeRequestExpiredError')throw ex;nativeSeen.add(incoming.id);if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;}
+        if(!alive(token) || turn!==turnEpoch)return;
+        if(now()>=incoming.expiresAt){
+          nativeSeen.add(incoming.id);
+          await files.write('cancel.json',envelope({id:uuid(),requestId:incoming.id,at:now(),reason:'Native request expired during publication. Retry this request.'}));
+          if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;
+        }
         nativeSeen.add(incoming.id);pending=requestId=incoming.id;turn=++turnEpoch;requestAt=now();lastAgentAt=null;
         activity=[];activitySeen.clear();clearReceipt();clearReview();
         transcript.push({role:'user',text:incoming.text,requestId:incoming.id});await saveTranscript();
@@ -194,7 +208,12 @@ function createFolderAgentClient(opts){
           seen.add(ack.result.id);exchange.receive({acknowledged:ack.result.id},ack);pendingReviewResult=null;
           publish({status:message});
           await snapshot(token);if(!alive(token) || turn!==turnEpoch)return;
-        }else if(message)publish({status:message});
+        }else if(message){
+          // A busy editor did not apply the approved version. Require another
+          // explicit click; closing the refreshed preview must never apply it.
+          if(reviewMode && reviewDecision && reviewDecision.action==='accept')reviewDecision=null;
+          publish({status:message});
+        }
       }
     }
     // Read accumulated progress before a final reply so a fast turn cannot hide
@@ -354,7 +373,7 @@ function createFolderAgentClient(opts){
           throw Error('The story changed while saving your message. Check the selection and send it again.');
         var request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
           selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel,replySurface:captured.replySurface,delivery:captured.delivery});
-        exchange.pin();
+        exchange.pin(sent.snapshot);
         await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:'Message saved — waiting for Claude.',progress:''});

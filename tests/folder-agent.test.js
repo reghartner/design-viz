@@ -459,3 +459,47 @@ test('native requests are accepted only in external workflow, once and before th
   h.disk.set('agent-request.json',h.envelope({id:'foreign',connectionId:'other',text:'Ignore',expiresAt:108000}));await h.client.poll();assert.equal(h.last.pending,null);
   const embedded=harness({workflow:'embedded'});await embedded.client.start();embedded.disk.set('agent-request.json',embedded.envelope({id:'native',text:'Ignore',expiresAt:108000}));await embedded.client.poll();assert.equal(embedded.last.pending,null);
 });
+
+test('review retains a later planning baseline while many human edits arrive',async()=>{
+  const h=harness({reviewMode:true});h.type('{"a":0,"b":0}');await h.client.start();await h.client.send('Edit B');
+  h.type('{"a":1,"b":0}');await h.client.poll();const base=h.disk.get('state.json').revision;
+  h.proposal({baseRevision:base,source:'{"a":1,"b":2}'});await h.client.poll();assert.equal(h.last.review.ok,true);
+  for(let i=2;i<45;i++){h.type(JSON.stringify({a:i,b:0}));await h.client.poll();}
+  assert.equal(h.last.review.ok,true);assert.deepEqual(JSON.parse(h.client.reviewContent()),{a:44,b:2});
+  await h.client.acceptReview();assert.deepEqual(JSON.parse(h.writes[0]),{a:44,b:2});
+});
+
+test('a busy commit consumes approval and cannot apply after closing its preview',async()=>{
+  const h=harness({reviewMode:true});await h.client.start();await h.client.send('Edit');h.proposal();await h.client.poll();
+  h.busy(true);assert.equal(await h.client.acceptReview(),false);assert.equal(h.writes.length,0);
+  h.busy(false);await h.client.poll();assert.equal(h.writes.length,0);
+  await h.client.acceptReview();assert.equal(h.writes.length,1);
+});
+
+for(const phase of ['before close','after close'])test('native expiry '+phase+' does not leave a pending turn or report lost folder access',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();
+  h.disk.set('agent-request.json',h.envelope({id:'expiring',text:'Too late',expiresAt:108000}));
+  if(phase==='before close')h.writeGate(name=>{if(name==='request.json')h.advance(9000);});
+  else{const write=h.files.write;h.files.write=async(...args)=>{await write(...args);if(args[0]==='request.json')h.advance(9000);};}
+  await h.client.poll();assert.equal(h.last.pending,null);assert.equal(h.last.accessError,undefined);assert.match(h.last.status,/expired.*retry/i);
+  if(phase==='after close')assert.equal(h.disk.get('cancel.json').requestId,'expiring');
+});
+
+test('a native timeout withdrawal clears an accepted but unacknowledged turn and accepts a retry',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});await h.client.start();
+  h.disk.set('agent-request.json',h.envelope({id:'late',text:'Late ack',expiresAt:108000}));await h.client.poll();assert.equal(h.last.pending,'late');
+  h.disk.set('agent-request.json',h.envelope({id:'late',text:'Late ack',expiresAt:0,withdrawn:true}));await h.client.poll();
+  assert.equal(h.last.pending,null);assert.equal(h.disk.get('cancel.json').requestId,'late');assert.equal(h.last.transcript[0].cancelled,true);
+  h.disk.set('agent-request.json',h.envelope({id:'retry',text:'Try again',expiresAt:108000}));await h.client.poll();assert.equal(h.last.pending,'retry');
+});
+
+test('native request pins the exact published revision despite edits during its disk read',async()=>{
+  const h=harness({workflow:'external',reviewMode:true});h.type('{"a":0,"b":0}');await h.client.start();
+  const base=h.disk.get('state.json').revision;
+  h.disk.set('agent-request.json',h.envelope({id:'planning',text:'Edit B',expiresAt:108000}));
+  h.gate(name=>{if(name==='agent-request.json')h.type('{"a":1,"b":0}');});await h.client.poll();h.gate(null);
+  assert.equal(h.disk.get('request.json').revision,base);
+  for(let i=2;i<45;i++){h.type(JSON.stringify({a:i,b:0}));await h.client.poll();}
+  h.proposal({baseRevision:base,source:'{"a":0,"b":2}'});await h.client.poll();
+  assert.equal(h.last.review.ok,true);assert.deepEqual(JSON.parse(h.client.reviewContent()),{a:44,b:2});
+});

@@ -148,7 +148,10 @@ function initWorkbenchAgentMessage(opts){
     try{
       if(connection.connected){
         if(!prepared || prepared.requestId!==connection.pending || prepared.message!==text || !connection.pending){
-          var captured=focus('clipboard'),request=await opts.send(text,captured);
+          // The full message travels on the clipboard. Keep registration small
+          // when source/context exceeds the direct transport's message limit.
+          var registered=text.length<=16000?text:'A long message ('+text.length+' characters) is being copied to our native agent conversation. Wait for the complete pasted message and follow its instructions and selected context. The shared state.json contains the complete current diagram.';
+          var captured=focus('clipboard'),request=await opts.send(registered,captured);
           prepared={requestId:request.id,source:captured.source,project:captured.project,message:text,text:'Read CONNECT.md in our shared folder '+JSON.stringify(connection.folderName)+'. Use registered request '+JSON.stringify(request.id)+' (session '+JSON.stringify(request.sessionId)+', connection '+JSON.stringify(request.connectionId)+'). Read its saved context and the latest state.json before editing. Reply and ask questions here in this agent conversation. Submit changes for preview; do not overwrite the shared source.\n\n'+text};
         }
         text=prepared.text;

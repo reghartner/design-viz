@@ -481,6 +481,7 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();
     await page.screenshot({path:info.outputPath('build-workflows.png')});
     await page.locator('#welcome-build-external').click();await expect(page.locator('#editor-agent')).not.toBeVisible();
+    await expect(page.locator('.folder-agent-prerequisites')).toContainText('Copy/paste works without Monitor.');
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     expect((await h.read('session.json')).workflow).toBe('external');
     await page.locator('#folder-agent-copy').click();
@@ -572,6 +573,24 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     await page.keyboard.press('Escape');await expect(page.locator('#agent-message-open')).toBeFocused();
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{');await page.locator('#agent-message-open').click();
     await expect(page.locator('#agent-message-error')).toContainText('Fix the diagram');await expect(page.locator('#agent-message-copy')).toBeDisabled();
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('connected Copy preserves a large message while registering a bounded native request',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-copy').click();
+    await page.locator('#agent-message-open').click();
+    const long='Read this complete pasted context. '+('Reference detail. '.repeat(1400))+' END OF MESSAGE';
+    await page.locator('#agent-message-text').fill(long);await page.locator('#agent-message-copy').click();
+    await expect(page.locator('#agent-message-status')).toContainText('Copied.');
+    const request=await h.read('request.json'),copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(request.text.length).toBeLessThanOrEqual(16000);expect(request.delivery).toBe('clipboard');
+    expect(copied).toContain(request.id);expect(copied).toContain(long);
+    await page.locator('#agent-message-copy').click();expect((await h.read('request.json')).id).toBe(request.id);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

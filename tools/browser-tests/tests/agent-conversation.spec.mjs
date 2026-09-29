@@ -66,9 +66,10 @@ test('twenty exchanges keep composer reachable and do not force an older-message
   await expect(page.locator('#folder-agent-panel-status')).toContainText('interrupt it in its session');
 });
 test('reload keeps draft/detail and a visible disconnected recovery without accessing the folder',async({page})=>{
-  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-input').fill('Keep this unsent question');
+  const draft='Keep this long unsent request. '.repeat(1000);
+  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-mode-external').click();await page.locator('#folder-agent-input').fill(draft);
   await page.evaluate(()=>publish({transcript:[{role:'assistant',text:'A saved answer',requestId:'r1'}]}));
-  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this unsent question');await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
+  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue(draft);await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
   await expect(page.locator('#folder-agent-messages')).toContainText('A saved answer');await expect(page.locator('#folder-agent-recovery')).toContainText('Interrupted requests will not replay');
   expect(await page.evaluate(()=>({pickerCalls,permissionCalls,starts:starts.length}))).toEqual({pickerCalls:0,permissionCalls:0,starts:0});
 });

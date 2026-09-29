@@ -13,7 +13,7 @@ async function helper(t){
   t.after(async()=>{await server.close();await fs.rm(dir,{recursive:true,force:true});});
   const snapshot={revision:'browser-1',project:0,source:'{"nodes":{}}',open:true,selection:[],views:[]};
   const send=(body={},headers={})=>fetch(server.origin+'/__flowview_agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Flowview-Session':server.token,...headers},body:JSON.stringify({clientId:'browser',snapshot,...body})});
-  return {server,snapshot,send,advanceTime:ms=>{now+=ms;},read:name=>fs.readFile(path.join(server.scratch,name),'utf8').then(JSON.parse),
+  return {root:dir,server,snapshot,send,advanceTime:ms=>{now+=ms;},read:name=>fs.readFile(path.join(server.scratch,name),'utf8').then(JSON.parse),
     propose:value=>fs.writeFile(path.join(server.scratch,'proposal.json'),JSON.stringify(value))};
 }
 test('local helper publishes source/selection and delivers file proposals exactly once after acknowledgement',async t=>{
@@ -130,4 +130,20 @@ test('retired operation and dry-run envelopes never apply, including envelopes c
     e.receive({proposal:{id:'replacement',baseRevision:sent.snapshot.revision,source:'{"title":"agent"}'}},e.request());
     assert.equal(e.request().result.status,'applied');assert.equal(h.writes.length,1);
   }
+});
+
+
+test('local helper serves only indexed lazy specs and rejects unlisted files and escaping symlinks',async t=>{
+  const h=await helper(t),folder=path.join(h.root,'diagrams/doorbell');await fs.mkdir(folder,{recursive:true});
+  const file=path.join(folder,'doorbell.spec.json');await fs.writeFile(file,'{"page":{"title":"Doorbell"}}');
+  await fs.writeFile(path.join(folder,'private.json'),'{}');
+  const index={version:2,diagrams:[{id:'doorbell',specUrl:'../diagrams/doorbell/doorbell.spec.json'}]};
+  await fs.writeFile(path.join(h.root,'workbench/diagrams.json'),JSON.stringify(index));
+  const response=await fetch(h.server.origin+'/diagrams/doorbell/doorbell.spec.json');
+  assert.equal(response.status,200);assert.equal((await response.json()).page.title,'Doorbell');
+  assert.equal((await fetch(h.server.origin+'/diagrams/doorbell/private.json')).status,404);
+  assert.equal((await fetch(h.server.origin+'/tools/agent-session.mjs')).status,404);
+  const outside=await fs.mkdtemp(path.join(os.tmpdir(),'outside-spec-'));t.after(()=>fs.rm(outside,{recursive:true,force:true}));
+  await fs.writeFile(path.join(outside,'external.json'),'{}');await fs.unlink(file);await fs.symlink(path.join(outside,'external.json'),file);
+  assert.equal((await fetch(h.server.origin+'/diagrams/doorbell/doorbell.spec.json')).status,404);
 });

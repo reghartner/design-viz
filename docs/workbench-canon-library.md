@@ -4,7 +4,7 @@ Choose **Canon diagrams** on the welcome page. Each card opens a **read-only**
 viewer. Readers can walk the steps, select an alternate, switch views, drill
 into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
-a reader restores its selected diagram from the published snapshot.
+a reader restores its selected diagram from the published index and its selected spec.
 
 **Edit in Workbench** opens a local editable copy through the normal import
 transaction, with a fresh Undo/Redo history. The previous project is kept in
@@ -28,8 +28,8 @@ https://your-diagrams-site/workbench/flowspec.html?diagram=doorbell
 Open **Canon diagrams → a diagram → Copy link**. The library cards are also
 normal links: right-click to copy one or open it in a new tab. Adjust the path
 above if your deployment gives the workbench a different address. These links
-work before Backstage is integrated, using only the static site's published
-`diagrams.json`. They open directly in fresh tabs, survive reloads, and support
+work before Backstage is integrated, using the static site's published
+`diagrams.json` index and the referenced JSON spec files. They open directly in fresh tabs, survive reloads, and support
 browser Back/Forward. Reading never replaces a saved local draft.
 
 The folder name supplies the ID. Keep it stable after publishing links. The link
@@ -67,7 +67,7 @@ the authored JSON and its evidence. The central entry controls ID, owner and
 canonical status even when the source spec carries older metadata.
 
 Review membership and content changes through the normal repository process.
-Both standard builds generate the existing `workbench/diagrams.json` snapshot:
+Both standard builds generate a lightweight `workbench/diagrams.json` index:
 
 ```sh
 python3 tools/build.py
@@ -76,14 +76,36 @@ docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
 
 The Python build validates against its freshly generated runtime. Docker's Node
 build stage reads root `canon.json` and its listed folders; nginx receives the
-resulting snapshot beside `flowspec.html`. The final image needs no Node process,
+resulting index beside `flowspec.html` and serves the original `diagrams/` files. The final image needs no Node process,
 API, browser GitHub token or live Backstage connection. The read-only library,
 direct links, Back/Forward and explicit **Edit in Workbench** behavior are unchanged.
 
-`diagrams.json` is a generated, gitignored snapshot, not another hand-maintained
-membership file. An empty `canon.json` list creates a valid empty snapshot.
+`diagrams.json` is a generated, gitignored index, not another hand-maintained
+membership file. Its version 2 entries contain `id`, `title`, `canon` membership,
+`counts` (nodes, steps, panels), and a relative `specUrl`. They contain no diagram
+rows, steps, panels, or embedded specs. For example:
+
+```json
+{
+  "version": 2,
+  "diagrams": [{
+    "id": "doorbell",
+    "title": "Doorbell delivery",
+    "canon": {"version": 1, "id": "doorbell", "kind": "canonical", "owner": "group:default/home-team"},
+    "counts": {"nodes": 12, "steps": 8, "panels": 3},
+    "specUrl": "../diagrams/doorbell/doorbell.spec.json"
+  }]
+}
+```
+
+The browser loads the index for library cards, then fetches only the selected
+spec for reading or editing. Membership from the index is applied in memory,
+just as in the Backstage provider; the source file remains unchanged. Existing
+version 1 embedded libraries remain readable, including the offline demo.
+
+An empty `canon.json` list creates a valid empty index.
 Missing files, malformed metadata, duplicate folders, invalid specs, escaping
-paths or a snapshot over 30 MB fail publication and preserve the prior snapshot.
+paths, a spec over 30 MB, or an index over 30 MB fail publication and preserve the prior index.
 Output cannot overwrite the source manifest or anything under `diagrams/`.
 
 Run the publisher directly from the repository root:
@@ -91,6 +113,12 @@ Run the publisher directly from the repository root:
 ```sh
 node tools/canon/library.mjs --out workbench/diagrams.json
 ```
+
+Spec URLs are relative to the output index's directory. Generate the index at
+its final location relative to the served source tree, and deploy both the index
+and the referenced files together. The supplied nginx Dockerfile does this.
+For a custom deployment, copying only `flowspec.html` and `diagrams.json` is
+insufficient; retain the referenced spec paths too.
 
 No arguments defaults to root `canon.json`. `--registry canon.json` selects an
 explicit central file for a different checkout. Explicit legacy `--registry`
@@ -104,9 +132,14 @@ approved Git revision. The `/backend` package exports `parseCanonManifest` and
 or fetching from GitHub. Apply per-viewer authorization before building the entity
 index. See the [Backstage guide](../apps/backstage/README.md#central-canon-membership).
 
-The browser fetches `diagrams.json` on first library entry with `cache: no-cache`;
-nginx serves it with revalidation too. Reload the page after deployment to receive
-the latest snapshot. The publisher and reader limit the snapshot to 30 MB.
+The browser fetches `diagrams.json` on first library entry with `cache: no-cache`,
+and fetches a spec on first open with the same cache policy. Both routes are
+revalidated by nginx. A loaded spec is reused for Back/Forward navigation in that
+page session. Reload after deployment to receive the latest index and content;
+Retry re-fetches both after a failed read. Each index/spec response is limited to
+30 MB. Spec URLs must be relative, resolve to the same origin, and cannot redirect.
+Missing or invalid selected specs show an error without changing the user's draft.
+The local agent-session helper also serves the specs named by its published index.
 
 A missing `diagrams.json` (HTTP 404) uses the explicitly labeled bundled
 **fictional example**. Downloaded `file:` workbenches use that example too.
@@ -115,8 +148,8 @@ HTTP errors show an error and Retry, never a silent fallback to example data.
 Metadata is displayed as text; the viewer applies its normal spec validation
 and safe-link rules.
 
-The snapshot contains full diagram content and evidence links. Publish only
-specs intended for everyone who can access that static deployment; its host
+The index and referenced specs together publish full diagram content and evidence
+links. Publish only specs intended for everyone who can access that static deployment; its host
 provides access control. Read-only describes the browsing UI, not a security
-boundary against someone who can download the files. A library snapshot does
+boundary against someone who can download the files. The static library does
 not replace the Backstage plugin's own source/authorization integration.

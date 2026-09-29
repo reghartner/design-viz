@@ -78,7 +78,7 @@ is unknown, not a failure. Agent suggestions require review before publication.
 The workbench home page exposes **Canon diagrams** as a read-only library with
 an explicit **Edit in Workbench** handoff. Root `canon.json` selects reviewed
 folders under `diagrams/`; the normal Python build and nginx image build generate
-`workbench/diagrams.json` from that list. Keep each folder’s JSON spec and generated
+`workbench/diagrams.json`, a metadata index with relative spec URLs, from that list. Keep each folder’s JSON spec and generated
 HTML together. Per-spec flags do not enroll a document. See the [deployment recipe](workbench-canon-library.md). This works
 with the static nginx deployment and needs no read API.
 

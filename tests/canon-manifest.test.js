@@ -52,7 +52,10 @@ test('the publisher snapshot and Backstage resolve identical membership and revi
  const output=path.join(path.dirname(file),'workbench/diagrams.json');
  const snapshot=await publishLibrary({registryPath:file,output});
  const backstage=await loadCanonDiagrams(file,{diagramUrls:({id})=>({viewerUrl:'https://flows.test/?diagram='+id,editUrl:'https://flows.test/?diagram='+id})});
- assert.deepEqual(snapshot.diagrams.map(d=>d.spec),backstage.specs);
+ const raw=JSON.parse(await fs.readFile(path.join(folder,'checkout.spec.json'),'utf8'));
+ assert.equal(snapshot.version,2);assert.equal(snapshot.diagrams[0].spec,undefined);
+ assert.equal(snapshot.diagrams[0].specUrl,'../diagrams/checkout/checkout.spec.json');
+ assert.deepEqual({...raw,page:{...raw.page,canon:snapshot.diagrams[0].canon}},backstage.specs[0]);
  const initial=await fs.readFile(output,'utf8');
  await fs.writeFile(path.join(folder,'checkout.spec.json'),'{broken');
  await assert.rejects(publishLibrary({registryPath:file,output}));
@@ -79,5 +82,5 @@ test('nginx build-stage inputs publish without a source checkout',async t=>{
  execFileSync(process.execPath,['tools/canon/library.mjs','--out','diagrams.json'],{cwd:root});
  const output=JSON.parse(await fs.readFile(path.join(root,'diagrams.json'),'utf8'));
  assert.equal(output.diagrams.length,1);assert.equal(output.diagrams[0].id,'checkout');
- assert.equal(output.diagrams[0].spec.page.canon.owner,entry.owner);
+ assert.equal(output.diagrams[0].canon.owner,entry.owner);
 });

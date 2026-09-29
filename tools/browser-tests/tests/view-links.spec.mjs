@@ -71,7 +71,10 @@ test('view-only embeds target their section even without steps or when other sec
  spec.page.sections.unshift({id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}});
  const url=await build(server,spec,'no-step-views');await page.goto(url+'#embed=front-door&v=service-flow');
  await expect(page.locator('#section-other')).toBeHidden();await expect(page.locator('#section-front-door')).toHaveClass(/dv-embed-target/);
- await expect(page.getByRole('combobox',{name:'Explore story'}).locator('option')).toHaveCount(1);
+ const story=page.getByRole('combobox',{name:'Explore story',includeHidden:true});
+ await expect(story).toBeHidden();
+ await expect(story.locator('option')).toHaveCount(1);
+ await expect(story.locator('option:checked')).toHaveText(named.page.sections[0].heading);
  const board=await page.locator('#section-front-door .explore-board').boundingBox();expect(board.width).toBe(page.viewportSize().width);expect(board.height).toBe(page.viewportSize().height);
  await expect(selected(page)).toHaveText('Service flow');await expect(page.locator('#section-front-door .board')).toBeVisible();
  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');

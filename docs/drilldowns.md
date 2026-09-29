@@ -20,8 +20,10 @@ letters, digits, underscores, periods, or hyphens: `/^[a-zA-Z][\w.-]*$/`.
 Keep the ID stable when the section heading changes.
 
 Set `detailOnly: true` on sections that should appear only when opened as a
-detail. This hides them from the initial reader view; it does not remove their
-content or create another file. A target can also be an ordinary visible
+detail. This hides them from the initial reader view and the Explore **Story**
+selector; it does not remove their content or create another file. Story switches
+between top-level diagram sections and appears only when there is more than one.
+Use the drill-down breadcrumb to return to an ancestor or the overview. A target can also be an ordinary visible
 section. Do not put a second diagram inside a node or duplicate a child flow
 inside each parent that references it.
 

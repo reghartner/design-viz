@@ -39,7 +39,8 @@ adding a made-up version or zoom field to its spec cannot update its engine.
 
 For domain drilldowns, author child flows as ordinary sections and attach
 `detail` to the parent node. Preserve section IDs when headings change; use
-`detailOnly:true` to hide details from the initial reader view. Map failures
+`detailOnly:true` to hide details from the initial reader view and Explore Story
+selector. Readers open them through the domain node and return with the breadcrumb. Map failures
 to explicit child paths and steps. Author only `mode:"focus"` for local details.
 Inline expansion is removed: never emit `mode:"expand"` or `detail.ports`.
 When reusing an older seed, replace its expansion modes with `focus` and omit

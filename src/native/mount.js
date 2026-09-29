@@ -25,9 +25,10 @@ function mountNativeSpec(environment, spec, options){
   function createCanvasNavigation(){
     canvasNav=document.createElement('label');canvasNav.className='native-canvas-story';canvasNav.textContent='Story ';
     canvasSelect=document.createElement('select');canvasSelect.setAttribute('aria-label','Explore story');canvasNav.appendChild(canvasSelect);
-    controller.sections.filter(function(rec){return rec.viewport;}).forEach(function(rec){
-      var option=document.createElement('option');option.value=rec.reference;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent || rec.reference;canvasSelect.appendChild(option);
+    controller.sections.filter(function(rec){return rec.viewport && !rec.detailOnly;}).forEach(function(rec){
+      var option=document.createElement('option');option.value=rec.reference;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent.trim() || rec.reference;canvasSelect.appendChild(option);
     });
+    canvasNav.hidden=canvasSelect.options.length<2;
     canvasSelect.addEventListener('change',function(){
       var rec=controller.sections.find(function(r){return r.reference===canvasSelect.value;});if(!rec)return;
       if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
@@ -41,7 +42,7 @@ function mountNativeSpec(environment, spec, options){
     var target=controller.activeTarget || {};
     var detail=controller.details && controller.details.activeSection && controller.details.activeSection();
     var next=canvas && (detail || controller.sections.find(function(rec){return rec.viewport &&
-      (rec.number===target.section || target.kind==='tab' && rec.tabBlock===target.tabBlock && rec.tab===target.tab);}) || canvasSection || controller.sections.find(function(rec){return rec.viewport;}));
+      (rec.number===target.section || target.kind==='tab' && rec.tabBlock===target.tabBlock && rec.tab===target.tab);}) || canvasSection || controller.sections.find(function(rec){return rec.viewport && !rec.detailOnly;}));
     if(canvasSection && canvasSection!==next){
       canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
       canvasSection.sectionEl.classList.remove('explore-active-section');

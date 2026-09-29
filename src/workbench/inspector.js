@@ -1866,7 +1866,7 @@ function sectionProseActions(val,target){
           {after:function(plan){
             var next={kind:plan.kind,section:target.section,index:plan.index};
             selectTarget(Object.assign({},next,{el:findTargetEl(next)}),false,true);
-            if(opts.preview.showPage)opts.preview.showPage();
+            if(opts.preview.revealProse)opts.preview.revealProse(next);
             focusProse();
           }});
       }));

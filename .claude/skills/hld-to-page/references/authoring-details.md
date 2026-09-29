@@ -117,7 +117,9 @@ Keep content in `section.text`/`bullets`, not fake diagram panels. Optional
 `exploreLayout.prose` saves `x/y/w/h` viewport fractions together, plus `stacked`
 and `hidden` booleans; `{hidden:true}` can stand alone. Notes follow the common
 overlay scale. **Visible elements → Section notes** saves visibility per view;
-the window’s Hide button is temporary. Standard restores the prose and its prior
+the window’s Hide button is temporary. Adding the first paragraph or bullet in
+the workbench creates notes and keeps Explore open; later additions restore
+temporarily hidden notes without changing saved visibility. Standard restores the prose and its prior
 collapse state; `section.collapsed` does not hide Explore notes. The setting
 belongs to the named view across every host profile. It does not duplicate
 story state. In the editor, **View type** beside the view buttons

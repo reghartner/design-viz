@@ -191,7 +191,10 @@ never a nested diagram or section card. Formatting, links and step-aware bullet
 reveals stay live. Move, resize, stack, zoom and temporarily hide notes with the
 same controls as panels. Standard restores the original prose in the document,
 including its previous collapsed state. The section’s `collapsed` default affects
-Standard prose only. Empty sections create no notes window.
+Standard prose only. Empty sections create no notes window. Adding the first paragraph or bullet in
+the workbench creates it immediately and keeps Explore open. Adding prose also
+restores notes hidden temporarily with the window’s Hide button; it does not
+change saved visibility defaults.
 
 Use **Panels · N** to choose which available panels to show. Panels hidden by
 the authored view or the current step are identified in that menu. **Hide

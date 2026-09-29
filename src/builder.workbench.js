@@ -488,6 +488,16 @@ function initWorkbenchBuilder(opts){
     opts.workspace.setHistory(life.guard(session.rememberView));
     life.own(function(){opts.workspace.setHistory(null);});
   }
+  function revealProseTarget(target){
+    var el=findTargetEl(target),floating=el && el.closest('.explore-prose-window');
+    if(floating && floating.hidden){
+      var ctl=opts.ctl && opts.ctl(),records=ctl?(ctl.sections || []).concat(ctl.details && ctl.details.activeSections?ctl.details.activeSections():[]):[];
+      var section=el.closest('.doc-sec'),rec=records.find(function(r){return r.sectionEl===section;});
+      if(rec && rec.viewport && rec.viewport.revealProse)rec.viewport.revealProse();
+    }
+    if((!floating || floating.hidden) && opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();
+    if(el)el.scrollIntoView({block:'nearest'});
+  }
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
     download:function(name,text,mime){return io && io.download(name,text,mime);},
@@ -498,7 +508,7 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl,showPage:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();},detail:function(target,parentId){
+    preview:{stepper:stepperFor,targetElement:findTargetEl,revealProse:revealProseTarget,detail:function(target,parentId){
       var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
       if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
       var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
@@ -952,10 +962,7 @@ function initWorkbenchBuilder(opts){
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
                   index: identity.index, card:identity.card, el: el}, false);
-    if((kind==='para' || kind==='bullet') && opts.workspace && opts.workspace.canvas){
-      opts.workspace.canvas.showPage();
-      if(el)el.scrollIntoView({block:'nearest'});
-    }
+    if(kind==='para' || kind==='bullet')revealProseTarget(identity);
     selectRange(plan);
     if(kind==='para' || kind==='bullet')inspector.focusProse();
   }

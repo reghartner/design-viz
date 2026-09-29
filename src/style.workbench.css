@@ -1317,9 +1317,9 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
 }
 
-/* At short heights, panels are clamped into the same vertical band as canvas
-   chrome. Keep their controls above that chrome and the tool rail accessible. */
-@media(max-height:520px){
+/* In compact windows, editor panels overlap canvas chrome. Keep editor
+   controls above that chrome and the tool rail accessible. */
+@media(max-height:520px),(max-width:1050px){
   .workspace-canvas .workwrap #spec-editor{z-index:150;}
   .workspace-canvas .workspace-rail{z-index:160;}
 }

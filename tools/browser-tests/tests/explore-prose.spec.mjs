@@ -80,3 +80,35 @@ test('Standard to Explore frames a short graph after indexing, and preserves a r
   await page.getByRole('button',{name:'Business',exact:true}).click();await page.getByRole('button',{name:'Explore',exact:true}).click();
   await expect.poll(()=>board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop}))).toEqual(camera);
 });
+
+test('first prose from Add or section inspector creates visible notes and keeps Explore with exact history',async({page,server})=>{
+  const raw=fixture('explore');raw.page.sections[0].text='';delete raw.page.sections[0].bullets;
+  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  const input=page.locator('#guide').getByLabel('Prose text',{exact:true});
+  for(const [route,kind] of [['add','paragraph'],['section','paragraph'],['add','bullet'],['section','bullet']]){
+    await closeTools(page);await expect(notes(page)).toHaveCount(0);await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
+    if(route==='section'){
+      await pagePreview(page);await inspectPageElement(page,page.locator('#docview .sec-h'));
+      await page.locator('#workspace-page').click();
+      await page.locator('#guide').getByRole('button',{name:kind==='paragraph'?'Add an introduction':'Add first point',exact:true}).click();
+    }else{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();}
+    await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await verifySeparation(page);
+    const field=kind==='paragraph'?'text':'bullets',label=kind==='paragraph'?'New paragraph':'New point';
+    const selector=kind==='paragraph'?'[data-dv-para="0"]':'[data-dv-bullet-path="0"]';
+    await expect(notes(page).locator(selector)).toHaveCount(1);await expect(notes(page).locator(selector)).toHaveClass(/dv-sel/);
+    await expect(input).toHaveValue(label);await expect(input).toBeFocused();
+    const added=await source(page),expected=structuredClone(raw);expected.page.sections[0][field]=[label];expect(JSON.parse(added)).toEqual(expected);
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(notes(page)).toHaveCount(0);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(added);await expect(notes(page)).toBeVisible();
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+  }
+});
+
+test('adding prose restores temporarily hidden notes without changing saved visibility or the selected view',async({page,server})=>{
+  const raw=fixture('explore');await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+  await notes(page).getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(notes(page)).toBeHidden();
+  await page.locator('#diagram-add').click();await page.locator('[data-add-kind="paragraph"]').click();
+  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await verifySeparation(page);await expect(notes(page).locator('[data-dv-para]')).toHaveCount(3);
+  await expect(page.locator('#guide').getByLabel('Prose text',{exact:true})).toHaveValue('New paragraph');
+  const saved=JSON.parse(await source(page));expect(saved.page.sections[0].diagram).toEqual(raw.page.sections[0].diagram);
+});

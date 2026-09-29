@@ -26805,6 +26805,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     isWorkbenchCanvas:function(){return workbenchCanvas;},
     setBoardHidden:function(hidden){canvasBoardHidden=hidden;board.hidden=workbenchCanvas?false:hidden;},
     isExplore:function(){return active;},
+    revealProse:function(){
+      if(!active)return false;var w=windows.find(function(item){return item.prose;});
+      if(!w || !available(w))return false;
+      w.state.hidden=false;memory.focus=false;paint();return true;
+    },
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
     setWorkbenchCanvas:function(on){

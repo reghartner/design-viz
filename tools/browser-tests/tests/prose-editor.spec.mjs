@@ -8,11 +8,11 @@ test('blank starter creates, edits, orders and removes prose through the UI with
  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await pasteDiagram(page,original);
  const src=page.locator('#src'),guide=page.locator('#guide'),field=guide.getByLabel('Prose text',{exact:true}),paragraphs=page.locator('#docview .sec-text');
  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
- await add(page,'paragraph');await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
+ await add(page,'paragraph');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await expect(page.locator('[data-explore-content="prose"]')).toBeVisible();
  await expect(paragraphs.first()).toBeVisible();await expect(paragraphs.first()).toHaveClass(/dv-sel/);await expect(field).toHaveValue('New paragraph');
  await expect(field).toBeFocused();expect(await field.evaluate(el=>[el.selectionStart,el.selectionEnd])).toEqual([0,'New paragraph'.length]);
  const created=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
- await page.locator('#redo-builder').click();await expect(src).toHaveValue(created);await paragraphs.first().click();
+ await page.locator('#redo-builder').click();await expect(src).toHaveValue(created);await inspectPageElement(page,paragraphs.first());
  await field.fill('First with `code`');await field.press('Tab');await expect(paragraphs.first().locator('code')).toHaveText('code');
  await guide.getByRole('button',{name:'Add paragraph after',exact:true}).click();await expect(field).toHaveValue('New paragraph');
  await expect(field).toBeFocused();
@@ -21,7 +21,7 @@ test('blank starter creates, edits, orders and removes prose through the UI with
  await guide.getByRole('button',{name:'Move paragraph up',exact:true}).click();await expect(paragraphs.first()).toHaveText('Second');await expect(paragraphs.first()).toHaveClass(/dv-sel/);
  await expect(guide.getByRole('button',{name:'Move paragraph up',exact:true})).toBeDisabled();
  const moved=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(two);
- await page.locator('#redo-builder').click();await expect(src).toHaveValue(moved);await paragraphs.first().click();
+ await page.locator('#redo-builder').click();await expect(src).toHaveValue(moved);await inspectPageElement(page,paragraphs.first());
  await guide.getByRole('button',{name:'Move paragraph down',exact:true}).click();await expect(src).toHaveValue(two);await expect(paragraphs.nth(1)).toHaveClass(/dv-sel/);
  await guide.getByRole('button',{name:'Add paragraph before',exact:true}).click();await expect(paragraphs.nth(1)).toHaveText('New paragraph');await expect(paragraphs.nth(1)).toHaveClass(/dv-sel/);
  await guide.getByRole('button',{name:'Delete paragraph',exact:true}).click();await expect(src).toHaveValue(two);

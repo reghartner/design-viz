@@ -2481,7 +2481,7 @@ function renderPage(view, page, skin, backlinks, options){
           if (primary && primary.number === number) changed({kind:'diagram', section:number});
         }
       }, function(){ if (ctl.onChange) ctl.onChange(); }, options);
-    var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, tabBlock:record.tabBlock, tab:record.tab,
+    var rec = {number:number, reference:reference, aliases:record.aliases, hasDiagram:!!sec.diagram, detailOnly:!!sec.detailOnly, tabBlock:record.tabBlock, tab:record.tab,
                sectionEl:built.sectionEl, stepper:built.stepper, boardSize:built.boardSize, prose:built.prose,
                flowDisclosure:built.flowDisclosure, presentation:built.presentation, viewport:built.viewport,
                contractCards:built.contractCards, contractCard:built.contractCard, contractRows:built.contractRows, destroy:built.destroy};

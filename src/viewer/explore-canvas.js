@@ -6,9 +6,10 @@ function initViewerExploreCanvas(ctl,view){
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
   var embedded=ctl.sections.find(function(rec){return rec.sectionEl.classList.contains('dv-embed-target');});
-  ctl.sections.filter(function(rec){return rec.hasDiagram && (!embedded || rec===embedded);}).forEach(function(rec){
-    var option=document.createElement('option');option.value=rec.number;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent || rec.reference || 'Section '+rec.number;sections.appendChild(option);
+  ctl.sections.filter(function(rec){return rec.hasDiagram && !rec.detailOnly && (!embedded || rec===embedded);}).forEach(function(rec){
+    var option=document.createElement('option');option.value=rec.number;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent.trim() || rec.reference || 'Section '+rec.number;sections.appendChild(option);
   });
+  label.hidden=sections.options.length<2;
   var back=document.createElement('button');back.type='button';back.className='mbtn';back.textContent='Back to page';navigation.appendChild(back);
   function show(rec){
     var previous=active;active=rec && rec.viewport && rec.viewport.isExplore()?rec:null;
@@ -76,7 +77,7 @@ function initViewerExploreCanvas(ctl,view){
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
   var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
-  if(!initial)initial=ctl.sections.find(function(r){return r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
+  if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
   return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
 }

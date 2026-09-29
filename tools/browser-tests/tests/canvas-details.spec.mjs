@@ -42,7 +42,7 @@ test('editor canvas follows nested details, returns to its camera and edits the 
 
 test('native canvas owns details while keeping root navigation, sibling isolation and curated return',async({page,server})=>{
   await writeFile(path.join(server.root,'canvas-detail-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
-  await writeFile(path.join(server.root,'canvas-detail-native.html'),'<style>body{margin:0}#a{position:fixed;inset:0}</style><div id="a"></div><div id="b"></div><script type="module">import {mountNativeViewer} from "./canvas-detail-native.js";window.mount=mountNativeViewer;</script>');
+  await writeFile(path.join(server.root,'canvas-detail-native.html'),'<style>body{margin:0}#a{position:fixed;inset:0;z-index:1}</style><div id="a"></div><div id="b"></div><script type="module">import {mountNativeViewer} from "./canvas-detail-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/canvas-detail-native.html');await page.waitForFunction(()=>!!window.mount);
   await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#a'),raw);window.other=mount(document.querySelector('#b'),raw);viewer.setCanvas(true);},JSON.parse(source));
   const root=page.locator('#a'),parent=root.locator('#section-doorbell-domains');
@@ -51,7 +51,8 @@ test('native canvas owns details while keeping root navigation, sibling isolatio
   await expect(page.locator('#b [data-dv-detail-preview]')).toHaveCount(0);
   await page.evaluate(()=>viewer.setCanvas(false));await expect(child.locator('.explore-stage')).toBeHidden();
   await page.evaluate(()=>viewer.setCanvas(true));child=await childCanvas(root,page);
-  await child.getByRole('combobox',{name:'Explore story',exact:true}).selectOption('doorbell-domains');
+  await expect(child.getByRole('combobox',{name:'Explore story',exact:true})).toBeHidden();
+  await child.locator('.detail-breadcrumb button').first().click();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);await expect(parent.locator('.explore-board')).toBeVisible();
   await page.evaluate(()=>{viewer.destroy();other.destroy();});await expect(root).toBeEmpty();
 });

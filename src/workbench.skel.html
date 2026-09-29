@@ -182,6 +182,7 @@
       <div class="draftbar" id="draftbar" hidden></div>
         <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
       <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <div class="document-settings-entry"><button class="bbtn" id="document-settings" type="button">Document settings</button></div>
       <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
       <details class="ssec" id="sec-inspect" open hidden>
         <summary>inspector</summary>
@@ -240,7 +241,7 @@
       </details>
       </div>
       <div class="editor-pane" id="editor-outline" role="tabpanel" aria-labelledby="editor-tab-outline" hidden>
-        <div class="editor-pane-heading"><h2>Document outline</h2><p>Find an element, then inspect its properties.</p><button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
+        <div class="editor-pane-heading"><h2>Document outline</h2><p>Find an element, then inspect its properties.</p><button class="bbtn" id="outline-document-settings" type="button">Document settings</button> <button class="bbtn" id="outline-inspect" type="button">Inspect selection</button></div>
       <details class="ssec" id="sec-outline" open>
         <summary>document outline <small>⌘/Ctrl K</small></summary>
         <input class="fctl" type="search" id="outline-search" aria-label="Search document outline" placeholder="Find a node, panel, step, or section…">
@@ -321,10 +322,14 @@
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
     <label class="workspace-preset">Workspace <select id="workspace-preset" aria-label="Workspace preset"><option value="custom">Custom</option><option value="story">Story</option><option value="engineering">Engineering</option><option value="present">Present</option></select></label>
     <details id="workspace-appearance" class="workspace-appearance"><summary>Canvas appearance</summary><div id="workspace-appearance-body">
+      <p class="fnote">Preview only — these buttons do not change the saved document.</p>
       <div class="toolrow">
-        <span class="lab">SKIN</span>
+        <span class="lab">PREVIEW SKIN</span>
         <span id="skinbtns"><!-- one button per skin, built by boot from SKIN_NAMES --></span>
       </div>
+      <p class="fnote" id="preview-skin-status" role="status"></p>
+      <button type="button" class="bbtn" id="preview-skin-default">Use document default</button>
+      <button type="button" class="bbtn" id="preview-skin-settings">Edit saved default…</button>
 
     </div></details>
     <div class="workmain" id="workspace-canvas" aria-label="Story view" tabindex="-1">

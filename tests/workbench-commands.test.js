@@ -928,3 +928,37 @@ test('headless graph commands honor registered panel references and hostile own 
   assert.strictEqual(typeof core.initWorkbenchBuilder, 'undefined');
   assert.strictEqual(typeof core.renderPage, 'undefined');
 });
+
+test('document settings preserve wrapped/bare blocks and sections and surrounding authored bytes',()=>{
+  for(const key of ['blocks','sections'])for(const wrapped of [true,false]){
+    const page={title:'Before',skin:'aurora',generatedFrom:{url:'https://example.test/design',label:'Design',version:'v1',future:'keep'},[key]:[{heading:'Flow',diagram:{nodes:{a:{}},rows:[['a']]}}]};
+    const raw=wrapped?{note:'outer',page}:page,text=JSON.stringify(raw,null,'\t');
+    const title=B.planDocumentSetting(text,raw,'title','After');assert.ok(!title.error);
+    assert.equal(title.text,text.replace('"Before"','"After"'));
+    const source=B.planDocumentSource(text,raw,'label','Specification'),next=JSON.parse(source.text),saved=wrapped?next.page:next;
+    assert.deepEqual(saved.generatedFrom,{...page.generatedFrom,label:'Specification'});
+    assert.deepEqual(saved[key],page[key]);assert.deepEqual(raw,wrapped?{note:'outer',page}:page);
+    const cleared=B.planDocumentSource(text,raw,'url',null);assert.equal((wrapped?JSON.parse(cleared.text).page:JSON.parse(cleared.text)).generatedFrom,undefined);
+    assert.ok(B.planDocumentSource(text,raw,'url','javascript:alert(1)').error);
+    assert.ok(B.planDocumentSetting(text,raw,'skin','missing').error);
+    assert.ok(B.planDocumentSetting(text,raw,'blocks',null).error);
+  }
+});
+
+test('document wrapper preserves bare diagram bytes and settings do not mutate bare diagrams implicitly',()=>{
+  const text='{ "nodes": {"a": {"title":"A"}},\n  "rows": [["a"]] }',raw=JSON.parse(text);
+  assert.ok(B.planDocumentSetting(text,raw,'title','Title').error);
+  const wrapped=B.planWrapDocument(text,raw);assert.ok(wrapped.text.includes(text));
+  assert.deepEqual(JSON.parse(wrapped.text).page.sections[0].diagram,raw);
+  assert.ok(B.planDocumentSource(wrapped.text,JSON.parse(wrapped.text),'label','Missing URL').error);
+});
+
+
+test('document tour uses the shared validator and keeps publication metadata intact',()=>{
+  const raw={page:{flowview:{authoredWith:'0.1.0',minVersion:'0.1.0',features:[]},blocks:[{heading:'One'}]}},text=JSON.stringify(raw);
+  assert.ok(B.planDocumentSetting(text,raw,'tour',{version:2,steps:[]}).error);
+  const tour={version:1,steps:[{id:'done',kind:'done',copy:{heading:'Done',body:'Finished'}}]};
+  const result=B.planDocumentSetting(text,raw,'tour',tour);assert.ok(!result.error);
+  assert.deepEqual(JSON.parse(result.text).page.tour,tour);assert.deepEqual(JSON.parse(result.text).page.flowview,raw.page.flowview);
+  assert.equal(JSON.parse(B.planDocumentSetting(result.text,JSON.parse(result.text),'tour',null).text).page.tour,undefined);
+});

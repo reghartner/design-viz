@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=true;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=true,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,url:''};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -1593,6 +1593,54 @@ function stepTimeRows(val,ctx,t){
     return [frow('Story time',input),note];
   }
 
+function documentForm(){
+    var parsed=parseEditor(),doc=builderDocumentPage(parsed.raw),rows=[];
+    function note(text){var p=document.createElement('p');p.className='fnote';p.textContent=text;return p;}
+    if(!doc){
+      rows.push(note('This is a bare diagram. Add a page wrapper to give it a title, saved appearance and source document. The diagram stays intact.'));
+      rows.push(actionButton('Add document settings',function(){return commitCascade(function(raw){return planWrapDocument(session.text(),raw);},{after:refreshFormSoon});}));
+      return rows;
+    }
+    function setting(key,value){return commitCascade(function(raw){return planDocumentSetting(session.text(),raw,key,value);},{after:refreshFormSoon});}
+    function source(key,value){return commitCascade(function(raw){return planDocumentSource(session.text(),raw,key,value);},{after:refreshFormSoon});}
+    var val=doc.page;
+    rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
+    var skin=selectControl(SKIN_NAMES,val.skin || '',function(v){return setting('skin',v);},true);
+    skin.options[0].textContent='Default ('+DEFAULT_SKIN+')';skin.setAttribute('aria-label','Saved default skin');
+    rows.push(frow('Saved default skin',skin));
+    rows.push(note('Saved in JSON and used when readers open the document. Canvas appearance only changes your preview; “Use document default” previews this saved choice. A hosting site may choose its own skin.'));
+    var heading=document.createElement('b');heading.className='document-source-heading';heading.textContent='Source document (optional)';rows.push(heading);
+    var provenance=specObject(val.generatedFrom)?val.generatedFrom:{};
+    rows.push(frow('Source URL',textControl(provenance.url,function(v){return source('url',v);},{placeholder:'https://…'})));
+    [['label','Source description','Design document'],['version','Source version','Optional revision'],['at','Source date','Optional date or timestamp']].forEach(function(field){
+      var input=textControl(provenance[field[0]],function(v){return source(field[0],v);},{placeholder:field[2]});
+      input.disabled=typeof provenance.url!=='string';rows.push(frow(field[1],input));
+    });
+    rows.push(note('Shown beneath the title as “Generated from”. Add the URL first; clearing it removes the source line. Each edit can be undone.'));
+    var advanced=document.createElement('details');advanced.className='document-advanced';advanced.open=OPEN_DOCUMENT_ADVANCED;
+    listen(advanced,'toggle',function(ev){if(ev.target===advanced && guide.contains(advanced))OPEN_DOCUMENT_ADVANCED=advanced.open;});
+    var summary=document.createElement('summary');summary.textContent='Advanced: reader tour and compatibility';advanced.appendChild(summary);
+    var tour=textControl(val.tour==null?'':JSON.stringify(val.tour,null,2),function(v){
+      var value=null;
+      if(v!=null){try{value=JSON.parse(v);}catch(ex){formError('Reader tour: not valid JSON ('+ex.message+')');return false;}}
+      return setting('tour',value);
+    },{textarea:true,placeholder:'Leave empty to use the built-in reader tour'});
+    tour.rows=6;tour.setAttribute('aria-label','Reader tour JSON');advanced.appendChild(frowBlock('Reader tour JSON',tour));
+    advanced.appendChild(note('A custom tour replaces the built-in tour for readers; it does not run in the editing workspace. Invalid configurations stay here for correction. Clear the field to restore the built-in tour.'));
+    var docs=document.createElement('a');docs.href='https://github.com/reghartner/design-viz/blob/main/docs/tour.md';docs.target='_blank';docs.rel='noopener noreferrer';docs.textContent='Reader tour authoring guide ↗';advanced.appendChild(docs);
+    if(typeof FlowviewCompatibility!=='undefined'){
+      var compatibility=FlowviewCompatibility.check(parsed.raw),metadata=specObject(val.flowview)?val.flowview:{};
+      advanced.appendChild(note('Compatibility: '+compatibility.status+' · Runtime '+compatibility.runtimeVersion+' (contract '+FlowviewCompatibility.contract+'). Document contract: '+(val.contract==null?'default':String(val.contract))+'.'));
+      advanced.appendChild(note('Required runtime: '+(compatibility.minVersion || 'not declared')+' · Authored with: '+(metadata.authoredWith || 'not stamped')+'.'));
+      var required=FlowviewCompatibility.detect(parsed.raw).concat(Array.isArray(metadata.features)?metadata.features:[]).filter(function(value,index,list){return list.indexOf(value)===index;});
+      advanced.appendChild(note('Required features: '+(required.join(', ') || 'none')+'.'));
+      compatibility.messages.forEach(function(message){advanced.appendChild(note(message));});
+      advanced.appendChild(note('Compatibility metadata is managed by Save and Export. Declared requirements are preserved.'));
+    }
+    rows.push(advanced);
+    return rows;
+  }
+
 function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
@@ -1619,6 +1667,7 @@ function sectionForm(val, ctx){
     if(builderTargetPath(parseEditor().raw,target).length===0)return routingRows;
     return [
       frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
+      frow('Initially collapse prose',checkboxControl(val.collapsed,function(on){return commitSimple('collapsed',on?'true':null);})),
     ].concat(routingRows,[
       frowBlock('Contract blocks',contractManager(target.section,val)),
       frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
@@ -2028,6 +2077,7 @@ function renderInspector(){
       form.className = 'iform';
       if (t.kind === 'tab') ensureAccentDatalist();
       var rows =
+        t.kind === 'document' ? documentForm() :
         t.kind === 'group' ? groupForm(val, ctx) :
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
@@ -2154,7 +2204,7 @@ function renderInspector(){
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
-      if (!armedHere)
+      if (!armedHere && t.kind !== 'document')
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
       if (t.kind === 'step') guide.appendChild(form);

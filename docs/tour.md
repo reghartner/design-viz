@@ -46,6 +46,17 @@ Older readers with only the completion flag get an optional offer because their
 individual learned topics are unknown. Custom `page.tour` sequences remain
 independent and do not mark built-in topics learned.
 
+## Editing a custom tour in the workbench
+
+Open **Inspect → Document settings → Advanced: reader tour and compatibility**
+and edit **Reader tour JSON**. The workbench validates JSON and the existing tour
+contract before committing. Invalid text stays in the field for correction and
+does not change source or Undo history. Leave the field or Tab out to commit a
+valid tour as one Undo action. Clear it to restore the built-in walkthrough.
+This area also shows read-only runtime, contract and feature requirements;
+Save/Export manage compatibility metadata. Test the custom tour in a published
+viewer or Canon reader, since tours do not run in the editing workspace.
+
 ## Where the config lives
 
 - Built-in default: `src/tour.config.js` (`TOUR_DEFAULT_CONFIG`). Treat it as

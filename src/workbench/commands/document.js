@@ -1,6 +1,41 @@
 /* Pure page/section/tab commands. Preserve raw source block/list addresses
    and rendered section ordinals; common commands supply clone/rewrite. */
 
+function builderDocumentPage(raw){
+  if(raw && specObject(raw.page))return {page:raw.page,path:['page']};
+  if(raw && (Array.isArray(raw.blocks) || Array.isArray(raw.sections)))return {page:raw,path:[]};
+  return null;
+}
+function planWrapDocument(text,raw){
+  if(builderDocumentPage(raw))return {text:text};
+  if(!raw || !specObject(raw.nodes) || !Array.isArray(raw.rows))return {error:'Open a page or diagram first.'};
+  // Preserve the authored diagram bytes; the existing page wrapper adds settings.
+  return {text:'{ "page": { "sections": [{ "diagram": '+text+' }] } }'};
+}
+function planDocumentSetting(text,raw,key,value){
+  var doc=builderDocumentPage(raw);
+  if(!doc)return {error:'Add document settings to this bare diagram first.'};
+  if(['title','skin','generatedFrom','tour'].indexOf(key)<0)return {error:'Unknown document setting.'};
+  if(key==='skin' && value!=null && SKIN_NAMES.indexOf(value)<0)return {error:'Choose a supported default skin.'};
+  if(key==='tour' && value!=null){
+    var warnings=tourLintConfig(value);if(warnings.length)return {error:warnings.join(' ')};
+  }
+  if(key!=='generatedFrom' && key!=='tour' && value!=null && typeof value!=='string')return {error:'Enter text for this setting.'};
+  return planSetField(text,raw,doc.path,key,value==null?null:JSON.stringify(value));
+}
+function planDocumentSource(text,raw,key,value){
+  var doc=builderDocumentPage(raw);
+  if(!doc)return {error:'Add document settings to this bare diagram first.'};
+  if(['url','label','version','at'].indexOf(key)<0)return {error:'Unknown source field.'};
+  if(value!=null && typeof value!=='string')return {error:'Enter text for this source field.'};
+  if(key==='url' && value!=null && !/^https?:\/\/\S+$/i.test(value))return {error:'Use an http:// or https:// source URL.'};
+  var source=specObject(doc.page.generatedFrom)?builderClone(doc.page.generatedFrom):{};
+  if(key==='url' && value==null)return planDocumentSetting(text,raw,'generatedFrom',null);
+  if(key!=='url' && typeof source.url!=='string')return {error:'Add the source URL first.'};
+  if(value==null)delete source[key];else source[key]=value;
+  return planDocumentSetting(text,raw,'generatedFrom',source);
+}
+
 var BUILDER_SECTION_TEMPLATE = [
   '{',
   '  "heading": "New section",',

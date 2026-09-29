@@ -255,7 +255,8 @@ var CONTRACT = [
 var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
-var activeSkin = null; /* null = follow spec */
+var activeSkin = null; /* null = follow the host/spec default */
+var previewDocumentSkin = false; /* explicit document-default preview bypasses the host cookie */
 var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
   beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
@@ -272,15 +273,24 @@ var skinBtns = {};
     b.className = 'skbtn';
     b.id = 'sk-' + name;
     b.setAttribute('aria-pressed', name === DEFAULT_SKIN ? 'true' : 'false');
-    b.textContent = name.toUpperCase() + (name === DEFAULT_SKIN ? ' (default)' : '');
+    b.textContent = name.toUpperCase();
     b.addEventListener('click', function(){
-      activeSkin = name; setSkinButtons(name);
+      previewDocumentSkin = false; activeSkin = name; setSkinButtons(name);
       workbenchPreview.repaint(name);
     });
     holder.appendChild(b);
     skinBtns[name] = b;
   });
 })();
+
+document.getElementById('preview-skin-default').addEventListener('click',function(){
+  previewDocumentSkin=true;activeSkin=null;
+  var skin=currentSkin(workbenchPreview.page());setSkinButtons(skin);workbenchPreview.repaint(skin);
+});
+document.getElementById('preview-skin-settings').addEventListener('click',function(){
+  document.getElementById('workspace-appearance').open=false;
+  document.getElementById('document-settings').click();
+});
 
 document.getElementById('contract').textContent = CONTRACT;
 document.getElementById('copy-contract').addEventListener('click', function(){
@@ -297,6 +307,7 @@ function readCookieText(){
   catch (ex) { return ''; } /* sandboxed pages may deny cookie reads */
 }
 function currentSkin(page){
+  if (previewDocumentSkin) return resolveSkin('', page && page.skin);
   if (activeSkin) return activeSkin;
   /* same precedence as the viewer (boot.flowview.js): a valid dv_skin
      cookie set by the hosting site beats the spec default, until a skin
@@ -304,6 +315,9 @@ function currentSkin(page){
   return resolveSkin(readCookieText(), page && page.skin);
 }
 function setSkinButtons(skin){
+  var page=workbenchPreview && workbenchPreview.page(),saved=resolveSkin('',page && page.skin);
+  var status=document.getElementById('preview-skin-status');
+  if(status)status.textContent='Preview: '+skin+' · Saved default: '+saved+'.';
   SKIN_NAMES.forEach(function(name){
     if (skinBtns[name]) skinBtns[name].setAttribute('aria-pressed', name === skin ? 'true' : 'false');
   });
@@ -320,7 +334,7 @@ function setSkinButtons(skin){
 window.dvSkins = SKIN_NAMES.slice();
 window.dvSetSkin = function(name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
-  activeSkin = name;
+  previewDocumentSkin = false; activeSkin = name;
   setSkinButtons(name);
   return applySkinClasses(document.body, view, name);
 };

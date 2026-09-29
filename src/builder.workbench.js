@@ -550,6 +550,13 @@ function initWorkbenchBuilder(opts){
   function commitCascade(planFor,opt){return inspector.transact(planFor,opt);}
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
   function parseEditor(){return session.snapshot();}
+  function openDocumentSettings(){
+    if(interactions.busy()){inspectorMessage('Finish the current canvas action before opening document settings.');return;}
+    clearMultiSelect();selectTarget({kind:'document'},false);
+  }
+  ['document-settings','outline-document-settings'].forEach(function(id){
+    var button=document.getElementById(id);if(button)life.listen(button,'click',openDocumentSettings);
+  });
   function scrollTextareaTo(start){
     /* newline counting under-measures because long JSON lines soft-wrap
        in the textarea; mirror the text up to the selection in an

@@ -86,6 +86,10 @@ replace a surgical edit with serialization of the whole document.
 on the parsed raw object corresponding to the editor text. Only `builderDiagram`
 also needs `jsonLocate()` from the source-edit leaf to check the source location.
 
+The `document` inspector target addresses the wrapped page or raw root. Document
+commands distinguish bare pages from bare diagrams, and only an explicit
+**Add document settings** action wraps a bare diagram.
+
 Raw addresses preserve `{page: ...}` wrappers, bare pages and bare diagrams.
 Section ordinals count prose and every tab in render order. Tab targets instead
 use the source block index plus tab index, matching renderer button IDs. A raw
@@ -107,7 +111,7 @@ the required leaves instead of the builder initializer or DOM renderer.
 | --- | --- |
 | `commands/common.js` | Shared ID/row helpers, registry-backed panel-authoring views, cloning/subtree rewrite, field/list edits and bulk dispatch |
 | `commands/graph.js` | Node/edge/group/panel creation, identity changes, deletion cascades, node duplication and insert templates |
-| `commands/document.js` | Page/section/tab insertion, deletion, duplication and movement, with raw-list addresses and rendered landing ordinals |
+| `commands/document.js` | Document title/default-skin/provenance edits and explicit bare-diagram wrapping; page/section/tab insertion, deletion, duplication and movement, with raw-list addresses and rendered landing ordinals |
 | `commands/narrative.js` | Step insertion, duplication, reordering and global deletion; path edits; hop/outcome, node/tone and panel-patch commands; shared narrative finalization |
 | `commands/layout.js` | Row/group/node movement, floats, swaps and stacks; centerpiece, host layouts, named views and pure tile transformations |
 | `commands/reuse.js` | Authored step copy/share planning, occurrence removal/independence, occurrence lookup and destination state previews |

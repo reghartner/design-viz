@@ -66,3 +66,19 @@ test('paired preview requires a ledger, handles ledger-only revisions and preser
   exchange.receive({proposal},sent);assert.equal(writes,1);assert.equal(ledger,'# After');assert.notEqual(exchange.request().snapshot.revision,sent.snapshot.revision);
   ledger='# Local evidence';const conflict=exchange.preview({...proposal,id:'q',ledger:'# Other agent evidence'});assert.equal(conflict.ok,false);assert.equal(conflict.conflicts[0].path,'/ledger');
 });
+
+test('seeded stress preserves disjoint edits, reorders, deletions and insertions while refusing overlapping edits',()=>{
+  let seed=0x2612026;const random=n=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed%n;};
+  for(let run=0;run<1200;run++){
+    const b={items:Array.from({length:8+random(25)},(_,i)=>({id:'node-'+i,title:'Title '+i,detail:'Detail '+i})),meta:{human:0,agent:0}};
+    const c=structuredClone(b),a=structuredClone(b),expected=structuredClone(b),index=random(b.items.length),mode=run%4;
+    c.meta.human=expected.meta.human=run+1;a.meta.agent=expected.meta.agent=run+1;
+    if(mode===0){c.items[index].title=expected.items[index].title='Human';a.items[index].detail=expected.items[index].detail='Agent';}
+    if(mode===1){c.items.reverse();expected.items.reverse();a.items[index].detail='Agent';expected.items.find(v=>v.id===a.items[index].id).detail='Agent';}
+    if(mode===2){const other=(index+1)%b.items.length;c.items.splice(index,1);expected.items.splice(index,1);a.items[other].detail='Agent';expected.items.find(v=>v.id===a.items[other].id).detail='Agent';}
+    if(mode===3){const human={id:'human-'+run,title:'Human'},agent={id:'agent-'+run,title:'Agent'};c.items.push(human);a.items.push(agent);expected.items.push(human,agent);}
+    const result=merge(b,c,a);assert.equal(result.ok,true,'disjoint run '+run);assert.deepEqual(JSON.parse(result.source),expected,'disjoint run '+run);
+    const left=structuredClone(b),right=structuredClone(b);left.items[index].title='Human';right.items[index].title='Agent';
+    const conflict=merge(b,left,right);assert.equal(conflict.ok,false,'overlap run '+run);assert.equal(conflict.source,undefined);
+  }
+});

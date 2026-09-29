@@ -1,10 +1,12 @@
 /* Browser-to-agent data only. No fetch, process launch, or browser automation. */
 function createFolderAgentFiles(directory){
-  var limit=8*1024*1024;
+  // Recovery holds before/after copies of both artifacts. JSON escaping can
+  // double each 4 MiB spec and expand each 256 KiB ledger up to sixfold.
+  function limit(name){return (name==='artifact-write.json'?20:8)*1024*1024;}
   async function readText(name,maxBytes){
     if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
     try{
-      var handle=await directory.getFileHandle(name),file=await handle.getFile(),bound=Math.min(limit,maxBytes || limit);
+      var handle=await directory.getFileHandle(name),file=await handle.getFile(),bound=Math.min(limit(name),maxBytes || limit(name));
       if(file.size>bound)throw Error(name+' exceeds the session size limit.');
       var text=await file.text();
       if(new TextEncoder().encode(text).length>bound)throw Error(name+' exceeds the session size limit.');
@@ -21,7 +23,7 @@ function createFolderAgentFiles(directory){
     write:async function(name,value,guard){
       if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain filename.');
       var text=typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
-      if(new TextEncoder().encode(text).length>limit)throw Error(name+' exceeds the session size limit.');
+      if(new TextEncoder().encode(text).length>limit(name))throw Error(name+' exceeds the session size limit.');
       if(guard)await guard({name:name,created:false,phase:'before-open'});
       var handle,created=false;
       try{handle=await directory.getFileHandle(name);}catch(ex){

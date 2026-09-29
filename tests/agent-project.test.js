@@ -3,14 +3,19 @@ async function setup(){
   const folder=await fs.mkdtemp(path.join(os.tmpdir(),'flowview-project-'));
   const ctx=vm.createContext({TextEncoder,Date});
   for(const file of ['folder-agent.js','agent-project.js'])vm.runInContext(await fs.readFile(path.join(__dirname,'../src/workbench',file),'utf8'),ctx);
-  let fail=null;
+  let fail=null,writeNumber=0,crash=null;
   function dir(base){return {name:path.basename(base),async *values(){for(const e of await fs.readdir(base,{withFileTypes:true}))yield {name:e.name,kind:e.isDirectory()?'directory':'file'};},
     async getDirectoryHandle(name,opts){const target=path.join(base,name);try{if(opts?.create)await fs.mkdir(target,{recursive:true});await fs.stat(target);}catch(e){if(e.code==='ENOENT')throw Object.assign(Error('Missing'),{name:'NotFoundError'});throw e;}return dir(target);},
     async getFileHandle(name,opts){const target=path.join(base,name);try{await fs.stat(target);}catch(e){if(e.code!=='ENOENT')throw e;if(!opts?.create)throw Object.assign(Error('Missing'),{name:'NotFoundError'});await fs.writeFile(target,'');}return {
       async getFile(){const content=await fs.readFile(target,'utf8');return {size:Buffer.byteLength(content),text:async()=>content};},
-      async createWritable(){let content;return {async write(value){content=value;},async close(){if(fail===name){fail=null;throw Error('disk full');}await fs.writeFile(target,content);},async abort(){}};}
+      async createWritable(){let content;return {async write(value){content=value;},async close(){
+        const index=++writeNumber;
+        if(fail===name || crash?.index===index && crash.phase==='before'){fail=null;throw Error('disk full');}
+        await fs.writeFile(target,content);
+        if(crash?.index===index && crash.phase==='after')throw Error('uncertain close');
+      },async abort(){}};}
     };}};}
-  return {folder,open:filename=>ctx.openFolderAgentProject(dir(folder),filename),write:(name,text)=>fs.writeFile(path.join(folder,name),text),read:name=>fs.readFile(path.join(folder,name),'utf8'),fail:name=>fail=name,close:()=>fs.rm(folder,{recursive:true,force:true})};
+  return {folder,open:filename=>ctx.openFolderAgentProject(dir(folder),filename),write:(name,text)=>fs.writeFile(path.join(folder,name),text),read:name=>fs.readFile(path.join(folder,name),'utf8'),fail:name=>fail=name,crash:(index,phase)=>{writeNumber=0;crash=index?{index,phase}:null;},close:()=>fs.rm(folder,{recursive:true,force:true})};
 }
 test('existing named spec and ledger open without connection metadata and keep unrelated files',async()=>{
   const h=await setup();try{
@@ -56,4 +61,46 @@ test('abandoned empty metadata files recover and a legacy folder ignores candida
     await fs.rm(path.join(h.folder,'.flowview-agent'),{recursive:true});await h.write('session.json',JSON.stringify({protocol:'flowview-folder-v1',sessionId:'s',connectionId:'old'}));await h.write('candidate.spec.json','{}');
     assert.equal((await h.open()).spec,'story.spec.json');
   }finally{await h.close();}
+});
+
+test('every paired-write boundary survives failure before or after close, including new native placeholders',async()=>{
+  for(const existing of [false,true])for(const phase of ['before','after'])for(let index=1;index<=4;index++){
+    const h=await setup();try{
+      const opened=await (await h.open()).initialize(),before={source:'{"revision":0}',ledger:'# Before'},after={source:'{"revision":1}',ledger:'# After'};
+      if(existing)await opened.files.flushArtifacts(before.source,before.ledger);
+      h.crash(index,phase);
+      await assert.rejects(opened.files.flushArtifacts(after.source,after.ledger),/disk full|uncertain close/);
+      h.crash(null);
+      const recovered=await (await h.open()).initialize();
+      const expected=index===1 && phase==='before'?(existing?before:{source:null,ledger:''}):after;
+      assert.equal(recovered.source,expected.source,JSON.stringify({existing,phase,index}));
+      assert.equal(recovered.ledger,expected.ledger,JSON.stringify({existing,phase,index}));
+      await recovered.files.flushArtifacts(after.source,after.ledger);
+      assert.equal(await h.read('story.spec.json'),after.source);assert.equal(await h.read('story.ledger.md'),after.ledger);
+    }finally{await h.close();}
+  }
+});
+
+test('large escaped specs remain writable and recoverable within the advertised artifact limits',async()=>{
+  const h=await setup();try{
+    const before=JSON.stringify({description:'"'.repeat(1500000),revision:0}),after=JSON.stringify({description:'"'.repeat(1500000),revision:1});
+    assert(Buffer.byteLength(before)<4*1024*1024);
+    const opened=await (await h.open()).initialize();await opened.files.flushArtifacts(before,'# Before');
+    h.fail('story.ledger.md');await assert.rejects(opened.files.flushArtifacts(after,'# After'),/disk full/);
+    const recovered=await (await h.open()).initialize();assert.equal(recovered.source,after);assert.equal(recovered.ledger,'# After');
+  }finally{await h.close();}
+});
+
+test('oversized handwritten artifacts cannot replace the last reopenable pair',async()=>{
+  for(const kind of ['source','ledger']){
+    const h=await setup();try{
+      const opened=await (await h.open()).initialize();await opened.files.flushArtifacts('{}','# Before');
+      const source=kind==='source'?JSON.stringify({description:'a'.repeat(4*1024*1024)}):'{}';
+      const ledger=kind==='ledger'?'a'.repeat(256*1024+1):'# Before';
+      await assert.rejects(opened.files.flushArtifacts(source,ledger),/size limit/);
+      assert.equal(await h.read('story.spec.json'),'{}');assert.equal(await h.read('story.ledger.md'),'# Before');
+      assert.equal(await h.read('.flowview-agent/artifact-write.json'),'null\n');
+      assert.equal((await h.open()).source,'{}');
+    }finally{await h.close();}
+  }
 });

@@ -649,3 +649,32 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
+
+test('transient failures at each paired commit stage recover once and preserve paired Undo/Redo',async({page})=>{
+  test.setTimeout(60000);
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    let previousSource=source,previousLedger='';
+    for(const [index,failedFile] of ['artifact-write.json','story.spec.json','story.ledger.md','result.json'].entries()){
+      const text='Stress update '+index;await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
+      const request=await publishedRequest(h,text),state=await h.read('state.json'),candidate=JSON.parse(previousSource);
+      candidate.page.blocks[0].diagram.nodes.b.title='Reviewed '+index;
+      const nextSource=JSON.stringify(candidate,null,2),nextLedger='# Coverage\n\nReviewed update '+index+'.\n';
+      await writeFile(path.join(h.session,'candidate.spec.json'),nextSource);await writeFile(path.join(h.session,'candidate.ledger.md'),nextLedger);
+      const proposal=JSON.parse(h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary',text));
+      await page.locator('#agent-update-open').click();h.failNextWrite(failedFile);await page.locator('#agent-update-commit').click();
+      await expect.poll(async()=>{try{const result=await h.read('result.json');return result.id===proposal.id?result.status:null;}catch{return null;}}).toBe('applied');
+      await expect(page.locator('#src')).toHaveValue(nextSource);expect(await readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(nextLedger);
+      h.run('reply','--request',request.id,'--text','Both saved files match the reviewed pair.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+      await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(previousSource);
+      await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(previousLedger);
+      await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(nextSource);
+      await expect.poll(()=>readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(nextLedger);
+      expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(nextSource);
+      previousSource=nextSource;previousLedger=nextLedger;
+    }
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});

@@ -84,7 +84,10 @@ python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \
 
 Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
 ledger limit: 256 KiB of nonempty UTF-8 text. The helper rejects symlinks,
-nonregular files, and filename traversal. Metadata/protocol files are bounded.
+nonregular files, and filename traversal. Metadata/protocol files are bounded
+at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
+both artifacts. Oversized handwritten artifacts are refused before replacing
+the last saved pair.
 
 **Preview Agent Updates** shows the proposed rendered diagram and full ledger,
 with **Current state** and **Proposed state** controls. Neither candidate is

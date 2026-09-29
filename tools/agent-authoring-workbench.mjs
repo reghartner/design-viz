@@ -109,6 +109,7 @@ export async function createSession(page, outDir, options = {}) {
   }
   await page.exposeBinding('authoringDisk', async (_, operation, name, value) => {
     const target = name==='/' && operation==='entries'?projectPath:await diskPath(projectPath, name);
+    const fileLimit = path.basename(target)==='artifact-write.json'?20*1024*1024:maximumBytes;
     if (operation === 'entries') return (await readdir(target,{withFileTypes:true})).map(entry=>({name:entry.name,kind:entry.isDirectory()?'directory':'file'}));
     if (operation === 'directory') {
       if (value?.create) await mkdir(target, {recursive: false}).catch(error => { if (error.code !== 'EEXIST') throw error; });
@@ -121,13 +122,13 @@ export async function createSession(page, outDir, options = {}) {
       catch (error) { if (error.code === 'ENOENT') return false; throw error; }
     }
     if (operation === 'read') {
-      if ((await lstat(target)).size > maximumBytes) throw new Error('Exchange file exceeds 8 MiB.');
+      if ((await lstat(target)).size > fileLimit) throw new Error('Exchange file exceeds its size limit.');
       const bytes = await readFile(target, 'utf8');
       await archive(name, bytes, 'read');
       return bytes;
     }
     if (operation === 'write') {
-      if (typeof value !== 'string' || Buffer.byteLength(value) > maximumBytes) throw new Error('Invalid exchange write.');
+      if (typeof value !== 'string' || Buffer.byteLength(value) > fileLimit) throw new Error('Invalid exchange write.');
       if(options.beforeWrite)await options.beforeWrite(path.basename(name),value);
       await atomicWrite(target, value);
       if(options.afterWrite)await options.afterWrite(path.basename(name),value);

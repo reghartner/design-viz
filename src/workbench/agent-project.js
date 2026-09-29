@@ -72,6 +72,7 @@ async function openFolderAgentProject(directory, filename){
       checkArtifacts:check,
       flushArtifacts:async function(nextSource,nextLedger,guard){
         var next={source:nextSource,ledger:nextLedger || ''};
+        if(new TextEncoder().encode(next.source).length>4*1024*1024 || new TextEncoder().encode(next.ledger).length>256*1024)throw Error('The diagram exceeds the artifact size limit (4 MiB spec, 256 KiB ledger). The last saved pair is unchanged; reduce the draft before saving it.');
         await check();if(guard)await guard();if(same(expected,next))return;
         await files.write('artifact-write.json',{version:1,spec:spec,ledger:ledger,before:expected,after:next},guard);
         await writePair(next,guard);await files.write('artifact-write.json',null,guard);

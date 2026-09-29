@@ -97,3 +97,22 @@ Two-file publication has a recovery journal; it is not an atomic filesystem
 transaction. Ledger merging is conservative whole-document merging. Validation
 and paired approval do not prove the ledger's semantic claims: the agent and
 reviewer must check them against the accepted diagram and source evidence.
+
+## Follow-up stress pass — 2026-09-29
+
+A seeded merge sweep exercised 1,200 disjoint edit/reorder/delete/insert cases
+and 1,200 overlapping edit cases. Every disjoint result preserved both changes;
+every overlap was refused without publishing a partial document.
+
+Sixteen injected interruptions covered failure immediately before and after
+each of the four paired-write closes, for both existing and empty folders.
+Reopening recovered the expected complete pair, including native empty-file
+placeholders and uncertain closes. Browser tests additionally interrupted the
+journal, spec, ledger and receipt writes during approval. Each retried to one
+accepted update, and one Undo/Redo restored the exact pair.
+
+Size stress found and fixed two defects: the 8 MiB metadata limit was too small
+for a journal containing escaped before/after copies of a valid large diagram,
+and direct draft publication could save artifacts larger than reopening permits.
+The journal now has a separate 20 MiB ceiling; spec/ledger limits are checked
+before any journal or artifact mutation. Regressions reproduce both failures.

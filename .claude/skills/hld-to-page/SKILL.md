@@ -12,7 +12,15 @@ fill in before you write any JSON. The worksheet makes you decide, for every
 step, what every panel shows, which edges light, which icons change, what time
 it is, and which code and catalog entries back it.
 
-**Local workbench session?** If the user gave you a local session scratch
+**Shared diagram folder?** If the selected folder contains
+`.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
+`flowview-folder-v1`, follow **Shared diagram folder** under
+[Special situations](#special-situations) instead of the deliverables below.
+Maintain the existing spec and ledger, submit both for workbench approval, and
+keep questions in the selected conversation. No separate `QUESTIONS.md`, OUT
+folder or HTML build is needed for this route.
+
+**Local loopback workbench session?** If the user gave you a local session scratch
 folder (it contains `state.json` and a `README.md`), follow
 [Local workbench session](#special-situations) instead of the deliverables
 below: no `QUESTIONS.md`, OUT folder or build.

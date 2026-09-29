@@ -73,7 +73,7 @@ both. Questions, permissions and interrupts stay in your agent app in the
 recommended flow. See [diagram folders](folder-agent-session.md) for setup,
 merge/conflict feedback and reopening an existing diagram.
 
-The separate **Just copy a starter brief** option creates a ready-to-copy prompt. Choose
+The separate **Need a standalone authoring brief instead?** option creates a ready-to-copy prompt. Choose
 whether to explain a design, explore a codebase, or improve an existing diagram;
 optionally describe the question and select the audience. The prompt directs
 your coding agent to the repository’s

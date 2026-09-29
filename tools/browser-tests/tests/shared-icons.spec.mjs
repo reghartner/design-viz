@@ -13,6 +13,10 @@ test('visual icon picker searches, filters, chooses one transaction, and closes 
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
  await page.locator('#docview .node[data-dv-node="camera"]').click();
  const guide=page.locator('#guide'),source=page.locator('#src');
+ await expect(guide.locator('.flow-icon-control > select')).toBeHidden();
+ await expect(guide.locator('.flow-icon-value')).toHaveText('Camera');
+ await expect(guide.locator('.flow-icon-browse')).toHaveAccessibleName('Icon: Camera. Choose icon');
+ await page.screenshot({path:info.outputPath('icon-field.png')});
  await guide.locator('.flow-icon-browse').first().click();
  const dialog=page.locator('dialog.flow-icon-picker');await expect(dialog).toBeVisible();
  await dialog.locator('.flow-icon-search').fill('battery');await expect(dialog.locator('[data-icon-id="battery-low"]')).toBeVisible();
@@ -31,6 +35,8 @@ test('company logo upload is shared across panels with override, opt-out and Und
  const root=page.locator('#docview');await expect(root.locator('.fv-brand-name').first()).toHaveText('Cedar');
  await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
  const guide=page.locator('#guide'),brand=guide.locator('.fv-brand-editor');await brand.evaluate(el=>{el.open=true;});
+ await expect(brand.locator('.flow-icon-control > select')).toBeHidden();
+ await expect(brand.locator('.flow-icon-browse')).toHaveAccessibleName('Brand icon: Home. Choose icon');
  await brand.getByLabel('Company logo file').setInputFiles({name:'logo.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});
  await expect(root.locator('.pt-deviceapp .fv-brand img')).toHaveCount(1);await expect(root.locator('.pt-screen .fv-brand img')).toHaveCount(1);await expect(root.locator('.pt-security .fv-brand img')).toHaveCount(1);
  const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.sections[0].diagram.brand.logoImage).toContain('data:image/png;base64,');expect(raw.page.sections[0].diagram.brand.icon).toBeUndefined();
@@ -64,6 +70,42 @@ test('step icon picker changes a device card and Inherit removes only that step 
  await picker.locator('.flow-icon-browse').click();await dialog.locator('[data-icon-id=""]').click();
  expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.app.heat.icon).toBeUndefined();
  await expect(page.locator('#docview .da-icon')).toHaveAttribute('data-icon','temperature');
+});
+
+test('multi-node icons use the picker, show mixed values, and apply or clear together with Undo',async({page,server})=>{
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
+ async function selectBoth(){await page.locator('#docview .node[data-dv-node="camera"]').click();await page.locator('#docview .node[data-dv-node="cloud"]').click({modifiers:['Shift']});}
+ await selectBoth();const control=page.locator('#guide .flow-icon-control'),source=page.locator('#src');
+ await expect(control.locator('.flow-icon-value')).toHaveText('Mixed icons');await expect(control.locator('select')).toBeHidden();
+ const before=await source.inputValue();await control.locator('button').click();
+ const dialog=page.locator('dialog.flow-icon-picker');await expect(dialog.locator('[aria-pressed="true"]')).toHaveCount(0);
+ await dialog.locator('[data-icon-id="battery-full"]').click();
+ let nodes=JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes;expect(nodes.camera.icon).toBe('battery-full');expect(nodes.cloud.icon).toBe('battery-full');
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
+ await selectBoth();await control.locator('button').click();await dialog.locator('[data-icon-id=""]').click();
+ nodes=JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes;expect(nodes.camera.icon).toBeUndefined();expect(nodes.cloud.icon).toBeUndefined();
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
+});
+
+test('Home icon picker keeps Restore layout distinct from Inherit and supports keyboard opening',async({page,server})=>{
+ const raw=fixture(),d=raw.page.sections[0].diagram;
+ d.panels=[{id:'home',type:'homemap',title:'Home',devices:[{id:'porch',kind:'camera',label:'Porch camera',x:50,y:50,icon:'camera'}]}];
+ d.steps[0].panels={home:{porch:{icon:'hot'}}};d.steps[1].panels={home:{porch:{icon:'cold'}}};
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+ await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
+ const field=page.locator('#guide .frow').filter({has:page.locator('.flow-icon-browse[aria-label^="Porch camera icon:"]')});
+ // The section can be collapsed; opening it only exposes the existing control.
+ await field.evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement)if(p.tagName==='DETAILS')p.open=true;});
+ await expect(field.locator('select')).toBeHidden();await field.locator('button').focus();await page.keyboard.press('Enter');
+ const dialog=page.locator('dialog.flow-icon-picker');await expect(dialog).toBeVisible();
+ await dialog.locator('.flow-icon-search').fill('cloud');await expect(dialog.locator('[data-icon-id="__default__"]')).toContainText('Restore layout icon');
+ await dialog.locator('[data-icon-id="__default__"]').click();
+ expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels.home.porch.icon).toBeNull();
+ await expect(field.locator('.flow-icon-value')).toHaveText('Restore layout icon');
+ await field.locator('button').click();await dialog.locator('[data-icon-id=""]').click();
+ const patch=JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.steps[1].panels?.home?.porch;
+ expect(patch?.icon).toBeUndefined();
+ await expect(field.locator('.flow-icon-value')).toHaveText('Inherit previous icon');
 });
 
 for(const local of [false,true])test((local?'Panel':'Diagram')+' malformed brand is preserved until explicit repair, with exact Undo',async({page,server})=>{

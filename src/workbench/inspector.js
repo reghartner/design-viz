@@ -195,7 +195,7 @@ function numberControl(value, commit){
     return input;
   }
 
-function selectControl(options, current, commit, allowEmpty){
+function selectControl(options, current, commit, allowEmpty, commitUnchanged){
     var sel = document.createElement('select');
     sel.className = 'fctl';
     if (allowEmpty){
@@ -216,7 +216,7 @@ function selectControl(options, current, commit, allowEmpty){
       sel.appendChild(extra);
     }
     sel.value = current == null ? '' : String(current);
-    commitOnChange(sel, null, function(v){ return commit(v === '' ? null : v); });
+    commitOnChange(sel, null, function(v){ return commit(v === '' ? null : v); },commitUnchanged);
     return sel;
   }
 
@@ -1876,12 +1876,13 @@ function renderMultiInspector(multiSel){
        an empty value removes the field from all of them */
     if (kind === 'node'){
       var parsed = parseEditor();
-      var values = [], diagrams = [];
+      var values = [], diagrams = [], nodeIcons = [];
       if (!parsed.error) multiSel.forEach(function(t){
         var got = builderDiagram(session.text(), parsed.raw, t.section);
         if (!got.error){
           diagrams.push(got.d);
           values.push(((got.d.nodes || {})[t.id] || {}).group || '');
+          nodeIcons.push(((got.d.nodes || {})[t.id] || {}).icon || '');
         }
       });
       ensureGroupDatalist(diagrams);
@@ -1892,10 +1893,14 @@ function renderMultiInspector(multiSel){
       form.appendChild(frow('tint', selectControl(['cmd', 'auth', 'data', 'mqtt', 'dev'], null, function(v){
         return applyBulkField('tint', v == null ? null : JSON.stringify(v));
       }, true)));
-      form.appendChild(frow('icon', selectControl(
-        ICON_SET, null, function(v){
+      var mixedIcons=nodeIcons.some(function(icon){return icon!==nodeIcons[0];});
+      var bulkIcon=selectControl(
+        ICON_SET, mixedIcons?'':nodeIcons[0], function(v){
         return applyBulkField('icon', v == null ? null : JSON.stringify(v));
-      }, true)));
+      }, true,true);
+      bulkIcon.setAttribute('data-icon-default-label','Use default icons');
+      if(mixedIcons)bulkIcon.setAttribute('data-icon-current-label','Mixed icons');
+      form.appendChild(frow('icon',iconPickerControl(bulkIcon)));
     }
     if (kind === 'edge'){
       form.appendChild(frow('kind', textControl(null, function(v){

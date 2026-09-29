@@ -95,16 +95,16 @@ Static signal arrows remain visible while paused or with reduced motion.
 
 For a cloud service on the map, expand **Devices**, open the device, choose
 **kind → sensor**, then **icon → cloud**. Sensor is also the generic device
-marker type. Its icon dropdown shows the supported names and previews the
-selected symbol; **Default (gear)** removes the explicit icon setting.
+marker type. Click its icon field to open the shared visual picker, then search
+for **Cloud**. The field previews the selected symbol and its name;
+**Default (gear)** removes the explicit icon setting.
 
-The choices are `terminal`, `cloud`, `shield`, `gear`, `db`, `antenna`, `thermo`,
-`pump`, `router`, `package`, `key`, `server`, `chip`, `phone`, `house`, `camera`,
-`doorbell`, `lock`, `bulb`, and `car`. Cameras and hubs use fixed camera/router
-icons; entry devices use their entry marker or door drawing. Their inspector
-explains this instead of offering an icon control that would have no effect.
+The shared library includes software, people, devices, and colored battery,
+temperature and alarm states. Cameras, hubs and sensors accept custom icons;
+their default markers are camera, router and gear. Entry devices keep their
+entry marker or door drawing, so their icon control is disabled.
 
-**Subjects** use the same dropdown with **Default (person)**. Use subjects for
+**Subjects** use the same picker with **Default (person)**. Use subjects for
 moving actors such as visitors or cars; use devices for a cloud service so it
 can participate in device states and signal arrows. These are shared layout
 settings across all paths and steps. Each icon edit supports Undo/Redo.

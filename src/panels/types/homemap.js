@@ -1898,6 +1898,7 @@ PanelRegistry.extend('homemap', {
           }, true);
         input.options[0].textContent = initial ? 'Use layout icon' : 'Inherit previous icon';
         input.options[1].textContent = 'Restore layout icon';
+        input.options[1].setAttribute('data-icon-reset','');
         input.setAttribute('aria-label', item.label + (initial ? ' initial' : '') + ' icon');
         input.setAttribute('data-icon-default-label', initial ? 'Use layout icon' : 'Inherit previous icon');
         return context.controls.row(item.label + ' · icon', context.controls.iconPicker(input));

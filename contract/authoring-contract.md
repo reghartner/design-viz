@@ -421,6 +421,21 @@ with no `title` shows its id:
   requires the `flow.drilldown` renderer capability.
 - `group` — optional containment-boundary membership (see "groups").
 
+### Delta markers — nodes, edges, and steps
+
+Set `delta: true` to show a green change triangle and enable **Δ ONLY**.
+Optional `deltaText` supplies a plain-text note (line breaks are preserved).
+Optional `deltaLinks` supplies an array of `{ "label": "Design decision",
+"url": "https://example.com/decision" }`; labels may be omitted. Only absolute
+HTTP(S) URLs are rendered. Invalid detail fields produce warnings and are ignored.
+
+A triangle with text or links opens an accessible popover on click or
+Enter/Space; Escape closes it and restores focus. Boolean-only markers remain
+visual indicators. Step-list markers open details independently of playback,
+including for steps without edges. Clearing `delta` hides the marker while
+retaining its optional details. See [delta markers](../docs/delta-markers.md)
+for the workbench controls and a complete example.
+
 ### groups — containment boundaries
 
 Declare `"groups": {"doorbell": {"title": "Doorbell unit"}}` at the diagram

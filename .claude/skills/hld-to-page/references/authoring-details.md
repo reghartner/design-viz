@@ -10,6 +10,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 
 | The source or operator needs… | Read |
 |---|---|
+| Highlight changed nodes, edges, or steps with optional click details | `docs/delta-markers.md`; keep `delta: true`, add plain `deltaText` and HTTP(S) `deltaLinks: [{label?, url}]` |
 | Confluence-ready JSON or an exported file for the Forge viewer | `docs/confluence.md`; company deployment agents also read `docs/confluence-integration.md` |
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | Domain cards that open focused internals; a child flow matching the current outcome | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; stable section IDs, `detailOnly`, `node.detail`, explicit `stepMap` and `mode:"focus"` |

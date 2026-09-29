@@ -565,9 +565,9 @@ function showCommunicationFailures(board,failures,animate){
   });
 }
 
-/* Both link menus belong to this board, including listeners outside its DOM. */
+/* Board popovers own their listeners outside the board's DOM too. */
 function destroyBoardLinks(el){
-  ['_nodeBacklinks', '_nodeLinks'].forEach(function(key){
+  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails'].forEach(function(key){
     var controller = el[key];
     el[key] = null;
     if (controller) controller.destroy();
@@ -623,19 +623,23 @@ function coinObstacleIndex(rects){
 }
 /* Area of the coins' boxes that falls on indexed rectangles. Stops early once
    it exceeds `limit` (when given), since the caller only needs to beat it. */
-function coinCover(pts, avoid, limit){
+function coinCover(pts, avoid, limit, marked){
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
   if (!index.size) return 0;
   var total = 0, h = COIN_R + 1;
-  function add(pt, r){
-    var w = Math.min(pt.x + h, r.x + r.w) - Math.max(pt.x - h, r.x),
-        t = Math.min(pt.y + h, r.y + r.h) - Math.max(pt.y - h, r.y);
+  function box(x, y, radius, r){
+    var w = Math.min(x + radius, r.x + r.w) - Math.max(x - radius, r.x),
+        t = Math.min(y + radius, r.y + r.h) - Math.max(y - radius, r.y);
     if (w > 0 && t > 0) total += w * t;
+  }
+  function add(pt, r){
+    box(pt.x, pt.y, h, r);
+    if (marked) box(pt.x + 13, pt.y - 13, 12, r);
   }
   for (var i = 0; i < pts.length; i++){
     var pt = pts[i], seen = {};
-    var x0 = Math.floor((pt.x - h) / COIN_CELL), x1 = Math.floor((pt.x + h) / COIN_CELL),
-        y0 = Math.floor((pt.y - h) / COIN_CELL), y1 = Math.floor((pt.y + h) / COIN_CELL);
+    var x0 = Math.floor((pt.x - h) / COIN_CELL), x1 = Math.floor((pt.x + (marked ? 25 : h)) / COIN_CELL),
+        y0 = Math.floor((pt.y - (marked ? 25 : h)) / COIN_CELL), y1 = Math.floor((pt.y + h) / COIN_CELL);
     for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++){
       var bucket = index.cells[gx + ',' + gy];
       if (bucket) for (var j = 0; j < bucket.length; j++){
@@ -655,23 +659,26 @@ function coinPointOnCard(pt, index){
     return pt.x > r.x + COIN_PAD && pt.x < r.x + r.w - COIN_PAD && pt.y > r.y + COIN_PAD && pt.y < r.y + r.h - COIN_PAD;
   });
 }
-function coinSlots(path, len, mid, n, avoid){
+function coinSlots(path, len, mid, n, avoid, marked){
   if (n < 1) return [];
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
   /* a lone coin sits on the midpoint, exactly as before shared rows, unless
      the midpoint itself lies on a card (e.g. a view leaves one coin on an edge
      that runs under a float); a coin merely grazing a card stays put */
-  if (n === 1 && !coinPointOnCard(mid, index)) return [{x: mid.x, y: mid.y}];
-  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, row = null;
+  if (n === 1 && (marked ? coinCover([mid], index, 0, true) === 0 : !coinPointOnCard(mid, index))) return [{x: mid.x, y: mid.y}];
+  // The badge projects toward the next coin on an ascending diagonal. Reserve
+  // its hit area as well as the number, including in the fallback grid.
+  var spacing = marked ? 44 : COIN_STEP, clearance = marked ? 42 : COIN_CLEAR, end = marked ? 36 : COIN_END;
+  var span = (n - 1) * spacing, lo = end + span / 2, hi = len - end - span / 2, row = null;
   if (lo <= hi){
     var centre = Math.min(hi, Math.max(lo, len / 2));
     row = [];
     for (var i = 0; i < n; i++){
-      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * COIN_STEP);
+      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * spacing);
       row.push({x: p.x, y: p.y});
     }
-    if (!coinsApart(row, COIN_CLEAR)) row = null;
-    else if (coinCover(row, index, 0) === 0) return row;
+    if (!coinsApart(row, clearance)) row = null;
+    else if (coinCover(row, index, 0, marked) === 0) return row;
   }
   /* block axes in reading order: along runs left to right (top to bottom when
      vertical), across runs top to bottom (left to right when vertical) */
@@ -686,7 +693,7 @@ function coinSlots(path, len, mid, n, avoid){
      COIN_END of an end, and never further than the widest block needs) */
   var need = span / 2 + 2, reach = Infinity;
   [-1, 1].forEach(function(dir){
-    var run = 0, limit = Math.min(len / 2 - COIN_END, need);
+    var run = 0, limit = Math.min(len / 2 - end, need);
     while (run + 2 <= limit){
       var q = path.getPointAtLength(len / 2 + dir * (run + 2));
       if (Math.abs((q.x - mid.x) * dy - (q.y - mid.y) * dx) > 1.5) break;
@@ -694,7 +701,7 @@ function coinSlots(path, len, mid, n, avoid){
     }
     reach = Math.min(reach, run);
   });
-  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / COIN_STEP) + 1));
+  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / spacing) + 1));
   function block(cols, near, side){
     var rows = Math.ceil(n / cols), out = [];
     for (var r = 0; r < rows; r++){
@@ -702,8 +709,8 @@ function coinSlots(path, len, mid, n, avoid){
       var across = side === 0 ? r - (rows - 1) / 2 : side > 0 ? near + r : -(near + rows - 1 - r);
       var inRow = Math.min(cols, n - r * cols);
       for (var c = 0; c < inRow; c++){
-        var along = (c - (inRow - 1) / 2) * COIN_STEP;
-        out.push({x: mid.x + dx * along + nx * across * COIN_STEP, y: mid.y + dy * along + ny * across * COIN_STEP});
+        var along = (c - (inRow - 1) / 2) * spacing;
+        out.push({x: mid.x + dx * along + nx * across * spacing, y: mid.y + dy * along + ny * across * spacing});
       }
     }
     return out;
@@ -742,7 +749,7 @@ function coinSlots(path, len, mid, n, avoid){
   order.sort(function(a, b){ return a.far - b.far || a.off - b.off || a.odd - b.odd || a.k - b.k; });
   var best = null, bestCover = Infinity;
   for (var ci = 0; ci < order.length; ci++){
-    var cover = coinCover(order[ci].pts, index, bestCover);
+    var cover = coinCover(order[ci].pts, index, bestCover, marked);
     if (cover === 0) return order[ci].pts;
     if (cover < bestCover){ best = order[ci].pts; bestCover = cover; }
   }
@@ -758,7 +765,8 @@ function layoutCoinGroup(group){
     if (base) base.classList.toggle('view-step-hidden', hide);
     if (!hide) shown.push(i);
   });
-  var pts = coinSlots(group.path, group.len, group.mid, shown.length, group.avoid);
+  var marked = shown.some(function(i){ return group.deltas && group.deltas[i]; });
+  var pts = coinSlots(group.path, group.len, group.mid, shown.length, group.avoid, marked);
   shown.forEach(function(ci, i){
     var dx = pts[i].x - group.mid.x, dy = pts[i].y - group.mid.y;
     [group.coins[ci], group.bases && group.bases[ci]].forEach(function(el){
@@ -865,7 +873,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
          (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
-         (n.delta === true ? '<polygon class="dvdelta" points="-3,-4 8,-4 2.5,-13" aria-hidden="true"/>' : '') +
          '</g>';
   });
   s += '</svg>';
@@ -874,7 +881,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   var nodeEls = {};
   Object.keys(d.nodes).forEach(function(id){
     var node = document.getElementById(prefix + '-n-' + id);
-    if (node) nodeEls[id] = node;
+    if (node){
+      nodeEls[id] = node;
+      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
+    }
   });
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
@@ -894,13 +904,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var p = L.pos[id];
     return {x: p.cx - p.w / 2 - COIN_PAD, y: p.cy - p.h / 2 - COIN_PAD, w: p.w + 2 * COIN_PAD, h: p.h + 2 * COIN_PAD};
   }));
-  function deltaBadge(parent, x, y, w, h, unrecorded){
-    var badge = document.createElementNS(SVGNS, 'polygon');
-    badge.setAttribute('class', 'dvdelta');
-    badge.setAttribute('aria-hidden', 'true');
-    badge.setAttribute('points', x + ',' + (y + h) + ' ' + (x + w) + ',' + (y + h) + ' ' + (x + w/2) + ',' + y);
-    parent.appendChild(badge);
-    if (!unrecorded) deltaRects.push({x:x - 1, y:y - 1, w:w + 2, h:h + 2});
+  function deltaBadge(parent, x, y, value, label, unrecorded){
+    var badge = appendDeltaMarker(parent, value, label, x, y);
+    if (!unrecorded) deltaRects.push({x:x - 12, y:y - 12, w:24, h:24});
     return badge;
   }
   (d.edges || []).forEach(function(e){
@@ -939,7 +945,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
         t.textContent = n;
         g.appendChild(c); g.appendChild(t); svg.appendChild(g);
-        if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7, true);
+        if (stepDelta) deltaBadge(g, mid.x + 13, mid.y - 13, d.steps[n - 1], d.steps[n - 1].title || d.steps[n - 1].id || 'step ' + n, true);
         group.coins.push(g); group.bases.push(base); group.deltas.push(stepDelta);
       });
       info.coinEl = group.coins[0];
@@ -947,7 +953,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       layoutCoinGroup(group).forEach(function(pt, i){
         coinRects.push({x: pt.x - 11, y: pt.y - 11, w: 22, h: 22});
         /* coin badges travel with their coin: record them at the final slot */
-        if (group.deltas[i]) deltaRects.push({x: pt.x + 4, y: pt.y - 15, w: 10, h: 9});
+        if (group.deltas[i]) deltaRects.push({x: pt.x + 1, y: pt.y - 25, w: 24, h: 24});
         if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
       });
     }
@@ -973,8 +979,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         pendingLabelBadges.push({e: e, lbl: lt});
       } else {
         /* no label: left of the coin, near the midpoint */
-        var badge = stepN ? deltaBadge(svg, coinLeft - 25, coinLeftY - 6, 11, 9) :
-          deltaBadge(svg, mid.x - 16, mid.y - 6, 11, 9);
+        var badge = stepN ? deltaBadge(svg, coinLeft - 26, coinLeftY, e, e.from + ' → ' + e.to) :
+          deltaBadge(svg, mid.x, mid.y - 14, e, e.from + ' → ' + e.to);
         markFragmentElement(badge, e);
       }
     }
@@ -989,7 +995,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var p = L.pos[id];
       if (p) obstacles.push({x: p.cx - p.w/2 - 2, y: p.cy - p.h/2 - 2, w: p.w + 4, h: p.h + 4});
       if (p && d.nodes[id] && d.nodes[id].delta === true)
-        obstacles.push({x:p.cx - p.w/2 - 4, y:p.cy - p.h/2 - 14, w:13, h:11});
+        obstacles.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
     });
     coinRects.forEach(function(r){ obstacles.push({x: r.x, y: r.y, w: r.w, h: r.h, hard: true}); });
     deltaRects.forEach(function(r){ obstacles.push(r); });
@@ -1009,7 +1015,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var r = {x: b.x, y: b.y, w: b.width, h: b.height, fixed: le.fixed};
       /* a delta-marked label carries a badge at its top-right — reserve
          that room so neighboring labels dodge the badge too */
-      if (le.badge){ r.y -= 9; r.h += 9; r.w += 12; }
+      if (le.badge){ r.y -= 15; r.h += 15; r.w += 27; }
       return r;
     });
     var nudges = resolveLabelCollisions(rects, obstacles);
@@ -1027,19 +1033,25 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var b;
     try { b = pb.lbl.getBBox(); } catch (ex){ b = null; }
     var badge = (b && b.width) ?
-      deltaBadge(svg, b.x + b.width + 3, b.y - 6, 9, 8) :
+      deltaBadge(svg, b.x + b.width + 14, b.y - 3, pb.e, pb.e.label) :
       /* hidden-context fallback (a section inside an inactive tab measures
          as zero): sit just above-right of the label's anchor point */
-      deltaBadge(svg, parseFloat(pb.lbl.getAttribute('x')) + 4,
-                 parseFloat(pb.lbl.getAttribute('y')) - 18, 9, 8);
+      deltaBadge(svg, parseFloat(pb.lbl.getAttribute('x')) + 14,
+                 parseFloat(pb.lbl.getAttribute('y')) - 18, pb.e, pb.e.label);
     markFragmentElement(badge, pb.e);
   });
+
+  el._deltaDetails = wireDeltaDetails(el, prefix, svg);
 
   /* a compact coin grid on a short edge can reach past the layout's canvas;
      grow the viewBox (and its ground) so no coin, badge, or the label of a
      shared-coin edge is clipped */
   (function(){
-    if (!coinRects.length) return;
+    Object.keys(d.nodes).forEach(function(id){
+      var p = L.pos[id];
+      if (p && d.nodes[id].delta === true) deltaRects.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
+    });
+    if (!coinRects.length && !deltaRects.length) return;
     var x1 = vb.x, y1 = vb.y, x2 = vb.x + vb.w, y2 = vb.y + vb.h, extra = [];
     labelEls.forEach(function(le){
       if (!le.coined) return;
@@ -1112,7 +1124,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
 
   return {kindsUsed: Object.keys(kindsUsed), anyRet: anyRet, edgeIds: edgeIds,
-    nodeEls: nodeEls, svg: svg,
+    nodeEls: nodeEls, svg: svg, deltaDetails: el._deltaDetails,
     /* re-pack each shared-edge coin row around the coins still visible */
     layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup); }};
 }
@@ -1284,8 +1296,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [], pathButtons = [], pathTimeline = null;
+  var chipButtons = [], pathButtons = [], pathTimeline = null, chipDeltas = null;
   function paintStepCoins(){
+    if (board.deltaDetails) board.deltaDetails.close();
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
       var index=selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step'))),position=visible.indexOf(index);
@@ -1301,6 +1314,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }).join(', ');
   }
   function paintChips(){
+    if (chipDeltas){ chipDeltas.destroy(); chipDeltas = null; }
+    paintChipContent();
+    decorateDeltaChips(chipsBox, source);
+    chipDeltas = wireDeltaDetails(chipsBox, prefix + '-chips');
+  }
+  function paintChipContent(){
     paintStepCoins();
     if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
@@ -1711,9 +1730,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     destroy: function(){
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
       if(pathTimeline)pathTimeline.destroy();
+      if(chipDeltas)chipDeltas.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){
+      if (board.deltaDetails) board.deltaDetails.close();
+      if (chipDeltas) chipDeltas.close();
       var wasPlaying = !!timer; hidden = true; stopAuto();
       resumeOnShow = wasPlaying && (!options || options.autoplay !== false); settleCurrentStep();
     } },

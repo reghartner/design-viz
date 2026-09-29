@@ -618,10 +618,22 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 [data-playback="playing"] .playback-button{box-shadow:inset 0 -2px currentColor;}
 @media(max-width:640px){.step-transport .tbtn{min-width:44px;min-height:44px;}}
 .schip{font:700 11px 'IBM Plex Mono',monospace; width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
-.dvdelta{fill:var(--delta); stroke:rgba(0,0,0,.4); stroke-width:1; pointer-events:none;}
-.schip.dvd{position:relative;}
-.schip.dvd::after{content:''; border-left:4px solid transparent; border-right:4px solid transparent;
-  border-bottom:7px solid var(--delta); position:absolute; top:-3px; right:-3px; pointer-events:none;}
+.dvdelta{--delta-ink:#0ac746;--delta-fill:#21ff6410;--delta-glow:drop-shadow(0 0 1.5px #57ff85) drop-shadow(0 0 5px #12f96699);pointer-events:none;}
+body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .dvdelta,body.sk-terminal .dvdelta,body.sk-blueprint .dvdelta{--delta-ink:#67ff94;--delta-fill:#2bff7610;--delta-glow:drop-shadow(0 0 2px #32ff77) drop-shadow(0 0 6px #23ff7199);}
+.dvdelta .dvdelta-hit{fill:transparent;stroke:none;}
+.dvdelta .dvdelta-mark{fill:var(--delta-fill);stroke:var(--delta-ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;filter:var(--delta-glow);}
+.dvdelta-action{cursor:pointer;pointer-events:all;outline:none;}
+.dvdelta-action:hover .dvdelta-mark,.dvdelta-action[aria-expanded="true"] .dvdelta-mark{stroke-width:2.5;fill:color-mix(in srgb,var(--delta-ink) 12%,transparent);}
+.dvdelta-action:focus-visible .dvdelta-hit{stroke:var(--delta-ink);stroke-width:2;}
+.delta-chip-wrap{position:relative;display:inline-flex;overflow:visible;}
+.delta-chip-icon{position:absolute;width:24px;height:24px;right:-12px;top:-12px;overflow:visible;z-index:1;pointer-events:none;}
+.schips:has(.delta-chip-wrap){gap:10px 12px;padding-top:8px;}
+.delta-popover{width:300px;padding:16px;gap:10px;border-radius:12px;font:400 13px/1.55 'IBM Plex Sans',sans-serif;}
+.delta-popover .node-link-title{font-size:15px;color:var(--dink);}
+.delta-popover-label{font:600 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#218955;padding-right:20px;}
+body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-terminal .delta-popover-label,body.sk-blueprint .delta-popover-label{color:#69e8a3;}
+.delta-popover-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}
+.delta-popover .node-reference-link{display:block;}
 /* Delta-only wins over each skin's inactive-step opacity rules. */
 .dv-deltaonly g.node:not(.dvd):not(.lit),
 .dv-deltaonly path.edge:not(.dvd):not(.lit),
@@ -3564,6 +3576,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .path-chip[aria-pressed="true"] {box-shadow:inset 0 0 0 1px var(--path-color);font-weight:700}
 .path-chip:focus-visible {outline:2px solid var(--path-color);outline-offset:3px}
 .termbar.has-paths .schips {display:block;flex-basis:100%;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px}
+.termbar.has-paths .schips:has(.delta-chip-wrap){padding:14px 14px 4px 2px;}
 .path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
 .path-row {display:contents}
 .path-matrix .path-chip {justify-self:start;max-width:220px;min-height:32px;box-sizing:border-box}

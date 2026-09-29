@@ -644,6 +644,39 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function isFiniteNum(v){ return typeof v === 'number' && isFinite(v); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isHex(s){ return typeof s === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s); }
+function deltaLinkUrl(value){
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value.trim())) return null;
+  try {
+    var url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch (ex){ return null; }
+}
+function deltaDetails(value){
+  value = value || {};
+  var text = typeof value.deltaText === 'string' ? value.deltaText.trim() : '';
+  var links = (Array.isArray(value.deltaLinks) ? value.deltaLinks : []).filter(function(link){
+    return link && typeof link === 'object' && !Array.isArray(link) && deltaLinkUrl(link.url);
+  }).map(function(link){
+    var url = deltaLinkUrl(link.url);
+    return {url:url, label:typeof link.label === 'string' && link.label.trim() ? link.label.trim() : url};
+  });
+  return {text:text, links:links, interactive:value.delta === true && !!(text || links.length)};
+}
+function deltaWarnings(value, path, warnings){
+  if (!value) return;
+  if (value.deltaText != null && typeof value.deltaText !== 'string')
+    warnings.push(path + '.deltaText: expected plain text — ignored');
+  if (value.deltaLinks != null){
+    if (!Array.isArray(value.deltaLinks)) warnings.push(path + '.deltaLinks: expected an array of {label?, url} — ignored');
+    else value.deltaLinks.forEach(function(link, index){
+      var at = path + '.deltaLinks[' + index + ']';
+      if (!link || typeof link !== 'object' || Array.isArray(link) || !deltaLinkUrl(link.url))
+        warnings.push(at + '.url: expected an absolute HTTP(S) URL — link ignored');
+      else if (link.label != null && typeof link.label !== 'string')
+        warnings.push(at + '.label: expected text — using the URL');
+    });
+  }
+}
 function resolveProtocols(page){
   var out = {};
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -929,6 +962,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    deltaWarnings(n, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
@@ -940,6 +974,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    deltaWarnings(e, EP, warnings);
     ['fromPort','toPort'].forEach(function(key){
       if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
     });
@@ -978,6 +1013,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
+    deltaWarnings(st, DP + '.steps[' + ti + ']', warnings);
     if(st && st.color!=null && !stepCircleColor(st))
       warnings.push(DP+'.steps['+ti+'].color: use #RGB or #RRGGBB for the step circles — using the default');
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')

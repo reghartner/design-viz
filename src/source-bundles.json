@@ -28,6 +28,7 @@
     "viewer/explore.js",
     "viewer/explore-canvas.js",
     "viewer/workspace-handoff.js",
+    "viewer/deltas.js",
     "engine.js",
     "viewer/detail-overview.js",
     "viewer/details.js",

@@ -1,0 +1,28 @@
+{
+  "page": {
+    "title": "A clearer view of what changed",
+    "skin": "pastel",
+    "sections": [{
+      "heading": "Reliable recording",
+      "text": ["Green triangles highlight changes. Click a marker to read the rationale and follow its supporting links."],
+      "diagram": {
+        "view": "step", "autoplay": false,
+        "nodes": {
+          "device": {"title": "Doorbell", "icon": "camera", "sub": "Firmware v2", "delta": true, "deltaText": "The doorbell now acknowledges a recording request before capture begins.", "deltaLinks": [{"label": "Firmware decision", "url": "https://example.com/decisions/firmware"}]},
+          "cloud": {"title": "Recording", "icon": "cloud", "sub": "Reliable delivery", "delta": true, "deltaText": "Requests are retried safely using a stable recording ID."},
+          "app": {"title": "Resident app", "icon": "phone", "sub": "Status and playback", "delta": true}
+        },
+        "rows": [["device", "cloud", "app"]],
+        "edges": [
+          {"from": "device", "to": "cloud", "label": "acknowledge", "kind": "https", "delta": true, "deltaText": "An explicit acknowledgement replaces the fire-and-forget request.", "deltaLinks": [{"label": "API contract", "url": "https://example.com/contracts/recording"}, {"label": "Rollout plan", "url": "https://example.com/rollout"}]},
+          {"from": "cloud", "to": "app", "label": "recording ready", "kind": "https"}
+        ],
+        "steps": [
+          {"id": "prepare", "nodes": ["device"], "text": "The doorbell prepares to record.", "delta": true, "deltaText": "Check device readiness before sending a request."},
+          {"id": "ack", "edge": "device->cloud", "text": "The device acknowledges the recording request.", "delta": true, "deltaText": "Continue only after acknowledgement.", "deltaLinks": [{"label": "Implementation", "url": "https://example.com/pulls/123"}]},
+          {"id": "ready", "edge": "cloud->app", "text": "The resident can play the recording."}
+        ]
+      }
+    }]
+  }
+}

@@ -2361,10 +2361,22 @@ body.sk-pastel .hmframe,.sk-daylight .hmframe{--hm-surface:#FFFFFF;}
 [data-playback="playing"] .playback-button{box-shadow:inset 0 -2px currentColor;}
 @media(max-width:640px){.step-transport .tbtn{min-width:44px;min-height:44px;}}
 .schip{font:700 11px 'IBM Plex Mono',monospace; width:26px; height:26px; border-radius:7px; cursor:pointer; padding:0;}
-.dvdelta{fill:var(--delta); stroke:rgba(0,0,0,.4); stroke-width:1; pointer-events:none;}
-.schip.dvd{position:relative;}
-.schip.dvd::after{content:''; border-left:4px solid transparent; border-right:4px solid transparent;
-  border-bottom:7px solid var(--delta); position:absolute; top:-3px; right:-3px; pointer-events:none;}
+.dvdelta{--delta-ink:#0ac746;--delta-fill:#21ff6410;--delta-glow:drop-shadow(0 0 1.5px #57ff85) drop-shadow(0 0 5px #12f96699);pointer-events:none;}
+body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .dvdelta,body.sk-terminal .dvdelta,body.sk-blueprint .dvdelta{--delta-ink:#67ff94;--delta-fill:#2bff7610;--delta-glow:drop-shadow(0 0 2px #32ff77) drop-shadow(0 0 6px #23ff7199);}
+.dvdelta .dvdelta-hit{fill:transparent;stroke:none;}
+.dvdelta .dvdelta-mark{fill:var(--delta-fill);stroke:var(--delta-ink);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;filter:var(--delta-glow);}
+.dvdelta-action{cursor:pointer;pointer-events:all;outline:none;}
+.dvdelta-action:hover .dvdelta-mark,.dvdelta-action[aria-expanded="true"] .dvdelta-mark{stroke-width:2.5;fill:color-mix(in srgb,var(--delta-ink) 12%,transparent);}
+.dvdelta-action:focus-visible .dvdelta-hit{stroke:var(--delta-ink);stroke-width:2;}
+.delta-chip-wrap{position:relative;display:inline-flex;overflow:visible;}
+.delta-chip-icon{position:absolute;width:24px;height:24px;right:-12px;top:-12px;overflow:visible;z-index:1;pointer-events:none;}
+.schips:has(.delta-chip-wrap){gap:10px 12px;padding-top:8px;}
+.delta-popover{width:300px;padding:16px;gap:10px;border-radius:12px;font:400 13px/1.55 'IBM Plex Sans',sans-serif;}
+.delta-popover .node-link-title{font-size:15px;color:var(--dink);}
+.delta-popover-label{font:600 10px/1.4 'IBM Plex Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:#218955;padding-right:20px;}
+body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-terminal .delta-popover-label,body.sk-blueprint .delta-popover-label{color:#69e8a3;}
+.delta-popover-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;}
+.delta-popover .node-reference-link{display:block;}
 /* Delta-only wins over each skin's inactive-step opacity rules. */
 .dv-deltaonly g.node:not(.dvd):not(.lit),
 .dv-deltaonly path.edge:not(.dvd):not(.lit),
@@ -6923,6 +6935,7 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .path-chip[aria-pressed="true"] {box-shadow:inset 0 0 0 1px var(--path-color);font-weight:700}
 .path-chip:focus-visible {outline:2px solid var(--path-color);outline-offset:3px}
 .termbar.has-paths .schips {display:block;flex-basis:100%;overflow-x:auto;max-width:100%;min-width:0;padding:4px 2px}
+.termbar.has-paths .schips:has(.delta-chip-wrap){padding:14px 14px 4px 2px;}
 .path-matrix {display:grid;grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),32px);gap:8px 3px;align-items:center;width:max-content}
 .path-row {display:contents}
 .path-matrix .path-chip {justify-self:start;max-width:220px;min-height:32px;box-sizing:border-box}
@@ -8290,6 +8303,39 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function isFiniteNum(v){ return typeof v === 'number' && isFinite(v); }
 function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function isHex(s){ return typeof s === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(s); }
+function deltaLinkUrl(value){
+  if (typeof value !== 'string' || !/^https?:\/\//i.test(value.trim())) return null;
+  try {
+    var url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch (ex){ return null; }
+}
+function deltaDetails(value){
+  value = value || {};
+  var text = typeof value.deltaText === 'string' ? value.deltaText.trim() : '';
+  var links = (Array.isArray(value.deltaLinks) ? value.deltaLinks : []).filter(function(link){
+    return link && typeof link === 'object' && !Array.isArray(link) && deltaLinkUrl(link.url);
+  }).map(function(link){
+    var url = deltaLinkUrl(link.url);
+    return {url:url, label:typeof link.label === 'string' && link.label.trim() ? link.label.trim() : url};
+  });
+  return {text:text, links:links, interactive:value.delta === true && !!(text || links.length)};
+}
+function deltaWarnings(value, path, warnings){
+  if (!value) return;
+  if (value.deltaText != null && typeof value.deltaText !== 'string')
+    warnings.push(path + '.deltaText: expected plain text — ignored');
+  if (value.deltaLinks != null){
+    if (!Array.isArray(value.deltaLinks)) warnings.push(path + '.deltaLinks: expected an array of {label?, url} — ignored');
+    else value.deltaLinks.forEach(function(link, index){
+      var at = path + '.deltaLinks[' + index + ']';
+      if (!link || typeof link !== 'object' || Array.isArray(link) || !deltaLinkUrl(link.url))
+        warnings.push(at + '.url: expected an absolute HTTP(S) URL — link ignored');
+      else if (link.label != null && typeof link.label !== 'string')
+        warnings.push(at + '.label: expected text — using the URL');
+    });
+  }
+}
 function resolveProtocols(page){
   var out = {};
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
@@ -8575,6 +8621,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   Object.keys(d.nodes).forEach(function(id){
     if (!placed[id]) warnings.push(DP + '.nodes.' + id + ': defined but not placed in rows or floats — it will not be drawn');
     var n = d.nodes[id] || {};
+    deltaWarnings(n, DP + '.nodes.' + id, warnings);
     validateHandoff(n.handoff,n,DP+'.nodes.'+id+'.handoff',errors);
     if (Object.prototype.hasOwnProperty.call(n, 'delta') && typeof n.delta !== 'boolean')
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
@@ -8586,6 +8633,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var edgeKeys = {};
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
+    deltaWarnings(e, EP, warnings);
     ['fromPort','toPort'].forEach(function(key){
       if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
     });
@@ -8624,6 +8672,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   });
   var stepIds = {};
   (d.steps || []).forEach(function(st, ti){
+    deltaWarnings(st, DP + '.steps[' + ti + ']', warnings);
     if(st && st.color!=null && !stepCircleColor(st))
       warnings.push(DP+'.steps['+ti+'].color: use #RGB or #RRGGBB for the step circles — using the default');
     if (st && Object.prototype.hasOwnProperty.call(st, 'delta') && typeof st.delta !== 'boolean')
@@ -26811,6 +26860,120 @@ function applyWorkspaceTarget(ctl,page,target){
   }
   return rec;
 }
+/* ---- src/viewer/deltas.js ---- */
+/* Delta markers share their appearance and optional details across the board
+   and step controls. Popovers belong to the rendered board/chip generation. */
+function appendDeltaMarker(parent, value, label, x, y){
+  var badge = document.createElementNS(SVGNS, 'g'), details = deltaDetails(value);
+  badge.setAttribute('class', 'dvdelta' + (details.interactive ? ' dvdelta-action' : ''));
+  badge.setAttribute('transform', 'translate(' + x + ' ' + y + ')');
+  badge.innerHTML = '<rect class="dvdelta-hit" x="-12" y="-12" width="24" height="24" rx="12"/>' +
+    '<path class="dvdelta-mark" d="M0 -5.5 L5.5 4 L-5.5 4 Z"/>';
+  var title = document.createElementNS(SVGNS, 'title');
+  title.textContent = details.interactive ? 'View change details · ' + label : 'Changed · ' + label;
+  badge.appendChild(title);
+  if (details.interactive){
+    badge.setAttribute('role', 'button'); badge.setAttribute('tabindex', '0');
+    badge.setAttribute('aria-label', 'Change details for ' + label);
+    badge.setAttribute('aria-haspopup', 'dialog'); badge.setAttribute('aria-expanded', 'false');
+    badge._deltaDetails = details; badge._deltaLabel = label;
+  } else {
+    badge.setAttribute('role', 'img'); badge.setAttribute('aria-label', 'Changed · ' + label);
+  }
+  parent.appendChild(badge);
+  return badge;
+}
+
+function decorateDeltaChips(host, source){
+  host.querySelectorAll('.schip.dvd').forEach(function(chip){
+    var value = source.steps[Number(chip.getAttribute('data-step-source'))];
+    // Every marked step uses the shared glyph. A sibling keeps navigation and
+    // optional details separate, including edgeless steps, without nested buttons.
+    var wrap = document.createElement('span'); wrap.className = 'delta-chip-wrap';
+    wrap.style.gridColumn = chip.style.gridColumn; wrap.style.gridRow = chip.style.gridRow;
+    chip.parentNode.insertBefore(wrap, chip); wrap.appendChild(chip);
+    var icon = document.createElementNS(SVGNS, 'svg');
+    icon.setAttribute('class', 'delta-chip-icon'); icon.setAttribute('viewBox', '-12 -12 24 24');
+    wrap.appendChild(icon);
+    appendDeltaMarker(icon, value, value.title || value.id || 'step ' + (Number(chip.getAttribute('data-step-source')) + 1), 0, 0);
+  });
+}
+
+function wireDeltaDetails(host, prefix, scope){
+  var triggers = (scope || host).querySelectorAll('.dvdelta-action');
+  if (!triggers.length) return null;
+  var pop = document.createElement('div');
+  pop.className = 'nbackpop node-link-menu delta-popover'; pop.id = prefix + '-delta-details';
+  pop.setAttribute('role', 'dialog'); pop.setAttribute('popover', 'manual'); pop.hidden = true;
+  host.appendChild(pop);
+  var active = null, destroyed = false, scrollAtOpen = [], listeners = [];
+  function listen(target, type, fn){
+    target.addEventListener(type, fn); listeners.push(function(){ target.removeEventListener(type, fn); });
+  }
+  function inside(target){ return pop.contains(target) || !!(active && active.contains(target)); }
+  function close(returnFocus){
+    if (!active) return;
+    var trigger = active; active = null; scrollAtOpen = [];
+    trigger.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', outside, true);
+    document.removeEventListener('focusin', outside, true);
+    document.removeEventListener('keydown', escape, true);
+    document.removeEventListener('scroll', scroll, true); window.removeEventListener('resize', resize);
+    if (pop.hidePopover && pop.matches(':popover-open')) pop.hidePopover();
+    pop.hidden = true;
+    if (returnFocus && trigger.isConnected) trigger.focus();
+  }
+  function outside(ev){ if (!inside(ev.target)) close(false); }
+  function escape(ev){ if (ev.key === 'Escape'){ ev.preventDefault(); ev.stopPropagation(); close(true); } }
+  function resize(){ close(false); }
+  function scroll(ev){
+    var target = ev.target === document || ev.target.nodeType === 9 ? document.scrollingElement : ev.target;
+    if (scrollAtOpen.some(function(s){ return s.el === target && (s.x !== target.scrollLeft || s.y !== target.scrollTop); })) close(false);
+  }
+  function show(trigger){
+    if (destroyed) return;
+    if (active === trigger){ close(true); return; }
+    close(false); active = trigger;
+    var details = trigger._deltaDetails;
+    pop.replaceChildren(); pop.setAttribute('aria-label', 'Change details for ' + trigger._deltaLabel);
+    var eyebrow = document.createElement('span'); eyebrow.className = 'delta-popover-label'; eyebrow.textContent = 'Δ  What changed'; pop.appendChild(eyebrow);
+    var title = document.createElement('strong'); title.className = 'node-link-title'; title.textContent = trigger._deltaLabel; pop.appendChild(title);
+    var dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'node-link-close';
+    dismiss.textContent = '×'; dismiss.setAttribute('aria-label', 'Close change details'); dismiss.addEventListener('click', function(){ close(true); }); pop.appendChild(dismiss);
+    if (details.text){
+      var note = document.createElement('p'); note.className = 'delta-popover-text'; note.textContent = details.text; pop.appendChild(note);
+    }
+    details.links.forEach(function(link){
+      var a = document.createElement('a'); a.className = 'nbacklink node-reference-link'; a.href = link.url;
+      a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = link.label + ' ↗'; pop.appendChild(a);
+    });
+    trigger.setAttribute('aria-expanded', 'true'); pop.hidden = false;
+    if (pop.showPopover) pop.showPopover();
+    var rect = trigger.getBoundingClientRect(), vw = window.innerWidth, vh = window.innerHeight;
+    pop.style.left = Math.max(8, Math.min(vw - pop.offsetWidth - 8, rect.left + rect.width / 2 - pop.offsetWidth / 2)) + 'px';
+    var top = rect.bottom + 8;
+    if (top + pop.offsetHeight > vh - 8) top = rect.top - pop.offsetHeight - 8;
+    pop.style.top = Math.max(8, top) + 'px';
+    dismiss.focus({preventScroll:true});
+    for (var ancestor = trigger; ancestor; ancestor = ancestor.parentElement || (ancestor.getRootNode && ancestor.getRootNode().host))
+      scrollAtOpen.push({el:ancestor, x:ancestor.scrollLeft, y:ancestor.scrollTop});
+    document.addEventListener('pointerdown', outside, true); document.addEventListener('focusin', outside, true);
+    document.addEventListener('keydown', escape, true); document.addEventListener('scroll', scroll, true);
+    window.addEventListener('resize', resize);
+  }
+  triggers.forEach(function(trigger){
+    trigger.setAttribute('aria-controls', pop.id);
+    ['pointerdown', 'mousedown'].forEach(function(type){ listen(trigger, type, function(ev){ ev.stopPropagation(); }); });
+    listen(trigger, 'click', function(ev){ ev.preventDefault(); ev.stopPropagation(); show(trigger); });
+    listen(trigger, 'keydown', function(ev){
+      if (ev.key === 'Enter' || ev.key === ' '){ ev.preventDefault(); ev.stopPropagation(); show(trigger); }
+    });
+  });
+  listen(pop, 'click', function(ev){ ev.stopPropagation(); });
+  return {close:function(){ close(false); }, destroy:function(){
+    close(false); destroyed = true; listeners.forEach(function(off){ off(); }); pop.remove();
+  }};
+}
 /* ---- src/engine.js ---- */
 /* engine.js — board renderer, stepper and page renderer.
    Consumes document, navigation, path, layout, state and geometry helpers
@@ -27379,9 +27542,9 @@ function showCommunicationFailures(board,failures,animate){
   });
 }
 
-/* Both link menus belong to this board, including listeners outside its DOM. */
+/* Board popovers own their listeners outside the board's DOM too. */
 function destroyBoardLinks(el){
-  ['_nodeBacklinks', '_nodeLinks'].forEach(function(key){
+  ['_nodeBacklinks', '_nodeLinks', '_deltaDetails'].forEach(function(key){
     var controller = el[key];
     el[key] = null;
     if (controller) controller.destroy();
@@ -27437,19 +27600,23 @@ function coinObstacleIndex(rects){
 }
 /* Area of the coins' boxes that falls on indexed rectangles. Stops early once
    it exceeds `limit` (when given), since the caller only needs to beat it. */
-function coinCover(pts, avoid, limit){
+function coinCover(pts, avoid, limit, marked){
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
   if (!index.size) return 0;
   var total = 0, h = COIN_R + 1;
-  function add(pt, r){
-    var w = Math.min(pt.x + h, r.x + r.w) - Math.max(pt.x - h, r.x),
-        t = Math.min(pt.y + h, r.y + r.h) - Math.max(pt.y - h, r.y);
+  function box(x, y, radius, r){
+    var w = Math.min(x + radius, r.x + r.w) - Math.max(x - radius, r.x),
+        t = Math.min(y + radius, r.y + r.h) - Math.max(y - radius, r.y);
     if (w > 0 && t > 0) total += w * t;
+  }
+  function add(pt, r){
+    box(pt.x, pt.y, h, r);
+    if (marked) box(pt.x + 13, pt.y - 13, 12, r);
   }
   for (var i = 0; i < pts.length; i++){
     var pt = pts[i], seen = {};
-    var x0 = Math.floor((pt.x - h) / COIN_CELL), x1 = Math.floor((pt.x + h) / COIN_CELL),
-        y0 = Math.floor((pt.y - h) / COIN_CELL), y1 = Math.floor((pt.y + h) / COIN_CELL);
+    var x0 = Math.floor((pt.x - h) / COIN_CELL), x1 = Math.floor((pt.x + (marked ? 25 : h)) / COIN_CELL),
+        y0 = Math.floor((pt.y - (marked ? 25 : h)) / COIN_CELL), y1 = Math.floor((pt.y + h) / COIN_CELL);
     for (var gx = x0; gx <= x1; gx++) for (var gy = y0; gy <= y1; gy++){
       var bucket = index.cells[gx + ',' + gy];
       if (bucket) for (var j = 0; j < bucket.length; j++){
@@ -27469,23 +27636,26 @@ function coinPointOnCard(pt, index){
     return pt.x > r.x + COIN_PAD && pt.x < r.x + r.w - COIN_PAD && pt.y > r.y + COIN_PAD && pt.y < r.y + r.h - COIN_PAD;
   });
 }
-function coinSlots(path, len, mid, n, avoid){
+function coinSlots(path, len, mid, n, avoid, marked){
   if (n < 1) return [];
   var index = avoid && avoid.cells ? avoid : coinObstacleIndex(avoid);
   /* a lone coin sits on the midpoint, exactly as before shared rows, unless
      the midpoint itself lies on a card (e.g. a view leaves one coin on an edge
      that runs under a float); a coin merely grazing a card stays put */
-  if (n === 1 && !coinPointOnCard(mid, index)) return [{x: mid.x, y: mid.y}];
-  var span = (n - 1) * COIN_STEP, lo = COIN_END + span / 2, hi = len - COIN_END - span / 2, row = null;
+  if (n === 1 && (marked ? coinCover([mid], index, 0, true) === 0 : !coinPointOnCard(mid, index))) return [{x: mid.x, y: mid.y}];
+  // The badge projects toward the next coin on an ascending diagonal. Reserve
+  // its hit area as well as the number, including in the fallback grid.
+  var spacing = marked ? 44 : COIN_STEP, clearance = marked ? 42 : COIN_CLEAR, end = marked ? 36 : COIN_END;
+  var span = (n - 1) * spacing, lo = end + span / 2, hi = len - end - span / 2, row = null;
   if (lo <= hi){
     var centre = Math.min(hi, Math.max(lo, len / 2));
     row = [];
     for (var i = 0; i < n; i++){
-      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * COIN_STEP);
+      var p = path.getPointAtLength(centre + (i - (n - 1) / 2) * spacing);
       row.push({x: p.x, y: p.y});
     }
-    if (!coinsApart(row, COIN_CLEAR)) row = null;
-    else if (coinCover(row, index, 0) === 0) return row;
+    if (!coinsApart(row, clearance)) row = null;
+    else if (coinCover(row, index, 0, marked) === 0) return row;
   }
   /* block axes in reading order: along runs left to right (top to bottom when
      vertical), across runs top to bottom (left to right when vertical) */
@@ -27500,7 +27670,7 @@ function coinSlots(path, len, mid, n, avoid){
      COIN_END of an end, and never further than the widest block needs) */
   var need = span / 2 + 2, reach = Infinity;
   [-1, 1].forEach(function(dir){
-    var run = 0, limit = Math.min(len / 2 - COIN_END, need);
+    var run = 0, limit = Math.min(len / 2 - end, need);
     while (run + 2 <= limit){
       var q = path.getPointAtLength(len / 2 + dir * (run + 2));
       if (Math.abs((q.x - mid.x) * dy - (q.y - mid.y) * dx) > 1.5) break;
@@ -27508,7 +27678,7 @@ function coinSlots(path, len, mid, n, avoid){
     }
     reach = Math.min(reach, run);
   });
-  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / COIN_STEP) + 1));
+  var maxCols = Math.max(1, Math.min(n, Math.floor(2 * reach / spacing) + 1));
   function block(cols, near, side){
     var rows = Math.ceil(n / cols), out = [];
     for (var r = 0; r < rows; r++){
@@ -27516,8 +27686,8 @@ function coinSlots(path, len, mid, n, avoid){
       var across = side === 0 ? r - (rows - 1) / 2 : side > 0 ? near + r : -(near + rows - 1 - r);
       var inRow = Math.min(cols, n - r * cols);
       for (var c = 0; c < inRow; c++){
-        var along = (c - (inRow - 1) / 2) * COIN_STEP;
-        out.push({x: mid.x + dx * along + nx * across * COIN_STEP, y: mid.y + dy * along + ny * across * COIN_STEP});
+        var along = (c - (inRow - 1) / 2) * spacing;
+        out.push({x: mid.x + dx * along + nx * across * spacing, y: mid.y + dy * along + ny * across * spacing});
       }
     }
     return out;
@@ -27556,7 +27726,7 @@ function coinSlots(path, len, mid, n, avoid){
   order.sort(function(a, b){ return a.far - b.far || a.off - b.off || a.odd - b.odd || a.k - b.k; });
   var best = null, bestCover = Infinity;
   for (var ci = 0; ci < order.length; ci++){
-    var cover = coinCover(order[ci].pts, index, bestCover);
+    var cover = coinCover(order[ci].pts, index, bestCover, marked);
     if (cover === 0) return order[ci].pts;
     if (cover < bestCover){ best = order[ci].pts; bestCover = cover; }
   }
@@ -27572,7 +27742,8 @@ function layoutCoinGroup(group){
     if (base) base.classList.toggle('view-step-hidden', hide);
     if (!hide) shown.push(i);
   });
-  var pts = coinSlots(group.path, group.len, group.mid, shown.length, group.avoid);
+  var marked = shown.some(function(i){ return group.deltas && group.deltas[i]; });
+  var pts = coinSlots(group.path, group.len, group.mid, shown.length, group.avoid, marked);
   shown.forEach(function(ci, i){
     var dx = pts[i].x - group.mid.x, dy = pts[i].y - group.mid.y;
     [group.coins[ci], group.bases && group.bases[ci]].forEach(function(el){
@@ -27679,7 +27850,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
          (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
-         (n.delta === true ? '<polygon class="dvdelta" points="-3,-4 8,-4 2.5,-13" aria-hidden="true"/>' : '') +
          '</g>';
   });
   s += '</svg>';
@@ -27688,7 +27858,10 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   var nodeEls = {};
   Object.keys(d.nodes).forEach(function(id){
     var node = document.getElementById(prefix + '-n-' + id);
-    if (node) nodeEls[id] = node;
+    if (node){
+      nodeEls[id] = node;
+      if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
+    }
   });
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
@@ -27708,13 +27881,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var p = L.pos[id];
     return {x: p.cx - p.w / 2 - COIN_PAD, y: p.cy - p.h / 2 - COIN_PAD, w: p.w + 2 * COIN_PAD, h: p.h + 2 * COIN_PAD};
   }));
-  function deltaBadge(parent, x, y, w, h, unrecorded){
-    var badge = document.createElementNS(SVGNS, 'polygon');
-    badge.setAttribute('class', 'dvdelta');
-    badge.setAttribute('aria-hidden', 'true');
-    badge.setAttribute('points', x + ',' + (y + h) + ' ' + (x + w) + ',' + (y + h) + ' ' + (x + w/2) + ',' + y);
-    parent.appendChild(badge);
-    if (!unrecorded) deltaRects.push({x:x - 1, y:y - 1, w:w + 2, h:h + 2});
+  function deltaBadge(parent, x, y, value, label, unrecorded){
+    var badge = appendDeltaMarker(parent, value, label, x, y);
+    if (!unrecorded) deltaRects.push({x:x - 12, y:y - 12, w:24, h:24});
     return badge;
   }
   (d.edges || []).forEach(function(e){
@@ -27753,7 +27922,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         t.setAttribute('x', mid.x); t.setAttribute('y', mid.y + 3.5); t.setAttribute('text-anchor', 'middle');
         t.textContent = n;
         g.appendChild(c); g.appendChild(t); svg.appendChild(g);
-        if (stepDelta) deltaBadge(g, mid.x + 5, mid.y - 14, 8, 7, true);
+        if (stepDelta) deltaBadge(g, mid.x + 13, mid.y - 13, d.steps[n - 1], d.steps[n - 1].title || d.steps[n - 1].id || 'step ' + n, true);
         group.coins.push(g); group.bases.push(base); group.deltas.push(stepDelta);
       });
       info.coinEl = group.coins[0];
@@ -27761,7 +27930,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       layoutCoinGroup(group).forEach(function(pt, i){
         coinRects.push({x: pt.x - 11, y: pt.y - 11, w: 22, h: 22});
         /* coin badges travel with their coin: record them at the final slot */
-        if (group.deltas[i]) deltaRects.push({x: pt.x + 4, y: pt.y - 15, w: 10, h: 9});
+        if (group.deltas[i]) deltaRects.push({x: pt.x + 1, y: pt.y - 25, w: 24, h: 24});
         if (pt.x < coinLeft){ coinLeft = pt.x; coinLeftY = pt.y; }
       });
     }
@@ -27787,8 +27956,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
         pendingLabelBadges.push({e: e, lbl: lt});
       } else {
         /* no label: left of the coin, near the midpoint */
-        var badge = stepN ? deltaBadge(svg, coinLeft - 25, coinLeftY - 6, 11, 9) :
-          deltaBadge(svg, mid.x - 16, mid.y - 6, 11, 9);
+        var badge = stepN ? deltaBadge(svg, coinLeft - 26, coinLeftY, e, e.from + ' → ' + e.to) :
+          deltaBadge(svg, mid.x, mid.y - 14, e, e.from + ' → ' + e.to);
         markFragmentElement(badge, e);
       }
     }
@@ -27803,7 +27972,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var p = L.pos[id];
       if (p) obstacles.push({x: p.cx - p.w/2 - 2, y: p.cy - p.h/2 - 2, w: p.w + 4, h: p.h + 4});
       if (p && d.nodes[id] && d.nodes[id].delta === true)
-        obstacles.push({x:p.cx - p.w/2 - 4, y:p.cy - p.h/2 - 14, w:13, h:11});
+        obstacles.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
     });
     coinRects.forEach(function(r){ obstacles.push({x: r.x, y: r.y, w: r.w, h: r.h, hard: true}); });
     deltaRects.forEach(function(r){ obstacles.push(r); });
@@ -27823,7 +27992,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       var r = {x: b.x, y: b.y, w: b.width, h: b.height, fixed: le.fixed};
       /* a delta-marked label carries a badge at its top-right — reserve
          that room so neighboring labels dodge the badge too */
-      if (le.badge){ r.y -= 9; r.h += 9; r.w += 12; }
+      if (le.badge){ r.y -= 15; r.h += 15; r.w += 27; }
       return r;
     });
     var nudges = resolveLabelCollisions(rects, obstacles);
@@ -27841,19 +28010,25 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var b;
     try { b = pb.lbl.getBBox(); } catch (ex){ b = null; }
     var badge = (b && b.width) ?
-      deltaBadge(svg, b.x + b.width + 3, b.y - 6, 9, 8) :
+      deltaBadge(svg, b.x + b.width + 14, b.y - 3, pb.e, pb.e.label) :
       /* hidden-context fallback (a section inside an inactive tab measures
          as zero): sit just above-right of the label's anchor point */
-      deltaBadge(svg, parseFloat(pb.lbl.getAttribute('x')) + 4,
-                 parseFloat(pb.lbl.getAttribute('y')) - 18, 9, 8);
+      deltaBadge(svg, parseFloat(pb.lbl.getAttribute('x')) + 14,
+                 parseFloat(pb.lbl.getAttribute('y')) - 18, pb.e, pb.e.label);
     markFragmentElement(badge, pb.e);
   });
+
+  el._deltaDetails = wireDeltaDetails(el, prefix, svg);
 
   /* a compact coin grid on a short edge can reach past the layout's canvas;
      grow the viewBox (and its ground) so no coin, badge, or the label of a
      shared-coin edge is clipped */
   (function(){
-    if (!coinRects.length) return;
+    Object.keys(d.nodes).forEach(function(id){
+      var p = L.pos[id];
+      if (p && d.nodes[id].delta === true) deltaRects.push({x:p.cx - p.w/2 - 8, y:p.cy - p.h/2 - 18, w:24, h:24});
+    });
+    if (!coinRects.length && !deltaRects.length) return;
     var x1 = vb.x, y1 = vb.y, x2 = vb.x + vb.w, y2 = vb.y + vb.h, extra = [];
     labelEls.forEach(function(le){
       if (!le.coined) return;
@@ -27926,7 +28101,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
 
   return {kindsUsed: Object.keys(kindsUsed), anyRet: anyRet, edgeIds: edgeIds,
-    nodeEls: nodeEls, svg: svg,
+    nodeEls: nodeEls, svg: svg, deltaDetails: el._deltaDetails,
     /* re-pack each shared-edge coin row around the coins still visible */
     layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup); }};
 }
@@ -28098,8 +28273,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
-  var chipButtons = [], pathButtons = [], pathTimeline = null;
+  var chipButtons = [], pathButtons = [], pathTimeline = null, chipDeltas = null;
   function paintStepCoins(){
+    if (board.deltaDetails) board.deltaDetails.close();
     var visible=stops();
     svg.querySelectorAll('.coin[data-dv-step]').forEach(function(coin){
       var index=selectedPath.indices.indexOf(Number(coin.getAttribute('data-dv-step'))),position=visible.indexOf(index);
@@ -28115,6 +28291,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }).join(', ');
   }
   function paintChips(){
+    if (chipDeltas){ chipDeltas.destroy(); chipDeltas = null; }
+    paintChipContent();
+    decorateDeltaChips(chipsBox, source);
+    chipDeltas = wireDeltaDetails(chipsBox, prefix + '-chips');
+  }
+  function paintChipContent(){
     paintStepCoins();
     if(pathTimeline){pathTimeline.destroy();pathTimeline=null;}
     while (chipsBox.firstChild) chipsBox.removeChild(chipsBox.firstChild);
@@ -28525,9 +28707,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     destroy: function(){
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
       if(pathTimeline)pathTimeline.destroy();
+      if(chipDeltas)chipDeltas.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){
+      if (board.deltaDetails) board.deltaDetails.close();
+      if (chipDeltas) chipDeltas.close();
       var wasPlaying = !!timer; hidden = true; stopAuto();
       resumeOnShow = wasPlaying && (!options || options.autoplay !== false); settleCurrentStep();
     } },

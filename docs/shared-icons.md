@@ -1,8 +1,8 @@
 # Shared icons and company branding
 
-Flowview uses one library of 58 colored SVG icons for diagram nodes, groups,
+Flowview uses one library of 63 colored SVG icons for diagram nodes, groups,
 Home elements, Device app cards, audio controls, monitoring and dispatch. Battery,
-temperature and alarm variants differ in shape as well as color. Icons describe
+voltage, temperature and alarm variants differ in shape as well as color. Icons describe
 the authored story; choosing an alarm icon does not trigger or verify an alarm.
 
 ## Choose an icon in the workbench
@@ -39,6 +39,15 @@ to carry. In JSON, `icon:null` resets to the declaration's icon, or the normal
 card default when none was declared. A battery card defaults to `battery`; a
 text card without an icon has none. A numeric value alone does not choose an
 alarm, hot or low-battery icon.
+
+For voltage stories, search **voltage** or filter **Power**. Use `voltage` for
+an unspecified reading, `voltage-normal` for nominal voltage (green check),
+`voltage-high` for overvoltage (red up arrow), `voltage-low` for undervoltage
+(amber down arrow), and `voltage-off` for no voltage (gray crossed circle).
+Set these explicitly on Home markers or Device app cards at the relevant steps;
+they do not infer thresholds or change a device's power state. For example,
+`"panels":{"app":{"supply":{"value":"9 V","icon":"voltage-low"}}}`
+patches an existing `supply` card in the `app` panel.
 
 ## Share a company name and mark
 
@@ -138,9 +147,9 @@ support; SVG paint fallbacks work without CSS or an external sprite in offline
 exports and native ShadowRoots. CSS consumers can override
 `--fv-icon-primary`, `--fv-icon-accent`, and `--fv-icon-wash`.
 
-`symbols()` emits the 37 new `#i-*` symbols by default. The source loader appends
+`symbols()` emits the 42 new `#i-*` symbols by default. The source loader appends
 them to the existing 21-symbol sprite, preserving legacy diagram tint behavior.
-`symbols({newOnly:false})` emits all 58 for consumers that have no legacy sprite.
+`symbols({newOnly:false})` emits all 63 for consumers that have no legacy sprite.
 Do not append the full set to a document that already contains those IDs.
 
 [`src/icons/brand.js`](../src/icons/brand.js) owns `FlowBrand.clean`, `resolve`,
@@ -161,7 +170,7 @@ The editor owns transactions and form lifetime through
 | Home | `pump package phone house doorbell bulb car person` |
 | Video | `camera monitor camera-off` |
 | Audio | `speaker microphone microphone-muted recorded chime siren detection headset` |
-| Power | `battery battery-full battery-low battery-charging plug solar` |
+| Power | `battery battery-full battery-low battery-charging voltage voltage-normal voltage-high voltage-low voltage-off plug solar` |
 | Dispatch | `police fire medical security` |
 
 ## Review of all 30 panel types

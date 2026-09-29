@@ -96,7 +96,8 @@ triggered door motion smoke water sensor`; Temperature `thermo temperature hot
 cold snowflake`; Home `pump package phone house doorbell bulb car person`;
 Video `camera monitor camera-off`; Audio `speaker microphone microphone-muted
 recorded chime siren detection headset`; Power `battery battery-full
-battery-low battery-charging plug solar`; Dispatch `police fire medical
+battery-low battery-charging voltage voltage-normal voltage-high voltage-low
+voltage-off plug solar`; Dispatch `police fire medical
 security`. Do not use any other ID.
 
 ## Checklist per step (use for worksheet section E)

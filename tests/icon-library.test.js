@@ -76,6 +76,7 @@ test('every glyph is standalone code-owned SVG with no external references', () 
 test('power, temperature and alarm states differ in silhouette as well as semantic color', () => {
   for (const states of [
     ['battery', 'battery-full', 'battery-low', 'battery-charging'],
+    ['voltage', 'voltage-normal', 'voltage-high', 'voltage-low', 'voltage-off'],
     ['temperature', 'hot', 'cold'],
     ['armed', 'disarmed', 'triggered'],
     ['camera', 'camera-off'],

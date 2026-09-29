@@ -72,6 +72,13 @@ var FlowIcons = (function () {
   add('battery-full', 'Battery full', 'Power', 'green', battery(solid(rect(5, 9, 3, 6, .8, 'accent') + rect(9.5, 9, 3, 6, .8, 'accent') + rect(14, 9, 3, 6, .8, 'accent'))));
   add('battery-low', 'Battery low', 'Power', 'red', battery(solid(rect(5, 9, 3, 6, .8, 'accent')) + path('M14 9.5v2.5M14 14.5h.01')));
   add('battery-charging', 'Battery charging', 'Power', 'green', battery(path('m12.5 4-6 9h4L9.5 20l6.5-10h-4Z', 'accent')));
+  // A shared bolt with a separate state mark stays legible at card-icon sizes.
+  var voltage = path('m11 2-8 11h5l-1 9 8-12h-5Z', 'wash');
+  add('voltage', 'Voltage', 'Power', 'teal', voltage + path('m17 9 2 6 2-6'));
+  add('voltage-normal', 'Normal voltage', 'Power', 'green', voltage + path('m16 12 2 2 4-5'));
+  add('voltage-high', 'High voltage', 'Power', 'red', voltage + path('M19 16V6m-3 3 3-3 3 3'));
+  add('voltage-low', 'Low voltage', 'Power', 'amber', voltage + path('M19 6v10m-3-3 3 3 3-3'));
+  add('voltage-off', 'No voltage', 'Power', 'neutral', voltage + circle(19, 12, 3) + path('m17 10 4 4'));
   add('plug', 'Power connected', 'Power', 'teal', path('M8 3v5M16 3v5M12 17v4') + path('M6 8h12v3a6 6 0 0 1-12 0Z', 'wash') + detail(path('M9 11h6')));
   add('solar', 'Solar power', 'Power', 'amber', circle(17, 6, 2.5, 'accent') + path('M17 1.5v1M21.5 6h1M20.2 2.8l.7-.7M13.8 2.8l-.7-.7') + path('M4 11h13l3 9H2Z', 'wash') + path('M3.5 15.5h15M8.5 11l-1 9M12.5 11l1 9'));
   add('temperature', 'Temperature', 'Temperature', 'teal', thermometer(10));

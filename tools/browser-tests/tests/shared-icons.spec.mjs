@@ -19,10 +19,11 @@ test('visual icon picker searches, filters, chooses one transaction, and closes 
  await page.screenshot({path:info.outputPath('icon-field.png')});
  await guide.locator('.flow-icon-browse').first().click();
  const dialog=page.locator('dialog.flow-icon-picker');await expect(dialog).toBeVisible();
- await dialog.locator('.flow-icon-search').fill('battery');await expect(dialog.locator('[data-icon-id="battery-low"]')).toBeVisible();
+ await dialog.locator('.flow-icon-search').fill('voltage');await expect(dialog.locator('[data-icon-id="voltage-low"]')).toBeVisible();
+ await expect(dialog.locator('.flow-icon-tile[data-icon-id^="voltage"]')).toHaveCount(5);
  await page.screenshot({path:info.outputPath('icon-picker.png')});
- const before=await source.inputValue();await dialog.locator('[data-icon-id="battery-low"]').click();
- await expect(dialog).toHaveCount(0);expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.camera.icon).toBe('battery-low');
+ const before=await source.inputValue();await dialog.locator('[data-icon-id="voltage-low"]').click();
+ await expect(dialog).toHaveCount(0);expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.nodes.camera.icon).toBe('voltage-low');
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);
  await page.locator('#docview .node[data-dv-node="camera"]').click();
  await guide.locator('.flow-icon-browse').first().click();await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);

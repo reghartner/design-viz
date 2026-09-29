@@ -334,6 +334,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   `.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
   `flowview-folder-v1`, read its `CONNECT.md` and follow
   [diagram-folder collaboration](../../../docs/folder-agent-session.md).
+  In the recommended copy/paste workflow, wait for messages in the agent app;
+  do not start or renew Monitor, a watcher, or a background polling loop. Monitor
+  belongs to the explicitly selected Beta conversation only.
   The project is the spec and coverage ledger at the folder root; `project.json`
   names them. Existing artifacts must be preserved and read before planning.
   Connection identity is temporary and can change without changing the project.
@@ -353,8 +356,8 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   **embedded** uses helper `reply` for questions and final answers. Copied requests
   are not dispatched by Monitor; external requests use acknowledged `begin`.
   Use `progress` for phases, errors and observable work during longer turns.
-  Wait for the proposal result before completion `reply`. Monitor is optional
-  for copy/paste, required for direct Send and the Beta embedded conversation.
+  Wait for the proposal result before completion `reply`. Copy/paste uses no
+  Monitor; direct Send and the explicitly selected Beta conversation require it.
   The bundled `authoring/` directory is VIZ; run validator and state-walk tools
   without an OUT build. Browser access is unavailable; never claim visual QA.
 - **Local workbench session.** When the user supplies a local session scratch

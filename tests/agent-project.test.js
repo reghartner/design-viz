@@ -104,3 +104,13 @@ test('oversized handwritten artifacts cannot replace the last reopenable pair',a
     }finally{await h.close();}
   }
 });
+
+
+test('folder inspection identifies prior artifacts and connection metadata before any writes',async()=>{
+  const h=await setup();try{
+    assert.equal((await h.open()).existing,false);
+    await h.write('story.ledger.md','# Existing work');assert.equal((await h.open()).existing,true);
+    await fs.unlink(path.join(h.folder,'story.ledger.md'));await fs.mkdir(path.join(h.folder,'.flowview-agent'));
+    assert.equal((await h.open()).existing,true);
+  }finally{await h.close();}
+});

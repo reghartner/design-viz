@@ -177,6 +177,8 @@ function initWorkbenchWelcome(opts){
     resume.hidden = !current && !draft;
     headerResume.hidden = !current || root.hidden;
     el('welcome-resume-title').textContent = current ? 'Continue ' + projectTitle() : 'Resume ' + (draft ? draft.title : 'your draft');
+    el('welcome-build-continue-title').textContent=current?'Continue '+projectTitle():draft?'Continue '+draft.title:'Open an existing diagram';
+    el('welcome-build-continue-detail').textContent=current || draft?'Use this draft, or choose an existing diagram folder.':'Choose its diagram folder to pick up where you left off.';
     var date = draft && new Date(draft.savedAt);
     el('welcome-resume-detail').textContent = current ? 'Your current project is still here, including its undo history.' :
       'Saved in this browser' + (date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : '') + '.';
@@ -249,11 +251,13 @@ function initWorkbenchWelcome(opts){
   });
   ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('build');});});
   el('welcome-build-brief').addEventListener('click',function(){navigation.go('agent');});
-  function buildWithClaude(mode){
-    if(!builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
-    enterEditor();builder.startAgent(mode);
+  function buildWithClaude(mode,fresh){
+    if(fresh===undefined)fresh=el('welcome-build-new').checked;
+    if(fresh || !builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
+    enterEditor();builder.startAgent(mode,{newProject:fresh});
   }
-  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('build');});});
+  document.addEventListener('dv:agentnew',function(event){buildWithClaude(event.detail && event.detail.workflow==='embedded'?'embedded':'external',true);});
+  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){el('welcome-build-new').checked=id==='welcome-new-agent';el('welcome-build-continue').checked=id!=='welcome-new-agent';navigation.go('build');});});
   el('welcome-build-external').addEventListener('click',function(){buildWithClaude('external');});
   el('welcome-build-embedded').addEventListener('click',function(){buildWithClaude('embedded');});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });

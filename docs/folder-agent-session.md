@@ -6,12 +6,20 @@ users do not need to create or manage a separate session folder.
 
 ## Choose how to work
 
-**Build with Claude** offers two choices:
+On the homepage, **Build with Claude** first makes the starting point explicit:
+**Start a new diagram** opens a blank project, while **Continue** names the current
+or saved draft. **Open an existing diagram** is shown when there is no draft.
+The setup dialog also offers **Start new diagram** so you can leave a previous
+connection without hunting through the editor. Starting new disconnects the old
+connection, preserves the draft in **Earlier drafts**, and requires a fresh folder;
+it never reopens or overwrites a previous folder's spec, ledger, or session.
+
+Then choose where to have the conversation:
 
 - **Work in your agent — Recommended.** Copy setup and messages with selected
   nodes/references into an agent that can read local files. Questions, permissions,
-  and interrupts stay in that agent app. Monitor is optional and only needed for
-  direct **Send to Claude**.
+  and interrupts stay in that agent app. The setup explicitly tells the agent
+  not to start Monitor, a watcher, polling loop, or background listener.
 - **Talk here with Claude — Beta.** Claude Code and its Monitor tool deliver
   questions and answers inside the workbench. Permission prompts and interrupts
   still happen in Claude.
@@ -149,7 +157,8 @@ the request remains active. Completion releases the request.
 
 ## Monitor and recovery
 
-Monitor is required only for the Beta conversation and optional direct Send:
+The recommended copy/paste setup contains no commands to start or renew Monitor.
+Choose the explicit Beta conversation to use Monitor and direct Send:
 
 ```sh
 python3 /path/to/diagram/.flowview-agent/folder-agent.py preflight --monitor available

@@ -31,14 +31,17 @@ async function mount(page,{stored,denied=false}={}){
     };
   },await read('workbench.skel.html'));
   for(const file of ['style.core.css','style.workbench.css','workbench/agent-conversation.css'])await page.addStyleTag({content:await read(file)});
-  for(const file of ['workbench/lifetime.js','workbench/agent-recovery.js','workbench/agent-review.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
+  for(const file of ['workbench/lifetime.js','workbench/targets.js','workbench/agent-message.js','workbench/agent-recovery.js','workbench/agent-review.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
   await page.evaluate(denied=>{
     window.denyPermission=denied;
     if(denied){const original=createWorkbenchAgentRecovery;window.createWorkbenchAgentRecovery=options=>{const store=original(options);return {...store,handle:async()=>({handle:window.testDirectory,sessionId:'s1'})};};}
     window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){},openEmptyFolder:()=>({ok:true,project:window.testProject}),restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
   },denied);
+  // These fixtures exercise the embedded conversation. Choose it through the
+  // production tab, while the separate folder-agent suite verifies copy defaults.
+  await page.locator('#folder-agent-mode-embedded').click();
 }
-async function connect(page){await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();}
+async function connect(page){await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-workflow')).toHaveValue('embedded');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));}
 async function composerVisible(page){
   for(const id of ['folder-agent-input','folder-agent-send','folder-agent-focus-summary']){
     const box=await page.locator('#'+id).boundingBox();const size=page.viewportSize();expect(box).not.toBeNull();expect(box.y).toBeGreaterThanOrEqual(0);expect(box.y+box.height).toBeLessThanOrEqual(size.height);
@@ -63,9 +66,10 @@ test('twenty exchanges keep composer reachable and do not force an older-message
   await expect(page.locator('#folder-agent-panel-status')).toContainText('interrupt it in its session');
 });
 test('reload keeps draft/detail and a visible disconnected recovery without accessing the folder',async({page})=>{
-  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-input').fill('Keep this unsent question');
+  const draft='Keep this long unsent request. '.repeat(1000);
+  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-mode-external').click();await page.locator('#folder-agent-input').fill(draft);
   await page.evaluate(()=>publish({transcript:[{role:'assistant',text:'A saved answer',requestId:'r1'}]}));
-  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this unsent question');await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
+  await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue(draft);await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
   await expect(page.locator('#folder-agent-messages')).toContainText('A saved answer');await expect(page.locator('#folder-agent-recovery')).toContainText('Interrupted requests will not replay');
   expect(await page.evaluate(()=>({pickerCalls,permissionCalls,starts:starts.length}))).toEqual({pickerCalls:0,permissionCalls:0,starts:0});
 });
@@ -206,7 +210,7 @@ test('context stays concise and expandable; setup and next-message detail preser
   await expect(page.locator('#folder-agent-focus-summary')).toHaveText('Focus: 30 items selected');
   await expect(page.locator('#folder-agent-context')).toBeHidden();await expect(page.locator('#folder-agent-level')).toBeHidden();
   await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-setup-level')).toBeVisible();
-  await page.locator('#folder-agent-setup-level').selectOption('engineering');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  await page.locator('#folder-agent-setup-level').selectOption('engineering');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));
   await expect(page.locator('#folder-agent-detail-summary')).toHaveText('Detail: Engineering');
   await page.locator('#folder-agent-focus-summary').click();
   expect(await page.locator('#folder-agent-context').textContent()).toBe(await page.evaluate(()=>folderAgentContextLines({selection:testSelection,views:testViews,technicalLevel:'engineering'}).join('\n')));

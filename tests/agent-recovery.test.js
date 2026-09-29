@@ -8,9 +8,9 @@ test('recovery cache persists preferences and unsent text independently of conne
   assert.equal(c.folderAgentSourceKey('{"title":"A"}'),c.folderAgentSourceKey('{"title":"A"}'));
   assert.notEqual(c.folderAgentSourceKey('{"title":"A"}'),c.folderAgentSourceKey('{"title":"B"}'));
 });
-test('untrusted cache is bounded plain data with no handles, source copies or executable markup',()=>{
+test('recovery preserves the draft with bounded plain history and no handles or source copies',()=>{
   const c=load(),record=c.folderAgentRecoveryRecord({level:'admin',draft:'x'.repeat(20000),source:'private spec',transcript:Array.from({length:110},()=>({role:'assistant',text:'<script>x()</script>'.repeat(5000),unsafe:'ignored'})),changes:[{id:'p1',status:'applied',source:'private spec',summary:'s'.repeat(3000)}]});
-  assert.equal(record.level,'story');assert.equal(record.draft.length,16000);assert.ok(record.transcript.reduce((n,m)=>n+m.text.length,0)<=180000);assert.ok(record.transcript.length<=100);
+  assert.equal(record.level,'story');assert.equal(record.draft,'x'.repeat(20000));assert.ok(record.transcript.reduce((n,m)=>n+m.text.length,0)<=180000);assert.ok(record.transcript.length<=100);
   assert.equal(record.source,undefined);assert.equal(record.transcript[0].unsafe,undefined);assert.equal(record.changes[0].source,undefined);assert.equal(record.changes[0].summary.length,2000);
   assert.equal(c.folderAgentRecoveryRecord(null),null);
 });

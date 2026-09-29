@@ -337,8 +337,8 @@ def main():
             withdrawn = True
         except (OSError, ValueError):
             pass
-        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Stop accepting this turn in Message agent before retrying.'
-        raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is active, use Stop accepting this turn in Message agent. Do not submit unacknowledged work.')
+        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Stop accepting this turn in Agent before retrying.'
+        raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is active, use Stop accepting this turn in Agent. Do not submit unacknowledged work.')
     active_request(folder, owner, args.request)
     input_name = args.file
     if input_name:

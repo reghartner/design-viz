@@ -157,11 +157,19 @@ working on the canvas or panel handles. Text fields keep their native text undo.
 Temporary geometry history ends when a different project is opened or the page
 reloads; saved editor-window positions still return on reload.
 
-**Message agent** lets you choose nodes and references, add a message, and copy
-the package into your agent’s conversation. Direct Send uses a connected Claude
-Monitor. The recommended workflow keeps conversation in the agent app; the Beta
-Agent window displays messages inside the workbench. Both share the durable
-diagram folder and review spec/ledger proposals through **Preview Agent Updates**.
+Open **Agent** in the left rail and choose **Copy & paste** (the default) or
+**In workbench — Beta**. Both tabs use the same message draft and current canvas
+selection: nodes, edges, steps, panels and other editor targets. Switching tabs
+preserves that draft and selection; it does not connect a folder or start Monitor.
+There is no separate toolbar message composer.
+
+**Copy request** includes the full current JSON and the shared selection/view
+context, and works without a connection. With a diagram folder connected, it also
+registers the request for the preview-and-approval workflow. Paste the copied text
+into the existing agent conversation; Copy never dispatches it through Monitor.
+If clipboard access is denied, select the prepared text and copy manually.
+**Send to Claude** in the Beta tab requires a connected folder and a live listener.
+Both modes review spec/ledger proposals through **Preview Agent Updates**.
 **Commit update** saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).
 

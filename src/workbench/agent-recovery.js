@@ -9,7 +9,8 @@ function folderAgentSourceKey(source){
 function folderAgentRecoveryRecord(value){
   if(!value || typeof value!=='object')return null;
   function short(v,n){return typeof v==='string'?v.slice(0,n):'';}
-  var result={version:1,draft:short(value.draft,16000),level:['story','mixed','engineering'].includes(value.level)?value.level:'story',
+  // Preserve unsent text exactly; only historical previews are shortened.
+  var result={version:1,draft:typeof value.draft==='string'?value.draft:'',level:['story','mixed','engineering'].includes(value.level)?value.level:'story',
     sourceKey:short(value.sourceKey,100),draftSourceKey:short(value.draftSourceKey || value.sourceKey,100),folderName:short(value.folderName,240),title:short(value.title,240),
     at:Number.isFinite(value.at)?value.at:0,sessionId:short(value.sessionId,120),transcript:[],changes:[]};
   var budget=180000;

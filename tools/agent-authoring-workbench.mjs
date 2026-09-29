@@ -3,6 +3,8 @@
  * Keep real Workbench folder-agent clients alive for local authoring trials.
  * Only the native directory picker/handles are replaced. There is no agent
  * transport server, model invocation, or product JavaScript test hook.
+ * On an explicit send, this broker owns a real helper watch for listener
+ * readiness. Models still receive one-shot requests from the evaluation runner.
  *
  * node tools/agent-authoring-workbench.mjs --output /tmp/new-trial --runs 6
  * Write run-01/control.json: {"seq":1,"text":"…","technicalLevel":"story"}.
@@ -14,6 +16,7 @@ import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
 import {createHash, randomUUID} from 'node:crypto';
+import {spawn} from 'node:child_process';
 import {setTimeout as delay} from 'node:timers/promises';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -93,7 +96,7 @@ export async function createSession(page, outDir, options = {}) {
   await writeFile(path.join(outDir, 'initial.spec.json'), source, {flag: 'wx'});
   const html = options.workbenchHtml ?? await readFile(path.join(root, 'workbench/flowspec.html'), 'utf8');
   const errors = options.diagnostics?.errors ?? [], unexpectedRequests = options.diagnostics?.unexpectedRequests ?? [], archiveHashes = new Map();
-  let sessionPath, archiveSequence = 0, lastSequence = 0, lastControlBytes, closed = false;
+  let sessionPath, archiveSequence = 0, lastSequence = 0, lastControlBytes, closed = false, listener, listenerError;
   page.setDefaultTimeout(15000);
   page.on('pageerror', error => errors.push({type: 'pageerror', message: error.message, at: Date.now()}));
   page.on('console', message => { if (message.type() === 'error') errors.push({type: 'console', message: message.text(), at: Date.now()}); });
@@ -206,6 +209,27 @@ export async function createSession(page, outDir, options = {}) {
   const identity = {runId, outDir, projectPath, sessionPath, sessionId: manifest.sessionId, connectionId: manifest.connectionId};
   await writeJson(path.join(outDir, 'session-path.json'), {...identity, status: 'ready', readyAt: Date.now()});
 
+  function startListener() {
+    listenerError = null;
+    const child = listener = spawn('python3', [path.join(sessionPath, 'folder-agent.py'), 'watch', '--minutes', '30'], {cwd: sessionPath, stdio: 'ignore'});
+    child.on('error', error => { if (listener === child) listenerError = error; });
+    child.on('exit', async (code, signal) => {
+      if (closed || listener !== child || code !== 0 || signal) return;
+      // Watches are bounded to 30 minutes; a full evaluation can last 45.
+      // Renew only while this broker still owns the connected editor session.
+      try {
+        const owner = await readJson(path.join(sessionPath, 'session.json'));
+        const editor = await readJson(path.join(sessionPath, 'editor.json'));
+        if (closed || listener !== child) return;
+        if (!editor?.connected || ![owner, editor].every(value => value?.sessionId === identity.sessionId && value.connectionId === identity.connectionId)) {
+          listenerError = new Error('The authoring session ended before its helper watch could renew.');
+          return;
+        }
+        startListener();
+      } catch (error) { if (!closed && listener === child) listenerError = error; }
+    });
+  }
+
   async function capture(status = 'ready') {
     const exactSource = await page.locator('#src').inputValue();
     await atomicWrite(path.join(outDir, 'final.spec.json'), exactSource);
@@ -243,7 +267,17 @@ export async function createSession(page, outDir, options = {}) {
     // Claim before interacting: a timeout after clicking must not duplicate an
     // already-published request on a later poll.
     lastSequence = control.seq;
-    await waitFor(() => page.locator('#folder-agent-send').isEnabled(), 'previous reply', 15000);
+    // The benchmark delivers each request to its model directly. Its own real
+    // helper watch provides readiness without asking a model to run Monitor.
+    if (manifest.workflow !== 'embedded') throw new Error('Authoring controls require the embedded workflow.');
+    if (!listener || listener.exitCode !== null || listener.signalCode !== null) {
+      startListener();
+    }
+    await waitFor(async () => {
+      if (listenerError) throw listenerError;
+      if (listener.exitCode !== null || listener.signalCode !== null) throw new Error('The authoring helper watch stopped before sending.');
+      return page.locator('#folder-agent-send').isEnabled();
+    }, 'listener readiness and previous reply', 15000);
     const previous = await readJson(path.join(sessionPath, 'request.json'));
     const level = page.locator('#folder-agent-level');
     // The editor keeps next-message settings collapsed between sends. Use the
@@ -283,6 +317,11 @@ export async function createSession(page, outDir, options = {}) {
     async function attempt(label, action) {
       try { await action(); } catch (error) { failures.push(label + ': ' + error.message); }
     }
+    await attempt('stop helper watch', async () => {
+      if (!listener || listener.exitCode !== null || listener.signalCode !== null || !listener.pid) return;
+      const stopped = new Promise(resolve => listener.once('close', resolve));
+      listener.kill(); await stopped;
+    });
     if (!page.isClosed()) {
       if (captureFinal) await attempt('capture', () => capture(status));
       await attempt('screenshot', () => page.screenshot({path: path.join(outDir, 'final.png'), fullPage: false}));

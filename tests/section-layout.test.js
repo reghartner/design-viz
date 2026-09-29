@@ -523,3 +523,19 @@ test('Explore overlay scale accepts bounded numeric values and recovers independ
   }
   assert.deepEqual(plain(ctx.sectionExploreLayout(d,{})),{});
 });
+
+test('Explore prose defaults accept independent visibility and bounded geometry without changing page content',()=>{
+  const d=diagram();d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]}}];
+  for(const prose of [{hidden:true},{x:.6,y:.2,w:.3,h:.4,stacked:false,hidden:false}]){
+    const value={prose,overlayScale:.75},warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+    const raw={page:{sections:[{text:['**Explanation**'],bullets:[{text:'Parent',sub:['Child']}],diagram:d}]}},text=JSON.stringify(raw,null,2);
+    const edit=ctx.planSectionExploreLayout(text,raw,0,'eng',value);assert.ok(!edit.error,edit.error);
+    const next=JSON.parse(edit.text);assert.deepEqual(next.page.sections[0].text,raw.page.sections[0].text);assert.deepEqual(next.page.sections[0].bullets,raw.page.sections[0].bullets);
+    const duplicate=ctx.planDuplicateSectionLayout(edit.text,next,0,'eng');assert.deepEqual(JSON.parse(duplicate.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+  }
+  for(const prose of [true,[],{x:.2},{x:0,y:0,w:0,h:.5},{hidden:'yes'},{stacked:1}]){
+    const warnings=[],input={prose,controls:{x:0,y:.8,w:.8,h:.15}},before=JSON.stringify(input);
+    const recovered=ctx.sectionExploreLayout(d,input,warnings);assert.ok(warnings.length);assert.deepEqual(plain(recovered.controls),input.controls);assert.equal(JSON.stringify(input),before);
+    assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'eng',input).error);
+  }
+});

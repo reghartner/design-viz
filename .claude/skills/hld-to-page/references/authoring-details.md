@@ -110,7 +110,15 @@ story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
 `"standard"` or `"explore"` (omitted means Standard). Use a default Standard view
 for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
-resizable, hideable panels at its edges, and pins step controls. The setting
+resizable, hideable panels at its edges, and pins step controls. A section’s
+paragraphs and nested bullets become one **Section notes** window using the same
+controls; only prose floats there, never the diagram or an entire section card.
+Keep content in `section.text`/`bullets`, not fake diagram panels. Optional
+`exploreLayout.prose` saves `x/y/w/h` viewport fractions together, plus `stacked`
+and `hidden` booleans; `{hidden:true}` can stand alone. Notes follow the common
+overlay scale. **Visible elements → Section notes** saves visibility per view;
+the window’s Hide button is temporary. Standard restores the prose and its prior
+collapse state; `section.collapsed` does not hide Explore notes. The setting
 belongs to the named view across every host profile. It does not duplicate
 story state. In the editor, **View type** beside the view buttons
 selects Standard/Explore, and **Make default** chooses which view opens in the

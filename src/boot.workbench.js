@@ -168,6 +168,7 @@ var CONTRACT = [
   '  Path IDs must be unique; each path needs existing, non-repeated step IDs.',
   '- Optional diagram.sectionLayout declares default/backstage/confluence tile arrays.',
   '- Explore view defaults: exploreLayout.panels [{panel,x,y,w,h,stacked?}] and controls {x,y,w,h} use viewport fractions. Panel dimensions and control height are at 100% content size; control width retains its span. overlayScale (0.5–1.25, default 1) scales panels and controls independently of the diagram. camera {zoom,x,y} saves scale (0.15–4) and SVG-relative center. Workbench gestures save defaults with Undo; reader moves stay temporary.',
+  '- Explore section text/bullets share one floating Section notes window; keep the diagram as the full canvas. Optional exploreLayout.prose saves x/y/w/h viewport fractions together plus stacked and hidden booleans; hidden may stand alone. Notes use overlayScale and retain step reveals. Standard restores normal prose collapse. Visible elements saves notes visibility; window Hide stays temporary.',
   '- Optional diagram.layouts: [{id,name,sectionLayout,steps?,presentation?,exploreLayout?}] provides named views.',
   '  presentation is standard (default) or explore, shared by all host profiles.',
   '  Explore uses a full-height graph, independent floating panels and pinned steps.',

@@ -18,7 +18,7 @@ const rect=loc=>loc.boundingBox();
 test('Business remains standard; linked Explore has a full-height canvas and independent vertical stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
- await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(4);
+ await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(5);
  const before=await page.locator('.boardcanvas>svg').count();
  const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board'));
  expect(stage).toEqual({x:0,y:0,width:page.viewportSize().width,height:page.viewportSize().height});expect(board).toEqual(stage);
@@ -28,7 +28,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
  await page.locator('.explore-board').evaluate(el=>{el.scrollLeft=1000;el.scrollTop=900;});
  const after=await rect(play);expect(after.x).toBeCloseTo(pos.x,0);expect(after.y).toBeCloseTo(pos.y,0);
- await play.click();await expect(floats(page)).toHaveCount(3);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeCloseTo(pos.y,0);
+ await play.click();await expect(floats(page)).toHaveCount(4);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeCloseTo(pos.y,0);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
@@ -46,7 +46,7 @@ test('panels resize inward below 210px, detach, cancel, hide and restore indepen
  await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-choices label').filter({hasText:'Home'}).getByRole('checkbox').check();await page.keyboard.press('Escape');
  await expect(home).toBeVisible();expect((await rect(home)).width).toBeCloseTo(narrow.width,0);
  await page.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(floats(page)).toHaveCount(0);
- await page.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(floats(page)).toHaveCount(4);
+ await page.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(floats(page)).toHaveCount(5);
  await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await expect(home).toHaveClass(/explore-stacked/);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Service flow',exact:true}).click();expect((await rect(home)).width).toBeCloseTo(narrow.width,0);
 });

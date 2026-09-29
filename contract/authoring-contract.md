@@ -1138,15 +1138,23 @@ perspectives" of one timeline). Types:
   Optional `layouts[].presentation` is `"standard"` (the default when omitted)
   or `"explore"`. Standard retains the authored arrangement. Explore provides a
   full-height graph with independently draggable, resizable, hideable floating
-  panels and pinned step controls. `layouts[].exploreLayout.overlayScale` optionally
+  panels and pinned step controls. Section paragraphs and nested bullets share
+  one floating **Section notes** window; it contains only prose, while the graph
+  stays the full Explore canvas. `layouts[].exploreLayout.prose` optionally saves
+  its `x/y/w/h` viewport fractions, `stacked` flag and `hidden` flag. Supply all four
+  geometry fields together, or use `{hidden:true}` alone. Content remains in the
+  section’s `text`/`bullets`; do not duplicate it in `diagram.panels`. Standard
+  restores the original prose and its collapse state. Notes use the same move,
+  resize, zoom and temporary visibility controls as panels.
+  `layouts[].exploreLayout.overlayScale` optionally
   sets their content size from 0.5 to 1.25 (default 1), independently of diagram
   zoom. Panel width/height and control height describe the size at 100%; control
   width keeps its chosen horizontal span at every scale. Positions stay in
   viewport coordinates. The **Panels & controls** zoom saves this value
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
-  Arrange section temporarily uses the saved grid; Done arranging restores the
-  chosen presentation. Duplicate view preserves it. Invalid values warn and
+  Arrange section keeps Explore visible and exposes a saved Section notes
+  visibility checkbox. Duplicate view preserves it. Invalid values warn and
   fall back to Standard; legacy single arrangements remain Standard.
   Named views are the complete button set; there is no extra automatic Data flow
   view. All views share step definitions, paths and live widget state. Optional

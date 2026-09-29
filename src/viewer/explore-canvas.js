@@ -22,8 +22,12 @@ function initViewerExploreCanvas(ctl,view){
     active.viewport.setReaderCanvas(true);
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
     if(!seen.has(key)){
-      seen.add(key);cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
-        if(active===rec && !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
+      cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
+        // Boot-time indexing briefly visits other views. Only mark a view after
+        // its frame actually opens, so those cancelled visits cannot skip Fit.
+        if(active!==rec || active.viewport.viewDefinition().id!==definition.id)return;
+        seen.add(key);
+        if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
       });
     }
   }

@@ -185,6 +185,14 @@ in-page expansion uses 1000px. Other content-sized hosts can set the pixel CSS
 variables `--explore-height` and `--explore-expanded-height` on their viewer. The same live
 widgets, selected path and step continue across Standard/Explore switches.
 
+A section’s paragraphs and nested bullets appear together in one **Section notes**
+window. The graph itself remains the full Explore canvas; notes contain only prose,
+never a nested diagram or section card. Formatting, links and step-aware bullet
+reveals stay live. Move, resize, stack, zoom and temporarily hide notes with the
+same controls as panels. Standard restores the original prose in the document,
+including its previous collapsed state. The section’s `collapsed` default affects
+Standard prose only. Empty sections create no notes window.
+
 Use **Panels · N** to choose which available panels to show. Panels hidden by
 the authored view or the current step are identified in that menu. **Hide
 panels** clears the graph; **Restore panels** brings the available panels back.
@@ -213,7 +221,9 @@ section** exposes element visibility, step selection,
 and view settings. **Optimize layout** and **Reset layout** reset Explore
 positions and camera to the automatic stack and sizing, respecting hidden panels.
 Temporary Hide/Restore actions never change saved visibility; use **Visible
-elements** for that. Defaults are shared across host profiles and scale to the
+elements** for that. **Section notes** has its own saved visibility checkbox in
+Explore. Reset and Optimize preserve that visibility while clearing its position
+and size. Defaults are shared across host profiles and scale to the
 available viewport. Duplicating a view preserves its defaults. Returning a view to **Standard** restores its authored arrangement.
 
 Keep Standard as the default for a business presentation and add an Explore
@@ -402,16 +412,27 @@ Invalid optional entries warn and fall back independently.
   "panels": [
     {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true}
   ],
+  "prose": {"x":0.04, "y":0.12, "w":0.3, "h":0.38, "stacked":false},
   "controls": {"x":0.02, "y":0.83, "w":0.68, "h":0.14},
   "camera": {"zoom":1.2, "x":0.5, "y":0.45}
 }
 ```
 
+`exploreLayout.prose` configures the single notes window for that section.
+Optional `hidden:true` saves visibility for this named view across host profiles;
+it can be used alone. If supplying geometry, include all four `x/y/w/h` viewport
+fractions, with positive width and height. Width and height are at 100% content
+scale. Optional `stacked:true` docks it at the edge. Omitting the object uses the
+automatic stack. It does not create prose or copy it into `diagram.panels`: content
+continues to live in the section’s `text` and `bullets`. A prose-only section
+without a diagram remains normal page content.
+
 Readers can move these windows and change framing for their own session without
 rewriting the spec. Only the workbench connects the renderer's authoring callback
 to source edits. The `layout.explore-defaults` capability identifies specs that
 need a viewer supporting saved defaults. `layout.explore-scale` identifies saved
-overlay scaling. Workbench scale changes save to the selected Explore view with
+overlay scaling. `layout.explore-prose` identifies sections with prose and an
+Explore view, or any saved notes defaults. Workbench scale changes save to the selected Explore view with
 one Undo action per click; reader scale changes last only for that viewing session.
 
 Each uses the same host-profile and tile contract as `sectionLayout` above.

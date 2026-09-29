@@ -23,6 +23,16 @@ skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 
+**Work with an agent** walks through the Recommended copy/paste and Beta Monitor
+choices, opening or creating a diagram folder, pasting setup, choosing message
+context, previewing the proposed diagram and ledger, and preparing the accepted
+pair for a Git commit. It explains conflict feedback and ledger reconciliation
+after a merge. The standalone brief and older automatically applied local-session
+route have separate disclosures so their instructions do not interrupt this flow.
+**How this works · Agent walkthrough** on the workflow choices and folder setup
+opens this chapter directly. Closing it returns focus to the originating control,
+including when the folder setup dialog is still open underneath.
+
 Choose a chapter to jump within the guide. **Close** or Escape returns to your
 previous work. Reading does not change the spec, selection, undo history, or
 welcome navigation. Browser Find and normal text copying remain available.
@@ -35,6 +45,9 @@ controller is `src/human-guide.workbench.js`. Edit the source and run
 Keep the human-facing steps and control names aligned with the real UI when
 changing authoring behavior. This guide complements the agent authoring skill
 and the detailed feature docs; it should not become a schema reference.
+An opener with `data-open-human-guide="hg-agent"` targets that chapter; an empty
+attribute opens the guide at its existing reading position. Keep agent authoring
+instructions here; the [reader tour](tour.md) runs only on read-only diagrams.
 
 The [canon library guide](workbench-canon-library.md) explains how a company
 ships its reviewed diagrams beside the editor.

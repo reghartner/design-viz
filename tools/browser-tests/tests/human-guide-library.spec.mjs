@@ -51,6 +51,50 @@ test('guide and bundled canon example also work from a downloaded file',async({p
   await expect(page.locator('#workbench-workspace')).not.toBeVisible();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 });
 
+for(const offline of [false,true])test('agent walkthrough opens at its chapter and preserves the workflow'+(offline?' offline':''),async({page,server},info)=>{
+  await page.setViewportSize({width:offline?760:1440,height:1000});
+  await page.goto(offline?pathToFileURL(server.root+'/workbench.html').href:server.origin+'/workbench.html');
+  await paste(page,source);await page.locator('#docview [data-dv-node="a"]').click();
+  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  await title.fill('Walkthrough draft');await title.press('Enter');
+  const edited=await page.locator('#src').inputValue();
+  await page.locator('#workbench-home').click();await page.locator('#welcome-agent').click();
+  const before=await page.evaluate(()=>({url:location.href,length:history.length,draft:localStorage.getItem('dv-workbench-draft')}));
+  const entry=page.locator('#welcome-build-screen [data-open-human-guide]');
+  await entry.click();
+  await expect(page.locator('#hg-agent')).toBeFocused();
+  await expect(guide(page).getByRole('heading',{name:'Your agent talks. The workbench shows the result.'})).toBeInViewport();
+  await expect(guide(page).getByRole('link',{name:'12 · Work with an agent'})).toHaveAttribute('aria-current','location');
+  await info.attach('agent-walkthrough'+(offline?'-narrow':''),{body:await guide(page).screenshot(),contentType:'image/png'});
+  // All three alternate-route disclosures must remain keyboard reachable.
+  const disclosures=page.locator('#hg-agent summary');
+  await page.keyboard.press('Tab');await expect(disclosures.nth(0)).toBeFocused();
+  await page.keyboard.press('Enter');await expect(disclosures.nth(0).locator('..')).toHaveAttribute('open','');
+  await page.keyboard.press('Tab');await expect(disclosures.nth(1)).toBeFocused();
+  await page.keyboard.press('Tab');await expect(disclosures.nth(2)).toBeFocused();
+  await page.keyboard.press('Tab');await expect(page.locator('#human-guide-close')).toBeFocused();
+  await page.keyboard.press('Shift+Tab');await expect(disclosures.nth(2)).toBeFocused();
+  await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();await expect(entry).toBeFocused();
+  expect(await page.evaluate(()=>({url:location.href,length:history.length,draft:localStorage.getItem('dv-workbench-draft')}))).toEqual(before);
+  // Opening help from an existing modal must not dismiss or reset that modal.
+  await page.locator('#welcome-build-external').click();
+  const setup=page.locator('#folder-agent-guide'),help=setup.locator('[data-open-human-guide]');
+  await page.locator('#folder-agent-filename').fill('existing.spec.json');
+  await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
+  await guide(page).getByRole('link',{name:'05 · Alternate outcomes'}).click();
+  for(const key of ['Delete','ControlOrMeta+z'])await page.keyboard.press(key);
+  await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();
+  await expect(setup).toBeVisible();await expect(help).toBeFocused();
+  await expect(page.locator('#folder-agent-filename')).toHaveValue('existing.spec.json');
+  await expect(page.locator('#folder-agent-workflow')).toHaveValue('external');
+  await expect(page.locator('#src')).toHaveValue(edited);
+  // Contextual reopening resets only the guide chapter, not the folder form.
+  await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
+  await page.locator('#human-guide-close').click();await expect(help).toBeFocused();
+  await page.locator('#folder-agent-close-guide').click();await page.locator('#undo-builder').click();
+  await expect(page.locator('#src')).toHaveValue(source);
+});
+
 test('canon browsing is read-only and editing opens a separate project while preserving the earlier draft',async({page,server},info)=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await paste(page,source);

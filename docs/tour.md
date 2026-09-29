@@ -14,6 +14,12 @@ control or state is missing, preserving authored numbering. It does not append
 lessons or search other sections for a page-authored target. The tour runs in
 the standalone viewer and Canon reader; it does not run in the editing workspace.
 
+For agent authoring, the Workbench's **How this works · Agent walkthrough**
+opens the **Work with an agent** chapter of the [User guide](workbench-user-guide.md).
+It covers workflow choice, diagram folders, selected message context and explicit
+review of spec/ledger updates. These editor actions do not belong in `page.tour`
+or the built-in reader lessons, whose targets must exist in the read-only viewer.
+
 Opening **Canon diagrams → View diagram** on the launch page offers the tour
 on the first visit. Published `?diagram=<id>` links and the offline bundled
 example behave the same way. Skip or finish once to dismiss automatic offers;

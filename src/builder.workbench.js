@@ -1140,7 +1140,7 @@ function initWorkbenchBuilder(opts){
   }
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
-    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Prepare review packages a handoff. Neither publishes to your company.';}
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,
@@ -1259,7 +1259,6 @@ function initWorkbenchBuilder(opts){
       return agentOptions.apply(JSON.stringify(raw,null,2),snapshot);
     }}):null;
   if(storyBrief){life.own(storyBrief.destroy);life.listen(document,'workbench-tool-visibility',function(event){if(event.detail.name==='brief' && event.detail.open)storyBrief.refresh();});}
-  life.listen(document.getElementById('workspace-prepare-review'),'click',function(){if(opts.workspace)opts.workspace.showTool('brief');if(storyBrief)storyBrief.refresh();});
   refreshProvenance();
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});

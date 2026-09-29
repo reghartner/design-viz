@@ -13,7 +13,7 @@ async function mount(page,{stored,denied=false}={}){
   if(stored)await page.evaluate(value=>localStorage.setItem('dv-folder-agent-recovery-v1',JSON.stringify(value)),stored);
   await page.evaluate(skeleton=>{
     const parsed=new DOMParser().parseFromString(skeleton,'text/html');
-    for(const id of ['editor-agent','folder-agent-guide','folder-agent-indicator','folder-agent-selection','agent-update-banner','agent-update-dialog'])document.body.appendChild(parsed.getElementById(id));
+    for(const id of ['editor-agent','folder-agent-guide','editor-tab-agent','folder-agent-selection','agent-update-banner','agent-update-dialog'])document.body.appendChild(parsed.getElementById(id));
     const panel=document.createElement('section');panel.className='workspace-window';panel.id='test-window';panel.style.cssText='left:20px;top:60px;width:min(420px,calc(100vw - 40px));height:calc(100dvh - 80px)';
     panel.appendChild(document.getElementById('editor-agent'));document.body.appendChild(panel);document.getElementById('editor-agent').hidden=false;
     const kit=document.createElement('script');kit.id='flowview-folder-kit';kit.type='application/json';kit.textContent=JSON.stringify({watcher:'# harmless test fixture',gzip:'',sha256:''});document.body.appendChild(kit);

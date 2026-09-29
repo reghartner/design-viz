@@ -163,10 +163,10 @@ test('one Build click guides visible copying and folder recovery, then the liste
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
     await expect(page.locator('#folder-agent-guide')).not.toBeVisible();
     await expect(page.locator('#folder-agent-input')).toBeFocused();
-    await expect(page.locator('#folder-agent-indicator-text')).toHaveText('Claude ready');
+    await expect(page.locator('#editor-tab-agent')).toHaveAttribute('aria-label','Agent · Claude ready');
     await page.getByRole('button',{name:'Close Agent · Claude panel',exact:true}).click();
-    await page.locator('#folder-agent-indicator').click();
-    await expect(page.locator('#folder-agent-input')).toBeFocused();
+    await page.locator('#editor-tab-agent').click();
+    await expect(page.locator('#folder-agent-input')).toBeVisible();
     await expect(page.locator('#folder-agent-guide')).not.toBeVisible();
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(2);
     await disconnect(page);expect(h.errors).toEqual([]);
@@ -398,8 +398,8 @@ test('agent context names the selection before pairing and freezes it beside the
     await page.locator('.folder-agent-sent-context summary').click();await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('[data-dv-node="b"]').first().click();
     h.run('progress','--request',request.id,'--text','Reading the selected doorbell.');
-    await expect(page.locator('#folder-agent-indicator')).toContainText('Claude working');
-    await page.locator('#folder-agent-indicator').click();
+    await expect(page.locator('#editor-tab-agent')).toHaveAttribute('aria-label','Agent · Claude working');
+    await page.locator('#editor-tab-agent').click();
     await expect(page.locator('#folder-agent-context')).toContainText('Backend');
     await expect(page.locator('.folder-agent-sent-context')).toContainText('Doorbell');
     expect((await h.read('request.json')).selection[0].label).toBe('Doorbell');

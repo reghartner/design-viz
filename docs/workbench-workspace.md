@@ -186,3 +186,16 @@ Published standalone pages open an Explore view across the full browser or ifram
 with floating data panels, playback and view choices. Switching to a curated
 standard/Home view restores its authored page layout. **Back to page** reveals
 the surrounding document. Browser fullscreen remains a separate explicit action.
+
+## Setup and review tools
+
+**File → Workspace preferences → Arrange editor for** chooses a starting set of
+editor windows: Story with an agent, Engineering review, or Canvas only. It does
+not change the diagram’s authored views or source. The left **Agent** tool owns
+connection controls; its status dot and tooltip show the current connection or
+activity state without another button in the header.
+
+**Brief → Download review package** downloads a ZIP containing the current JSON,
+viewer HTML, story notes, and evidence references. It does not publish or submit
+anything. The header’s **Download JSON** keeps a source file, while File reports
+whether browser recovery was saved.

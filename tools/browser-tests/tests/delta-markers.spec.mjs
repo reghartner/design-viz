@@ -10,6 +10,7 @@ async function standalone(page, server){
   const spec = structuredClone(raw);
   diagram(spec).nodes.device.deltaLinks = [{label:'Design decision',url:server.origin+'/decision.html'}];
   diagram(spec).nodes.cloud.deltaText = '<img src=x onerror=alert(1)>\nPlain text only.';
+  diagram(spec).steps[2].delta = true;
   await writeFile(path.join(server.root,'decision.html'), '<p>Decision destination</p>');
   await writeFile(path.join(server.root,'deltas.json'), JSON.stringify(spec));
   execFileSync('python3', [path.join(repo,'tools/inject.py'),path.join(server.root,'deltas.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'deltas.html')]);
@@ -21,6 +22,9 @@ test('delta details support notes, multiple links, keyboard and independent step
   const root = page.locator('.docview'), marker = root.locator('[data-dv-node="device"] .dvdelta');
   const pop = root.getByRole('dialog',{name:'Change details for Doorbell'});
   await expect(root.locator('[data-dv-node="app"] .dvdelta')).not.toHaveAttribute('tabindex');
+  const passiveStep = root.locator('.delta-chip-wrap:has([data-step-source="2"])');
+  await expect(passiveStep.getByRole('img',{name:'Changed · ready'})).not.toHaveAttribute('tabindex');
+  await expect(passiveStep.getByRole('button')).toHaveCount(1);
   for (const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
     await page.evaluate(skin => window.dvSetSkin(skin), skin);
     await marker.click(); await expect(pop).toBeVisible();
@@ -53,6 +57,12 @@ test('delta details support notes, multiple links, keyboard and independent step
   await marker.click(); await expect(pop).toBeVisible();
   const box = await pop.boundingBox(); expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x+box.width).toBeLessThanOrEqual(420);
   await page.screenshot({path:testInfo.outputPath('delta-narrow.png')});
+  await page.keyboard.press('Escape');
+  // The decorative SVG overlaps this corner but must not swallow navigation.
+  const passiveChip = passiveStep.locator('.schip'), chipBox = await passiveChip.boundingBox();
+  await passiveChip.click({position:{x:chipBox.width-4,y:4}});
+  await expect(current).toHaveAttribute('data-step-source','2');
+  await expect(root.locator('.delta-popover:visible')).toHaveCount(0);
 });
 
 test('inspector authors delta notes and links with exact Undo/Redo and rejects unsafe URLs', async({page,server}) => {

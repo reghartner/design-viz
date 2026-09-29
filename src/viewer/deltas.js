@@ -5,7 +5,6 @@ function appendDeltaMarker(parent, value, label, x, y){
   badge.setAttribute('class', 'dvdelta' + (details.interactive ? ' dvdelta-action' : ''));
   badge.setAttribute('transform', 'translate(' + x + ' ' + y + ')');
   badge.innerHTML = '<rect class="dvdelta-hit" x="-12" y="-12" width="24" height="24" rx="12"/>' +
-    '<path class="dvdelta-disc" d="M-9 0a9 9 0 1 0 18 0a9 9 0 1 0-18 0"/>' +
     '<path class="dvdelta-mark" d="M0 -5.5 L5.5 4 L-5.5 4 Z"/>';
   var title = document.createElementNS(SVGNS, 'title');
   title.textContent = details.interactive ? 'View change details · ' + label : 'Changed · ' + label;
@@ -25,13 +24,11 @@ function appendDeltaMarker(parent, value, label, x, y){
 function decorateDeltaChips(host, source){
   host.querySelectorAll('.schip.dvd').forEach(function(chip){
     var value = source.steps[Number(chip.getAttribute('data-step-source'))];
-    if (!deltaDetails(value).interactive) return;
-    // A sibling control keeps navigation and change details separate, including
-    // edgeless steps. It never nests a button inside the step's button.
+    // Every marked step uses the shared glyph. A sibling keeps navigation and
+    // optional details separate, including edgeless steps, without nested buttons.
     var wrap = document.createElement('span'); wrap.className = 'delta-chip-wrap';
     wrap.style.gridColumn = chip.style.gridColumn; wrap.style.gridRow = chip.style.gridRow;
     chip.parentNode.insertBefore(wrap, chip); wrap.appendChild(chip);
-    chip.classList.add('delta-has-details');
     var icon = document.createElementNS(SVGNS, 'svg');
     icon.setAttribute('class', 'delta-chip-icon'); icon.setAttribute('viewBox', '-12 -12 24 24');
     wrap.appendChild(icon);

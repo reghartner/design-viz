@@ -175,18 +175,20 @@ test('dynamic object fields preserve empty text, unknown siblings, and explicit 
 });
 
 test('registered collection composers reuse shared assignment and sparse history',()=>{
-  const e=environment(),shape={cols:[{k:'name',req:true},{k:'status',kind:'enum',options:['ready','hold']}]};
+  const e=environment(),shape={cols:[{k:'name',req:true},{k:'status',kind:'enum',options:['ready','hold']}]};let seen;
   e.C.PanelRegistry.define('collection-fixture',{authoring:{template:{title:'Collection'},initialFields:true,
     setupFields:[['initial','json']],patchFields:[['entries','jsonArr']],fieldMeta:{entries:{label:'Entries'}},
     editor(context){return {patchControl(field,options){
       if(field[0]!=='entries')return null;
+      seen=options;
       const existing=Array.isArray(options.value)?options.value:[];
       return context.controls.rows(field[0],options.value,shape,{raw:false,commitValue:options.commit,
         collect(items){return {value:items.map((item,index)=>Object.assign({},existing[index] || {},item))};}});
     }};}}});
-  const spec={nodes:{},rows:[[]],panels:[{id:'collection',type:'collection-fixture',initial:{entries:[{name:'one',status:'ready',future:true}],futureTop:9}}],steps:[]};
+  const spec={nodes:{},rows:[[]],panels:[{id:'collection',type:'collection-fixture',columns:[{id:'status'}],initial:{entries:[{name:'one',status:'ready',future:true}],futureTop:9}}],steps:[{panels:{collection:{}}}]};
   const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
   assert.equal(aria(h.guide,'Entries assignment').value,'set');
+  assert.equal(JSON.stringify(seen.panel.columns),JSON.stringify([{id:'status'}]));assert.equal(seen.effective,null);
   const initial=h.guide.querySelector('.initialedit');
   assert.equal(initial.querySelectorAll('.rawjson').length,1,'custom rows do not duplicate raw JSON');
   assert.equal(initial.querySelector('.rawjson').querySelector('summary').textContent,'Advanced JSON');
@@ -194,6 +196,9 @@ test('registered collection composers reuse shared assignment and sparse history
   status.value='hold';status.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{entries:[{name:'one',status:'hold',future:true}],futureTop:9});
   h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(JSON.parse(h.text).panels[0].initial.entries[0].status,'hold');
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  assert.equal(JSON.stringify(seen.effective.value),JSON.stringify([{name:'one',status:'hold',future:true}]));
+  assert.equal(seen.effective.origin.label,'Initial state');
 });
 
 test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{

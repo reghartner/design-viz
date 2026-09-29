@@ -1142,7 +1142,8 @@ function panelPatchControl(pid, patch, decl, target, options){
            needed to author an empty string, remove a value, or choose null. */
         setValueDisabled(valueControl,current==='null',settings.rememberDisabled);return control;
       }
-      var customControl=editor.patchControl && editor.patchControl(f,{initial:initial,value:cur,assigned:has,
+      var customControl=editor.patchControl && editor.patchControl(f,{initial:initial,panel:decl,value:cur,assigned:has,
+        effective:effectiveFields[key] || null,
         commit:function(value){return commitPatch(key,value,false,null,storage);}});
       if(customControl){
         var customWrap=document.createElement('div');customWrap.className='panel-state-assignment panel-state-object';

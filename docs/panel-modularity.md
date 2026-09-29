@@ -223,7 +223,11 @@ Collections can keep their schema and transformation in the panel module with
 `editor.patchControl(field, options)`. Return a DOM control for the matching
 field and call `options.commit(value)` with the authored value (or `undefined`
 to omit it); the shared inspector still supplies assignment modes, sparse merge,
-effective-value help, history and refresh. The editor context's rows control
+effective-value help, history and refresh. `options.panel` is the declaration
+even when a step is selected. `options.effective` is the complete folded field
+record (`value` and `origin`) when one is available, so snapshot composers can
+show their inherited baseline without treating its nested keys as independent
+assignments. The editor context's rows control
 accepts `{commitValue, collect, raw:false}` for typed collection rows.
 `collect(items)` may return `{value}` or `{error}` when the UI row shape differs
 from the stored value. Unmatched fields return nothing and use the standard

@@ -124,3 +124,15 @@ Missing manifests are normal. Invalid entries are counted, while valid entries
 remain available; malformed manifests and failed requests show a message without
 hiding the embedded examples. Team specs are validated when selected. Loading a
 manifest requires an HTTP(S) host; downloaded `file:` pages use the embedded set.
+
+## Start fresh with an agent
+
+**Build with Claude** shows **Start a new diagram** and **Continue** (with the
+current or saved title), or **Open an existing diagram** when there is no draft.
+The setup dialog also has **Start new diagram**. New projects keep the previous
+draft in **Earlier drafts**, disconnect the old folder, and require a fresh folder
+without existing diagram artifacts or connection metadata.
+
+The recommended **Work in your agent** setup uses copy/paste and explicitly tells
+the agent not to start Monitor or a background watcher. Only the separately labeled
+Beta conversation includes Monitor startup and renewal commands.

@@ -79,5 +79,5 @@ async function openFolderAgentProject(directory, filename){
       }});
     return {files:result,source:source,ledger:notes || '',hasLedger:notes!==null,legacy:legacy};
   }
-  return {source:recovery?null:source,recovering:!!recovery,ledger:notes || '',spec:spec,initialize:initialize};
+  return {existing:!!metadata || source!==null || notes!==null,source:recovery?null:source,recovering:!!recovery,ledger:notes || '',spec:spec,initialize:initialize};
 }

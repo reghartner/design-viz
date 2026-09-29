@@ -1198,6 +1198,7 @@ function initWorkbenchBuilder(opts){
   agentOptions.show=function(){if(opts.workspace)opts.workspace.showTool('agent');};
   agentOptions.hide=function(){if(opts.workspace && opts.workspace.isOpen('agent'))opts.workspace.hideTool('agent');};
   agentOptions.message=function(){if(agentMessage)agentMessage.open();};
+  agentOptions.newProject=function(mode){document.dispatchEvent(new CustomEvent('dv:agentnew',{detail:{workflow:mode}}));};
   var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   var handoffRequests=new Set();life.own(function(){handoffRequests.forEach(function(request){request.abort();});});
   async function handoffHtml(source){
@@ -1256,7 +1257,7 @@ function initWorkbenchBuilder(opts){
   function destroy(){life.destroy();}
   return {
     loadSpec:function(raw,origin){var ok=life.alive() && loadText(JSON.stringify(raw,null,2));if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
-    startAgent:function(mode){if(agentChat)agentChat.openSetup(mode || 'external');},
+    startAgent:function(mode,options){if(agentChat)agentChat.openSetup(mode || 'external',options);},
     preserveDraft:life.guard(session.preserveDraft),
     earlierDrafts:session.earlierDrafts,
     restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),

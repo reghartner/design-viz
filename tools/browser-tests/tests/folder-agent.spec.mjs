@@ -485,7 +485,7 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();
     await page.screenshot({path:info.outputPath('build-workflows.png')});
     await page.locator('#welcome-build-external').click();await expect(page.locator('#editor-agent')).not.toBeVisible();
-    await expect(page.locator('.folder-agent-prerequisites')).toContainText('Copy/paste works without Monitor.');
+    await expect(page.locator('.folder-agent-prerequisites')).toContainText('Copy/paste does not start Monitor or a background watcher.');
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     expect((await h.read('session.json')).workflow).toBe('external');
     await page.locator('#folder-agent-copy').click();
@@ -675,6 +675,55 @@ test('transient failures at each paired commit stage recover once and preserve p
       expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(nextSource);
       previousSource=nextSource;previousLedger=nextLedger;
     }
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+
+test('Start new clears a connected story, preserves it, and refuses to reopen its old folder',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();
+    await expect(page.locator('#welcome-build-continue-title')).toContainText('Browser contract');
+    await page.locator('#welcome-build-external').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    const oldSession=h.session,oldSpec=await readFile(path.join(h.folder,'story.spec.json'),'utf8');
+    // The escape hatch is also reachable after setup has entered an old session.
+    await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-start-description')).toContainText('Start fresh');
+    await expect(page.locator('#folder-agent-copy')).toBeDisabled();await expect(page.locator('#folder-agent-instructions')).toHaveValue('');
+    expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes).toEqual({});
+    expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(d=>d.text))).toContain(source);
+    await expect.poll(async()=>JSON.parse(await readFile(path.join(oldSession,'editor.json'),'utf8')).connected).toBe(false);
+    const writes=h.writes.length;await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-status')).toContainText('Choose a new, empty diagram folder');expect(h.writes).toHaveLength(writes);
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(oldSpec);
+    await mkdir(path.join(h.folder,'fresh'));await page.evaluate(()=>window.pickPath='/fresh');await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    const prompt=await page.locator('#folder-agent-instructions').inputValue();
+    expect(prompt).toContain('Do not start Monitor');expect(prompt).not.toMatch(/watch --minutes|Renew Monitor|preflight --monitor/);
+    expect(JSON.parse(await readFile(path.join(h.folder,'fresh/story.spec.json'),'utf8')).page.blocks[0].diagram.nodes).toEqual({});
+    await page.screenshot({path:info.outputPath('fresh-agent-setup.png')});expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('home explicitly starts new from a saved draft and Continue still restores the chosen draft',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.evaluate(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:Date.now()})),source);
+    await page.reload();await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-continue-title')).toContainText('Browser contract');
+    await page.screenshot({path:info.outputPath('agent-starting-point.png')});
+    await page.locator('#welcome-build-new').check();await page.locator('#welcome-build-external').click();
+    await expect(page.locator('#folder-agent-start-description')).toContainText('Start fresh');
+    expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes).toEqual({});
+    expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(d=>d.text))).toContain(source);
+    // Cancelling New and explicitly choosing Continue also clears the new-folder
+    // restriction when the current draft itself has not changed.
+    await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#welcome-build-continue').check();await page.locator('#welcome-build-external').click();
+    await expect(page.locator('#folder-agent-start-description')).not.toContainText('Start fresh');
+    await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
+    await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).click();
+    await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#welcome-build-continue').check();await page.locator('#welcome-build-external').click();
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#folder-agent-start-description')).not.toContainText('Start fresh');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

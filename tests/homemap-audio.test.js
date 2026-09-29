@@ -128,7 +128,7 @@ function editorHarness(){
     controls:{row:(label,ctl)=>{const row=element();row.label=label;row.appendChild(ctl);return row;},
       action:(label,run)=>{const e=element('button');e.textContent=label;e.run=run;return e;},
       number:(v,save)=>input('input',v,save),text:(v,save)=>input('input',v,save),
-      select:(options,v,save,allowEmpty)=>{const e=input('select',v,save);e.options=(allowEmpty?['']:[]).concat(options).map(value=>({value,textContent:value}));return e;},
+      select:(options,v,save,allowEmpty)=>{const e=input('select',v,save);e.options=(allowEmpty?['']:[]).concat(options).map(value=>Object.assign(element('option'),{value,textContent:value}));return e;},
       iconPicker:input=>input},
     editingBlocked:()=>false,error:message=>lastError=message,inspect(){},listen:(e,k,fn)=>e.events[k]=fn,
     transact(fn){const plan=fn(raw);if(plan.error){lastError=plan.error;return false;}source=plan.text;raw=JSON.parse(source);return true;},

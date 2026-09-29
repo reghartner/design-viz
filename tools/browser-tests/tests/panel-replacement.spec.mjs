@@ -29,7 +29,7 @@ test('panel replacement requires review, seeds setup, clears every path override
  expect(d.steps[0].panels).toEqual({keep:{value:9}});expect(d.steps[1].patch).toEqual({});expect(d.paths).toEqual(raw.page.sections[0].diagram.paths);
  expect(d.steps.map(s=>s.panelVisibility)).toEqual([{work:true},{work:false}]);await expect(panel(page)).toHaveClass(/dv-sel/);
  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await page.locator('#redo-builder').click();await expect(src).toHaveValue(replaced);
- await page.locator('#add-panel').click();await expect(page.locator('#panel-picker-title')).toHaveText('Give your story another dimension.');
+ await page.locator('#diagram-add').click();await page.locator('#add-panel').click();await expect(page.locator('#panel-picker-title')).toHaveText('Give your story another dimension.');
  await expect(page.locator('#panel-picker-review')).toBeHidden();await expect(page.locator('#panel-picker-add')).toHaveText('Add panel');
  await page.locator('#panel-picker-cancel').click();await expect(src).toHaveValue(replaced);
 });

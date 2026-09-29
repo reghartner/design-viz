@@ -381,13 +381,16 @@ and fall back to Standard without dropping the view. Legacy single arrangements
 always use Standard. Explore uses the same story, widgets and saved visibility;
 its reader panel movement and sizing do not alter tile coordinates.
 Optional `layouts[].exploreLayout` saves floating defaults separately from the
-grid. Positions and dimensions use fractions of the Explore viewport; widths and
-heights describe each window at 100% content scale. Optional `overlayScale`
+grid. Positions and dimensions use fractions of the Explore viewport. Panel
+width/height and control height describe their size at 100% content scale;
+control width is its horizontal span and does not change with content scale.
+Optional `overlayScale`
 (0.5–1.25, default 1) scales all floating panels and step controls together,
 independently of diagram zoom. The **Panels & controls** minus/plus buttons
 change this scale; clicking its percentage resets it to 100%. Panel headers and
-drag/resize targets remain usable. Right-docked panels stay at the edge; automatic
-step controls keep the available width and shrink vertically. Camera
+drag/resize targets remain usable. Right-docked panels stay at the edge. Step
+controls shrink vertically while keeping their width: automatic bars fill the
+available space; manually sized bars retain their chosen span. Camera
 `x`/`y` describe its center as fractions of the SVG viewBox width/height, and
 `zoom` is the rendered scale (0.15–4). Omitted entries use automatic placement.
 The renderer clamps windows to the available viewport and practical minimum sizes.

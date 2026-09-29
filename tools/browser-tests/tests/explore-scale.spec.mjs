@@ -7,7 +7,10 @@ const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts
 function fixture(scale){
   const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;
   sec.id='doorbell';d.autoplay=false;d.defaultLayout='service-flow';
-  if(scale!==undefined)d.layouts[1].exploreLayout.overlayScale=scale;
+  if(scale!==undefined){
+    d.layouts[1].exploreLayout.overlayScale=scale;
+    d.layouts[1].exploreLayout.controls={x:.06,y:.76,w:.6,h:.14};
+  }
   d.steps[1].panelVisibility={clip:false};d.steps[2].panelVisibility={clip:true};
   return spec;
 }
@@ -44,10 +47,11 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(.75),null,2));
   const source=()=>page.locator('#src').inputValue(),readout=page.locator('#workspace-overlay-size');
   await expect(readout).toBeVisible();await expect(readout).toHaveText('75%');await page.evaluate(()=>document.fonts.ready);
-  const before=await source(),width=(await size(panel(page))).w,graphBefore=await graph(page).boundingBox();
+  const before=await source(),width=(await size(panel(page))).w,graphBefore=await graph(page).boundingBox(),savedControls=await size(player(page));
   await page.locator('#workspace-overlay-out').click();await expect(readout).toHaveText('65%');
   const scaled=await source();expect(JSON.parse(scaled).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(.65);
   expect((await size(panel(page))).w).toBeCloseTo(width*.65/.75,0);expect(await graph(page).boundingBox()).toEqual(graphBefore);
+  expect((await size(player(page))).w).toBeCloseTo(savedControls.w,0);expect((await size(player(page))).h).toBeCloseTo(savedControls.h*.65/.75,0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(readout).toHaveText('75%');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(scaled);await expect(readout).toHaveText('65%');
   await panel(page).locator('.explore-window-grip').press('ArrowLeft');
@@ -62,6 +66,8 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   expect((await panel(page).boundingBox()).x).toBeCloseTo(dragStart.x-100,0);expect((await panel(page).boundingBox()).y).toBeCloseTo(dragStart.y+30,0);
   expect((await size(panel(page))).w).toBeCloseTo(dragStart.width,0);await expect(readout).toHaveText('65%');
   const pr=await player(page).boundingBox();await player(page).locator('.explore-player-grip').press('ArrowUp');expect((await player(page).boundingBox()).y).toBeCloseTo(pr.y-8,0);expect((await size(player(page))).h).toBeCloseTo(pr.height,0);
+  await player(page).locator('.explore-window-resize').press('ArrowRight');await player(page).locator('.explore-window-resize').press('ArrowDown');
+  expect((await size(player(page))).w).toBeCloseTo(pr.width+8,0);expect((await size(player(page))).h).toBeCloseTo(pr.height+8,0);
   const saved=await source(),raw=JSON.parse(saved),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
   expect(layout.overlayScale).toBe(.65);expect(layout.camera).toEqual(fixture(.75).page.sections[0].diagram.layouts[1].exploreLayout.camera);
   await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(readout).toBeHidden();
@@ -70,5 +76,6 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   await expect(page.locator('.explore-overlay-value')).toHaveText('65%');
   const exported=await panel(page).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
   expect(exported.width/stage.width).toBeCloseTo(layout.panels[0].w*.65,3);
+  const exportedControls=await size(player(page));expect(exportedControls.w/stage.width).toBeCloseTo(layout.controls.w,3);expect(exportedControls.h/stage.height).toBeCloseTo(layout.controls.h*.65,3);
   await expect(page.locator('[data-explore-panel=home]')).toBeHidden();
 });

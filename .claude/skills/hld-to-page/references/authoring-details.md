@@ -127,8 +127,9 @@ and fitting remain temporary. Use **Back to page** to author the opening camera
 through pans and zoom changes in the contained Explore view. Windows use viewport fractions; `camera` uses
 `zoom` plus center `x`/`y` as fractions of the SVG viewBox. Duplicate view keeps
 these defaults. **Panels & controls** has a separate zoom for the floating content.
-Use `exploreLayout.overlayScale` from 0.5 to 1.25 (default 1); saved window sizes
-are the 100% dimensions. This scales panel bodies and step typography together
+Use `exploreLayout.overlayScale` from 0.5 to 1.25 (default 1); panel width/height
+and control height are 100% dimensions. Control width retains its chosen span
+at every scale. This scales panel bodies and step typography together
 without changing the diagram camera. Workbench adjustments save with Undo;
 click the percentage to reset to 100%. Reader overrides and temporary Hide panels remain session-only.
 See `docs/section-layouts.md` for the contract and an example.

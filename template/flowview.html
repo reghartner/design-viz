@@ -26365,8 +26365,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     return w===playerWindow?300:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
   }
   function overlayScale(){return memory && memory.layout.overlayScale || 1;}
-  // Saved rectangles describe the size at 100%. Positions stay in viewport
-  // coordinates; scaling never changes the diagram camera or stored rectangles.
+  // Panel dimensions and control height describe the size at 100%. Controls
+  // retain their chosen horizontal span so smaller text exposes more steps.
+  // Positions stay in viewport coordinates; the diagram camera is independent.
   function scaledRect(w,r,inverse){
     var scale=overlayScale(),s=inverse?1/scale:scale,controls=w===playerWindow;
     return {x:r.x,y:r.y,w:controls?r.w:r.w*s,h:controls?r.h*s:32+(r.h-32)*s};

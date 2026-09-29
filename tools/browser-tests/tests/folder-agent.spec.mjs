@@ -580,7 +580,7 @@ test('Agent tabs reuse current node, step and panel selection and preserve one d
     await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
     await page.locator('#folder-agent-mode-external').click();await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');
     await page.locator('#folder-agent-send').click();
-    let copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('capture.js');expect(copied).toMatch(/"kind":\s*"node"/);expect(copied.endsWith(input)).toBe(true);
+    let copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('capture.js');expect(copied).toMatch(/"kind":\s*"node"/);expect(copied).not.toContain(input);expect(copied).not.toContain('"rows"');
     await page.locator('#workspace-window-agent .workspace-window-close').click();
     await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();
     await page.locator('#workspace-window-steps .workspace-window-close').click();await openAgent(page);
@@ -618,7 +618,7 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     await expect(page.locator('#folder-agent-panel-status')).toContainText('Ctrl+C');
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
-    expect((await preview.inputValue()).endsWith(source)).toBe(true);
+    expect(await preview.inputValue()).not.toContain(source);expect(await preview.inputValue()).not.toContain('"rows"');
     await page.setViewportSize({width:640,height:360});await preview.focus();
     await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback.png')});
     expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
@@ -670,7 +670,10 @@ test('connected Copy preserves a large message while registering a bounded nativ
     await page.locator('#workspace-window-json .workspace-window-close').click();await copyRequest(page,'Review the full source.');
     const largeRequest=await h.read('request.json'),fullCopy=await page.evaluate(()=>navigator.clipboard.readText());
     expect(largeRequest.id).not.toBe(request.id);expect(largeRequest.text.length).toBeLessThanOrEqual(16000);
-    expect(fullCopy).toContain('Review the full source.');expect(fullCopy.endsWith(largeSource)).toBe(true);
+    expect(fullCopy).toContain('Review the full source.');expect(fullCopy).toContain(largeRequest.id);
+    expect(fullCopy).not.toContain('SOURCE END');expect(fullCopy).not.toContain('Complete evidence.');
+    expect(fullCopy.length).toBeLessThan(3000);
+    expect((await h.read('state.json')).source).toBe(largeSource);
 
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}

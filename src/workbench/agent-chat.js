@@ -132,7 +132,7 @@ function initWorkbenchAgentChat(opts){
     root.dataset.workflow=composeMode;
     [[externalMode,'external'],[embeddedMode,'embedded']].forEach(function(item){var selected=item[1]===composeMode;item[0].setAttribute('aria-selected',String(selected));item[0].tabIndex=selected?0:-1;});
     workflowBody.setAttribute('aria-labelledby','folder-agent-mode-'+composeMode);
-    modeDescription.textContent=composeMode==='external'?'Keep the conversation in your agent. Copy your request with the current selection. No monitor is started.':'Talk to Claude here. Connect explicitly to receive replies and changes in the workbench.';
+    modeDescription.textContent=composeMode==='external'?'Copy your request with selected item references and view context. Diagram JSON is not included. Keep the conversation in your agent; no monitor is started.':'Talk to Claude here. Connect explicitly to receive replies and changes in the workbench.';
     history.setAttribute('aria-label',composeMode==='external'?'Agent requests and changes':'Conversation history');
     form.querySelector('.folder-agent-hint').textContent=composeMode==='external'?'Replies stay in your agent':'⌘ / Ctrl + Enter';
     paint({});

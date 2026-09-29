@@ -133,9 +133,12 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 
 In **Agent → Copy & paste**, write the request in the shared message box;
 include additional URLs or file paths there if useful. **Copy request** includes
-the complete current source plus the existing selection, view/path/step context
-and detail level. Selection focuses the request; it does not exclude the rest of
-the diagram. No folder is required to copy a request.
+your message, selected item identifiers and JSON paths, their evidence references,
+view/path/step context and detail level. It does not include the complete source,
+panel payloads or the contents of selected sections/documents. The agent reads
+the current spec and ledger from the shared folder before editing. No folder is
+required to copy a request; without one, provide the spec or source files separately
+when needed (for example, with **Download JSON**).
 
 With a connected folder, Copy registers a request and copies its ID with the
 message and context. Long clipboard messages use a bounded registration

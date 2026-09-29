@@ -163,8 +163,11 @@ selection: nodes, edges, steps, panels and other editor targets. Switching tabs
 preserves that draft and selection; it does not connect a folder or start Monitor.
 There is no separate toolbar message composer.
 
-**Copy request** includes the full current JSON and the shared selection/view
-context, and works without a connection. With a diagram folder connected, it also
+**Copy request** includes your message, selected item identifiers and evidence
+references, and view context. It omits the full JSON and selected containers'
+contents, and works without a connection. The agent can read the spec and ledger
+from the shared folder; without a folder, provide needed files separately.
+With a diagram folder connected, Copy also
 registers the request for the preview-and-approval workflow. Paste the copied text
 into the existing agent conversation; Copy never dispatches it through Monitor.
 If clipboard access is denied, select the prepared text and copy manually.

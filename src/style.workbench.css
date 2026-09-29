@@ -1241,6 +1241,8 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-width:1050px){.workspace-canvas .workspace-create .editor-add-destination,.workspace-canvas .workspace-save>[data-open-human-guide]{display:none;}.workspace-canvas .workspace-create{flex:1;}.workspace-canvas .workspace-tools{gap:6px;}}
 @media(max-width:700px){.workspace-canvas:not(.welcome-active) .workbench-header{gap:8px;}.workspace-canvas:not(.welcome-active) .workbench-brand>span,.workspace-canvas .workspace-history,.workspace-canvas #workspace-home{display:none;}.workspace-canvas .workspace-save{gap:5px;}.workspace-canvas .workspace-tools .editor-add-button{font-size:11px;padding:6px;}.workspace-canvas-controls{left:76px;right:10px;flex-wrap:wrap;justify-content:center;}}
 .workspace-selection{position:fixed;left:84px;bottom:14px;z-index:140;max-width:calc(100vw - 560px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:10px 12px;box-shadow:0 4px 18px #14244210;color:var(--sub);font:500 12px 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.workspace-selection:disabled{cursor:default;opacity:.6}
+.workspace-selection:not(:disabled):hover,.workspace-selection:focus-visible{border-color:#6366f1;color:#4f46e5}
 @media(max-width:850px){.workspace-selection{bottom:68px;max-width:calc(100vw - 100px);}}
 
 /* In diagram mode there is no document-sized camera: the board owns every

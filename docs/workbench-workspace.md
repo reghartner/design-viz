@@ -163,8 +163,16 @@ selection: nodes, edges, steps, panels and other editor targets. Switching tabs
 preserves that draft and selection; it does not connect a folder or start Monitor.
 There is no separate toolbar message composer.
 
-**Copy request** includes the full current JSON and the shared selection/view
-context, and works without a connection. With a diagram folder connected, it also
+The bottom-left **Copy for agent · N selected** button copies selection context
+in one click, without opening Agent or requiring a message. It briefly shows
+**Copied**. It preserves the current draft and any active request, and is disabled
+when nothing is selected. Clipboard denial opens the manual-copy fallback in Agent.
+
+**Copy request** includes your message, selected item identifiers and evidence
+references, and view context. It omits the full JSON and selected containers'
+contents, and works without a connection. The agent can read the spec and ledger
+from the shared folder; without a folder, provide needed files separately.
+With a diagram folder connected, Copy also
 registers the request for the preview-and-approval workflow. Paste the copied text
 into the existing agent conversation; Copy never dispatches it through Monitor.
 If clipboard access is denied, select the prepared text and copy manually.
@@ -173,11 +181,14 @@ Both modes review spec/ledger proposals through **Preview Agent Updates**.
 **Commit update** saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).
 
-The Agent window names the current selection and the view/path/step context.
-Each sent message retains a receipt of that exact context. A persistent Claude
-indicator shows waiting, working, quiet or finished even while Agent is closed.
-The selection pill also opens Agent. The entire story is shared; selection is
-focus, not a limit on the data sent.
+The Agent window names the current selection and view/path/step context.
+Copy & paste shows **Shared folder ready** without waiting for a listener, or
+**Request active · Continue in your agent** while a request is active. Replies and
+live progress stay in your agent; **Recent diagram updates** is collapsed by default.
+Previews and conflict feedback remain available. The Beta conversation retains
+sent context and live output, with its waiting/working indicator on the Agent rail.
+The bottom-left **Copy for agent** button copies selected references directly.
+The full spec and ledger remain available through the shared folder.
 
 **⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
 Save, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place

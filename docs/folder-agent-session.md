@@ -24,7 +24,11 @@ Then choose where to have the conversation:
   questions and answers inside the workbench. Permission prompts and interrupts
   still happen in Claude.
 
-Both choices use the same diagram folder and the same approval process.
+Both choices use the same diagram folder and the same approval process. In the
+approval preview, **Coverage ledger** starts collapsed and identifies whether it
+changed. Expand it to read, scroll or resize its bounded reading area; switching
+between Current state and Proposed state keeps it open. Collapsing it restores
+the diagram space. Committing still saves the reviewed spec and ledger together.
 
 In the editor, open **Agent** in the left rail. **Copy & paste** is the default;
 **In workbench — Beta** is the other tab. Both share one draft and the existing
@@ -32,6 +36,13 @@ selection context, including steps, panels, nodes, edges and other editor target
 Switching tabs preserves that context and draft. A tab switch neither connects a
 folder nor starts a listener, and does not change an active connection's workflow.
 Use the connection setup when changing how the agent listens.
+
+Copy & paste shows **Shared folder ready** once the folder is connected; it does
+not wait for a Claude listener. An active request says **Continue in your agent**.
+Conversation and live progress stay in the agent app. The panel keeps update
+previews, conflict feedback and collapsed **Recent diagram updates**; there is no
+chat feed or empty conversation area. The Beta tab retains its conversation feed
+and requires its own explicit Monitor connection.
 
 ## Open or create a diagram folder
 
@@ -131,11 +142,21 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 
 ## Conversation and request lifecycle
 
+For a quick handoff, select items and click **Copy for agent · N selected** at
+the bottom left. It copies selection identifiers, references and view context
+without opening Agent or requiring a message. **Copied** confirms success.
+This action leaves your message draft and any active request alone; it creates
+no request and sends nothing to Monitor. With no selection it is disabled.
+If clipboard access is denied, Agent opens with the selected text for manual copy.
+
 In **Agent → Copy & paste**, write the request in the shared message box;
 include additional URLs or file paths there if useful. **Copy request** includes
-the complete current source plus the existing selection, view/path/step context
-and detail level. Selection focuses the request; it does not exclude the rest of
-the diagram. No folder is required to copy a request.
+your message, selected item identifiers and JSON paths, their evidence references,
+view/path/step context and detail level. It does not include the complete source,
+panel payloads or the contents of selected sections/documents. The agent reads
+the current spec and ledger from the shared folder before editing. No folder is
+required to copy a request; without one, provide the spec or source files separately
+when needed (for example, with **Download JSON**).
 
 With a connected folder, Copy registers a request and copies its ID with the
 message and context. Long clipboard messages use a bounded registration
@@ -160,11 +181,14 @@ acknowledgement. Keep the workbench visible, or retry after returning to it. One
 request is active at a time. **Stop accepting this turn** cancels acceptance of
 its proposals/replies; interrupt computation in the agent app itself.
 
-Use `progress --request ID --text TEXT` to report meaningful work phases, errors,
+In the Beta conversation, use `progress --request ID --text TEXT` to report meaningful work phases, errors,
 and observable activity during longer work (roughly every 20 seconds at tool
 boundaries). Progress retains up to 100 events with a 512 KiB budget. Use shell-safe
 quoting or `--file answer.txt` for longer content. Replies/progress are plain text,
 not executable UI. Permission prompts stay in the agent app.
+For copy/paste, report progress and errors in the agent app; periodic helper
+progress is unnecessary and is not displayed. Still submit proposals and send
+the completion `reply` to release the request after its proposal result.
 
 Embedded questions and answers use `reply`; an answer completes that request so
 the user can respond. External conversations keep discussion in the agent app

@@ -12,22 +12,30 @@ async function arrangeEditor(page,mode){
   await page.locator('#workspace-preset').selectOption(mode);
 }
 
-test('workspace presets preserve authored story and short windows keep conversation input reachable',async({page,server})=>{
+test('workspace presets preserve authored story and short windows keep both agent workflows reachable',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(spec());await paste(page,original);
   for(const mode of ['story','engineering','present']){await arrangeEditor(page,mode);await expect(page.locator('#src')).toHaveValue(original);}
   await expect(page.locator('.workspace-window:visible')).toHaveCount(0);
   await expect(page.locator('.workbench-header #folder-agent-indicator, .workbench-header #workspace-prepare-review, .workbench-header #workspace-preset')).toHaveCount(0);
   await expect(page.locator('#workspace-preset')).not.toBeVisible();
   await page.setViewportSize({width:640,height:360});await page.locator('#editor-tab-agent').click();
-  const layout=await page.evaluate(()=>{
-    const win=document.getElementById('workspace-window-agent').getBoundingClientRect();
-    return {history:document.getElementById('folder-agent-history').clientHeight,controls:['folder-agent-input','folder-agent-send'].map(id=>{
-      const node=document.getElementById(id),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {inside:r.top>=win.top && r.bottom<=win.bottom,reachable:node===hit || node.contains(hit)};
-    })};
-  });
-  expect(layout.history).toBeGreaterThan(30);expect(layout.controls).toEqual([{inside:true,reachable:true},{inside:true,reachable:true}]);
-  await page.locator('#folder-agent-input').fill('Keep the outcome in focus');await expect(page.locator('#folder-agent-input')).toHaveValue('Keep the outcome in focus');
+  await page.locator('#folder-agent-input').fill('Keep the outcome in focus');
+  for(const mode of ['external','embedded','external']){
+    await page.locator('#folder-agent-mode-'+mode).click();
+    const history=page.locator('.folder-agent-history-frame');
+    if(mode==='external')await expect(history).toBeHidden();else await expect(history).toBeVisible();
+    const layout=await page.evaluate(()=>{
+      const win=document.getElementById('workspace-window-agent').getBoundingClientRect();
+      return {history:document.getElementById('folder-agent-history').clientHeight,controls:['folder-agent-input','folder-agent-send'].map(id=>{
+        const node=document.getElementById(id),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+        return {inside:r.top>=win.top && r.bottom<=win.bottom,reachable:node===hit || node.contains(hit)};
+      })};
+    });
+    if(mode==='external')expect(layout.history).toBe(0);else expect(layout.history).toBeGreaterThan(30);
+    expect(layout.controls,mode).toEqual([{inside:true,reachable:true},{inside:true,reachable:true}]);
+    await expect(page.locator('#folder-agent-input')).toHaveValue('Keep the outcome in focus');
+    await expect(page.locator('#src')).toHaveValue(original);
+  }
 });
 
 test('Brief links engineering evidence to a block story and exports the exact viewable draft',async({page,server},info)=>{

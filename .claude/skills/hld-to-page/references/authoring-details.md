@@ -269,9 +269,18 @@ preview. Mapping omissions inherit detail defaults; explicit null suppresses an
 inherited default. Imported numeric child positions retain their type until
 edited.
 
-Humans can click nested bullets, add siblings/subpoints, indent/outdent and
-reorder complete subtrees in the inspector. Prose formatting buttons write the
-existing safe emphasis, HTTP(S) link, inline-code and fenced-code syntax.
+Humans can start section prose with **Add to diagram → Paragraph** or
+**Bullet point**, using the **Section** selector to choose the destination. These append to `text`
+or `bullets`, work without a diagram, select the new item, and open page preview
+when Explore hides prose. Empty section inspectors offer **Add an introduction**
+and **Add first point**. Insertions focus and select the placeholder text for
+replacement. Paragraphs support add before/after, move up/down,
+and deletion. Existing string `text` becomes an array when another paragraph
+is added. Nested bullets support siblings/subpoints, indent/outdent, reorder
+and deletion of complete subtrees. Each structural action has one Undo/Redo.
+Prose formatting buttons write the existing safe emphasis, HTTP(S) link,
+inline-code and fenced-code syntax. Bare diagrams need a page section before
+they can hold prose.
 
 Fragment inspectors expose **Visibility by path position** for edges, bullets,
 and contract rows. The UI is one-based; `revealAt` / `hideAt` remain zero-based

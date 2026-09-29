@@ -493,7 +493,7 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl,detail:function(target,parentId){
+    preview:{stepper:stepperFor,targetElement:findTargetEl,showPage:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();},detail:function(target,parentId){
       var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
       if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
       var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
@@ -938,17 +938,24 @@ function initWorkbenchBuilder(opts){
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
                   index: identity.index, card:identity.card, el: el}, false);
+    if((kind==='para' || kind==='bullet') && opts.workspace && opts.workspace.canvas){
+      opts.workspace.canvas.showPage();
+      if(el)el.scrollIntoView({block:'nearest'});
+    }
     selectRange(plan);
+    if(kind==='para' || kind==='bullet')inspector.focusProse();
   }
   var addButtons = {
     'add-step': ['step', planAddStep],
+    'add-paragraph': ['para',planAddParagraph],
+    'add-bullet': ['bullet',planAddBullet],
     'add-section': ['section', planAddSection],
     'add-contract': ['contract',planAddContract]
   };
   Object.keys(addButtons).forEach(function(id){
     var btn = document.getElementById(id);
     if (btn) life.listen(btn,'click', function(){
-      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-section' || id==='add-contract');
+      confirmAddition(function(){runInsert(addButtons[id][0], addButtons[id][1]);},id==='add-paragraph' || id==='add-bullet'?'prose':id==='add-section' || id==='add-contract');
     });
   });
   /* + edge draws by clicking source then target (Esc cancels) */
@@ -1012,7 +1019,7 @@ function initWorkbenchBuilder(opts){
       var rec=parsed.error ? null : specSectionPaths(parsed.raw)[session.insertSection];
       return {text:session.text(),raw:parsed.raw,section:session.insertSection,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
-        diagram:rec && specValueAt(parsed.raw,rec.diagram),error:error,locked:locked};
+        diagram:rec && specValueAt(parsed.raw,rec.diagram),prose:!!(rec && rec.section.length),error:error,locked:locked};
   }
   var catalogPicker=initCatalogGraphPicker({document:document,src:src,pause:pausePreview,error:inspectorMessage,
     catalog:opts.catalog,importCatalog:opts.importCatalog,context:additionContext,

@@ -1,4 +1,41 @@
-/* Structural prose edits move whole subtrees without normalizing metadata. */
+/* Section prose stays in existing text/bullets fields; surrounding source and
+   complete bullet subtrees are preserved. */
+function planAddProse(text,raw,section,kind){
+  var rec=specSectionPaths(raw)[section],sec=rec && specValueAt(raw,rec.section);
+  if(!rec || !rec.section.length || !specObject(sec))return {error:'Choose a page section for prose.'};
+  if(kind!=='para' && kind!=='bullet')return {error:'Unknown prose kind.'};
+  var key=kind==='para'?'text':'bullets',value=sec[key],list;
+  if(kind==='para' && typeof value==='string')list=[value];
+  else if(value==null)list=[];
+  else if(Array.isArray(value))list=value.slice();
+  else return {error:'Correct this section’s '+key+' in JSON before adding.'};
+  if(kind==='para' && list.some(function(item){return typeof item!=='string';}))return {error:'Paragraphs must be text strings.'};
+  var index=list.length;list.push(kind==='para'?'New paragraph':'New point');
+  var plan=Array.isArray(value)?jsonInsertMember(text,rec.section.concat([key]),null,JSON.stringify(list[index])):
+    planSetField(text,raw,rec.section,key,JSON.stringify(list,null,2));
+  if(!plan || plan.error)return plan || {error:'Could not add prose.'};
+  plan.kind=kind;plan.index=index;return plan;
+}
+function planAddParagraph(text,raw,section){return planAddProse(text,raw,section,'para');}
+function planAddBullet(text,raw,section){return planAddProse(text,raw,section,'bullet');}
+
+function planParagraphStructure(text,raw,target,action,expectedText){
+  var rec=specSectionPaths(raw)[target.section],sec=rec && specValueAt(raw,rec.section),value=sec && sec.text;
+  var list=typeof value==='string'?[value]:Array.isArray(value)?value.slice():[],index=target.index;
+  if(target.kind!=='para' || !rec || !rec.section.length || !Number.isInteger(index) || index<0 || index>=list.length ||
+    list.some(function(item){return typeof item!=='string';}))return {error:'Select an existing paragraph.'};
+  if(expectedText!==undefined && JSON.stringify(value)!==expectedText)return {error:'The paragraphs changed. Select the paragraph again.'};
+  var next=index;
+  if(action==='before' || action==='after'){
+    next=index+(action==='after'?1:0);list.splice(next,0,'New paragraph');
+  }else if(action==='up' || action==='down'){
+    next=index+(action==='up'?-1:1);if(next<0 || next>=list.length)return {error:'Already at the end of these paragraphs.'};
+    list.splice(next,0,list.splice(index,1)[0]);
+  }else return {error:'Unknown paragraph action.'};
+  var plan=planSetField(text,raw,rec.section,'text',JSON.stringify(list,null,2));
+  if(!plan.error)plan.target={kind:'para',section:target.section,index:next};return plan;
+}
+
 function planBulletStructure(text,raw,target,action,expectedTree){
   var path=builderTargetPath(raw,target),rec=specSectionPaths(raw)[target.section];
   if(target.kind!=='bullet' || !path || !rec)return {error:'Select an existing bullet.'};

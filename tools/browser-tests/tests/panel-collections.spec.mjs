@@ -12,6 +12,7 @@ test('collection forms preserve unknown data and exact history across real brows
   const guide=page.locator('#guide'),source=page.locator('#src'),root=page.locator('#docview');
   const diagram=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram;
   await inspectPageElement(page,root.locator('.pt-checks .ptitle'));
+  await guide.locator('.initialedit > summary').click();
   await guide.getByLabel('Authorization Result',{exact:true}).selectOption('fail');
   await expect.poll(async()=>(await diagram()).panels[0].initial.results.auth.status).toBe('fail');
   expect((await diagram()).panels[0].initial.results).toEqual({auth:{status:'fail',future:true},unknown:{keep:true}});
@@ -19,7 +20,7 @@ test('collection forms preserve unknown data and exact history across real brows
   await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
 
   await inspectPageElement(page,root.locator('.pt-table .ptitle'));
-  const initial=guide.locator('.initialedit');
+  const initial=guide.locator('.initialedit');await initial.locator(':scope > summary').click();
   await expect(initial.getByLabel('Reading type',{exact:true}).first()).toHaveValue('number');
   await initial.locator('.rowline').first().getByTitle('move this item down',{exact:true}).click();
   await expect.poll(async()=>(await diagram()).panels[2].initial.rows.map(r=>r.id)).toEqual(['two','one']);

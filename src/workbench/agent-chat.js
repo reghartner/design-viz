@@ -39,7 +39,7 @@ function folderAgentInstructions(folderName,level,resume,identity,workflow){
     'Read the latest state.json before planning; save its revision. It contains the current source and ledger together. Preserve unrelated work and stable IDs. Write the complete proposed spec to '+support+'/candidate.spec.json and its reconciled ledger to '+support+'/candidate.ledger.md. Even a ledger-only change submits both artifacts. Never directly overwrite the accepted spec or ledger while connected, or edit state.json, request.json, transcript.json, session.json or editor.json.',
     'Validate the proposed spec with the bundled tools/validate.js and spec_walk.py, and check that ledger claims match it. Do not claim visual QA. Submit python3 "'+helper+'" propose --request <request id> --revision <revision read before planning> --file candidate.spec.json --ledger candidate.ledger.md --summary "Describe the change". Candidate filenames are relative to the helper folder.',
     'Every proposal waits for a full diagram and ledger preview and explicit Commit update. The workbench may merge separate edits; conflicts remain unapplied. Wait for matching result.json before another proposal or final reply. If rejected, reread the current pair and reconcile feedback; never merely relabel an old proposal with a newer revision. Approval saves both artifacts in the diagram folder as one Undo action. Git commit is a separate step.',
-    'Report meaningful work phases and errors with python3 "'+helper+'" progress --request <request id> --text "What I am doing". During longer work, report observable progress at tool boundaries roughly every 20 seconds. Use --file answer.txt for longer text and shell-safe quoting. Do not invent activity.',
+    external?'Keep progress and errors in this agent conversation. The copy/paste panel does not display the conversation or progress feed; no periodic helper progress is needed. Proposals still appear for review, and the completion receipt still releases the request.':'Report meaningful work phases and errors with python3 "'+helper+'" progress --request <request id> --text "What I am doing". During longer work, report observable progress at tool boundaries roughly every 20 seconds. Use --file answer.txt for longer text and shell-safe quoting. Do not invent activity.',
     'After acceptance, reread the accepted spec and ledger and confirm they agree, including any merged human changes. If the ledger needs correction, submit another paired proposal before claiming the work is ready to commit. '+(external?'Give the answer here and also write a brief completion receipt with the helper.':'Write the final answer with the helper.')+' Use python3 "'+helper+'" reply --request <request id> --text "Completion receipt". Replies release the request; do not send one before its proposal result.',
     'Stop when interrupted, cancelled, disconnected, or when connection identity changes. Do not attach old work to a newer request. Prepare the reviewed spec and ledger for a repository commit; commit or publish only when the user authorizes it. Keep connection metadata, transcripts and candidate files out of the commit. Do not modify the Flowview implementation. These instructions grant no additional permissions.'
   ].join('\n\n');
@@ -79,6 +79,8 @@ function initWorkbenchAgentChat(opts){
   var latest=button('latest','New output · Jump to latest');latest.classList.add('folder-agent-latest');latest.hidden=true;
   var historyFrame=element('div','folder-agent-history-frame');historyFrame.append(history,latest);
   history.append(recoveryCard,get('messages'),activity);
+  var changeHistory=element('details','folder-agent-change-history'),changeSummary=element('summary'),changeLog=element('div');
+  changeHistory.id='folder-agent-change-history';changeHistory.hidden=true;changeHistory.append(changeSummary,changeLog);history.append(changeHistory);
   var previousContext=root.querySelector('.folder-agent-context-card'),contextDetails=element('details','folder-agent-context-card'),contextSummary=element('summary'),contextBody=element('div');
   contextSummary.id='folder-agent-focus-summary';contextBody.append(get('context-heading'),get('context'),previousContext.querySelector('.folder-agent-hint'));contextDetails.append(contextSummary,contextBody);
   var reviewCard=element('section','folder-agent-receipt'),reviewSummary=element('p'),reviewAccept=button('review-accept','Preview Agent Updates');
@@ -155,7 +157,7 @@ function initWorkbenchAgentChat(opts){
     [[externalMode,'external'],[embeddedMode,'embedded']].forEach(function(item){var selected=item[1]===composeMode;item[0].setAttribute('aria-selected',String(selected));item[0].tabIndex=selected?0:-1;});
     workflowBody.setAttribute('aria-labelledby','folder-agent-mode-'+composeMode);
     modeDescription.textContent=composeMode==='external'?'Copy your request with selected item references and view context. Diagram JSON is not included. Keep the conversation in your agent; no monitor is started.':'Talk to Claude here. Connect explicitly to receive replies and changes in the workbench.';
-    history.setAttribute('aria-label',composeMode==='external'?'Agent requests and changes':'Conversation history');
+    history.setAttribute('aria-label',composeMode==='external'?'Diagram updates':'Conversation history');
     form.querySelector('.folder-agent-hint').textContent=composeMode==='external'?'Replies stay in your agent':'⌘ / Ctrl + Enter';
     paint({});
   }
@@ -209,7 +211,7 @@ function initWorkbenchAgentChat(opts){
   function scrollLatest(){following=true;latest.hidden=true;history.scrollTop=history.scrollHeight;}
   function isAtLatest(){return history.scrollHeight-history.scrollTop-history.clientHeight<48;}
   life.listen(latest,'click',scrollLatest);life.listen(history,'scroll',function(){following=isAtLatest();if(following)latest.hidden=true;});
-  var historySize=new ResizeObserver(function(){if(following && life.alive())scrollLatest();});historySize.observe(history);
+  var historySize=new ResizeObserver(function(){if(composeMode==='embedded' && following && life.alive())scrollLatest();});historySize.observe(history);
   life.own(function(){historySize.disconnect();});
   function sourceTitle(source){try{var parsed=JSON.parse(source);return String((parsed.page || parsed).title || 'Untitled story').slice(0,240);}catch(ex){return 'Current draft';}}
   function saveRecovery(){
@@ -265,10 +267,15 @@ function initWorkbenchAgentChat(opts){
     parent.appendChild(card);
   }
   function renderConversation(){
-    var log=get('messages'),serialized=JSON.stringify([state.transcript,state.changes]);
+    var external=composeMode==='external',messages=get('messages'),log=external?changeLog:messages;
+    messages.hidden=external;changeHistory.hidden=!external || !state.changes.length;
+    var inactive=external?messages:changeLog;
+    if(inactive.dataset.transcript){inactive.replaceChildren();delete inactive.dataset.transcript;}
+    changeSummary.textContent='Recent diagram updates · '+state.changes.length;
+    var serialized=JSON.stringify([external?[]:state.transcript,state.changes]);
     if(log.dataset.transcript===serialized)return false;
     var expanded=Array.from(log.querySelectorAll('.folder-agent-sent-context')).map(function(item){return item.open;}),receipted=new Set(),contextIndex=0;log.replaceChildren();
-    state.transcript.forEach(function(item){
+    (external?[]:state.transcript).forEach(function(item){
       var message=element('article','folder-agent-message'),label=element('b','',item.role==='user'?'You':'Claude'),body=element('div','',item.text);
       message.append(label,body);
       if(item.role==='user' && item.context){
@@ -291,9 +298,14 @@ function initWorkbenchAgentChat(opts){
   }
   function paintStage(phase){
     var lastMessage=state.transcript[state.transcript.length-1],finished=lastMessage && lastMessage.role==='assistant';
-    var key=accessLost?'access':state.cancelling?'stopping':state.review?'review':!state.connected?'disconnected':!state.listening?'connecting':state.pending?(phase==='idle'?'waiting':phase):lastMessage && lastMessage.cancelled?'cancelled':finished?'complete':'ready';
+    var external=composeMode==='external';
+    var key=accessLost?'access':state.cancelling?'stopping':state.review?'review':!state.connected?(external?'no-folder':'disconnected'):external?(state.pending?'external-active':'folder-ready'):workflow!=='embedded'?'reconnect':!state.listening?'connecting':state.pending?(phase==='idle'?'waiting':phase):lastMessage && lastMessage.cancelled?'cancelled':finished?'complete':'ready';
     var stages={disconnected:['Connect Claude','M9 3v4m6-4v4M7 7h10v3a5 5 0 0 1-10 0V7m5 8v6'],connecting:['Waiting for connection','M12 3a9 9 0 1 0 9 9M12 7v5l3 2'],waiting:['Waiting for Claude','M12 3a9 9 0 1 0 9 9M12 7v5l3 2'],responding:['Claude is working','M5 5h14v11H9l-4 4V5m4 4h6m-6 3h4'],quiet:['No recent update','M9 5v14m6-14v14'],'permission-needed':['Permission needed in Claude','M12 3 2 21h20L12 3m0 6v5m0 3v1'],review:['Ready for your review','M5 3h14v18H5V3m3 9 3 3 5-6'],complete:['Reply received','M4 12l5 5L20 6'],ready:['Ready for your message','M4 12l5 5L20 6'],access:['Folder access needs attention','M12 3 2 21h20L12 3m0 6v5m0 3v1'],stopping:['Stopping this turn','M6 6h12v12H6z']};
     stages.cancelled=['Stopped accepting this turn','M6 6h12v12H6z'];
+    stages['no-folder']=['No shared folder connected',stages.disconnected[1]];
+    stages['folder-ready']=['Shared folder ready',stages.ready[1]];
+    stages['external-active']=['Request active · Continue in your agent',stages.ready[1]];
+    stages.reconnect=['Reconnect for in-workbench chat',stages.disconnected[1]];
     var current=stages[key] || stages.waiting;
     stageStatus.dataset.stage=key;stagePath.setAttribute('d',current[1]);
     if(stageText.textContent!==current[0])stageText.textContent=current[0];
@@ -346,13 +358,13 @@ function initWorkbenchAgentChat(opts){
     var previousPending=state.pending,previousReview=reviewCard.dataset.proposal,wasAtLatest=following && isAtLatest(),previousScroll=history.scrollTop,justListening=update.listening && !state.listening;
     following=wasAtLatest;
     Object.assign(state,update);
-    if(justListening){
+    if(justListening && workflow==='embedded'){
       get('pairing').open=false;
-      if(guide.open){closeGuide();if(workflow==='embedded'){if(opts.show)opts.show();get('input').focus();}}
-      status(workflow==='external'?'Folder connected. Use Agent → Copy & paste to copy your request with the current selection.':'Claude is connected. Describe the story in your own words.');
+      if(guide.open){closeGuide();if(opts.show)opts.show();get('input').focus();}
+      status('Claude is connected. Describe the story in your own words.');
     }
     if(update.status)status(update.status);
-    get('connection').textContent=state.connected?(state.listening?'Claude listener active':workflow==='external'?'Shared folder ready':'Waiting for Claude listener'):'Not connected';
+    get('connection').textContent=accessLost?'Folder access needs attention':state.connected?(workflow==='external'?'Shared folder ready':state.listening?'Claude listener active':'Waiting for Claude listener'):'Not connected';
     paintCompose();
     get('copy').disabled=connecting || !state.connected || !get('instructions').value;
     get('disconnect').disabled=!state.connected;get('disconnect-guide').hidden=!state.connected;
@@ -360,16 +372,17 @@ function initWorkbenchAgentChat(opts){
     guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){button.disabled=connecting;});
     setText('open-setup',composeMode==='embedded' && state.connected && workflow!=='embedded'?'Reconnect for in-workbench chat':state.connected?'Connection settings':composeMode==='embedded'?'Connect in-workbench chat':'Connect shared folder');
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
-    paintStage(phase);stageStatus.hidden=composeMode==='external' && !state.pending && !state.review;paintDetail();
+    paintStage(phase);paintDetail();
     root.dataset.connected=String(state.connected);
     var agentTab=doc.getElementById('editor-tab-agent');
     if(agentTab){
-      agentTab.dataset.phase=state.pending?phase:state.listening?'ready':'idle';
-      var agentStatus=state.pending?(phase==='responding'?'Claude working':phase==='permission-needed'?'Claude needs permission':phase==='quiet'?'No recent update':'Claude waiting'):state.listening?'Claude ready':state.connected?(workflow==='external'?'Shared folder ready':'Connecting'):'Choose a workflow';
+      var externalConnection=workflow==='external';
+      agentTab.dataset.phase=accessLost?'permission-needed':state.review?'review':state.pending?(externalConnection?'active':phase):state.connected && (externalConnection || state.listening)?'ready':'idle';
+      var agentStatus=accessLost?'Folder access needs attention':state.review?'Updates ready for review':state.pending?(externalConnection?'Request active in your agent':phase==='responding'?'Claude working':phase==='permission-needed'?'Claude needs permission':phase==='quiet'?'No recent update':'Claude waiting'):state.connected?(externalConnection?'Shared folder ready':state.listening?'Claude ready':'Connecting'):'Choose a workflow';
       agentTab.title='Agent · '+agentStatus;
       agentTab.setAttribute('aria-label','Agent · '+agentStatus);
     }
-    get('activity').hidden=!state.pending && !activity.length;
+    get('activity').hidden=composeMode==='external' || !state.pending && !activity.length;
     get('activity').dataset.phase=phase;
     setText('activity-title',{waiting:'Waiting for Claude to respond',responding:'Claude is working',quiet:'No recent update from Claude','permission-needed':'Claude is waiting for permission',complete:'Claude finished this turn',disconnected:'Disconnected'}[phase] || 'Claude activity');
     setText('progress',!state.pending?(state.connected?'Updates from the latest turn.':'Updates received before disconnecting.')
@@ -378,9 +391,10 @@ function initWorkbenchAgentChat(opts){
       :phase==='quiet'?'No new update for '+seconds+'s. Claude may still be working or waiting for permission in its terminal.'
       :state.agentResponded?'Last update '+seconds+'s ago.'
       :'Message sent '+seconds+'s ago. The watcher is connected; Claude has not acknowledged it yet.');
-    var activityLog=get('activity-log'),ids=activity.map(function(item){return item.id;}),activitySignature=JSON.stringify(activity),activityChanged=activityLog.dataset.activity!==activitySignature;
-    if(activityLog.firstChild && (!activity.length || activityLog.firstChild.dataset.id!==ids[0]))activityLog.replaceChildren();
-    activity.slice(activityLog.children.length).forEach(function(item){
+    var visibleActivity=composeMode==='external'?[]:activity;
+    var activityLog=get('activity-log'),ids=visibleActivity.map(function(item){return item.id;}),activitySignature=JSON.stringify(visibleActivity),activityChanged=activityLog.dataset.activity!==activitySignature;
+    if(activityLog.firstChild && (!visibleActivity.length || activityLog.firstChild.dataset.id!==ids[0]))activityLog.replaceChildren();
+    visibleActivity.slice(activityLog.children.length).forEach(function(item){
       var entry=doc.createElement('li'),time=doc.createElement('time'),body=doc.createElement('div'),date=new Date(item.at);
       entry.dataset.id=item.id;
       if(!isNaN(date.getTime())){time.dateTime=date.toISOString();time.textContent=date.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}
@@ -393,7 +407,7 @@ function initWorkbenchAgentChat(opts){
     activitySummary.textContent=state.pending?'Live activity':'Activity from the latest turn';
     if(state.preflight){
       var checks=(state.preflight.checks || []),blocked=checks.filter(function(check){return check.status!=='ready';});
-      preflightStatus.textContent=state.preflight.ready?'Local setup checked. Waiting for the watcher and Claude’s first update.':blocked.map(function(check){return check.message;}).join(' ');
+      preflightStatus.textContent=state.preflight.ready?(workflow==='external'?'Local setup checked. Continue in your agent.':'Local setup checked. Waiting for the watcher and Claude’s first update.'):blocked.map(function(check){return check.message;}).join(' ');
     }else preflightStatus.textContent='';
     reviewer.update(state.review || null);reviewCard.hidden=!state.review;
     if(state.review){
@@ -402,15 +416,21 @@ function initWorkbenchAgentChat(opts){
       if(reviewCard.dataset.proposal!==reviewKey){reviewCard.dataset.proposal=reviewKey;}
     }else{reviewCard.dataset.proposal='';}
     var conversationChanged=renderConversation();
-    if(conversationChanged || previousPending!==state.pending || previousReview!==reviewCard.dataset.proposal || activityChanged){
+    if(composeMode==='embedded' && (conversationChanged || previousPending!==state.pending || previousReview!==reviewCard.dataset.proposal || activityChanged)){
       if(wasAtLatest)scrollLatest();else{history.scrollTop=previousScroll;latest.hidden=false;}
     }
-    paintRecovery();saveRecovery();
+    if(composeMode==='external')latest.hidden=true;
+    paintRecovery();
+    historyFrame.hidden=composeMode==='external' && recoveryCard.hidden && reviewCard.hidden && changeHistory.hidden;
+    saveRecovery();
 
   }
   async function tick(token){
     if(!life.alive() || token!==generation || !client)return;
-    try{await client.poll();if(!life.alive() || token!==generation)return;if(accessLost){accessLost=false;paint({});}}catch(ex){
+    try{await client.poll();if(!life.alive() || token!==generation)return;if(accessLost){
+      accessLost=false;paint({});
+      if(state.connected && /^(Folder access needs attention|Folder unavailable):/.test(get('panel-status').textContent))status(workflow==='external'?'Folder access restored. Continue in your agent.':'Folder access restored.');
+    }}catch(ex){
       if(!life.alive() || token!==generation)return;
       accessLost=true;paint({});status('Folder access needs attention: '+ex.message+' Disconnect in Connection details, then Reopen diagram folder to restore access.');
     }
@@ -549,7 +569,7 @@ function initWorkbenchAgentChat(opts){
     }catch(ex){await connectionFailure(ex,token);}
     finally{if(unlockSetup)unlockSetup();if(releaseLock===unlockSetup)releaseLock=null;if(life.alive() && token===generation){connecting=false;paint({});}}
   }
-  life.listen(get('messages'),'click',async function(event){
+  life.listen(history,'click',async function(event){
     var control=event.target.closest('[data-receipt-action]'),card=control && control.closest('[data-change-id]');if(!card)return;
     var receipt=(state.changes || []).find(function(item){return item.id===card.dataset.changeId;});if(!receipt)return;
     control.disabled=true;

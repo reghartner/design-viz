@@ -549,7 +549,7 @@
   <section id="agent-update-issues" hidden><h3>Tell your agent what needs attention</h3><textarea id="agent-update-feedback" readonly rows="7" aria-label="Feedback for your agent"></textarea><button type="button" class="rbtn" id="agent-update-copy-feedback">Copy feedback for your agent</button><button type="button" class="bbtn" id="agent-update-return">Return for revision</button></section>
   <nav aria-label="Preview version"><button type="button" class="bbtn" id="agent-update-proposed" aria-pressed="true">Proposed state</button><button type="button" class="bbtn" id="agent-update-current" aria-pressed="false">Current state</button></nav>
   <div id="agent-update-scroll"><div id="agent-update-view"></div></div>
-  <section class="agent-update-ledger"><h3>Coverage ledger · reviewed with the diagram</h3><pre id="agent-update-ledger"></pre></section>
+  <details id="agent-update-ledger-panel" class="agent-update-ledger"><summary id="agent-update-ledger-summary">Coverage ledger · Included in this update</summary><pre id="agent-update-ledger" tabindex="0" aria-label="Coverage ledger for this preview"></pre></details>
   <details><summary>Inspect this version’s JSON</summary><textarea id="agent-update-source" readonly rows="6" aria-label="Preview source"></textarea></details>
   <footer><span>Saves the spec and ledger locally. Undo restores both. Git commit stays in your agent.</span><button type="button" class="bbtn" id="agent-update-discard">Discard update</button><button type="button" class="rbtn" id="agent-update-commit" disabled>Commit update</button></footer>
 </dialog>

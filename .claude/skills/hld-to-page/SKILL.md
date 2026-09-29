@@ -405,7 +405,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   **external/agent** keeps questions and interrupts in the native agent app;
   **embedded** uses helper `reply` for questions and final answers. Copied requests
   are not dispatched by Monitor; external requests use acknowledged `begin`.
-  Use `progress` for phases, errors and observable work during longer turns.
+  In Beta, use `progress` for phases, errors and observable work during longer turns.
+  For copy/paste, keep progress and errors in the native app; the workbench hides
+  the conversation and progress feed, so periodic helper progress is unnecessary.
   Wait for the proposal result before completion `reply`. Copy/paste uses no
   Monitor; direct Send and the explicitly selected Beta conversation require it.
   The bundled `authoring/` directory is VIZ; run validator and state-walk tools

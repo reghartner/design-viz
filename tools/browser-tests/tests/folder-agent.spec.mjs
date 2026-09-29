@@ -517,6 +517,9 @@ test('external branch copies context without dispatch, accepts native followups 
     await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
     h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json','--summary','Delivery story');
     await expect(page.locator('#agent-update-open')).toBeVisible();await expect(page.locator('#src')).toHaveValue(base.source);
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Ready for your review');
+    await expect(page.locator('#folder-agent-review-accept')).toBeVisible();
+    await expect(page.locator('#folder-agent-messages')).toBeHidden();
     expect(h.run('watch','--minutes','.002','--interval','.1')).toBe(''); // Even an optional watcher never dispatches a copied request.
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Doorbell');
     await page.screenshot({path:info.outputPath('agent-full-preview.png')});
@@ -538,9 +541,62 @@ test('external branch copies context without dispatch, accepts native followups 
     await expect(page.locator('#agent-update-banner-summary')).toContainText('Includes your latest edits');
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Human camera');await expect(page.locator('#agent-update-view')).toContainText('Agent backend');
     await expect(page.locator('#src')).toHaveValue(human);await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(/Agent backend/);
-    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(human);
+    await expect.poll(async()=>{const result=await h.read('result.json');return result.requestId===followup.id && result.status==='applied';}).toBe(true);
+    await openAgent(page);
+    await expect(page.locator('#folder-agent-change-history')).not.toHaveAttribute('open','');
+    await page.locator('#folder-agent-change-history>summary').click();
+    await page.locator('#folder-agent-change-history [data-receipt-action="undo"]').last().click();
+    await expect(page.locator('#src')).toHaveValue(human);
     expect(h.errors).toEqual([]);
   }finally{watcher?.kill();native?.kill();await page.close();await h.cleanup();}
+});
+
+test('copy and paste treats the folder as connected without Monitor and keeps conversation output out of the panel',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await openAgent(page);await expect(page.locator('#folder-agent-stage')).toHaveText('No shared folder connected');
+    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    expect((await h.read('session.json')).workflow).toBe('external');
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    await expect(page.locator('#editor-tab-agent')).toHaveAttribute('aria-label','Agent · Shared folder ready');
+    await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
+    const compact=await page.evaluate(()=>({header:document.querySelector('.folder-agent-header').getBoundingClientRect().bottom,composer:document.querySelector('.folder-agent-composer').getBoundingClientRect().top}));
+    expect(Math.abs(compact.composer-compact.header)).toBeLessThan(2);
+    await copyRequest(page,'Explain this selected flow in our agent conversation');const request=await h.read('request.json');
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
+    h.run('progress','--request',request.id,'--text','Only the native conversation needs this detailed progress.');
+    await expect(page.locator('#folder-agent-activity')).toBeHidden();await expect(page.locator('#folder-agent-messages')).toBeHidden();
+    await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
+    await page.screenshot({path:info.outputPath('copy-paste-connected-compact.png')});
+    // A tab switch changes the presentation, never the connection or the request.
+    await page.locator('#folder-agent-mode-embedded').click();
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Reconnect for in-workbench chat');
+    await expect(page.locator('#folder-agent-activity')).toBeVisible();
+    await expect(page.locator('#folder-agent-activity-log')).toContainText('Only the native conversation');
+    await expect(page.locator('#folder-agent-messages')).toContainText('Explain this selected flow');
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();
+    await page.locator('#folder-agent-mode-external').click();
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
+    await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(0);
+    await expect(page.locator('#folder-agent-messages article')).toHaveCount(0);
+    await expect(page.locator('#folder-agent-latest')).toBeHidden();
+    expect((await h.read('request.json')).id).toBe(request.id);
+    h.run('reply','--request',request.id,'--text','This final answer belongs in the native conversation.');
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    await expect(page.locator('#folder-agent-panel-status')).toHaveText('Request finished. Continue in your agent.');
+    await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
+    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain this selected flow in our agent conversation');
+    // Folder I/O failures still surface, and recovering access restores readiness.
+    h.readGate(async()=>{throw Error('Test folder temporarily unavailable');});
+    await expect(page.locator('#folder-agent-stage')).toHaveText('Folder access needs attention');
+    h.readGate(null);await expect(page.locator('#folder-agent-stage')).toHaveText('Shared folder ready');
+    await expect(page.locator('#folder-agent-panel-status')).toHaveText('Folder access restored. Continue in your agent.');
+    await disconnect(page);await expect(page.locator('#folder-agent-stage')).toHaveText('No shared folder connected');
+    expect(h.errors).toEqual([]);
+  }finally{h.readGate(null);await page.close();await h.cleanup();}
 });
 
 test('conflicting update preserves local edits and copies actionable feedback for the agent',async({page},info)=>{
@@ -754,7 +810,7 @@ test('connected Copy preserves a large message while registering a bounded nativ
 test('diagram folder opens an existing named pair without metadata and reviews ledger-only changes with paired Undo',async({page},info)=>{
   const h=await setup(page);
   const beforeLedger='# Coverage ledger\n\nExisting evidence and decisions.\n';
-  const afterLedger='# Coverage ledger\n\nExisting evidence and decisions.\n\nReviewed: the same diagram needs no spec change.\n';
+  const afterLedger='# Coverage ledger\n\nExisting evidence and decisions.\n\nReviewed: the same diagram needs no spec change.\n'+Array.from({length:500},(_,i)=>'Evidence '+i+': verified against the source and retained for review.').join('\n')+'\n';
   try{
     await writeFile(path.join(h.folder,'payments.spec.json'),source);
     await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
@@ -770,9 +826,31 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     await writeFile(path.join(h.session,'candidate.spec.json'),source);await writeFile(path.join(h.session,'candidate.ledger.md'),afterLedger);
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review evidence without changing the diagram');
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
+    await expect(page.locator('#agent-update-ledger')).toBeHidden();
+    await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Changed in this update');
+    const collapsed=await page.locator('#agent-update-scroll').boundingBox();
+    await page.screenshot({path:info.outputPath('ledger-collapsed-preview.png')});
+    await page.locator('#agent-update-ledger-summary').focus();await page.keyboard.press('Enter');
+    await expect(page.locator('#agent-update-ledger')).toBeVisible();
+    const expanded=await page.locator('#agent-update-scroll').boundingBox(),ledger=await page.locator('#agent-update-ledger').boundingBox();
+    expect(expanded.height).toBeLessThan(collapsed.height);expect(expanded.height).toBeGreaterThan(200);
+    expect(ledger.height).toBeLessThanOrEqual(page.viewportSize().height*.24+1);
+    await page.locator('#agent-update-ledger').focus();await page.keyboard.press('PageDown');
+    await expect.poll(()=>page.locator('#agent-update-ledger').evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
+    await page.mouse.move(ledger.x+ledger.width-3,ledger.y+ledger.height-3);await page.mouse.down();await page.mouse.move(ledger.x+ledger.width-3,ledger.y+ledger.height-63,{steps:5});await page.mouse.up();
+    await expect.poll(async()=> (await page.locator('#agent-update-ledger').boundingBox()).height).toBeLessThan(ledger.height-30);
     expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
     await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-ledger')).toHaveText(beforeLedger.trim());
+    await expect(page.locator('#agent-update-ledger')).toBeVisible();
+    await expect(page.locator('#agent-update-ledger-summary')).toHaveText('Coverage ledger · Current state');
     await page.locator('#agent-update-proposed').click();await page.screenshot({path:info.outputPath('paired-diagram-ledger-preview.png')});
+    await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
+    await page.setViewportSize({width:640,height:600});
+    await page.locator('#agent-update-ledger-summary').focus();await page.keyboard.press('Enter');
+    await expect(page.locator('#agent-update-ledger')).toBeHidden();
+    await expect(page.locator('#agent-update-commit')).toBeInViewport();
+    await page.screenshot({path:info.outputPath('ledger-collapsed-narrow-preview.png')});
+    await page.setViewportSize({width:1440,height:1000});
     await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
     await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
     const handwritten=source.replace('Doorbell','Handwritten after approval');await page.locator('#editor-tab-json').click();await page.locator('#src').fill(handwritten);await page.locator('#editor-tab-json').focus();

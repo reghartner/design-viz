@@ -181,11 +181,14 @@ Both modes review spec/ledger proposals through **Preview Agent Updates**.
 **Commit update** saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).
 
-The Agent window names the current selection and the view/path/step context.
-Each sent message retains a receipt of that exact context. A persistent Claude
-indicator shows waiting, working, quiet or finished even while Agent is closed.
-The selection pill also opens Agent. The entire story is shared; selection is
-focus, not a limit on the data sent.
+The Agent window names the current selection and view/path/step context.
+Copy & paste shows **Shared folder ready** without waiting for a listener, or
+**Request active · Continue in your agent** while a request is active. Replies and
+live progress stay in your agent; **Recent diagram updates** is collapsed by default.
+Previews and conflict feedback remain available. The Beta conversation retains
+sent context and live output, with its waiting/working indicator on the Agent rail.
+The bottom-left **Copy for agent** button copies selected references directly.
+The full spec and ledger remain available through the shared folder.
 
 **⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
 Save, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place

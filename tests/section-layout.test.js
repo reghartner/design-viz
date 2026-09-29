@@ -487,7 +487,7 @@ test('named layouts starter opens Standard and offers Explore for the same techn
 
 test('Explore defaults validate independently and remain view-local through duplicate, rename and delete',()=>{
   const d=diagram();d.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone]}}];
-  const value={panels:[{panel:'home',x:.6,y:.05,w:.3,h:.45,stacked:false}],controls:{x:.05,y:.8,w:.7,h:.12},camera:{zoom:1.25,x:.6,y:.4}};
+  const value={overlayScale:.75,panels:[{panel:'home',x:.6,y:.05,w:.3,h:.45,stacked:false}],controls:{x:.05,y:.8,w:.7,h:.12},camera:{zoom:1.25,x:.6,y:.4}};
   const text=JSON.stringify({page:{sections:[{diagram:d}]}} ,null,2),raw=JSON.parse(text);
   const plan=ctx.planSectionExploreLayout(text,raw,0,'engineering',value);assert.ok(!plan.error,plan.error);
   const next=JSON.parse(plan.text),nd=next.page.sections[0].diagram;
@@ -511,4 +511,15 @@ test('malformed Explore geometry warns and falls back without hiding the view or
   const view=ctx.diagramLayoutViews(d)[0];assert.equal(view.id,'eng');assert.equal(view.exploreLayout.panels.length,1);assert.equal(view.exploreLayout.camera,undefined);assert.equal(view.exploreLayout.controls,undefined);
   assert.ok(ctx.planSectionExploreLayout(source,d,0,'eng',value).error);
   for(const invalid of [null,[],42]){const w=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,invalid,w)),{});assert.equal(w.length,1);}
+});
+test('Explore overlay scale accepts bounded numeric values and recovers independently of rectangles',()=>{
+  const d=diagram(),controls={x:0,y:.8,w:.7,h:.1};
+  for(const value of [.5,.75,1,1.25]){
+    const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,{overlayScale:value,controls},warnings)),{overlayScale:value,controls});assert.deepEqual(warnings,[]);
+  }
+  for(const value of [null,'0.75',0,.49,1.26,Infinity,{},[]]){
+    const warnings=[],input={overlayScale:value,controls},before=JSON.stringify(input);
+    assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,warnings)),{controls});assert.equal(warnings.length,1);assert.match(warnings[0],/overlayScale/);assert.equal(JSON.stringify(input),before);
+  }
+  assert.deepEqual(plain(ctx.sectionExploreLayout(d,{})),{});
 });

@@ -1175,6 +1175,10 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 #workspace-appearance-body #skinbtns{display:flex;flex-wrap:wrap;gap:4px;}
 #workspace-appearance-body .layout-preview-tools{flex-wrap:wrap;}
 .workspace-canvas-controls{position:fixed;bottom:14px;right:14px;z-index:140;display:flex;gap:4px;align-items:center;padding:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244214;}
+.workspace-overlay-tools{display:flex;align-items:center;gap:3px;border-left:1px solid var(--line);margin-left:5px;padding-left:8px;}
+.workspace-overlay-tools[hidden]{display:none;}
+.workspace-zoom-label{font-size:11px;font-weight:600;color:var(--muted);white-space:nowrap;padding:0 4px;}
+#workspace-overlay-size{min-width:50px;font-variant-numeric:tabular-nums;}
 #workspace-pan[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 .canvas-hand,.canvas-hand *{cursor:grab!important;}
 .canvas-panning,.canvas-panning *{cursor:grabbing!important;user-select:none!important;}
@@ -1235,6 +1239,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) .viewport-actions>[aria-label*="Expand"],.workspace-diagram:not(.welcome-active) .viewport-actions>[aria-label*="expanded"],.workspace-diagram:not(.welcome-active) .layout-flow-toggle{display:none;}
 .workspace-diagram:not(.welcome-active) .explore-tools{left:auto;right:12px;top:118px;bottom:auto;padding:0;background:none;border:0;box-shadow:none;}
 .workspace-diagram:not(.welcome-active) .explore-tools>.mbtn,.workspace-diagram:not(.welcome-active) .explore-zoom,.workspace-diagram:not(.welcome-active) .explore-tools .board-size{display:none;}
+.workspace-diagram:not(.welcome-active) .explore-tools>.explore-zoom-group{display:none;}
 .workspace-diagram:not(.welcome-active) .explore-tools .lg{padding:6px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;}
 .workspace-diagram:not(.welcome-active) .explore-board{background-image:radial-gradient(color-mix(in srgb,var(--dtext) 16%,transparent) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
 .workspace-diagram:not(.welcome-active) .explore-board::-webkit-scrollbar{display:none;}

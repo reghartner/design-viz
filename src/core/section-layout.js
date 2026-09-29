@@ -71,6 +71,10 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value===undefined)return out;
   if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.overlayScale!==undefined){
+    if(!Number.isFinite(value.overlayScale) || value.overlayScale<.5 || value.overlayScale>1.25)warn(path+'.overlayScale','use a scale from 0.5 to 1.25 for panels and step controls');
+    else out.overlayScale=value.overlayScale;
+  }
   if(value.panels!==undefined){
     if(!Array.isArray(value.panels))warn(path+'.panels','expected an array');
     else out.panels=value.panels.reduce(function(list,v,i){

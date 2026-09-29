@@ -11,6 +11,14 @@ const spec=()=>({page:{contract:'1',title:'Compatibility test',blocks:[{tabs:[{l
     layouts:[{id:'home',steps:['start','done']}]}
 }]}]}]}});
 const plain=v=>JSON.parse(JSON.stringify(v));
+test('saved Explore scale declares a capability so older viewers can report it',()=>{
+  const raw={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[{id:'engineering',presentation:'explore',exploreLayout:{overlayScale:.75}}]}}]}};
+  assert.ok(C.detect(raw).includes('layout.explore-scale'));
+  const stamped=C.stamp(raw),available={...C.features};delete available['layout.explore-scale'];
+  assert.ok(C.check(stamped,{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-scale'));
+  delete raw.page.sections[0].diagram.layouts[0].exploreLayout.overlayScale;
+  assert.ok(!C.detect(raw).includes('layout.explore-scale'));
+});
 
 test('semver compares numeric components, prereleases and metadata without lexical mistakes',()=>{
   for(const [a,b] of [['1.9.0','1.10.0'],['1.0.0-alpha','1.0.0-alpha.1'],['1.0.0-beta.2','1.0.0-beta.11'],

@@ -1123,7 +1123,11 @@ perspectives" of one timeline). Types:
   Optional `layouts[].presentation` is `"standard"` (the default when omitted)
   or `"explore"`. Standard retains the authored arrangement. Explore provides a
   full-height graph with independently draggable, resizable, hideable floating
-  panels and pinned step controls. The setting belongs to the view across all
+  panels and pinned step controls. `layouts[].exploreLayout.overlayScale` optionally
+  sets their content size from 0.5 to 1.25 (default 1), independently of diagram
+  zoom. Saved panel/control widths and heights describe the size at 100%; positions
+  stay in viewport coordinates. The **Panels & controls** zoom saves this value
+  in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
   Arrange section temporarily uses the saved grid; Done arranging restores the
   chosen presentation. Duplicate view preserves it. Invalid values warn and

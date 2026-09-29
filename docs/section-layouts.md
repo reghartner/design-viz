@@ -381,7 +381,13 @@ and fall back to Standard without dropping the view. Legacy single arrangements
 always use Standard. Explore uses the same story, widgets and saved visibility;
 its reader panel movement and sizing do not alter tile coordinates.
 Optional `layouts[].exploreLayout` saves floating defaults separately from the
-grid. Positions and dimensions use fractions of the Explore viewport; camera
+grid. Positions and dimensions use fractions of the Explore viewport; widths and
+heights describe each window at 100% content scale. Optional `overlayScale`
+(0.5–1.25, default 1) scales all floating panels and step controls together,
+independently of diagram zoom. The **Panels & controls** minus/plus buttons
+change this scale; clicking its percentage resets it to 100%. Panel headers and
+drag/resize targets remain usable. Right-docked panels stay at the edge; automatic
+step controls keep the available width and shrink vertically. Camera
 `x`/`y` describe its center as fractions of the SVG viewBox width/height, and
 `zoom` is the rendered scale (0.15–4). Omitted entries use automatic placement.
 The renderer clamps windows to the available viewport and practical minimum sizes.
@@ -389,6 +395,7 @@ Invalid optional entries warn and fall back independently.
 
 ```json
 "exploreLayout": {
+  "overlayScale": 0.75,
   "panels": [
     {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true}
   ],
@@ -400,7 +407,9 @@ Invalid optional entries warn and fall back independently.
 Readers can move these windows and change framing for their own session without
 rewriting the spec. Only the workbench connects the renderer's authoring callback
 to source edits. The `layout.explore-defaults` capability identifies specs that
-need a viewer supporting saved defaults.
+need a viewer supporting saved defaults. `layout.explore-scale` identifies saved
+overlay scaling. Workbench scale changes save to the selected Explore view with
+one Undo action per click; reader scale changes last only for that viewing session.
 
 Each uses the same host-profile and tile contract as `sectionLayout` above.
 When a named view lacks both the requested host and a default profile, it uses

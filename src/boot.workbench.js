@@ -167,7 +167,7 @@ var CONTRACT = [
   '  Example: happy=[accept,auth,queue,deliver,ack], drop=[accept,auth,queue,lost].',
   '  Path IDs must be unique; each path needs existing, non-repeated step IDs.',
   '- Optional diagram.sectionLayout declares default/backstage/confluence tile arrays.',
-  '- Explore view defaults: exploreLayout.panels [{panel,x,y,w,h,stacked?}] and controls {x,y,w,h} use viewport fractions. camera {zoom,x,y} saves scale (0.15–4) and SVG-relative center. Workbench gestures save defaults with Undo; reader moves stay temporary.',
+  '- Explore view defaults: exploreLayout.panels [{panel,x,y,w,h,stacked?}] and controls {x,y,w,h} use viewport fractions at 100% content size. overlayScale (0.5–1.25, default 1) scales panels and controls independently of the diagram. camera {zoom,x,y} saves scale (0.15–4) and SVG-relative center. Workbench gestures save defaults with Undo; reader moves stay temporary.',
   '- Optional diagram.layouts: [{id,name,sectionLayout,steps?,presentation?,exploreLayout?}] provides named views.',
   '  presentation is standard (default) or explore, shared by all host profiles.',
   '  Explore uses a full-height graph, independent floating panels and pinned steps.',

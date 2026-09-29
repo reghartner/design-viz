@@ -986,13 +986,39 @@ function panelPatchControl(pid, patch, decl, target, options){
           if(value===undefined)delete values[key];else values[key]=value;
           if(storage==='once'){if(Object.keys(values).length)next.enterOnce=values;else delete next.enterOnce;}
         }
-        return initial ? planSetField(session.text(),raw,path,'initial',JSON.stringify(next)) :
+        return initial ? planSetField(session.text(),raw,path,'initial',Object.keys(next || {}).length?JSON.stringify(next):null) :
           planStepSetPanelPatch(session.text(),raw,target.section,target.index,pid,JSON.stringify(next));
       });
       if (ok) refreshFormSoon();
       return ok;
     }
-    function fieldInput(f, value){
+    var effectiveFields=Object.create(null);
+    if(!initial){
+      var parsedEffective=parseEditor(), recEffective=!parsedEffective.error && specSectionPaths(parsedEffective.raw)[target.section];
+      if(recEffective){
+        var diagramEffective=specValueAt(parsedEffective.raw,recEffective.diagram), stepperEffective=stepperFor(target.section);
+        var modelEffective=builderEffectivePanelStates(diagramEffective,target.index,stepperEffective && stepperEffective.path());
+        var panelEffective=!modelEffective.error && modelEffective.panels.find(function(item){return item.id===pid;});
+        (panelEffective && panelEffective.fields || []).forEach(function(item){effectiveFields[item.key]=item;});
+      }
+    }
+    function stateLabel(key,meta){
+      var custom=editor.patchLabel && editor.patchLabel(key);
+      return custom && custom!==key?custom:meta.label;
+    }
+    function shortStateValue(value){
+      var text=JSON.stringify(value);if(text===undefined)return 'none';
+      return text.length>90?text.slice(0,87)+'…':text;
+    }
+    function stateNote(meta,key,assigned){
+      var bits=[];if(meta.help)bits.push(meta.help);
+      var effective=effectiveFields[key];
+      if(effective)bits.push((assigned?'Effective':'Inherited')+' '+shortStateValue(effective.value)+' · '+effective.origin.label+'.');
+      else if(!assigned)bits.push(initial?'No starting value is authored; the panel default applies.':'No earlier authored value; the panel default applies.');
+      if(!bits.length)return null;
+      var note=document.createElement('p');note.className='fnote panel-state-note';note.textContent=bits.join(' ');return note;
+    }
+    function fieldInput(f, value, meta){
       var input;
       if (f[1] === 'enum' || f[1] === 'bool'){
         var boolOpts = f[2] && f[2].trueOnly ? ['true'] : ['true', 'false'];
@@ -1009,6 +1035,7 @@ function panelPatchControl(pid, patch, decl, target, options){
       }
       input.setAttribute('aria-label', f[0]);
       if (editor.patchField) editor.patchField(f,input,options);
+      if(input.tagName==='SELECT' && input.options.length && input.options[0].value==='')input.options[0].textContent='Choose value…';
       return input;
     }
     function rawControl(){
@@ -1033,12 +1060,21 @@ function panelPatchControl(pid, patch, decl, target, options){
       durationNote.textContent='Set a value, then choose Carry forward or This step only. Inherit removes this step’s assignment. One-step values resume the carried state at the next stop.';
       body.appendChild(durationNote);
     }
-    fields.forEach(function(f){
-      var key = f[0], cur = patch && patch[key];
+    var stateFields=fields.map(function(f,index){return {field:f,index:index,meta:panelFieldPresentation(decl,f,initial?'initial':'step')};})
+      .filter(function(item){return !item.meta.hidden;})
+      .sort(function(a,b){return Number(a.meta.advanced)-Number(b.meta.advanced) || a.index-b.index;});
+    var lastGroup=null;
+    stateFields.forEach(function(entry){
+      var f=entry.field,meta=entry.meta,key=f[0],has=panelObject(patch) && Object.prototype.hasOwnProperty.call(patch,key),cur=has?patch[key]:undefined;
+      var groupName=meta.advanced?'Advanced':meta.group;
+      if(groupName && groupName!==lastGroup){
+        var groupHeading=document.createElement('h4');groupHeading.className='panel-state-group';groupHeading.textContent=groupName;body.appendChild(groupHeading);
+      }
+      lastGroup=groupName || lastGroup;
       var temporary=!initial && (panelAuthoring(decl.type).transientFields || []).indexOf(key)>=0;
       var once=temporary && patch && panelObject(patch.enterOnce)?patch.enterOnce:null;
       var hasOnce=once && Object.prototype.hasOwnProperty.call(once,key),hasCarry=patch && Object.prototype.hasOwnProperty.call(patch,key);
-      var storage=hasOnce?'once':'carry';if(hasOnce)cur=once[key];
+      var storage=hasOnce?'once':'carry';if(hasOnce){cur=once[key];has=true;}
       if(temporary){
         var state=hasOnce?(hasCarry?'both':'once'):(hasCarry?'carry':'inherit');
         var duration=selectControl(['inherit','carry','once'].concat(state==='both'?['both']:[]),state,function(value){
@@ -1047,7 +1083,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         });
         var labels={inherit:'Inherit previous state',carry:'Carry forward',once:'This step only',both:'This step + carried value (advanced)'};
         Array.from(duration.options).forEach(function(o){o.textContent=labels[o.value];});duration.setAttribute('aria-label',key+' duration');
-        duration.disabled=state==='inherit';body.appendChild(frow((editor.patchLabel?editor.patchLabel(key):key)+' duration',duration));
+        duration.disabled=state==='inherit';body.appendChild(frow(stateLabel(key,meta)+' duration',duration));
         var hint=document.createElement('p');hint.className='fnote';
         hint.textContent=state==='both'?'Editing the current temporary value; a separate carried value resumes afterwards. Choosing a duration keeps the current value and replaces those two assignments.':state==='inherit'?'Enter a value below, then choose its duration.':state==='once'?'This value applies only at this stop. Later steps resume the carried state. Choose Inherit to remove this override.':'Later steps keep this value. Choose Inherit to remove this step’s assignment.';
         if(key==='audio')hint.textContent+=' Audio is one complete snapshot; its individual fields do not inherit separately.';
@@ -1068,21 +1104,70 @@ function panelPatchControl(pid, patch, decl, target, options){
           if(!initial)body.appendChild(frow('Clear earlier notifications',checkboxControl(cur===true,function(value){return commitPatch('clear',value?true:undefined);})));return;
         }
       }
+      function setValueDisabled(control,disabled,remember){
+        var targets=[];
+        if(control.matches && control.matches('input,select,textarea,button'))targets.push(control);
+        targets=targets.concat(Array.from(control.querySelectorAll?control.querySelectorAll('input,select,textarea,button'):[]));
+        targets.forEach(function(child){
+          if(remember!==false){
+            if(disabled)child.setAttribute('data-panel-state-value-disabled','true');
+            else child.removeAttribute('data-panel-state-value-disabled');
+          }
+          child.disabled=disabled || (remember===false && child.getAttribute('data-panel-state-value-disabled')==='true');
+        });
+        control.classList.toggle('panel-state-value-disabled',disabled);
+      }
+      function assignmentMode(valueControl,onSet,settings){
+        settings=settings || {};
+        var assignmentHas=settings.has===undefined?has:settings.has;
+        var assignmentValue=settings.value===undefined?cur:settings.value;
+        var assignmentMeta=settings.meta || meta;
+        var assignmentLabel=settings.label || stateLabel(key,meta);
+        var assignmentCommit=settings.commit || function(value){return commitPatch(key,value,false,null,storage);};
+        var current=!assignmentHas?'omit':assignmentValue===null?'null':'set';
+        var choices=['omit','set'];if(assignmentMeta.nullLabel || current==='null')choices.push('null');
+        var control=selectControl(choices,current,function(value){
+          if(value==='omit')return assignmentCommit(undefined);
+          if(value==='null')return assignmentCommit(null);
+          setValueDisabled(valueControl,false,settings.rememberDisabled);
+          if(onSet){var result=onSet(current);if(result!==undefined)return result;}
+          var focus=valueControl.matches && valueControl.matches('input,select,textarea')?valueControl:valueControl.querySelector && valueControl.querySelector('input,select,textarea');
+          if(focus)focus.focus({preventScroll:true});return true;
+        });
+        var labels={omit:assignmentMeta.unsetLabel,set:'Set value',null:assignmentMeta.nullLabel || 'Keep explicit null (advanced)'};
+        Array.from(control.options).forEach(function(option){option.textContent=labels[option.value];});
+        control.classList.add('panel-state-mode');control.setAttribute('aria-label',assignmentLabel+' assignment');
+        setValueDisabled(valueControl,current!=='set',settings.rememberDisabled);return control;
+      }
       if (f[1] === 'objf'){
         var group = document.createElement('div');
         group.className = 'rowsedit';
+        var invalidObject=has && cur!==null && !panelObject(cur);
         f[2].forEach(function(col){
-          var input=fieldInput(col,cur && cur[col[0]]);
+          var colMeta=panelFieldPresentation(decl,col,initial?'initial':'step');
+          var nested=panelObject(cur)?cur:null,nestedHas=!!nested && Object.prototype.hasOwnProperty.call(nested,col[0]);
+          var input=fieldInput(col,nestedHas?nested[col[0]]:undefined,colMeta);
           if(col[0]==='icon' && col[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
           wireCommit(input,function(){
-            var values=Object.create(null);values[col[0]]=input.value;
-            var out=patchFieldsCollect([col],values);
+            var out=panelFieldAssignment(col,input.value,'set');
             if(out.error){formError(key+': '+out.error);return false;}
-            var invalid=editor.validateSubfield && editor.validateSubfield(key,col,out.item[col[0]]);
+            var invalid=editor.validateSubfield && editor.validateSubfield(key,col,out.value);
             if(invalid){formError(key+': '+invalid);return false;}
-            return commitPatch(key,out.item,false,[col],storage);
+            var values=Object.create(null);values[col[0]]=out.value;
+            return commitPatch(key,values,false,[col],storage);
           });
-          group.appendChild(frow(editor.patchLabel ? editor.patchLabel(col[0]) : col[0], col[0]==='icon' && col[1]==='enum'?iconPickerControl(input):input));
+          var shown=col[0]==='icon' && col[1]==='enum'?iconPickerControl(input):input;
+          var nestedWrap=document.createElement('div');nestedWrap.className='panel-state-assignment panel-state-subfield';
+          if(colMeta.assignment!==false)nestedWrap.appendChild(assignmentMode(shown,function(previous){
+              if(previous!=='set' && col[1]==='text'){
+                var item=Object.create(null);item[col[0]]='';return commitPatch(key,item,false,[col],storage);
+              }
+            },{has:nestedHas,value:nestedHas?nested[col[0]]:undefined,meta:colMeta,label:stateLabel(col[0],colMeta),commit:function(value){
+              var item=Object.create(null);if(value!==undefined)item[col[0]]=value;
+              return commitPatch(key,item,false,[col],storage);
+            }}));
+          nestedWrap.appendChild(shown);
+          group.appendChild(frowBlock(stateLabel(col[0],colMeta),nestedWrap));
           /* Optional per-panel actions beside one sub-field (device-app report time). */
           var extra=editor.patchSubfield && editor.patchSubfield(key,col,input,{initial:initial,value:cur && cur[col[0]],commit:function(value){
             var item=Object.create(null);if(value!==undefined)item[col[0]]=value;
@@ -1090,24 +1175,31 @@ function panelPatchControl(pid, patch, decl, target, options){
           }});
           if(extra)group.appendChild(extra);
         });
-        body.appendChild(frowBlock(key, group));
+        if(invalidObject){setValueDisabled(group,true);var invalidNote=document.createElement('p');invalidNote.className='fnote';invalidNote.textContent='This value has an unsupported shape. Repair it in Advanced JSON before using these fields.';group.appendChild(invalidNote);}
+        var objectWrap=document.createElement('div');objectWrap.className='panel-state-assignment panel-state-object';objectWrap.appendChild(assignmentMode(group,null,{rememberDisabled:false}));objectWrap.appendChild(group);
+        var objectNote=stateNote(meta,key,has);if(objectNote)objectWrap.appendChild(objectNote);
+        body.appendChild(frowBlock(stateLabel(key,meta),objectWrap));
       } else {
-        var input = fieldInput(f, cur);
+        var input = fieldInput(f,cur,meta);
         if(key==='icon' && f[1]==='enum')input.setAttribute('data-icon-default-label',initial?'Use declared icon':'Inherit previous icon');
         wireCommit(input, function(){
-          var values = Object.create(null);
-          values[key] = input.value;
-          var out = patchFieldsCollect([f], values);
-          if (out.error){ formError(out.error); return false; }
-          return commitPatch(key, out.item[key],false,null,storage);
+          var out=panelFieldAssignment(f,input.value,'set');
+          if(out.error){formError(out.error);return false;}
+          return commitPatch(key,out.value,false,null,storage);
         });
-        body.appendChild(frow(editor.patchLabel ? editor.patchLabel(key) : key, key==='icon' && f[1]==='enum'?iconPickerControl(input):input));
+        var shown=key==='icon' && f[1]==='enum'?iconPickerControl(input):input;
+        var wrap=document.createElement('div');wrap.className='panel-state-assignment';
+        wrap.appendChild(assignmentMode(shown,function(previous){
+          if(previous!=='set' && f[1]==='text')return commitPatch(key,'',false,null,storage);
+        }));wrap.appendChild(shown);
+        var note=stateNote(meta,key,has);if(note)wrap.appendChild(note);
+        body.appendChild(frowBlock(stateLabel(key,meta),wrap));
       }
     });
     var rawFold = document.createElement('details');
     rawFold.className = 'rawjson';
     var rawSummary = document.createElement('summary');
-    rawSummary.textContent = 'raw JSON';
+    rawSummary.textContent = 'Advanced JSON';
     rawFold.appendChild(rawSummary);
     rawFold.appendChild(rawControl());
     body.appendChild(rawFold);
@@ -1446,61 +1538,75 @@ function panelEditorForCard(card){
 
 function panelSetupRows(val){
     var fields = PANEL_SETUP_FIELDS[val.type] || [['initial', 'json']];
-    return fields.map(function(f){
-      var key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type);
-      if(key==='initial' && panelAuthoring(val.type).initialFields)return panelPatchControl(val.id,val.initial || {},val,Object.assign({},session.target),{initial:true});
+    var entries=fields.map(function(f,index){return {field:f,index:index,meta:panelFieldPresentation(val,f,'setup')};})
+      .filter(function(entry){return !entry.meta.hidden;})
+      .sort(function(a,b){return Number(a.meta.advanced)-Number(b.meta.advanced) || a.index-b.index;});
+    var rows=[],lastGroup=null;
+    function annotated(row,meta){
+      if(!meta.help)return row;
+      var wrap=document.createElement('div');wrap.className='panel-setup-field';wrap.appendChild(row);
+      var note=document.createElement('p');note.className='fnote panel-setup-note';note.textContent=meta.help;wrap.appendChild(note);return wrap;
+    }
+    entries.forEach(function(entry){
+      var f=entry.field,meta=entry.meta,key = f[0], kind = f[1], cur = val[key], editor=panelEditor(val.type),row;
+      var groupName=meta.advanced?'Advanced settings':meta.group;
+      if(groupName && groupName!==lastGroup){var heading=document.createElement('h4');heading.className='panel-state-group panel-setup-group';heading.textContent=groupName;rows.push(heading);}
+      lastGroup=groupName || lastGroup;
+      if(key==='initial' && panelAuthoring(val.type).initialFields){rows.push(panelPatchControl(val.id,val.initial===undefined?{}:val.initial,val,Object.assign({},session.target),{initial:true}));return;}
       var custom=editor.setupField && editor.setupField(f,val);
-      if(custom) return custom;
+      if(custom){rows.push(annotated(custom,meta));return;}
 
       if (kind === 'text')
-        return frow(key, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
+        row=frow(meta.label, textControl(cur, function(v){ return commitSimple(key, v == null ? null : JSON.stringify(v)); }));
       if (kind === 'num')
-        return frow(key, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
+        row=frow(meta.label, numberControl(cur, function(v){ return commitSimple(key, v == null ? null : String(v)); }));
 
       if (kind === 'clock')
-        return frow(key, textControl(cur, function(v){
+        row=frow(meta.label, textControl(cur, function(v){
           if (v != null && builderClockInvalid(v)){
             formError(key + ': "' + v + '" is not ' + BUILDER_CLOCK_HINT); return false;
           }
           return commitSimple(key, v == null ? null : JSON.stringify(v));
         }, {placeholder: '90s, 5m, 2h30m'}));
       if (kind === 'rows'){
-        return frowBlock(key, rowsFieldControl(key, cur, f[2] || {cols: []}));
+        row=frowBlock(meta.label, rowsFieldControl(key, cur, f[2] || {cols: []}));
       }
-      if (kind === 'map') return frowBlock(key, mapFieldControl(key, cur, f[2] || {}));
-      if (kind === 'objf') return frowBlock(key, objFieldsControl(key, cur, f[2] || {cols: []}));
+      if (kind === 'map')row=frowBlock(meta.label, mapFieldControl(key, cur, f[2] || {}));
+      if (kind === 'objf')row=frowBlock(meta.label, objFieldsControl(key, cur, f[2] || {cols: []}));
       if (kind === 'csv'){
         /* comma-separated entry is lossy for labels that CONTAIN commas —
            such lists fall back to JSON editing instead of being rewritten */
         var hasComma = Array.isArray(cur) && cur.some(function(s){
           return typeof s === 'string' && s.indexOf(',') >= 0;
         });
-        if (hasComma) return frow(key, jsonFieldControl(key, cur, 'jsonArr'));
-        return frow(key, textControl(Array.isArray(cur) ? cur.join(', ') : cur, function(v){
-          if (v == null) return commitSimple(key, null);
-          var list = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-          return commitSimple(key, list.length ? JSON.stringify(list) : null);
-        }, {placeholder: 'A, B, C'}));
+        if (hasComma)row=frow(meta.label, jsonFieldControl(key, cur, 'jsonArr'));
+        else row=frow(meta.label, textControl(Array.isArray(cur) ? cur.join(', ') : cur, function(v){
+            if (v == null) return commitSimple(key, null);
+            var list = v.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+            return commitSimple(key, list.length ? JSON.stringify(list) : null);
+          }, {placeholder: 'A, B, C'}));
       }
-      return frow(key, jsonFieldControl(key, cur, kind));
+      if(!row)row=frow(meta.label, jsonFieldControl(key, cur, kind));
+      rows.push(annotated(row,meta));
     });
+    return rows;
   }
 
 function panelForm(val, ctx){
     var t = session.target;
     var rows = [
-      frow('id', textControl(val.id, function(v){
+      frow('Stable ID', textControl(val.id, function(v){
         if (v == null){ formError('a panel needs an id'); return false; }
         if (v === val.id){ formError(''); return true; }
         return commitCascade(function(raw){ return planRenamePanel(session.text(), raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
-      frow('type', selectControl(PANEL_TYPES, val.type, function(v){
+      frow('Panel type', selectControl(PANEL_TYPES, val.type, function(v){
         var ok = commitSimple('type', v == null ? null : JSON.stringify(v));
         if (ok) renderInspector(); /* the setup rows follow the type */
         return ok;
       })),
-      frow('title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
+      frow('Title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
     rows.push(frow('Presentation', selectControl(['Sidebar', 'Centerpiece'], ctx.diagram.primaryPanel === val.id ? 'Centerpiece' : 'Sidebar', function(v){
       return commitCascade(function(raw){ return planPrimaryPanel(session.text(), raw, t.section, v === 'Centerpiece' ? val.id : null); },

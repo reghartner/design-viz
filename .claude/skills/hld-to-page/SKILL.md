@@ -288,6 +288,11 @@ Translation is mechanical once the worksheet is done:
   each row's `time` becomes `steps[].time`.
 - Each `patch:` cell becomes a sparse patch under `steps[].panels.<panel-id>`.
   Each `holds:` cell becomes nothing in JSON (the state carries forward).
+- Starting values become a sparse `panel.initial` object. Omit a field to use
+  the panel default; do not copy renderer defaults into the spec. An empty
+  string is an authored value only when the panel documentation says it hides
+  text. Use `null` only for a documented reset, such as returning an icon to
+  its declared default.
 - Icon plan rows become `icon` patches. A restore row becomes exactly its
   Restore value: `icon: null` only when it returns to the declared default;
   otherwise patch the earlier icon explicitly (for example back to

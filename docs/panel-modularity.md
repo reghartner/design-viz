@@ -211,6 +211,22 @@ an optional third argument `{initial: true}` for context-specific labels. The
 shared inspector owns transactions, unknown-field preservation, and Undo/Redo;
 panels should not duplicate that machinery.
 
+Field tuples stay backward compatible as `[key, kind, options?]`. A fourth
+metadata object, or `authoring.fieldMeta[key]`, can declare `label`, `help`,
+`group`, `advanced`, `hidden`, `unsetLabel`, and `nullLabel`; `setup`, `initial`,
+and `step` objects override those values in one context. Dynamic fields should
+use tuple metadata so labels can come from the declaration, for example
+`[device.id, 'objf', fields, {label: device.label, group: 'Devices'}]`.
+`assignment: false` leaves assignment UX to a registered custom field adapter.
+
+The shared state editor uses a separate assignment selector. Omitted starting
+fields use the panel default; omitted step fields inherit; `null` is offered only
+when `nullLabel` declares a meaningful reset (or an imported value is already
+null); and **Set value** can author a real empty string. Assignment modes are UI
+state only and never serialize sentinels. Typed edits preserve unknown siblings,
+and removing the last starting field removes `initial` rather than writing an
+empty object. **Advanced JSON** remains available for complete object editing.
+
 `authoring.notifications: true` opts a panel into the shared notification
 composer for `notify` and its clear-before-add control. It reuses the inspector
 transaction/lifetime and the renderer's existing notification object contract.

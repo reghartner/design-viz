@@ -4935,6 +4935,20 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    initialFields: true,
+    fieldMeta: {
+      low: { label: 'Low threshold' },
+      crit: { label: 'Critical threshold' },
+      drainPerHour: { label: 'Drain % per hour' },
+      chargePerHour: { label: 'Charge % per hour' },
+      charge: { label: 'Charge %', group: 'Reading' },
+      drain: { label: 'Extra drain %', group: 'Reading', initial: { hidden: true } },
+      trend: { label: 'Trend', group: 'Power' },
+      source: { label: 'Power source', group: 'Power' },
+      cold: { label: 'Cold conditions', group: 'Context' },
+      note: { label: 'Note', group: 'Context' },
+      label: { label: 'Reading label', group: 'Context' },
+    },
     /* New panels start with the diagram's authored constants. Built-in
        placeholders are not copied, so the inspector keeps showing them as
        placeholders instead of passing them off as this device's rates. */
@@ -6666,12 +6680,13 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
-              ['icon', 'enum', ICON_SET],
+              ['icon', 'enum', ICON_SET, { nullLabel: 'Use declared icon' }],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
-              ['reportedAt', 'text'],
+              ['reportedAt', 'text', null, { assignment: false }],
             ],
+            { label: f.label || f.id, group: 'Data cards' },
           ];
         });
       if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});
@@ -6876,11 +6891,17 @@ PanelRegistry.extend('deviceapp', {
         {id:'patrol',label:'Patrol unit',kind:'police',callsign:'Unit 24'},
         {id:'backup',label:'Security response',kind:'security',callsign:'Unit 08'}],
         initial:{status:'idle',priority:'routine',timeOfDay:'dusk',patrol:{status:'available'},backup:{status:'available'}}},
+      initialFields:true,
+      fieldMeta:{
+        agency:{label:'Response agency'},responders:{label:'Responders'},
+        status:{label:'Dispatch status',group:'Incident'},priority:{label:'Priority',group:'Incident'},timeOfDay:{label:'Time of day',group:'Incident'},
+        incident:{label:'Incident',group:'Details'},location:{label:'Location',group:'Details'},dispatcher:{label:'Dispatcher',group:'Details'},detail:{label:'Summary',group:'Details'},note:{label:'Internal note',group:'Details'}
+      },
       setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'callsign'}],max:8}],['initial','json']],
       patchFields:[['status','enum',statuses],['priority','enum',priorities],['timeOfDay','enum',times],['incident','text'],['location','text'],['dispatcher','text'],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('dispatch').authoring.patchFields.concat(items(panel).map(function (unit) {
-          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']]];
+          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']],{label:unit.label||unit.id,group:'Responders'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -7020,6 +7041,12 @@ PanelRegistry.extend('gauge', {
 PanelRegistry.extend('gauge', {
   authoring: {
     template: { title: 'Draw', unit: 'mA', max: 400, initial: { value: 12 } },
+    initialFields: true,
+    fieldMeta: {
+      unit: { label: 'Unit' },
+      max: { label: 'Maximum' },
+      value: { label: 'Value', help: 'The number shown by the gauge.' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['max', 'num'],
@@ -10756,6 +10783,10 @@ PanelRegistry.extend('leds', {
       ],
       initial: { power: 'on' },
     },
+    initialFields: true,
+    fieldMeta: {
+      leds: { label: 'Indicators' },
+    },
     setupFields: [
       ['leds', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['initial', 'json'],
@@ -10774,7 +10805,12 @@ PanelRegistry.extend('leds', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
+          return [
+            item.id,
+            'enum',
+            ['on', 'off', 'tx', 'rx'],
+            { label: item.label || item.id, group: 'Indicators' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -11178,6 +11214,13 @@ PanelRegistry.extend('orbit', {
       title: 'Lifecycle',
       states: ['IDLE', 'ACTIVE', 'DONE'],
       initial: { state: 'IDLE' },
+    },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Lifecycle states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state' },
+      via: { label: 'Transition label', help: 'Describe how the lifecycle reached this state.' },
     },
     setupFields: [
       ['states', 'csv'],
@@ -12219,6 +12262,14 @@ body.sk-editorial .sk-daylight .qside-out{color:var(--ed-warn);}`,
 PanelRegistry.extend('queue', {
   authoring: {
     template: { title: 'Queue', initial: { state: 'empty' } },
+    initialFields: true,
+    fieldMeta: {
+      state: { label: 'Queue state', group: 'Message' },
+      label: { label: 'Message label', group: 'Message' },
+      from: { label: 'From', group: 'Route' },
+      to: { label: 'To', group: 'Route' },
+      reason: { label: 'Waiting reason', group: 'Route' },
+    },
     setupFields: [['initial', 'json']],
     patchFields: [
       ['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']],
@@ -14244,11 +14295,17 @@ PanelRegistry.extend('screen', {
         {id:'hall',label:'Hall motion',kind:'motion',zone:'Hallway'}],
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
+      initialFields:true,
+      fieldMeta:{
+        site:{label:'Site'},scene:{label:'Camera scene'},videoLabel:{label:'Video label'},sensors:{label:'Sensors'},
+        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},
+        status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
+      },
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
       patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
-          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
+          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']],{label:sensor.label||sensor.id,group:'Sensors'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -14690,6 +14747,10 @@ body.sk-editorial .sk-daylight .sgrow.s-jammed .sgstate{color:var(--ed-bad);}`,
 PanelRegistry.extend('signal', {
   authoring: {
     template: { title: 'Links', links: [{ id: 'up', label: 'uplink', transport: 'wifi' }] },
+    initialFields: true,
+    fieldMeta: {
+      links: { label: 'Connections' },
+    },
     setupFields: [
       [
         'links',
@@ -14742,6 +14803,7 @@ PanelRegistry.extend('signal', {
               ['bars', 'num', { min: 0, max: 4 }],
               ['note', 'text'],
             ],
+            { label: item.label || item.id, group: 'Links' },
           ];
         });
     },
@@ -14899,6 +14961,12 @@ body.sk-editorial .sk-daylight .pchip.cur{
 PanelRegistry.extend('state', {
   authoring: {
     template: { title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: { state: 'OFF' } },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state', help: 'Choose one of the declared states.' },
+    },
     setupFields: [
       ['states', 'csv'],
       ['colors', 'map'],
@@ -15647,6 +15715,17 @@ PanelRegistry.extend('thermo', {
       crit: 85,
       initial: { value: 21 },
     },
+    initialFields: true,
+    fieldMeta: {
+      min: { label: 'Minimum' },
+      max: { label: 'Maximum' },
+      warn: { label: 'High warning' },
+      crit: { label: 'High critical' },
+      lowWarn: { label: 'Low warning' },
+      lowCrit: { label: 'Low critical' },
+      value: { label: 'Temperature' },
+      label: { label: 'Reading label' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['min', 'num'],
@@ -15915,6 +15994,12 @@ PanelRegistry.extend('tiles', {
         { id: 't2', label: 'UNIT 2' },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      tiles: { label: 'Devices' },
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+    },
     setupFields: [
       ['tiles', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
       ['states', 'csv'],
@@ -15937,7 +16022,12 @@ PanelRegistry.extend('tiles', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'objf', [stateField, ['sub', 'text']]];
+          return [
+            item.id,
+            'objf',
+            [stateField, ['sub', 'text']],
+            { label: item.label || item.id, group: 'Devices' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -17729,6 +17819,13 @@ PanelRegistry.extend('waterfall', {
         { id: 'net', label: 'network', ms: 40 },
         { id: 'work', label: 'processing', ms: 120 },
       ],
+    },
+    initialFields: true,
+    fieldMeta: {
+      spans: { label: 'Timed spans' },
+      reveal: { label: 'Visible spans', help: 'Number of spans visible from the start.' },
+      highlight: { label: 'Highlighted span' },
+      total: { label: 'Total label' },
     },
     setupFields: [
       [

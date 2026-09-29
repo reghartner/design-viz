@@ -374,6 +374,10 @@ body.sk-editorial .sk-daylight .sgrow.s-jammed .sgstate{color:var(--ed-bad);}`,
 PanelRegistry.extend('signal', {
   authoring: {
     template: { title: 'Links', links: [{ id: 'up', label: 'uplink', transport: 'wifi' }] },
+    initialFields: true,
+    fieldMeta: {
+      links: { label: 'Connections' },
+    },
     setupFields: [
       [
         'links',
@@ -426,6 +430,7 @@ PanelRegistry.extend('signal', {
               ['bars', 'num', { min: 0, max: 4 }],
               ['note', 'text'],
             ],
+            { label: item.label || item.id, group: 'Links' },
           ];
         });
     },

@@ -23,6 +23,68 @@ var PANEL_SETUP_FIELDS = panelAuthoringMap('setupFields');
 /* Dynamic-key types are expanded from their declarations by panelPatchFields. */
 var PANEL_PATCH_FIELDS = panelAuthoringMap('patchFields');
 
+/* Optional presentation metadata stays with the panel definition while the
+   shared inspector owns rendering and assignment semantics. Existing field
+   tuples remain valid; a fourth tuple item may annotate dynamically expanded
+   fields without adding a central per-type switch.
+
+   authoring.fieldMeta.<key> and tuple[3] accept:
+     label / help / group / advanced / hidden / assignment
+     setup / initial / step — context-specific overrides of those properties
+     unsetLabel — copy for an omitted assignment
+     nullLabel — opt in to an explicit JSON null assignment
+   Context metadata is merged last. */
+function builderFieldLabel(key){
+  var text=String(key == null?'':key).replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/[_-]+/g,' ').trim();
+  return text?text.charAt(0).toUpperCase()+text.slice(1):'';
+}
+function panelFieldPresentation(decl,field,mode){
+  var key=field && field[0], authoring=decl && panelAuthoring(decl.type) || {}, registered=authoring.fieldMeta && authoring.fieldMeta[key];
+  var tuple=field && panelObject(field[3])?field[3]:null;
+  var out={key:key,label:builderFieldLabel(key),help:'',group:'',advanced:false,hidden:false};
+  function merge(meta){
+    if(!panelObject(meta))return;
+    ['label','help','group','unsetLabel','nullLabel'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name];});
+    ['advanced','hidden'].forEach(function(name){if(Object.prototype.hasOwnProperty.call(meta,name))out[name]=meta[name]===true;});
+    if(Object.prototype.hasOwnProperty.call(meta,'assignment'))out.assignment=meta.assignment!==false;
+  }
+  merge(registered);merge(tuple);merge(registered && registered[mode]);merge(tuple && tuple[mode]);
+  if(!out.unsetLabel)out.unsetLabel=mode==='initial'?'Use panel default':mode==='step'?'Inherit previous':'Leave unset';
+  return out;
+}
+
+/* Assignment mode is separate from the user value. This preserves a real
+   empty string, keeps omission distinct from JSON null and never reserves a
+   sentinel in an enum/icon namespace. patchFieldsCollect retains its legacy
+   blank-means-omission behavior; state editors call this helper explicitly. */
+function panelFieldAssignment(field,raw,mode){
+  if(mode==='omit')return {value:undefined};
+  if(mode==='null')return {value:null};
+  var key=field[0],kind=field[1],extra=field[2],text=raw==null?'':String(raw);
+  if(kind!=='text' && kind!=='enum')text=text.trim();
+  if(kind==='text')return {value:text.trim()};
+  if(text==='')return {error:builderFieldLabel(key)+' needs a value, or choose the inherited/default assignment.'};
+  if(kind==='num'){
+    var number=Number(text);if(!isFinite(number))return {error:key+': "'+text+'" is not a number'};
+    if(extra && (number<extra.min || number>extra.max))return {error:key+': use a number from '+extra.min+' to '+extra.max};
+    return {value:number};
+  }
+  if(kind==='bool'){
+    if(text!=='true' && text!=='false')return {error:key+': use true or false'};
+    if(extra && extra.trueOnly && text==='false')return {error:key+': only true (or unset) — false is ignored by the renderer'};
+    return {value:text==='true'};
+  }
+  if(kind==='clock' && builderClockInvalid(text))return {error:key+': "'+text+'" is not '+BUILDER_CLOCK_HINT};
+  if(kind==='json' || kind==='jsonArr' || kind==='jsonAny'){
+    var parsed;try{parsed=JSON.parse(text);}catch(ex){return {error:key+': not valid JSON ('+ex.message+')'};}
+    if(kind==='jsonArr' && !Array.isArray(parsed))return {error:key+' is a JSON array — [ ... ]'};
+    if(kind==='json' && !(parsed===null && extra && extra.nullable) && (!parsed || typeof parsed!=='object' || Array.isArray(parsed)))
+      return {error:key+' is a JSON object'+(extra && extra.nullable?' or null':'')+' — { ... }'};
+    return {value:parsed};
+  }
+  return {value:text};
+}
+
 function patchSummaryLine(patchObj){
   var keys = Object.keys(patchObj || {}).slice(0, 2);
   if (!keys.length) return 'empty patch';
@@ -49,30 +111,9 @@ function patchFieldsCollect(fields, values){
     var raw = !Object.prototype.hasOwnProperty.call(values, key) || values[key] == null ? '' : String(values[key]);
     if (kind !== 'enum') raw = raw.trim();
     if (raw === '') continue;
-    var value = raw;
-    if (kind === 'num'){
-      value = Number(raw);
-      if (!isFinite(value)) return {error: key + ': "' + raw + '" is not a number'};
-      if (extra && (value < extra.min || value > extra.max))
-        return {error: key + ': use a number from ' + extra.min + ' to ' + extra.max};
-    } else if (kind === 'bool'){
-      if (raw !== 'true' && raw !== 'false') return {error: key + ': use true or false'};
-      /* the validator accepts only literal true for phone clear — false is
-         an always-warned no-op, so the form refuses to write it */
-      if (extra && extra.trueOnly && raw === 'false')
-        return {error: key + ': only true (or unset) — false is ignored by the renderer'};
-      value = raw === 'true';
-    } else if (kind === 'clock' && builderClockInvalid(raw)){
-      return {error: key + ': "' + raw + '" is not ' + BUILDER_CLOCK_HINT};
-    } else if (kind === 'json' || kind === 'jsonArr' || kind === 'jsonAny'){
-      try { value = JSON.parse(raw); }
-      catch (ex){ return {error: key + ': not valid JSON (' + ex.message + ')'}; }
-      if (kind === 'jsonArr' && !Array.isArray(value)) return {error: key + ' is a JSON array — [ ... ]'};
-      if (kind === 'json' && !(value === null && extra && extra.nullable) &&
-          (!value || typeof value !== 'object' || Array.isArray(value)))
-        return {error: key + ' is a JSON object' + (extra && extra.nullable ? ' or null' : '') + ' — { ... }'};
-    }
-    item[key] = value;
+    var assignment=panelFieldAssignment(f,raw,'set');
+    if(assignment.error)return {error:assignment.error};
+    item[key] = assignment.value;
   }
   return {item: item};
 }

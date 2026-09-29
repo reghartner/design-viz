@@ -174,11 +174,17 @@
         {id:'patrol',label:'Patrol unit',kind:'police',callsign:'Unit 24'},
         {id:'backup',label:'Security response',kind:'security',callsign:'Unit 08'}],
         initial:{status:'idle',priority:'routine',timeOfDay:'dusk',patrol:{status:'available'},backup:{status:'available'}}},
+      initialFields:true,
+      fieldMeta:{
+        agency:{label:'Response agency'},responders:{label:'Responders'},
+        status:{label:'Dispatch status',group:'Incident'},priority:{label:'Priority',group:'Incident'},timeOfDay:{label:'Time of day',group:'Incident'},
+        incident:{label:'Incident',group:'Details'},location:{label:'Location',group:'Details'},dispatcher:{label:'Dispatcher',group:'Details'},detail:{label:'Summary',group:'Details'},note:{label:'Internal note',group:'Details'}
+      },
       setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'callsign'}],max:8}],['initial','json']],
       patchFields:[['status','enum',statuses],['priority','enum',priorities],['timeOfDay','enum',times],['incident','text'],['location','text'],['dispatcher','text'],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('dispatch').authoring.patchFields.concat(items(panel).map(function (unit) {
-          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']]];
+          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']],{label:unit.label||unit.id,group:'Responders'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {

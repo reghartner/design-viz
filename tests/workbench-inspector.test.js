@@ -83,7 +83,7 @@ function environment(){
   doc.getElementById=id=>doc.body.querySelector('#'+id);
   const C={document:doc,URL};vm.createContext(C);
   for(const name of pureNames)vm.runInContext(readSource(name+'.js'),C);
-  function mount(spec){
+  function mount(spec,options={}){
     const guide=doc.body.appendChild(element()),timers=new Map(),scheduled=[];
     let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0;
     const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},
@@ -95,7 +95,7 @@ function environment(){
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
       surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
       selection:{select(){selectionCalls++;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
-      preview:{stepper:()=>null,targetElement:()=>null},
+      preview:{stepper:()=>options.stepper || null,targetElement:()=>null},
       modes:{adding:()=>null,connecting:()=>null,toggleAdding(){},editPathStep(){}},
       clipboard:{current:()=>null,selectHome(){selectionCalls++;},clearHome(){}}});
     return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},
@@ -106,6 +106,72 @@ function environment(){
 }
 const home=()=>({nodes:{},rows:[],panels:[{id:'home',type:'homemap',outline:{w:300,h:164,future:'keep'}}],steps:[{panels:{home:{}}}]});
 const named=(guide,name)=>guide.querySelectorAll('.obj-field').find(label=>label.textContent===name)?.querySelector('input');
+const aria=(guide,label)=>guide.querySelector('[aria-label="'+label+'"]');
+
+test('palette-created simple panels expose typed starting state with sparse exact history',()=>{
+  const e=environment(),empty={nodes:{},rows:[[]]},added=e.C.planAddPanel(JSON.stringify(empty),empty,0,'gauge');
+  assert.equal(added.error,undefined);
+  const spec=JSON.parse(added.text);spec.panels[0].initial.futureReading={unit:'future'};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.ok(h.guide.querySelector('[data-panel-state="initial"]'));
+  assert.equal(aria(h.guide,'Value assignment').value,'set');
+  const value=aria(h.guide,'value');assert.equal(value.value,'12');
+  const before=h.text;value.value='42';value.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{value:42,futureReading:{unit:'future'}});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  const omit=aria(h.guide,'Value assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{futureReading:{unit:'future'}});
+  h.session.undo();assert.equal(h.text,changed);
+});
+
+test('step controls distinguish inherited and set values while retaining imported enum tokens',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'status',type:'state',states:['OFF','ON'],initial:{state:'FUTURE',futureTop:true}}],steps:[
+    {title:'Known',panels:{status:{state:'ON',futurePatch:{keep:true}}}},
+    {title:'Inherited',panels:{status:{futureSecond:7}}}
+  ]},h=e.mount(spec);
+  h.session.target={kind:'step',section:0,index:1};h.inspector.render();
+  assert.equal(aria(h.guide,'Current state assignment').value,'omit');
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON" · Inherited from step 1/);
+  const mode=aria(h.guide,'Current state assignment');mode.value='set';mode.fire('change');
+  const field=aria(h.guide,'state');assert.equal(field.disabled,false);field.value='OFF';field.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.status,{futureSecond:7,state:'OFF'});
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'state').value,'ON');
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Effective "ON" · Set at this step/);
+  h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'state').value,'FUTURE');
+  assert.match(aria(h.guide,'state').options.at(-1).textContent,/unknown/);
+});
+
+test('effective field context follows the active path at a shared target step',()=>{
+  const e=environment();let activePath='main';
+  const spec={nodes:{},rows:[[]],panels:[{id:'status',type:'state',states:['OFF','ON','ALERT'],initial:{state:'OFF'}}],steps:[
+    {id:'start',panels:{status:{}}},{id:'main-state',panels:{status:{state:'ON'}}},
+    {id:'alt-state',panels:{status:{state:'ALERT'}}},{id:'finish',panels:{status:{}}}
+  ],paths:[{id:'main',steps:['start','main-state','finish']},{id:'alt',steps:['start','alt-state','finish']}]};
+  const h=e.mount(spec,{stepper:{path:()=>activePath}});h.session.target={kind:'step',section:0,index:3};h.inspector.render();
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON"/);
+  activePath='alt';h.inspector.render();
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ALERT"/);
+});
+
+test('dynamic object fields preserve empty text, unknown siblings, and explicit icon reset',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'links',type:'signal',links:[{id:'up',label:'Uplink'}],initial:{up:{state:'future',note:'',futureNested:9},futureTop:true}},{id:'app',type:'deviceapp',fields:[{id:'model',label:'Camera model',icon:'camera'}],initial:{model:{value:'Doorbell',icon:'chip',futureNested:4}}}],steps:[]};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'Uplink assignment').value,'set');
+  assert.equal(aria(h.guide,'Note assignment').value,'set');
+  assert.equal(aria(h.guide,'note').value,'');
+  assert.equal(aria(h.guide,'state').value,'future');
+  const noteMode=aria(h.guide,'Note assignment');noteMode.value='omit';noteMode.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{up:{state:'future',futureNested:9},futureTop:true});
+
+  h.session.target={kind:'panel',section:0,index:1};h.inspector.render();
+  const iconMode=aria(h.guide,'Icon assignment');
+  assert.ok(Array.from(iconMode.options).some(option=>option.value==='null' && option.textContent==='Use declared icon'));
+  iconMode.value='null';iconMode.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[1].initial.model,{value:'Doorbell',icon:null,futureNested:4});
+  assert.equal(aria(h.guide,'Report time assignment'),null,'custom report-time actions stay authoritative');
+});
 
 test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{
   for(const bare of [false,true]){

@@ -32,7 +32,7 @@ test('card icon overrides carry independently and null restores the declaration 
 test('card icons have typed initial/step authoring and validate without deriving temperature or alarms', () => {
   const p = app();
   const fields = C.panelPatchFields(p).find(f => f[0]==='power')[2];
-  assert.deepEqual(plain(fields.find(f=>f[0]==='icon')),['icon','enum',plain(C.ICON_SET)]);
+  assert.deepEqual(plain(fields.find(f=>f[0]==='icon')),['icon','enum',plain(C.ICON_SET),{nullLabel:'Use declared icon'}]);
   assert.equal(C.PanelRegistry.get('deviceapp').authoring.initialFields,true);
   const warnings=[];
   C.deviceAppPatchWarnings({power:{icon:'battery-low'},temperature:{icon:'triggered'}},'patch',p,warnings);

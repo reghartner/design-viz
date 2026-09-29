@@ -58,6 +58,7 @@
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",
+    "workbench/agent-project.js",
     "workbench/agent-recovery.js",
     "workbench/agent-review.js",
     "workbench/agent-chat.js",

@@ -9,7 +9,7 @@
  * Wait for control-result.json status "sent", then use the published session
  * folder and its real helper. Create output/shutdown.json to stop the broker.
  */
-import {readFile, writeFile, mkdir, rename, rm, lstat, realpath, copyFile} from 'node:fs/promises';
+import {readFile, writeFile, mkdir, rename, rm, lstat, realpath, copyFile,readdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
@@ -108,11 +108,12 @@ export async function createSession(page, outDir, options = {}) {
     await writeJson(path.join(outDir, 'exchange-history', filename + '.meta.json'), {sequence, filename, name, operation, sha256: digest, at: Date.now()});
   }
   await page.exposeBinding('authoringDisk', async (_, operation, name, value) => {
-    const target = await diskPath(projectPath, name);
+    const target = name==='/' && operation==='entries'?projectPath:await diskPath(projectPath, name);
+    if (operation === 'entries') return (await readdir(target,{withFileTypes:true})).map(entry=>({name:entry.name,kind:entry.isDirectory()?'directory':'file'}));
     if (operation === 'directory') {
       if (value?.create) await mkdir(target, {recursive: false}).catch(error => { if (error.code !== 'EEXIST') throw error; });
-      if (!(await lstat(target)).isDirectory()) throw new Error('Not a directory.');
-      if (path.dirname(target) === projectPath && /^flowview-session-[\w-]+$/.test(path.basename(target))) sessionPath = target;
+      try{if (!(await lstat(target)).isDirectory()) throw new Error('Not a directory.');}catch(error){if(error.code==='ENOENT')return false;throw error;}
+      if (path.dirname(target) === projectPath && path.basename(target)==='.flowview-agent') sessionPath = target;
       return true;
     }
     if (operation === 'exists') {
@@ -145,12 +146,13 @@ export async function createSession(page, outDir, options = {}) {
     }
     function directory(name) {
       return {
-        kind: 'directory', name: name.split('/').pop() || 'Authoring agent project',
+        kind: 'directory', name: name.split('/').pop() || 'agent-project',
+        async *values(){for(const entry of await window.authoringDisk('entries',name || '/'))yield entry;},
         async queryPermission() { return 'granted'; },
         async requestPermission() { return 'granted'; },
         async getDirectoryHandle(child, options) {
           validName(child);
-          await window.authoringDisk('directory', name + '/' + child, {create: options?.create === true});
+          if(!await window.authoringDisk('directory', name + '/' + child, {create: options?.create === true}))throw new DOMException('Missing directory','NotFoundError');
           return directory(name + '/' + child);
         },
         async getFileHandle(child, options) {
@@ -198,7 +200,7 @@ export async function createSession(page, outDir, options = {}) {
   await waitFor(() => page.locator('#folder-agent-copy').isEnabled(), 'connected editor');
   const instructions = await page.locator('#folder-agent-instructions').inputValue();
   if (await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-close-guide').click();
-  if (!sessionPath) throw new Error('Editor did not create its session folder.');
+  if (!sessionPath) throw new Error('Editor did not create its diagram support folder.');
   const manifest = await readJson(path.join(sessionPath, 'session.json'));
   const identity = {runId, outDir, projectPath, sessionPath, sessionId: manifest.sessionId, connectionId: manifest.connectionId};
   await writeJson(path.join(outDir, 'session-path.json'), {...identity, status: 'ready', readyAt: Date.now()});

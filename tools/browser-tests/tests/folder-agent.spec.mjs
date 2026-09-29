@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-import {readFile,writeFile,mkdir,mkdtemp,rm,stat,rename} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,mkdtemp,rm,stat,rename,readdir} from 'node:fs/promises';
 import {execFileSync,spawn} from 'node:child_process';
 import path from 'node:path';
 import {tmpdir} from 'node:os';
@@ -17,7 +17,8 @@ async function setup(page){
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
   await page.exposeBinding('folderDisk',async(_,operation,name,value)=>{
     const target=path.resolve(folder,'.'+name);if(!target.startsWith(folder+path.sep)&&target!==folder)throw Error('Outside test folder');
-    if(operation==='mkdir'){await mkdir(target,{recursive:true});sessionFolder=target;return;}
+    if(operation==='entries')return (await readdir(target,{withFileTypes:true})).map(e=>({name:e.name,kind:e.isDirectory()?'directory':'file'}));
+    if(operation==='mkdir'){if(!value?.create){try{return (await stat(target)).isDirectory();}catch(e){if(e.code==='ENOENT')return false;throw e;}}await mkdir(target,{recursive:true});sessionFolder=target;return true;}
     if(operation==='write'){
       writes.push(name);
       if(path.basename(target)===failWrite){failWrite=null;throw Error('Test write failure');}
@@ -32,14 +33,15 @@ async function setup(page){
   await page.addInitScript(()=>{
     localStorage.setItem('dv_tour_v1','done');
     function dir(name){return {name:name.split('/').pop()||'Test folder',
-      async getDirectoryHandle(child){await window.folderDisk('mkdir',name+'/'+child);return dir(name+'/'+child);},
+      async *values(){for(const entry of await window.folderDisk('entries',name || '/'))yield entry;},
+      async getDirectoryHandle(child,options){if(!await window.folderDisk('mkdir',name+'/'+child,options))throw new DOMException('Missing','NotFoundError');return dir(name+'/'+child);},
       async getFileHandle(child,options){const file=name+'/'+child;
         if(!options?.create && !await window.folderDisk('exists',file))throw new DOMException('Missing','NotFoundError');
         return {async getFile(){const text=await window.folderDisk('read',file);return new File([text],child);},
           async createWritable(){let value;return {async write(text){value=text;},async close(){await window.folderDisk('write',file,value);},async abort(){}};}};
       }};}
     window.pickerCalls=0;
-    window.showDirectoryPicker=async()=>{window.pickerCalls++;if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.resumeFolder?'/'+window.resumeFolder:'');};
+    window.showDirectoryPicker=async()=>{window.pickerCalls++;if(window.cancelPicker)throw new DOMException('Cancelled','AbortError');return dir(window.pickPath || '');};
   });
   await page.route('**/*',async route=>{
     const url=new URL(route.request().url());
@@ -62,8 +64,8 @@ async function chooseFolder(page){
 }
 async function resumeFolder(page){
   if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
-  await expect(page.locator('#folder-agent-resume')).toBeVisible();
-  await page.locator('#folder-agent-resume').click();
+  await expect(page.locator('#folder-agent-connect')).toBeVisible();
+  await page.locator('#folder-agent-connect').click();
 }
 async function publishedRequest(h,text){
   // Send disables while its file write is pending, before Claude can read it.
@@ -85,7 +87,7 @@ test('editor conversation uses real local files and helper; changes render with 
     await chooseFolder(page);await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const manifest=await h.read('session.json'),prompt=await page.locator('#folder-agent-instructions').inputValue();
-    expect(prompt).toContain(JSON.stringify('./'+path.basename(h.session)));
+    expect(prompt).toContain(JSON.stringify('./Test folder'));
     expect(prompt).toContain('relative to your current working directory');
     expect(prompt).toContain(manifest.sessionId);expect(prompt).toContain(manifest.connectionId);
     expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
@@ -106,7 +108,8 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(next.technicalLevel).toBe('engineering');
     await writeFile(path.join(h.session,'candidate.spec.json'),edited);
     await page.locator('#folder-agent-input').focus(); // Composer focus must allow diagram updates.
-    h.run('propose','--request',next.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Customer story updated');
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',next.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Customer story updated');
     await expect(page.locator('#agent-update-banner')).toBeVisible();
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Customer camera');
     await expect(page.locator('#src')).toHaveValue(source);await page.locator('#agent-update-commit').click();
@@ -140,7 +143,7 @@ test('one Build click guides visible copying and folder recovery, then the liste
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
-    await expect(page.getByRole('dialog',{name:'Let’s connect your Claude.'})).toBeVisible();
+    await expect(page.getByRole('dialog',{name:'Choose your diagram folder.'})).toBeVisible();
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);
     await page.screenshot({path:info.outputPath('claude-centered-start.png')});
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
@@ -154,7 +157,7 @@ test('one Build click guides visible copying and folder recovery, then the liste
     await page.locator('#folder-agent-guide-help [data-agent-change-folder]').click();
     await expect.poll(async()=>JSON.parse(await readFile(path.join(oldFolder,'editor.json'),'utf8')).connected).toBe(false);
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
-    expect(h.session).not.toBe(oldFolder);
+    expect(h.session).toBe(oldFolder);
     await page.locator('#folder-agent-copy').click();
     await page.screenshot({path:info.outputPath('claude-centered-wait.png')});
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
@@ -237,7 +240,7 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     await expect(page.locator('#src')).toHaveValue(localDraft);expect((await h.read('state.json')).source).toBe(savedSource);
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify({...before,connected:false,at:Date.now()}));
     await resumeFolder(page);
-    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/selected exchange folder/);
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/diagram folder/);
     const after=await h.read('session.json');expect(after.sessionId).toBe(before.sessionId);expect(after.connectionId).not.toBe(before.connectionId);
     await expect(page.locator('#folder-agent-recovery-choice')).toBeHidden();
     await expect(page.locator('#src')).toHaveValue(savedSource);
@@ -290,11 +293,11 @@ test('byte-identical Resume clears old history and a late owner change refuses w
     await writeFile(path.join(h.session,'state.json'),JSON.stringify(replacementState));
     await writeFile(path.join(h.session,'editor.json'),JSON.stringify(replacementEditor));
     release();await expect(page.locator('#folder-agent-status')).toContainText(/saved session changed|identity/i);
-    await expect(page.locator('#folder-agent-resume')).toBeEnabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
+    await expect(page.locator('#folder-agent-connect')).toBeEnabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
     await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
     expect(h.writes).toEqual([]);expect(await h.read('session.json')).toEqual(replacement);expect(await h.read('state.json')).toEqual(replacementState);expect(await h.read('editor.json')).toEqual(replacementEditor);
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toBe(instructions);
-    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+    await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeEnabled();
     expect(h.errors).toEqual([]);
   }finally{release?.();h.readGate(null);await page.close();await h.cleanup();}
 });
@@ -459,7 +462,8 @@ test('full-document reviewed apply, exact receipt Undo and cancelled late propos
 
     spec.page.blocks[0].diagram.nodes.b.title='Delivery service';
     await writeFile(path.join(h.session,'candidate.spec.json'),JSON.stringify(spec,null,2));
-    h.run('propose','--request',request.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Rename one service');
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',current.revision,'--file','candidate.spec.json','--summary','Rename one service');
     await expect(page.locator('#folder-agent-review')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
     await page.locator('#folder-agent-review-accept').click();await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe('applied');
     await expect(page.locator('#src')).toHaveValue(/Delivery service/);h.run('reply','--request',request.id,'--text','Renamed the service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
@@ -494,7 +498,8 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#agent-message-copy').click();expect((await h.read('request.json')).id).toBe(request.id);
     await page.locator('#agent-message-close').click();
     const base=await h.read('state.json');await writeFile(path.join(h.session,'candidate.spec.json'),source);
-    h.run('propose','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json','--summary','Delivery story');
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json','--summary','Delivery story');
     await expect(page.locator('#agent-update-open')).toBeVisible();await expect(page.locator('#src')).toHaveValue(base.source);
     expect(h.run('watch','--minutes','.002','--interval','.1')).toBe(''); // Even an optional watcher never dispatches a copied request.
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Doorbell');
@@ -512,7 +517,8 @@ test('external branch copies context without dispatch, accepts native followups 
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(human);await page.locator('#go').click();
     await expect.poll(async()=> (await h.read('state.json')).source).toBe(human);
     await writeFile(path.join(h.session,'candidate.spec.json'),agent);
-    h.run('propose','--request',followup.id,'--revision',before.revision,'--file','candidate.spec.json','--summary','Agent backend');
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',followup.id,'--revision',before.revision,'--file','candidate.spec.json','--summary','Agent backend');
     await expect(page.locator('#agent-update-banner-summary')).toContainText('Includes your latest edits');
     await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Human camera');await expect(page.locator('#agent-update-view')).toContainText('Agent backend');
     await expect(page.locator('#src')).toHaveValue(human);await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(/Agent backend/);
@@ -531,11 +537,12 @@ test('conflicting update preserves local edits and copies actionable feedback fo
     const human=source.replace('"Doorbell"','"My camera"');
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(human);await page.locator('#go').click();await expect.poll(async()=> (await h.read('state.json')).source).toBe(human);
     await writeFile(path.join(h.session,'candidate.spec.json'),source.replace('"Doorbell"','"Their camera"'));
-    h.run('propose','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json');
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nThis trial changes the requested node title and preserves unrelated story behavior.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',base.revision,'--file','candidate.spec.json');
     await expect(page.locator('#agent-update-banner-title')).toHaveText('Agent update needs attention');await page.locator('#agent-update-open').click();
     await expect(page.locator('#agent-update-commit')).toBeDisabled();await expect(page.locator('#agent-update-feedback')).toHaveValue(/nodes\/a\/title/);
     await page.screenshot({path:info.outputPath('agent-conflict-feedback.png')});
-    await page.locator('#agent-update-copy-feedback').click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('Reread state.json');
+    await page.locator('#agent-update-copy-feedback').click();expect(await page.evaluate(()=>navigator.clipboard.readText())).toContain('Reread .flowview-agent/state.json');
     await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('rejected');
     await expect(page.locator('#src')).toHaveValue(human);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -591,6 +598,54 @@ test('connected Copy preserves a large message while registering a bounded nativ
     expect(request.text.length).toBeLessThanOrEqual(16000);expect(request.delivery).toBe('clipboard');
     expect(copied).toContain(request.id);expect(copied).toContain(long);
     await page.locator('#agent-message-copy').click();expect((await h.read('request.json')).id).toBe(request.id);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('diagram folder opens an existing named pair without metadata and reviews ledger-only changes with paired Undo',async({page},info)=>{
+  const h=await setup(page);
+  const beforeLedger='# Coverage ledger\n\nExisting evidence and decisions.\n';
+  const afterLedger='# Coverage ledger\n\nExisting evidence and decisions.\n\nReviewed: the same diagram needs no spec change.\n';
+  try{
+    await writeFile(path.join(h.folder,'payments.spec.json'),source);
+    await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#src')).toHaveValue(source);
+    expect(path.basename(h.session)).toBe('.flowview-agent');
+    expect((await h.read('session.json')).artifacts).toMatchObject({spec:'payments.spec.json',ledger:'payments.ledger.md'});
+    expect(await readFile(path.join(h.folder,'README.md'),'utf8')).toBe('Existing agent project notes.');
+    await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+    await page.locator('#agent-message-open').click();await page.locator('#agent-message-text').fill('Record the reviewed evidence in the ledger.');await page.locator('#agent-message-copy').click();await page.locator('#agent-message-close').click();
+    const request=await h.read('request.json'),state=await h.read('state.json');
+    await writeFile(path.join(h.session,'candidate.spec.json'),source);await writeFile(path.join(h.session,'candidate.ledger.md'),afterLedger);
+    h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Review evidence without changing the diagram');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-ledger')).toHaveText(afterLedger.trim());
+    expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    await page.locator('#agent-update-current').click();await expect(page.locator('#agent-update-ledger')).toHaveText(beforeLedger.trim());
+    await page.locator('#agent-update-proposed').click();await page.screenshot({path:info.outputPath('paired-diagram-ledger-preview.png')});
+    await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
+    const handwritten=source.replace('Doorbell','Handwritten after approval');await page.locator('#editor-tab-json').click();await page.locator('#src').fill(handwritten);await page.locator('#editor-tab-json').focus();
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    await page.locator('#redo-builder').click();await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
+    expect(await readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(handwritten);
+    await page.locator('#editor-tab-agent').click();await disconnect(page);
+    const outside=source.replace('Doorbell','Outside edit');await writeFile(path.join(h.folder,'payments.spec.json'),outside);
+    await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(outside);
+    expect((await h.read('state.json')).ledger).toBe(afterLedger);
+    expect(await page.evaluate(text=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).some(entry=>entry.text===text && entry.ledger),handwritten)).toBe(true);
+    await closeGuide(page);await disconnect(page);await mkdir(path.join(h.folder,'second-diagram'));
+    await page.evaluate(()=>window.pickPath='/second-diagram');await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
+    expect(await readFile(path.join(h.folder,'second-diagram/story.ledger.md'),'utf8')).toBe(afterLedger);
+    expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
+    await closeGuide(page);await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{broken JSON');await page.locator('#editor-tab-json').focus();
+    await expect.poll(async()=>(await h.read('state.json')).source).toBe('{broken JSON');
+    expect(await readFile(path.join(h.folder,'second-diagram/story.spec.json'),'utf8')).toBe(outside);
+    expect(await readFile(path.join(h.folder,'second-diagram/story.ledger.md'),'utf8')).toBe(afterLedger);
+    await page.locator('#editor-tab-agent').click();await disconnect(page);await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(outside);
+    expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).ledger)).toBe(afterLedger);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

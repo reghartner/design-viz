@@ -159,7 +159,8 @@ class AuthorEvalTests(unittest.TestCase):
         allowed = command[command.index('--allowedTools') + 1:command.index('--permission-prompts')]
         self.assertNotIn('Bash', allowed)
         self.assertNotIn('Write(./**)', allowed)
-        self.assertIn('Write(./story.ledger.md)', allowed)
+        self.assertIn('Write(./candidate.ledger.md)', allowed)
+        self.assertNotIn('Write(./story.ledger.md)', allowed)
         self.assertNotIn('Write(./operations.json)', allowed)
         for phase in (1, 2):
             prompt = eval.author_prompt(OWNER, 'request-1', phase)

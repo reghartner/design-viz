@@ -1,10 +1,11 @@
 /* Read-only proposed state, separate from the editor's document and history. */
 function workbenchAgentConflictFeedback(review){
+  var prefix=review.artifacts && review.artifacts.metadata==='.'?'':'.flowview-agent/';
   return ['Your proposed Flowview update could not be committed. My current diagram has been preserved.',
     'Proposal: '+review.id, 'Starting revision: '+review.baseRevision, 'Current revision: '+review.revision,'',
     'Please resolve these conflicts or validation problems:',
     (review.conflicts || []).map(function(item){return '- '+item.path+': '+item.reason;}).join('\n'),'',
-    'Reread state.json and story.spec.json in our shared folder. Reconcile your intended changes with my latest edits, preserve unrelated work, validate the complete story, and submit a new proposal with the revision you actually read. Do not just relabel the old proposal with a newer revision.'
+    'Reread '+prefix+'state.json and the accepted spec and ledger named in '+prefix+'project.json. Reconcile your intended changes with my latest edits, preserve unrelated work, reconcile the ledger with the complete story, validate it, and submit both artifacts in a new proposal with the revision you actually read. Do not just relabel the old proposal with a newer revision.'
   ].join('\n');
 }
 function initWorkbenchAgentReview(opts){
@@ -19,6 +20,7 @@ function initWorkbenchAgentReview(opts){
     el('current').setAttribute('aria-pressed',String(viewing==='current'));el('proposed').setAttribute('aria-pressed',String(viewing==='proposed'));
     var source=viewing==='current'?shown.current:shown.source;
     el('source').value=source || '';
+    el('ledger').textContent=(viewing==='current'?shown.currentLedger:shown.ledger) || 'No coverage ledger yet.';
     if(!source){el('view').textContent='Resolve the issues above with your agent to get a complete, valid preview.';return;}
     try{
       var page=normalize(JSON.parse(source)),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
@@ -32,7 +34,7 @@ function initWorkbenchAgentReview(opts){
     var changed=shown && shown.review.version!==next.review.version;shown=next;
     el('summary').textContent=next.review.summary;
     el('note').textContent=!next.review.ok?'Your current story is unchanged. Share this feedback so your agent can revise the update.':
-      (changed?'The diagram changed, so this preview has been refreshed. Review it again. ':next.review.merged?'Your changes and the agent’s separate changes are combined below. ':'')+'Commit applies this preview as one undoable change.';
+      (changed?'The diagram changed, so this preview has been refreshed. Review it again. ':next.review.merged?'Your changes and the agent’s separate changes are combined below. ':'')+'Commit updates the spec and ledger in your diagram folder as one undoable change. A Git commit is a separate step in your agent.';
     el('issues').hidden=!!next.review.ok;el('feedback').value=workbenchAgentConflictFeedback(next.review);
     draw();
   }

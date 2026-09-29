@@ -475,7 +475,9 @@ function initWorkbenchBuilder(opts){
       sourceOrigin=null;refreshProvenance();
       setSelected(null);clearMultiSelect();clearStepMarkers();inspectorMessage(message);
     },
-    invalidateProject:retireProjectUI
+    artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
+    restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
+    invalidateProject:function(policy){retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
   });
   if(opts.workspace && opts.workspace.setHistory){
     opts.workspace.setHistory(life.guard(session.rememberView));
@@ -1112,12 +1114,14 @@ function initWorkbenchBuilder(opts){
     var value=provenance(),el=document.getElementById('workspace-provenance');
     if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Save downloads JSON; Prepare review packages a handoff. Neither publishes to your company.';}
   }
+  var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,
+    setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
       var previewCurrent=snap.renderedText===snap.text;
       var ctl=opts.ctl && opts.ctl();
-      return {project:snap.project,open:!!open,source:open?snap.text:'',parseError:open?snap.error || null:null,
+      return {project:snap.project,open:!!open,source:open?snap.text:'',ledger:agentLedgerProject===snap.project?agentLedger:null,parseError:open?snap.error || null:null,
         previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
           var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
             if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];
@@ -1152,8 +1156,16 @@ function initWorkbenchBuilder(opts){
       var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
       var findings=validate(normalize(raw));
       if(findings.errors.length)return {ok:false,error:findings.errors.join('\n')};
-      var outcome;
-      var accepted=session.accept({text:text},{snapshot:snapshot,beforePublish:function(){
+      var ledgerEpoch=agentLedgerEpoch,outcome,paired=proposal && typeof proposal.ledger==='string',history;
+      if(paired){
+        history={kind:'source',capture:function(){return {source:session.text(),ledger:agentLedger || ''};},before:{source:snapshot.text,ledger:agentLedgerProject===snapshot.project?agentLedger:''},after:{source:text,ledger:proposal.ledger},restore:function(value){
+          if(agentLedgerEpoch!==ledgerEpoch)return 'expired';
+          agentOptions.setLedger(value.ledger);clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();
+          var restored=session.restoreHistoryText(value.source);rehighlight();if(stepList)stepList.sync();if(storyBrief)storyBrief.refresh();return restored;
+        }};
+      }
+      var accepted=session.accept({text:text},{snapshot:snapshot,history:history,beforePublish:function(){
+        if(paired)agentOptions.setLedger(proposal.ledger);
         clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();if(guide)guide.hidden=true;
       },afterRender:function(plan,result){
         outcome=result;
@@ -1166,9 +1178,13 @@ function initWorkbenchBuilder(opts){
       if(accepted && storyBrief)storyBrief.refresh();refreshProvenance();
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
     },
+    openEmptyFolder:function(expected){
+      var current=agentOptions.snapshot();if(current.project!==expected.project || current.source!==expected.source)return {ok:false,error:'Your draft changed while opening the folder.'};
+      session.preserveDraft();session.resetHistory();agentLedgerEpoch++;return {ok:true,project:current.project};
+    },
     restoreSavedStory:function(source,expected){
       var current=agentOptions.snapshot();
-      if(expected && (current.project!==expected.project || current.source!==expected.source))return {ok:false,error:'Your draft changed while opening the folder. Select the session folder again to resume.'};
+      if(expected && (current.project!==expected.project || current.source!==expected.source))return {ok:false,error:'Your draft changed while opening the folder. Choose the diagram folder again.'};
       var ok=loadText(source);return {ok:ok,project:session.snapshot().project};
     },
     showChanges:showAgentChanges,
@@ -1201,7 +1217,7 @@ function initWorkbenchBuilder(opts){
     }finally{handoffRequests.delete(request);}
   }
   var storyBrief=typeof initWorkbenchStoryBrief==='function'?initWorkbenchStoryBrief({document:document,snapshot:agentOptions.snapshot,
-    readLedger:function(){return agentChat?agentChat.readLedger():null;},provenance:provenance,renderHtml:handoffHtml,
+    readLedger:async function(){var live=agentChat?await agentChat.readLedger():null,snap=agentOptions.snapshot();return live || (snap.ledger?{text:snap.ledger,sourceMatches:null,verified:false}:null);},provenance:provenance,renderHtml:handoffHtml,
     addEvidence:function(evidence,expected){
       var snapshot=agentOptions.snapshot();if(snapshot.source!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'The story changed. Choose its current story moment again.'};
       var raw;try{raw=JSON.parse(snapshot.source);}catch(error){return {ok:false,error:'Repair the JSON first.'};}

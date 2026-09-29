@@ -2,7 +2,7 @@
 function createFolderAgentFiles(directory){
   var limit=8*1024*1024;
   async function readText(name,maxBytes){
-    if(!/^[\w.-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
+    if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
     try{
       var handle=await directory.getFileHandle(name),file=await handle.getFile(),bound=Math.min(limit,maxBytes || limit);
       if(file.size>bound)throw Error(name+' exceeds the session size limit.');
@@ -17,8 +17,9 @@ function createFolderAgentFiles(directory){
       if(!/^state-[\w-]{1,120}\.json$/.test(name))throw Error('Only staged session snapshots may be removed.');
       try{await directory.removeEntry(name);}catch(ex){if(ex.name!=='NotFoundError')throw ex;}
     },
-    read:async function(name){var text=await readText(name);return text===null?null:JSON.parse(text);},
+    read:async function(name){var text=await readText(name);return text===null || text==='' && /^(project|session|state|editor|transcript|changes|artifact-write)\.json$/.test(name)?null:JSON.parse(text);},
     write:async function(name,value,guard){
+      if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain filename.');
       var text=typeof value==='string'?value:JSON.stringify(value,null,2)+'\n';
       if(new TextEncoder().encode(text).length>limit)throw Error(name+' exceeds the session size limit.');
       if(guard)await guard({name:name,created:false,phase:'before-open'});
@@ -59,7 +60,7 @@ async function inspectFolderAgentSession(files,snapshot,now){
   if(existing.protocol!=='flowview-folder-v1')throw Error('Unsupported saved session.');
   var previous,lease=await files.read('editor.json');
   try{previous=await files.read('state.json');}catch(ex){
-    if(ex.name!=='SyntaxError' || existing.recoveryState!=='state-'+existing.connectionId+'.json')throw ex;
+    if(!files.artifacts && (ex.name!=='SyntaxError' || existing.recoveryState!=='state-'+existing.connectionId+'.json'))throw ex;
     previous=null;
   }
   // A startup claim publishes this identity-bound snapshot before rotating the
@@ -68,16 +69,19 @@ async function inspectFolderAgentSession(files,snapshot,now){
   // unrelated connection's canonical state.
   if((!previous || previous.sessionId!==existing.sessionId || previous.connectionId!==existing.connectionId) &&
       existing.recoveryState==='state-'+existing.connectionId+'.json')previous=await files.read(existing.recoveryState);
+  if(files.artifacts && (!previous || previous.sessionId!==existing.sessionId || previous.connectionId!==existing.connectionId)){var artifactSource=await files.readText('story.spec.json');previous={source:artifactSource,revision:'reopened-artifacts',sessionId:existing.sessionId,connectionId:existing.connectionId};}
   if(!previous || previous.sessionId!==existing.sessionId || previous.connectionId!==existing.connectionId ||
       typeof previous.source!=='string' || new TextEncoder().encode(previous.source).length>4*1024*1024 ||
       typeof previous.revision!=='string')throw Error('The saved story snapshot is missing or invalid.');
   var transcript=await files.read('transcript.json'),changes=await files.read('changes.json');
+  if(files.artifacts){var savedFile=await files.readText('story.spec.json');if(savedFile!==null)previous.source=savedFile;}
   var current=typeof snapshot==='function'?snapshot():snapshot,at=typeof now==='function'?now():Number.isFinite(now)?now:Date.now();
+  var claiming=existing.recoveryState && Number.isFinite(existing.claimAt) && at-existing.claimAt<15000;
   var ownsLease=lease && lease.sessionId===existing.sessionId && lease.connectionId===existing.connectionId;
   return {identity:{sessionId:existing.sessionId,connectionId:existing.connectionId},createdAt:existing.createdAt,
     savedSource:previous.source,savedRevision:previous.revision,sourceMatches:!!current && previous.source===current.source,
     transcript:folderAgentSavedMessages(transcript,existing.sessionId),changes:folderAgentSavedChanges(changes,existing.sessionId),
-    lease:{connected:!!(ownsLease && lease.connected),active:!!(ownsLease && lease.connected && Number.isFinite(lease.at) && at-lease.at<15000),at:ownsLease?lease.at:null}};
+    lease:{connected:!!(ownsLease && lease.connected),active:!!claiming || !!(ownsLease && lease.connected && Number.isFinite(lease.at) && at-lease.at<15000),at:ownsLease?lease.at:null}};
 }
 
 function createFolderAgentClient(opts){
@@ -117,7 +121,7 @@ function createFolderAgentClient(opts){
     var preview=exchange.preview(proposal);
     reviewCandidate={signature:signature,proposal:proposal,preview:preview,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,
       summary:String(proposal.summary || 'Your agent proposed a story update.').slice(0,1000),baseRevision:String(proposal.baseRevision || '').slice(0,160),
-      revision:preview.current.revision,kind:'replacement',ok:preview.ok,merged:!!preview.merged,conflicts:preview.conflicts || []}};
+      revision:preview.current.revision,artifacts:files.artifacts,kind:'replacement',ok:preview.ok,merged:!!preview.merged,conflicts:preview.conflicts || []}};
     publish({status:preview.ok?'Agent updates are ready to preview. Your current story is unchanged.':'Agent update needs attention. Copy the feedback to your agent to resolve it.'});
     return 'wait';
   }
@@ -133,10 +137,16 @@ function createFolderAgentClient(opts){
       await files.write('editor.json',envelope({connected:false,at:now()}));
       publish({status:'Disconnected — open the same project and reconnect to continue.'});return null;
     }
+    if(files.checkArtifacts)await files.checkArtifacts();
     var serialized=JSON.stringify(sent.snapshot);
     if(serialized!==lastState){
       await files.write('state.json',envelope(sent.snapshot));if(!alive(token))return null;
-      await files.write('story.spec.json',sent.snapshot.source);if(!alive(token))return null;
+      if(files.flushArtifacts){
+        var invalid=sent.snapshot.parseError;try{if(!invalid && opts.validate)invalid=opts.validate(sent.snapshot.source);}catch(ex){invalid=ex.message;}
+        if(invalid)publish({status:'Your JSON needs repair. The last valid spec and ledger remain in the diagram folder; your unfinished draft stays in the workbench.'});
+        else await files.flushArtifacts(sent.snapshot.source,sent.snapshot.ledger,async function(){if(!alive(token) || !belongs(await files.read('session.json')) || !alive(token))throw Error('Connection changed.');});
+      }
+      else await files.write('story.spec.json',sent.snapshot.source);if(!alive(token))return null;
       lastState=serialized;
     }
     if(now()-lastHeartbeat>=1000){
@@ -182,6 +192,7 @@ function createFolderAgentClient(opts){
     }
     if(changesDirty){await saveChanges();if(!alive(token) || turn!==turnEpoch)return;}
     var proposal=await readOptional('proposal.json');if(!alive(token) || turn!==turnEpoch)return;
+    if(reviewCandidate && (!belongs(proposal) || !validId(proposal.id) || proposal.requestId!==pending)){clearReview();publish({});}
     if(belongs(proposal) && validId(proposal.id) && pending && proposal.requestId===pending && !seen.has(proposal.id)){
       // Retry a failed receipt write before considering the same proposal again.
       var ack=exchange.request(),message;
@@ -196,11 +207,12 @@ function createFolderAgentClient(opts){
         if(!ack.result){
           if(typeof proposal.source==='string' && new TextEncoder().encode(proposal.source).length>4*1024*1024)proposal.source=null;
           var accepted=reviewDecision && reviewDecision.preview;
-          var applying=accepted?Object.assign({},proposal,{source:accepted.source,baseRevision:accepted.current.revision}):proposal;
+          var applying=accepted?Object.assign({},proposal,{source:accepted.source,ledger:accepted.ledger,baseRevision:accepted.current.revision}):proposal;
           message=exchange.receive({proposal:applying},sent);ack=exchange.request();
           if(ack.result)ack.result.baseRevision=proposal.baseRevision;
         }else message=ack.result.message;
         if(ack.result){
+          if(files.flushArtifacts && ['applied','unchanged'].includes(ack.result.status)){pendingReviewResult=ack.result;await snapshot(token);if(!alive(token) || turn!==turnEpoch)return;}
           clearReview();receipt(ack.result,proposal,requestId);
           await saveChanges();if(!alive(token) || turn!==turnEpoch)return;
           await files.write('result.json',envelope(Object.assign({},ack.result,{requestId:requestId,at:now()})));
@@ -291,9 +303,10 @@ function createFolderAgentClient(opts){
         }
       }
       manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
+      if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
       project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
-      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate});
+      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
       manifest.recoveryState=recoveryState;
       try{
@@ -337,9 +350,10 @@ function createFolderAgentClient(opts){
         await checkClaim();
         await files.write('session.json',manifest,checkClaim);await checkOwner();
         await files.write('state.json',envelope(initial.snapshot),checkOwner);await checkOwner();
-        await files.write('story.spec.json',initial.snapshot.source,checkOwner);await checkOwner();
+        if(files.flushArtifacts)await files.flushArtifacts(initial.snapshot.source,initial.snapshot.ledger,checkOwner);
+        else await files.write('story.spec.json',initial.snapshot.source,checkOwner);await checkOwner();
         await files.write('editor.json',envelope({connected:true,at:now()}),checkOwner);await checkOwner();
-        var committed=Object.assign({},manifest);delete committed.recoveryState;
+        var committed=Object.assign({},manifest);delete committed.recoveryState;delete committed.claimAt;
         await files.write('session.json',committed,checkOwner);await checkOwner();manifest=committed;
         lastState=JSON.stringify(initial.snapshot);lastHeartbeat=now();
         if(typeof files.remove==='function'){
@@ -385,7 +399,7 @@ function createFolderAgentClient(opts){
       }
     });},
     reviewContent:function(){return reviewCandidate && reviewCandidate.preview.ok?reviewCandidate.preview.source:reviewCandidate && reviewCandidate.proposal.source || '';},
-    reviewSnapshot:function(){return connected && reviewCandidate?{review:reviewCandidate.public,source:reviewCandidate.preview.source || null,current:reviewCandidate.preview.current.source}:null;},
+    reviewSnapshot:function(){return connected && reviewCandidate?{review:reviewCandidate.public,source:reviewCandidate.preview.source || null,current:reviewCandidate.preview.current.source,ledger:reviewCandidate.preview.ledger!=null?reviewCandidate.preview.ledger:reviewCandidate.proposal.ledger || '',currentLedger:reviewCandidate.preview.current.ledger || ''}:null;},
     setReviewMode:function(value){reviewMode=value===true;publish({});},
     acceptReview:function(version){
       if(!connected || disposed || !reviewCandidate || !reviewCandidate.preview.ok || reviewCandidate.public.requestId!==pending || version!==undefined && version!==reviewCandidate.public.version)return Promise.resolve(false);
@@ -420,7 +434,7 @@ function createFolderAgentClient(opts){
       if(new TextEncoder().encode(text).length>256*1024)throw Error('Story brief exceeds the 256 KiB size limit.');
       var owner=await files.read('session.json');if(!alive(token) || !belongs(owner))return null;
       var current=opts.snapshot();if(!current.open || current.project!==project || current.source!==sent.snapshot.source)return null;
-      return {text:text,filename:'story.ledger.md',sessionId:manifest.sessionId,connectionId:manifest.connectionId,
+      return {text:text,filename:files.artifacts?files.artifacts.ledger:'story.ledger.md',sessionId:manifest.sessionId,connectionId:manifest.connectionId,
         sourceRevision:null,sharedRevision:sent.snapshot.revision,sourceMatches:null,verified:false,at:now(),readAt:now()};
     });},
     poll:function(){return serial(poll).catch(function(ex){publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},

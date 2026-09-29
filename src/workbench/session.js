@@ -20,15 +20,16 @@ function createBuilderSession(options){
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
   }
-  function save(){if(disposed)return;projectOpen=true;persistence.save(text(),baselineText);}
+  function save(){if(disposed)return;projectOpen=true;if(options.artifacts)persistence.save(text(),baselineText,options.artifacts());else persistence.save(text(),baselineText);}
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
     var entry=from[from.length-1];
     if(typeof entry!=='string'){
+      var captured=entry.capture?entry.capture():entry.after;
       var restored=entry.restore(entry.before);if(restored===false)return false;
       if(restored==='expired'){from.pop();historyVersion++;historyChanged();return historyStep(from,to,message);}
-      from.pop();to.push({restore:entry.restore,before:entry.after,after:entry.before});
+      from.pop();to.push({kind:entry.kind,capture:entry.capture,restore:entry.restore,before:captured,after:entry.before});
       historyVersion++;historyChanged();return true;
     }
     historyVersion++;
@@ -38,8 +39,8 @@ function createBuilderSession(options){
     save();return true;
   }
   function preserveDraft(){
-    if(projectOpen)persistence.preserve(text(),baselineText);
-    else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline);
+    if(projectOpen){if(options.artifacts)persistence.preserve(text(),baselineText,options.artifacts());else persistence.preserve(text(),baselineText);}
+    else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline,initialDraft);
   }
   function invalidateProject(policy){
     if(disposed)return;
@@ -49,7 +50,7 @@ function createBuilderSession(options){
       undoStack.length=redoStack.length=0;importedText=null;historyVersion++;historyChanged();
     }
     project++;
-    if(options.invalidateProject)options.invalidateProject();
+    if(options.invalidateProject)options.invalidateProject(policy);
     target=null;
   }
   function replaceProject(value,baseline,hooks){
@@ -79,17 +80,21 @@ function createBuilderSession(options){
       if(disposed || !plan || plan.error)return false;
       var before=text(),expected=hooks && hooks.snapshot;
       if(expected && (expected.text!==before || expected.project!==project))return false;
-      pushUndo(before);
+      pushUndo(hooks && hooks.history || before);
       if(hooks && hooks.beforePublish)hooks.beforePublish();
       options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);
       return true;
     },
+    restoreHistoryText:function(value){
+      if(disposed)return false;
+      options.source.write(value);target=null;render('history',{});save();return true;
+    },
     rememberView:function(change){
       if(disposed || !change || typeof change.restore!=='function' || JSON.stringify(change.before)===JSON.stringify(change.after))return false;
       pushUndo({restore:change.restore,before:change.before,after:change.after});return true;
     },
-    historyType:function(redo){var stack=redo?redoStack:undoStack;return !stack.length?null:typeof stack[stack.length-1]==='string'?'source':'view';},
+    historyType:function(redo){var stack=redo?redoStack:undoStack;return !stack.length?null:typeof stack[stack.length-1]==='string'?'source':stack[stack.length-1].kind || 'view';},
     importText:function(value,hooks){
       if(disposed)return false;
       pushUndo(text());options.source.write(value);
@@ -114,10 +119,11 @@ function createBuilderSession(options){
     discardDraft:function(){if(disposed)return;persistence.clear();initialDraft=null;save();},
     draft:function(){return initialDraft?{text:initialDraft.text,at:initialDraft.at}:null;},
     preserveDraft:preserveDraft,
+    resetHistory:function(){undoStack.length=redoStack.length=0;historyVersion++;historyChanged();},
     earlierDrafts:persistence.archived,
     restoreEarlierDraft:function(entry,hooks){
       if(!entry || typeof entry.text!=='string')return false;
-      return replaceProject(entry.text,entry.baseline,hooks);
+      var ok=replaceProject(entry.text,entry.baseline,hooks);if(ok && options.restoreArtifacts){options.restoreArtifacts(entry);save();}return ok;
     },
     isProjectOpen:function(){return projectOpen;},
     invalidateProject:invalidateProject,replaceProject:replaceProject,
@@ -125,6 +131,7 @@ function createBuilderSession(options){
       if(disposed || !initialDraft)return false;
       var draft=initialDraft,missingBaseline=recoveredBaseline==null;
       replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,hooks);
+      if(options.restoreArtifacts){options.restoreArtifacts(draft);save();}
       return {missingBaseline:missingBaseline};
     },
     destroy:function(){if(disposed)return;disposed=true;project++;undoStack.length=redoStack.length=0;persistence.destroy();}

@@ -79,3 +79,5 @@
 @media(max-width:760px){.agent-workflow-choices{grid-template-columns:1fr;}.agent-update-banner,.agent-update-dialog header,.agent-update-dialog footer{flex-wrap:wrap;}.agent-update-dialog{width:100vw;height:100dvh;margin:0;border-radius:0;}}
 
 .workspace-canvas:not(.welcome-active) .agent-update-banner{position:fixed;left:84px;right:20px;top:calc(var(--workspace-toolbar,64px) + 24px);z-index:150;border:1px solid #acbce7;border-radius:12px;box-shadow:0 4px 18px #14244220;}
+
+.agent-update-ledger{padding:0 20px 16px}.agent-update-ledger pre{white-space:pre-wrap;overflow:auto;max-height:260px;font:13px/1.6 var(--mono,monospace);border:1px solid var(--border,#ddd);padding:16px;border-radius:8px}

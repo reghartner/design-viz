@@ -53,3 +53,16 @@ test('preview validates combined relationships, unknown revisions and invalid JS
 test('concurrent common additions with conflicting order never pick a winner',()=>{
   assert.equal(merge([{id:'a'}],[{id:'a'},{id:'x'},{id:'y'}],[{id:'a'},{id:'y'},{id:'x'}]).ok,false);
 });
+
+test('paired preview requires a ledger, handles ledger-only revisions and preserves conflicting ledger edits',()=>{
+  const vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+  const context=vm.createContext({TextEncoder});
+  for(const name of ['agent-merge.js','agent-session.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',name),'utf8'),context);
+  let source='{"title":"Initial"}',ledger='# Before',writes=0;
+  const exchange=context.createWorkbenchAgentExchange({clientId:'pair',requireLedger:true,snapshot:()=>({source,ledger,project:1,open:true}),busy:()=>false,apply:(text,current,proposal)=>{source=text;ledger=proposal.ledger;writes++;return {ok:true};}});
+  const sent=exchange.request(),proposal={id:'p',baseRevision:sent.snapshot.revision,source,ledger:'# After'};
+  assert.equal(exchange.preview({...proposal,ledger:undefined}).ok,false);
+  assert.equal(exchange.preview(proposal).ledger,'# After');
+  exchange.receive({proposal},sent);assert.equal(writes,1);assert.equal(ledger,'# After');assert.notEqual(exchange.request().snapshot.revision,sent.snapshot.revision);
+  ledger='# Local evidence';const conflict=exchange.preview({...proposal,id:'q',ledger:'# Other agent evidence'});assert.equal(conflict.ok,false);assert.equal(conflict.conflicts[0].path,'/ledger');
+});

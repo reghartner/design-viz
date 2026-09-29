@@ -417,8 +417,9 @@ test('native file creation exposes an empty placeholder until close without brea
   assert.equal(state.connectionId,owner.connectionId);assert.equal(owner.recoveryState,undefined);
   assert.equal([...disk.keys()].some(name=>/^state-native-.*\.json$/.test(name)),false);
   await client.disconnect();await h.context.createFolderAgentClient(options).start(true);
-  // A malformed entry that was already present is never mistaken for our creation.
-  disk.set('session.json','');const before=[...disk];
+  // An abandoned empty placeholder can be claimed again; nonempty corruption stays an error.
+  disk.set('session.json','');await h.context.createFolderAgentClient(options).start(false);
+  disk.set('session.json','{broken');const before=[...disk];
   await assert.rejects(h.context.createFolderAgentClient(options).start(false),{name:'SyntaxError'});
   assert.deepEqual([...disk],before);
 });

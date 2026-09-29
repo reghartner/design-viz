@@ -1293,6 +1293,15 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas .workspace-tools .editor-add-button{gap:4px;}
   .workspace-canvas .workspace-tools .rbtn{padding:7px 10px;}
 }
+.folder-agent-guide #folder-agent-workflow,.folder-agent-guide #folder-agent-filename{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
+.agent-message-icon{display:none;}
+@media(max-width:540px){
+  .workspace-canvas .editor-add-label{font-size:0;}
+  .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
+  .workspace-canvas #agent-message-open{padding:6px;}
+  .workspace-canvas #agent-message-open>span{display:none;}
+  .workspace-canvas .agent-message-icon{display:block;}
+}
 
 /* At short heights, panels are clamped into the same vertical band as canvas
    chrome. Keep their controls above that chrome and the tool rail accessible. */

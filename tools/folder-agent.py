@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Flowview folder bridge. Local files only: no server, networking, or subprocesses.
 
-Run from a session folder: python3 folder-agent.py watch
+Run from a diagram folder: python3 .flowview-agent/folder-agent.py watch
 The watcher prints only new requests/results and maintains listener.json.
 It never executes instructions, source, or commands from the session files.
 """
@@ -26,7 +26,7 @@ PROGRESS_LIMIT = 100
 def read(folder, name):
     target = folder / name
     if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
-        raise ValueError(f"Not a regular session file within the size limit: {name}")
+        raise ValueError(f"Not a regular helper file within the size limit: {name}")
     return json.loads(target.read_text(encoding='utf-8'))
 
 
@@ -275,12 +275,13 @@ def main():
         command = commands.add_parser(name)
         command.add_argument('--request', required=True)
         content = command.add_mutually_exclusive_group(required=True)
-        content.add_argument('--file', help='UTF-8 file inside the session folder')
+        content.add_argument('--file', help='UTF-8 file inside the helper folder')
         if name != 'propose':
             content.add_argument('--text', help='Short plain-text update; quote as a shell argument')
         if name == 'progress':
             command.add_argument('--phase', choices=('working', 'permission-needed'), default='working')
         if name == 'propose':
+            command.add_argument('--ledger', help='Complete candidate .ledger.md beside the helper; required for diagram folders')
             command.add_argument('--revision', required=True, help='Revision read BEFORE planning the edit')
             command.add_argument('--summary', default='Updated the story.')
     args = parser.parse_args()
@@ -342,10 +343,10 @@ def main():
     input_name = args.file
     if input_name:
         if not re.fullmatch(r'[A-Za-z0-9_.-]+', input_name) or input_name in ('.', '..'):
-            raise ValueError('Use a plain filename inside the session folder')
+            raise ValueError('Use a plain filename inside the helper folder')
         target = folder / input_name
         if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
-            raise ValueError('Input must be a regular session file within the size limit')
+            raise ValueError('Input must be a regular helper file within the size limit')
         text = target.read_text(encoding='utf-8')
     else:
         text = args.text
@@ -372,6 +373,16 @@ def main():
         # It rejects unknown/expired revisions and asks for conflict resolution.
         json.loads(text)
         value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
+        if read(folder, 'session.json').get('pairedArtifacts') or args.ledger:
+            if not args.ledger or not re.fullmatch(r'[A-Za-z0-9_.-]+', args.ledger) or args.ledger in ('.', '..'):
+                raise ValueError('Include --ledger candidate.ledger.md with the proposed spec.')
+            ledger_path = folder / args.ledger
+            if ledger_path.is_symlink() or not ledger_path.is_file() or ledger_path.stat().st_size > 256 * 1024:
+                raise ValueError('Ledger must be a regular candidate file of at most 256 KiB.')
+            ledger = ledger_path.read_text(encoding='utf-8')
+            if not ledger.strip():
+                raise ValueError('The proposed coverage ledger must not be empty.')
+            value['ledger'] = ledger
         filename = 'proposal.json'
     else:
         if len(text) > 32000:

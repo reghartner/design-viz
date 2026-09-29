@@ -34,7 +34,7 @@ class Claude {
     this.events=[];this.results=[];this.buffer='';this.exited=false;this.session=session;this.pending=Promise.resolve();
     const folder=session.sessionPath, relative='./'+path.basename(folder);
     const allowed=['Read(./**)','Glob(./**)','Grep(./**)','Monitor'];
-    for(const name of ['candidate.spec.json','story.ledger.md','answer.txt','progress.txt','baseline.json']) {
+    for(const name of ['candidate.spec.json','candidate.ledger.md','answer.txt','progress.txt','baseline.json']) {
       allowed.push('Write('+relative+'/'+name+')','Edit('+relative+'/'+name+')');
     }
     for(const location of [folder,relative,relative.slice(2)])for(const quote of ['', '"', "'"])allowed.push(
@@ -136,7 +136,8 @@ async function edit(session,modify) {
 }
 async function preview(session,previous) {
   const proposal=await waitFor(async()=>{
-    const value=await session.read('proposal.json');return value?.id!==previous?.id?value:null;
+    const value=await session.read('proposal.json'),request=await session.read('request.json'),result=await session.read('result.json');
+    return value && value.requestId===request?.id && value.id!==previous?.id && value.id!==result?.id?value:null;
   },'real Claude proposal');
   await expect(session.page.locator('#agent-update-open')).toBeVisible({timeout:15000});
   await session.page.locator('#agent-update-open').click();
@@ -152,10 +153,24 @@ async function commit(session,proposal,name) {
 async function finish(session) {
   await session.agent.pending;
   if((await session.read('reply.json'))?.requestId!==(await session.read('request.json'))?.id)
-    await session.agent.turn('I committed the preview. Read the matching result.json and give the brief completion receipt through the helper, then wait for my next request here.');
-  await waitFor(async()=>{const reply=await session.read('reply.json'),request=await session.read('request.json');return reply?.requestId===request?.id;},'helper completion receipt',15000);
+    session.agent.send('I committed the preview. Read the accepted spec and ledger and matching result.json. If merged human edits require a ledger correction, submit a ledger-only paired proposal for my review; otherwise give the brief completion receipt through the helper, then wait.');
+  let corrections=0;
+  await waitFor(async()=>{
+    const reply=await session.read('reply.json'),request=await session.read('request.json');
+    if(reply?.requestId===request?.id)return true;
+    const proposal=await session.read('proposal.json'),result=await session.read('result.json');
+    if(proposal?.requestId===request?.id && proposal.id!==result?.id && await session.page.locator('#agent-update-open').isVisible()){
+      assert(++corrections<=3,'Agent did not finish reconciling its ledger');
+      const state=await session.read('state.json');assert.deepEqual(JSON.parse(proposal.source),JSON.parse(state.source),'Post-approval correction must preserve the accepted diagram');
+      await preview(session);await commit(session,proposal,'ledger-reconciliation-'+corrections);
+      session.agent.send('I committed the ledger correction. Reread the accepted pair and matching result; if they agree, send the completion receipt through the helper.');
+    }
+    return false;
+  },'paired completion receipt',180000);
+  await session.agent.pending;
 }
-const prepare='Prepare and validate the complete candidate and record the exact starting revision in story.ledger.md. Stop before proposing it and wait for me to say Submit. Keep this request active; do not send the final helper reply yet.';
+
+const prepare='Prepare and validate the complete candidate and reconcile the coverage ledger with the proposed spec and record the exact starting revision in candidate.ledger.md. Stop before proposing it and wait for me to say Submit. Keep this request active; do not send the final helper reply yet.';
 try {
   if(args.includes('--native-only')){
     const session=await connect('native','external'),page=session.page,agent=session.agent;

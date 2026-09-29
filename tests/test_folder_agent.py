@@ -45,6 +45,20 @@ class FolderAgentTests(unittest.TestCase):
         return subprocess.run([sys.executable, str(HELPER), '--folder', str(self.folder), *args],
                               text=True, capture_output=True, timeout=10)
 
+    def test_paired_project_requires_nonempty_ledger_and_packages_it(self):
+        manifest = json.loads((self.folder / 'session.json').read_text())
+        manifest['pairedArtifacts'] = True
+        (self.folder / 'session.json').write_text(json.dumps(manifest))
+        missing = self.propose()
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn('--ledger', missing.stderr)
+        (self.folder / 'candidate.ledger.md').write_text('# Coverage ledger\n\nEvidence for this exact proposed story.\n')
+        result = self.run_helper('propose', '--request', 'request', '--revision', 'connection-1',
+                                 '--file', 'candidate.spec.json', '--ledger', 'candidate.ledger.md')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((self.folder / 'proposal.json').read_text())['ledger'],
+                         '# Coverage ledger\n\nEvidence for this exact proposed story.\n')
+
     def propose(self):
         return self.run_helper('propose', '--request', 'request', '--revision', 'connection-1',
                                '--file', 'candidate.spec.json')
@@ -71,7 +85,7 @@ class FolderAgentTests(unittest.TestCase):
     def test_filename_escape_and_symlink_refused(self):
         self.assertIn('plain filename', self.run_helper('reply', '--request', 'request', '--file', '../answer.txt').stderr)
         (self.folder/'link.txt').symlink_to(self.folder/'answer.txt')
-        self.assertIn('regular session file', self.run_helper('reply', '--request', 'request', '--file', 'link.txt').stderr)
+        self.assertIn('regular helper file', self.run_helper('reply', '--request', 'request', '--file', 'link.txt').stderr)
 
     def test_kit_checksum_traversal_and_symlink_refused(self):
         helper.prepare(self.folder)

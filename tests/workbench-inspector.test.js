@@ -131,6 +131,7 @@ test('step controls distinguish inherited and set values while retaining importe
   ]},h=e.mount(spec);
   h.session.target={kind:'step',section:0,index:1};h.inspector.render();
   assert.equal(aria(h.guide,'Current state assignment').value,'omit');
+  assert.equal(aria(h.guide,'state').disabled,false,'an omitted field can be assigned directly');
   assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON" · Inherited from step 1/);
   const mode=aria(h.guide,'Current state assignment');mode.value='set';mode.fire('change');
   const field=aria(h.guide,'state');assert.equal(field.disabled,false);field.value='OFF';field.fire('change');h.flush();
@@ -171,6 +172,28 @@ test('dynamic object fields preserve empty text, unknown siblings, and explicit 
   iconMode.value='null';iconMode.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[1].initial.model,{value:'Doorbell',icon:null,futureNested:4});
   assert.equal(aria(h.guide,'Report time assignment'),null,'custom report-time actions stay authoritative');
+});
+
+test('registered collection composers reuse shared assignment and sparse history',()=>{
+  const e=environment(),shape={cols:[{k:'name',req:true},{k:'status',kind:'enum',options:['ready','hold']}]};
+  e.C.PanelRegistry.define('collection-fixture',{authoring:{template:{title:'Collection'},initialFields:true,
+    setupFields:[['initial','json']],patchFields:[['entries','jsonArr']],fieldMeta:{entries:{label:'Entries'}},
+    editor(context){return {patchControl(field,options){
+      if(field[0]!=='entries')return null;
+      const existing=Array.isArray(options.value)?options.value:[];
+      return context.controls.rows(field[0],options.value,shape,{raw:false,commitValue:options.commit,
+        collect(items){return {value:items.map((item,index)=>Object.assign({},existing[index] || {},item))};}});
+    }};}}});
+  const spec={nodes:{},rows:[[]],panels:[{id:'collection',type:'collection-fixture',initial:{entries:[{name:'one',status:'ready',future:true}],futureTop:9}}],steps:[]};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'Entries assignment').value,'set');
+  const initial=h.guide.querySelector('.initialedit');
+  assert.equal(initial.querySelectorAll('.rawjson').length,1,'custom rows do not duplicate raw JSON');
+  assert.equal(initial.querySelector('.rawjson').querySelector('summary').textContent,'Advanced JSON');
+  const status=initial.querySelector('.rowline').querySelector('select'),before=h.text;
+  status.value='hold';status.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{entries:[{name:'one',status:'hold',future:true}],futureTop:9});
+  h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(JSON.parse(h.text).panels[0].initial.entries[0].status,'hold');
 });
 
 test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{

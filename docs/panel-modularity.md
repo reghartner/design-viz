@@ -219,6 +219,16 @@ use tuple metadata so labels can come from the declaration, for example
 `[device.id, 'objf', fields, {label: device.label, group: 'Devices'}]`.
 `assignment: false` leaves assignment UX to a registered custom field adapter.
 
+Collections can keep their schema and transformation in the panel module with
+`editor.patchControl(field, options)`. Return a DOM control for the matching
+field and call `options.commit(value)` with the authored value (or `undefined`
+to omit it); the shared inspector still supplies assignment modes, sparse merge,
+effective-value help, history and refresh. The editor context's rows control
+accepts `{commitValue, collect, raw:false}` for typed collection rows.
+`collect(items)` may return `{value}` or `{error}` when the UI row shape differs
+from the stored value. Unmatched fields return nothing and use the standard
+control. Keep a panel's operation semantics in that panel module.
+
 The shared state editor uses a separate assignment selector. Omitted starting
 fields use the panel default; omitted step fields inherit; `null` is offered only
 when `nullLabel` declares a meaningful reset (or an imported value is already

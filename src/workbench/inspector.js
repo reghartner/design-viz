@@ -1137,9 +1137,19 @@ function panelPatchControl(pid, patch, decl, target, options){
         var labels={omit:assignmentMeta.unsetLabel,set:'Set value',null:assignmentMeta.nullLabel || 'Keep explicit null (advanced)'};
         Array.from(control.options).forEach(function(option){option.textContent=labels[option.value];});
         control.classList.add('panel-state-mode');control.setAttribute('aria-label',assignmentLabel+' assignment');
-        setValueDisabled(valueControl,current!=='set',settings.rememberDisabled);return control;
+        /* Omitted values stay directly editable: typing or selecting is the
+           fastest way to create an assignment. The mode control is still
+           needed to author an empty string, remove a value, or choose null. */
+        setValueDisabled(valueControl,current==='null',settings.rememberDisabled);return control;
       }
-      if (f[1] === 'objf'){
+      var customControl=editor.patchControl && editor.patchControl(f,{initial:initial,value:cur,assigned:has,
+        commit:function(value){return commitPatch(key,value,false,null,storage);}});
+      if(customControl){
+        var customWrap=document.createElement('div');customWrap.className='panel-state-assignment panel-state-object';
+        customWrap.appendChild(assignmentMode(customControl,null,{rememberDisabled:false}));customWrap.appendChild(customControl);
+        var customNote=stateNote(meta,key,has);if(customNote)customWrap.appendChild(customNote);
+        body.appendChild(frowBlock(stateLabel(key,meta),customWrap));
+      } else if (f[1] === 'objf'){
         var group = document.createElement('div');
         group.className = 'rowsedit';
         var invalidObject=has && cur!==null && !panelObject(cur);
@@ -1321,7 +1331,13 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
       var out = rowsEditorCollect(shape, rows);
       if (out.error){ formError(key + ': ' + out.error); return false; }
       formError('');
-      var ok = commitSimple(key, out.items.length ? JSON.stringify(out.items) : null);
+      var value=out.items.length?out.items:undefined;
+      if(options.collect){
+        var collected=options.collect(value || []);
+        if(collected && collected.error){formError(key+': '+collected.error);return false;}
+        value=collected && Object.prototype.hasOwnProperty.call(collected,'value')?collected.value:collected;
+      }
+      var ok = options.commitValue ? options.commitValue(value) : commitSimple(key, value===undefined?null:JSON.stringify(value));
       if (ok){
         if (options.committed) options.committed(refs.filter(function(r){return !rowIsBlank(r);}));
         refreshFormSoon(); /* resync typed rows, raw fallback, stale bases */
@@ -1410,7 +1426,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
       if (first) first.focus();
     });
     wrap.appendChild(addBtn);
-    wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
+    if(options.raw!==false)wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
     return wrap;
   }
 

@@ -31,6 +31,15 @@ test('paragraph insertion and moves retain string content and follow its new sel
  const removed=C.builderDeletePlan(after.text,result,after.target);assert.deepEqual(JSON.parse(removed.text),JSON.parse(before.text));
  assert.equal(C.specValueAt(JSON.parse(down.text),C.builderTargetPath(JSON.parse(down.text),down.target)),'New paragraph');
 });
+test('adding a first paragraph replaces renderer-empty string text without an extra paragraph',()=>{
+ for(const [text,expected,index] of [['',['New paragraph'],0],[' ',[' ','New paragraph'],1],[[''],['','New paragraph'],1]]){
+  const raw={page:{sections:[{heading:'Story',text,bullets:fixture().sections[0].bullets,future:true}]}},source=JSON.stringify(raw,null,2);
+  const plan=C.planAddParagraph(source,raw,0);assert.equal(plan.error,undefined);assert.equal(plan.index,index);
+  const result=JSON.parse(plan.text);assert.deepEqual(result.page.sections[0].text,expected);
+  assert.deepEqual(result.page.sections[0].bullets,raw.page.sections[0].bullets);assert.equal(result.page.sections[0].future,true);
+  assert.equal(JSON.stringify(raw,null,2),source);
+ }
+});
 test('prose planners reject malformed content, invalid selections, bare diagrams and stale paragraphs',()=>{
  const raw={sections:[{text:['One','Two']} ]},source=JSON.stringify(raw),t={kind:'para',section:0,index:0};
  for(const [target,action] of [[t,'up'],[{...t,index:1},'down'],[{...t,index:9},'after'],[{...t,index:-1},'after'],[{...t,index:0.5},'before'],[{...t,kind:'bullet'},'after'],[t,'unknown']])assert.ok(C.planParagraphStructure(source,raw,target,action).error);

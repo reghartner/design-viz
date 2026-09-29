@@ -5,7 +5,7 @@ function planAddProse(text,raw,section,kind){
   if(!rec || !rec.section.length || !specObject(sec))return {error:'Choose a page section for prose.'};
   if(kind!=='para' && kind!=='bullet')return {error:'Unknown prose kind.'};
   var key=kind==='para'?'text':'bullets',value=sec[key],list;
-  if(kind==='para' && typeof value==='string')list=[value];
+  if(kind==='para' && typeof value==='string')list=value.length?[value]:[];
   else if(value==null)list=[];
   else if(Array.isArray(value))list=value.slice();
   else return {error:'Correct this section’s '+key+' in JSON before adding.'};

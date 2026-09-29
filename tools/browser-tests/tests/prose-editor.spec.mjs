@@ -68,6 +68,24 @@ test('prose-only tab sections support first additions and stale Add dialogs do n
  await page.evaluate(()=>document.querySelector('#add-paragraph').dispatchEvent(new MouseEvent('click',{bubbles:true})));await expect(page.locator('#src')).toHaveValue(changed);
 });
 const spec=()=>({page:{sections:[{heading:'Story',bullets:['First',{text:'Parent',sub:[{text:'Nested point',revealAt:0,custom:true},'Sibling']},'Last'],contract:{fields:[{k:'value',g:'Some context'}],note:'Contract note'},diagram:{nodes:{a:{}},rows:[['a']],steps:[{id:'one',text:'One'},{id:'two',text:'Two'}]}}]}});
+test('empty string prose becomes one focused first paragraph through either insertion control',async({page,server})=>{
+ const raw=spec();raw.page.sections[0].text='';delete raw.page.sections[0].bullets;const original=JSON.stringify(raw,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ const src=page.locator('#src'),paragraphs=page.locator('#docview .sec-text'),field=page.locator('#guide').getByLabel('Prose text',{exact:true});
+ for(const route of ['section','add']){
+  await expect(paragraphs).toHaveCount(0);
+  if(route==='section'){
+   await inspectPageElement(page,page.locator('#docview .sec-h'));
+   await page.locator('#guide').getByRole('button',{name:'Add an introduction',exact:true}).click();
+  }else await add(page,'paragraph');
+  await expect(paragraphs).toHaveCount(1);await expect(paragraphs).toHaveAttribute('data-dv-para','0');await expect(paragraphs).toHaveClass(/dv-sel/);
+  await expect(field).toHaveValue('New paragraph');await expect(field).toBeFocused();
+  const after=await src.inputValue(),expected=structuredClone(raw);expected.page.sections[0].text=['New paragraph'];expect(JSON.parse(after)).toEqual(expected);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);await expect(paragraphs).toHaveCount(0);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(after);await expect(paragraphs).toHaveCount(1);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+ }
+});
 test('nested prose supports direct selection, structure changes, formatting and exact Undo',async({page,server},info)=>{
  const original=JSON.stringify(spec(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
  const root=page.locator('#docview'),guide=page.locator('#guide'),text=guide.locator('.prose-editor textarea');

@@ -229,6 +229,9 @@
           card.open = !!expanded[foldKey];
           context.listen(card, 'toggle', function () { expanded[foldKey] = card.open; });
           var summary = document.createElement('summary'); summary.textContent = text(item.label) || item.id; card.appendChild(summary);
+          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }, 'bdanger'));
+          var note = document.createElement('p'); note.className = 'fnote';
+          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           if (embeddedImageSource(item.src)) {
             var preview = document.createElement('img'); preview.src = item.src; preview.alt = text(item.alt) || item.id; preview.className = 'appscreen-thumbnail'; card.appendChild(preview);
           }
@@ -241,9 +244,6 @@
             card.appendChild(context.controls.row(pair[1], input));
           });
           card.appendChild(context.controls.row('Replace image', upload(panel, item.id)));
-          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }));
-          var note = document.createElement('p'); note.className = 'fnote';
-          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           box.appendChild(card);
         });
         return context.controls.block('Screens', box);
@@ -267,14 +267,16 @@
           panelOwn(patch, 'screen') ? patch.screen === null ? '@blank' : 'id:' + patch.screen : '', function (value) {
             return update('screen', !value ? undefined : value === '@blank' ? null : value.slice(3));
           }));
+        var dateActions=document.createElement('div');dateActions.className='iacts';dateActions.setAttribute('role','group');dateActions.setAttribute('aria-label','Date actions');
+        dateActions.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
+        box.appendChild(dateActions);
         var date = context.controls.text(patch.date, function (value) { return update('date', value == null ? undefined : value); },
           {placeholder:patch.date === '' ? 'Hidden at this step' : 'Inherit previous date'});
         date.setAttribute('aria-label', 'Date · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Date', date));
         var clock = context.controls.text(patch.clock, function (value) { return update('clock', value == null ? undefined : value); },
           {placeholder:patch.clock === '' ? 'Hidden at this step' : 'Inherit previous time'});
         clock.setAttribute('aria-label', 'Time · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Time', clock));
-        box.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
-        box.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
         var help = document.createElement('p'); help.className = 'fnote'; help.textContent = 'The selected screen carries forward until another step changes it. Add or replace images by selecting the App screens panel.'; box.appendChild(help);
         return box;
       }

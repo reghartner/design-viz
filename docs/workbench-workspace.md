@@ -1,5 +1,19 @@
 # Workbench canvas and floating tools
 
+Object actions sit below the inspector title and JSON path, before its fields.
+Use that action bar to copy, duplicate, change a panel's type, move or delete the
+selected object. These buttons are neutral; destructive actions use red text.
+Ordinary fields save as you edit them. **Diagram handoff** and **Domain detail**
+save a group of fields with their own **Apply** button at the top of the open
+group. That action row stays visible while scrolling through the group.
+The extraction preview likewise keeps **Download**, **Apply extraction**, and
+**Cancel** above its settings and report; a separate destination must be
+downloaded before Apply becomes available. List Add buttons start their list,
+while remove and reorder buttons stay with the affected item.
+Collapsible sections start closed when you select another object. Muted header
+rows and chevrons identify them; click a header or focus it and press Enter to
+expand it. Open sections stay open through edits to the same selected object.
+
 For a captioned, searchable list with duplicate and reorder controls, see
 [Story steps](workbench-steps.md).
 

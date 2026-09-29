@@ -1,7 +1,7 @@
 /* Every declared panel is available here, even without a content patch. */
 function createPanelVisibilityControl(options){
   var doc=options.document,c=options.controls,wrap=doc.createElement('details');
-  wrap.className='rawjson panel-visibility';wrap.open=true;
+  wrap.className='rawjson panel-visibility';
   var title=doc.createElement('summary');title.textContent='Panel visibility';wrap.appendChild(title);
   var note=doc.createElement('p');note.className='fnote';
   note.textContent='Show or Hide carries forward on this path. Inherit removes this step’s override. Hidden panels keep their space and state; attached step controls stay available. A view’s hidden elements stay hidden.';

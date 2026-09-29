@@ -97,6 +97,11 @@ For custom controls, `authoring.editor(context)` returns hooks such as
 `setupRows`, `setupField`, `stepControl`, `clickTarget` and `decoratePreview`.
 It is created once per editor/type. The context supplies live source/selection
 reads, shared controls, `commit` for a field and `transact` for a mutation planner.
+`controls.groupActions(label)` creates an accessible action row for a nested
+composer. Append it after the group's summary and short consequence note,
+before its fields. Reserve primary styling for that group's explicit Apply;
+auto-committing fields need no Apply button. Row-local actions remain on their
+item, and list Add controls appear before the list.
 Use those commands so a gesture is one Undo/Redo operation and selection is
 restored consistently. Do not implement another history stack or JSON writer.
 Home uses shared row controls with decorations for its draggable elements.

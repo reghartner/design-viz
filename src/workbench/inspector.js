@@ -3,7 +3,7 @@
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
-  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=true,OPEN_DOCUMENT_ADVANCED=false;
+  var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,url:''};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
@@ -32,14 +32,35 @@ function createBuilderInspector(opts){
   }
   function beginForm(identity){
     var same=identity===inspectorScrollKey;
-    var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null};
+    var previous={focus:same?captureFocus():null,scroll:same?guide.scrollTop:0,sizes:same?captureTextareaSizes():null,disclosures:same?captureDisclosures():null};
+    if(!same){
+      OPEN_VOCABULARY.clear();OPEN_INITIAL_EDITORS.clear();OPEN_PATCH_EDITORS.clear();CUSTOM_PANEL_FOLDS.clear();
+      OPEN_EFFECTIVE_STATE=false;OPEN_EFFECTIVE_PANELS.clear();OPEN_STORY_TIME=false;
+    }
     retireForm();
     inspectorScrollKey=identity;invalidateEffectiveState=null;
     revealInspector();guide.hidden=false;guide.innerHTML='';
     return previous;
   }
   function finishForm(previous){
+    disclosureNodes().forEach(function(fold){
+      var key=fold.getAttribute('data-inspector-disclosure');
+      if(previous.disclosures && Object.prototype.hasOwnProperty.call(previous.disclosures,key))fold.open=previous.disclosures[key];
+      else if(!previous.disclosures && !fold.hasAttribute('data-inspector-reveal'))fold.open=false;
+    });
     assignControlKeys();restoreTextareaSizes(previous.sizes);restoreFocus(previous.focus);guide.scrollTop=previous.scroll;
+  }
+  function disclosureNodes(){
+    var counts=Object.create(null),folds=Array.from(guide.querySelectorAll('details'));
+    folds.forEach(function(fold){
+      var parent=fold.parentNode && fold.parentNode.closest('details'),row=fold.closest('.frow'),label=row && row.querySelector('.flab');
+      var summary=fold.querySelector('summary'),title=summary?summary.textContent.split(' · ')[0].replace(/\s+\(\d+\)$/,''):'';
+      var name=JSON.stringify([parent && parent.getAttribute('data-inspector-disclosure'),fold.className,fold.getAttribute('data-panel-id'),label?label.textContent:'',title]);
+      var index=counts[name] || 0;counts[name]=index+1;fold.setAttribute('data-inspector-disclosure',name+':'+index);
+    });return folds;
+  }
+  function captureDisclosures(){
+    var state=Object.create(null);disclosureNodes().forEach(function(fold){state[fold.getAttribute('data-inspector-disclosure')]=fold.open;});return state;
   }
   function captureTextareaSizes(){
     var sizes=Object.create(null);
@@ -255,6 +276,11 @@ function actionButton(label, onClick, cls){
     b.textContent = label;
     formLife.listen(b,'click', function(ev){if(!disposed)return onClick.call(this,ev);});
     return b;
+  }
+
+function actionGroup(label,cls){
+    var group=document.createElement('div');group.className='iacts '+(cls || 'igroup-actions');
+    group.setAttribute('role','group');group.setAttribute('aria-label',label);return group;
   }
 
 function ensureAccentDatalist(){
@@ -476,7 +502,7 @@ function nodeForm(val, ctx){
 
 function handoffControls(val){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
-    fold.className='node-handoff-editor';fold.open=val.handoff!=null;summary.textContent='Diagram handoff';fold.appendChild(summary);
+    fold.className='node-handoff-editor';summary.textContent='Diagram handoff';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
     note.textContent='The node’s arrow continues in a separate diagram document. Supply a destination URL or a stable spec ID for the host to resolve. Use link above for source documentation. Apply saves these fields together.';
     fold.appendChild(note);
@@ -484,6 +510,7 @@ function handoffControls(val){
       var conflict=document.createElement('p');conflict.className='fnote';
       conflict.textContent='Remove the existing domain detail before applying a diagram handoff.';fold.appendChild(conflict);
     }
+    var actions=actionGroup('Diagram handoff actions');fold.appendChild(actions);
     var draft=val.handoff || {},fields={};
     [['url','Destination URL','https://…'],['spec','Spec ID (optional)','stable-spec-id'],
       ['revision','Revision (optional)','pinned revision; requires a spec ID'],['section','Section (optional)','section ID; requires a spec ID']].forEach(function(field){
@@ -491,21 +518,21 @@ function handoffControls(val){
       control.value=draft[field[0]]==null?'':String(draft[field[0]]);control.placeholder=field[2];fields[field[0]]=control;
       fold.appendChild(frow(field[1],control));
     });
-    fold.appendChild(actionButton('Apply handoff',function(){
+    actions.appendChild(actionButton('Apply handoff',function(){
       var handoff={};Object.keys(fields).forEach(function(key){var value=fields[key].value.trim();if(value)handoff[key]=value;});
       var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,handoff);});
       if(ok)refreshFormSoon();
-    }));
-    if(val.handoff!=null)fold.appendChild(actionButton('Remove handoff',function(){
+    },'igroup-apply'));
+    if(val.handoff!=null)actions.appendChild(actionButton('Remove handoff',function(){
       var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,null);});
       if(ok)refreshFormSoon();
-    }));
+    },'bdanger'));
     return fold;
   }
 
 function detailControls(val,ctx){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
-    fold.className='node-detail-editor';fold.open=!!val.detail;summary.textContent='Domain detail';fold.appendChild(summary);
+    fold.className='node-detail-editor';summary.textContent='Domain detail';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
     note.textContent='Open an ordinary section as this node’s inner flow, or link to an approved spec. Apply saves these fields together. Changing the child section or target type resets its entry position, mappings and boundary ports.';
     fold.appendChild(note);
@@ -513,6 +540,7 @@ function detailControls(val,ctx){
       var conflict=document.createElement('p');conflict.className='fnote';
       conflict.textContent='Remove the existing diagram handoff before applying a domain detail.';fold.appendChild(conflict);
     }
+    var actions=actionGroup('Domain detail actions');fold.appendChild(actions);
     var body=document.createElement('div');fold.appendChild(body);
     var draft=val.detail?builderClone(val.detail):{mode:'focus'};
     var type=draft.spec?'Approved spec':draft.url && !draft.section?'URL':'Local section';
@@ -527,6 +555,7 @@ function detailControls(val,ctx){
     function picker(options,value,empty){return selectControl(options,value,function(){return true;},empty);}
     function draw(){
       body.innerHTML='';
+      actions.innerHTML='';
       var kind=picker(['Local section','Approved spec','URL'],type,false);
       body.appendChild(frow('Detail target',kind));
       listen(kind,'change',function(){
@@ -589,16 +618,16 @@ function detailControls(val,ctx){
         }else {put('spec',spec);put('revision',revision);put('url',url);}
         return detail;
       };
-      body.appendChild(actionButton('Apply detail',function(){
+      actions.appendChild(actionButton('Apply detail',function(){
         var detail;
         try{detail=collect();}catch(ex){formError('Step mapping must be valid JSON.');return;}
         var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,detail);});
         if(ok)refreshFormSoon();
-      }));
-      if(val.detail)body.appendChild(actionButton('Remove detail',function(){
+      },'igroup-apply'));
+      if(val.detail)actions.appendChild(actionButton('Remove detail',function(){
         var ok=commitCascade(function(raw){return planSetNodeDetail(session.text(),raw,target.section,target.id,null);});
         if(ok)refreshFormSoon();
-      }));
+      },'bdanger'));
     }
     draw();return fold;
   }
@@ -735,7 +764,7 @@ function stepForm(val, ctx){
       var editor=p && panelEditor(p.type);
       if(editor && editor.stepControl){
         var fold=document.createElement('details'),key=JSON.stringify([session.snapshot().project,t.section,p.type,p.id]);
-        fold.className='patchedit panel-step-group';fold.open=CUSTOM_PANEL_FOLDS.get(key)!==false;
+        fold.className='patchedit panel-step-group';fold.open=CUSTOM_PANEL_FOLDS.get(key)===true;fold.setAttribute('data-panel-id',p.id);
         var summary=document.createElement('summary');summary.textContent=(p.title || p.id)+' · '+p.type;fold.appendChild(summary);
         fold.appendChild(editor.stepControl(ctx.diagram,p,t));
         formLife.listen(fold,'toggle',function(ev){if(ev.target===fold && guide.contains(fold))CUSTOM_PANEL_FOLDS.set(key,fold.open);});
@@ -842,7 +871,7 @@ function stepForm(val, ctx){
           return planStepPanelVisibility(session.text(),raw,t,pid,value,JSON.stringify(val));
         },{after:refreshFormSoon});}
       });
-      visibilityGroup.open=CUSTOM_PANEL_FOLDS.get(visibilityKey)!==false;
+      visibilityGroup.open=CUSTOM_PANEL_FOLDS.get(visibilityKey)===true;
       formLife.listen(visibilityGroup,'toggle',function(ev){
         if(ev.target===visibilityGroup && guide.contains(visibilityGroup))CUSTOM_PANEL_FOLDS.set(visibilityKey,visibilityGroup.open);
       });
@@ -936,7 +965,8 @@ function panelPatchControl(pid, patch, decl, target, options){
     var det = document.createElement('details');
     det.className = initial ? 'initialedit patchedit' : 'patchedit';
     det.setAttribute('data-panel-state',initial?'initial':'step');
-    det.open = initial ? OPEN_INITIAL_EDITORS.get(pid)!==false : OPEN_PATCH_EDITORS.has(pid);
+    det.setAttribute('data-panel-id',pid);
+    det.open = initial ? OPEN_INITIAL_EDITORS.get(pid)===true : OPEN_PATCH_EDITORS.has(pid);
     formLife.listen(det,'toggle', function(ev){
       if (ev.target !== det || !guide.contains(det)) return;
       if(initial){OPEN_INITIAL_EDITORS.set(pid,det.open);return;}
@@ -1345,7 +1375,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
       }
       return ok;
     }
-    var addBtn = document.createElement('button');
+    var addBtn = document.createElement('button');wrap.appendChild(addBtn);
     function rowIsBlank(ref){
       return !ref.base && Object.keys(ref.inputs).every(function(k){
         return ref.inputs[k].value.trim() === '';
@@ -1422,12 +1452,11 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
         formError(key + ': at most ' + shape.max + ' items'); return;
       }
       var line = buildRow(null);
-      wrap.insertBefore(line, addBtn);
+      wrap.insertBefore(line, raw);
       var first = line.querySelector('input, select');
       if (first) first.focus();
     });
-    wrap.appendChild(addBtn);
-    if(options.raw!==false)wrap.appendChild(rawJsonFallback(key, cur, 'jsonArr'));
+    var raw=options.raw!==false?rawJsonFallback(key, cur, 'jsonArr'):null;if(raw)wrap.appendChild(raw);
     return wrap;
   }
 
@@ -1445,7 +1474,7 @@ function mapFieldControl(key, cur, opts){
       if (ok) refreshFormSoon();
       return ok;
     }
-    var addBtn = document.createElement('button');
+    var addBtn = document.createElement('button');wrap.appendChild(addBtn);
     function buildPair(k, v){
       var line = document.createElement('div');
       line.className = 'rowline';
@@ -1473,11 +1502,10 @@ function mapFieldControl(key, cur, opts){
     addBtn.type = 'button'; addBtn.className = 'bbtn rowadd'; addBtn.textContent = '+ pair';
     formLife.listen(addBtn,'click', function(){
       var line = buildPair(null, null);
-      wrap.insertBefore(line, addBtn);
+      wrap.insertBefore(line, raw);
       line.querySelector('input').focus();
     });
-    wrap.appendChild(addBtn);
-    wrap.appendChild(rawJsonFallback(key, cur, 'json'));
+    var raw=rawJsonFallback(key, cur, 'json');wrap.appendChild(raw);
     return wrap;
   }
 
@@ -1532,7 +1560,7 @@ function objFieldsControl(key, cur, shape){
       listen:function(target,type,fn,options){if(!disposed)return listen(target,type,fn,options);},
       onFormRetire:function(cleanup){if(disposed)cleanup();else formLife.own(cleanup);},
       clearClipboard:function(){if(!disposed)opts.clipboard.clearHome();},
-      controls:{row:frow,block:frowBlock,action:actionButton,text:textControl,
+      controls:{row:frow,block:frowBlock,action:actionButton,groupActions:actionGroup,text:textControl,
         number:numberControl,select:selectControl,rows:rowsFieldControl,iconPicker:iconPickerControl}
     };
     var value=factory ? factory(context) : {};
@@ -1618,7 +1646,7 @@ function panelForm(val, ctx){
         return commitCascade(function(raw){ return planRenamePanel(session.text(), raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
-      frowBlock('Panel type',panelTypeControl(val,t)),
+      frow('Panel type',Object.assign(document.createElement('span'),{textContent:val.type})),
       frow('Title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
     rows.push(frow('Presentation', selectControl(['Sidebar', 'Centerpiece'], ctx.diagram.primaryPanel === val.id ? 'Centerpiece' : 'Sidebar', function(v){
@@ -1637,10 +1665,9 @@ function panelForm(val, ctx){
     return rows.concat(panelSetupRows(val));
   }
 
-function panelTypeControl(val,target){
-    var wrap=document.createElement('div'),name=document.createElement('span');name.textContent=val.type+' ';
+function panelTypeAction(target){
     var saved=Object.assign({},target),button=actionButton('Change panel type…',function(){if(opts.replacePanelType)opts.replacePanelType(saved);});
-    button.disabled=!opts.replacePanelType;wrap.append(name,button);return wrap;
+    button.disabled=!opts.replacePanelType;return button;
   }
 
 function selectContract(section,card,kind,index){
@@ -1653,11 +1680,11 @@ function addContract(section,copy){
   }
 function contractManager(section,val){
     var list=document.createElement('div');list.className='contract-manager';
+    list.appendChild(actionButton('+ Add contract block',function(){addContract(section);}));
     sectionContracts(val).forEach(function(rec){
       var width={4:'⅓',6:'½',8:'⅔',12:'full'}[contractColumnSpan(rec.value.span)];
       list.appendChild(actionButton((rec.value.title || 'On the wire')+' · '+width+' width',function(){selectContract(section,rec.key);}));
     });
-    list.appendChild(actionButton('+ Add contract block',function(){addContract(section);}));
     return list;
   }
 function contractForm(val,ctx){
@@ -1915,7 +1942,7 @@ function bulletForm(val, ctx){
         return isObj ? commitSimple('text', s) : commitValue(s);
       }))
     ];
-    var actions=document.createElement('div');actions.className='prose-toolbar';
+    var actions=actionGroup('Point structure','prose-toolbar');
     var indices=builderBulletIndices(target),path=builderTargetPath(snapshot.raw,target),siblings=specValueAt(snapshot.raw,path.slice(0,-1)),index=indices[indices.length-1];
     [['Add sibling','sibling'],['Add subpoint','child'],['Indent','indent'],['Outdent','outdent'],['Move point up','up'],['Move point down','down']].forEach(function(pair){
       var button=actionButton(pair[0],function(){
@@ -1924,7 +1951,7 @@ function bulletForm(val, ctx){
       });
       button.disabled=(pair[1]==='indent' || pair[1]==='up') && index===0 || pair[1]==='outdent' && indices.length===1 || pair[1]==='down' && index===siblings.length-1;
       actions.appendChild(button);
-    });rows.push(actions);
+    });rows.unshift(actions);
     rows.push(visibilityControl(val,ctx));
     return rows;
   }
@@ -1950,9 +1977,7 @@ function paraForm(val, ctx){
   }
 
 function crowForm(val, ctx){
-    var target=session.target;
     return [
-      frowBlock('Block',actionButton('Edit contract block',function(){selectContract(target.section,target.card);})),
       frow('k', textControl(val.k, function(v){
         if (v == null){ formError('a contract row needs k — the field name'); return false; }
         return commitSimple('k', JSON.stringify(v));
@@ -2004,6 +2029,7 @@ function renderExtractionPreview(multiSel){
     var heading=document.createElement('h3');heading.textContent='Create an independent domain';panel.appendChild(heading);
     function paragraph(text,cls){var p=document.createElement('p');p.className=cls || '';p.textContent=text;panel.appendChild(p);return p;}
     paragraph('Move '+selected.length+' selected nodes into their own diagram. The child starts with no steps; author its sequence independently.','extraction-intro');
+    var actions=actionGroup('Extraction actions','igroup-actions extraction-actions');panel.appendChild(actions);
     var form=document.createElement('div');form.className='iform';panel.appendChild(form);
     function field(label,value,placeholder,container){
       var input=document.createElement('input');input.type='text';input.className='fctl';input.value=value || '';
@@ -2028,7 +2054,6 @@ function renderExtractionPreview(multiSel){
     var error=document.createElement('div');error.className='gerr ierr';error.hidden=true;error.setAttribute('role','alert');panel.appendChild(error);
     var report=document.createElement('section');report.className='extraction-report';report.setAttribute('aria-label','Extraction preview');panel.appendChild(report);
     var status=paragraph('','extraction-status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');
-    var actions=document.createElement('div');actions.className='iacts extraction-actions';panel.appendChild(actions);
     var download=actionButton('Download destination JSON',function(){
       if(!ready())return;
       if(!opts.download){showError('Download is unavailable in this editor. The source is unchanged.');return;}
@@ -2173,9 +2198,7 @@ function renderMultiInspector(multiSel){
         return applyBulkField('lane', v == null ? null : JSON.stringify(v));
       }, {placeholder: 'lane id from page.lanes — empty removes'})));
     }
-    if (form.childNodes.length) guide.appendChild(form);
-    var acts = document.createElement('div');
-    acts.className = 'iacts';
+    var acts = actionGroup('Selected '+kind+' actions','inspector-actions');
     if(!clipboardToolbar() && clipboard() && (kind === 'node' || kind === 'panel')){
       acts.appendChild(actionButton('Copy selected',function(){clipboard().copy(multiSel);}));
       acts.appendChild(actionButton('Duplicate selected',function(){clipboard().duplicate(multiSel);}));
@@ -2206,6 +2229,7 @@ function renderMultiInspector(multiSel){
     acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
       opts.selection.removeMany, 'bdanger'));
     guide.appendChild(acts);
+    if (form.childNodes.length) guide.appendChild(form);
     finishForm(previous);
   }
 
@@ -2275,13 +2299,6 @@ function renderInspector(){
           independent.disabled = !!modes.adding() || !!modes.connecting();
         }
       }
-      if(t.kind==='node'){
-        var connectButton=actionButton('Connect from this node',function(){modes.connectFrom(t);});
-        connectButton.className+=' node-connect-button';connectButton.title='Alt/Option-click a node, then click its destination';
-        guide.appendChild(connectButton);
-        var connectTip=document.createElement('p');connectTip.className='fnote';
-        connectTip.textContent='Shortcut: Alt/Option-click this node, then click a destination. Escape cancels.';guide.appendChild(connectTip);
-      }
       var form = document.createElement('div');
       form.className = 'iform';
       if (t.kind === 'tab') ensureAccentDatalist();
@@ -2298,25 +2315,13 @@ function renderInspector(){
         t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
       rows.forEach(function(r){ form.appendChild(r); });
-      if (t.kind !== 'step') guide.appendChild(form);
-
-      var acts = document.createElement('div');
-      acts.className = 'iacts';
-      // Panel-scoped actions remain useful when the toolbar targets a selected
-      // Home element. Other duplicate actions use the persistent toolbar.
+      var acts = actionGroup(g.title+' actions','inspector-actions');
       if(clipboard() && (!clipboardToolbar() || t.kind==='panel') && ['node','section','panel'].indexOf(t.kind)>=0){
         acts.appendChild(actionButton('Copy '+t.kind,function(){clipboard().copy([t]);}));
         acts.appendChild(actionButton('Paste…',function(){opts.clipboard.clearHome();clipboard().open();}));
         if(t.kind === 'panel')acts.appendChild(actionButton('Duplicate panel',function(){clipboard().duplicate([t]);}));
       }
       if (t.kind === 'node'){
-        if(!val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
-          commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
-            {after:function(plan){
-              session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;
-              rehighlight();renderInspector();
-            }});
-        }));
         if(!clipboardToolbar())acts.appendChild(actionButton('duplicate', function(){
           commitCascade(function(raw){ return planDuplicateNode(session.text(), raw, t.section, t.id); },
             {after: function(plan){
@@ -2324,7 +2329,19 @@ function renderInspector(){
               renderInspector();
             }});
         }));
+        var connectButton=actionButton('Connect from this node',function(){modes.connectFrom(t);});
+        connectButton.title='Alt/Option-click a node, then click its destination. Escape cancels.';
+        acts.appendChild(connectButton);
+        if(!val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
+          commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
+            {after:function(plan){
+              session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;
+              rehighlight();renderInspector();
+            }});
+        }));
       }
+      if(t.kind==='panel')acts.appendChild(panelTypeAction(t));
+      if(t.kind==='crow')acts.appendChild(actionButton('Edit contract block',function(){selectContract(t.section,t.card);}));
       if(t.kind==='contract'){
         acts.appendChild(actionButton('Duplicate block',function(){addContract(t.section,val);}));
         var contracts=sectionContracts(specValueAt(parsed.raw,rec.section)),ci=contracts.findIndex(function(c){return c.key===(t.card==null?'legacy':String(t.card));});
@@ -2416,9 +2433,9 @@ function renderInspector(){
         }));
       }
       if (!armedHere && t.kind !== 'document')
-        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
-      if (t.kind === 'step') guide.appendChild(form);
+      guide.appendChild(form);
     }
 
     /* the pass-1 field guidance, tucked under a details fold */

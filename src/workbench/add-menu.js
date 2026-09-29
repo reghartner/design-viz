@@ -21,13 +21,17 @@ function initDiagramAddMenu(opts){
   function showError(message){error.textContent=message || '';error.hidden=!message;}
   function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section;}
   function paint(current){
-    choices.concat(presetButtons).forEach(function(action){action.disabled=invalid || !!current.error || !current.diagram;});
+    choices.concat(presetButtons).forEach(function(action){
+      var prose=action.hasAttribute('data-add-prose');
+      action.disabled=invalid || !!current.error || !(prose?current.prose:current.diagram);
+      if(prose)action.title=current.prose?'':'Prose belongs to a page section.';
+    });
     structure.forEach(function(action){action.disabled=invalid || !!current.error;});
     menu.hidden=choosingNode;footer.hidden=choosingNode;nodePage.hidden=!choosingNode;
-    title.textContent=choosingNode ? 'Add a node' : 'Add to diagram';
+    title.textContent=choosingNode ? 'Add a node' : 'Add to section';
     help.textContent=choosingNode ? 'Click a preset to add it, then customize the node in the inspector.' : 'Choose an item to get started.';
     showError(invalid ? 'The source or destination changed. Close this dialog and open it again before adding.' :
-      current.error || (!current.diagram ? 'Choose a section with a diagram, or add a new section below.' : ''));
+      current.error || (!current.diagram ? current.prose ? 'This section supports prose. Choose a section with a diagram for nodes, connections, steps and panels.' : 'Choose a page section, or add a new section below.' : ''));
   }
   function refresh(){
     var current=opts.context(),entries=current.sections || [];
@@ -53,12 +57,13 @@ function initDiagramAddMenu(opts){
     doc.getElementById('diagram-add-destination').textContent=current.label || 'Page';
     dialog.querySelector('.diagram-add-structure').open=false;
     paint(current);dialog.showModal();button.setAttribute('aria-expanded','true');
-    (choices[0].disabled ? doc.getElementById('diagram-add-close') : choices[0]).focus({preventScroll:true});
+    focusChoice();
   }
+  function focusChoice(){(choices.find(function(choice){return !choice.disabled;}) || doc.getElementById('diagram-add-close')).focus({preventScroll:true});}
   function confirm(run,pageStructure){
     if(!dialog.open)return false;
     var current=opts.context();
-    if(invalid || !same(current) || (!pageStructure && !current.diagram)){invalid=invalid || !same(current);paint(current);return false;}
+    if(invalid || !same(current) || (pageStructure==='prose'?!current.prose:!pageStructure && !current.diagram)){invalid=invalid || !same(current);paint(current);return false;}
     close();run();return true;
   }
   function invalidate(){if(dialog.open){invalid=true;paint(opts.context());}}
@@ -74,7 +79,7 @@ function initDiagramAddMenu(opts){
     if(invalid || !same(current) || !current.diagram){invalid=invalid || !same(current);paint(current);return;}
     choosingNode=true;paint(current);presetButtons[0].focus({preventScroll:true});
   });
-  life.listen(back,'click',function(){choosingNode=false;paint(opts.context());(choices[0].disabled ? doc.getElementById('diagram-add-close') : choices[0]).focus({preventScroll:true});});
+  life.listen(back,'click',function(){choosingNode=false;paint(opts.context());focusChoice();});
   life.listen(doc.getElementById('diagram-add-close'),'click',function(){close();});
   life.listen(dialog,'cancel',function(event){event.preventDefault();close();});
   life.listen(dialog,'close',function(){if(!dialog.open){snapshot=null;button.setAttribute('aria-expanded','false');}});

@@ -234,5 +234,6 @@ function initWorkbenchCanvas(){
   document.getElementById('workspace-fit').addEventListener('click',fit);
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,
+    showPage:function(){pageOverride=true;select(section);},
     reset:function(){skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;pageOverride=false;},fit:fit};
 }

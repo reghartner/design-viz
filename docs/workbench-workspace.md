@@ -30,6 +30,17 @@ remain available. The Steps Path selector can inspect an alternate even when the
 current named view hides every step on that route. Editing and rerendering keep
 that exact authored step without changing the view's selected subset.
 
+Choose a destination in **Section**, then **Add to diagram → Paragraph** or **Bullet point**
+to create section prose. These actions append and select the new item, including
+in sections without diagrams, and reveal page preview when Explore hides it.
+Empty section inspectors also offer **Add an introduction** and **Add first point**.
+New paragraphs and points focus their text field with the placeholder selected.
+Select a paragraph for **Add paragraph before/after**, **Move paragraph up/down**,
+and **Delete paragraph**. Select a bullet for siblings, subpoints, indent/outdent,
+reordering and deletion; these move or remove its whole subtree. Each addition,
+move or deletion is one Undo/Redo. Prose needs a page section; a bare diagram
+has no section prose surface.
+
 Prose and step-text fields support backticks for inline code and triple-backtick
 fences for multiline code blocks. Enter real newlines in the text field; JSON
 source uses `\n`. Code remains literal, preserves indentation, and scrolls within

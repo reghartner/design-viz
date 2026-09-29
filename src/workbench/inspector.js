@@ -1668,7 +1668,7 @@ function sectionForm(val, ctx){
     return [
       frow('heading', textControl(val.heading, function(v){ return identity('heading',v); })),
       frow('Initially collapse prose',checkboxControl(val.collapsed,function(on){return commitSimple('collapsed',on?'true':null);})),
-    ].concat(routingRows,[
+    ].concat(sectionProseActions(val,target),routingRows,[
       frowBlock('Contract blocks',contractManager(target.section,val)),
       frow('Stable section ID',textControl(val.id,function(v){return identity('id',v);},{placeholder:'optional stable-section-id'})),
       frow('Detail only',checkboxControl(val.detailOnly,function(on){return commitSimple('detailOnly',on?'true':null);})),
@@ -1678,6 +1678,28 @@ function sectionForm(val, ctx){
     ]);
   }
 
+function focusProse(){
+    if(disposed || !session.target || (session.target.kind!=='para' && session.target.kind!=='bullet'))return;
+    var input=guide.querySelector('.prose-editor textarea');
+    if(input){input.focus({preventScroll:true});input.select();}
+  }
+function sectionProseActions(val,target){
+    var actions=document.createElement('div');actions.className='prose-toolbar';
+    [['Add an introduction','para',!val.text || Array.isArray(val.text) && !val.text.length],
+      ['Add first point','bullet',!val.bullets || !val.bullets.length]].forEach(function(entry){
+      if(!entry[2])return;
+      actions.appendChild(actionButton(entry[0],function(){
+        return commitCascade(function(raw){return planAddProse(session.text(),raw,target.section,entry[1]);},
+          {after:function(plan){
+            var next={kind:plan.kind,section:target.section,index:plan.index};
+            selectTarget(Object.assign({},next,{el:findTargetEl(next)}),false,true);
+            if(opts.preview.showPage)opts.preview.showPage();
+            focusProse();
+          }});
+      }));
+    });
+    return actions.children.length?[frowBlock('Section prose',actions)]:[];
+  }
 function proseControl(value,commit){
     var key=targetIdentity();if(proseDraft.key!==key)proseDraft={key:key,url:''};
     var draft=proseDraft;
@@ -1723,7 +1745,7 @@ function bulletForm(val, ctx){
     [['Add sibling','sibling'],['Add subpoint','child'],['Indent','indent'],['Outdent','outdent'],['Move point up','up'],['Move point down','down']].forEach(function(pair){
       var button=actionButton(pair[0],function(){
         return commitCascade(function(raw){return planBulletStructure(session.text(),raw,target,pair[1],expected);},
-          {after:function(plan){selectTarget(Object.assign({},plan.target,{el:findTargetEl(plan.target)}),false,true);}});
+          {after:function(plan){selectTarget(Object.assign({},plan.target,{el:findTargetEl(plan.target)}),false,true);if(pair[1]==='sibling' || pair[1]==='child')focusProse();}});
       });
       button.disabled=(pair[1]==='indent' || pair[1]==='up') && index===0 || pair[1]==='outdent' && indices.length===1 || pair[1]==='down' && index===siblings.length-1;
       actions.appendChild(button);
@@ -1733,10 +1755,22 @@ function bulletForm(val, ctx){
   }
 
 function paraForm(val, ctx){
+    var target=Object.assign({},session.target),snapshot=parseEditor(),rec=specSectionPaths(snapshot.raw)[target.section];
+    var value=specValueAt(snapshot.raw,rec.section.concat(['text'])),expected=JSON.stringify(value);
+    var count=typeof value==='string'?1:value.length,actions=document.createElement('div');
+    actions.className='prose-toolbar';actions.setAttribute('role','group');actions.setAttribute('aria-label','Paragraph actions');
+    [['Add paragraph before','before'],['Add paragraph after','after'],['Move paragraph up','up'],['Move paragraph down','down']].forEach(function(pair){
+      var button=actionButton(pair[0],function(){
+        return commitCascade(function(raw){return planParagraphStructure(session.text(),raw,target,pair[1],expected);},
+          {after:function(plan){selectTarget(Object.assign({},plan.target,{el:findTargetEl(plan.target)}),false,true);if(pair[1]==='before' || pair[1]==='after')focusProse();}});
+      });
+      button.disabled=pair[1]==='up' && target.index===0 || pair[1]==='down' && target.index===count-1;
+      actions.appendChild(button);
+    });
     return [
       frowBlock('text', proseControl(val, function(v){
         return commitValue(JSON.stringify(v == null ? '' : v));
-      }))
+      })),actions
     ];
   }
 
@@ -2205,7 +2239,7 @@ function renderInspector(){
         }));
       }
       if (!armedHere && t.kind !== 'document')
-        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       guide.appendChild(acts);
       if (t.kind === 'step') guide.appendChild(form);
     }
@@ -2250,7 +2284,7 @@ function renderInspector(){
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
     sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();},
-    message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,
+    message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},
     destroy:function(){if(disposed)return;disposed=true;try{retire();}finally{formLife.destroy();panelEditors=Object.create(null);if(guide)guide.innerHTML='';}}

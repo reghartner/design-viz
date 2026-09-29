@@ -169,6 +169,11 @@ For section text/bullets, `collapsed:true` starts prose folded. Humans set this
 with **Initially collapse prose** in the section inspector; the diagram and
 contract blocks remain visible, and reader toggles do not rewrite that default.
 
+For human editing, the workbench can create and reorder section paragraphs
+and bullet lists through Add and Inspect. See
+[Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
+for these controls and the existing prose syntax.
+
 ## Phase 1: Inventory the source
 
 Read SOURCE fully. Build the coverage ledger as described in

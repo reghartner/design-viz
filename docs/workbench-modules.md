@@ -566,7 +566,11 @@ visibility; `commands/visibility.js` preserves string bullets and advanced field
 while writing one undoable reveal/hide change. Bounds address full path positions,
 not registry indices or compressed view stops.
 
-`commands/prose.js` owns nested bullet operations and safe syntax insertion.
+`commands/prose.js` owns first/appended section prose, paragraph insertion and
+reordering, nested bullet operations, and safe syntax insertion. Paragraph
+structure actions retain string content while converting single-string `text`
+to an array on insertion; surrounding source remains intact. Add-menu prose
+actions need a page section, not a diagram, and reveal page preview on insertion.
 Bullet targets use `bulletPath: [rootIndex, childIndex, ...]`; legacy `index`
 targets resolve to a top-level point. Render markers, Outline, selection,
 bulk deletion and inspectors share the full address. Moves retain complete

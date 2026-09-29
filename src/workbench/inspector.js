@@ -1618,11 +1618,7 @@ function panelForm(val, ctx){
         return commitCascade(function(raw){ return planRenamePanel(session.text(), raw, t.section, t.index, v); },
           {after: function(){ renderInspector(); }});
       }, {required: 'a panel needs an id'})),
-      frow('Panel type', selectControl(PANEL_TYPES, val.type, function(v){
-        var ok = commitSimple('type', v == null ? null : JSON.stringify(v));
-        if (ok) renderInspector(); /* the setup rows follow the type */
-        return ok;
-      })),
+      frowBlock('Panel type',panelTypeControl(val,t)),
       frow('Title', textControl(val.title, function(v){ return commitSimple('title', v == null ? null : JSON.stringify(v)); }))
     ];
     rows.push(frow('Presentation', selectControl(['Sidebar', 'Centerpiece'], ctx.diagram.primaryPanel === val.id ? 'Centerpiece' : 'Sidebar', function(v){
@@ -1639,6 +1635,12 @@ function panelForm(val, ctx){
     if(panelAuthoring(val.type).branding)rows.push(brandControl(val,ctx));
     if(editor.setupRows) editor.setupRows(val,ctx.diagram,t,rows);
     return rows.concat(panelSetupRows(val));
+  }
+
+function panelTypeControl(val,target){
+    var wrap=document.createElement('div'),name=document.createElement('span');name.textContent=val.type+' ';
+    var saved=Object.assign({},target),button=actionButton('Change panel type…',function(){if(opts.replacePanelType)opts.replacePanelType(saved);});
+    button.disabled=!opts.replacePanelType;wrap.append(name,button);return wrap;
   }
 
 function selectContract(section,card,kind,index){

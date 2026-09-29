@@ -937,6 +937,15 @@ body.sk-aurora.sk-blueprint{
 .panel-picker::backdrop{background:#20233765;backdrop-filter:blur(5px);}
 .panel-picker,.panel-picker *{box-sizing:border-box;}
 .panel-picker [hidden]{display:none!important;}
+.panel-picker-review{flex:1;min-height:0;overflow:auto;padding:24px 30px;background:#fff;color:#30394f;}
+.panel-picker-review h3{margin:0 0 14px;font:600 23px/1.35 'Sora',sans-serif;}
+.panel-picker-review h4{margin:22px 0 8px;font-size:14px;}
+.panel-picker-review p,.panel-picker-review li{overflow-wrap:anywhere;}
+.panel-picker-review ul{padding-left:22px;}
+.panel-picker-review details{margin:22px 0;padding:14px;border:1px solid #e0e2ee;border-radius:10px;}
+.panel-picker-review summary{cursor:pointer;font-weight:600;}
+.panel-picker-review textarea{display:block;width:100%;height:180px;margin:12px 0;font:11px/1.5 'IBM Plex Mono',monospace;resize:vertical;}
+#panel-picker-copy-status{display:inline-block;margin:8px;}
 .panel-picker button,.panel-picker input{font-family:inherit;}
 .panel-picker button{cursor:pointer;}
 .panel-picker button:disabled{cursor:not-allowed;opacity:.5;}

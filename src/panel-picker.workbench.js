@@ -64,7 +64,8 @@ function panelPickerPreview(type, referenceImage, skin){
 }
 
 function panelPickerCurrent(snapshot, current){
-  return !!snapshot && !!current && !current.error && snapshot.text === current.text && snapshot.section === current.section;
+  return !!snapshot && !!current && !current.error && snapshot.text === current.text && snapshot.section === current.section &&
+    snapshot.project===current.project && snapshot.targetKey===current.targetKey;
 }
 
 function initPanelPicker(opts){
@@ -76,8 +77,11 @@ function initPanelPicker(opts){
   var filters = document.getElementById('panel-picker-filters'), detail = document.getElementById('panel-picker-preview');
   var add = document.getElementById('panel-picker-add'), status = document.getElementById('panel-picker-status');
   var snapshot = null, selected = null, category = 'All panels', opener = null, invalid = false, referenceImage = null;
+  var operation=null,reviewPlan=null,copyGeneration=0;
+  var content=dialog.querySelector('.panel-picker-content'),review=el('panel-picker-review');
   var resize = typeof ResizeObserver === 'function' ? new ResizeObserver(life.guard(fitPreviews)) : null;
   function el(id){ return document.getElementById(id); }
+  function context(){return operation?operation.context():opts.context();}
   function fitPreviews(){
     dialog.querySelectorAll('.panel-picker-art').forEach(function(frame){
       var widget = frame.firstElementChild;
@@ -109,7 +113,7 @@ function initPanelPicker(opts){
     el('panel-picker-type').textContent = selected.type;
     detail.replaceChildren(makePreview(type,true));
     detail.parentElement.scrollTop = 0;
-    add.disabled = invalid;
+    add.disabled = invalid || !!(operation && snapshot && snapshot.panelType===type);
     fitPreviews();
   }
   function paintGrid(){
@@ -135,7 +139,7 @@ function initPanelPicker(opts){
   }
   function invalidate(){
     if (!dialog.open) return;
-    invalid = true; add.disabled = true;
+    invalid = true; add.disabled = true;copyGeneration++;
     status.textContent = 'The diagram or destination changed. Close this picker and open it again to choose the current section.';
     status.hidden = false;
   }
@@ -143,22 +147,29 @@ function initPanelPicker(opts){
     cardsLife.destroy();filtersLife.destroy();
     if (resize) resize.disconnect();
     grid.replaceChildren(); detail.replaceChildren(); snapshot = null; selected = null; referenceImage = null;
+    operation=null;reviewPlan=null;copyGeneration++;review.hidden=true;content.hidden=false;
+    el('panel-picker-original').value='';el('panel-picker-review-details').replaceChildren();
   }
   function close(focus){
     if (!dialog.open) return;
     dialog.close(); cleanup();
     if (focus!==false && opener && opener.isConnected) opener.focus({preventScroll:true});
   }
-  function open(){
-    var current = opts.context();
+  function open(replacement){
+    operation=replacement || null;
+    var current = context();
     if (current.error){ opts.error(current.error); return; }
     snapshot = current; opener = document.activeElement; invalid = false; selected = null;
     category = 'All panels'; search.value = ''; status.hidden = true; status.textContent = '';
     el('panel-picker-destination').textContent = current.label;
+    el('panel-picker-title').textContent=operation?'Choose a replacement panel.':'Give your story another dimension.';
+    el('panel-picker-intro').textContent=operation?'Choose a different type, then review the setup and step changes before replacing.':'Choose a panel to preview it, then add it to your diagram.';
+    dialog.querySelector('.panel-picker-destination>span').textContent=operation?'Replace':'Add to';
+    add.textContent=operation?'Review replacement':'Add panel';content.hidden=false;review.hidden=true;reviewPlan=null;
     referenceImage = panelPickerReferenceImage();
     if (opts.pause) opts.pause();
     paintFilters(); paintGrid();
-    var first=panelAuthoringCatalog()[0];if(first)select(first.type);
+    var first=panelAuthoringCatalog().find(function(entry){return entry.type===current.panelType;}) || panelAuthoringCatalog()[0];if(first)select(first.type);
     dialog.showModal(); fitPreviews();
     if (resize) resize.observe(dialog);
     search.focus({preventScroll:true});
@@ -176,14 +187,45 @@ function initPanelPicker(opts){
     filtersLife.listen(button,'click',function(){category = name;paintGrid();}); filters.appendChild(button);
   });
   }
+  function showReview(plan){
+    reviewPlan=plan;copyGeneration++;var details=el('panel-picker-review-details'),summary=plan.replacement;details.replaceChildren();
+    status.hidden=true;status.textContent='';
+    el('panel-picker-review-summary').textContent='Replace “'+summary.title+'” ('+summary.from+') with '+summary.to+'. The new panel starts from its template. Undo restores all original data.';
+    function list(title,items,empty){
+      var heading=document.createElement('h4');heading.textContent=title;details.appendChild(heading);
+      if(!items.length){var note=document.createElement('p');note.textContent=empty;details.appendChild(note);return;}
+      var ul=document.createElement('ul');items.forEach(function(value){var li=document.createElement('li');li.textContent=value;ul.appendChild(li);});details.appendChild(ul);
+    }
+    list('Kept',['Panel ID, title, starting visibility, layout positions, and centerpiece setting.','Step visibility and path membership.' ].concat(summary.kept.indexOf('brand')>=0?['Company branding.']:[]),'');
+    list('Setup replaced or removed',summary.removedFields,'No old type-specific setup.');
+    list('Step overrides removed',summary.steps.map(function(step){return 'Step '+(step.index+1)+(step.id?' · '+step.id:'')+(step.text?' · '+step.text:'')+' — '+step.fields.join('; ')+' — '+(step.paths.length?step.paths.join(', '):'not on a path');}),'No step overrides for this panel.');
+    list('Playback controls detached',summary.detached,'All control attachments stay as they are.');
+    el('panel-picker-original').value=JSON.stringify(summary.original,null,2);el('panel-picker-copy-status').textContent='';
+    review.querySelector('details').open=false;content.hidden=true;review.hidden=false;review.scrollTop=0;
+    add.textContent='Replace panel';el('panel-picker-review-title').focus({preventScroll:true});
+  }
+  life.listen(el('panel-picker-back'),'click',function(){
+    reviewPlan=null;copyGeneration++;review.hidden=true;content.hidden=false;add.textContent='Review replacement';fitPreviews();search.focus({preventScroll:true});
+  });
+  life.listen(el('panel-picker-copy'),'click',function(){
+    if(!reviewPlan || invalid)return;
+    var token=++copyGeneration,input=el('panel-picker-original'),value=input.value;
+    function done(message){if(life.alive() && dialog.open && reviewPlan && token===copyGeneration)el('panel-picker-copy-status').textContent=message;}
+    function fallback(){if(!life.alive() || !dialog.open || !reviewPlan || token!==copyGeneration)return;input.focus();input.select();done('Select and copy the JSON above.');}
+    try{if(navigator.clipboard && navigator.clipboard.writeText)Promise.resolve(navigator.clipboard.writeText(value)).then(function(){done('Copied original diagram JSON.');},fallback);else fallback();}catch(ex){fallback();}
+  });
   life.listen(search,'input',paintGrid);
   life.listen(el('panel-picker-clear'),'click',function(){search.value = '';category = 'All panels';paintGrid();search.focus();});
   life.listen(el('panel-picker-close'),'click',close);
   life.listen(el('panel-picker-cancel'),'click',close);
   life.listen(add,'click',function(){
     if (invalid || !selected) return;
-    if (!panelPickerCurrent(snapshot,opts.context())){invalidate();return;}
+    if (!panelPickerCurrent(snapshot,context())){invalidate();return;}
     var type = selected.type;
+    if(operation){
+      if(!reviewPlan){var plan=operation.review(type,snapshot);if(plan.error){status.textContent=plan.error;status.hidden=false;return;}showReview(plan);return;}
+      var apply=operation.apply,approved=reviewPlan,original=snapshot;close(false);apply(approved,original);return;
+    }
     close(); opts.insert(type);
   });
   life.listen(dialog,'cancel',function(ev){ev.preventDefault();close();});
@@ -194,6 +236,6 @@ function initPanelPicker(opts){
   life.listen(dialog,'keydown',function(ev){ev.stopPropagation();if (ev.key === 'Escape'){ev.preventDefault();close();}});
   life.listen(dialog,'click',function(ev){ev.stopPropagation();});
   life.listen(opts.src,'input',invalidate);
-  return {open:life.guard(open),close:life.guard(close),refresh:life.guard(function(){if(dialog.open && !panelPickerCurrent(snapshot,opts.context())) invalidate();}),invalidate:life.guard(invalidate),
+  return {open:life.guard(open),close:life.guard(close),refresh:life.guard(function(){if(dialog.open && !panelPickerCurrent(snapshot,context())) invalidate();}),invalidate:life.guard(invalidate),
     destroy:function(){if(!life.alive())return;life.destroy();close(false);cleanup();opener=null;filters.replaceChildren();}};
 }

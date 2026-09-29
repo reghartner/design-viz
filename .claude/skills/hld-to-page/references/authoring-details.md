@@ -258,6 +258,17 @@ with **position (%)**. See `docs/free-node-placement.md` and the executable
 
 ## Human handoff in the workbench
 
+Panel inspectors use **Change panel type…** to open the visual library and an
+explicit replacement review. Replacement seeds the registered template and
+instantiate hook, preserves ID/title/visibility, diagram layouts and centerpiece,
+and keeps branding only for compatible types. Old type-specific setup, including
+unknown imported keys, is listed and discarded. All state overrides for that
+panel are removed from registry steps and legacy `patch` aliases on every path;
+`panelVisibility`, other panels, captions and path membership survive. Controls
+attached to a panel that cannot host them become detached with their geometry
+intact. The review offers original diagram JSON for backup; one Undo restores
+the full change. Treat replacement as a new panel-state authoring task.
+
 Camera and Device App have typed **Starting state** controls in the panel
 inspector. Set defaults there and authored changes on steps; keep advanced
 initial fields intact. Phone and Device App also offer a shared notification

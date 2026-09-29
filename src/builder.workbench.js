@@ -500,6 +500,7 @@ function initWorkbenchBuilder(opts){
   }
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
+    replacePanelType:function(target){changePanelType(target);},
     download:function(name,text,mime){return io && io.download(name,text,mime);},
     schedule:function(fn,ms){return life.delay(fn,ms);},cancel:function(timer){life.cancelDelay(timer);},
     surface:{reveal:revealInspector,hideDiff:hideDiff,
@@ -1024,10 +1025,31 @@ function initWorkbenchBuilder(opts){
       if (findings.errors.length) return {error:'Fix the diagram’s validation errors before adding a panel.'};
       var rec = specSectionPaths(parsed.raw)[session.insertSection];
       if (!rec || !specValueAt(parsed.raw,rec.diagram)) return {error:'Choose a section with a diagram before adding a panel.'};
-      return {text:session.text(),section:session.insertSection,label:builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'')};
+      return {text:session.text(),project:parsed.project,section:session.insertSection,label:builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'')};
     },
     insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type);});}
   }) : null;
+  function changePanelType(target){
+    if(!panelPicker)return;
+    var section=target.section,index=target.index;
+    panelPicker.open({
+      context:function(){
+        var parsed=parseEditor(),selected=session.target;
+        if(parsed.error)return {error:'Fix the JSON before replacing a panel.'};
+        if(interactions.adding() || interactions.connecting())return {error:'Finish adding to the step or connecting nodes first.'};
+        if(!selected || selected.kind!=='panel' || selected.section!==section || selected.index!==index)return {error:'Select this panel again before replacing its type.'};
+        var path=builderTargetPath(parsed.raw,{kind:'panel',section:section,index:index}),panel=path && specValueAt(parsed.raw,path);
+        if(!panel)return {error:'The panel no longer exists.'};
+        if(validate(normalize(parsed.raw)).errors.length)return {error:'Fix the diagram’s validation errors before replacing a panel.'};
+        return Object.assign({},parsed,{section:section,targetKey:JSON.stringify([section,index,panel.id]),panelType:panel.type,label:panel.title || panel.id});
+      },
+      review:function(type,snapshot){return planReplacePanel(snapshot.text,snapshot.raw,section,index,type);},
+      apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
+        clearMultiSelect();var next={kind:'panel',section:section,index:index};
+        selectTarget(Object.assign({},next,{el:findTargetEl(next)}),false);
+      }},snapshot);}
+    });
+  }
   var panelBtn = document.getElementById('add-panel');
   if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
   function additionContext(){

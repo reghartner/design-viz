@@ -94,6 +94,67 @@ function planAddPanel(text, raw, sectionIdx, type){
           index: (got.d.panels || []).length};
 }
 
+/* Changing type is an explicit replacement. Field-name overlap does not prove
+   compatible meaning (for example state, span, or initial), so only common
+   identity/visibility and supported branding survive. Registry steps are edited
+   once, including dormant legacy aliases, without changing path membership. */
+function planReplacePanel(text,raw,sectionIdx,panelIdx,type){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  var old=Array.isArray(got.d.panels) && got.d.panels[panelIdx],authoring=panelAuthoring(type);
+  if(!specObject(old) || !Number.isInteger(panelIdx) || !old.id)return {error:'Select an existing panel to replace.'};
+  if((got.d.panels || []).filter(function(p){return p && p.id===old.id;}).length!==1)return {error:'Give this panel a unique ID before replacing it.'};
+  if(!authoring.template || !authoring.picker)return {error:'Choose a supported panel type.'};
+  if(type===old.type)return {error:'Choose a different panel type.'};
+  if(got.d.steps!=null && !Array.isArray(got.d.steps))return {error:'Correct the steps list before replacing a panel.'};
+  var entry=builderClone(authoring.template);entry.id=old.id;entry.type=type;
+  if(authoring.instantiate)entry=authoring.instantiate(entry,builderClone(got.d)) || entry;
+  var common=['id','title','visible'];if(authoring.branding)common.push('brand');
+  common.forEach(function(key){if(Object.prototype.hasOwnProperty.call(old,key))entry[key]=builderClone(old[key]);});
+  entry.id=old.id;entry.type=type;
+  var review={from:old.type,to:type,id:old.id,title:old.title || old.id,
+    kept:common.filter(function(key){return Object.prototype.hasOwnProperty.call(old,key);}),
+    removedFields:Object.keys(old).filter(function(key){return key!=='type' && common.indexOf(key)<0;}),steps:[],detached:[],original:builderClone(got.d)};
+  var out=text,failed=null;
+  function remove(path,key){
+    if(failed)return;
+    var result=jsonRemoveMember(out,path,key);if(!result){failed={error:'Could not remove the old panel data.'};return;}out=result.text;
+  }
+  var paths=diagramPathList(got.d);
+  (got.d.steps || []).forEach(function(step,index){
+    if(!step)return;
+    var fields=[];
+    ['panels','patch'].forEach(function(key){
+      if(!specObject(step[key]) || !Object.prototype.hasOwnProperty.call(step[key],old.id))return;
+      fields.push(key+'.'+old.id+(specObject(step[key][old.id])?' ('+Object.keys(step[key][old.id]).join(', ')+')':''));
+      // Keep an empty panels map: removing it could activate a dormant patch alias.
+      remove(got.path.concat(['steps',index,key]),old.id);
+    });
+    if(fields.length)review.steps.push({index:index,id:step.id,text:step.text || '',fields:fields,
+      paths:paths.filter(function(path){return path.indices.indexOf(index)>=0;}).map(function(path){return path.label;})});
+  });
+  if(!panelCapability(type,'attachControls',false)){
+    [{value:got.d,path:got.path,label:'Default layout'}].concat((Array.isArray(got.d.layouts)?got.d.layouts:[]).map(function(layout,index){
+      return {value:layout,path:got.path.concat(['layouts',index]),label:layout && (layout.name || layout.id) || 'View '+(index+1)};
+    })).forEach(function(view){
+      if(!view.value || !specObject(view.value.sectionLayout))return;
+      Object.keys(view.value.sectionLayout).forEach(function(profile){
+        var items=view.value.sectionLayout[profile];if(!Array.isArray(items))return;
+        items.forEach(function(item,index){
+          if(!item || item.attachTo!=='panel:'+old.id)return;
+          review.detached.push(view.label+' / '+profile+' / tile '+(index+1));
+          remove(view.path.concat(['sectionLayout',profile,index]),'attachTo');
+        });
+      });
+    });
+  }
+  if(failed)return failed;
+  var plan=planReplaceValue(out,raw,got.path.concat(['panels',panelIdx]),JSON.stringify(entry,null,2));
+  if(plan.error)return plan;
+  var errors=validate(normalize(JSON.parse(plan.text))).errors;
+  if(errors.length)return {error:'The replacement would be invalid: '+errors.join('; ')};
+  plan.kind='panel';plan.index=panelIdx;plan.replacement=review;return plan;
+}
+
 function builderGroupsShapeError(d){
   /* the validator treats a non-object diagram.groups as "no declarations";
      every mutation planner refuses that shape outright — numeric own keys

@@ -481,11 +481,18 @@
     </section>
     <section class="panel-picker-detail" aria-label="Selected panel">
       <div id="panel-picker-category" class="panel-picker-eyebrow"></div><h3 id="panel-picker-name"></h3>
-      <div id="panel-picker-preview"></div><div class="panel-picker-preview-caption">Illustrative preview · editable after adding</div>
+      <div id="panel-picker-preview"></div><div class="panel-picker-preview-caption">Illustrative preview · editable in the inspector</div>
       <p id="panel-picker-description" aria-live="polite"></p>
       <div class="panel-picker-detail-note">Starts with a simple, editable setup. Use the inspector to make it yours.<br>Panel type <code id="panel-picker-type"></code></div>
     </section>
   </div>
+  <section id="panel-picker-review" class="panel-picker-review" aria-labelledby="panel-picker-review-title" hidden>
+    <h3 id="panel-picker-review-title" tabindex="-1">Review panel replacement</h3>
+    <p id="panel-picker-review-summary"></p>
+    <div id="panel-picker-review-details"></div>
+    <details><summary>Keep a copy of the original diagram JSON</summary><p>Includes this panel, every step override, and the saved layouts.</p><textarea id="panel-picker-original" readonly aria-label="Original diagram JSON" spellcheck="false"></textarea><button type="button" id="panel-picker-copy" class="panel-picker-secondary">Copy original JSON</button><span id="panel-picker-copy-status" role="status"></span></details>
+    <button type="button" id="panel-picker-back" class="panel-picker-secondary">Choose another type</button>
+  </section>
   <p id="panel-picker-status" class="panel-picker-status" role="status" hidden></p>
   <footer class="panel-picker-footer"><div class="panel-picker-destination"><span>Add to</span><strong id="panel-picker-destination"></strong></div><div class="panel-picker-footer-actions"><button type="button" id="panel-picker-cancel" class="panel-picker-secondary">Cancel</button><button type="button" id="panel-picker-add" class="panel-picker-primary"><span aria-hidden="true">+</span>Add panel</button></div></footer>
 </dialog>

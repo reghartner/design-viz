@@ -174,6 +174,10 @@ and bullet lists through Add and Inspect. See
 [Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
 for these controls and the existing prose syntax.
 
+When handing off a page for human editing, the workbench’s **Change panel type…**
+action reviews discarded setup and step state before replacement. See
+[Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).
+
 ## Phase 1: Inventory the source
 
 Read SOURCE fully. Build the coverage ledger as described in

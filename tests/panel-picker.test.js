@@ -56,6 +56,10 @@ test('source, destination, or edit-mode changes invalidate an open picker snapsh
     assert.equal(context.panelPickerCurrent(snapshot,current),false);
   }
   assert.equal(context.panelPickerCurrent(null,snapshot),false);
+  const replacement={...snapshot,project:1,targetKey:'panel 1'};
+  assert.equal(context.panelPickerCurrent(replacement,{...replacement}),true);
+  assert.equal(context.panelPickerCurrent(replacement,{...replacement,project:2}),false);
+  assert.equal(context.panelPickerCurrent(replacement,{...replacement,targetKey:'panel 2'}),false);
 });
 
 

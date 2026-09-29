@@ -238,6 +238,16 @@ accepts `{commitValue, collect, raw:false}` for typed collection rows.
 from the stored value. Unmatched fields return nothing and use the standard
 control. Keep a panel's operation semantics in that panel module.
 
+The editor context includes its owned `document` for constructing controls.
+Rows accept `shape.wide:true` for labeled cards even with four or fewer fields,
+and column `label` for captions and accessible names. Projected rows should
+retain source identity through reorder or rename before reconstructing stored
+objects; preserve unknown row/cell keys and distinguish strings, numbers,
+booleans and null. `src/workbench/panel-collections.js` shares keyed snapshot,
+typed table-cell and append-event composers used by Checks, Budget, Table and
+Log. These helpers run only in the workbench; the panel module keeps its runtime
+state semantics.
+
 The shared state editor uses a separate assignment selector. Omitted starting
 fields use the panel default; omitted step fields inherit; `null` is offered only
 when `nullLabel` declares a meaningful reset (or an imported value is already

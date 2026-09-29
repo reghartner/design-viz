@@ -1321,7 +1321,7 @@ function colInput(col, value){
       input = document.createElement('select');
       input.className = 'fctl';
       var none = document.createElement('option');
-      none.value = ''; none.textContent = '(' + col.k + ')';
+      none.value = ''; none.textContent = '(' + (col.label || col.k) + ')';
       input.appendChild(none);
       options.forEach(function(o){
         var op = document.createElement('option');
@@ -1340,9 +1340,10 @@ function colInput(col, value){
     } else {
       input = document.createElement('input');
       input.type = 'text'; input.className = 'fctl';
-      input.placeholder = col.k + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
+      input.placeholder = (col.label || col.k) + (col.req ? ' *' : '') + (col.kind === 'clock' ? ' (5m, 2h…)' : '');
       input.value = value == null ? '' : String(value);
     }
+    input.setAttribute('aria-label',col.label || col.k);
     return input;
   }
 
@@ -1404,7 +1405,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
       /* 5+ columns cannot share one flex line — the inputs shrink into
          unreadable slivers. Wide shapes render each item as a card of
          LABELED inputs in a wrapping grid instead. */
-      var wide = (shape.cols || []).length > 4;
+      var wide = shape.wide || (shape.cols || []).length > 4;
       var line = document.createElement('div');
       line.className = wide ? 'rowline rowcard' : 'rowline';
       var ref = {base: base, inputs: {}};
@@ -1417,7 +1418,7 @@ function wireCommit(input,fire){return wireBuilderCommit(input,fire,{blur:true,l
           cell.className = 'rowcell';
           var cap = document.createElement('span');
           cap.className = 'rowk';
-          cap.textContent = col.k + (col.req ? ' *' : '');
+          cap.textContent = (col.label || col.k) + (col.req ? ' *' : '');
           cell.appendChild(cap);
           if (!options.cell || !options.cell({column:col,input:input,cell:cell,ref:ref,base:base})) cell.appendChild(col.kind==='icon'?iconPickerControl(input):input);
           line.appendChild(cell);
@@ -1551,6 +1552,7 @@ function objFieldsControl(key, cur, shape){
     var factory=panelAuthoring(type).editor, cached=panelEditors[type];
     if(cached && cached.factory===factory) return cached.value;
     var context={
+      document:document,
       source:function(){return session.text();}, target:function(){return session.target;},
       editingBlocked:function(){return !!modes.adding();}, parse:parseEditor,
       commit:commitSimple, transact:commitCascade, error:formError,

@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -491,4 +491,41 @@ test('section initial prose collapse is one authored edit with exact Undo',()=>{
   const before=h.text,control=row.querySelector('input');control.checked=true;control.fire('change');
   assert.equal(JSON.parse(h.text).page.sections[0].collapsed,true);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);h.inspector.destroy();
+});
+
+test('check and budget composers edit sparse starting and step snapshots with exact undo',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'checks',type:'checks',checks:[{id:'auth',label:'Authorization'}],initial:{results:{auth:{status:'pass',detail:'',future:4},unknown:{keep:true}},futureTop:9}},
+    {id:'budget',type:'budget',metrics:[{id:'latency',label:'Latency',max:100,unit:'ms'}],initial:{values:{latency:20,unknown:5}}}
+  ],steps:[{panels:{checks:{},budget:{values:{latency:30,unknown:6}}}}]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text;
+  const result=aria(h.guide,'Authorization Result');result.value='fail';result.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{results:{auth:{status:'fail',detail:'',future:4},unknown:{keep:true}},futureTop:9});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const clear=aria(h.guide,'Latency no data');clear.fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.budget,{values:{latency:null,unknown:6}});
+  const omit=aria(h.guide,'Metric values assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.budget,{});
+});
+
+test('table composer preserves row identity through reorder and clears all rows explicitly',()=>{
+  const e=environment(),rows=[{id:'one',cells:{value:4,hidden:'keep'},future:9},{id:'two',cells:{value:8}}];
+  const spec={nodes:{},rows:[[]],panels:[{id:'table',type:'table',columns:[{id:'value',label:'Reading'}],initial:{rows}}],steps:[]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text,initial=()=>h.guide.querySelector('.initialedit');
+  const first=initial().querySelector('.rowline');first.querySelectorAll('button').find(b=>b.title==='move this item down').fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial.rows,[rows[1],rows[0]]);
+  h.session.undo();assert.equal(h.text,before);
+  const clear=e.mount(spec);clear.inspector.render();
+  for(let i=0;i<2;i++){clear.guide.querySelector('.initialedit').querySelector('.rowline').querySelectorAll('button').find(b=>b.title==='remove this item').fire('click');clear.flush();}
+  assert.deepEqual(JSON.parse(clear.text).panels[0].initial.rows,[]);
+});
+
+test('log composer edits events at one step without rewriting accumulated earlier events',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'log',type:'log',tags:{NET:'#112233'},initial:{log:['boot']}}],steps:[{panels:{log:{log:[{tag:'NET',text:'connected',future:7}]}}},{panels:{log:{log:[{tag:'NET',text:'sent'}]}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:1};h.inspector.render();const before=h.text;
+  const events=h.guide.querySelector('.patchedit').querySelector('.rowline');
+  const text=aria(events,'text');text.value='acknowledged';text.fire('change');h.flush();
+  const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);assert.deepEqual(changed.steps[1].panels.log.log,[{tag:'NET',text:'acknowledged'}]);
+  h.session.undo();assert.equal(h.text,before);
 });

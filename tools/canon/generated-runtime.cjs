@@ -5223,6 +5223,7 @@ PanelRegistry.extend('budget', {
 /* budget authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('budget', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Resource budgets',
       metrics: [{ id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240 }],
@@ -5252,6 +5253,17 @@ PanelRegistry.extend('budget', {
       ['values', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      metrics: {label:'Metrics and limits',group:'Content'},
+      values: {label:'Metric values',help:'A complete values snapshot. An omitted metric or No data shows no measurement. Use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='values')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,unit:item.unit,scalar:true};
+      }));
+    }};},
     picker: {
       order: 2,
       name: 'Resource budget',
@@ -5771,6 +5783,7 @@ PanelRegistry.extend('checks', {
 /* checks authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('checks', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Decision checks',
       checks: [
@@ -5787,6 +5800,17 @@ PanelRegistry.extend('checks', {
       ['results', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      checks: {label:'Checks',group:'Content'},
+      results: {label:'Check results',help:'A complete results snapshot. Checks omitted from this snapshot use Pending; use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='results')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,fields:[{key:'status',label:'Result',options:CHECK_STATUSES},{key:'detail',label:'Detail'}]};
+      }));
+    }};},
     picker: {
       order: 1,
       name: 'Decision checks',
@@ -10962,6 +10986,7 @@ PanelRegistry.extend('log', {
 /* log authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('log', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Event log',
       tags: { NET: '#38E1FF' },
@@ -10972,6 +10997,13 @@ PanelRegistry.extend('log', {
       ['initial', 'json'],
     ],
     patchFields: [['log', 'jsonArr']],
+    fieldMeta: {
+      tags: {label:'Event tags and colors',group:'Content'},
+      log: {label:'Events',initial:{help:'Events visible before the story begins.'},step:{help:'These events append to the log at this step. An empty list adds nothing; it does not clear earlier events.'}},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='log')return createPanelLogComposer(context,options);
+    }};},
     picker: {
       order: 7,
       name: 'Event log',
@@ -15163,6 +15195,7 @@ PanelRegistry.extend('table', {
 /* table authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('table', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Data state',
       columns: [
@@ -15181,6 +15214,14 @@ PanelRegistry.extend('table', {
       ['rows', 'jsonArr'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      columns: {label:'Columns',group:'Content'},
+      rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='rows')return createPanelTableComposer(context,options);
+    }};},
     picker: {
       order: 0,
       name: 'Data table',

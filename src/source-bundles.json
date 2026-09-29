@@ -54,6 +54,7 @@
     "workbench/persistence.js",
     "workbench/session.js",
     "workbench/field-values.js",
+    "workbench/panel-collections.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/agent-merge.js",

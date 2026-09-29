@@ -1374,3 +1374,6 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .document-source-heading{margin-top:10px;font-size:12px;}
 .document-advanced{margin-top:10px;font-size:12px;}
 .document-advanced>summary{cursor:pointer;margin-bottom:8px;}
+
+.panel-collection-item{padding:10px;border:1px solid var(--line);border-radius:8px;margin:8px 0;min-width:0;}
+.panel-collection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;}

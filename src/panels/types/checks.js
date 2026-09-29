@@ -102,6 +102,7 @@ PanelRegistry.extend('checks', {
 /* checks authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('checks', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Decision checks',
       checks: [
@@ -118,6 +119,17 @@ PanelRegistry.extend('checks', {
       ['results', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      checks: {label:'Checks',group:'Content'},
+      results: {label:'Check results',help:'A complete results snapshot. Checks omitted from this snapshot use Pending; use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='results')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,fields:[{key:'status',label:'Result',options:CHECK_STATUSES},{key:'detail',label:'Detail'}]};
+      }));
+    }};},
     picker: {
       order: 1,
       name: 'Decision checks',

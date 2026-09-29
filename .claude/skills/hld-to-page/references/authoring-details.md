@@ -274,6 +274,13 @@ inspector. Set defaults there and authored changes on steps; keep advanced
 initial fields intact. Phone and Device App also offer a shared notification
 composer for initial and per-step messages; clear runs before add.
 
+Checks, Budget, Table and Log have typed starting/step collection composers.
+Checks `results`, Budget `values` and Table `rows` replace the complete field
+snapshot; omitted inner entries do not carry independently. Empty table rows
+clear the table. Log `log` appends events at that step; `[]` adds nothing rather
+than clearing history. Inherit removes the whole step field. Typed table cells
+preserve scalar types and unknown fields. Keep advanced imported shapes intact.
+
 Camera fields and Phone audio expose carry-forward / this-step-only duration
 and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported
 carry + `enterOnce` pairs retain both assignments during ordinary value edits;

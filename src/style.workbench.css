@@ -1309,7 +1309,9 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas #agent-message-open{padding:6px;}
   .workspace-canvas #agent-message-open>span{display:none;}
   .workspace-canvas .agent-message-icon{display:block;}
+  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
 }
+@media(max-width:800px){.workspace-canvas .workspace-save #workspace-prepare-review{display:none;}}
 
 /* At short heights, panels are clamped into the same vertical band as canvas
    chrome. Keep their controls above that chrome and the tool rail accessible. */

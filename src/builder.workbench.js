@@ -414,7 +414,7 @@ function initWorkbenchBuilder(opts){
   var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime();
   life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});
   var view = opts.view, src = opts.src;
-  function render(request){ hideDiff(); return opts.render(request || {origin:'navigation'}); }
+  function render(request){ hideDiff();var result=opts.render(request || {origin:'navigation'});refreshClipboardActions();return result; }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
@@ -465,7 +465,12 @@ function initWorkbenchBuilder(opts){
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
     persistence:createBuilderPersistence({storage:function(){return localStorage;},
       schedule:function(fn,ms){return life.delay(fn,ms);},
-      cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();}}),
+      cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
+      status:function(state){
+        var status=document.getElementById('workbench-recovery-status');if(!status)return;
+        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Download JSON to keep your changes.'}[state];
+        status.dataset.state=state;
+      }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
     historyChanged:function(undo,redo){
       if(undoBtn)undoBtn.disabled=!undo;
@@ -503,7 +508,7 @@ function initWorkbenchBuilder(opts){
       if(!trigger)return {error:'The detail node is not visible in this view.'};
       trigger.dispatchEvent(new MouseEvent('click',{bubbles:true}));return {};
     }},
-    clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,
+    clipboard:{current:function(){return objectClipboard;},toolbar:function(){return !!objectClipboard && !!document.getElementById('object-duplicate');},selectHome:homeClipboardSelect,
       clearHome:function(){if(interactions)interactions.clearHome();}},
     modes:{adding:function(){return interactions.adding();},connecting:function(){return interactions.connecting();},
       connectFrom:function(t){interactions.startConnect(t.section,t.id);},
@@ -514,7 +519,8 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
-    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();},
+    selectionChanged:refreshClipboardActions,
+    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();refreshClipboardActions();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
       if(diffbox && !diffbox.hidden){hideDiff();diffBtn.focus();return true;}
@@ -716,6 +722,13 @@ function initWorkbenchBuilder(opts){
       } else selectTarget(t,false);
     }});
   }
+  var clipboardRefresh=null;
+  function refreshClipboardActions(){
+    if(!objectClipboard)return;
+    if(clipboardRefresh!=null)life.cancelDelay(clipboardRefresh);
+    clipboardRefresh=life.delay(function(){clipboardRefresh=null;if(objectClipboard)objectClipboard.refresh();},0);
+  }
+  life.listen(src,'input',refreshClipboardActions);
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
     isActive:opts.isActive,
     text:function(){return session.text();},selection:clipboardSelection,destination:clipboardDestination,
@@ -725,6 +738,7 @@ function initWorkbenchBuilder(opts){
       if(!parsed.error){var got=builderDiagram(session.text(),parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
       return 'Destination: section '+(dest.section+1)+(panel ? ' · '+(panel.title || panel.id) : '')+'. Select a Home panel first to paste a room, device, or subject.';
     },apply:applyClipboardPlan,
+    canDuplicate:function(targets){return targets.length===1 && ['node','section','step'].indexOf(targets[0].kind)>=0;},
     duplicate:function(targets){
       if(targets.length !== 1 || ['node','section','step'].indexOf(targets[0].kind)<0)return null;
       var t=targets[0];return commitCascade(function(raw){
@@ -1126,7 +1140,7 @@ function initWorkbenchBuilder(opts){
   }
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
-    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Save downloads JSON; Prepare review packages a handoff. Neither publishes to your company.';}
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Prepare review packages a handoff. Neither publishes to your company.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,

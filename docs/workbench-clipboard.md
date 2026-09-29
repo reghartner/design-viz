@@ -1,9 +1,12 @@
 # Copy, paste and duplicate objects
 
-The editor footer has **Copy**, **Paste…**, and **Duplicate** beside Undo/Redo.
-The node, panel and section inspectors also expose Copy; panels now have
-**Duplicate panel**. Objects can be pasted into another section, another spec
-opened in this editor, or another browser tab.
+The editor toolbar has **Copy**, **Paste into Section…**, and **Duplicate**.
+Copy and Duplicate enable only when the selection supports that action. A
+single story step supports Duplicate; use **Reuse steps…** to copy it elsewhere.
+Paste remains available without a selection and names its destination section.
+The panel inspector also keeps whole-panel actions when a Home element is
+selected. Objects can be pasted into another section, another spec opened in
+this editor, or another browser tab.
 
 ## Home layout elements
 

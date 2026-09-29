@@ -5,6 +5,16 @@ for(const name of ['document','window','localStorage'])Object.defineProperty(con
 vm.createContext(context);
 for(const name of ['persistence','session'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench/'+name+'.js'),'utf8'),context);
 const plain=value=>JSON.parse(JSON.stringify(value));
+test('recovery status reports actual persistence success and failure independently of editing',()=>{
+  const states=[];let blocked=false,pending;
+  const persistence=context.createBuilderPersistence({storage:()=>({setItem(){if(blocked)throw Error('quota');}}),
+    status:state=>states.push(state),now:()=>1,schedule:fn=>{pending=fn;return 1;},cancel(){}});
+  persistence.schedule(()=>persistence.save('story','baseline'));
+  assert.equal(states.at(-1),'pending');pending();assert.equal(states.at(-1),'saved');
+  blocked=true;persistence.save('new story','baseline');assert.equal(states.at(-1),'unavailable');
+  blocked=false;persistence.save('new story','baseline');assert.equal(states.at(-1),'saved');
+  persistence.destroy();const count=states.length;persistence.save('later','baseline');assert.equal(states.length,count);
+});
 function harness({initial='{"title":"initial"}',storage=new Map(),deferInitialSave=false,blocked=false}={}){
   let text=initial,renderedText=initial,renders=0,next=0,invalidations=0;
   const writes=[],events=[],timers=new Map(),history=[];

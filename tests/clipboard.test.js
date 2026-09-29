@@ -111,6 +111,15 @@ test('native object copy/paste works without Clipboard API and makes exactly one
   assert.equal(diagram(JSON.parse(h.text),1).panels[0].devices[1].id,'cam-copy-3');
   h.text=h.undo.pop();assert.equal(diagram(JSON.parse(h.text),1).panels[0].devices.length,1);
 });
+test('clipboard button capabilities follow selection, source and blocked actions while targetless Paste stays available',()=>{
+  const h=harness(),copy=h.elements['object-copy'],duplicate=h.elements['object-duplicate'],paste=h.elements['object-paste'];
+  h.targets=[];h.ctl.refresh();assert.equal(copy.disabled,true);assert.equal(duplicate.disabled,true);assert.equal(paste.disabled,false);
+  assert.match(paste.textContent,/Section 2/);
+  h.targets=[{kind:'step',section:0,index:0}];h.ctl.refresh();assert.equal(copy.disabled,true);assert.equal(duplicate.disabled,true);
+  h.targets=[{kind:'node',section:0,id:'a'}];h.ctl.refresh();assert.equal(copy.disabled,false);assert.equal(duplicate.disabled,false);
+  h.blocked=true;h.ctl.refresh();assert.equal(copy.disabled,true);assert.equal(duplicate.disabled,true);assert.equal(paste.disabled,true);
+  h.blocked=false;h.text='{';h.ctl.refresh();assert.equal(copy.disabled,true);assert.equal(paste.disabled,true);assert.match(copy.title,/JSON/);
+});
 test('typing, selected prose and unrelated paste remain native; duplicate shortcut respects editing modes',()=>{
   const h=harness(),field={closest:()=>true};let writes=0;
   assert.equal(h.event('copy',{target:field,clipboardData:{setData(){writes++;}}}).prevented,undefined);

@@ -20,6 +20,7 @@ function createBuilderInspector(opts){
   function revealInspector(){opts.surface.reveal();}
   function hideDiff(){opts.surface.hideDiff();}
   function clipboard(){return disposed?null:opts.clipboard.current();}
+  function clipboardToolbar(){return !!(opts.clipboard.toolbar && opts.clipboard.toolbar());}
   function targetIdentity(){
     var t=session.target;
     return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId]):null;
@@ -2050,7 +2051,7 @@ function renderMultiInspector(multiSel){
     if (form.childNodes.length) guide.appendChild(form);
     var acts = document.createElement('div');
     acts.className = 'iacts';
-    if(clipboard() && (kind === 'node' || kind === 'panel')){
+    if(!clipboardToolbar() && clipboard() && (kind === 'node' || kind === 'panel')){
       acts.appendChild(actionButton('Copy selected',function(){clipboard().copy(multiSel);}));
       acts.appendChild(actionButton('Duplicate selected',function(){clipboard().duplicate(multiSel);}));
     }
@@ -2176,7 +2177,9 @@ function renderInspector(){
 
       var acts = document.createElement('div');
       acts.className = 'iacts';
-      if(clipboard() && ['node','section','panel'].indexOf(t.kind)>=0){
+      // Panel-scoped actions remain useful when the toolbar targets a selected
+      // Home element. Other duplicate actions use the persistent toolbar.
+      if(clipboard() && (!clipboardToolbar() || t.kind==='panel') && ['node','section','panel'].indexOf(t.kind)>=0){
         acts.appendChild(actionButton('Copy '+t.kind,function(){clipboard().copy([t]);}));
         acts.appendChild(actionButton('Paste…',function(){opts.clipboard.clearHome();clipboard().open();}));
         if(t.kind === 'panel')acts.appendChild(actionButton('Duplicate panel',function(){clipboard().duplicate([t]);}));
@@ -2189,7 +2192,7 @@ function renderInspector(){
               rehighlight();renderInspector();
             }});
         }));
-        acts.appendChild(actionButton('duplicate', function(){
+        if(!clipboardToolbar())acts.appendChild(actionButton('duplicate', function(){
           commitCascade(function(raw){ return planDuplicateNode(session.text(), raw, t.section, t.id); },
             {after: function(plan){
               session.target = {section: t.section, kind: 'node', id: plan.id};
@@ -2209,7 +2212,7 @@ function renderInspector(){
         });
       }
       if (t.kind === 'section'){
-        acts.appendChild(actionButton('duplicate', function(){
+        if(!clipboardToolbar())acts.appendChild(actionButton('duplicate', function(){
           commitCascade(function(raw){ return planDuplicateSection(session.text(), raw, t.section); },
             {after: function(plan){
               session.target = {section: plan.index, kind: 'section'};
@@ -2274,7 +2277,7 @@ function renderInspector(){
           removeHere.disabled = !!modes.connecting() || !selectedPath || selectedPath.indices.length <= 1;
           acts.appendChild(removeHere);
         }
-        acts.appendChild(actionButton('duplicate step', function(){
+        if(!clipboardToolbar())acts.appendChild(actionButton('duplicate step', function(){
           commitCascade(function(raw){ return planDuplicateStep(session.text(), raw, t.section, t.index, stepperFor(t.section) && stepperFor(t.section).path()); },
             {after:function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));

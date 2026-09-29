@@ -6,6 +6,20 @@ function initBuilderClipboard(document, options){
   if (!dialog) return null;
   var feedback=document.getElementById('object-clipboard-feedback'), status=document.getElementById('object-clipboard-status');
   var memory=null, destination=null, writing=false, request=0, opener=null;
+  var copyButton=document.getElementById('object-copy'),duplicateButton=document.getElementById('object-duplicate'),pasteButton=document.getElementById('object-paste');
+  function refresh(){
+    var targets=options.selection(),blocked=options.blocked(),valid=true;
+    try{JSON.parse(options.text());}catch(ex){valid=false;}
+    var result=valid&&!blocked?pack(targets):{error:blocked?'Finish the current drag, connection, or ADD TO STEP action first.':'Fix the JSON source first.'};
+    var special=valid&&!blocked&&options.canDuplicate&&options.canDuplicate(targets);
+    copyButton.disabled=!!result.error;copyButton.title=result.error || 'Copy selected objects (⌘/Ctrl C)';
+    duplicateButton.disabled=!!result.error&&!special;
+    duplicateButton.title=special?'Duplicate this '+targets[0].kind+' (⌘/Ctrl D)':result.error || 'Duplicate selected objects (⌘/Ctrl D)';
+    pasteButton.disabled=blocked||!valid;
+    var target=options.destination();
+    pasteButton.textContent=target && Number.isFinite(target.section)?'Paste into Section '+(target.section+1)+'…':'Paste…';
+    pasteButton.title=pasteButton.disabled?result.error:options.destinationLabel(target);
+  }
   function say(message){status.textContent=message;}
   function editable(target){return target && target.closest && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),dialog');}
   function selectedText(){var selection=win.getSelection && win.getSelection();return selection && !selection.isCollapsed;}
@@ -87,6 +101,7 @@ function initBuilderClipboard(document, options){
     if(editable(ev.target) || !(ev.metaKey || ev.ctrlKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase()!=='d')return;
     if(!options.selection().length)return;ev.preventDefault();duplicate();
   });
-  return {copy:life.guard(copy),duplicate:life.guard(duplicate),open:life.guard(open),cancelPending:life.guard(function(){request++;}),
+  refresh();
+  return {refresh:life.guard(refresh),copy:life.guard(copy),duplicate:life.guard(duplicate),open:life.guard(open),cancelPending:life.guard(function(){request++;}),
     destroy:function(){if(!life.alive())return;life.destroy();close(false);destination=null;memory=null;}};
 }

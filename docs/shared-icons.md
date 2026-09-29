@@ -7,19 +7,23 @@ the authored story; choosing an alarm icon does not trigger or verify an alarm.
 
 ## Choose an icon in the workbench
 
-Select a node or group and open **Inspect → icon → Browse icons**. Search by
+Select a node or group and click its **Inspect → icon** field. The preview and
+current name form one button that opens the library. Search by
 name or token, filter **Category**, then choose a tile to apply it. The same
 picker appears in Home's **Edit layout** device/subject rows, Device app's
 **fields** rows, each card's **Starting state** and step controls, and the
 **Company branding → Library icon** control. Arrow keys move between tiles;
-Escape closes the picker. The adjacent select remains available.
+Escape closes the picker. There is no separate icon dropdown. Select multiple
+nodes to apply one icon to all of them; **Mixed icons** indicates different
+current choices, and **Use default icons** clears their explicit choices.
 
 Home cameras, hubs and sensors accept explicit icon choices. Without one they
 use `camera`, `router` and `gear`, respectively; subjects keep their person
 avatar. An icon choice changes the marker, preserving its device kind and state.
 For a changing Home marker, use **Starting device and subject conditions** or
 the selected step's **Home at this step** editor. The element's **icon** row
-offers **Inherit previous icon**, **Restore layout icon**, and the shared picker.
+opens the shared picker with **Inherit previous icon** and **Restore layout icon**
+tiles alongside the colored icons. These choices stay available when filtering.
 Initial/step objects accept a known `icon` ID; omission carries the earlier
 choice and `icon:null` restores the layout icon. State, temperature, audio and
 position changes leave an existing icon choice intact. Entry doors keep their

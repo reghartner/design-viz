@@ -1,5 +1,5 @@
-/* The authoring control keeps its caller's select and commit wiring. Each open
-   dialog owns a separate listener ledger, so a retired form cannot commit. */
+/* One visible picker button; the caller's hidden select retains value/commit
+   wiring. Each dialog owns its listeners, so a retired form cannot commit. */
 function createFlowIconPicker(opts){
   var doc=opts.document,view=doc.defaultView,select=opts.select;
   var icons=typeof FlowIcons!=='undefined'?FlowIcons:view && view.FlowIcons;
@@ -7,28 +7,36 @@ function createFlowIconPicker(opts){
   var wrap=doc.createElement('span');wrap.className='flow-icon-control';
   var preview=doc.createElement('span');preview.className='flow-icon-preview';preview.setAttribute('aria-hidden','true');
   var browse=doc.createElement('button');browse.type='button';browse.className='flow-icon-browse';
-  browse.textContent='Browse icons';browse.setAttribute('aria-haspopup','dialog');
-  wrap.append(preview,select,browse);
+  var currentLabel=doc.createElement('span');currentLabel.className='flow-icon-value';
+  var action=doc.createElement('span');action.className='flow-icon-action';action.textContent='Choose';
+  browse.append(preview,currentLabel,action);browse.setAttribute('aria-haspopup','dialog');
+  select.hidden=true;select.tabIndex=-1;select.setAttribute('aria-hidden','true');
+  // The button comes first so an enclosing field label activates the picker.
+  wrap.append(browse,select);
 
   function metadata(id){
     return icons && icons.registry && Object.prototype.hasOwnProperty.call(icons.registry,id)?icons.registry[id]:null;
   }
   /* The field owns empty-value semantics: inheritance and declared defaults
      can opt in with data-icon-default-label before creating the picker. */
-  function emptyLabel(){return select.getAttribute('data-icon-default-label') || '';}
-  function name(id){var meta=metadata(id);return id?(meta && meta.label || id):emptyLabel() || 'Default';}
+  function option(id){return Array.from(select.options).find(function(item){return item.value===id;});}
+  function emptyLabel(){var empty=option('');return select.getAttribute('data-icon-default-label') || (empty && empty.textContent!=='(none)'?empty.textContent:'');}
+  function name(id){var meta=metadata(id),fieldOption=option(id);return id?(meta && meta.label || fieldOption && fieldOption.textContent || id):emptyLabel() || 'Default';}
+  function reset(id){var item=option(id);return !id || !!(item && item.hasAttribute('data-icon-reset'));}
   function disabled(){return !!select.disabled || !!(select.matches && select.matches(':disabled'));}
   function current(){return !retired && wrap.isConnected && select.isConnected && wrap.contains(select);}
   function visual(target,id){
     target.replaceChildren();
-    target.classList.toggle('flow-icon-default',!id);
-    target.classList.toggle('flow-icon-unknown',!!id && !metadata(id));
+    target.classList.toggle('flow-icon-default',reset(id));
+    target.classList.toggle('flow-icon-unknown',!reset(id) && !metadata(id));
     if(metadata(id) && icons.render)target.innerHTML=icons.render(id,{className:'flow-icon-art',label:''});
-    else if(id)target.textContent='?';
+    else if(!reset(id))target.textContent='?';
   }
   function sync(){
     if(retired)return;
     visual(preview,select.value);preview.title=name(select.value);
+    currentLabel.textContent=select.getAttribute('data-icon-current-label') || name(select.value);
+    browse.setAttribute('aria-label',(select.getAttribute('aria-label') || 'Icon')+': '+currentLabel.textContent+'. Choose icon');
     browse.disabled=disabled();wrap.setAttribute('aria-disabled',String(browse.disabled));
     if(opened && disabled())close(false);
   }
@@ -95,13 +103,13 @@ function createFlowIconPicker(opts){
     var footer=element('footer','flow-icon-footer');
     var selected=element('span','flow-icon-current');
     var selectedArt=element('span','flow-icon-current-art');selectedArt.setAttribute('aria-hidden','true');visual(selectedArt,select.value);
-    selected.append(selectedArt,element('span','','Current: '+name(select.value)));
+    selected.append(selectedArt,element('span','','Current: '+currentLabel.textContent));
     footer.append(selected,element('span','flow-icon-key-hint','Arrow keys to browse · Esc to close'));
     dialog.append(header,filters,resultBar,scroll,footer);
 
     function tile(id){
       var button=element('button','flow-icon-tile');button.type='button';button.dataset.iconId=id;
-      button.setAttribute('aria-pressed',String(id===select.value));button.tabIndex=-1;
+      button.setAttribute('aria-pressed',String(id===select.value && !select.getAttribute('data-icon-current-label')));button.tabIndex=-1;
       var art=element('span','flow-icon-tile-art');art.setAttribute('aria-hidden','true');visual(art,id);
       var title=name(id),emptyDescription=emptyLabel() || 'Use field default';
       button.title=id?title+' · '+id:emptyLabel() || 'Use this field’s default icon';
@@ -117,8 +125,11 @@ function createFlowIconPicker(opts){
         return (!group || (meta.category || 'Other')===group) && words.every(function(word){return text.includes(word);});
       });
       grid.replaceChildren();
-      /* Default remains available even while a search or category is active. */
-      grid.appendChild(tile(''));matches.forEach(function(id){grid.appendChild(tile(id));});
+      /* Defaults, resets and imported values stay available even while filtering.
+         Field-specific choices must not disappear with the native dropdown. */
+      grid.appendChild(tile(''));
+      Array.from(select.options).filter(function(item){return item.value && !metadata(item.value);}).forEach(function(item){grid.appendChild(tile(item.value));});
+      matches.forEach(function(id){grid.appendChild(tile(id));});
       var entry=Array.from(grid.children).find(function(button){return button.dataset.iconId===select.value;}) || grid.firstElementChild;
       if(entry)entry.tabIndex=0;
       empty.hidden=matches.length>0;count.textContent=matches.length+' '+(matches.length===1?'icon':'icons')+(group?' in '+group:'');
@@ -180,7 +191,7 @@ function createFlowIconPicker(opts){
   listen(select,'change',sync);
   if(view && view.MutationObserver){
     observer=new view.MutationObserver(function(){if(!retired)sync();});
-    observer.observe(select,{attributes:true,attributeFilter:['disabled','data-icon-default-label'],childList:true,subtree:true});
+    observer.observe(select,{attributes:true,attributeFilter:['disabled','aria-label','data-icon-default-label','data-icon-current-label'],childList:true,subtree:true});
   }
   function retire(){
     if(retired)return;retired=true;close(false);

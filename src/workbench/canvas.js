@@ -72,7 +72,13 @@ function initWorkbenchCanvas(){
       select(rec.number-1);
     }else select(section);
   }
-  function paintZoom(){var vp=viewport(),value=vp && vp.canvasZoom();document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';}
+  function paintZoom(){
+    var vp=viewport(),value=vp && vp.canvasZoom(),scale=vp?vp.overlayScale():1;
+    document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';
+    document.getElementById('workspace-overlay-tools').hidden=!diagramMode() || !vp;
+    document.getElementById('workspace-overlay-size').textContent=Math.round(scale*100)+'%';
+    document.getElementById('workspace-overlay-out').disabled=scale<=.5;document.getElementById('workspace-overlay-in').disabled=scale>=1.25;
+  }
   function fit(){
     var vp=viewport();if(!diagramMode() || !vp)return;
     var left=84,right=24,top=145,bottom=195;
@@ -211,6 +217,7 @@ function initWorkbenchCanvas(){
   });
   surface.addEventListener('workbench-canvas-view',function(){cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(autoFit);});
   view.addEventListener('diagram-view-change',selectedByEvent);
+  view.addEventListener('explore-overlay-scale',paintZoom);
   view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus],[data-view-layout],.section-view-settings'))selectedByEvent(ev);},true);
   view.addEventListener('change',function(ev){if(ev.target.closest('.section-view-settings'))selectedByEvent(ev);},true);
   // Automatic Home/Data views predate viewport change events.
@@ -220,6 +227,10 @@ function initWorkbenchCanvas(){
   document.getElementById('workspace-zoom-in').addEventListener('click',function(){setZoom(viewport().canvasZoom()*1.2);});
   document.getElementById('workspace-zoom-out').addEventListener('click',function(){setZoom(viewport().canvasZoom()/1.2);});
   document.getElementById('workspace-zoom').addEventListener('click',function(){setZoom(1);});
+  function setOverlay(value){var vp=viewport();if(diagramMode() && vp){vp.setOverlayScale(value);paintZoom();}}
+  document.getElementById('workspace-overlay-out').addEventListener('click',function(){var vp=viewport();if(vp)setOverlay(vp.overlayScale()-.1);});
+  document.getElementById('workspace-overlay-in').addEventListener('click',function(){var vp=viewport();if(vp)setOverlay(vp.overlayScale()+.1);});
+  document.getElementById('workspace-overlay-size').addEventListener('click',function(){setOverlay(1);});
   document.getElementById('workspace-fit').addEventListener('click',fit);
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,

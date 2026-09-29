@@ -1184,7 +1184,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 #workspace-canvas-world{position:relative;width:100%;padding:140px 84px 100px;box-sizing:border-box;}
 .workspace-canvas #docview{max-width:none;margin:0;border:0;background:transparent;border-radius:0;}
 .workspace-canvas #workspace-columns{display:none;}
-.workspace-canvas:not(.welcome-active) .workbench-header{position:fixed;left:12px;right:12px;top:12px;z-index:140;max-width:none;min-height:48px;padding:8px 12px;gap:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:0 4px 18px #14244212;flex-wrap:nowrap;}
+.workspace-canvas:not(.welcome-active) .workbench-header{position:fixed;left:12px;right:12px;top:12px;z-index:170;max-width:none;min-height:48px;padding:8px 12px;gap:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:0 4px 18px #14244212;flex-wrap:nowrap;}
 .workspace-canvas:not(.welcome-active) .workbench-brand{font-size:17px;gap:8px;}
 .workspace-canvas .workbench-mark{width:24px;height:24px;}
 .workspace-canvas .workspace-tools{flex-wrap:nowrap;gap:10px;}
@@ -1297,7 +1297,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram .workspace-active-section>.detail-head .sec-h{font-size:14px;margin:4px 0 0;}
 .workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:84px;bottom:72px;z-index:95;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
 .dv-connect-canvas-hint{position:fixed;top:174px;left:84px;z-index:146;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
-@media(max-width:700px){.workspace-canvas .workspace-history{display:flex;position:fixed;left:84px;bottom:118px;z-index:145;padding:5px;background:var(--card);border:1px solid var(--line);border-radius:9px;}}
+@media(max-width:700px){.workspace-canvas .workspace-history{display:flex;position:fixed;left:84px;bottom:118px;z-index:170;padding:5px;background:var(--card);border:1px solid var(--line);border-radius:9px;}}
 @media(max-width:700px){.workspace-canvas:has(.extraction-preview) .workspace-history,.workspace-canvas:has(.extraction-preview) .workspace-selection,.workspace-canvas:has(.extraction-preview) .workspace-canvas-controls{visibility:hidden;}}
 
 /* Workspace intent and local provenance remain separate from authored views. */
@@ -1312,7 +1312,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-width:1100px){.workspace-provenance{display:none;}}
 @media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:122px;}}
 
-@media(max-height:520px){.workspace-canvas #workspace-window-agent{top:64px!important;height:calc(100dvh - 78px)!important;max-height:none;z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;}.workspace-canvas #workspace-window-agent .folder-agent-header{max-height:35px;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
+@media(max-height:520px){.workspace-canvas #workspace-window-agent{top:116px!important;height:calc(100dvh - 118px)!important;max-height:none;z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;padding:2px 8px;}.workspace-canvas #workspace-window-agent .folder-agent-header{max-height:26px;overflow:auto;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
 
 @media(max-height:520px){.workspace-canvas:has(#workspace-window-agent:not([hidden])) #spec-editor{z-index:150;}}
 
@@ -1344,6 +1344,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-height:520px),(max-width:1050px){
   .workspace-canvas .workwrap #spec-editor{z-index:150;}
   .workspace-canvas .workspace-rail{z-index:160;}
+  .workspace-canvas .workspace-appearance{z-index:160;}
 }
 
 /* Responsive Standard pages use the space beside the tool rail. Explicit host

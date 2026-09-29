@@ -14,11 +14,13 @@ function workspacePrefs(raw){
   return prefs;
 }
 function workspacePanelRect(rect,width,height){
-  var minW=Math.min(300,Math.max(1,width-24)),minH=Math.min(240,Math.max(1,height-96));
+  // Compact chrome uses a second row for destination and appearance controls.
+  var top=width<=1050?126:72,availableH=Math.max(1,height-top-12);
+  var minW=Math.min(300,Math.max(1,width-24)),minH=Math.min(240,availableH);
   var w=Math.max(minW,Math.min(width-24,Number.isFinite(rect.w)?rect.w:380));
-  var h=Math.max(minH,Math.min(height-96,Number.isFinite(rect.h)?rect.h:640));
+  var h=Math.max(minH,Math.min(availableH,Number.isFinite(rect.h)?rect.h:640));
   return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
-    y:Math.max(72,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
+    y:Math.max(top,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');

@@ -2443,7 +2443,7 @@ function renderInspector(){
       }
       if (!armedHere && t.kind !== 'document')
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
-      if(acts.childNodes.length)guide.appendChild(acts);
+      if(acts.children.length)guide.appendChild(acts);
       guide.appendChild(form);
     }
 

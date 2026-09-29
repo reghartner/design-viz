@@ -7,22 +7,20 @@ test('a new connection and explicit resume use native buffered filesystem handle
   await page.addInitScript(()=>{
     window.showDirectoryPicker=async()=>{
       const root=await navigator.storage.getDirectory();
-      if(window.resumeNativeFolder)return root.getDirectoryHandle(window.resumeNativeFolder);
       return root;
     };
   });
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-workflow').selectOption('embedded');await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
   const first=await page.evaluate(async()=>{
-    const root=await navigator.storage.getDirectory();let directory;
-    for await(const [name,handle] of root.entries())if(name.startsWith('flowview-session-')){directory=handle;window.resumeNativeFolder=name;break;}
+    const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');
     const read=async name=>JSON.parse(await(await directory.getFileHandle(name)).getFile().then(file=>file.text()));
     return {manifest:await read('session.json'),state:await read('state.json')};
   });
   expect(first.state.connectionId).toBe(first.manifest.connectionId);expect(first.state.source).toBe(source);
   await page.locator('#folder-agent-close-guide').click();await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
-  await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-resume')).toBeVisible();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-connect')).toBeVisible();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
-  const next=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle(window.resumeNativeFolder);return JSON.parse(await(await directory.getFileHandle('session.json')).getFile().then(file=>file.text()));});
+  const next=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');return JSON.parse(await(await directory.getFileHandle('session.json')).getFile().then(file=>file.text()));});
   expect(next.sessionId).toBe(first.manifest.sessionId);expect(next.connectionId).not.toBe(first.manifest.connectionId);
 });

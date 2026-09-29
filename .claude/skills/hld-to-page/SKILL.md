@@ -12,7 +12,15 @@ fill in before you write any JSON. The worksheet makes you decide, for every
 step, what every panel shows, which edges light, which icons change, what time
 it is, and which code and catalog entries back it.
 
-**Local workbench session?** If the user gave you a local session scratch
+**Shared diagram folder?** If the selected folder contains
+`.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
+`flowview-folder-v1`, follow **Shared diagram folder** under
+[Special situations](#special-situations) instead of the deliverables below.
+Maintain the existing spec and ledger, submit both for workbench approval, and
+keep questions in the selected conversation. No separate `QUESTIONS.md`, OUT
+folder or HTML build is needed for this route.
+
+**Local loopback workbench session?** If the user gave you a local session scratch
 folder (it contains `state.json` and a `README.md`), follow
 [Local workbench session](#special-situations) instead of the deliverables
 below: no `QUESTIONS.md`, OUT folder or build.
@@ -322,18 +330,33 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
 
 ## Special situations
 
-- **Browser folder session.** If the supplied directory has a `session.json`
-  whose protocol is `flowview-folder-v1`, read its `CONNECT.md` and follow
-  [folder sessions](../../../docs/folder-agent-session.md). This is a local
-  session with a different transport. Use its reply/progress/proposal helper
-  so the user receives questions and answers inside the editor. Immediately
-  acknowledge every request with `progress`, report each work phase and errors,
-  and send longer-work updates at tool boundaries roughly every 20 seconds.
-  Report observable actions; terminal-only output is invisible to this user.
-  Route every question, blocker and final answer through `reply`. Preserve the
-  worksheet and decisions in `story.ledger.md` in that folder. The bundled
-  `authoring/` directory is VIZ; use its validator and state-walk tools, without
-  an OUT build. Browser access is unavailable: never claim visual inspection.
+- **Shared diagram folder.** When the selected folder contains
+  `.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
+  `flowview-folder-v1`, read its `CONNECT.md` and follow
+  [diagram-folder collaboration](../../../docs/folder-agent-session.md).
+  The project is the spec and coverage ledger at the folder root; `project.json`
+  names them. Existing artifacts must be preserved and read before planning.
+  Connection identity is temporary and can change without changing the project.
+  Maintain the worksheet, answers, coverage, evidence, decisions and open work
+  in a complete candidate ledger alongside the candidate spec. Submit both with
+  `propose --file candidate.spec.json --ledger candidate.ledger.md`; never write
+  accepted artifacts directly while connected. Even ledger-only changes require
+  a paired proposal. Every update waits for preview and explicit approval; one
+  Undo restores both. Reconcile conflicts against the current spec and ledger,
+  never merely relabel an old proposal with a new revision. After acceptance,
+  reread both artifacts and reconcile the ledger with any merged human edits
+  before claiming they are ready to commit. Keep `.flowview-agent/` metadata,
+  candidates and workbench conversation history out of the repository commit.
+  Commit or publish the reviewed artifacts only when authorized by the user.
+  Use `session.workflow` and `request.replySurface` to route conversation:
+  **external/agent** keeps questions and interrupts in the native agent app;
+  **embedded** uses helper `reply` for questions and final answers. Copied requests
+  are not dispatched by Monitor; external requests use acknowledged `begin`.
+  Use `progress` for phases, errors and observable work during longer turns.
+  Wait for the proposal result before completion `reply`. Monitor is optional
+  for copy/paste, required for direct Send and the Beta embedded conversation.
+  The bundled `authoring/` directory is VIZ; run validator and state-walk tools
+  without an OUT build. Browser access is unavailable; never claim visual QA.
 - **Local workbench session.** When the user supplies a local session scratch
   directory, read its `README.md` and the
   [file-session protocol](../../../docs/local-agent-session.md). Read the

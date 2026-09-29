@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Flowview folder bridge. Local files only: no server, networking, or subprocesses.
 
-Run from a session folder: python3 folder-agent.py watch
+Run from a diagram folder: python3 .flowview-agent/folder-agent.py watch
 The watcher prints only new requests/results and maintains listener.json.
 It never executes instructions, source, or commands from the session files.
 """
@@ -26,7 +26,7 @@ PROGRESS_LIMIT = 100
 def read(folder, name):
     target = folder / name
     if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
-        raise ValueError(f"Not a regular session file within the size limit: {name}")
+        raise ValueError(f"Not a regular helper file within the size limit: {name}")
     return json.loads(target.read_text(encoding='utf-8'))
 
 
@@ -173,7 +173,27 @@ def prepare(folder):
 def watch(folder, interval=0.25, minutes=25):
     owner = identity(folder)
     prepare(folder)
-    seen = set()
+    seen = {}
+    try:
+        previous = read(folder, 'listener.json')
+        if all(previous.get(k) == v for k, v in owner.items()):
+            for item in previous.get('events', [])[-256:]:
+                if (isinstance(item, list) and len(item) == 2 and item[0] in ('request', 'result', 'cancel') and
+                        isinstance(item[1], str) and re.fullmatch(r'[\w-]{1,120}', item[1])):
+                    seen[tuple(item)] = True
+    except (OSError, ValueError, TypeError):
+        pass
+
+    def mark_seen(key):
+        seen[key] = True
+        while len(seen) > 256:
+            del seen[next(iter(seen))]
+
+    def heartbeat(listening=True):
+        write(folder, 'listener.json', {**owner, 'at': int(time.time() * 1000), 'listening': listening,
+                                       'events': [list(key) for key in seen]},
+              guard=lambda: assert_owner(folder, owner))
+
     deadline = time.monotonic() + minutes * 60
     last_heartbeat = 0
     try:
@@ -185,8 +205,7 @@ def watch(folder, interval=0.25, minutes=25):
                 break
             now = time.time()
             if now - last_heartbeat >= 1:
-                write(folder, 'listener.json', {**owner, 'at': int(now * 1000), 'listening': True},
-                      guard=lambda: assert_owner(folder, owner))
+                heartbeat()
                 last_heartbeat = now
             try:
                 editor = read(folder, 'editor.json')
@@ -205,20 +224,27 @@ def watch(folder, interval=0.25, minutes=25):
                         if not key[1] or key in seen:
                             continue
                         if kind in ('request', 'result') and cancelled(folder, owner, value.get('id') if kind == 'request' else value.get('requestId')):
-                            seen.add(key)
+                            mark_seen(key)
                             continue
-                        if kind == 'request':
+                        if kind == 'request' and value.get('delivery') in ('clipboard', 'native'):
+                            mark_seen(key)
+                            continue
+                        if kind in ('request', 'result'):
                             try:
                                 reply = read(folder, 'reply.json')
-                                if (reply.get('requestId') == value['id'] and
+                                if (reply.get('requestId') == (value['id'] if kind == 'request' else value.get('requestId')) and
                                         all(reply.get(k) == v for k, v in owner.items())):
-                                    seen.add(key)
+                                    mark_seen(key)
                                     continue
                             except (OSError, ValueError):
                                 pass
-                        seen.add(key)
+                        mark_seen(key)
                         print(json.dumps({'event': 'flowview_' + kind, 'file': str(folder / filename),
-                                          'id': value['id'], **({'requestId': value['requestId']} if kind == 'cancel' else {}), **owner}), flush=True)
+                                          'id': value['id'], 'requestId': value['id'] if kind == 'request' else value.get('requestId'), **owner}), flush=True)
+                        # Preserve delivery across ordinary Monitor renewals.
+                        # A process crash between output and this write can still
+                        # repeat an event, so consumers must also deduplicate IDs.
+                        heartbeat()
                     except (OSError, ValueError):
                         pass  # A writer may not have finished publishing yet.
             except (OSError, ValueError):
@@ -227,7 +253,7 @@ def watch(folder, interval=0.25, minutes=25):
     finally:
         try:
             if identity(folder) == owner:
-                write(folder, 'listener.json', {**owner, 'at': int(time.time() * 1000), 'listening': False})
+                heartbeat(False)
         except (OSError, ValueError):
             pass
 
@@ -240,6 +266,8 @@ def main():
     watching.add_argument('--interval', type=float, default=0.25)
     watching.add_argument('--minutes', type=float, default=25)
     commands.add_parser('prepare')
+    beginning = commands.add_parser('begin', help='Register a request from the native agent conversation')
+    beginning.add_argument('--text', required=True)
     checking = commands.add_parser('preflight')
     checking.add_argument('--monitor', choices=('available', 'unavailable', 'unverified'), default='unverified',
                           help='Report Monitor availability after checking the visible Claude session; never inferred by this helper')
@@ -247,12 +275,13 @@ def main():
         command = commands.add_parser(name)
         command.add_argument('--request', required=True)
         content = command.add_mutually_exclusive_group(required=True)
-        content.add_argument('--file', help='UTF-8 file inside the session folder')
+        content.add_argument('--file', help='UTF-8 file inside the helper folder')
         if name != 'propose':
             content.add_argument('--text', help='Short plain-text update; quote as a shell argument')
         if name == 'progress':
             command.add_argument('--phase', choices=('working', 'permission-needed'), default='working')
         if name == 'propose':
+            command.add_argument('--ledger', help='Complete candidate .ledger.md beside the helper; required for diagram folders')
             command.add_argument('--revision', required=True, help='Revision read BEFORE planning the edit')
             command.add_argument('--summary', default='Updated the story.')
     args = parser.parse_args()
@@ -269,14 +298,55 @@ def main():
         watch(folder, args.interval, args.minutes)
         return
     owner = identity(folder)
+    if args.command == 'begin':
+        if read(folder, 'session.json').get('workflow') != 'external':
+            raise ValueError('Native requests require the Work in your agent workflow.')
+        if not args.text.strip() or len(args.text) > 16000:
+            raise ValueError('Enter a request of at most 16000 characters.')
+        editor = read(folder, 'editor.json')
+        if not editor.get('connected') or time.time() * 1000 - editor.get('at', 0) > 15000 or any(editor.get(k) != v for k, v in owner.items()):
+            raise ValueError('Return to the workbench and reconnect before starting a request.')
+        request_id = uuid.uuid4().hex
+        write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text, 'expiresAt': int(time.time() * 1000) + 8000}, guard=lambda: assert_owner(folder, owner))
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline:
+            assert_owner(folder, owner)
+            try:
+                request = active_request(folder, owner, request_id)
+                # request.json can become visible before the browser's close
+                # continuation has accepted the turn. Its transcript entry is
+                # published only after that decision and the pending state.
+                transcript = read(folder, 'transcript.json')
+                acknowledged = (transcript.get('sessionId') == owner['sessionId'] and
+                                any(item.get('role') == 'user' and item.get('requestId') == request_id and
+                                    not item.get('cancelled') for item in transcript.get('messages', [])))
+                if acknowledged and time.monotonic() < deadline and request.get('expiresAt', float('inf')) > time.time() * 1000:
+                    print(json.dumps({'id': request_id, 'revision': request['revision']}))
+                    return
+                time.sleep(0.1)
+            except (OSError, ValueError):
+                time.sleep(0.1)
+        def still_ours():
+            assert_owner(folder, owner)
+            if read(folder, 'agent-request.json').get('id') != request_id:
+                raise ValueError('Another native request replaced this attempt.')
+        withdrawn = False
+        try:
+            write(folder, 'agent-request.json', {**owner, 'id': request_id, 'text': args.text,
+                                               'expiresAt': 0, 'withdrawn': True}, guard=still_ours)
+            withdrawn = True
+        except (OSError, ValueError):
+            pass
+        outcome = 'This attempt was withdrawn.' if withdrawn else 'Withdrawal could not be confirmed; use Stop accepting this turn in Message agent before retrying.'
+        raise ValueError('The workbench did not acknowledge this request in time. ' + outcome + ' Keep the workbench visible and retry; if another turn is active, use Stop accepting this turn in Message agent. Do not submit unacknowledged work.')
     active_request(folder, owner, args.request)
     input_name = args.file
     if input_name:
         if not re.fullmatch(r'[A-Za-z0-9_.-]+', input_name) or input_name in ('.', '..'):
-            raise ValueError('Use a plain filename inside the session folder')
+            raise ValueError('Use a plain filename inside the helper folder')
         target = folder / input_name
         if target.is_symlink() or not target.is_file() or target.stat().st_size > LIMIT:
-            raise ValueError('Input must be a regular session file within the size limit')
+            raise ValueError('Input must be a regular helper file within the size limit')
         text = target.read_text(encoding='utf-8')
     else:
         text = args.text
@@ -297,10 +367,22 @@ def main():
         if len(text.encode('utf-8')) > 4 * 1024 * 1024:
             raise ValueError('Proposal source exceeds 4 MiB')
         state = read(folder, 'state.json')
-        if state['revision'] != args.revision or any(state.get(k) != v for k, v in owner.items()):
-            raise ValueError('Document changed: reread state.json and reconcile, not just the revision number.')
+        if any(state.get(k) != v for k, v in owner.items()) or not args.revision.startswith(owner['connectionId'] + '-'):
+            raise ValueError('Unknown connection revision: reread state.json in this session.')
+        # The workbench retains baselines and previews safe three-way merges.
+        # It rejects unknown/expired revisions and asks for conflict resolution.
         json.loads(text)
         value.update(baseRevision=args.revision, source=text, summary=args.summary[:1000])
+        if read(folder, 'session.json').get('pairedArtifacts') or args.ledger:
+            if not args.ledger or not re.fullmatch(r'[A-Za-z0-9_.-]+', args.ledger) or args.ledger in ('.', '..'):
+                raise ValueError('Include --ledger candidate.ledger.md with the proposed spec.')
+            ledger_path = folder / args.ledger
+            if ledger_path.is_symlink() or not ledger_path.is_file() or ledger_path.stat().st_size > 256 * 1024:
+                raise ValueError('Ledger must be a regular candidate file of at most 256 KiB.')
+            ledger = ledger_path.read_text(encoding='utf-8')
+            if not ledger.strip():
+                raise ValueError('The proposed coverage ledger must not be empty.')
+            value['ledger'] = ledger
         filename = 'proposal.json'
     else:
         if len(text) > 32000:

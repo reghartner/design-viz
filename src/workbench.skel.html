@@ -18,13 +18,14 @@
   <div class="workspace-tools" aria-label="Project actions">
     <button class="bbtn" id="workspace-home" type="button">← New / open</button>
     <div class="workspace-create">
-        <button type="button" id="diagram-add" class="editor-add-button" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> Add to diagram <span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
+        <button type="button" id="diagram-add" class="editor-add-button" aria-label="Add to diagram" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> <span class="editor-add-label">Add to diagram</span><span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
         <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
     </div>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button type="button" class="bbtn" id="workspace-prepare-review">Prepare review</button><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Save</button></div>
+    <div class="workspace-save"><button class="bbtn" id="agent-message-open" type="button" aria-label="Message agent" title="Message agent" aria-haspopup="dialog"><span>Message agent</span><svg class="agent-message-icon" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18"><path d="M5 4h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 3v-3H3V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="1.6"/></svg></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button type="button" class="bbtn" id="workspace-prepare-review">Prepare review</button><button type="button" id="folder-agent-indicator" class="folder-agent-indicator" data-phase="idle"><span class="agent-status-dot" aria-hidden="true"></span><span id="folder-agent-indicator-text">Connect Claude</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Save</button></div>
   </div>
 </header>
+<section id="agent-update-banner" class="agent-update-banner" role="status" hidden><div><strong id="agent-update-banner-title">Agent updates are ready</strong><p id="agent-update-banner-summary"></p></div><button type="button" class="rbtn" id="agent-update-open">Preview Agent Updates</button></section>
 
 {{HUMAN_GUIDE}}
 <script type="application/json" id="flowview-folder-kit">{{FOLDER_AGENT_KIT}}</script>
@@ -38,7 +39,7 @@
           <h1 tabindex="-1">Give your system<br>a story.</h1>
           <p>Turn architecture, processes, and everyday interactions into diagrams people can follow. Bring your JSON, or begin with an idea.</p>
           <button type="button" class="welcome-button welcome-button-primary welcome-build" id="welcome-agent">✧ Build with Claude</button>
-          <p class="welcome-note">Your Claude account. Your story. Talk together right on the canvas.</p>
+          <p class="welcome-note">Your agent. Your conversation. A shared diagram you can review.</p>
         </div>
         <div class="welcome-story" aria-hidden="true">
           <div class="welcome-story-top"><span><i></i> A request, explained</span><span>01 / 03</span></div>
@@ -62,7 +63,7 @@
       <details id="welcome-earlier-drafts" hidden><summary>Earlier drafts saved before switching stories</summary><div id="welcome-earlier-list"></div></details>
       <button type="button" class="welcome-library-entry" id="welcome-library"><span><b>Canon diagrams</b><span>Browse the published stories. Open read-only, edit when you choose.</span></span><span aria-hidden="true">→</span></button>
       <div class="welcome-bottom">
-        <button type="button" class="welcome-agent-card" id="welcome-agent-prompt"><span class="welcome-agent-spark" aria-hidden="true">✧</span><span><span class="welcome-kicker">Using another agent?</span><strong>Take a brief to your agent.</strong><span>Copy authoring instructions and bring the result back here.</span></span><span class="welcome-arrow" aria-hidden="true">→</span></button>
+        <button type="button" class="welcome-agent-card" id="welcome-agent-prompt"><span class="welcome-agent-spark" aria-hidden="true">✧</span><span><span class="welcome-kicker">Using another agent?</span><strong>Take a brief to your agent.</strong><span>Copy messages to your agent and preview its updates here.</span></span><span class="welcome-arrow" aria-hidden="true">→</span></button>
         <div class="welcome-principles"><p><b>Show how it works.</b> Animate connections and walk through each step.</p><p><b>Keep the whole story.</b> Explore happy paths, failures, and what changes.</p></div>
       </div>
     </div>
@@ -108,9 +109,20 @@
       <p class="welcome-error" id="welcome-template-error" role="alert" hidden></p>
     </div>
 
+    <div id="welcome-build-screen" class="welcome-screen" hidden>
+      <button class="welcome-back" type="button" data-welcome-back>← Back</button>
+      <p class="welcome-kicker">Build with Claude</p><h1 tabindex="-1">Where would you like to work?</h1>
+      <p class="welcome-description">Keep the spec and coverage ledger in your diagram folder. Choose where you have the conversation. Preview agent updates here before committing them.</p>
+      <div class="agent-workflow-choices">
+        <button type="button" id="welcome-build-external" class="agent-workflow-choice agent-workflow-recommended"><span class="welcome-kicker">Recommended · Copy and paste</span><strong>Work in your agent</strong><span>Talk, answer questions, and interrupt in your agent’s own app. Copy messages with selected nodes and references from the workbench.</span><b>Choose diagram folder →</b></button>
+        <button type="button" id="welcome-build-embedded" class="agent-workflow-choice"><span class="welcome-kicker">Beta · Conversation in the workbench</span><strong>Talk here with Claude</strong><span>Send messages and read replies beside the diagram through your local Claude session and Monitor.</span><b>Connect Claude →</b></button>
+      </div>
+      <p class="welcome-note">Both options share the current diagram through local files. New updates wait for your review. Permissions and interrupts stay in your agent.</p>
+      <button type="button" id="welcome-build-brief" class="welcome-text-button">Need a standalone authoring brief instead?</button>
+    </div>
     <div id="welcome-agent-screen" class="welcome-screen" hidden>
       <button class="welcome-back" type="button" data-welcome-back>← Back</button>
-      <div class="welcome-agent-return"><span><b>Talk to Claude inside the editor</b> · Local folder experiment</span><button type="button" id="welcome-agent-live" class="welcome-button welcome-button-primary">Start with Claude →</button><span class="welcome-note">Connect your own visible Claude Code session. No local server.</span></div>
+      <div class="welcome-agent-return"><span><b>Talk to Claude inside the editor</b> · Beta</span><button type="button" id="welcome-agent-live" class="welcome-button welcome-button-primary">Start with Claude →</button><span class="welcome-note">Connect your own visible Claude Code session. No local server.</span></div>
       <p class="welcome-kicker">From idea to explanation</p><h1 tabindex="-1">A good brief goes a long way.</h1><p class="welcome-description">Use your preferred coding agent. This prompt points it to Flowview’s authoring skill and helps it build a story from your sources.</p>
       <ol class="welcome-agent-steps"><li><span>1</span><b>Shape your brief</b>Choose a starting point below.</li><li><span>2</span><b>Give it to your agent</b>Attach your design, docs, or code.</li><li><span>3</span><b>Bring your JSON here</b>Preview, refine, and share.</li></ol>
       <div class="welcome-agent-layout">
@@ -159,7 +171,7 @@
           <section class="folder-agent-context-card" aria-label="Context for your next message"><b id="folder-agent-context-heading">Your next message includes</b><div id="folder-agent-context" aria-live="polite"></div><p class="folder-agent-hint">The whole story is shared. Your selection tells Claude where to focus.</p></section>
           <label for="folder-agent-level">Story detail</label><select id="folder-agent-level" class="fctl"><option value="story">Story — people and outcomes</option><option value="mixed">Mixed — story and main services</option><option value="engineering">Engineering — evidence and implementation</option></select>
           <form id="folder-agent-form"><label for="folder-agent-input">What should the story explain?</label><textarea id="folder-agent-input" rows="4" maxlength="16000" placeholder="Explain what our customer experiences when…"></textarea><button type="submit" class="rbtn" id="folder-agent-send" disabled>Send to Claude</button><span class="folder-agent-hint">⌘ / Ctrl + Enter</span></form>
-          <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your session folder keeps the conversation, story, and authoring notes.</p>
+          <p class="folder-agent-hint">Replies and changes appear here. One Undo reverses a diagram change. Your diagram folder keeps the spec and ledger, with workbench conversation data in .flowview-agent/.</p>
         </div>
       </div>
       <div class="editor-pane" id="editor-brief" role="tabpanel" aria-labelledby="editor-tab-brief" hidden></div>
@@ -476,6 +488,25 @@
   <p id="object-clipboard-feedback" role="status"></p>
   <div class="story-actions"><button type="button" class="bbtn" id="object-clipboard-cancel">Cancel</button><button type="button" class="rbtn" id="object-clipboard-apply">Paste copy</button></div>
 </dialog>
+<dialog class="reuse-dialog agent-message-dialog" id="agent-message-dialog" aria-labelledby="agent-message-title" aria-describedby="agent-message-help">
+  <div class="reuse-header"><h2 id="agent-message-title">Send message from workbench</h2><p id="agent-message-help">Choose context for your agent. Send through your connected Claude folder or copy into any agent’s conversation.</p></div>
+  <div class="reuse-scroll">
+    <p id="agent-message-error" class="reuse-note" role="alert" hidden></p>
+    <label for="agent-message-text">Your message</label><textarea class="fctl" id="agent-message-text" rows="3" placeholder="Explain why these services retry, using the selected references…"></textarea>
+    <p class="reuse-note">Your canvas selection is checked below. Choose any other nodes or references to include.</p>
+    <div class="agent-message-context">
+      <fieldset><legend>Nodes</legend><div id="agent-message-nodes" class="agent-message-choices"></div></fieldset>
+      <fieldset><legend>References</legend><div id="agent-message-references" class="agent-message-choices"></div></fieldset>
+    </div>
+    <p id="agent-message-count" class="reuse-note" role="status"></p>
+    <label for="agent-message-extra">Additional references <span class="reuse-note">— optional, one URL or file path per line</span></label><textarea class="fctl" id="agent-message-extra" rows="2" placeholder="docs/recording-design.md"></textarea>
+    <label class="agent-message-source"><input type="checkbox" id="agent-message-source"> Include full diagram JSON (all nodes and references)</label>
+    <p class="reuse-note">Checkboxes choose what goes in this message. A connected Claude folder already shares the full story for editing.</p>
+    <label for="agent-message-preview">Message to send or copy</label><textarea class="fctl" id="agent-message-preview" rows="8" readonly spellcheck="false" aria-describedby="agent-message-status"></textarea>
+    <div class="agent-message-connection"><p id="agent-message-connection" class="reuse-note" role="status"></p><button type="button" class="bbtn" id="agent-message-connect">Connect shared folder</button></div>
+  </div>
+  <div class="agent-message-footer"><p id="agent-message-status" role="status"></p><button type="button" class="bbtn" id="agent-message-cancel-turn" hidden>Stop accepting this turn</button><button type="button" class="bbtn" id="agent-message-close">Close</button><button type="button" class="rbtn" id="agent-message-copy" disabled>Copy message</button><button type="button" class="bbtn" id="agent-message-send" disabled>Send to Claude</button></div>
+</dialog>
 <dialog class="reuse-dialog" id="step-reuse" aria-labelledby="reuse-title" aria-describedby="reuse-destination">
   <div class="reuse-header">
     <h2 id="reuse-title">Reuse steps</h2>
@@ -513,33 +544,42 @@
   <div class="reuse-footer"><p id="reuse-feedback" role="status"></p><button class="bbtn" id="reuse-cancel">Cancel</button><button class="rbtn" id="reuse-apply" disabled>Copy steps</button></div>
 </dialog>
 
+<dialog id="agent-update-dialog" class="agent-update-dialog" aria-labelledby="agent-update-title">
+  <header><div><p class="welcome-kicker">Review before committing</p><h2 id="agent-update-title">Preview Agent Updates</h2><p id="agent-update-summary"></p></div><button type="button" class="bbtn" id="agent-update-close">Back to workbench</button></header>
+  <p id="agent-update-note" role="status"></p>
+  <section id="agent-update-issues" hidden><h3>Tell your agent what needs attention</h3><textarea id="agent-update-feedback" readonly rows="7" aria-label="Feedback for your agent"></textarea><button type="button" class="rbtn" id="agent-update-copy-feedback">Copy feedback for your agent</button><button type="button" class="bbtn" id="agent-update-return">Return for revision</button></section>
+  <nav aria-label="Preview version"><button type="button" class="bbtn" id="agent-update-proposed" aria-pressed="true">Proposed state</button><button type="button" class="bbtn" id="agent-update-current" aria-pressed="false">Current state</button></nav>
+  <div id="agent-update-scroll"><div id="agent-update-view"></div></div>
+  <section class="agent-update-ledger"><h3>Coverage ledger · reviewed with the diagram</h3><pre id="agent-update-ledger"></pre></section>
+  <details><summary>Inspect this version’s JSON</summary><textarea id="agent-update-source" readonly rows="6" aria-label="Preview source"></textarea></details>
+  <footer><span>Saves the spec and ledger locally. Undo restores both. Git commit stays in your agent.</span><button type="button" class="bbtn" id="agent-update-discard">Discard update</button><button type="button" class="rbtn" id="agent-update-commit" disabled>Commit update</button></footer>
+</dialog>
 <dialog id="folder-agent-guide" class="folder-agent-guide" aria-labelledby="folder-agent-guide-title">
   <header class="folder-agent-guide-header"><span>✧ Your Claude · Your account</span><button type="button" class="bbtn" id="folder-agent-close-guide" aria-label="Connect later">×</button></header>
   <ol class="folder-agent-guide-steps" aria-label="Connection progress"><li data-agent-stage="folder">Choose folder</li><li data-agent-stage="review">Paste in Claude</li><li data-agent-stage="waiting">Connect</li></ol>
   <h2 id="folder-agent-guide-title">Let’s connect your Claude.</h2>
   <div id="folder-agent-guide-folder">
-    <section class="folder-agent-resume-card" aria-label="Resume a Claude session">
-      <b>Pick up where you left off</b>
-      <p id="folder-agent-resume-help">Choose your <code>flowview-session-…</code> folder. We’ll open its saved story and conversation. Your current draft stays in Earlier drafts.</p>
-      <button type="button" class="welcome-button welcome-button-primary" id="folder-agent-resume" aria-describedby="folder-agent-resume-help">Resume from folder</button>
-    </section>
-    <h3>Start a new session</h3>
+    <p>Open the folder containing your spec and coverage ledger, or choose where your agent will create them. Existing files are loaded; your current draft stays in Earlier drafts.</p>
     <div id="folder-agent-new-session">
-    <p>Keep your Claude Code session open. Choose the folder it’s working in to bring the conversation here.</p>
-    <pre class="folder-agent-command">Claude’s working folder ← choose this folder
-└─ flowview-session-…   created for you</pre>
-    <details><summary>Not sure which folder?</summary><p id="folder-agent-folder-help">Ask Claude: <b>“What is the full path to your current working folder?”</b> Choose that exact folder, not its parent or an exchange subfolder.</p></details>
-    <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><p>Use your own account and normal permission prompts. The session must offer Monitor. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
-    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose Claude’s exact working folder</button><button type="button" class="welcome-text-button" data-agent-later>Connect later</button></div>
-    <p class="folder-agent-hint">Your browser will ask for folder access. Flowview creates an exchange subfolder inside it.</p>
+    <label for="folder-agent-workflow">Where you talk</label><select id="folder-agent-workflow"><option value="external">In my agent — copy and paste (Recommended)</option><option value="embedded">Inside the workbench (Beta)</option></select>
+    <p>Use an agent with access to this folder. You can return to the same diagram with another conversation or agent.</p>
+    <pre class="folder-agent-command">your-diagram/
+├─ story.spec.json       diagram
+├─ story.ledger.md       evidence, decisions and open work
+└─ .flowview-agent/      connection data and workbench history</pre>
+    <label for="folder-agent-filename">Diagram filename <span class="folder-agent-hint">— optional</span></label><input class="fctl" id="folder-agent-filename" placeholder="Detect existing spec, or create story.spec.json" aria-describedby="folder-agent-folder-help">
+    <p id="folder-agent-folder-help" class="folder-agent-hint">If the folder has several .spec.json files, enter the one to open. Its matching .ledger.md stays beside it.</p>
+    <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'</pre><p>Use your own account and normal permission prompts. Monitor is needed for direct Send and the Beta conversation; copy and paste works without it. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
+    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose diagram folder</button><button type="button" class="welcome-text-button" data-agent-later>Connect later</button></div>
+    <p class="folder-agent-hint">Your browser will ask for folder access. Flowview stores connection files in .flowview-agent/ inside it. Your spec and ledger remain at the top level.</p>
     </div>
   </div>
   <div id="folder-agent-guide-review" hidden>
-    <p>Copy these instructions into your open Claude session. Everything you’ll send is visible below.</p>
+    <p>Copy these instructions into your agent’s conversation. Everything you’ll send is visible below.</p>
     <p id="folder-agent-guide-folder-name" class="folder-agent-folder"></p>
-    <label for="folder-agent-instructions">Full connection instructions</label><textarea id="folder-agent-instructions" readonly spellcheck="false" rows="12" aria-label="Full Claude connection instructions"></textarea>
+    <label for="folder-agent-instructions">Full connection instructions</label><textarea id="folder-agent-instructions" readonly spellcheck="false" rows="12" aria-label="Full agent connection instructions"></textarea>
     <div class="folder-agent-guide-actions"><button type="button" class="welcome-text-button" data-agent-change-folder>Change folder</button><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-copy" disabled>Copy connection instructions</button></div>
-    <p class="folder-agent-hint">Your story is shared with your Claude session. Claude keeps its own permission prompts.</p>
+    <p class="folder-agent-hint">Your spec and ledger stay in the diagram folder. Your agent keeps its own permission prompts.</p>
   </div>
   <div id="folder-agent-guide-waiting" hidden>
     <p>Paste the instructions into Claude and approve its request when prompted. This guide closes when the folder listener responds.</p>
@@ -548,10 +588,11 @@
     <p class="folder-agent-hint">Any permission approval happens in Claude. You can keep working here while it connects.</p><button type="button" class="welcome-text-button" data-agent-later>Back to canvas</button>
   </div>
   <div id="folder-agent-guide-help" hidden>
-    <p>The folder you choose here must be the one Claude is already working in.</p><p class="folder-agent-command">Ask Claude: “What is the full path to your current working folder?”</p>
-    <p>Choose that exact folder. We’ll prepare fresh instructions for you to paste.</p>
+    <p>Give your agent the full path to the diagram folder you selected.</p><p class="folder-agent-command">Ask your agent to verify .flowview-agent/session.json in that folder.</p>
+    <p>Choose your diagram folder again to prepare fresh connection instructions.</p>
     <div class="folder-agent-guide-actions"><button type="button" class="welcome-button" id="folder-agent-help-back">Back</button><button type="button" class="welcome-button welcome-button-primary" data-agent-change-folder>Choose a different folder</button></div>
   </div>
+  <button type="button" class="bbtn" id="folder-agent-disconnect-guide" hidden>Disconnect shared folder</button>
   <p id="folder-agent-status" class="folder-agent-hint" role="status"></p>
 </dialog>
 

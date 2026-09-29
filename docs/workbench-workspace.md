@@ -132,6 +132,14 @@ working on the canvas or panel handles. Text fields keep their native text undo.
 Temporary geometry history ends when a different project is opened or the page
 reloads; saved editor-window positions still return on reload.
 
+**Message agent** lets you choose nodes and references, add a message, and copy
+the package into your agent’s conversation. Direct Send uses a connected Claude
+Monitor. The recommended workflow keeps conversation in the agent app; the Beta
+Agent window displays messages inside the workbench. Both share the durable
+diagram folder and review spec/ledger proposals through **Preview Agent Updates**.
+**Commit update** saves both artifacts as one Undo action; a Git commit remains
+a separate action in the agent. See [diagram folders](folder-agent-session.md).
+
 The Agent window names the current selection and the view/path/step context.
 Each sent message retains a receipt of that exact context. A persistent Claude
 indicator shows waiting, working, quiet or finished even while Agent is closed.

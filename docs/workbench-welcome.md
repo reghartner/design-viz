@@ -63,7 +63,17 @@ finish loading the project, but does not navigate you back into the editor.
 
 ## Build with your own agent
 
-Choose **Build it with your agent** to create a ready-to-copy prompt. Choose
+**Build with Claude** offers **Work in your agent — Recommended** for copy/paste
+communication and **Talk here with Claude — Beta** for conversation through
+Claude Monitor. Both open the same durable diagram folder, containing a spec and
+coverage ledger, with connection data inside `.flowview-agent/`. Select an
+existing folder or one where these artifacts should be created. Agent proposals
+show a full preview of both artifacts and require **Commit update**; Undo restores
+both. Questions, permissions and interrupts stay in your agent app in the
+recommended flow. See [diagram folders](folder-agent-session.md) for setup,
+merge/conflict feedback and reopening an existing diagram.
+
+The separate **Need a standalone authoring brief instead?** option creates a ready-to-copy prompt. Choose
 whether to explain a design, explore a codebase, or improve an existing diagram;
 optionally describe the question and select the audience. The prompt directs
 your coding agent to the repository’s

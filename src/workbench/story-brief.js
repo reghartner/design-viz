@@ -81,7 +81,7 @@ function buildStoryHandoff(options){
   var summary=['# '+title,'','This is a local draft prepared for human review. Downloading or opening this package does not publish it.','',
     '## Files','','- story.spec.json — editable story; open it in Flowview Workbench.',
     '- story.html — generated viewer for the same story snapshot.',
-    '- story.ledger.md — story brief, decisions, assumptions and unresolved questions from the session.',
+    '- story.ledger.md — story brief, decisions, assumptions and unresolved questions for this diagram.',
     '- sources.json — source references and provenance; referenced source file contents are not included.',
     '- changes.json — available agent change receipts, not a complete audit of every manual edit.','',
     '## Review before engineering work','',status.text,

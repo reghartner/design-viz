@@ -28,7 +28,7 @@ class FolderAgentTests(unittest.TestCase):
         self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner})
         self.put('editor.json', {**self.owner, 'connected': True, 'at': time.time()*1000})
         self.put('request.json', {**self.owner, 'id': 'request', 'text': 'Tell a story'})
-        self.put('state.json', {**self.owner, 'revision': 'revision-1', 'source': '{}'})
+        self.put('state.json', {**self.owner, 'revision': 'connection-1', 'source': '{}'})
         (self.folder/'answer.txt').write_text('Our customer is ready.', encoding='utf-8')
         (self.folder/'candidate.spec.json').write_text('{"page":{}}')
         self.kit({'docs/example.md': 'Small kit'})
@@ -45,8 +45,22 @@ class FolderAgentTests(unittest.TestCase):
         return subprocess.run([sys.executable, str(HELPER), '--folder', str(self.folder), *args],
                               text=True, capture_output=True, timeout=10)
 
+    def test_paired_project_requires_nonempty_ledger_and_packages_it(self):
+        manifest = json.loads((self.folder / 'session.json').read_text())
+        manifest['pairedArtifacts'] = True
+        (self.folder / 'session.json').write_text(json.dumps(manifest))
+        missing = self.propose()
+        self.assertNotEqual(missing.returncode, 0)
+        self.assertIn('--ledger', missing.stderr)
+        (self.folder / 'candidate.ledger.md').write_text('# Coverage ledger\n\nEvidence for this exact proposed story.\n')
+        result = self.run_helper('propose', '--request', 'request', '--revision', 'connection-1',
+                                 '--file', 'candidate.spec.json', '--ledger', 'candidate.ledger.md')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads((self.folder / 'proposal.json').read_text())['ledger'],
+                         '# Coverage ledger\n\nEvidence for this exact proposed story.\n')
+
     def propose(self):
-        return self.run_helper('propose', '--request', 'request', '--revision', 'revision-1',
+        return self.run_helper('propose', '--request', 'request', '--revision', 'connection-1',
                                '--file', 'candidate.spec.json')
 
     def test_reply_and_proposal_identity_and_pending_ack_guard(self):
@@ -54,15 +68,16 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         proposal = helper.read(self.folder, 'proposal.json')
         self.assertEqual(proposal['connectionId'], 'connection')
-        self.assertEqual(proposal['baseRevision'], 'revision-1')
+        self.assertEqual(proposal['baseRevision'], 'connection-1')
         for command in [self.propose, lambda: self.run_helper('reply', '--request', 'request', '--file', 'answer.txt')]:
             self.assertIn('pending proposal', command().stderr)
         self.put('result.json', {**self.owner, 'id': proposal['id'], 'status': 'applied'})
         self.assertEqual(self.run_helper('reply', '--request', 'request', '--file', 'answer.txt').returncode, 0)
 
-    def test_stale_revision_disconnected_and_old_request_refused(self):
-        self.put('state.json', {**self.owner, 'revision': 'revision-2'})
-        self.assertIn('Document changed', self.propose().stderr)
+    def test_stale_revision_reaches_browser_but_disconnected_publication_is_refused(self):
+        self.put('state.json', {**self.owner, 'revision': 'connection-2'})
+        self.assertEqual(self.propose().returncode, 0)  # Browser merges or reports conflicts using its retained baseline.
+        (self.folder / 'proposal.json').unlink()
         self.put('editor.json', {**self.owner, 'connected': False, 'at': time.time()*1000})
         self.assertIn('disconnected', self.propose().stderr)
         self.assertFalse((self.folder/'proposal.json').exists())
@@ -70,7 +85,7 @@ class FolderAgentTests(unittest.TestCase):
     def test_filename_escape_and_symlink_refused(self):
         self.assertIn('plain filename', self.run_helper('reply', '--request', 'request', '--file', '../answer.txt').stderr)
         (self.folder/'link.txt').symlink_to(self.folder/'answer.txt')
-        self.assertIn('regular session file', self.run_helper('reply', '--request', 'request', '--file', 'link.txt').stderr)
+        self.assertIn('regular helper file', self.run_helper('reply', '--request', 'request', '--file', 'link.txt').stderr)
 
     def test_kit_checksum_traversal_and_symlink_refused(self):
         helper.prepare(self.folder)
@@ -121,6 +136,62 @@ class FolderAgentTests(unittest.TestCase):
         self.put('reply.json', {**self.owner, 'requestId': 'request'})
         self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
 
+    def test_copy_and_native_requests_do_not_dispatch_through_monitor(self):
+        for delivery in ('clipboard', 'native'):
+            self.put('request.json', {**self.owner, 'id': 'copied', 'delivery': delivery})
+            run = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(run.stdout, '')
+
+    def test_monitor_renewal_preserves_events_for_an_active_request_and_new_results(self):
+        first = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+        self.assertEqual(json.loads(first.stdout)['requestId'], 'request')
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+        self.put('result.json', {**self.owner, 'id': 'proposal', 'requestId': 'request', 'status': 'applied'})
+        result = self.run_helper('watch', '--minutes', '.003', '--interval', '.1')
+        self.assertEqual(json.loads(result.stdout)['event'], 'flowview_result')
+        self.assertEqual(json.loads(result.stdout)['requestId'], 'request')
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+        self.put('request.json', {**self.owner, 'id': 'next', 'text': 'Next request'})
+        self.assertEqual(json.loads(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout)['id'], 'next')
+
+    def test_fresh_monitor_does_not_redispatch_a_completed_result(self):
+        self.put('result.json', {**self.owner, 'id': 'proposal', 'requestId': 'request', 'status': 'applied'})
+        self.put('reply.json', {**self.owner, 'requestId': 'request'})
+        self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
+
+    def test_native_begin_timeout_withdraws_its_request(self):
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        # Deterministically cross the deadline without waiting eight real seconds.
+        with patch.object(sys, 'argv', ['folder-agent.py', '--folder', str(self.folder), 'begin', '--text', 'Late']), patch.object(helper.time, 'monotonic', side_effect=[0, 9]):
+            with self.assertRaisesRegex(ValueError, 'withdrawn'):
+                helper.main()
+        self.assertTrue(helper.read(self.folder, 'agent-request.json')['withdrawn'])
+        self.assertEqual(helper.read(self.folder, 'agent-request.json')['expiresAt'], 0)
+
+    def test_native_begin_waits_for_editor_ack_and_refuses_embedded_workflow(self):
+        self.assertIn('external', self.run_helper('begin', '--text', 'Change the story').stderr.lower().replace('work in your agent', 'external'))
+        self.put('session.json', {'protocol': 'flowview-folder-v1', **self.owner, 'workflow': 'external'})
+        process = subprocess.Popen([sys.executable, str(HELPER), '--folder', str(self.folder), 'begin', '--text', 'Native request'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        try:
+            deadline = time.monotonic() + 3
+            while not (self.folder/'agent-request.json').exists() and time.monotonic() < deadline:
+                time.sleep(.02)
+            request = helper.read(self.folder, 'agent-request.json')
+            self.assertEqual(request['text'], 'Native request')
+            self.assertGreater(request['expiresAt'], time.time()*1000)
+            self.put('request.json', {**request, 'revision': 'connection-1'})
+            time.sleep(.2)
+            self.assertIsNone(process.poll(), 'Publishing request.json alone must not acknowledge the turn')
+            self.put('transcript.json', {'sessionId': self.owner['sessionId'], 'messages': [{'role': 'user', 'requestId': request['id'], 'text': request['text']}]})
+            output, error = process.communicate(timeout=3)
+            self.assertEqual(process.returncode, 0, error)
+            self.assertEqual(json.loads(output)['id'], request['id'])
+        finally:
+            if process.poll() is None:
+                process.kill()
+                process.communicate()
+
     def test_watcher_ignores_stale_heartbeat_and_old_connection(self):
         self.put('editor.json', {**self.owner, 'connected': True, 'at': 0})
         self.assertEqual(self.run_helper('watch', '--minutes', '.003', '--interval', '.1').stdout, '')
@@ -155,7 +226,7 @@ class FolderAgentTests(unittest.TestCase):
 
     def test_cancelled_turn_rejects_all_helper_outputs_and_watcher_reports_cancellation(self):
         self.put('cancel.json', {**self.owner, 'id': 'cancel-1', 'requestId': 'request'})
-        for command in [('propose', '--revision', 'revision-1', '--file', 'candidate.spec.json'),
+        for command in [('propose', '--revision', 'connection-1', '--file', 'candidate.spec.json'),
                         ('reply', '--text', 'Too late'), ('progress', '--text', 'Still going')]:
             result = self.run_helper(command[0], '--request', 'request', *command[1:])
             self.assertNotEqual(result.returncode, 0)
@@ -205,14 +276,14 @@ class FolderAgentTests(unittest.TestCase):
     def test_retired_operation_flags_never_publish_a_proposal(self):
         self.put('candidate.spec.json', {'title': 'Complete document'})
         for flags in [('--operations', 'candidate.spec.json'), ('--file', 'candidate.spec.json', '--dry-run')]:
-            run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', *flags)
+            run = self.run_helper('propose', '--request', 'request', '--revision', 'connection-1', *flags)
             self.assertNotEqual(run.returncode, 0)
             self.assertFalse((self.folder/'proposal.json').exists())
-        run = self.run_helper('propose', '--request', 'request', '--revision', 'revision-1', '--file', 'candidate.spec.json')
+        run = self.run_helper('propose', '--request', 'request', '--revision', 'connection-1', '--file', 'candidate.spec.json')
         self.assertEqual(run.returncode, 0, run.stderr)
         proposal = helper.read(self.folder, 'proposal.json')
         self.assertEqual(proposal['source'], (self.folder/'candidate.spec.json').read_text())
-        self.assertEqual(proposal['baseRevision'], 'revision-1')
+        self.assertEqual(proposal['baseRevision'], 'connection-1')
         self.assertNotIn('operations', proposal)
         self.assertNotIn('dryRun', proposal)
 

@@ -2,7 +2,10 @@
 
 Open **Brief** to read the current story's intent, author answers, decisions,
 assumptions and engineering gaps. The connected Claude session supplies
-`story.ledger.md`. Refresh the brief after asking Claude to update those notes.
+`story.ledger.md` (or the matching ledger for a named spec) in the diagram folder.
+The agent submits ledger changes with its spec for preview and approval; refresh
+the brief after accepting the pair. Connection files and workbench conversation
+history live in `.flowview-agent/` and stay out of the repository commit.
 A story can still be viewed and handed off without a connected agent; the
 package explicitly records that its ledger is missing.
 

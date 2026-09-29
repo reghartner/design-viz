@@ -56,3 +56,28 @@
 .folder-agent-review-toggle{display:flex!important;align-items:flex-start;gap:5px;font-weight:400!important;margin-top:7px;}
 #folder-agent-review{margin:8px 0;border-color:var(--accent);}
 #folder-agent-review-source{font:11px/1.4 monospace;min-height:100px;resize:vertical;}
+/* Shared-folder workflows and the separate proposal viewer. */
+.agent-workflow-choices{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:32px 0;}
+.agent-workflow-choice{display:flex;flex-direction:column;align-items:flex-start;gap:18px;padding:30px;text-align:left;background:#fff;border:1px solid #d7dae4;border-radius:16px;color:#243249;font:15px/1.6 'IBM Plex Sans',sans-serif;cursor:pointer;}
+.agent-workflow-choice strong{font-size:24px;line-height:1.2;}.agent-workflow-choice b{margin-top:auto;}
+.agent-workflow-recommended{background:#f0f2fd;border:2px solid #7c89ca;}
+.agent-workflow-choice:hover{box-shadow:0 6px 24px #24324915;}.agent-workflow-choice:focus-visible{outline:3px solid #546ac4;outline-offset:4px;}
+.agent-update-banner{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:20px 28px;background:#e9eefc;border-bottom:1px solid #acbce7;color:#21385c;}
+.agent-update-banner strong{font-size:18px;}.agent-update-banner p{margin:5px 0 0;font-size:13px;}.agent-update-banner button{font-size:15px;padding:12px 22px;flex:none;}
+.agent-update-banner[hidden],body.welcome-active .agent-update-banner{display:none;}
+.agent-update-dialog{box-sizing:border-box;width:calc(100vw - 32px);height:calc(100dvh - 32px);max-width:none;max-height:none;margin:16px;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);}
+.agent-update-dialog[open]{display:flex;flex-direction:column;}.agent-update-dialog::backdrop{background:#07111c99;}
+.agent-update-dialog header,.agent-update-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;flex:none;}
+.agent-update-dialog header{border-bottom:1px solid var(--line);}.agent-update-dialog h2{margin:4px 0;font-size:24px;}.agent-update-dialog header p{margin:4px 0;}
+.agent-update-dialog footer{border-top:1px solid var(--line);}.agent-update-dialog footer span{flex:1;color:var(--sub);font-size:12px;}
+.agent-update-dialog nav{padding:8px 24px;display:flex;gap:8px;}.agent-update-dialog nav [aria-pressed="true"]{background:#dfe7fc;color:#203761;}
+.agent-update-dialog>p,.agent-update-dialog>details{margin:10px 24px;}.agent-update-dialog textarea{box-sizing:border-box;width:100%;background:var(--bg);color:var(--ink);padding:12px;border:1px solid var(--line);font:12px/1.5 'IBM Plex Mono',monospace;}
+#agent-update-scroll{flex:1;min-height:100px;overflow:auto;background:var(--bg);padding:16px 24px;}
+#agent-update-issues{padding:12px 24px;background:#fff3df;max-height:38vh;overflow:auto;color:#493513;}#agent-update-issues[hidden]{display:none;}
+#agent-update-view{max-width:1500px;margin:auto;}#agent-update-view .doc-title{display:block;}
+.agent-update-dialog button:disabled{opacity:.45;cursor:default;}
+@media(max-width:760px){.agent-workflow-choices{grid-template-columns:1fr;}.agent-update-banner,.agent-update-dialog header,.agent-update-dialog footer{flex-wrap:wrap;}.agent-update-dialog{width:100vw;height:100dvh;margin:0;border-radius:0;}}
+
+.workspace-canvas:not(.welcome-active) .agent-update-banner{position:fixed;left:84px;right:20px;top:calc(var(--workspace-toolbar,64px) + 24px);z-index:150;border:1px solid #acbce7;border-radius:12px;box-shadow:0 4px 18px #14244220;}
+
+.agent-update-ledger{padding:0 20px 16px}.agent-update-ledger pre{white-space:pre-wrap;overflow:auto;max-height:260px;font:13px/1.6 var(--mono,monospace);border:1px solid var(--border,#ddd);padding:16px;border-radius:8px}

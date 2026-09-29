@@ -52,13 +52,13 @@ async function folderSession(page){
   return {errors,unexpectedRequests,read:async name=>JSON.parse(await readFile(path.join(session,name),'utf8')),
     async write(name,value){
       const temporary=path.join(session,'.agent-write-'+(++writeId));
-      try{await writeFile(temporary,JSON.stringify(value),{flag:'wx'});await rename(temporary,path.join(session,name));}finally{await rm(temporary,{force:true});}
+      try{await writeFile(temporary,typeof value==='string'?value:JSON.stringify(value),{flag:'wx'});await rename(temporary,path.join(session,name));}finally{await rm(temporary,{force:true});}
     },
     run:(...args)=>JSON.parse(execFileSync('python3',[path.join(session,'folder-agent.py'),...args],{cwd:session,encoding:'utf8'})),
     cleanup:()=>rm(folder,{recursive:true,force:true})};
 }
 
-test('retired API and invalid full source preserve exact source and history; a valid document applies once',async({page})=>{
+test('retired API and invalid full source preserve exact history; a reviewed document and ledger apply once',async({page})=>{
   const h=await folderSession(page);
   try{
     const raw=JSON.parse(source);raw.page.blocks[0].id='delivery';
@@ -82,33 +82,49 @@ test('retired API and invalid full source preserve exact source and history; a v
       await expect.poll(async()=>{try{return (await h.read('result.json')).id;}catch(error){if(error.code==='ENOENT')return null;throw error;}}).toBe(id);
       return h.read('result.json');
     }
+    async function reject(){
+      await page.locator('#agent-update-open').click();
+      await expect(page.locator('#agent-update-commit')).toBeDisabled();
+      await page.locator('#agent-update-return').click();
+    }
     async function unchanged(){
       await expect(page.locator('#src')).toHaveValue(original);
       await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
       expect((await h.read('state.json')).revision).toBe(state.revision);
-      await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
+      await expect(page.locator('#docview [data-dv-node="b"]')).toContainText('Backend');
     }
     // A stale helper must not apply operations, or silently apply accompanying source.
     const expected=structuredClone(raw);expected.page.blocks[0].diagram.nodes.b.title='Delivery service';
     for(const [id,extra] of [['retired-operations',{operations:[renameOperation]}],['retired-dry-run',{dryRun:'true',source:JSON.stringify(expected)}]]){
       await h.write('proposal.json',{...manifest,id,requestId:request.id,baseRevision:state.revision,...extra});
-      expect(await result(id)).toMatchObject({status:'rejected',revision:state.revision,message:expect.stringContaining('complete updated document')});
+      await page.locator('#agent-update-open').click();
+      await expect(page.locator('#agent-update-feedback')).toHaveValue(/complete updated document/);
+      await expect(page.locator('#agent-update-commit')).toBeDisabled();
+      await page.locator('#agent-update-return').click();
+      expect(await result(id)).toMatchObject({status:'rejected',revision:state.revision});
       await unchanged();
     }
     // The complete document still passes through the editor validator.
     await h.write('proposal.json',{...manifest,id:'invalid-document',requestId:request.id,baseRevision:state.revision,source:'{"page":{"blocks":[{"diagram":{"nodes":{}}}]}}'});
+    await reject();
     expect(await result('invalid-document')).toMatchObject({status:'rejected',revision:state.revision});
     await unchanged();
     await h.write('candidate.spec.json',expected);
-    const accepted=h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--summary','Rename exactly one service');
+    const ledger='# Coverage\n\nNode b in section delivery is named Delivery service. Other fields are preserved.\n';
+    await h.write('candidate.ledger.md',ledger);
+    const accepted=h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename exactly one service');
+    await page.locator('#agent-update-open').click();
+    await expect(page.locator('#agent-update-ledger')).toHaveText(ledger);
+    await unchanged();
+    await page.locator('#agent-update-commit').click();
     expect(await result(accepted.id)).toMatchObject({status:'applied'});
     await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue())).toEqual(expected);
     const changed=await page.locator('#src').inputValue();
-    await expect(page.locator('[data-dv-node="b"]')).toContainText('Delivery service');
+    await expect(page.locator('#docview [data-dv-node="b"]')).toContainText('Delivery service');
     h.run('reply','--request',request.id,'--text','Renamed exactly one service.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
     await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeEnabled();
-    await expect(page.locator('[data-dv-node="b"]')).toContainText('Backend');
+    await expect(page.locator('#docview [data-dv-node="b"]')).toContainText('Backend');
     // No earlier or duplicate action remains, including a different project.
     await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
     await expect(page.locator('#redo-builder')).toBeDisabled();

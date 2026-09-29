@@ -1,13 +1,41 @@
 /* Optional local-file transport. No browser-control or script-execution commands. */
 function createWorkbenchAgentExchange(opts){
-  var lastSource=null,lastProject=null,sequence=0,pending=null;
+  var lastSource=null,lastLedger=null,lastProject=null,sequence=0,pending=null,baselines=new Map(),baselineBytes=0,pinned=null,reviewBase=null;
   function snapshot(){
     var value=opts.snapshot();
-    if(value.source!==lastSource || value.project!==lastProject){lastSource=value.source;lastProject=value.project;sequence++;}
+    if(value.source!==lastSource || value.ledger!==lastLedger || value.project!==lastProject){
+      if(value.project!==lastProject){baselines.clear();baselineBytes=0;pinned=null;reviewBase=null;}
+      lastSource=value.source;lastLedger=value.ledger;lastProject=value.project;sequence++;
+      baselines.set(opts.clientId+'-'+sequence,{source:value.source,ledger:value.ledger,project:value.project});baselineBytes+=value.source.length;
+      while(baselines.size>32 || baselineBytes>16*1024*1024 && baselines.size>1){var key=baselines.keys().next().value;baselineBytes-=baselines.get(key).source.length;baselines.delete(key);}
+    }
     value.revision=opts.clientId+'-'+sequence;
     return value;
   }
   return {
+    pin:function(current){current=current || snapshot();pinned={revision:current.revision,source:current.source,ledger:current.ledger,project:current.project};reviewBase=null;},
+    preview:function(proposal){
+      var current=snapshot(),base=baselines.get(proposal.baseRevision) || (pinned && pinned.revision===proposal.baseRevision?pinned:null) || (reviewBase && reviewBase.revision===proposal.baseRevision?reviewBase:null),outcome;
+      function blocked(reason){return {ok:false,current:current,conflicts:[{path:'/',reason:reason}]};}
+      if(!current.open)return blocked('Open the original project before reviewing this update.');
+      if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))return blocked('Submit a complete updated document in source.');
+      if(typeof proposal.source!=='string' || new TextEncoder().encode(proposal.source).length>4*1024*1024)return blocked('Invalid or oversized proposed source.');
+      if(!base || base.project!==current.project)return blocked('The starting revision is no longer available. Reread state.json and reconcile your proposal with the latest story.');
+      reviewBase={revision:proposal.baseRevision,source:base.source,ledger:base.ledger,project:base.project};
+      try{outcome=mergeWorkbenchAgentSource(base.source,current.source,proposal.source);}catch(ex){return blocked('The document is too complex to merge safely. Ask for a revised proposal.');}outcome.current=current;
+      if(outcome.ok && new TextEncoder().encode(outcome.source).length>4*1024*1024)return blocked('The combined story exceeds the 4 MiB size limit.');
+      if(outcome.ok && opts.validate){
+        try{var error=opts.validate(outcome.source);if(error)return blocked('The combined story failed validation: '+error);}
+        catch(ex){return blocked('The combined story failed validation: '+ex.message);}
+      }
+      if(outcome.ok && opts.requireLedger){
+        if(typeof proposal.ledger!=='string' || !proposal.ledger.trim() || new TextEncoder().encode(proposal.ledger).length>256*1024)return blocked('Include the complete coverage ledger (up to 256 KiB) with this spec.');
+        var before=base.ledger || '',local=current.ledger || '',incoming=proposal.ledger;
+        if(local!==before && incoming!==before && local!==incoming)return {ok:false,current:current,conflicts:[{path:'/ledger',reason:'Both changed the coverage ledger. Reread the accepted pair and reconcile it.'}]};
+        outcome.ledger=incoming===before?local:incoming;
+      }
+      return outcome;
+    },
     request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},
     receive:function(reply,sent){
       if(pending && sent.result && pending.id===sent.result.id && reply.acknowledged===pending.id)pending=null;
@@ -22,9 +50,10 @@ function createWorkbenchAgentExchange(opts){
       if(!current.open)return result('rejected','Open a project before applying agent changes.');
       if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
       if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';
+      if(opts.requireLedger && (typeof proposal.ledger!=='string' || !proposal.ledger.trim() || new TextEncoder().encode(proposal.ledger).length>256*1024))return result('rejected','A complete coverage ledger is required.');
       var source=proposal.source;
       if(typeof source!=='string' || source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
-      if(source===current.source)return result('unchanged','Agent proposal matches the current document.');
+      if(source===current.source && (!opts.requireLedger || proposal.ledger===current.ledger))return result('unchanged','Agent proposal matches the current document.');
       var outcome;
       try{outcome=opts.apply(source,current,proposal);}
       catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}

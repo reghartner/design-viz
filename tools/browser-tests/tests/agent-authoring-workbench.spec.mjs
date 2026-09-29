@@ -38,7 +38,12 @@ test('authoring broker connects the real editor, sends once, applies helper outp
     expect(await readFile(path.join(outDir, 'reply.json'), 'utf8')).toBe('{broken');
     const source = JSON.stringify({page: {title: 'Customer onboarding', blocks: [{id: 'story', heading: 'Story'}]}}, null, 3) + '\n';
     await writeFile(path.join(session.sessionPath, 'candidate.spec.json'), source);
-    const proposal = helper('propose', '--request', request.id, '--revision', sent.revision, '--file', 'candidate.spec.json', '--summary', 'Set the requested page title.');
+    await writeFile(path.join(session.sessionPath, 'candidate.ledger.md'), '# Coverage ledger\n\nPage title follows the requested wording.\n');
+    const proposal = helper('propose', '--ledger', 'candidate.ledger.md', '--request', request.id, '--revision', sent.revision, '--file', 'candidate.spec.json', '--summary', 'Set the requested page title.');
+    await expect(page.locator('#agent-update-open')).toBeVisible();
+    await expect(page.locator('#src')).toHaveValue(defaultSource);
+    await page.locator('#agent-update-open').click();
+    await page.locator('#agent-update-commit').click();
     await expect.poll(async () => {
       try { return (await read('result.json')).id; }
       catch (error) { if (error.code === 'ENOENT') return null; throw error; }
@@ -135,7 +140,7 @@ test('broker rejects malformed control instructions before touching the editor',
   expect(validateControl({seq: 2, text: ' Keep this story. '})).toEqual({seq: 2, text: 'Keep this story.', technicalLevel: 'story'});
 });
 
-test('a broken session is recorded while its healthy peer continues through the UI and helper', async () => {
+test('a broken session is recorded while its healthy peer proposes an update awaiting review', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'flowview-authoring-isolation-'));
   const output = path.join(directory, 'trial');
   const running = runBroker({output, runs: 2, maxMinutes: 0.6}).then(value => ({value}), error => ({error}));
@@ -159,12 +164,12 @@ test('a broken session is recorded while its healthy peer continues through the 
     const source = defaultSource.replace('New story', 'Healthy peer');
     await writeFile(path.join(healthy.sessionPath, 'candidate.spec.json'), source);
     const helper = (...args) => JSON.parse(execFileSync('python3', [path.join(healthy.sessionPath, 'folder-agent.py'), ...args], {cwd: healthy.sessionPath, encoding: 'utf8'}));
-    const proposal = helper('propose', '--request', sent.requestId, '--revision', sent.revision, '--file', 'candidate.spec.json', '--summary', 'Name the healthy story.');
-    await expect.poll(async () => (await read(path.join(healthy.sessionPath, 'result.json')))?.id).toBe(proposal.id);
-    expect((await read(path.join(healthy.sessionPath, 'result.json'))).status).toBe('applied');
-    const reply = helper('reply', '--request', sent.requestId, '--text', 'The healthy story is ready.');
-    await expect.poll(async () => (await read(path.join(output, 'run-02/capture.json')))?.replyId).toBe(reply.id);
-    expect(await readFile(path.join(output, 'run-02/final.spec.json'), 'utf8')).toBe(source);
+    await writeFile(path.join(healthy.sessionPath, 'candidate.ledger.md'), '# Coverage ledger\n\nPage title follows the requested wording.\n');
+    const proposal = helper('propose', '--ledger', 'candidate.ledger.md', '--request', sent.requestId, '--revision', sent.revision, '--file', 'candidate.spec.json', '--summary', 'Name the healthy story.');
+    await expect.poll(async () => (await readdir(path.join(output, 'run-02/exchange-history'))).some(name => /-proposal\.json$/.test(name))).toBe(true);
+    expect((await read(path.join(healthy.sessionPath, 'proposal.json'))).id).toBe(proposal.id);
+    expect(await read(path.join(healthy.sessionPath, 'result.json'))).toBeNull();
+    expect(await readFile(path.join(output, 'run-02/final.spec.json'), 'utf8')).toBe(defaultSource);
     expect((await read(path.join(output, 'run-02/browser-state.json'))).errors).toEqual([]);
     await writeFile(path.join(output, 'shutdown.json'), '{}');
     const outcome = await running;

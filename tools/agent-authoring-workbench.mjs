@@ -9,7 +9,7 @@
  * Wait for control-result.json status "sent", then use the published session
  * folder and its real helper. Create output/shutdown.json to stop the broker.
  */
-import {readFile, writeFile, mkdir, rename, rm, lstat, realpath, copyFile} from 'node:fs/promises';
+import {readFile, writeFile, mkdir, rename, rm, lstat, realpath, copyFile,readdir} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {createRequire} from 'node:module';
@@ -108,11 +108,13 @@ export async function createSession(page, outDir, options = {}) {
     await writeJson(path.join(outDir, 'exchange-history', filename + '.meta.json'), {sequence, filename, name, operation, sha256: digest, at: Date.now()});
   }
   await page.exposeBinding('authoringDisk', async (_, operation, name, value) => {
-    const target = await diskPath(projectPath, name);
+    const target = name==='/' && operation==='entries'?projectPath:await diskPath(projectPath, name);
+    const fileLimit = path.basename(target)==='artifact-write.json'?20*1024*1024:maximumBytes;
+    if (operation === 'entries') return (await readdir(target,{withFileTypes:true})).map(entry=>({name:entry.name,kind:entry.isDirectory()?'directory':'file'}));
     if (operation === 'directory') {
       if (value?.create) await mkdir(target, {recursive: false}).catch(error => { if (error.code !== 'EEXIST') throw error; });
-      if (!(await lstat(target)).isDirectory()) throw new Error('Not a directory.');
-      if (path.dirname(target) === projectPath && /^flowview-session-[\w-]+$/.test(path.basename(target))) sessionPath = target;
+      try{if (!(await lstat(target)).isDirectory()) throw new Error('Not a directory.');}catch(error){if(error.code==='ENOENT')return false;throw error;}
+      if (path.dirname(target) === projectPath && path.basename(target)==='.flowview-agent') sessionPath = target;
       return true;
     }
     if (operation === 'exists') {
@@ -120,14 +122,16 @@ export async function createSession(page, outDir, options = {}) {
       catch (error) { if (error.code === 'ENOENT') return false; throw error; }
     }
     if (operation === 'read') {
-      if ((await lstat(target)).size > maximumBytes) throw new Error('Exchange file exceeds 8 MiB.');
+      if ((await lstat(target)).size > fileLimit) throw new Error('Exchange file exceeds its size limit.');
       const bytes = await readFile(target, 'utf8');
       await archive(name, bytes, 'read');
       return bytes;
     }
     if (operation === 'write') {
-      if (typeof value !== 'string' || Buffer.byteLength(value) > maximumBytes) throw new Error('Invalid exchange write.');
+      if (typeof value !== 'string' || Buffer.byteLength(value) > fileLimit) throw new Error('Invalid exchange write.');
+      if(options.beforeWrite)await options.beforeWrite(path.basename(name),value);
       await atomicWrite(target, value);
+      if(options.afterWrite)await options.afterWrite(path.basename(name),value);
       await archive(name, value, 'write');
       return;
     }
@@ -143,12 +147,13 @@ export async function createSession(page, outDir, options = {}) {
     }
     function directory(name) {
       return {
-        kind: 'directory', name: name.split('/').pop() || 'Authoring agent project',
+        kind: 'directory', name: name.split('/').pop() || 'agent-project',
+        async *values(){for(const entry of await window.authoringDisk('entries',name || '/'))yield entry;},
         async queryPermission() { return 'granted'; },
         async requestPermission() { return 'granted'; },
         async getDirectoryHandle(child, options) {
           validName(child);
-          await window.authoringDisk('directory', name + '/' + child, {create: options?.create === true});
+          if(!await window.authoringDisk('directory', name + '/' + child, {create: options?.create === true}))throw new DOMException('Missing directory','NotFoundError');
           return directory(name + '/' + child);
         },
         async getFileHandle(child, options) {
@@ -191,10 +196,12 @@ export async function createSession(page, outDir, options = {}) {
   await page.locator('#welcome-paste-form button[type=submit]').click();
   await page.locator('#editor-tab-agent').click();
   if (!await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-open-setup').click();
+  await page.locator('#folder-agent-workflow').selectOption(options.workflow ?? 'embedded');
   await page.locator('#folder-agent-connect').click();
-  await waitFor(() => page.locator('#folder-agent-send').isEnabled(), 'connected editor');
+  await waitFor(() => page.locator('#folder-agent-copy').isEnabled(), 'connected editor');
+  const instructions = await page.locator('#folder-agent-instructions').inputValue();
   if (await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-close-guide').click();
-  if (!sessionPath) throw new Error('Editor did not create its session folder.');
+  if (!sessionPath) throw new Error('Editor did not create its diagram support folder.');
   const manifest = await readJson(path.join(sessionPath, 'session.json'));
   const identity = {runId, outDir, projectPath, sessionPath, sessionId: manifest.sessionId, connectionId: manifest.connectionId};
   await writeJson(path.join(outDir, 'session-path.json'), {...identity, status: 'ready', readyAt: Date.now()});
@@ -281,8 +288,12 @@ export async function createSession(page, outDir, options = {}) {
       await attempt('screenshot', () => page.screenshot({path: path.join(outDir, 'final.png'), fullPage: false}));
       // A failed capture must not prevent ending the editor lease.
       await attempt('disconnect', async () => {
-        const disconnect = page.locator('#folder-agent-disconnect');
-        if (!await disconnect.isVisible()) await page.locator('#folder-agent-pairing > summary').click();
+        let disconnect = page.locator('#folder-agent-disconnect-guide');
+        if (!await page.locator('#folder-agent-guide').isVisible()) {
+          if (!await page.locator('#editor-agent').isVisible()) await page.locator('#editor-tab-agent').click();
+          disconnect = page.locator('#folder-agent-disconnect');
+          if (!await disconnect.isVisible()) await page.locator('#folder-agent-pairing > summary').click();
+        }
         if (await disconnect.isVisible() && await disconnect.isEnabled()) {
           await disconnect.click();
           await waitFor(async () => (await readJson(path.join(sessionPath, 'editor.json')))?.connected === false, 'disconnected lease');
@@ -294,7 +305,7 @@ export async function createSession(page, outDir, options = {}) {
     if (failures.length) throw new Error(failures.join('\n'));
   }
   await capture();
-  return {...identity, errors, unexpectedRequests, sendControl, pollControl, capture, close};
+  return {...identity, instructions, errors, unexpectedRequests, sendControl, pollControl, capture, close};
 }
 
 export async function runBroker({output, runs = 6, seedSource = defaultSource, maxMinutes = 45, shutdown}) {

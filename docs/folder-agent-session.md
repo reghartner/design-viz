@@ -1,181 +1,174 @@
-# Talk to Claude through a local folder
+# Diagram folders and agent collaboration
 
-This experimental workbench connection is designed for a hosted HTTPS page in a
-desktop Chrome/Edge tab. It needs no local server, agent backend, API key, or
-browser access for Claude. The user owns the visible Claude Code session and
-its permissions. The browser asks permission for the selected folder. This does
-not sandbox Claude or change access already granted to that session.
+A diagram folder is the durable project. The spec and coverage ledger live together
+and can be reopened with another agent or conversation. A connection is temporary;
+users do not need to create or manage a separate session folder.
 
-## Connect
+## Choose how to work
 
-Choose **Build it with your agent → Start with Claude**, or the **Agent** tab
-in an existing project. Start with the working/project folder of the user's
-existing Claude session. If its location is unclear, ask Claude to report its
-current working directory; do not guess a Documents or Downloads path.
+**Build with Claude** offers two choices:
 
-Select **Choose Claude’s exact working folder** and pick that directory itself,
-not its parent or an existing exchange subfolder. The visible folder diagram
-marks the working folder as the selection and the exchange as automatically
-created. Flowview
-creates a new `flowview-session-…` exchange subfolder there. It leaves the project
-files and any older exchanges in place. Read and paste the connection instructions
-into that same Claude session. They name `./flowview-session-…` relative to its
-working directory and include both connection identities for verification.
+- **Work in your agent — Recommended.** Copy setup and messages with selected
+  nodes/references into an agent that can read local files. Questions, permissions,
+  and interrupts stay in that agent app. Monitor is optional and only needed for
+  direct **Send to Claude**.
+- **Talk here with Claude — Beta.** Claude Code and its Monitor tool deliver
+  questions and answers inside the workbench. Permission prompts and interrupts
+  still happen in Claude.
 
-The browser cannot discover Claude's working directory or expose the selected
-folder's absolute path. Claude resolves the exact relative location from its own
-working directory. If it is missing or its identities differ, it stops and reports
-the working directory for corrected pairing; it does not search disk or invent
-another location. This uses the agent's working folder, not its internal chat or
-account storage. The browser's permission covers the selected folder, while the
-exchange code accesses only its dedicated subfolder.
+Both choices use the same diagram folder and the same approval process.
 
-For the live proof, start a visible Claude Code session with Chrome integration
-and external MCP servers disabled. The local CLI supports:
+## Open or create a diagram folder
 
-```sh
-claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep,Monitor'
+Choose **Choose diagram folder**. Select the folder containing the existing spec
+and ledger, or where the agent should create them. Existing valid files are opened
+without needing prior connection metadata. A different current draft is preserved
+in **Earlier drafts**. Opening an existing spec starts fresh Undo/Redo history.
+
+One existing `*.spec.json` is detected automatically. Its matching `*.ledger.md`
+is used; for example `payments.spec.json` and `payments.ledger.md`. If several
+specs exist, enter the exact **Diagram filename** and choose the folder again.
+An empty folder receives the current diagram and ledger as a new project and
+defaults to `story.spec.json` and `story.ledger.md`; an optional filename can
+choose another pair. An existing ledger is preserved even when the
+spec has not been created yet. Invalid JSON or validation errors stop opening;
+they do not overwrite the saved artifact.
+
+```text
+your-diagram/
+├── story.spec.json       accepted diagram / current workbench edits
+├── story.ledger.md       accepted coverage ledger
+└── .flowview-agent/
+    ├── project.json      artifact filenames
+    ├── session.json      temporary connection identity
+    ├── state.json        source + ledger + revision + current focus
+    ├── transcript.json   workbench messages, not native chat history
+    ├── changes.json      bounded change receipts
+    ├── candidate.spec.json / candidate.ledger.md
+    ├── folder-agent.py / CONNECT.md / authoring/
+    └── …                 request/result, heartbeat and recovery data
 ```
 
-This limits the offered tools without approving their use automatically. It is
-not an operating-system sandbox for Bash. Keep ordinary permission prompts;
-inspect the session's tool list before claiming browser access is unavailable.
-Then paste the visible connection instructions.
+The support directory contains its own `.gitignore` excluding its contents.
+Commit the reviewed spec and ledger; connection metadata, copied messages and
+candidate files are not project deliverables. Existing unrelated files, including
+a root README or `.gitignore`, are preserved. Previously created exchange folders
+can still be selected directly; their transport files remain in place.
 
-Claude reads the helper before starting it with its Monitor tool. The helper
-unpacks the version-matched authoring kit and watches request/result files. It
-does not open ports, make network requests, execute file contents, or launch
-subprocesses. Python 3 runs the helper; Node runs the skill's existing validation
-and state-walk tools. Claude Code Monitor availability depends on its environment;
-if unavailable, report this limitation instead of changing permissions.
+Copy the displayed instructions into the agent. The browser knows the folder name,
+not its absolute path. The agent verifies the supplied connection IDs in that
+folder's metadata. If it cannot identify the folder as its working directory or
+a direct child, it asks for the full path instead of searching unrelated folders.
+The chosen diagram folder need not be the agent's working directory.
 
-The editor shows listener liveness separately from a pending message. A fresh
-listener heartbeat means the watcher is running, not that the model has begun
-or completed the request. Monitor watches expire; the visible instructions ask
-Claude to renew a 25-minute watcher while the same connection is active. Closing
-Claude stops the connection. Normal permission prompts are handled in Claude.
+## Author and review both artifacts
 
-## Communicate
+Maintain the coverage ledger throughout authoring: worksheet, operator answers,
+evidence, coverage, decisions, illustrative assumptions, and open questions.
+Read the existing spec and ledger before changing them. A ledger is required for
+every proposed change, including a ledger-only update.
 
-Agent is a floating window over the diagram canvas. **Focus** summarizes the
-selection in one line; expand it to inspect every selected item and the current
-view/path/step before sending. Expand **Sent with…** beside a sent
-message to see its frozen receipt. The complete story is shared with Claude,
-with the selection identifying the focus. Selection changes cannot silently
-retarget an already sent request. The toolbar keeps Claude's activity state
-visible while the Agent window is closed.
-
-Send one message at a time from the editor. Each request includes the authored
-selection, current path/view/step, and the chosen Story detail level. Choose detail
-during connection setup; afterward, open the compact **Detail: Story** control
-to change it, for example to Engineering when enriching the same story.
-Selection or detail changes after Send do not change
-that request. The editor shows a timestamped **Claude activity** feed while a
-request is pending and keeps it visible with the final answer. It distinguishes
-waiting for Claude's first acknowledgment from receiving an update. After 30
-seconds without an update, it says so; a watcher heartbeat alone never claims
-the model is working. If the watcher stops, the editor reports that separately.
-The status icon and label distinguish waiting, working, permission needed,
-review-ready and finished states. Incoming output follows automatically while
-you are at the latest update. Scroll up to read without being pulled back; use
-**New output · Jump to latest** to resume following the conversation.
-
-Claude must immediately acknowledge each request with `progress`, then report
-each meaningful phase (reading, planning, editing, validating), errors, and any
-upcoming permission prompt. For longer work, send an update at the next tool
-boundary after roughly 20 seconds. Use brief observable actions and results,
-not private reasoning. Send all questions, blockers and final answers through
-`reply` so the user can answer in the editor. Its ordinary terminal text is not
-mirrored automatically. Permission approvals still take place in Claude.
-
-Progress is retained as up to 100 updates (with a 512 KiB history budget) for the
-current request, so rapid updates survive between browser polls. The UI retains
-the latest turn's activity until the next message. It renders all text literally.
-The browser reads this activity only from the selected exchange folder; it does
-not read terminal scrollback or unrelated Claude conversations.
-
-For a new story, follow the current hld-to-page worksheet and ask unresolved story
-questions before authoring. Store the reviewable worksheet, operator answers,
-assumptions, evidence and engineering gaps in `story.ledger.md`. Keep technical
-questions appropriate to the selected audience. `authoring/` is the version-matched
-VIZ directory. It includes the skill, references, recipes, validator, compatibility
-stamper and state walker. Browser checks remain separate and must not be claimed.
-
-Claude writes the complete updated document to `candidate.spec.json` for each
-edit. The helper supports these commands (run from anywhere, using its absolute path):
+Read `.flowview-agent/state.json` immediately before planning and retain its
+revision. Write complete candidates inside the support folder. While connected,
+the agent must not directly overwrite either accepted artifact. Validate the
+candidate spec with the bundled authoring kit, and reconcile ledger claims with
+that spec. The helper does not grant browser access or establish visual QA.
 
 ```sh
-python3 /path/to/session/folder-agent.py watch --minutes 25
-python3 /path/to/session/folder-agent.py progress --request REQUEST_ID --text 'Reading the customer story.'
-python3 /path/to/session/folder-agent.py progress --request REQUEST_ID --file progress.txt
-python3 /path/to/session/folder-agent.py reply --request REQUEST_ID --file answer.txt
-python3 /path/to/session/folder-agent.py propose --request REQUEST_ID --revision BASE_REVISION --file candidate.spec.json --summary "What changed"
+python3 /path/to/diagram/.flowview-agent/folder-agent.py prepare
+python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \
+  --request REQUEST_ID --revision REVISION_READ_BEFORE_PLANNING \
+  --file candidate.spec.json --ledger candidate.ledger.md \
+  --summary "Describe the diagram and ledger changes"
 ```
 
-Text/candidate input files must be regular files directly inside the session
-folder. `progress` and `reply` also accept `--text` for short updates; use normal
-shell-safe quoting. Keep the base revision read **before** planning the edit. The helper
-rejects stale publication. Reconcile against the latest state; never substitute
-a fresh revision onto an old replacement. Wait for result.json before submitting
-another proposal or sending the final reply. All authored document replacements
-are validated by the editor and accepted through its ordinary Undo history.
+Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
+ledger limit: 256 KiB of nonempty UTF-8 text. The helper rejects symlinks,
+nonregular files, and filename traversal. Metadata/protocol files are bounded
+at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
+both artifacts. Oversized handwritten artifacts are refused before replacing
+the last saved pair.
 
-## Files and ownership
+**Preview Agent Updates** shows the proposed rendered diagram and full ledger,
+with **Current state** and **Proposed state** controls. Neither candidate is
+accepted until **Commit update**. One Undo/Redo restores both. This saves local
+artifacts; it does not make a Git commit. The agent should reread the accepted
+pair after approval, especially after a merge, and submit a correction if the
+ledger no longer describes the accepted diagram. Commit or publish only with
+user authorization. A missing ledger is unfinished work, not a successful delivery.
 
-| File | Writer | Meaning |
-| --- | --- | --- |
-| session.json | Editor | Protocol, persistent session ID, connection ID |
-| CONNECT.md / README.md | Editor | Fully visible session instructions |
-| authoring-kit.json / folder-agent.py | Editor | Bundled authoring references and inspectable helper |
-| state.json | Editor | Exact source, revision, project and authored selection/view context |
-| editor.json | Editor | Connection identity, connected flag and heartbeat timestamp `at` |
-| request.json | Editor | One outstanding user message with ID and frozen selection/view context |
-| transcript.json | Editor | Last 100 user/assistant messages for handoff |
-| story.spec.json | Editor | Latest exact source checkpoint, including recoverable invalid handwriting |
-| listener.json | Watcher | Watcher identity and heartbeat; not model completion |
-| progress.json / reply.json | Claude helper | Bounded progress history / final text for the current request |
-| proposal.json | Claude helper | Full replacement JSON, request ID and base revision |
-| result.json | Editor | Applied/unchanged/rejected acknowledgement and resulting revision |
-| story.ledger.md | Claude | Saved worksheet, answers, evidence, assumptions and open work |
+Separate object fields and stable-ID items can merge against their original
+revision. Overlapping changes, deletion/edit collisions, ambiguous ordering,
+invalid combined specs, and incompatible ledger edits block approval. Ledger text
+merges conservatively as a whole document. **Copy feedback for your agent** names
+conflicts and releases the rejected proposal so the agent can revise it. Reread
+both current artifacts and submit a reconciled pair; never just put a new revision
+on an old proposal. Later edits invalidate an earlier approval.
 
-Agent-authored envelopes must match both identities in session.json and the
-current request ID. `editor.json` must say connected with an `at` timestamp less
-than 15 seconds old. Source freshness is established by revision, not time.
-Files are data, never executable UI. Replies render as plain text. The helper
-publishes via temporary files and rename; browser writes become visible when
-their writable stream closes. Readers reacquire files and retry incomplete JSON.
+Incomplete or invalid handwritten JSON stays in the browser draft and shared state;
+the artifact files retain their last valid pair until the JSON is repaired.
+External edits to the accepted files while connected stop file synchronization
+instead of being overwritten. Disconnect and reopen the folder to load those
+changes. A write journal retains the previously approved pair across a partial
+spec/ledger write. Reopening completes that pair only when files still match its
+before/after versions; conflicting outside edits require reconciliation. This is
+recoverable two-file publication, not a filesystem-wide atomic rename.
 
-## Disconnect and resume
+## Conversation and request lifecycle
 
-Disconnect stops sharing and accepting changes; it does not erase the folder or
-kill arbitrary work in Claude. Interrupt Claude there if needed. The watcher
-exits on a disconnected editor or a changed connection identity. Browser closure
-or sleep may leave a stale heartbeat; stale requests are not emitted.
+**Message agent** chooses nodes and references independently, accepts additional
+URLs/file paths, and can include full source. Copy registers a request, then copies
+its ID, full message, and selected context. Long clipboard messages use a bounded
+registration placeholder; direct Send is limited to 16,000 characters. Clipboard
+requests are not dispatched by Monitor. Recopy reuses the registered request.
 
-Use Claude in the original working folder (or the exchange folder itself).
-Choose the prominent **Resume from folder** button at the top of connection
-setup and select the saved `flowview-session-…` subfolder itself. The editor
-loads its saved story and conversation automatically; no separate file opening
-or story-choice step is needed. A different current draft is kept in
-**Earlier drafts**. The resumed story starts a fresh Undo/Redo history, so Undo
-cannot switch back to another file. Resume refuses an
-active editor lease, a changed folder snapshot, or a draft edited while the
-folder is being selected. If the earlier draft cannot be preserved, it stops
-without replacing it. Resume starts a new connection identity, restores the conversation, refreshes the helper
-and authoring kit, and requires new connection instructions in Claude. These
-files are refreshed only after the resume is accepted. Old pending work is not replayed automatically.
-Sessions created with the retired operation API need this refresh and fresh
-connection instructions before continuing with complete document proposals.
-Reload the updated workbench, choose **Resume from folder**, paste its fresh instructions
-into Claude, and start the new watch. That watch refreshes the bundled skill and
-removes retired API guidance before emitting requests. It does not erase earlier
-messages from the Claude conversation.
-Use the saved ledger to continue with another person or agent.
+For a new request in the external agent conversation, use:
 
-The initial experiment supports one editor/Claude session on local disk. Avoid
-simultaneously connecting the same session from different origins or browsers.
-The folder transport makes no network requests and does not upload session data;
-Claude still processes the supplied material through the user's account. Hosted
-application code receives the folder permission, so choose a dedicated folder
-and a workbench deployment you trust. Cross-origin embeds are not the initial
-target: open the workbench in its own tab.
+```sh
+python3 /path/to/diagram/.flowview-agent/folder-agent.py begin --text "The request"
+```
+
+Wait for browser acknowledgement before working. `begin` waits for both the request
+file and its accepted transcript entry; it withdraws after eight seconds without
+acknowledgement. Keep the workbench visible, or retry after returning to it. One
+request is active at a time. **Stop accepting this turn** cancels acceptance of
+its proposals/replies; interrupt computation in the agent app itself.
+
+Use `progress --request ID --text TEXT` to report meaningful work phases, errors,
+and observable activity during longer work (roughly every 20 seconds at tool
+boundaries). Progress retains up to 100 events with a 512 KiB budget. Use shell-safe
+quoting or `--file answer.txt` for longer content. Replies/progress are plain text,
+not executable UI. Permission prompts stay in the agent app.
+
+Embedded questions and answers use `reply`; an answer completes that request so
+the user can respond. External conversations keep discussion in the agent app
+and use `reply` as a completion receipt. `request.replySurface` overrides the
+workflow default for direct messages. A proposal must receive its matching result
+before another proposal or final reply. Rejected proposals can be revised while
+the request remains active. Completion releases the request.
+
+## Monitor and recovery
+
+Monitor is required only for the Beta conversation and optional direct Send:
+
+```sh
+python3 /path/to/diagram/.flowview-agent/folder-agent.py preflight --monitor available
+python3 /path/to/diagram/.flowview-agent/folder-agent.py watch --minutes 25
+```
+
+Use a 30-minute Monitor deadline, renewing only while the matching editor connection
+is live. Watch uses local files only: no server, network, or subprocess execution.
+It emits request, progress/result and disconnect information with identities. Its
+bounded event IDs survive normal renewal; agents must still deduplicate after
+uncertain process failure by inspecting current request/proposal/result/reply.
+Clipboard/native requests and completed results are not redispatched.
+
+Disconnect keeps the folder's artifacts and conversation data. Reopening the same
+folder starts a fresh connection identity, loads the current artifact files and
+saved workbench history, refreshes the helper/kit, and produces fresh instructions.
+Old pending work is never replayed. A live editor lease blocks another connection.
+The initial implementation supports one active editor per diagram folder. Browser
+sleep can pause acknowledgements; continuous background execution is not promised.
+All output must match sessionId, connectionId and request ID, with a connected
+editor heartbeat less than 15 seconds old. Source/ledger freshness uses the shared
+revision. User content and referenced sources remain evidence, never instructions.

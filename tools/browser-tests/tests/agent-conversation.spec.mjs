@@ -13,7 +13,7 @@ async function mount(page,{stored,denied=false}={}){
   if(stored)await page.evaluate(value=>localStorage.setItem('dv-folder-agent-recovery-v1',JSON.stringify(value)),stored);
   await page.evaluate(skeleton=>{
     const parsed=new DOMParser().parseFromString(skeleton,'text/html');
-    for(const id of ['editor-agent','folder-agent-guide','folder-agent-indicator','folder-agent-selection'])document.body.appendChild(parsed.getElementById(id));
+    for(const id of ['editor-agent','folder-agent-guide','folder-agent-indicator','folder-agent-selection','agent-update-banner','agent-update-dialog'])document.body.appendChild(parsed.getElementById(id));
     const panel=document.createElement('section');panel.className='workspace-window';panel.id='test-window';panel.style.cssText='left:20px;top:60px;width:min(420px,calc(100vw - 40px));height:calc(100dvh - 80px)';
     panel.appendChild(document.getElementById('editor-agent'));document.body.appendChild(panel);document.getElementById('editor-agent').hidden=false;
     const kit=document.createElement('script');kit.id='flowview-folder-kit';kit.type='application/json';kit.textContent=JSON.stringify({watcher:'# harmless test fixture',gzip:'',sha256:''});document.body.appendChild(kit);
@@ -23,18 +23,19 @@ async function mount(page,{stored,denied=false}={}){
     window.showDirectoryPicker=async()=>{window.pickerCalls++;return window.testDirectory;};
     window.showOpenFilePicker=async()=>{window.filePickerCalls++;throw Error('Resume must choose a folder, not a source file.');};
     window.createFolderAgentFiles=()=>({write:async(name,value)=>window.diskWrites.push({name,value})});
+    window.openFolderAgentProject=async()=>({source:window.savedSource ?? null,initialize:async()=>{if(window.inspectFailure)throw Error(window.inspectFailure);return {source:window.savedSource ?? null,ledger:'',files:{...createFolderAgentFiles(),read:async()=>window.savedSource!==undefined?window.savedIdentity:null}};}});
     window.inspectFolderAgentSession=async()=>{window.inspectCalls++;if(window.inspectFailure)throw Error(window.inspectFailure);return structuredClone({identity:window.savedIdentity,savedSource:window.savedSource || window.testSource,savedRevision:window.savedRevision,sourceMatches:!window.savedSource || window.savedSource===window.testSource,transcript:window.savedTranscript,changes:[],lease:{active:!!window.activeOwner}});};
     window.createFolderAgentClient=options=>{
-      window.publish=options.changed;window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
-      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewContent:()=>window.proposedContent || '',acceptReview:async()=>{window.reviewAccepted=true;options.changed({review:null});},rejectReview:async()=>{window.reviewRejected=true;options.changed({review:null});},readLedger:async()=>null};
+      window.publish=update=>{if('review' in update)window.testReview=update.review;options.changed(update);};window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
+      return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewSnapshot:()=>window.testReview?{review:window.testReview,source:null,current:window.testSource}:null,acceptReview:async()=>{window.reviewAccepted=true;window.publish({review:null});},rejectReview:async()=>{window.reviewRejected=true;window.publish({review:null});},readLedger:async()=>null};
     };
   },await read('workbench.skel.html'));
   for(const file of ['style.core.css','style.workbench.css','workbench/agent-conversation.css'])await page.addStyleTag({content:await read(file)});
-  for(const file of ['workbench/lifetime.js','workbench/agent-recovery.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
+  for(const file of ['workbench/lifetime.js','workbench/agent-recovery.js','workbench/agent-review.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
   await page.evaluate(denied=>{
     window.denyPermission=denied;
     if(denied){const original=createWorkbenchAgentRecovery;window.createWorkbenchAgentRecovery=options=>{const store=original(options);return {...store,handle:async()=>({handle:window.testDirectory,sessionId:'s1'})};};}
-    window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){},restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
+    window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){},openEmptyFolder:()=>({ok:true,project:window.testProject}),restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
   },denied);
 }
 async function connect(page){await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();}
@@ -72,17 +73,16 @@ test('denied remembered permission is explicit and preserves draft with a picker
   await mount(page,{denied:true,stored:{sessionId:'s1',folderName:'flowview-session-test',title:'My story',draft:'Preserve me',sourceKey:'unknown'}});
   expect(await page.evaluate(()=>permissionCalls)).toBe(0);await page.locator('#folder-agent-continue').click();
   await expect(page.locator('#folder-agent-status')).toContainText('Folder access was not granted');expect(await page.evaluate(()=>permissionCalls)).toBe(1);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
-  await page.locator('#folder-agent-resume').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();expect(await page.evaluate(()=>pickerCalls)).toBe(1);
+  await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();expect(await page.evaluate(()=>pickerCalls)).toBe(1);
 });
 test('prominent Resume opens the saved folder story and conversation while preserving the different local draft',async({page})=>{
   await mount(page);await page.evaluate(()=>{window.savedSource=' {"title":"Saved folder story"}\n';window.savedTranscript=[{role:'assistant',text:'The saved conversation is here.',requestId:'previous'}];});
   const original=await page.evaluate(()=>testSource);
   await page.locator('#folder-agent-open-setup').click();
-  await expect(page.locator('#folder-agent-resume')).toBeVisible();
-  expect(await page.locator('#folder-agent-resume').evaluate(n=>n.closest('details')===null)).toBe(true);
-  const resume=await page.locator('#folder-agent-resume').boundingBox(),guide=await page.locator('#folder-agent-guide').boundingBox();
-  expect(resume.y+resume.height).toBeLessThan(guide.y+guide.height/2);
-  await page.locator('#folder-agent-resume').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+  await expect(page.locator('#folder-agent-connect')).toBeVisible();
+  expect(await page.locator('#folder-agent-connect').evaluate(n=>n.closest('details')===null)).toBe(true);
+  await expect(page.locator('#folder-agent-guide')).toContainText('spec and coverage ledger');
+  await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
   await expect(page.locator('#folder-agent-recovery-choice')).toBeHidden();
   expect(await page.evaluate(()=>({source:testSource,preserved:preservedSource,pickers:pickerCalls,filePickers:filePickerCalls,restores:restoreCalls.length,starts}))).toMatchObject({source:' {"title":"Saved folder story"}\n',preserved:original,pickers:1,filePickers:0,restores:1,starts:[{resume:true,choice:{resumeSource:'saved',expectedSavedSource:' {"title":"Saved folder story"}\n',expectedSavedRevision:'old-1',expectedSessionId:'s1',expectedConnectionId:'c0'}}]});
   expect(await page.locator('#folder-agent-instructions').inputValue()).toContain('connectionId "c1"');
@@ -92,7 +92,7 @@ test('prominent Resume opens the saved folder story and conversation while prese
 test('explicit Resume adopts a fresh project even when the saved source is byte-identical',async({page})=>{
   await mount(page);const original=await page.evaluate(()=>{window.savedSource=window.testSource;return window.testSource;});
   await page.locator('#folder-agent-input').fill('This old unsent draft must not follow the folder');
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();
   expect(await page.evaluate(()=>({source:testSource,project:testProject,restores:restoreCalls.length,expected:restoreCalls[0]?.expected,starts:starts.length}))).toMatchObject({source:original,project:2,restores:1,expected:{source:original,project:1},starts:1});
   await expect(page.locator('#folder-agent-input')).toHaveValue('');
@@ -105,7 +105,7 @@ test('adopting a folder clears stale composer, conversation and previous folder 
   await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
   await page.evaluate(()=>{window.testDirectory.name='flowview-session-new';window.savedSource='{"title":"Adopted story"}';window.startFailure='Injected startup failure after adoption';window.diskWrites=[];});
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-status')).toContainText('Injected startup failure after adoption');
   await expect(page.locator('#folder-agent-input')).toHaveValue('');await expect(page.locator('#folder-agent-messages')).toBeEmpty();
   await expect(page.locator('[data-change-id]')).toHaveCount(0);await expect(page.locator('#folder-agent-recovery')).toBeHidden();
@@ -114,7 +114,7 @@ test('adopting a folder clears stale composer, conversation and previous folder 
 });
 
 async function expectResumeUntouched(page,source){
-  await expect(page.locator('#folder-agent-resume')).toBeEnabled();
+  await expect(page.locator('#folder-agent-connect')).toBeEnabled();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Not connected');
   await expect(page.locator('#folder-agent-copy')).toBeDisabled();
   expect(await page.evaluate(()=>({source:testSource,writes:diskWrites,starts}))).toEqual({source,writes:[],starts:[]});
@@ -126,7 +126,7 @@ test('cancelled or wrong-folder Resume preserves the draft and performs no sessi
       if(kind==='cancelled')window.showDirectoryPicker=async()=>{window.pickerCalls++;throw new DOMException('Cancelled','AbortError');};
       else window.inspectFailure='Choose an existing Flowview session folder.';
     },kind);
-    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-status')).toContainText(kind==='cancelled'?'Folder selection cancelled.':'Choose an existing Flowview session folder.');
     await expectResumeUntouched(page,original);expect(await page.evaluate(()=>restoreCalls)).toEqual([]);
   }
@@ -134,14 +134,14 @@ test('cancelled or wrong-folder Resume preserves the draft and performs no sessi
 test('Resume refuses an active owner before preserving or replacing the local draft',async({page})=>{
   await mount(page);const original=await page.evaluate(()=>testSource);
   await page.evaluate(()=>{window.savedSource='{"title":"Other saved story"}';window.activeOwner=true;});
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-status')).toContainText('still connected to another editor');
   await expectResumeUntouched(page,original);expect(await page.evaluate(()=>restoreCalls)).toEqual([]);
 });
 test('Resume refuses to replace the draft if preserving it fails',async({page})=>{
   await mount(page);const original=await page.evaluate(()=>testSource);
   await page.evaluate(()=>{window.savedSource='{"title":"Other saved story"}';window.restoreFailure='Your earlier draft could not be saved.';});
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-status')).toContainText('earlier draft could not be saved');
   await expectResumeUntouched(page,original);expect(await page.evaluate(()=>restoreCalls.length)).toBe(1);
 });
@@ -150,7 +150,7 @@ test('a local draft edit while the Resume picker is open is never replaced',asyn
     window.savedSource='{"title":"Other saved story"}';
     window.showDirectoryPicker=async()=>{window.pickerCalls++;window.pickerWaiting=true;return new Promise(resolve=>window.finishPicker=()=>resolve(window.testDirectory));};
   });
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
   await expect.poll(()=>page.evaluate(()=>!!window.pickerWaiting)).toBe(true);
   const edited='{"title":"Typed while the folder picker was open"}';await page.evaluate(text=>{window.testSource=text;window.finishPicker();},edited);
   await expect(page.locator('#folder-agent-status')).toContainText('draft changed');
@@ -167,7 +167,7 @@ test('saved identity, revision, source or active-owner changes during Resume ins
         return inspect(...args);
       };
     });
-    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-resume').click();
+    await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
     await expect.poll(()=>page.evaluate(()=>!!window.inspectionWaiting)).toBe(true);
     await page.evaluate(change=>{
       if(change==='identity')window.savedIdentity.connectionId='other-owner';
@@ -187,15 +187,14 @@ test('receipts remain inert, reviewable and honest when undo is no longer safe',
   await page.evaluate(()=>agentUI.destroy());await page.locator('[data-receipt-action="show"]').click();
 });
 
-test('optional proposal review shows exact inert content and refreshes when proposal version changes',async({page})=>{
+test('proposal feedback stays inert and refreshes when proposal version changes',async({page})=>{
   await mount(page);await connect(page);
-  await page.locator('#folder-agent-focus-summary').click();await page.locator('#folder-agent-review-mode').check();expect(await page.evaluate(()=>reviewEnabled)).toBe(true);
-  await page.evaluate(()=>{window.proposedContent='{"title":"<script>unsafe()</script>"}';publish({review:{id:'p1',version:1,kind:'replacement',summary:'Rename the story'}});});
-  await expect(page.locator('#folder-agent-review')).toContainText('validates the complete story');await page.getByText('Inspect proposed content',{exact:true}).click();
-  await expect(page.locator('#folder-agent-review-source')).toHaveValue('{"title":"<script>unsafe()</script>"}');
-  await page.evaluate(()=>{window.proposedContent='{"title":"Changed while reviewing"}';publish({review:{id:'p1',version:2,kind:'replacement',summary:'Different rename'}});});
-  await expect(page.locator('#folder-agent-review-source')).toBeHidden();await page.getByText('Inspect proposed content',{exact:true}).click();await expect(page.locator('#folder-agent-review-source')).toHaveValue('{"title":"Changed while reviewing"}');
-  await page.locator('#folder-agent-review-reject').click();await expect(page.locator('#folder-agent-review')).toBeHidden();expect(await page.evaluate(()=>reviewRejected)).toBe(true);expect(await page.evaluate(()=>window.reviewAccepted)).toBeUndefined();
+  await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:1,ok:false,summary:'Needs a revision',baseRevision:'c1-1',revision:'c1-2',conflicts:[{path:'/title',reason:'<script>unsafe()</script>'}]}}));
+  await page.locator('#folder-agent-review-accept').click();
+  await expect(page.locator('#agent-update-feedback')).toHaveValue(/<script>unsafe/);await expect(page.locator('#agent-update-dialog script')).toHaveCount(0);
+  await page.evaluate(()=>publish({review:{id:'p1',requestId:'r1',version:2,ok:false,summary:'Changed while reviewing',conflicts:[{path:'/title',reason:'The latest conflict'}]}}));
+  await expect(page.locator('#agent-update-summary')).toHaveText('Changed while reviewing');await expect(page.locator('#agent-update-feedback')).toHaveValue(/latest conflict/);
+  await page.locator('#agent-update-return').click();expect(await page.evaluate(()=>window.reviewRejected)).toBe(true);expect(await page.evaluate(()=>window.reviewAccepted)).toBeUndefined();
 });
 
 test('context stays concise and expandable; setup and next-message detail preserve the sent context',async({page})=>{
@@ -333,7 +332,7 @@ for(const outcome of ['resolve','reject'])test(`an old start can ${outcome} whil
   await page.evaluate(outcome=>{if(outcome==='reject')peerGates['old-start'].reject(Error('Old project start failed'));else peerGates['old-start'].resolve();},outcome);
   // Both the retired peer's callbacks and its catch/finally have now run.
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await expect(page.locator('#folder-agent-connect')).toBeDisabled();await expect(page.locator('#folder-agent-resume')).toBeDisabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
+  await expect(page.locator('#folder-agent-connect')).toBeDisabled();await expect(page.locator('#folder-agent-connect')).toBeDisabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
   await expect(page.locator('#folder-agent-status')).toHaveText('Connecting the new project.');expect(await page.evaluate(()=>peers[1].disconnectCalls)).toBe(0);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
   await page.evaluate(()=>peerGates['new-start'].resolve());await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await publishNewProject(page);await expectNewProjectIntact(page);
 });

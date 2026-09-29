@@ -22,7 +22,8 @@ function createBuilderPersistence(options){
       var storage=options.storage();
       storage.setItem(baselineKey,JSON.stringify({text:baseline,draftText:text}));
       storage.setItem(draftKey,JSON.stringify(Object.assign({text:text,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{})));
-    } catch(ex){ /* unavailable storage does not prevent editing */ }
+      if(options.status)options.status('saved');
+    } catch(ex){if(options.status)options.status('unavailable'); /* unavailable storage does not prevent editing */ }
   }
   function cancel(){
     generation++;
@@ -54,6 +55,7 @@ function createBuilderPersistence(options){
     schedule:function(saveCurrent){
       if(disposed)return;
       cancel();var token=generation;
+      if(options.status)options.status('pending');
       timer=options.schedule(function(){
         if(disposed || token!==generation)return;
         timer=null;saveCurrent();

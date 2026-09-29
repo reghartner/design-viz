@@ -139,6 +139,12 @@ body.sk-editorial .sk-daylight .pchip.cur{
 PanelRegistry.extend('state', {
   authoring: {
     template: { title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: { state: 'OFF' } },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state', help: 'Choose one of the declared states.' },
+    },
     setupFields: [
       ['states', 'csv'],
       ['colors', 'map'],

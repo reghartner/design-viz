@@ -1,6 +1,6 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'src/starters/audio-story.json'),'utf8');
 const spec=JSON.parse(source);
@@ -73,6 +73,7 @@ test('workbench Home audio controls edit only the selected step and Undo restore
  await expect(page.locator('#src')).toHaveValue(source);
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').first().click();
  await page.locator('#editor-tab-inspect').click();
+ await openInspectorGroup(page.locator('#guide .panel-step-group'));
  await page.locator('#guide summary').filter({hasText:/^Doorbell · audio$/}).click();
  const control=page.getByLabel('Doorbell audio output',{exact:true});
  await control.selectOption('recorded');

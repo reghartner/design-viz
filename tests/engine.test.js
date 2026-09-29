@@ -4817,3 +4817,11 @@ test('inline code padding keeps quoted backticks and all-space contents literal'
  assert.equal(C.inlineMarkup('`  `'),'<code>  </code>');
  assert.equal(C.inlineMarkup('`  x  `'),'<code> x </code>');
 });
+
+test('floating prose reuses its content without changing the standard page collapse choice',()=>{
+  const control=C.createProseController({hidden:true,style:{}},{setAttribute(){},addEventListener(){}},true,null,null,'Notes',{hidden:false,addEventListener(){}});
+  const element=control.proseEl;
+  control.setFloating(true);assert.strictEqual(control.proseEl,element);assert.equal(element.hidden,false);assert.equal(control.collapsed,true);assert.equal(control.toggleButton.hidden,true);assert.equal(control.teaserEl.hidden,true);
+  C.setProseCollapsed(control,false,false);C.setProseCollapsed(control,true,false);assert.equal(element.hidden,false);
+  control.setFloating(false);assert.equal(element.hidden,true);assert.equal(control.toggleButton.hidden,false);assert.equal(control.teaserEl.hidden,false);assert.equal(control.collapsed,true);
+});

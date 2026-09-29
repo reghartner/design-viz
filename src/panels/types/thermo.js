@@ -528,6 +528,17 @@ PanelRegistry.extend('thermo', {
       crit: 85,
       initial: { value: 21 },
     },
+    initialFields: true,
+    fieldMeta: {
+      min: { label: 'Minimum' },
+      max: { label: 'Maximum' },
+      warn: { label: 'High warning' },
+      crit: { label: 'High critical' },
+      lowWarn: { label: 'Low warning' },
+      lowCrit: { label: 'Low critical' },
+      value: { label: 'Temperature' },
+      label: { label: 'Reading label' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['min', 'num'],

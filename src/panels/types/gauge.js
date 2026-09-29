@@ -86,6 +86,12 @@ PanelRegistry.extend('gauge', {
 PanelRegistry.extend('gauge', {
   authoring: {
     template: { title: 'Draw', unit: 'mA', max: 400, initial: { value: 12 } },
+    initialFields: true,
+    fieldMeta: {
+      unit: { label: 'Unit' },
+      max: { label: 'Maximum' },
+      value: { label: 'Value', help: 'The number shown by the gauge.' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['max', 'num'],

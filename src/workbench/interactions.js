@@ -21,6 +21,7 @@ function createBuilderInteractions(opts){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
     if (selectedEl) selectedEl.classList.add('dv-sel');
+    if(opts.selectionChanged)opts.selectionChanged();
   }
 
   function updateTargetLabel(raw){
@@ -157,7 +158,7 @@ function createBuilderInteractions(opts){
       return [clipboardHomeTarget.target];
     return session.target ? [session.target] : [];
   }
-  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};}
+  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};if(opts.selectionChanged)opts.selectionChanged();}
   function clipboardDestination(targets){
     var selected=targets && targets[0] || clipboardSelection()[0];
     return {section:selected ? selected.section : session.insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
@@ -190,6 +191,7 @@ function createBuilderInteractions(opts){
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
     multiSel = [];
+    if(opts.selectionChanged)opts.selectionChanged();
   }
   function dropMultiUI(){
     if (guide) guide.hidden = true;

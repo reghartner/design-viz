@@ -113,6 +113,7 @@ PanelRegistry.extend('log', {
 /* log authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('log', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Event log',
       tags: { NET: '#38E1FF' },
@@ -123,6 +124,13 @@ PanelRegistry.extend('log', {
       ['initial', 'json'],
     ],
     patchFields: [['log', 'jsonArr']],
+    fieldMeta: {
+      tags: {label:'Event tags and colors',group:'Content'},
+      log: {label:'Events',initial:{help:'Events visible before the story begins.'},step:{help:'These events append to the log at this step. An empty list adds nothing; it does not clear earlier events.'}},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='log')return createPanelLogComposer(context,options);
+    }};},
     picker: {
       order: 7,
       name: 'Event log',

@@ -77,22 +77,22 @@ function harness(options={}){
 test('brief renders script-looking content as inert text and functions without a connected agent',async()=>{
   const h=harness({readLedger:async()=>({text:ledger+'\n## Assumptions\n<img src=x onerror=alert(1)>'})});await settle();
   assert.match(h.text(),/<img src=x/);assert.match(h.text(),/correspondence/);
-  await h.button('Prepare engineering handoff').click();assert.equal(h.downloads.length,1);
+  await h.button('Download review package').click();assert.equal(h.downloads.length,1);
   const archive=Buffer.from(await h.urls.get(h.downloads[0].url).arrayBuffer());assert.ok(archive.includes(Buffer.from('story.spec.json')));
   h.api.destroy();assert.equal(h.revoked.length,1);assert.equal(h.timers.size,0);assert.equal(h.mount.children.length,0);
-  const noAgent=harness({readLedger:async()=>null});await settle();assert.match(noAgent.text(),/No story ledger/);await noAgent.button('Prepare engineering handoff').click();assert.equal(noAgent.downloads.length,1);noAgent.api.destroy();
+  const noAgent=harness({readLedger:async()=>null});await settle();assert.match(noAgent.text(),/No story ledger/);await noAgent.button('Download review package').click();assert.equal(noAgent.downloads.length,1);noAgent.api.destroy();
 });
 test('late ledger reads cannot cross a project replacement or a destroyed brief',async()=>{
   const old=deferred(),h=harness({readLedger:()=>old.promise});h.setSnapshot({source:'{"title":"New project"}',project:2});h.api.refresh();h.api.destroy();old.resolve({text:'## A. Story\nSTALE SECRET'});await settle();
   assert.ok(!h.text().includes('STALE SECRET'));assert.equal(h.mount.children.length,0);assert.equal(h.downloads.length,0);
 });
 test('handoff aborts if the story changes while rendering and a second click cannot duplicate the pending download',async()=>{
-  const rendering=deferred(),h=harness({renderHtml:()=>rendering.promise});await settle();const button=h.button('Prepare engineering handoff'),pending=button.click();await settle();assert.equal(button.disabled,true);
+  const rendering=deferred(),h=harness({renderHtml:()=>rendering.promise});await settle();const button=h.button('Download review package'),pending=button.click();await settle();assert.equal(button.disabled,true);
   await h.api.refresh();assert.equal(button.disabled,true);await button.click();h.setSnapshot({source:'{"title":"Changed"}'});rendering.resolve('<html>old</html>');await pending;
   assert.equal(h.downloads.length,0);assert.match(h.text(),/story changed while preparing/);h.api.destroy();
 });
 test('destroying the brief during HTML generation prevents stale downloads',async()=>{
-  const rendering=deferred(),h=harness({renderHtml:()=>rendering.promise});await settle();const pending=h.button('Prepare engineering handoff').click();await settle();h.api.destroy();rendering.resolve('<html>old</html>');await pending;assert.equal(h.downloads.length,0);
+  const rendering=deferred(),h=harness({renderHtml:()=>rendering.promise});await settle();const pending=h.button('Download review package').click();await settle();h.api.destroy();rendering.resolve('<html>old</html>');await pending;assert.equal(h.downloads.length,0);
 });
 test('ledger tables are readable inert cells, including escaped pipes, and scripts never become elements',async()=>{
   const h=harness({readLedger:async()=>({text:'## Decisions I made\n| decision | reason |\n|---|---|\n| Keep A \\| B | <img src=x onerror=alert(1)><br>Needs review |\n'})});await settle();

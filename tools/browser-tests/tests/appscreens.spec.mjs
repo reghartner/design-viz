@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste,pagePreview} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/app-screens/app-screens.spec.json'),'utf8');
 const raw=JSON.parse(source), diagram=value=>value.page.sections[0].diagram;
@@ -11,7 +11,11 @@ const panel=root=>root.locator('.pt-appscreens');
 const chip=(root,id)=>root.locator('.schip[data-step-source="'+id+'"]').first();
 async function screen(root,id){await expect(panel(root).locator('.appscreen-current')).toHaveAttribute('data-screen-id',id);await expect.poll(()=>panel(root).locator('.appscreen-current').evaluate(el=>el.complete && el.naturalWidth>0)).toBe(true);}
 async function inspect(page){await pagePreview(page);await panel(page.locator('#docview')).locator('.ptitle').click();await page.locator('#editor-tab-inspect').click();}
-async function inspectStep(page,index){await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="'+index+'"]').click();await page.locator('#editor-tab-inspect').click();}
+async function inspectStep(page,index){
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="'+index+'"]').click();await page.locator('#editor-tab-inspect').click();
+  const group=page.locator('#guide .panel-step-group[data-panel-id="product"]');
+  if(await group.getAttribute('open')===null)await group.locator(':scope > summary').click();
+}
 async function publish(server,name,content=source){
   await writeFile(path.join(server.root,name+'.json'),content);
   execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,name+'.json'),path.join(repo,'template/flowview.html'),path.join(server.root,name+'.html')]);
@@ -51,10 +55,12 @@ test('upload, replace, starting screen and per-step choices use the real inspect
   await guide.locator('.appscreen-card summary').filter({hasText:/^home$/}).click();
   const name=guide.getByLabel('Name for home',{exact:true});await name.fill('Home screen');await name.press('Tab');
   await expect(panel(root).locator('figcaption strong')).toHaveText('Home screen');
-  await guide.getByLabel('Starting screen',{exact:true}).selectOption('connecting');await screen(root,'connecting');
+  const initial=guide.locator('.initialedit[data-panel-id="product"]');
+  if(await initial.getAttribute('open')===null)await initial.locator(':scope > summary').click();
+  await initial.getByLabel('screen',{exact:true}).selectOption('connecting');await screen(root,'connecting');
   const starting=await src.inputValue();await page.locator('#undo-builder').click();await screen(root,'home');
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(starting);
-  await inspectStep(page,1);await guide.getByLabel('App screen · Product experience',{exact:true}).selectOption('id:home');await screen(root,'home');
+  await inspectStep(page,1);await openInspectorGroup(guide.locator('.panel-step-group'));await guide.getByLabel('App screen · Product experience',{exact:true}).selectOption('id:home');await screen(root,'home');
   const changed=await src.inputValue();expect(diagram(JSON.parse(changed)).steps[1].panels.product).toEqual({screen:'home'});
   await page.locator('#undo-builder').click();await expect(src).toHaveValue(starting);
   await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);await inspect(page);
@@ -95,7 +101,7 @@ test('invalid and retired file reads preserve all existing images and source',as
     };
   });
   await input.setInputFiles(upload('live'));await page.waitForFunction(()=>!!window.releaseUpload);
-  await inspectStep(page,1);await page.evaluate(()=>releaseUpload());
+  await inspectStep(page,1);await openInspectorGroup(page.locator('#guide .panel-step-group'));await page.evaluate(()=>releaseUpload());
   await expect(src).toHaveValue(source);await expect(page.getByLabel('App screen · Product experience',{exact:true})).toBeVisible();
 });
 

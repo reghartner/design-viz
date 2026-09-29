@@ -231,6 +231,13 @@ PanelRegistry.extend('orbit', {
       states: ['IDLE', 'ACTIVE', 'DONE'],
       initial: { state: 'IDLE' },
     },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Lifecycle states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state' },
+      via: { label: 'Transition label', help: 'Describe how the lifecycle reached this state.' },
+    },
     setupFields: [
       ['states', 'csv'],
       ['colors', 'map'],

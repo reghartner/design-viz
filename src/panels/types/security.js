@@ -213,11 +213,17 @@
         {id:'hall',label:'Hall motion',kind:'motion',zone:'Hallway'}],
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
+      initialFields:true,
+      fieldMeta:{
+        site:{label:'Site'},scene:{label:'Camera scene'},videoLabel:{label:'Video label'},sensors:{label:'Sensors'},
+        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},
+        status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
+      },
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
       patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
-          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
+          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']],{label:sensor.label||sensor.id,group:'Sensors'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {

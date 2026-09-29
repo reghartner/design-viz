@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,openInspectorGroup} from '../helpers/test.mjs';
 test('protocols and lanes can be chosen, created and renamed without JSON',async({page,server})=>{
  const original=JSON.stringify({view:'step',nodes:{a:{title:'Service'},b:{title:'Device'}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Deliver'}],steps:[{id:'go',text:'Deliver',nodes:['a','b']}]},null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,original);
@@ -22,12 +22,12 @@ test('protocols and lanes can be chosen, created and renamed without JSON',async
  expect((await source()).page.protocols['event-stream']).toEqual({label:'Domain events',color:'#abcdef'});
  await expect(guide.getByLabel('Display name',{exact:true})).toBeVisible();
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
- await guide.getByText('New lane…',{exact:true}).click();await guide.getByLabel('Name',{exact:true}).fill('Device cloud');
+ await openInspectorGroup(guide.locator('details').filter({has:page.locator(':scope > summary').filter({hasText:'New lane…'})}));await guide.getByLabel('Name',{exact:true}).fill('Device cloud');
  await guide.getByRole('button',{name:'Create lane',exact:true}).click();
  await expect(guide.getByRole('combobox',{name:'Story lane',exact:true})).toHaveValue('device-cloud');
  expect((await source()).page.sections[0].diagram.steps[0].lane).toBe('device-cloud');
  const saved=await page.locator('#src').inputValue();
- await guide.getByText('New lane…',{exact:true}).click();await guide.getByLabel('Name',{exact:true}).fill('Device cloud');
+ await openInspectorGroup(guide.locator('details').filter({has:page.locator(':scope > summary').filter({hasText:'New lane…'})}));await guide.getByLabel('Name',{exact:true}).fill('Device cloud');
  await guide.getByRole('button',{name:'Create lane',exact:true}).click();
  await expect(guide.locator('.ierr')).toContainText('already exists');await expect(page.locator('#src')).toHaveValue(saved);
 });

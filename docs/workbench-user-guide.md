@@ -1,5 +1,8 @@
 # The human guide
 
+The workspace chapter explains top inspector actions, collapsed muted section
+headers, same-selection expansion retention, and group-scoped Apply controls.
+
 Open **User guide** in the workbench header or workspace toolbar. It is available
 from welcome, during editing, and in Focus workspace. The guide ships inside
 `workbench/flowspec.html`, including downloaded/offline copies and company nginx

@@ -159,6 +159,7 @@ PanelRegistry.extend('budget', {
 /* budget authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('budget', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Resource budgets',
       metrics: [{ id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240 }],
@@ -188,6 +189,17 @@ PanelRegistry.extend('budget', {
       ['values', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      metrics: {label:'Metrics and limits',group:'Content'},
+      values: {label:'Metric values',help:'A complete values snapshot. An omitted metric or No data shows no measurement. Use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='values')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,unit:item.unit,scalar:true};
+      }));
+    }};},
     picker: {
       order: 2,
       name: 'Resource budget',

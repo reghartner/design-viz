@@ -142,6 +142,7 @@ PanelRegistry.extend('table', {
 /* table authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('table', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Data state',
       columns: [
@@ -160,6 +161,14 @@ PanelRegistry.extend('table', {
       ['rows', 'jsonArr'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      columns: {label:'Columns',group:'Content'},
+      rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='rows')return createPanelTableComposer(context,options);
+    }};},
     picker: {
       order: 0,
       name: 'Data table',

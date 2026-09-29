@@ -97,6 +97,11 @@ For custom controls, `authoring.editor(context)` returns hooks such as
 `setupRows`, `setupField`, `stepControl`, `clickTarget` and `decoratePreview`.
 It is created once per editor/type. The context supplies live source/selection
 reads, shared controls, `commit` for a field and `transact` for a mutation planner.
+`controls.groupActions(label)` creates an accessible action row for a nested
+composer. Append it after the group's summary and short consequence note,
+before its fields. Reserve primary styling for that group's explicit Apply;
+auto-committing fields need no Apply button. Row-local actions remain on their
+item, and list Add controls appear before the list.
 Use those commands so a gesture is one Undo/Redo operation and selection is
 restored consistently. Do not implement another history stack or JSON writer.
 Home uses shared row controls with decorations for its draggable elements.
@@ -210,6 +215,56 @@ writes `panel.initial`, separately from step patches. `editor.patchField` receiv
 an optional third argument `{initial: true}` for context-specific labels. The
 shared inspector owns transactions, unknown-field preservation, and Undo/Redo;
 panels should not duplicate that machinery.
+
+Field tuples stay backward compatible as `[key, kind, options?]`. A fourth
+metadata object, or `authoring.fieldMeta[key]`, can declare `label`, `help`,
+`group`, `advanced`, `hidden`, `unsetLabel`, and `nullLabel`; `setup`, `initial`,
+and `step` objects override those values in one context. Dynamic fields should
+use tuple metadata so labels can come from the declaration, for example
+`[device.id, 'objf', fields, {label: device.label, group: 'Devices'}]`.
+`assignment: false` leaves assignment UX to a registered custom field adapter.
+
+Collections can keep their schema and transformation in the panel module with
+`editor.patchControl(field, options)`. Return a DOM control for the matching
+field and call `options.commit(value)` with the authored value (or `undefined`
+to omit it); the shared inspector still supplies assignment modes, sparse merge,
+effective-value help, history and refresh. `options.panel` is the declaration
+even when a step is selected. `options.effective` is the complete folded field
+record (`value` and `origin`) when one is available, so snapshot composers can
+show their inherited baseline without treating its nested keys as independent
+assignments. The editor context's rows control
+accepts `{commitValue, collect, raw:false}` for typed collection rows.
+`collect(items)` may return `{value}` or `{error}` when the UI row shape differs
+from the stored value. Unmatched fields return nothing and use the standard
+control. Keep a panel's operation semantics in that panel module.
+
+The editor context includes its owned `document` for constructing controls.
+Rows accept `shape.wide:true` for labeled cards even with four or fewer fields,
+and column `label` for captions and accessible names. Projected rows should
+retain source identity through reorder or rename before reconstructing stored
+objects; preserve unknown row/cell keys and distinguish strings, numbers,
+booleans and null. `src/workbench/panel-collections.js` shares keyed snapshot,
+typed table-cell and append-event composers used by Checks, Budget, Table and
+Log. These helpers run only in the workbench; the panel module keeps its runtime
+state semantics.
+
+Panel-owned composers also need to match the runtime fold rather than treating
+every array as the same kind of state. In-flight has no starting snapshot:
+`start`, `end` and `mark` are operations on one selected step. Timeline `events`
+and `miss` append to earlier entries. X-ray `layers` and Buffer `cells` are full
+snapshots, while Buffer `mark` appends ordered range paints until a later cells
+snapshot resets the base. App screens retains its bespoke upload and step
+controls, and uses the shared assignment editor for its starting screen, date
+and time. Unsupported or ambiguous imported shapes stay editable in
+**Advanced JSON** instead of being silently normalized.
+
+The shared state editor uses a separate assignment selector. Omitted starting
+fields use the panel default; omitted step fields inherit; `null` is offered only
+when `nullLabel` declares a meaningful reset (or an imported value is already
+null); and **Set value** can author a real empty string. Assignment modes are UI
+state only and never serialize sentinels. Typed edits preserve unknown siblings,
+and removing the last starting field removes `initial` rather than writing an
+empty object. **Advanced JSON** remains available for complete object editing.
 
 `authoring.notifications: true` opts a panel into the shared notification
 composer for `notify` and its clear-before-add control. It reuses the inspector

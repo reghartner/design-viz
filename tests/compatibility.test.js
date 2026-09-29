@@ -158,3 +158,14 @@ test('Explore named views advertise their capability without requiring it for St
   assert.deepEqual(plain(result.missingFeatures),['layout.explore']);
   assert.match(result.messages.join(' '),/Explore view presentation/);
 });
+
+test('floating prose declares a capability for content or saved per-view defaults, including tab sections',()=>{
+  const raw=spec(),section=raw.page.blocks[0].tabs[0].sections[0],view=section.diagram.layouts[0];
+  section.text=['Explanation'];assert.ok(!C.detect(raw).includes('layout.explore-prose'));
+  view.presentation='explore';assert.ok(C.detect(raw).includes('layout.explore-prose'));
+  const available={...C.features};delete available['layout.explore-prose'];
+  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-prose'));
+  delete section.text;assert.ok(!C.detect(raw).includes('layout.explore-prose'));
+  section.bullets=['A point'];assert.ok(C.detect(raw).includes('layout.explore-prose'));delete section.bullets;
+  view.exploreLayout={prose:{hidden:true}};assert.ok(C.detect(raw).includes('layout.explore-prose'));
+});

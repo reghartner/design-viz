@@ -7381,6 +7381,11 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .explore-window-body{flex:none;min-height:0;width:calc(100% / var(--explore-overlay-scale,1));height:calc((100% - 32px) / var(--explore-overlay-scale,1));transform:scale(var(--explore-overlay-scale,1));transform-origin:top left;overflow:auto;overscroll-behavior:contain;container-type:inline-size;}
 body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-box;width:100%;max-width:none;min-width:0;min-height:100%;margin:0;border:0;border-radius:0;padding:8px;box-shadow:none;}
 .explore-window-body>.pwidget>.ptitle{display:none;}
+.explore-prose-window .sec-prose{box-sizing:border-box;width:100%;min-width:0;padding:12px 14px 24px;color:var(--dtext);font:14px/1.55 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
+.explore-prose-window .sec-text{max-width:none;margin:0 0 12px;}
+.explore-prose-window .sec-prose>ul{margin:0;padding-left:20px;}
+.explore-prose-window .sec-prose li{margin:6px 0;}
+
 .explore-window-body .pbody{min-width:0;}
 .explore-window-body svg{max-width:100%;}
 .explore-window-resize{position:absolute;right:0;bottom:0;z-index:2;width:23px;height:23px;border:0;border-radius:6px 0 0;background:var(--explore-bg);color:var(--dtext);font-size:14px;cursor:nwse-resize;touch-action:none;}
@@ -7674,7 +7679,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -7769,9 +7774,16 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;
+        if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.prose!=null;}))used['layout.explore-prose']=true;
       }
     }
-    function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
+    function contracts(s){
+      if(!object(s))return;
+      if(Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null)used['content.contracts']=true;
+      var prose=typeof s.text==='string'?s.text.length>0:Array.isArray(s.text) && s.text.some(function(text){return typeof text==='string' && text.length>0;});
+      if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && Array.isArray(s.diagram.layouts) &&
+        s.diagram.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore-prose']=true;
+    }
     if(!object(page))return [];
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
@@ -9865,6 +9877,18 @@ function sectionExploreLayout(d,value,warnings,path){
       if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
     },[]);
   }
+  if(value.prose!==undefined){
+    var prose=value.prose,at=path+'.prose';
+    if(!object(prose))warn(at,'expected an object with optional x/y/w/h, stacked and hidden');
+    else{
+      var geometry=['x','y','w','h'].some(function(k){return prose[k]!==undefined;}),notes=geometry?(rect(prose,at) || {}):{};
+      ['stacked','hidden'].forEach(function(k){
+        if(prose[k]!==undefined && typeof prose[k]!=='boolean')warn(at+'.'+k,'expected a boolean');
+        else if(notes && prose[k]!==undefined)notes[k]=prose[k];
+      });
+      if(notes)out.prose=notes;
+    }
+  }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
     var c=value.camera;
@@ -11891,6 +11915,27 @@ var FlowAudio = (function () {
       return context.controls.row(label, input);
     }
     function choices(panel) { return screens(panel).map(function (item) { return [item.id, text(item.label) || item.id]; }); }
+    function stateScreen(options) {
+      var input = document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', 'screen');
+      var empty = document.createElement('option');empty.value = '';empty.textContent = 'Choose a screen…';input.appendChild(empty);
+      var known = false;
+      choices(options.panel).forEach(function (pair) {
+        var option = document.createElement('option');option.value = pair[0];option.textContent = pair[1];
+        if (pair[0] === options.value) known = true;input.appendChild(option);
+      });
+      if (typeof options.value === 'string' && options.value && !known) {
+        var unknown = document.createElement('option');unknown.value = options.value;unknown.textContent = options.value + ' (unknown)';input.appendChild(unknown);
+      }
+      input.value = typeof options.value === 'string' ? options.value : '';
+      context.listen(input, 'change', function () {
+        if (!input.value) {
+          input.value = typeof options.value === 'string' ? options.value : '';
+          context.error('Choose a screen, or change the assignment to Show no screen or Use panel default.');return;
+        }
+        options.commit(input.value);
+      });
+      return input;
+    }
     function editPanel(update) {
       if (context.editingBlocked()) { context.error('Finish ADD TO STEP before editing app screens.'); return false; }
       return context.transact(function (raw) {
@@ -11995,30 +12040,12 @@ var FlowAudio = (function () {
       return input;
     }
     return {
+      patchControl: function (field, options) { return field[0] === 'screen' ? stateScreen(options) : null; },
       setupField: function (field, panel) {
         if (field[0] === 'frame' || field[0] === 'transition') {
           var frame = field[0] === 'frame';
           return select(frame ? 'Frame' : 'Transition', frame ? [['phone','Phone'],['none','None']] : [['cut','Cut'],['crossfade','Crossfade']],
             panel[field[0]] || (frame ? 'phone' : 'cut'), function (value) { context.commit(field[0], JSON.stringify(value)); });
-        }
-        if (field[0] === 'initial') {
-          var initialBox = document.createElement('div');
-          initialBox.appendChild(select('Starting screen', [['','No screen']].concat(choices(panel)), panel.initial && panel.initial.screen || '', function (value) {
-            editPanel(function (raw, live, path) {
-              return planSetField(context.source(), raw, path, 'initial', JSON.stringify(Object.assign({}, live.initial, {screen:value || null})));
-            });
-          }));
-          [['clock','Starting time','9:41'],['date','Starting date','Thu, Sep 24']].forEach(function (field) {
-            var input = context.controls.text(panel.initial && panel.initial[field[0]], function (value) {
-              return editPanel(function (raw, live, path) {
-                var initial = Object.assign({}, live.initial);
-                if (value == null) delete initial[field[0]]; else initial[field[0]] = value;
-                return planSetField(context.source(), raw, path, 'initial', JSON.stringify(initial));
-              });
-            }, {placeholder:'Optional · ' + field[2]});
-            input.setAttribute('aria-label', field[1]); initialBox.appendChild(context.controls.row(field[1], input));
-          });
-          return initialBox;
         }
         if (field[0] !== 'screens') return;
         var box = document.createElement('div'); box.className = 'appscreen-editor';
@@ -12031,6 +12058,9 @@ var FlowAudio = (function () {
           card.open = !!expanded[foldKey];
           context.listen(card, 'toggle', function () { expanded[foldKey] = card.open; });
           var summary = document.createElement('summary'); summary.textContent = text(item.label) || item.id; card.appendChild(summary);
+          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }, 'bdanger'));
+          var note = document.createElement('p'); note.className = 'fnote';
+          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           if (embeddedImageSource(item.src)) {
             var preview = document.createElement('img'); preview.src = item.src; preview.alt = text(item.alt) || item.id; preview.className = 'appscreen-thumbnail'; card.appendChild(preview);
           }
@@ -12043,9 +12073,6 @@ var FlowAudio = (function () {
             card.appendChild(context.controls.row(pair[1], input));
           });
           card.appendChild(context.controls.row('Replace image', upload(panel, item.id)));
-          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }));
-          var note = document.createElement('p'); note.className = 'fnote';
-          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           box.appendChild(card);
         });
         return context.controls.block('Screens', box);
@@ -12069,14 +12096,18 @@ var FlowAudio = (function () {
           panelOwn(patch, 'screen') ? patch.screen === null ? '@blank' : 'id:' + patch.screen : '', function (value) {
             return update('screen', !value ? undefined : value === '@blank' ? null : value.slice(3));
           }));
+        var dateActions=document.createElement('div');dateActions.className='iacts';dateActions.setAttribute('role','group');dateActions.setAttribute('aria-label','Date and time actions');
+        dateActions.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
+        dateActions.appendChild(context.controls.action('Hide time', function () { return update('clock', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit time', function () { return update('clock', undefined); }));
+        box.appendChild(dateActions);
         var date = context.controls.text(patch.date, function (value) { return update('date', value == null ? undefined : value); },
           {placeholder:patch.date === '' ? 'Hidden at this step' : 'Inherit previous date'});
         date.setAttribute('aria-label', 'Date · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Date', date));
         var clock = context.controls.text(patch.clock, function (value) { return update('clock', value == null ? undefined : value); },
           {placeholder:patch.clock === '' ? 'Hidden at this step' : 'Inherit previous time'});
         clock.setAttribute('aria-label', 'Time · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Time', clock));
-        box.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
-        box.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
         var help = document.createElement('p'); help.className = 'fnote'; help.textContent = 'The selected screen carries forward until another step changes it. Add or replace images by selecting the App screens panel.'; box.appendChild(help);
         return box;
       }
@@ -12105,10 +12136,18 @@ var FlowAudio = (function () {
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, once); }); },
     storyTime:function (panel, states, steps, story) { return story ? storyTimeClockOverlay(panel, states, steps, story) : states; },
     authoring:{
+      initialFields:true,
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],
       patchFields:[['screen','text'],['date','text'],['clock','text']],
       expandPatchFields:function (panel) { return [['screen','enum',screens(panel).map(function (item) { return item.id; })],['date','text'],['clock','text']]; },
+      fieldMeta:{
+        screens:{label:'Screens',help:'Upload each exported screen once, then select it in Starting state or a step.',group:'Content'},
+        frame:{label:'Device frame',group:'Presentation'},transition:{label:'Screen transition',group:'Presentation'},
+        screen:{label:'Displayed screen',nullLabel:'Show no screen',initial:{label:'Starting screen',unsetLabel:'Use panel default'},step:{label:'App screen'}},
+        date:{label:'Date',help:'Use an empty string to hide the date while preserving a deliberate assignment.',initial:{label:'Starting date'}},
+        clock:{label:'Time',help:'Use an empty string to hide the time while preserving a deliberate assignment.',initial:{label:'Starting time'}}
+      },
       origin:function (panel, key, snapshot, context) { return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, false); }); },
       picker:{order:26, name:'App screens', category:'Devices & interfaces', tagline:'Your product screens, in step',
         description:'Upload exported Figma screens or screenshots, then change the displayed screen alongside the flow. Choose a phone frame and cut or crossfade transitions.'},
@@ -12594,6 +12633,20 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    initialFields: true,
+    fieldMeta: {
+      low: { label: 'Low threshold' },
+      crit: { label: 'Critical threshold' },
+      drainPerHour: { label: 'Drain % per hour' },
+      chargePerHour: { label: 'Charge % per hour' },
+      charge: { label: 'Charge %', group: 'Reading' },
+      drain: { label: 'Extra drain %', group: 'Reading', initial: { hidden: true } },
+      trend: { label: 'Trend', group: 'Power' },
+      source: { label: 'Power source', group: 'Power' },
+      cold: { label: 'Cold conditions', group: 'Context' },
+      note: { label: 'Note', group: 'Context' },
+      label: { label: 'Reading label', group: 'Context' },
+    },
     /* New panels start with the diagram's authored constants. Built-in
        placeholders are not copied, so the inspector keeps showing them as
        placeholders instead of passing them off as this device's rates. */
@@ -12847,6 +12900,7 @@ PanelRegistry.extend('budget', {
 /* budget authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('budget', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Resource budgets',
       metrics: [{ id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240 }],
@@ -12876,6 +12930,17 @@ PanelRegistry.extend('budget', {
       ['values', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      metrics: {label:'Metrics and limits',group:'Content'},
+      values: {label:'Metric values',help:'A complete values snapshot. An omitted metric or No data shows no measurement. Use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='values')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,unit:item.unit,scalar:true};
+      }));
+    }};},
     picker: {
       order: 2,
       name: 'Resource budget',
@@ -13228,8 +13293,60 @@ body.sk-editorial .bfcell{border-radius:1px;}`,
 });
 
 /* buffer authoring contract; merged into this panel definition by the bundle. */
+function bufferStateEditor(context) {
+  function cells(options) {
+    if (options.value !== undefined && !Array.isArray(options.value)) return null;
+    var baseline = options.value !== undefined ? options.value :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var count = bufferSegCount(options.panel), doc = context.document;
+    var wrap = doc.createElement('div');wrap.className = 'buffer-cell-editor';
+    for (var index = 0; index < count; index++) (function (cellIndex) {
+      var current = BUFFER_STATES.indexOf(baseline[cellIndex]) >= 0 ? baseline[cellIndex] :
+        baseline[cellIndex] === undefined ? 'empty' : baseline[cellIndex];
+      var input = context.controls.select(BUFFER_STATES, current, function (state) {
+        var next = baseline.slice();
+        while (next.length < count) next.push('empty');
+        next[cellIndex] = state;
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', 'Cell ' + (cellIndex + 1) + ' state');
+      var label = doc.createElement('label');label.className = 'buffer-cell-control';
+      var number = doc.createElement('span');number.textContent = String(cellIndex + 1);label.appendChild(number);label.appendChild(input);wrap.appendChild(label);
+    })(index);
+    return wrap;
+  }
+  function paints(options) {
+    var current = options.value;
+    if (current !== undefined && (!Array.isArray(current) || current.some(function (op) {
+      return !Array.isArray(op) || op.length < 3 || typeof op[0] !== 'number' || typeof op[1] !== 'number';
+    }))) return null;
+    var rows = (current || []).map(function (op, index) {
+      return { from: op[0], to: op[1], state: op[2], _sourceIndex: index };
+    });
+    var count = bufferSegCount(options.panel);
+    return context.controls.rows('Paint ranges', rows, { cols: [
+      { k: 'from', label: 'First cell', kind: 'num', req: true },
+      { k: 'to', label: 'Last cell', kind: 'num', req: true },
+      { k: 'state', label: 'State', kind: 'enum', options: BUFFER_STATES, req: true }
+    ]}, { raw: false, commitValue: options.commit, collect: function (items) {
+      var operations = [];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i], from = item.from, to = item.to;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to >= count)
+          return { error: 'Use whole-number cell indexes from 0 to ' + (count - 1) + ', with First cell no greater than Last cell.' };
+        var base = current && current[item._sourceIndex], operation = Array.isArray(base) ? base.slice() : [];
+        operation[0] = from;operation[1] = to;operation[2] = item.state;operations.push(operation);
+      }
+      return { value: operations.length ? operations : undefined };
+    }});
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'cells' ? cells(options) : field[0] === 'mark' ? paints(options) : null;
+  }};
+}
 PanelRegistry.extend('buffer', {
   authoring: {
+    initialFields: true,
     template: { title: 'Buffer', initial: {} },
     setupFields: [
       ['segments', 'num'],
@@ -13243,6 +13360,21 @@ PanelRegistry.extend('buffer', {
       ['note', 'text'],
       ['label', 'text'],
     ],
+    expandPatchFields: function (panel) { return [
+      ['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num', { min: 0, max: bufferSegCount(panel) - 1 }],
+      ['note', 'text'], ['label', 'text']
+    ]; },
+    fieldMeta: {
+      segments: { label: 'Cell count', help: 'Use 2–48 cells.', group: 'Buffer' },
+      capacity: { label: 'Capacity label', help: 'Optional display text such as 4 MiB.', group: 'Buffer' },
+      cells: { label: 'Complete cell snapshot', help: 'Replaces every visible cell and clears earlier range paints. Use Paint ranges for ordinary step changes.', step: { advanced: true } },
+      mark: { label: 'Paint ranges', initial: { help: 'Range paints applied over the starting cell snapshot.' },
+        step: { unsetLabel: 'Paint no ranges at this step', help: 'These range operations apply at this step and accumulate until a complete cell snapshot replaces them.' } },
+      head: { label: 'Write head', help: 'Zero-based cell index. Omit it to hide the marker.' },
+      note: { label: 'Note' },
+      label: { hidden: true },
+    },
+    editor: bufferStateEditor,
     picker: {
       order: 13,
       name: 'Buffer',
@@ -13290,6 +13422,12 @@ PanelRegistry.extend('buffer', {
     },
   },
 });
+
+PanelRegistry.extend('buffer', { editorStyles: String.raw`
+.buffer-cell-editor{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:7px;min-width:0;}
+.buffer-cell-control{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:5px;min-width:0;font:10px 'IBM Plex Mono',monospace;}
+.buffer-cell-control>span{text-align:right;color:var(--muted);}
+` });
 /* ---- src/panels/types/checks.js ---- */
 /* Check results are authored status snapshots. */
 var CHECK_STATUSES = ['pending', 'pass', 'fail', 'warn', 'skip'];
@@ -13395,6 +13533,7 @@ PanelRegistry.extend('checks', {
 /* checks authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('checks', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Decision checks',
       checks: [
@@ -13411,6 +13550,17 @@ PanelRegistry.extend('checks', {
       ['results', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      checks: {label:'Checks',group:'Content'},
+      results: {label:'Check results',help:'A complete results snapshot. Checks omitted from this snapshot use Pending; use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='results')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,fields:[{key:'status',label:'Result',options:CHECK_STATUSES},{key:'detail',label:'Detail'}]};
+      }));
+    }};},
     picker: {
       order: 1,
       name: 'Decision checks',
@@ -14325,12 +14475,13 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
-              ['icon', 'enum', ICON_SET],
+              ['icon', 'enum', ICON_SET, { nullLabel: 'Use declared icon' }],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
-              ['reportedAt', 'text'],
+              ['reportedAt', 'text', null, { assignment: false }],
             ],
+            { label: f.label || f.id, group: 'Data cards' },
           ];
         });
       if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});
@@ -14535,11 +14686,17 @@ PanelRegistry.extend('deviceapp', {
         {id:'patrol',label:'Patrol unit',kind:'police',callsign:'Unit 24'},
         {id:'backup',label:'Security response',kind:'security',callsign:'Unit 08'}],
         initial:{status:'idle',priority:'routine',timeOfDay:'dusk',patrol:{status:'available'},backup:{status:'available'}}},
+      initialFields:true,
+      fieldMeta:{
+        agency:{label:'Response agency'},responders:{label:'Responders'},
+        status:{label:'Dispatch status',group:'Incident'},priority:{label:'Priority',group:'Incident'},timeOfDay:{label:'Time of day',group:'Incident'},
+        incident:{label:'Incident',group:'Details'},location:{label:'Location',group:'Details'},dispatcher:{label:'Dispatcher',group:'Details'},detail:{label:'Summary',group:'Details'},note:{label:'Internal note',group:'Details'}
+      },
       setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'callsign'}],max:8}],['initial','json']],
       patchFields:[['status','enum',statuses],['priority','enum',priorities],['timeOfDay','enum',times],['incident','text'],['location','text'],['dispatcher','text'],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('dispatch').authoring.patchFields.concat(items(panel).map(function (unit) {
-          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']]];
+          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']],{label:unit.label||unit.id,group:'Responders'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -14679,6 +14836,12 @@ PanelRegistry.extend('gauge', {
 PanelRegistry.extend('gauge', {
   authoring: {
     template: { title: 'Draw', unit: 'mA', max: 400, initial: { value: 12 } },
+    initialFields: true,
+    fieldMeta: {
+      unit: { label: 'Unit' },
+      max: { label: 'Maximum' },
+      value: { label: 'Value', help: 'The number shown by the gauge.' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['max', 'num'],
@@ -17343,11 +17506,13 @@ PanelRegistry.extend('homemap', {
         var group = document.createElement('details');
         group.className = 'home-elements';
         group.open = state.open;
+        if(state.reveal!=null)group.setAttribute('data-inspector-reveal','');
         var summary = document.createElement('summary');
         summary.textContent =
           key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
         group.appendChild(summary);
         group.appendChild(context.controls.rows(key, cur, shape, homeRowOptions(key, state)));
+        delete state.reveal;
         listen(group,'toggle', function () {
           if (group.isConnected) state.open = group.open;
         });
@@ -17464,6 +17629,7 @@ PanelRegistry.extend('homemap', {
             var fold = document.createElement('details');
             fold.className = 'home-element';
             fold.open = !base || folds.items[index] === true;
+            if(folds.reveal===index)fold.setAttribute('data-inspector-reveal','');
             ref.fold = fold;
             var summary = document.createElement('summary');
             var name = document.createElement('span');
@@ -17631,7 +17797,9 @@ PanelRegistry.extend('homemap', {
                 (home[pick.field] || []).findIndex(function (x) {
                   return x.id === pick.id;
                 });
-          if (home && item >= 0)
+          if (home && item >= 0){
+            this.revealElement({section:target.section,index:target.index,field:pick.field,item:item});
+            context.inspect();
             context.selectClipboard({
               kind: 'home',
               section: target.section,
@@ -17639,6 +17807,7 @@ PanelRegistry.extend('homemap', {
               field: pick.field,
               item: item,
             });
+          }
         },
         revealElement: function (t) {
           var identity = JSON.stringify([t.section, t.index, t.field]);
@@ -17646,6 +17815,7 @@ PanelRegistry.extend('homemap', {
             homeElementFolds[identity] || (homeElementFolds[identity] = { open: true, items: [] });
           folds.open = true;
           folds.items[t.item] = true;
+          folds.reveal = t.item;
         },
         decoratePreview: function (card) {
           if (card.querySelector('[data-home-layout]')) return;
@@ -17837,18 +18007,18 @@ PanelRegistry.extend('image', {
             };
             reader.readAsDataURL(file);
           });
-          wrap.appendChild(input);
-          wrap.appendChild(note);
           if (cur) {
             var remove = document.createElement('button');
             remove.type = 'button';
-            remove.className = 'bbtn';
+            remove.className = 'bbtn bdanger';
             remove.textContent = 'Remove image';
             remove.addEventListener('click', function () {
               if (context.commit(key, null)) context.refresh();
             });
             wrap.appendChild(remove);
           }
+          wrap.appendChild(input);
+          wrap.appendChild(note);
           return context.controls.block('Image file', wrap);
         },
       };
@@ -18215,18 +18385,58 @@ PanelRegistry.extend('inflight', {
 });
 
 /* inflight authoring contract; merged into this panel definition by the bundle. */
+function inflightOperationEditor(context) {
+  function laneOptions(panel) {
+    return (Array.isArray(panel.lanes) ? panel.lanes : [])
+      .filter(function (lane) { return lane && typeof lane.id === 'string'; })
+      .map(function (lane) { return lane.id; });
+  }
+  function endRows(options) {
+    if (options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (lane) { return typeof lane !== 'string'; }))) return null;
+    var rows = (options.value || []).map(function (lane, index) { return { lane: lane, _sourceIndex: index }; });
+    return context.controls.rows('Finishes', rows,
+      { cols: [{ k: 'lane', label: 'Lane', kind: 'enum', options: laneOptions(options.panel), req: true }] },
+      { raw: false, commitValue: options.commit, collect: function (items) {
+        return { value: items.length ? items.map(function (item) { return item.lane; }) : undefined };
+      }});
+  }
+  return { patchControl: function (field, options) {
+    var key = field[0], lanes = laneOptions(options.panel), shape;
+    if ((key === 'start' || key === 'mark') && options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'start') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'label', label: 'Operation label' }
+    ]};
+    if (key === 'mark') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'state', label: 'Outcome', kind: 'enum', options: INFLIGHT_STATES, req: true }
+    ]};
+    if (shape) return context.controls.rows(key, options.value, shape,
+      { raw: false, commitValue: options.commit });
+    if (key === 'end') return endRows(options);
+  }};
+}
 PanelRegistry.extend('inflight', {
   authoring: {
     template: { title: 'In flight', lanes: [{ id: 'op', label: 'operation' }] },
-    setupFields: [
-      ['lanes', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
-      ['initial', 'json'],
-    ],
+    setupFields: [['lanes', 'rows', { cols: [{ k: 'id', label: 'Lane ID', req: true }, { k: 'label', label: 'Name' }] }]],
     patchFields: [
       ['start', 'jsonArr'],
       ['end', 'jsonArr'],
       ['mark', 'jsonArr'],
     ],
+    fieldMeta: {
+      lanes: { label: 'Operation lanes', help: 'Declare up to eight lanes before adding operations.', group: 'Content' },
+      start: { label: 'Start operations', unsetLabel: 'Start nothing at this step',
+        help: 'Each row starts a new operation at this step. Starting an already-open lane closes its earlier bar and begins a new one.' },
+      end: { label: 'Finish operations', unsetLabel: 'Finish nothing at this step',
+        help: 'Each lane closes its currently open operation at this step.' },
+      mark: { label: 'Mark open operations', unsetLabel: 'Mark nothing at this step',
+        help: 'Set the outcome of an operation that is still open. This is an event at this step, not an inherited snapshot.' },
+    },
+    editor: inflightOperationEditor,
     picker: {
       order: 6,
       name: 'In-flight work',
@@ -18267,8 +18477,6 @@ PanelRegistry.extend('inflight', {
       };
       states = [{}, {}, {}, {}, {}, {}];
       step = 5;
-
-      panel.initial = builderClone(state);
 
       return { panel: panel, state: state, states: states, step: step };
     },
@@ -18415,6 +18623,10 @@ PanelRegistry.extend('leds', {
       ],
       initial: { power: 'on' },
     },
+    initialFields: true,
+    fieldMeta: {
+      leds: { label: 'Indicators' },
+    },
     setupFields: [
       ['leds', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['initial', 'json'],
@@ -18433,7 +18645,12 @@ PanelRegistry.extend('leds', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
+          return [
+            item.id,
+            'enum',
+            ['on', 'off', 'tx', 'rx'],
+            { label: item.label || item.id, group: 'Indicators' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -18564,6 +18781,7 @@ PanelRegistry.extend('log', {
 /* log authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('log', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Event log',
       tags: { NET: '#38E1FF' },
@@ -18574,6 +18792,13 @@ PanelRegistry.extend('log', {
       ['initial', 'json'],
     ],
     patchFields: [['log', 'jsonArr']],
+    fieldMeta: {
+      tags: {label:'Event tags and colors',group:'Content'},
+      log: {label:'Events',initial:{help:'Events visible before the story begins.'},step:{help:'These events append to the log at this step. An empty list adds nothing; it does not clear earlier events.'}},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='log')return createPanelLogComposer(context,options);
+    }};},
     picker: {
       order: 7,
       name: 'Event log',
@@ -18837,6 +19062,13 @@ PanelRegistry.extend('orbit', {
       title: 'Lifecycle',
       states: ['IDLE', 'ACTIVE', 'DONE'],
       initial: { state: 'IDLE' },
+    },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Lifecycle states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state' },
+      via: { label: 'Transition label', help: 'Describe how the lifecycle reached this state.' },
     },
     setupFields: [
       ['states', 'csv'],
@@ -19878,6 +20110,14 @@ body.sk-editorial .sk-daylight .qside-out{color:var(--ed-warn);}`,
 PanelRegistry.extend('queue', {
   authoring: {
     template: { title: 'Queue', initial: { state: 'empty' } },
+    initialFields: true,
+    fieldMeta: {
+      state: { label: 'Queue state', group: 'Message' },
+      label: { label: 'Message label', group: 'Message' },
+      from: { label: 'From', group: 'Route' },
+      to: { label: 'To', group: 'Route' },
+      reason: { label: 'Waiting reason', group: 'Route' },
+    },
     setupFields: [['initial', 'json']],
     patchFields: [
       ['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']],
@@ -21903,11 +22143,17 @@ PanelRegistry.extend('screen', {
         {id:'hall',label:'Hall motion',kind:'motion',zone:'Hallway'}],
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
+      initialFields:true,
+      fieldMeta:{
+        site:{label:'Site'},scene:{label:'Camera scene'},videoLabel:{label:'Video label'},sensors:{label:'Sensors'},
+        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},
+        status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
+      },
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
       patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
-          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
+          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']],{label:sensor.label||sensor.id,group:'Sensors'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -22349,6 +22595,10 @@ body.sk-editorial .sk-daylight .sgrow.s-jammed .sgstate{color:var(--ed-bad);}`,
 PanelRegistry.extend('signal', {
   authoring: {
     template: { title: 'Links', links: [{ id: 'up', label: 'uplink', transport: 'wifi' }] },
+    initialFields: true,
+    fieldMeta: {
+      links: { label: 'Connections' },
+    },
     setupFields: [
       [
         'links',
@@ -22401,6 +22651,7 @@ PanelRegistry.extend('signal', {
               ['bars', 'num', { min: 0, max: 4 }],
               ['note', 'text'],
             ],
+            { label: item.label || item.id, group: 'Links' },
           ];
         });
     },
@@ -22558,6 +22809,12 @@ body.sk-editorial .sk-daylight .pchip.cur{
 PanelRegistry.extend('state', {
   authoring: {
     template: { title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: { state: 'OFF' } },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state', help: 'Choose one of the declared states.' },
+    },
     setupFields: [
       ['states', 'csv'],
       ['colors', 'map'],
@@ -22733,6 +22990,7 @@ PanelRegistry.extend('table', {
 /* table authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('table', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Data state',
       columns: [
@@ -22751,6 +23009,14 @@ PanelRegistry.extend('table', {
       ['rows', 'jsonArr'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      columns: {label:'Columns',group:'Content'},
+      rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='rows')return createPanelTableComposer(context,options);
+    }};},
     picker: {
       order: 0,
       name: 'Data table',
@@ -23306,6 +23572,17 @@ PanelRegistry.extend('thermo', {
       crit: 85,
       initial: { value: 21 },
     },
+    initialFields: true,
+    fieldMeta: {
+      min: { label: 'Minimum' },
+      max: { label: 'Maximum' },
+      warn: { label: 'High warning' },
+      crit: { label: 'High critical' },
+      lowWarn: { label: 'Low warning' },
+      lowCrit: { label: 'Low critical' },
+      value: { label: 'Temperature' },
+      label: { label: 'Reading label' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['min', 'num'],
@@ -23574,6 +23851,12 @@ PanelRegistry.extend('tiles', {
         { id: 't2', label: 'UNIT 2' },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      tiles: { label: 'Devices' },
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+    },
     setupFields: [
       ['tiles', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
       ['states', 'csv'],
@@ -23596,7 +23879,12 @@ PanelRegistry.extend('tiles', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'objf', [stateField, ['sub', 'text']]];
+          return [
+            item.id,
+            'objf',
+            [stateField, ['sub', 'text']],
+            { label: item.label || item.id, group: 'Devices' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -24552,8 +24840,29 @@ rect.tlfuture{opacity:.18;}
 });
 
 /* timeline authoring contract; merged into this panel definition by the bundle. */
+function timelineStateEditor(context) {
+  function lanes(panel) { return timelineLaneIds(panel); }
+  return { patchControl: function (field, options) {
+    var key = field[0], value = options.value, shape;
+    if (value !== undefined &&
+        (!Array.isArray(value) || value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'events') shape = { wide: true, cols: [
+      { k: 'at', label: 'Time', kind: 'clock', req: true },
+      { k: 'label', label: 'Event label' },
+      { k: 'kind', label: 'Kind', kind: 'enum', options: TIMELINE_EVENT_KINDS },
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel) }
+    ]};
+    if (key === 'miss') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel), req: true },
+      { k: 'at', label: 'Expected at', kind: 'clock', req: true }
+    ]};
+    return shape ? context.controls.rows(key, value, shape,
+      { raw: false, commitValue: options.commit }) : null;
+  }};
+}
 PanelRegistry.extend('timeline', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Heartbeat',
       span: '6h',
@@ -24590,6 +24899,18 @@ PanelRegistry.extend('timeline', {
       ['events', 'jsonArr'],
       ['miss', 'jsonArr'],
     ],
+    fieldMeta: {
+      span: { label: 'Timeline span', help: 'A duration such as 6h or 90m.', group: 'Timeline' },
+      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline' },
+      lanes: { label: 'Cadence lanes', help: 'Optional independent periodic tracks; declaring lanes replaces the shared cadence.', group: 'Timeline' },
+      events: { label: 'Events', setup: { label: 'Reference events', help: 'Markers that are always present on the timeline.' },
+        initial: { label: 'Starting events', help: 'Events already present before the first step.' },
+        step: { label: 'Events added here', unsetLabel: 'Add no events at this step', help: 'These markers append at this step. Earlier events remain on the timeline.' } },
+      miss: { label: 'Missed beats', initial: { help: 'Missed lane beats already known before the story starts.' },
+        step: { unsetLabel: 'Add no missed beats at this step', help: 'These misses append at this step. Earlier misses remain visible.' } },
+      now: { label: 'Current time', help: 'Moves the timeline cursor. Later steps keep this value until another valid time is set.' },
+    },
+    editor: timelineStateEditor,
     picker: {
       order: 11,
       name: 'Heartbeat timeline',
@@ -25389,6 +25710,13 @@ PanelRegistry.extend('waterfall', {
         { id: 'work', label: 'processing', ms: 120 },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      spans: { label: 'Timed spans' },
+      reveal: { label: 'Visible spans', help: 'Number of spans visible from the start.' },
+      highlight: { label: 'Highlighted span' },
+      total: { label: 'Total label' },
+    },
     setupFields: [
       [
         'spans',
@@ -25703,8 +26031,53 @@ body.sk-editorial .sk-daylight .xfoot.no{color:var(--ed-bad);}`,
 });
 
 /* xray authoring contract; merged into this panel definition by the bundle. */
+function xrayLayerEditor(context) {
+  function composer(options) {
+    var authored = options.value;
+    if (authored !== undefined &&
+        (!Array.isArray(authored) || authored.some(function (item) { return !panelObject(item); }))) return null;
+    var baseline = authored !== undefined ? authored :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var ids = Object.create(null);
+    if (baseline.some(function (item) {
+      if (!item || item.id == null) return false;
+      var id = String(item.id);if (ids[id]) return true;ids[id] = true;return false;
+    })) return null;
+    var declarations = Array.isArray(options.panel.layers) ? options.panel.layers : [];
+    var doc = context.document, wrap = doc.createElement('div');wrap.className = 'rowsedit';
+    declarations.forEach(function (layer) {
+      if (!layer || layer.id == null) return;
+      var id = String(layer.id), label = layer.label || id;
+      var current = baseline.find(function (item) { return item && String(item.id) === id; });
+      var input = context.controls.select(['sealed','open'], current && current.open === true ? 'open' : 'sealed', function (state) {
+        var source = baseline, next = source.map(function (item) { return panelObject(item) ? panelCollectionCopy(item) : item; });
+        var index = next.findIndex(function (item) { return item && String(item.id) === id; });
+        if (state === 'open') {
+          var value = index >= 0 && panelObject(next[index]) ? next[index] : { id: id };
+          value.id = layer.id;value.open = true;
+          if (index >= 0) next[index] = value;else next.push(value);
+        } else if (index >= 0) {
+          var sealed = next[index];delete sealed.open;
+          if (Object.keys(sealed).some(function (key) { return key !== 'id'; })) next[index] = sealed;
+          else next.splice(index, 1);
+        }
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', label + ' layer state');
+      wrap.appendChild(context.controls.row(label, input));
+    });
+    if (!declarations.length) {
+      var empty = doc.createElement('p');empty.className = 'fnote';empty.textContent = 'Declare layers on this panel first.';wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'layers' ? composer(options) : null;
+  }};
+}
 PanelRegistry.extend('xray', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Layers',
       layers: [
@@ -25720,6 +26093,13 @@ PanelRegistry.extend('xray', {
       ['layers', 'jsonArr'],
       ['hop', 'text'],
     ],
+    fieldMeta: {
+      layers: { label: 'Layer states', help: 'A complete snapshot. Layers not listed are sealed; editing an inherited state saves the complete visible snapshot.',
+        setup: { label: 'Layers', help: 'Declare the protection layers from outermost to innermost.' },
+        initial: { label: 'Starting layer states' } },
+      hop: { label: 'Current location', help: 'Names the device or boundary where readability is being evaluated.' },
+    },
+    editor: xrayLayerEditor,
     picker: {
       order: 26,
       name: 'Layer X-ray',
@@ -26279,15 +26659,17 @@ function restoreCanvasPanelMemory(d, memories, id, value){
     if(!(d.panels || []).some(function(panel){return panel.id===key;}))return;
     saved.panels[key]=Object.assign(saved.panels[key] || {hidden:false},value.panels[key]);
   });
+  if(value.prose)saved.prose=Object.assign(saved.prose || {hidden:false},value.prose);
+  else delete saved.prose;
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
   if(value.layout){
-    ['panels','controls','overlayScale'].forEach(function(key){
+    ['panels','prose','controls','overlayScale'].forEach(function(key){
       if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
     });
   }
   return true;
 }
-function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
+function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, prose){
   var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
@@ -26333,7 +26715,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale}};
+    return {panels:panels,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
@@ -26353,12 +26735,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   function rememberRect(w){
     var r=relative(w.state);
     if(w===playerWindow)memory.layout.controls=r;
+    else if(w.prose)memory.layout.prose=Object.assign({},memory.layout.prose || {},r,{stacked:w.state.stacked===true});
     else{
       var panels=memory.layout.panels || (memory.layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;});
       var value=Object.assign({panel:w.panel.id},r,{stacked:w.state.stacked===true});
       if(i<0)panels.push(value);else panels[i]=value;
     }
   }
+  function savedWindowRect(w){return w.prose?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===w.panel.id;});}
   function camera(width,height){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     return {zoom:clamp(graphPixels/graphWidth(),.15,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
@@ -26412,7 +26796,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */
-    return w===playerWindow?300:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
+    return w===playerWindow?300:w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
   }
   function overlayScale(){return memory && memory.layout.overlayScale || 1;}
   // Panel dimensions and control height describe the size at 100%. Controls
@@ -26452,7 +26836,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     if(boundsChanged){
       // Defaults are viewport fractions. Initial mounting and full-browser
       // promotion can both change bounds after panel DOM has been created.
-      windows.forEach(function(w){var saved=(memory.layout.panels || []).find(function(p){return p.panel===w.panel.id;});if(saved)Object.assign(w.state,absolute(saved));});
+      windows.forEach(function(w){var saved=savedWindowRect(w);if(saved && saved.w)Object.assign(w.state,absolute(saved));});
       if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
     }
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
@@ -26559,11 +26943,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     }
     rememberRect(w);publish(token);
   }
-  function panelWindow(card,panel,it,index){
-    var label=panel.title || panel.id;
-    var saved=(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
-    var state=memory.panels[panel.id] || (memory.panels[panel.id]=saved?Object.assign(absolute(saved),{stacked:saved.stacked,hidden:false}):{x:12,y:12,w:220,h:panel.type==='homemap'?250:220,stacked:true,hidden:false});
-    var el=document.createElement('article');el.className='explore-window';el.setAttribute('data-explore-panel',panel.id);el.setAttribute('aria-label',label);
+  function floatingWindow(card,panel,it,notes){
+    var label=notes?'Section notes':panel.title || panel.id;
+    var saved=notes?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
+    var state=notes?memory.prose:memory.panels[panel.id];
+    if(!state){
+      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false}):{x:12,y:12,w:notes?320:220,h:notes?280:panel.type==='homemap'?250:220,stacked:!(saved && saved.stacked===false),hidden:false};
+      if(notes)memory.prose=state;else memory.panels[panel.id]=state;
+    }
+    var el=document.createElement('article');el.className='explore-window'+(notes?' explore-prose-window':'');
+    el.setAttribute(notes?'data-explore-content':'data-explore-panel',notes?'prose':panel.id);el.setAttribute('aria-label',label);
     var header=document.createElement('div');header.className='explore-window-header';el.appendChild(header);
     var grip=button(label,function(){},header,'explore-window-grip');grip.title='Drag to move; arrow keys to move; drop at the right edge to stack';grip.setAttribute('aria-label','Move '+label+'; use arrow keys');
     var hide=button('×',function(){state.hidden=true;paint();summary.focus();},header,'explore-window-hide');hide.setAttribute('aria-label','Hide '+label);
@@ -26571,7 +26960,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
     var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
-    var w={el:el,card:card,panel:panel,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
+    var w={el:el,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
     check.addEventListener('change',function(){state.hidden=!check.checked;if(check.checked)memory.focus=false;paint();});
     grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});
     grip.addEventListener('keydown',function(ev){keyboard(ev,w,'move');});resize.addEventListener('keydown',function(ev){keyboard(ev,w,'resize');});
@@ -26591,21 +26980,25 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
     board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
-    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};panelWindow(card,panel,it,index);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
+    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
+    if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
     if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
     lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);
-    if(memory.scroll){board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}
+    // A reader view can enter at page size before becoming full-browser. Restore the
+    // graph-relative center; raw scroll offsets describe the old viewport.
+    if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
     else if(memory.layout.camera)positionCamera(memory.layout.camera);
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
   }
   function leave(){
     if(!active)return;clearScrollEdit();finish(true);
-    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
+    if(prose)prose.setFloating(false);
     windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;
     stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
     shell.classList.remove('viewport-explore');menu.hidden=focus.hidden=stack.hidden=true;
@@ -26671,6 +27064,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     isWorkbenchCanvas:function(){return workbenchCanvas;},
     setBoardHidden:function(hidden){canvasBoardHidden=hidden;board.hidden=workbenchCanvas?false:hidden;},
     isExplore:function(){return active;},
+    revealProse:function(){
+      if(!active)return false;var w=windows.find(function(item){return item.prose;});
+      if(!w || !available(w))return false;
+      w.state.hidden=false;memory.focus=false;paint();return true;
+    },
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
     setWorkbenchCanvas:function(on){
@@ -26693,13 +27091,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
     },
     reset:function(){
       if(!active)return;var token=beginEdit();if(token===false)return;
-      var id=definition.id;leave();delete memories[id];
-      var previous=definition;definition=Object.assign({},definition,{exploreLayout:{}});enter();definition=previous;publish(token);
+      var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};leave();delete memories[id];
+      var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
     },
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,
     snapshotCanvasState:function(){
-      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);
     },
     restoreCanvasState:function(saved){
@@ -26714,7 +27112,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize){
       return true;
     },
     snapshotReaderState:function(){
-      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop};memory.zoom=zoom;}
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
       return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
     },
     restoreReaderState:function(saved){
@@ -26765,8 +27163,12 @@ function initViewerExploreCanvas(ctl,view){
     active.viewport.setReaderCanvas(true);
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
     if(!seen.has(key)){
-      seen.add(key);cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
-        if(active===rec && !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
+      cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
+        // Boot-time indexing briefly visits other views. Only mark a view after
+        // its frame actually opens, so those cancelled visits cannot skip Fit.
+        if(active!==rec || active.viewport.viewDefinition().id!==definition.id)return;
+        seen.add(key);
+        if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
       });
     }
   }
@@ -28823,7 +29225,7 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
-function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize){
+function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
   if(!items)return null;
@@ -28853,7 +29255,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
-  var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize);
+  var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize,prose);
   var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden,visibility=Object.create(null);
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
@@ -29047,6 +29449,10 @@ function setProseCollapsed(control, collapsed, animate, win){
   if (control.animation && typeof control.animation.cancel === 'function') control.animation.cancel();
   control.animation = null;
   if (control.proseEl.style) control.proseEl.style.overflow = '';
+  // Explore moves this same live prose into a window. Its visibility is owned
+  // by that window; the page's collapse choice resumes when the prose returns.
+  control.toggleButton.hidden=!!control.floating;
+  if(control.floating){control.proseEl.hidden=false;if(control.teaserEl)control.teaserEl.hidden=true;return changed;}
   var reduced = win && typeof win.matchMedia === 'function' &&
                 win.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!animate || reduced || typeof control.proseEl.animate !== 'function'){
@@ -29080,6 +29486,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   var control = {proseEl:proseEl, toggleButton:toggleButton, teaserEl:teaserEl || null,
                  defaultCollapsed:!!defaultCollapsed, collapsed:!defaultCollapsed,
                  sectionLabel:sectionLabel || 'this section', animation:null};
+  control.setFloating=function(value){control.floating=!!value;setProseCollapsed(control,control.collapsed,false,win);};
   setProseCollapsed(control, control.defaultCollapsed, false, win);
   toggleButton.addEventListener('click', function(){
     if (setProseCollapsed(control, !control.collapsed, true, win) && onChange) onChange();
@@ -29269,7 +29676,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     }
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
-    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize);
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
     if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
       /* Expansion also belongs to ordinary diagrams without authored views. */
@@ -29279,7 +29686,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       if(bar && bar.parentNode===box)surface.appendChild(bar);
       var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
-      standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize);
+      standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize,prose);
       result.viewport=standardViewport;
     }
     ready=true;

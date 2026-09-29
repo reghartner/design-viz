@@ -165,18 +165,18 @@ PanelRegistry.extend('image', {
             };
             reader.readAsDataURL(file);
           });
-          wrap.appendChild(input);
-          wrap.appendChild(note);
           if (cur) {
             var remove = document.createElement('button');
             remove.type = 'button';
-            remove.className = 'bbtn';
+            remove.className = 'bbtn bdanger';
             remove.textContent = 'Remove image';
             remove.addEventListener('click', function () {
               if (context.commit(key, null)) context.refresh();
             });
             wrap.appendChild(remove);
           }
+          wrap.appendChild(input);
+          wrap.appendChild(note);
           return context.controls.block('Image file', wrap);
         },
       };

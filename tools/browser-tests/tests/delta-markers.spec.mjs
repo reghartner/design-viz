@@ -1,7 +1,7 @@
 import {readFile, writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test, expect, paste, closeTools, inspectPageElement, trackResources, resources} from '../helpers/test.mjs';
+import {test, expect, openInspectorGroup, paste, closeTools, inspectPageElement, trackResources, resources} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 const raw = JSON.parse(await readFile(path.join(repo, 'examples/delta-markers/delta-markers.spec.json')));
@@ -71,11 +71,13 @@ test('inspector authors delta notes and links with exact Undo/Redo and rejects u
   await page.goto(server.origin+'/workbench.html'); await paste(page,source);
   await inspectPageElement(page,page.locator('[data-dv-node="device"]'));
   const guide = page.locator('#guide'), src = page.locator('#src');
+  await openInspectorGroup(guide.locator('.delta-details-editor'));
   await guide.getByLabel('Delta note',{exact:true}).fill('A new acknowledgement.'); await guide.getByLabel('Delta note',{exact:true}).press('Tab');
   const edited = await src.inputValue(); expect(diagram(JSON.parse(edited)).nodes.device.deltaText).toBe('A new acknowledgement.');
   await page.locator('#undo-builder').click(); await expect(src).toHaveValue(source);
   await page.locator('#redo-builder').click(); await expect(src).toHaveValue(edited);
   await inspectPageElement(page,page.locator('[data-dv-node="device"]'));
+  await openInspectorGroup(guide.locator('.delta-details-editor'));
   await guide.getByLabel('Add delta link',{exact:true}).fill('javascript:alert(1)'); await guide.getByLabel('Add delta link',{exact:true}).press('Enter');
   await expect(src).toHaveValue(edited); await expect(guide).toContainText('Use a full https://');
   await guide.getByLabel('Add delta link',{exact:true}).fill(server.origin+'/decision'); await guide.getByLabel('Add delta link',{exact:true}).press('Enter');

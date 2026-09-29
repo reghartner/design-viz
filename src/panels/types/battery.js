@@ -427,6 +427,20 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    initialFields: true,
+    fieldMeta: {
+      low: { label: 'Low threshold' },
+      crit: { label: 'Critical threshold' },
+      drainPerHour: { label: 'Drain % per hour' },
+      chargePerHour: { label: 'Charge % per hour' },
+      charge: { label: 'Charge %', group: 'Reading' },
+      drain: { label: 'Extra drain %', group: 'Reading', initial: { hidden: true } },
+      trend: { label: 'Trend', group: 'Power' },
+      source: { label: 'Power source', group: 'Power' },
+      cold: { label: 'Cold conditions', group: 'Context' },
+      note: { label: 'Note', group: 'Context' },
+      label: { label: 'Reading label', group: 'Context' },
+    },
     /* New panels start with the diagram's authored constants. Built-in
        placeholders are not copied, so the inspector keeps showing them as
        placeholders instead of passing them off as this device's rates. */

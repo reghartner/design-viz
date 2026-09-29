@@ -10,7 +10,7 @@ test('offscreen or oversized saved panels stay reachable after a smaller viewpor
   const r=context.workspacePanelRect({x:1600,y:1000,w:700,h:900},800,600);
   assert.ok(r.x>=12);assert.ok(r.y>=72);assert.ok(r.x+r.w<=788);assert.ok(r.y+r.h<=588);
   const narrow=context.workspacePanelRect({x:-1000,y:-1000,w:-20,h:-30},375,700);
-  assert.equal(narrow.x,12);assert.equal(narrow.y,72);assert.equal(narrow.w,300);assert.equal(narrow.h,240);
+  assert.equal(narrow.x,12);assert.equal(narrow.y,126);assert.equal(narrow.w,300);assert.equal(narrow.h,240);
 });
 test('missing and nonfinite geometry uses usable defaults without rewriting source data',()=>{
   const original={x:Infinity,y:NaN,w:NaN,h:Infinity};

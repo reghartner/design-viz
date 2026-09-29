@@ -348,6 +348,14 @@ body.sk-editorial .sk-daylight .qside-out{color:var(--ed-warn);}`,
 PanelRegistry.extend('queue', {
   authoring: {
     template: { title: 'Queue', initial: { state: 'empty' } },
+    initialFields: true,
+    fieldMeta: {
+      state: { label: 'Queue state', group: 'Message' },
+      label: { label: 'Message label', group: 'Message' },
+      from: { label: 'From', group: 'Route' },
+      to: { label: 'To', group: 'Route' },
+      reason: { label: 'Waiting reason', group: 'Route' },
+    },
     setupFields: [['initial', 'json']],
     patchFields: [
       ['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']],

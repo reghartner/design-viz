@@ -137,7 +137,8 @@ function initWorkbenchStoryBrief(opts){
   function listen(node,type,fn){node.addEventListener(type,fn);listeners.push(function(){node.removeEventListener(type,fn);});}
   var lead=el('p','The story, its decisions, and the evidence an engineer needs. Keep the intended outcome visible as the implementation grows.',null,'story-brief-intro');
   var provenance=el('p','Local draft',null,'story-brief-provenance');
-  var actions=el('div',undefined,null,'story-brief-actions'),refreshButton=el('button','Refresh brief',actions),handoffButton=el('button','Prepare engineering handoff',actions);
+  var actions=el('div',undefined,null,'story-brief-actions'),refreshButton=el('button','Refresh brief',actions),handoffButton=el('button','Download review package',actions);
+  handoffButton.title='Download a ZIP with the diagram JSON, viewer HTML, story notes, and evidence references. Nothing is published.';
   refreshButton.type=handoffButton.type='button';refreshButton.className='bbtn';handoffButton.className='rbtn';
   var status=el('p','',null,'story-brief-status');status.setAttribute('role','status');
   var body=el('div',undefined,null,'story-brief-sections');

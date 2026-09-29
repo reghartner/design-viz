@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {readSource}=require('../tools/source-loader.cjs');
 const pureNames=['validator','workbench/source-edit','workbench/targets','workbench/commands/common',
   'workbench/commands/vocabulary','workbench/commands/visibility','workbench/commands/prose','workbench/commands/detail-mapping','workbench/commands/panel-duration','workbench/commands/panel-visibility','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout',
-  'workbench/persistence','workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
+  'workbench/persistence','workbench/session','workbench/field-values','workbench/panel-collections','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/vocabulary','workbench/visibility','workbench/panel-visibility','workbench/detail-mapping','workbench/notifications','workbench/icon-picker','workbench/brand','workbench/inspector'];
 function environment(){
   const doc={activeElement:null},listeners={};
   function element(tag = 'div', id = ''){
@@ -83,7 +83,7 @@ function environment(){
   doc.getElementById=id=>doc.body.querySelector('#'+id);
   const C={document:doc,URL};vm.createContext(C);
   for(const name of pureNames)vm.runInContext(readSource(name+'.js'),C);
-  function mount(spec){
+  function mount(spec,options={}){
     const guide=doc.body.appendChild(element()),timers=new Map(),scheduled=[];
     let text=JSON.stringify(spec,null,2),next=0,inspector,reveals=0,selectionCalls=0,retireCalls=0;
     const session=C.createBuilderSession({source:{read:()=>text,write:value=>text=value},render(){},
@@ -95,7 +95,7 @@ function environment(){
       schedule(fn){timers.set(++next,fn);scheduled.push(fn);return next;},cancel:id=>timers.delete(id),
       surface:{show(){},reveal(){reveals++;},hideDiff(){},retire(){retireCalls++;}},
       selection:{select(){selectionCalls++;},range(){selectionCalls++;},rehighlight(){selectionCalls++;},remove(){},removeMany(){}},
-      preview:{stepper:()=>null,targetElement:()=>null},
+      preview:{stepper:()=>options.stepper || null,targetElement:()=>null},
       modes:{adding:()=>null,connecting:()=>null,toggleAdding(){},editPathStep(){}},
       clipboard:{current:()=>null,selectHome(){selectionCalls++;},clearHome(){}}});
     return {inspector,session,guide,timers,scheduled,get text(){return text;},get reveals(){return reveals;},get retireCalls(){return retireCalls;},get selectionCalls(){return selectionCalls;},
@@ -106,6 +106,122 @@ function environment(){
 }
 const home=()=>({nodes:{},rows:[],panels:[{id:'home',type:'homemap',outline:{w:300,h:164,future:'keep'}}],steps:[{panels:{home:{}}}]});
 const named=(guide,name)=>guide.querySelectorAll('.obj-field').find(label=>label.textContent===name)?.querySelector('input');
+const aria=(guide,label)=>guide.querySelector('[aria-label="'+label+'"]');
+
+test('palette-created simple panels expose typed starting state with sparse exact history',()=>{
+  const e=environment(),empty={nodes:{},rows:[[]]},added=e.C.planAddPanel(JSON.stringify(empty),empty,0,'gauge');
+  assert.equal(added.error,undefined);
+  const spec=JSON.parse(added.text);spec.panels[0].initial.futureReading={unit:'future'};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.ok(h.guide.querySelector('[data-panel-state="initial"]'));
+  assert.equal(aria(h.guide,'Value assignment').value,'set');
+  const value=aria(h.guide,'value');assert.equal(value.value,'12');
+  const before=h.text;value.value='42';value.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{value:42,futureReading:{unit:'future'}});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  const omit=aria(h.guide,'Value assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{futureReading:{unit:'future'}});
+  h.session.undo();assert.equal(h.text,changed);
+});
+
+test('step controls distinguish inherited and set values while retaining imported enum tokens',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'status',type:'state',states:['OFF','ON'],initial:{state:'FUTURE',futureTop:true}}],steps:[
+    {title:'Known',panels:{status:{state:'ON',futurePatch:{keep:true}}}},
+    {title:'Inherited',panels:{status:{futureSecond:7}}}
+  ]},h=e.mount(spec);
+  h.session.target={kind:'step',section:0,index:1};h.inspector.render();
+  assert.equal(aria(h.guide,'Current state assignment').value,'omit');
+  assert.equal(aria(h.guide,'state').disabled,false,'an omitted field can be assigned directly');
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON" · Inherited from step 1/);
+  const mode=aria(h.guide,'Current state assignment');mode.value='set';mode.fire('change');
+  const field=aria(h.guide,'state');assert.equal(field.disabled,false);field.value='OFF';field.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[1].panels.status,{futureSecond:7,state:'OFF'});
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'state').value,'ON');
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Effective "ON" · Set at this step/);
+  h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'state').value,'FUTURE');
+  assert.match(aria(h.guide,'state').options.at(-1).textContent,/unknown/);
+});
+
+test('effective field context follows the active path at a shared target step',()=>{
+  const e=environment();let activePath='main';
+  const spec={nodes:{},rows:[[]],panels:[{id:'status',type:'state',states:['OFF','ON','ALERT'],initial:{state:'OFF'}}],steps:[
+    {id:'start',panels:{status:{}}},{id:'main-state',panels:{status:{state:'ON'}}},
+    {id:'alt-state',panels:{status:{state:'ALERT'}}},{id:'finish',panels:{status:{}}}
+  ],paths:[{id:'main',steps:['start','main-state','finish']},{id:'alt',steps:['start','alt-state','finish']}]};
+  const h=e.mount(spec,{stepper:{path:()=>activePath}});h.session.target={kind:'step',section:0,index:3};h.inspector.render();
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ON"/);
+  activePath='alt';h.inspector.render();
+  assert.match(h.guide.querySelector('.panel-state-note').textContent,/Inherited "ALERT"/);
+});
+
+test('dynamic object fields preserve empty text, unknown siblings, and explicit icon reset',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'links',type:'signal',links:[{id:'up',label:'Uplink'}],initial:{up:{state:'future',note:'',futureNested:9},futureTop:true}},{id:'app',type:'deviceapp',fields:[{id:'model',label:'Camera model',icon:'camera'}],initial:{model:{value:'Doorbell',icon:'chip',futureNested:4}}}],steps:[]};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'Uplink assignment').value,'set');
+  assert.equal(aria(h.guide,'Note assignment').value,'set');
+  assert.equal(aria(h.guide,'note').value,'');
+  assert.equal(aria(h.guide,'state').value,'future');
+  const noteMode=aria(h.guide,'Note assignment');noteMode.value='omit';noteMode.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{up:{state:'future',futureNested:9},futureTop:true});
+
+  h.session.target={kind:'panel',section:0,index:1};h.inspector.render();
+  const iconMode=aria(h.guide,'Icon assignment');
+  assert.ok(Array.from(iconMode.options).some(option=>option.value==='null' && option.textContent==='Use declared icon'));
+  iconMode.value='null';iconMode.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[1].initial.model,{value:'Doorbell',icon:null,futureNested:4});
+  assert.equal(aria(h.guide,'Report time assignment'),null,'custom report-time actions stay authoritative');
+});
+
+test('dynamic step icon inheritance and report-time actions preserve sparse sibling state',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'app',type:'deviceapp',fields:[
+    {id:'model',label:'Camera model',icon:'camera'},{id:'battery',label:'Battery',kind:'battery'}
+  ]}],steps:[{panels:{app:{
+    model:{value:'Doorbell',icon:'cold',futureNested:4},
+    battery:{reportedAt:null,futureNested:5},futureTop:6
+  }}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+
+  const icon=aria(h.guide,'icon');icon.value='';icon.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.app,{
+    model:{value:'Doorbell',futureNested:4},battery:{reportedAt:null,futureNested:5},futureTop:6
+  });
+
+  const clear=aria(h.guide,'battery: clear report time');
+  assert.equal(clear.disabled,true,'an authored null keeps the custom Clear action disabled');
+  aria(h.guide,'battery: inherit report time').fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.app,{
+    model:{value:'Doorbell',futureNested:4},battery:{futureNested:5},futureTop:6
+  });
+});
+
+test('registered collection composers reuse shared assignment and sparse history',()=>{
+  const e=environment(),shape={cols:[{k:'name',req:true},{k:'status',kind:'enum',options:['ready','hold']}]};let seen;
+  e.C.PanelRegistry.define('collection-fixture',{authoring:{template:{title:'Collection'},initialFields:true,
+    setupFields:[['initial','json']],patchFields:[['entries','jsonArr']],fieldMeta:{entries:{label:'Entries'}},
+    editor(context){return {patchControl(field,options){
+      if(field[0]!=='entries')return null;
+      seen=options;
+      const existing=Array.isArray(options.value)?options.value:[];
+      return context.controls.rows(field[0],options.value,shape,{raw:false,commitValue:options.commit,
+        collect(items){return {value:items.map((item,index)=>Object.assign({},existing[index] || {},item))};}});
+    }};}}});
+  const spec={nodes:{},rows:[[]],panels:[{id:'collection',type:'collection-fixture',columns:[{id:'status'}],initial:{entries:[{name:'one',status:'ready',future:true}],futureTop:9}}],steps:[{panels:{collection:{}}}]};
+  const h=e.mount(spec);h.session.target={kind:'panel',section:0,index:0};h.inspector.render();
+  assert.equal(aria(h.guide,'Entries assignment').value,'set');
+  assert.equal(JSON.stringify(seen.panel.columns),JSON.stringify([{id:'status'}]));assert.equal(seen.effective,null);
+  const initial=h.guide.querySelector('.initialedit');
+  assert.equal(initial.querySelectorAll('.rawjson').length,1,'custom rows do not duplicate raw JSON');
+  assert.equal(initial.querySelector('.rawjson').querySelector('summary').textContent,'Advanced JSON');
+  const status=initial.querySelector('.rowline').querySelector('select'),before=h.text;
+  status.value='hold';status.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{entries:[{name:'one',status:'hold',future:true}],futureTop:9});
+  h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(JSON.parse(h.text).panels[0].initial.entries[0].status,'hold');
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  assert.equal(JSON.stringify(seen.effective.value),JSON.stringify([{name:'one',status:'hold',future:true}]));
+  assert.equal(seen.effective.origin.label,'Initial state');
+});
 
 test('diagram routing edits the selected section or bare diagram with exact undo and retired controls',()=>{
   for(const bare of [false,true]){
@@ -397,4 +513,111 @@ test('section initial prose collapse is one authored edit with exact Undo',()=>{
   const before=h.text,control=row.querySelector('input');control.checked=true;control.fire('change');
   assert.equal(JSON.parse(h.text).page.sections[0].collapsed,true);
   h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);h.inspector.destroy();
+});
+
+test('check and budget composers edit sparse starting and step snapshots with exact undo',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'checks',type:'checks',checks:[{id:'auth',label:'Authorization'}],initial:{results:{auth:{status:'pass',detail:'',future:4},unknown:{keep:true}},futureTop:9}},
+    {id:'budget',type:'budget',metrics:[{id:'latency',label:'Latency',max:100,unit:'ms'}],initial:{values:{latency:20,unknown:5}}}
+  ],steps:[{panels:{checks:{},budget:{values:{latency:30,unknown:6}}}}]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text;
+  const result=aria(h.guide,'Authorization Result');result.value='fail';result.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{results:{auth:{status:'fail',detail:'',future:4},unknown:{keep:true}},futureTop:9});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const clear=aria(h.guide,'Latency no data');clear.fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.budget,{values:{latency:null,unknown:6}});
+  const omit=aria(h.guide,'Metric values assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.budget,{});
+});
+
+test('table composer preserves row identity through reorder and clears all rows explicitly',()=>{
+  const e=environment(),rows=[{id:'one',cells:{value:4,hidden:'keep'},future:9},{id:'two',cells:{value:8}}];
+  const spec={nodes:{},rows:[[]],panels:[{id:'table',type:'table',columns:[{id:'value',label:'Reading'}],initial:{rows}}],steps:[]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text,initial=()=>h.guide.querySelector('.initialedit');
+  const first=initial().querySelector('.rowline');first.querySelectorAll('button').find(b=>b.title==='move this item down').fire('click');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial.rows,[rows[1],rows[0]]);
+  h.session.undo();assert.equal(h.text,before);
+  const clear=e.mount(spec);clear.inspector.render();
+  for(let i=0;i<2;i++){clear.guide.querySelector('.initialedit').querySelector('.rowline').querySelectorAll('button').find(b=>b.title==='remove this item').fire('click');clear.flush();}
+  assert.deepEqual(JSON.parse(clear.text).panels[0].initial.rows,[]);
+});
+
+test('log composer edits events at one step without rewriting accumulated earlier events',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'log',type:'log',tags:{NET:'#112233'},initial:{log:['boot']}}],steps:[{panels:{log:{log:[{tag:'NET',text:'connected',future:7}]}}},{panels:{log:{log:[{tag:'NET',text:'sent'}]}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:1};h.inspector.render();const before=h.text;
+  const events=h.guide.querySelector('.patchedit').querySelector('.rowline');
+  const text=aria(events,'text');text.value='acknowledged';text.fire('change');h.flush();
+  const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);assert.deepEqual(changed.steps[1].panels.log.log,[{tag:'NET',text:'acknowledged'}]);
+  h.session.undo();assert.equal(h.text,before);
+});
+
+test('in-flight operations are step-local typed rows and preserve imported siblings',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'flight',type:'inflight',lanes:[{id:'request',label:'Request'}],futureDecl:true}],steps:[
+    {panels:{flight:{start:[{lane:'request',label:'send',futureRow:7}],futurePatch:{keep:true}}}}
+  ]};
+  const h=e.mount(spec);h.inspector.render();
+  assert.equal(h.guide.querySelector('.initialedit'),null,'in-flight has no unsupported starting snapshot');
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  const label=aria(h.guide,'Operation label');assert.equal(label.value,'send');label.value='retry';label.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.flight,
+    {start:[{lane:'request',label:'retry',futureRow:7}],futurePatch:{keep:true}});
+  h.session.undo();assert.equal(h.text,before);assert.equal(h.session.canUndo(),false);
+});
+
+test('timeline events edit only the selected append operation and keep unknown row data',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'timeline',type:'timeline',span:'2h',cadence:{every:'30m'},initial:{events:[{at:'0',label:'boot'}]}}],steps:[
+    {panels:{timeline:{events:[{at:'15m',label:'ready'}]}}},
+    {panels:{timeline:{events:[{at:'45m',label:'late',kind:'future-kind',futureRow:8}],futurePatch:true}}}
+  ]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:1};h.inspector.render();const before=h.text;
+  const label=aria(h.guide,'Event label');label.value='recovered';label.fire('change');h.flush();
+  const changed=JSON.parse(h.text);assert.deepEqual(changed.panels,spec.panels);assert.deepEqual(changed.steps[0],spec.steps[0]);
+  assert.deepEqual(changed.steps[1].panels.timeline,
+    {events:[{at:'45m',label:'recovered',kind:'future-kind',futureRow:8}],futurePatch:true});
+  h.session.undo();assert.equal(h.text,before);
+});
+
+test('X-ray and Buffer snapshot composers start from effective state without erasing advanced values',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[
+    {id:'xray',type:'xray',layers:[{id:'case',label:'Case'},{id:'board',label:'Board'}],initial:{layers:[{id:'case',open:true,futureRow:3},{id:'future',open:true}]},futureTop:'x'},
+    {id:'buffer',type:'buffer',segments:3,initial:{cells:['buffered','future-token','empty'],futureTop:'b'}}
+  ],steps:[{panels:{xray:{hop:'gateway',futurePatch:'x'},buffer:{mark:[[0,1,'uploaded','future-tail']],futurePatch:'b'}}}]};
+  const h=e.mount(spec);h.session.target={kind:'step',section:0,index:0};h.inspector.render();const before=h.text;
+  const board=aria(h.guide,'Board layer state');assert.equal(board.value,'sealed');board.value='open';board.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.xray,{hop:'gateway',futurePatch:'x',layers:[
+    {id:'case',open:true,futureRow:3},{id:'future',open:true},{id:'board',open:true}
+  ]});
+  const afterBoard=h.text;
+  const caseLayer=aria(h.guide,'Case layer state');caseLayer.value='sealed';caseLayer.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.xray.layers,[
+    {id:'case',futureRow:3},{id:'future',open:true},{id:'board',open:true}
+  ]);
+  const afterXray=h.text;h.session.undo();assert.equal(h.text,afterBoard);h.session.undo();assert.equal(h.text,before);
+  h.session.redo();assert.equal(h.text,afterBoard);h.session.redo();assert.equal(h.text,afterXray);
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const cell=aria(h.guide,'Cell 1 state');cell.value='protected';cell.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer,
+    {mark:[[0,1,'uploaded','future-tail']],futurePatch:'b',cells:['protected','future-token','empty']});
+  h.session.target={kind:'step',section:0,index:0};h.inspector.render();
+  const state=aria(h.guide,'State');state.value='dropped';state.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer.mark,[[0,1,'dropped','future-tail']]);
+  h.session.undo();assert.deepEqual(JSON.parse(h.text).steps[0].panels.buffer.mark,[[0,1,'uploaded','future-tail']]);
+});
+
+test('App screens Starting state exposes explicit default, null and set modes',()=>{
+  const e=environment(),spec={nodes:{},rows:[[]],panels:[{id:'app',type:'appscreens',screens:[
+    {id:'home',label:'Home',src:'data:image/png;base64,AA==',width:1,height:1},
+    {id:'live',label:'Live',src:'data:image/png;base64,AA==',width:1,height:1}
+  ],initial:{screen:null,date:'',futureTop:9}}],steps:[]};
+  const h=e.mount(spec);h.inspector.render();const before=h.text;
+  const mode=aria(h.guide,'Starting screen assignment');assert.equal(mode.value,'null');
+  mode.value='set';mode.fire('change');const screen=aria(h.guide,'screen');assert.equal(screen.disabled,false);
+  screen.value='live';screen.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{screen:'live',date:'',futureTop:9});
+  const changed=h.text;h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,changed);
+  h.inspector.render();const blank=aria(h.guide,'screen');blank.value='';blank.fire('change');
+  assert.equal(blank.value,'live');assert.equal(h.text,changed);assert.equal(h.session.canUndo(),true);
+  const omit=aria(h.guide,'Starting screen assignment');omit.value='omit';omit.fire('change');h.flush();
+  assert.deepEqual(JSON.parse(h.text).panels[0].initial,{date:'',futureTop:9});
 });

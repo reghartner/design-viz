@@ -254,9 +254,13 @@ function initWorkbenchAgentChat(opts){
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
     paintStage(phase);paintDetail();
     root.dataset.connected=String(state.connected);
-    get('indicator').dataset.phase=state.pending?phase:state.listening?'ready':'idle';
-    setText('indicator-text',state.pending?(phase==='responding'?'Claude working':phase==='permission-needed'?'Claude · needs permission':phase==='quiet'?'Claude · no recent update':'Claude · waiting'):state.listening?'Claude ready':state.connected?(workflow==='external'?'Shared folder ready':'Claude · connecting'):'Connect Claude');
-    get('indicator').title=state.pending && activity.length?activity[activity.length-1].text:'Open the Claude panel';
+    var agentTab=doc.getElementById('editor-tab-agent');
+    if(agentTab){
+      agentTab.dataset.phase=state.pending?phase:state.listening?'ready':'idle';
+      var agentStatus=state.pending?(phase==='responding'?'Claude working':phase==='permission-needed'?'Claude needs permission':phase==='quiet'?'No recent update':'Claude waiting'):state.listening?'Claude ready':state.connected?(workflow==='external'?'Shared folder ready':'Connecting'):'Connect Claude';
+      agentTab.title='Agent · '+agentStatus;
+      agentTab.setAttribute('aria-label','Agent · '+agentStatus);
+    }
     get('activity').hidden=!state.pending && !activity.length;
     get('activity').dataset.phase=phase;
     setText('activity-title',{waiting:'Waiting for Claude to respond',responding:'Claude is working',quiet:'No recent update from Claude','permission-needed':'Claude is waiting for permission',complete:'Claude finished this turn',disconnected:'Disconnected'}[phase] || 'Claude activity');
@@ -461,7 +465,6 @@ function initWorkbenchAgentChat(opts){
   });
   life.listen(get('disconnect'),'click',disconnect);
   life.listen(get('disconnect-guide'),'click',async function(){await disconnect();closeGuide();});
-  life.listen(get('indicator'),'click',openSetup);
   life.listen(get('open-setup'),'click',function(){if(state.listening || accessLost)get('pairing').open=!get('pairing').open;else openSetup();});
   life.listen(get('close-guide'),'click',closeGuide);
   life.listen(guide,'cancel',function(event){event.preventDefault();closeGuide();});

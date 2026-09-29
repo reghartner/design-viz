@@ -37,6 +37,12 @@ Standard or Explore presentation follows that selection. The React hook reacts
 to a changed `target.view` without reloading the spec and retains the reader's
 latest section/view/step when a changed link resolver requires a fresh mount.
 Revision changes start from the new spec and host target.
+In Explore, section paragraphs and bullets move into a **Section notes** floating
+window inside that viewer’s ShadowRoot. The graph remains the full canvas. Notes
+reuse the live prose node, so formatting, links and step-aware reveals continue;
+Standard restores it to the section with its prior collapse state. Moves, sizes
+and visibility stay isolated per mount and per view. Destroy retires the notes
+with the other viewer content.
 Plain diagrams without a presentation controller accept and report the canonical
 `flow` view ID.
 

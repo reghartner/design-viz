@@ -585,3 +585,21 @@ after selecting the parent event; it never rewrites source for navigation.
 `commands/panel-duration.js` moves one authoring-declared transient field between
 carried and `enterOnce` storage, or removes both to inherit. Shared patch controls
 edit the selected storage in place without duplicating panel field editors.
+
+### Panel type replacement
+
+`commands/graph.js` owns `planReplacePanel`: instantiate the destination’s
+registered template, retain common identity/visibility and compatible branding,
+and surgically replace the declaration. It removes the panel’s state from both
+`steps[].panels` and legacy `steps[].patch`, including dormant aliases. Empty
+`panels` maps remain present so a dormant alias cannot become active. Paths,
+panel visibility and unrelated source bytes stay intact. Layout tile references
+and centerpiece IDs survive; unsupported step-control attachments are removed
+without changing their tile geometry.
+
+The existing `panel-picker.workbench.js` supports insertion and replacement.
+Replacement adds an explicit review stage with discarded setup keys, affected
+registry steps and paths, detached controls, and copyable original diagram JSON.
+The builder binds the pending operation to exact source, project and selected
+panel identity. Source/target changes invalidate it; project retirement and
+destroy close it. Only the final Replace action publishes one session edit.

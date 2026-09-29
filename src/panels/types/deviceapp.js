@@ -891,12 +891,13 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
-              ['icon', 'enum', ICON_SET],
+              ['icon', 'enum', ICON_SET, { nullLabel: 'Use declared icon' }],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
-              ['reportedAt', 'text'],
+              ['reportedAt', 'text', null, { assignment: false }],
             ],
+            { label: f.label || f.id, group: 'Data cards' },
           ];
         });
       if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});

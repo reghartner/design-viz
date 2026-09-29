@@ -535,7 +535,8 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                   bar:rect(sec.querySelector('.termbar')),grid:rect(grid),
                   heading:rect(sec.querySelector('.sec-h')),
                   toolbar:rect(sec.querySelector('.diagram-views')),
-                  panels:Array.from(sec.querySelectorAll('.explore-window'))
+                  notes:rect(sec.querySelector('[data-explore-content="prose"]')),
+                  panels:Array.from(sec.querySelectorAll('[data-explore-panel]'))
                     .filter(function(el){return el.getBoundingClientRect().height>0;})
                     .map(function(el){return {id:el.getAttribute('data-explore-panel'),rect:rect(el)};})};
                 grid.setAttribute('data-layout-id','wrong-view');
@@ -553,7 +554,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
             clip = state["clip"]
             self.assertIsNotNone(clip)
-            for part in [state["stage"], state["graph"], state["bar"],
+            for part in [state["stage"], state["graph"], state["bar"], state["notes"],
                          *(panel["rect"] for panel in state["panels"])]:
                 self.assertGreater(part["height"], 0)
                 self.assertLessEqual(clip["x"], part["left"])

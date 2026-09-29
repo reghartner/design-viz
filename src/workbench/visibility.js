@@ -4,7 +4,6 @@ function createVisibilityControl(options){
   var max=Math.max.apply(null,[0].concat(paths.map(function(p){return p.indices.length;})));
   var wrap=doc.createElement('details');wrap.className='rawjson visibility-control';
   var heading=doc.createElement('summary');heading.textContent='Visibility by path position';wrap.appendChild(heading);
-  wrap.open=options.value.revealAt!=null || options.value.hideAt!=null;
   var note=doc.createElement('p');note.className='fnote';
   note.textContent='Applies to the same position in every path, including steps hidden in this view. Show is inclusive; Hide starts at that position. Ambient mode shows everything. Reordering steps keeps these positions.';wrap.appendChild(note);
   if(!max){note.textContent='Add story steps to this section to preview visibility timing. Ambient mode shows everything.';}

@@ -329,8 +329,60 @@ body.sk-editorial .bfcell{border-radius:1px;}`,
 });
 
 /* buffer authoring contract; merged into this panel definition by the bundle. */
+function bufferStateEditor(context) {
+  function cells(options) {
+    if (options.value !== undefined && !Array.isArray(options.value)) return null;
+    var baseline = options.value !== undefined ? options.value :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var count = bufferSegCount(options.panel), doc = context.document;
+    var wrap = doc.createElement('div');wrap.className = 'buffer-cell-editor';
+    for (var index = 0; index < count; index++) (function (cellIndex) {
+      var current = BUFFER_STATES.indexOf(baseline[cellIndex]) >= 0 ? baseline[cellIndex] :
+        baseline[cellIndex] === undefined ? 'empty' : baseline[cellIndex];
+      var input = context.controls.select(BUFFER_STATES, current, function (state) {
+        var next = baseline.slice();
+        while (next.length < count) next.push('empty');
+        next[cellIndex] = state;
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', 'Cell ' + (cellIndex + 1) + ' state');
+      var label = doc.createElement('label');label.className = 'buffer-cell-control';
+      var number = doc.createElement('span');number.textContent = String(cellIndex + 1);label.appendChild(number);label.appendChild(input);wrap.appendChild(label);
+    })(index);
+    return wrap;
+  }
+  function paints(options) {
+    var current = options.value;
+    if (current !== undefined && (!Array.isArray(current) || current.some(function (op) {
+      return !Array.isArray(op) || op.length < 3 || typeof op[0] !== 'number' || typeof op[1] !== 'number';
+    }))) return null;
+    var rows = (current || []).map(function (op, index) {
+      return { from: op[0], to: op[1], state: op[2], _sourceIndex: index };
+    });
+    var count = bufferSegCount(options.panel);
+    return context.controls.rows('Paint ranges', rows, { cols: [
+      { k: 'from', label: 'First cell', kind: 'num', req: true },
+      { k: 'to', label: 'Last cell', kind: 'num', req: true },
+      { k: 'state', label: 'State', kind: 'enum', options: BUFFER_STATES, req: true }
+    ]}, { raw: false, commitValue: options.commit, collect: function (items) {
+      var operations = [];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i], from = item.from, to = item.to;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to >= count)
+          return { error: 'Use whole-number cell indexes from 0 to ' + (count - 1) + ', with First cell no greater than Last cell.' };
+        var base = current && current[item._sourceIndex], operation = Array.isArray(base) ? base.slice() : [];
+        operation[0] = from;operation[1] = to;operation[2] = item.state;operations.push(operation);
+      }
+      return { value: operations.length ? operations : undefined };
+    }});
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'cells' ? cells(options) : field[0] === 'mark' ? paints(options) : null;
+  }};
+}
 PanelRegistry.extend('buffer', {
   authoring: {
+    initialFields: true,
     template: { title: 'Buffer', initial: {} },
     setupFields: [
       ['segments', 'num'],
@@ -344,6 +396,21 @@ PanelRegistry.extend('buffer', {
       ['note', 'text'],
       ['label', 'text'],
     ],
+    expandPatchFields: function (panel) { return [
+      ['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num', { min: 0, max: bufferSegCount(panel) - 1 }],
+      ['note', 'text'], ['label', 'text']
+    ]; },
+    fieldMeta: {
+      segments: { label: 'Cell count', help: 'Use 2–48 cells.', group: 'Buffer' },
+      capacity: { label: 'Capacity label', help: 'Optional display text such as 4 MiB.', group: 'Buffer' },
+      cells: { label: 'Complete cell snapshot', help: 'Replaces every visible cell and clears earlier range paints. Use Paint ranges for ordinary step changes.', step: { advanced: true } },
+      mark: { label: 'Paint ranges', initial: { help: 'Range paints applied over the starting cell snapshot.' },
+        step: { unsetLabel: 'Paint no ranges at this step', help: 'These range operations apply at this step and accumulate until a complete cell snapshot replaces them.' } },
+      head: { label: 'Write head', help: 'Zero-based cell index. Omit it to hide the marker.' },
+      note: { label: 'Note' },
+      label: { hidden: true },
+    },
+    editor: bufferStateEditor,
     picker: {
       order: 13,
       name: 'Buffer',
@@ -391,3 +458,9 @@ PanelRegistry.extend('buffer', {
     },
   },
 });
+
+PanelRegistry.extend('buffer', { editorStyles: String.raw`
+.buffer-cell-editor{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:7px;min-width:0;}
+.buffer-cell-control{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:5px;min-width:0;font:10px 'IBM Plex Mono',monospace;}
+.buffer-cell-control>span{text-align:right;color:var(--muted);}
+` });

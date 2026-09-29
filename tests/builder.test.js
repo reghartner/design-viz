@@ -323,8 +323,11 @@ test('PANEL_SETUP_FIELDS covers exactly the engine panel types with known contro
       assert.ok(typeof key === 'string' && key.length, type + '.' + key);
       assert.ok(kinds.has(kind), type + '.' + key + ' kind ' + kind);
     }
-    /* Static reference images have no time-varying state. */
-    if (type !== 'image') assert.ok(fields.some(f => f[0] === 'initial'), type + ' exposes initial');
+    /* Static reference images have no time-varying state. In-flight bars are
+       derived only from step-local start/end/mark operations. */
+    if (type !== 'image' && type !== 'inflight')
+      assert.ok(fields.some(f => f[0] === 'initial'), type + ' exposes initial');
+    if (type === 'inflight') assert.ok(!fields.some(f => f[0] === 'initial'), 'inflight omits unsupported initial state');
   }
 });
 
@@ -382,7 +385,8 @@ test('every PANEL_SETUP_FIELDS entry uses a known control kind with a sane shape
       }
     });
     const last = B.PANEL_SETUP_FIELDS[type][B.PANEL_SETUP_FIELDS[type].length - 1];
-    if (type !== 'image') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
+    if (type !== 'image' && type !== 'inflight') assert.strictEqual(last[0], 'initial', type + ' ends with initial');
+    if (type === 'inflight') assert.strictEqual(last[0], 'lanes', 'inflight has declarations but no starting snapshot');
   });
 });
 

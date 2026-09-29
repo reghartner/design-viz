@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'src/starters/diagram-handoffs.json'),'utf8'));
 function localSpec(origin){
@@ -56,6 +56,7 @@ test('workbench handoff body selects for editing, fields apply atomically and Un
  const source=JSON.stringify(localSpec(server.origin),null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  await inspectPageElement(page,page.locator('[data-dv-node="push"] .t1'));
+ await openInspectorGroup(page.locator('#guide .node-handoff-editor'));
  await expect(page.getByRole('button',{name:'Apply handoff',exact:true})).toBeVisible();
  await page.getByLabel('Destination URL',{exact:true}).fill(server.origin+'/push.html#d=delivery');
  await page.getByRole('button',{name:'Apply handoff',exact:true}).click();

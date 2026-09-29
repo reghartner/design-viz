@@ -286,6 +286,13 @@ PanelRegistry.extend('waterfall', {
         { id: 'work', label: 'processing', ms: 120 },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      spans: { label: 'Timed spans' },
+      reveal: { label: 'Visible spans', help: 'Number of spans visible from the start.' },
+      highlight: { label: 'Highlighted span' },
+      total: { label: 'Total label' },
+    },
     setupFields: [
       [
         'spans',

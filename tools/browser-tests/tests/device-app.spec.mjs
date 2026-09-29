@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/device-app-notifications/device-app-notifications.spec.json'),'utf8');
 const raw=JSON.parse(source);
@@ -135,11 +135,12 @@ test('home/app navigation and card visibility keep one phone frame in standalone
 test('workbench edits the starting screen and per-step cards with independent Undo/Redo',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,navigationSource);
  const root=page.locator('#docview'),guide=page.locator('#guide');
- await inspectPageElement(page,app(root).locator('.ptitle'));await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('app');
+ await inspectPageElement(page,app(root).locator('.ptitle'));await openInspectorGroup(guide.locator('.initialedit'));await guide.getByRole('combobox',{name:'Starting phone screen',exact:true}).selectOption('app');
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(navigationSource);
  await inspectPageElement(page,app(root).locator('.ptitle'));
- const initialClip=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^clip$/})});
+ await openInspectorGroup(guide.locator('.initialedit'));
+ const initialClip=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^Last recording$/})});
  await initialClip.getByRole('combobox',{name:'Card visibility',exact:true}).selectOption('true');
  let updated=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(updated.panels[0].initial.clip).toEqual({value:'Yesterday',status:'ready',visible:true});expect(updated.panels[0].initial.phoneScreen).toBe('home');
@@ -151,7 +152,7 @@ test('workbench edits the starting screen and per-step cards with independent Un
  await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','home');
  await page.locator('#undo-builder').click();await expect(app(root).locator('.da-phone')).toHaveAttribute('data-da-screen','app');
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
- const clip=patch.locator('.frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^clip$/})});
+ const clip=patch.locator('.frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^Last recording$/})});
  await clip.getByRole('combobox',{name:'Card visibility',exact:true}).selectOption('true');
  await expect(app(root).locator('[data-da-field=clip] .da-value')).toHaveText('Yesterday');
  updated=diagram(JSON.parse(await page.locator('#src').inputValue()));expect(updated.steps[2].panels.app.clip).toEqual({visible:true});expect(updated.steps[2].panels.app.clear).toBe(true);
@@ -279,7 +280,8 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  await page.goto(server.origin+'/workbench.html');await paste(page,original);
  const root=page.locator('#docview'),guide=page.locator('#guide');
  await inspectPageElement(page,app(root).locator('.ptitle'));
- const battery=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^battery$/})});
+ await openInspectorGroup(guide.locator('.initialedit'));
+ const battery=guide.locator('.initialedit .frow').filter({has:page.locator(':scope > .flab').filter({hasText:/^Battery$/})});
  await battery.getByLabel('value',{exact:true}).fill('42');await battery.getByLabel('value',{exact:true}).press('Tab');
  await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
  let edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
@@ -288,6 +290,7 @@ test('starting state uses typed fields, preserves advanced data, and leaves step
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
  await page.locator('#redo-builder').click();await expect(app(root).locator('[data-da-field=battery] .da-value')).toHaveText('42%');
  await inspectPageElement(page,root.locator('.pt-screen .ptitle'));
+ await openInspectorGroup(guide.locator('.initialedit'));
  await guide.locator('.initialedit').getByLabel('mode',{exact:true}).selectOption('live');
  edited=diagram(JSON.parse(await page.locator('#src').inputValue()));
  expect(edited.panels[1].initial).toEqual({mode:'live',banner:'Ready',custom:17});expect(edited.steps).toEqual(d.steps);

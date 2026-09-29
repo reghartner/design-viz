@@ -227,6 +227,12 @@ PanelRegistry.extend('tiles', {
         { id: 't2', label: 'UNIT 2' },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      tiles: { label: 'Devices' },
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+    },
     setupFields: [
       ['tiles', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
       ['states', 'csv'],
@@ -249,7 +255,12 @@ PanelRegistry.extend('tiles', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'objf', [stateField, ['sub', 'text']]];
+          return [
+            item.id,
+            'objf',
+            [stateField, ['sub', 'text']],
+            { label: item.label || item.id, group: 'Devices' },
+          ];
         });
     },
     example: function (sample, context) {

@@ -28,6 +28,29 @@ test('patchSummaryLine compacts arrays and objects and prints scalar values bare
   assert.strictEqual(B.patchSummaryLine({cells: [], notify: null}), 'cells → [0 items] · notify → null');
 });
 
+test('panel field presentation merges compatible registry, tuple and context metadata', () => {
+  B.PanelRegistry.define('field-meta-fixture',{authoring:{fieldMeta:{camelName:{label:'Registered label',help:'Shared help',group:'Basics',
+    initial:{unsetLabel:'Use fixture default'},step:{label:'Step label'}}}}});
+  const field=['camelName','text',null,{help:'Tuple help',advanced:true,step:{group:'Changes'}}];
+  assert.deepStrictEqual(plain(B.panelFieldPresentation({type:'field-meta-fixture'},field,'initial')),{
+    key:'camelName',label:'Registered label',help:'Tuple help',group:'Basics',advanced:true,hidden:false,unsetLabel:'Use fixture default'
+  });
+  assert.deepStrictEqual(plain(B.panelFieldPresentation({type:'field-meta-fixture'},field,'step')),{
+    key:'camelName',label:'Step label',help:'Tuple help',group:'Changes',advanced:true,hidden:false,unsetLabel:'Inherit previous'
+  });
+  assert.equal(B.panelFieldPresentation({type:'gauge'},['futureField','text'],'setup').label,'Future Field');
+});
+
+test('explicit panel assignment modes preserve omission, null and a real empty string', () => {
+  assert.deepStrictEqual(plain(B.panelFieldAssignment(['label','text'],'','omit')),{});
+  assert.deepStrictEqual(plain(B.panelFieldAssignment(['label','text'],'','null')),{value:null});
+  assert.deepStrictEqual(plain(B.panelFieldAssignment(['label','text'],'','set')),{value:''});
+  assert.deepStrictEqual(plain(B.panelFieldAssignment(['value','num'],'0','set')),{value:0});
+  assert.match(B.panelFieldAssignment(['value','num'],'','set').error,/needs a value/);
+  assert.deepStrictEqual(plain(B.panelFieldAssignment(['state','enum',['ok']],'future','set')),{value:'future'});
+  assert.deepStrictEqual(plain(B.patchFieldsCollect([['label','text']],{label:''}).item),{},'legacy blank collection still omits');
+});
+
 test('panelPatchFields uses declaration vocabularies only when nonempty and falls back for unknown types', () => {
   for (const type of ['state', 'orbit']){
     assert.deepStrictEqual(plain(B.panelPatchFields({type, states: ['idle', 'busy']})[0]),
@@ -43,16 +66,29 @@ test('panelPatchFields uses declaration vocabularies only when nonempty and fall
 
 test('panelPatchFields expands declared led tile and signal ids with the correct nested fields', () => {
   assert.deepStrictEqual(plain(B.panelPatchFields({type: 'leds', leds: [{id: 'power'}, null, {}, {id: ''}]})),
-    [['power', 'enum', ['on', 'off', 'tx', 'rx']]]);
+    [['power', 'enum', ['on', 'off', 'tx', 'rx'], {label: 'power', group: 'Indicators'}]]);
   const tile = {type: 'tiles', tiles: [{id: 'front'}], states: ['ready']};
   assert.deepStrictEqual(plain(B.panelPatchFields(tile)),
-    [['front', 'objf', [['state', 'enum', ['ready']], ['sub', 'text']]]]);
+    [['front', 'objf', [['state', 'enum', ['ready']], ['sub', 'text']], {label: 'front', group: 'Devices'}]]);
   tile.states = [];
   assert.deepStrictEqual(plain(B.panelPatchFields(tile)[0][2][0]), ['state', 'text']);
   assert.deepStrictEqual(plain(B.panelPatchFields({type: 'signal', links: [{id: 'uplink'}]})),
     [['uplink', 'objf', [['state', 'enum', ['ok', 'weak', 'retrying', 'lost', 'jammed']],
-      ['bars', 'num', {min: 0, max: 4}], ['note', 'text']]]]);
+      ['bars', 'num', {min: 0, max: 4}], ['note', 'text']], {label: 'uplink', group: 'Links'}]]);
   for (const type of ['leds', 'tiles', 'signal']) assert.deepStrictEqual(plain(B.panelPatchFields({type})), []);
+});
+
+test('simple and dynamic panels expose typed starting-state controls with authored labels', () => {
+  for (const type of ['state','gauge','queue','thermo','battery','orbit','waterfall','leds','signal','tiles','dispatch','security',
+    'timeline','xray','buffer','appscreens'])
+    assert.equal(B.PanelRegistry.get(type).authoring.initialFields,true,type);
+  assert.equal(B.PanelRegistry.get('inflight').authoring.initialFields,undefined);
+  assert.ok(!B.PANEL_SETUP_FIELDS.inflight.some(field=>field[0]==='initial'));
+  assert.equal(B.panelFieldPresentation({type:'leds'},B.panelPatchFields({type:'leds',leds:[{id:'power',label:'Power'}]})[0],'initial').label,'Power');
+  assert.equal(B.panelFieldPresentation({type:'dispatch'},B.panelPatchFields({type:'dispatch',responders:[{id:'patrol',label:'Patrol unit'}]}).at(-1),'step').group,'Responders');
+  assert.equal(B.panelFieldPresentation({type:'security'},B.panelPatchFields({type:'security',sensors:[{id:'frontDoor',label:'Front door'}]}).at(-1),'initial').label,'Front door');
+  assert.equal(B.panelFieldPresentation({type:'battery'},['drain','num'],'initial').hidden,true);
+  assert.equal(B.panelFieldPresentation({type:'battery'},['drain','num'],'step').hidden,false);
 });
 
 test('patchFieldsCollect omits blank fields and preserves false zero and unknown enum tokens', () => {

@@ -1846,7 +1846,7 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
-function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize){
+function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
   if(!items)return null;
@@ -1876,7 +1876,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
   grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
-  var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize);
+  var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize,prose);
   var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden,visibility=Object.create(null);
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
@@ -2070,6 +2070,10 @@ function setProseCollapsed(control, collapsed, animate, win){
   if (control.animation && typeof control.animation.cancel === 'function') control.animation.cancel();
   control.animation = null;
   if (control.proseEl.style) control.proseEl.style.overflow = '';
+  // Explore moves this same live prose into a window. Its visibility is owned
+  // by that window; the page's collapse choice resumes when the prose returns.
+  control.toggleButton.hidden=!!control.floating;
+  if(control.floating){control.proseEl.hidden=false;if(control.teaserEl)control.teaserEl.hidden=true;return changed;}
   var reduced = win && typeof win.matchMedia === 'function' &&
                 win.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (!animate || reduced || typeof control.proseEl.animate !== 'function'){
@@ -2103,6 +2107,7 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   var control = {proseEl:proseEl, toggleButton:toggleButton, teaserEl:teaserEl || null,
                  defaultCollapsed:!!defaultCollapsed, collapsed:!defaultCollapsed,
                  sectionLabel:sectionLabel || 'this section', animation:null};
+  control.setFloating=function(value){control.floating=!!value;setProseCollapsed(control,control.collapsed,false,win);};
   setProseCollapsed(control, control.defaultCollapsed, false, win);
   toggleButton.addEventListener('click', function(){
     if (setProseCollapsed(control, !control.collapsed, true, win) && onChange) onChange();
@@ -2292,7 +2297,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     }
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
       d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
-    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize);
+    var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
     if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
       /* Expansion also belongs to ordinary diagrams without authored views. */
@@ -2302,7 +2307,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       if(bar && bar.parentNode===box)surface.appendChild(bar);
       var toolbar=boardLayout.viewChoicesHost && boardLayout.viewChoicesHost.parentNode;
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
-      standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize);
+      standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize,prose);
       result.viewport=standardViewport;
     }
     ready=true;

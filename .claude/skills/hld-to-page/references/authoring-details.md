@@ -110,7 +110,17 @@ story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
 `"standard"` or `"explore"` (omitted means Standard). Use a default Standard view
 for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
-resizable, hideable panels at its edges, and pins step controls. The setting
+resizable, hideable panels at its edges, and pins step controls. A section’s
+paragraphs and nested bullets become one **Section notes** window using the same
+controls; only prose floats there, never the diagram or an entire section card.
+Keep content in `section.text`/`bullets`, not fake diagram panels. Optional
+`exploreLayout.prose` saves `x/y/w/h` viewport fractions together, plus `stacked`
+and `hidden` booleans; `{hidden:true}` can stand alone. Notes follow the common
+overlay scale. **Visible elements → Section notes** saves visibility per view;
+the window’s Hide button is temporary. Adding the first paragraph or bullet in
+the workbench creates notes and keeps Explore open; later additions restore
+temporarily hidden notes without changing saved visibility. Standard restores the prose and its prior
+collapse state; `section.collapsed` does not hide Explore notes. The setting
 belongs to the named view across every host profile. It does not duplicate
 story state. In the editor, **View type** beside the view buttons
 selects Standard/Explore, and **Make default** chooses which view opens in the
@@ -248,10 +258,46 @@ with **position (%)**. See `docs/free-node-placement.md` and the executable
 
 ## Human handoff in the workbench
 
+Inspector actions sit above the form; paragraph and bullet structure actions
+precede their text. Muted disclosure headers start closed on a fresh selection
+and retain the user's choice during edits. Expand **Starting state**, a step's
+panel group, **Diagram handoff**, or **Domain detail** before editing it.
+Handoff/detail Apply and extraction Download/Apply/Cancel stay at their group
+top; ordinary fields auto-commit. Explicitly selecting or creating a Home
+element reveals its own editor. List Add stays above the items, with each
+item's remove and reorder controls kept local.
+
+Panel inspectors use **Change panel type…** to open the visual library and an
+explicit replacement review. Replacement seeds the registered template and
+instantiate hook, preserves ID/title/visibility, diagram layouts and centerpiece,
+and keeps branding only for compatible types. Old type-specific setup, including
+unknown imported keys, is listed and discarded. All state overrides for that
+panel are removed from registry steps and legacy `patch` aliases on every path;
+`panelVisibility`, other panels, captions and path membership survive. Controls
+attached to a panel that cannot host them become detached with their geometry
+intact. The review offers original diagram JSON for backup; one Undo restores
+the full change. Treat replacement as a new panel-state authoring task.
+
 Camera and Device App have typed **Starting state** controls in the panel
 inspector. Set defaults there and authored changes on steps; keep advanced
 initial fields intact. Phone and Device App also offer a shared notification
 composer for initial and per-step messages; clear runs before add.
+
+Checks, Budget, Table and Log have typed starting/step collection composers.
+Checks `results`, Budget `values` and Table `rows` replace the complete field
+snapshot; omitted inner entries do not carry independently. Empty table rows
+clear the table. Log `log` appends events at that step; `[]` adds nothing rather
+than clearing history. Inherit removes the whole step field. Typed table cells
+preserve scalar types and unknown fields. Keep advanced imported shapes intact.
+
+Inflight, Timeline, X-ray, Buffer and App screens also have typed state controls,
+but their arrays do not share one fold rule. Inflight has no Starting state:
+`start`, `end` and `mark` are operations on the selected step. Timeline `events`
+and `miss` append. X-ray `layers` and Buffer `cells` are complete snapshots;
+Buffer `mark` appends ordered range paints until a later cells snapshot resets
+the base. App screens keeps its upload and per-step chooser, with explicit
+default / no-screen / set choices for the starting screen. Leave unsupported or
+ambiguous imported shapes in Advanced JSON rather than rewriting them.
 
 Camera fields and Phone audio expose carry-forward / this-step-only duration
 and Inherit. Audio is a whole snapshot, not per-property inheritance. Imported

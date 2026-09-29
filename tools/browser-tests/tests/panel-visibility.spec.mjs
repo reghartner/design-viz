@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -53,6 +53,7 @@ test('editor exposes every panel without a patch; Show Hide Inherit and starting
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
  const source=page.locator('#src'),guide=page.locator('#guide');
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
+ await openInspectorGroup(guide.locator('.panel-visibility'));
  const visibility=guide.getByLabel('Panel visibility · phone',{exact:true});await expect(visibility).toHaveValue('inherit');
  const before=await source.inputValue();await visibility.selectOption('show');
  await expect(page.locator('#docview .pt-phone')).not.toHaveClass(/panel-step-hidden/);
@@ -71,9 +72,9 @@ test('panel visibility disclosure stays collapsed through edits and is scoped to
  const raw=fixture();raw.page.sections.push(structuredClone(raw.page.sections[0]));raw.page.sections[1].heading='Another story';
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
  const inspect=async(section)=>{await page.locator('#editor-tab-steps').click();await page.locator('#steps-section').selectOption(String(section));await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();};
- await inspect(0);const fold=page.locator('#guide .panel-visibility');await fold.locator(':scope > summary').click();await expect(fold).not.toHaveAttribute('open','');
+ await inspect(0);const fold=page.locator('#guide .panel-visibility');await expect(fold).not.toHaveAttribute('open','');
  const caption=page.locator('#guide').getByLabel('text',{exact:true});await caption.fill('Visibility controls stay folded');await caption.press('Tab');await expect(fold).not.toHaveAttribute('open','');
  await page.locator('#editor-tab-json').click();await page.locator('#editor-tab-inspect').click();await expect(fold).not.toHaveAttribute('open','');
- await inspect(1);await expect(fold).toHaveAttribute('open','');await inspect(0);await expect(fold).not.toHaveAttribute('open','');
- await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture(),null,2));await inspect(0);await expect(fold).toHaveAttribute('open','');
+ await inspect(1);await expect(fold).not.toHaveAttribute('open','');await inspect(0);await expect(fold).not.toHaveAttribute('open','');
+ await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture(),null,2));await inspect(0);await expect(fold).not.toHaveAttribute('open','');
 });

@@ -173,6 +173,14 @@ For human editing, the workbench can create and reorder section paragraphs
 and bullet lists through Add and Inspect. See
 [Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
 for these controls and the existing prose syntax.
+Inspector object actions appear above their fields. Collapsible groups start
+closed for a fresh selection; open the named group before using its controls.
+Ordinary fields save as edited; handoff/detail composers have their own Apply
+at the top of the expanded group. Open groups remain open during same-object edits.
+
+When handing off a page for human editing, the workbench’s **Change panel type…**
+action reviews discarded setup and step state before replacement. See
+[Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).
 
 ## Phase 1: Inventory the source
 
@@ -288,6 +296,11 @@ Translation is mechanical once the worksheet is done:
   each row's `time` becomes `steps[].time`.
 - Each `patch:` cell becomes a sparse patch under `steps[].panels.<panel-id>`.
   Each `holds:` cell becomes nothing in JSON (the state carries forward).
+- Starting values become a sparse `panel.initial` object. Omit a field to use
+  the panel default; do not copy renderer defaults into the spec. An empty
+  string is an authored value only when the panel documentation says it hides
+  text. Use `null` only for a documented reset, such as returning an icon to
+  its declared default.
 - Icon plan rows become `icon` patches. A restore row becomes exactly its
   Restore value: `icon: null` only when it returns to the declared default;
   otherwise patch the earlier icon explicitly (for example back to

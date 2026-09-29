@@ -39,6 +39,7 @@ test('full path positions drive shared events, filtered views and routed edge un
  await root.locator('button.schip[data-step-source="2"]').click();await hidden(false);
  await expect(root.locator('button.schip[aria-current="true"]')).toHaveText('2');
  await root.locator('text.lbl[data-dv-edge="0"]').click();
+ await page.locator('#guide').getByText('Visibility by path position',{exact:true}).click();
  await page.locator('#guide').getByRole('button',{name:'Show from current position',exact:true}).click();
  expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.edges[0].revealAt).toBe(2);
  await root.locator('.path-chip[data-dv-path="alternate"]').click();await hidden(true);

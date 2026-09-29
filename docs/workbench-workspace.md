@@ -1,5 +1,19 @@
 # Workbench canvas and floating tools
 
+Object actions sit below the inspector title and JSON path, before its fields.
+Use that action bar to copy, duplicate, change a panel's type, move or delete the
+selected object. These buttons are neutral; destructive actions use red text.
+Ordinary fields save as you edit them. **Diagram handoff** and **Domain detail**
+save a group of fields with their own **Apply** button at the top of the open
+group. That action row stays visible while scrolling through the group.
+The extraction preview likewise keeps **Download**, **Apply extraction**, and
+**Cancel** above its settings and report; a separate destination must be
+downloaded before Apply becomes available. List Add buttons start their list,
+while remove and reorder buttons stay with the affected item.
+Collapsible sections start closed when you select another object. Muted header
+rows and chevrons identify them; click a header or focus it and press Enter to
+expand it. Open sections stay open through edits to the same selected object.
+
 For a captioned, searchable list with duplicate and reorder controls, see
 [Story steps](workbench-steps.md).
 
@@ -186,3 +200,16 @@ Published standalone pages open an Explore view across the full browser or ifram
 with floating data panels, playback and view choices. Switching to a curated
 standard/Home view restores its authored page layout. **Back to page** reveals
 the surrounding document. Browser fullscreen remains a separate explicit action.
+
+## Setup and review tools
+
+**File → Workspace preferences → Arrange editor for** chooses a starting set of
+editor windows: Story with an agent, Engineering review, or Canvas only. It does
+not change the diagram’s authored views or source. The left **Agent** tool owns
+connection controls; its status dot and tooltip show the current connection or
+activity state without another button in the header.
+
+**Brief → Download review package** downloads a ZIP containing the current JSON,
+viewer HTML, story notes, and evidence references. It does not publish or submit
+anything. The header’s **Download JSON** keeps a source file, while File reports
+whether browser recovery was saved.

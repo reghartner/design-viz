@@ -414,7 +414,7 @@ function initWorkbenchBuilder(opts){
   var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime();
   life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});
   var view = opts.view, src = opts.src;
-  function render(request){ hideDiff(); return opts.render(request || {origin:'navigation'}); }
+  function render(request){ hideDiff();var result=opts.render(request || {origin:'navigation'});refreshClipboardActions();return result; }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
@@ -465,7 +465,12 @@ function initWorkbenchBuilder(opts){
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
     persistence:createBuilderPersistence({storage:function(){return localStorage;},
       schedule:function(fn,ms){return life.delay(fn,ms);},
-      cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();}}),
+      cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
+      status:function(state){
+        var status=document.getElementById('workbench-recovery-status');if(!status)return;
+        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Download JSON to keep your changes.'}[state];
+        status.dataset.state=state;
+      }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
     historyChanged:function(undo,redo){
       if(undoBtn)undoBtn.disabled=!undo;
@@ -483,8 +488,19 @@ function initWorkbenchBuilder(opts){
     opts.workspace.setHistory(life.guard(session.rememberView));
     life.own(function(){opts.workspace.setHistory(null);});
   }
+  function revealProseTarget(target){
+    var el=findTargetEl(target),floating=el && el.closest('.explore-prose-window');
+    if(floating && floating.hidden){
+      var ctl=opts.ctl && opts.ctl(),records=ctl?(ctl.sections || []).concat(ctl.details && ctl.details.activeSections?ctl.details.activeSections():[]):[];
+      var section=el.closest('.doc-sec'),rec=records.find(function(r){return r.sectionEl===section;});
+      if(rec && rec.viewport && rec.viewport.revealProse)rec.viewport.revealProse();
+    }
+    if((!floating || floating.hidden) && opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();
+    if(el)el.scrollIntoView({block:'nearest'});
+  }
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
+    replacePanelType:function(target){changePanelType(target);},
     download:function(name,text,mime){return io && io.download(name,text,mime);},
     schedule:function(fn,ms){return life.delay(fn,ms);},cancel:function(timer){life.cancelDelay(timer);},
     surface:{reveal:revealInspector,hideDiff:hideDiff,
@@ -493,7 +509,7 @@ function initWorkbenchBuilder(opts){
     selection:{select:selectTarget,clear:clearMultiSelect,range:selectRange,rehighlight:rehighlight,
       current:function(){return interactions?interactions.selection():[];},
       remove:deleteCurrent,removeMany:bulkDeleteSelected},
-    preview:{stepper:stepperFor,targetElement:findTargetEl,showPage:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();},detail:function(target,parentId){
+    preview:{stepper:stepperFor,targetElement:findTargetEl,revealProse:revealProseTarget,detail:function(target,parentId){
       var parsed=session.snapshot();if(parsed.error)return {error:parsed.error};
       if(opts.renderedText && opts.renderedText()!==parsed.text)return {error:'Render the latest valid source before previewing this mapping.'};
       var rec=specSectionPaths(parsed.raw)[target.section],d=rec && specValueAt(parsed.raw,rec.diagram);
@@ -503,7 +519,7 @@ function initWorkbenchBuilder(opts){
       if(!trigger)return {error:'The detail node is not visible in this view.'};
       trigger.dispatchEvent(new MouseEvent('click',{bubbles:true}));return {};
     }},
-    clipboard:{current:function(){return objectClipboard;},selectHome:homeClipboardSelect,
+    clipboard:{current:function(){return objectClipboard;},toolbar:function(){return !!objectClipboard && !!document.getElementById('object-duplicate');},selectHome:homeClipboardSelect,
       clearHome:function(){if(interactions)interactions.clearHome();}},
     modes:{adding:function(){return interactions.adding();},connecting:function(){return interactions.connecting();},
       connectFrom:function(t){interactions.startConnect(t.section,t.id);},
@@ -514,7 +530,8 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
-    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();},
+    selectionChanged:refreshClipboardActions,
+    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();refreshClipboardActions();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
       if(diffbox && !diffbox.hidden){hideDiff();diffBtn.focus();return true;}
@@ -716,6 +733,13 @@ function initWorkbenchBuilder(opts){
       } else selectTarget(t,false);
     }});
   }
+  var clipboardRefresh=null;
+  function refreshClipboardActions(){
+    if(!objectClipboard)return;
+    if(clipboardRefresh!=null)life.cancelDelay(clipboardRefresh);
+    clipboardRefresh=life.delay(function(){clipboardRefresh=null;if(objectClipboard)objectClipboard.refresh();},0);
+  }
+  life.listen(src,'input',refreshClipboardActions);
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
     isActive:opts.isActive,
     text:function(){return session.text();},selection:clipboardSelection,destination:clipboardDestination,
@@ -725,6 +749,7 @@ function initWorkbenchBuilder(opts){
       if(!parsed.error){var got=builderDiagram(session.text(),parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
       return 'Destination: section '+(dest.section+1)+(panel ? ' · '+(panel.title || panel.id) : '')+'. Select a Home panel first to paste a room, device, or subject.';
     },apply:applyClipboardPlan,
+    canDuplicate:function(targets){return targets.length===1 && ['node','section','step'].indexOf(targets[0].kind)>=0;},
     duplicate:function(targets){
       if(targets.length !== 1 || ['node','section','step'].indexOf(targets[0].kind)<0)return null;
       var t=targets[0];return commitCascade(function(raw){
@@ -938,10 +963,7 @@ function initWorkbenchBuilder(opts){
     var el = findTargetEl(identity);
     selectTarget({section: identity.section, kind: identity.kind, id: identity.id,
                   index: identity.index, card:identity.card, el: el}, false);
-    if((kind==='para' || kind==='bullet') && opts.workspace && opts.workspace.canvas){
-      opts.workspace.canvas.showPage();
-      if(el)el.scrollIntoView({block:'nearest'});
-    }
+    if(kind==='para' || kind==='bullet')revealProseTarget(identity);
     selectRange(plan);
     if(kind==='para' || kind==='bullet')inspector.focusProse();
   }
@@ -1003,10 +1025,31 @@ function initWorkbenchBuilder(opts){
       if (findings.errors.length) return {error:'Fix the diagram’s validation errors before adding a panel.'};
       var rec = specSectionPaths(parsed.raw)[session.insertSection];
       if (!rec || !specValueAt(parsed.raw,rec.diagram)) return {error:'Choose a section with a diagram before adding a panel.'};
-      return {text:session.text(),section:session.insertSection,label:builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'')};
+      return {text:session.text(),project:parsed.project,section:session.insertSection,label:builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'')};
     },
     insert:function(type){runInsert('panel',function(text,raw,si){return planAddPanel(text,raw,si,type);});}
   }) : null;
+  function changePanelType(target){
+    if(!panelPicker)return;
+    var section=target.section,index=target.index;
+    panelPicker.open({
+      context:function(){
+        var parsed=parseEditor(),selected=session.target;
+        if(parsed.error)return {error:'Fix the JSON before replacing a panel.'};
+        if(interactions.adding() || interactions.connecting())return {error:'Finish adding to the step or connecting nodes first.'};
+        if(!selected || selected.kind!=='panel' || selected.section!==section || selected.index!==index)return {error:'Select this panel again before replacing its type.'};
+        var path=builderTargetPath(parsed.raw,{kind:'panel',section:section,index:index}),panel=path && specValueAt(parsed.raw,path);
+        if(!panel)return {error:'The panel no longer exists.'};
+        if(validate(normalize(parsed.raw)).errors.length)return {error:'Fix the diagram’s validation errors before replacing a panel.'};
+        return Object.assign({},parsed,{section:section,targetKey:JSON.stringify([section,index,panel.id]),panelType:panel.type,label:panel.title || panel.id});
+      },
+      review:function(type,snapshot){return planReplacePanel(snapshot.text,snapshot.raw,section,index,type);},
+      apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
+        clearMultiSelect();var next={kind:'panel',section:section,index:index};
+        selectTarget(Object.assign({},next,{el:findTargetEl(next)}),false);
+      }},snapshot);}
+    });
+  }
   var panelBtn = document.getElementById('add-panel');
   if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
   function additionContext(){
@@ -1126,7 +1169,7 @@ function initWorkbenchBuilder(opts){
   }
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
-    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Save downloads JSON; Prepare review packages a handoff. Neither publishes to your company.';}
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,
@@ -1245,7 +1288,6 @@ function initWorkbenchBuilder(opts){
       return agentOptions.apply(JSON.stringify(raw,null,2),snapshot);
     }}):null;
   if(storyBrief){life.own(storyBrief.destroy);life.listen(document,'workbench-tool-visibility',function(event){if(event.detail.name==='brief' && event.detail.open)storyBrief.refresh();});}
-  life.listen(document.getElementById('workspace-prepare-review'),'click',function(){if(opts.workspace)opts.workspace.showTool('brief');if(storyBrief)storyBrief.refresh();});
   refreshProvenance();
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});

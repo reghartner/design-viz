@@ -15,7 +15,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -110,9 +110,16 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;
+        if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.prose!=null;}))used['layout.explore-prose']=true;
       }
     }
-    function contracts(s){if(object(s) && (Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null))used['content.contracts']=true;}
+    function contracts(s){
+      if(!object(s))return;
+      if(Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null)used['content.contracts']=true;
+      var prose=typeof s.text==='string'?s.text.length>0:Array.isArray(s.text) && s.text.some(function(text){return typeof text==='string' && text.length>0;});
+      if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && Array.isArray(s.diagram.layouts) &&
+        s.diagram.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore-prose']=true;
+    }
     if(!object(page))return [];
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
@@ -2206,6 +2213,18 @@ function sectionExploreLayout(d,value,warnings,path){
       if(r)list.push(Object.assign({panel:v.panel},r,{stacked:v.stacked===true}));return list;
     },[]);
   }
+  if(value.prose!==undefined){
+    var prose=value.prose,at=path+'.prose';
+    if(!object(prose))warn(at,'expected an object with optional x/y/w/h, stacked and hidden');
+    else{
+      var geometry=['x','y','w','h'].some(function(k){return prose[k]!==undefined;}),notes=geometry?(rect(prose,at) || {}):{};
+      ['stacked','hidden'].forEach(function(k){
+        if(prose[k]!==undefined && typeof prose[k]!=='boolean')warn(at+'.'+k,'expected a boolean');
+        else if(notes && prose[k]!==undefined)notes[k]=prose[k];
+      });
+      if(notes)out.prose=notes;
+    }
+  }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
     var c=value.camera;
@@ -4232,6 +4251,27 @@ var FlowAudio = (function () {
       return context.controls.row(label, input);
     }
     function choices(panel) { return screens(panel).map(function (item) { return [item.id, text(item.label) || item.id]; }); }
+    function stateScreen(options) {
+      var input = document.createElement('select');input.className = 'fctl';input.setAttribute('aria-label', 'screen');
+      var empty = document.createElement('option');empty.value = '';empty.textContent = 'Choose a screen…';input.appendChild(empty);
+      var known = false;
+      choices(options.panel).forEach(function (pair) {
+        var option = document.createElement('option');option.value = pair[0];option.textContent = pair[1];
+        if (pair[0] === options.value) known = true;input.appendChild(option);
+      });
+      if (typeof options.value === 'string' && options.value && !known) {
+        var unknown = document.createElement('option');unknown.value = options.value;unknown.textContent = options.value + ' (unknown)';input.appendChild(unknown);
+      }
+      input.value = typeof options.value === 'string' ? options.value : '';
+      context.listen(input, 'change', function () {
+        if (!input.value) {
+          input.value = typeof options.value === 'string' ? options.value : '';
+          context.error('Choose a screen, or change the assignment to Show no screen or Use panel default.');return;
+        }
+        options.commit(input.value);
+      });
+      return input;
+    }
     function editPanel(update) {
       if (context.editingBlocked()) { context.error('Finish ADD TO STEP before editing app screens.'); return false; }
       return context.transact(function (raw) {
@@ -4336,30 +4376,12 @@ var FlowAudio = (function () {
       return input;
     }
     return {
+      patchControl: function (field, options) { return field[0] === 'screen' ? stateScreen(options) : null; },
       setupField: function (field, panel) {
         if (field[0] === 'frame' || field[0] === 'transition') {
           var frame = field[0] === 'frame';
           return select(frame ? 'Frame' : 'Transition', frame ? [['phone','Phone'],['none','None']] : [['cut','Cut'],['crossfade','Crossfade']],
             panel[field[0]] || (frame ? 'phone' : 'cut'), function (value) { context.commit(field[0], JSON.stringify(value)); });
-        }
-        if (field[0] === 'initial') {
-          var initialBox = document.createElement('div');
-          initialBox.appendChild(select('Starting screen', [['','No screen']].concat(choices(panel)), panel.initial && panel.initial.screen || '', function (value) {
-            editPanel(function (raw, live, path) {
-              return planSetField(context.source(), raw, path, 'initial', JSON.stringify(Object.assign({}, live.initial, {screen:value || null})));
-            });
-          }));
-          [['clock','Starting time','9:41'],['date','Starting date','Thu, Sep 24']].forEach(function (field) {
-            var input = context.controls.text(panel.initial && panel.initial[field[0]], function (value) {
-              return editPanel(function (raw, live, path) {
-                var initial = Object.assign({}, live.initial);
-                if (value == null) delete initial[field[0]]; else initial[field[0]] = value;
-                return planSetField(context.source(), raw, path, 'initial', JSON.stringify(initial));
-              });
-            }, {placeholder:'Optional · ' + field[2]});
-            input.setAttribute('aria-label', field[1]); initialBox.appendChild(context.controls.row(field[1], input));
-          });
-          return initialBox;
         }
         if (field[0] !== 'screens') return;
         var box = document.createElement('div'); box.className = 'appscreen-editor';
@@ -4372,6 +4394,9 @@ var FlowAudio = (function () {
           card.open = !!expanded[foldKey];
           context.listen(card, 'toggle', function () { expanded[foldKey] = card.open; });
           var summary = document.createElement('summary'); summary.textContent = text(item.label) || item.id; card.appendChild(summary);
+          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }, 'bdanger'));
+          var note = document.createElement('p'); note.className = 'fnote';
+          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           if (embeddedImageSource(item.src)) {
             var preview = document.createElement('img'); preview.src = item.src; preview.alt = text(item.alt) || item.id; preview.className = 'appscreen-thumbnail'; card.appendChild(preview);
           }
@@ -4384,9 +4409,6 @@ var FlowAudio = (function () {
             card.appendChild(context.controls.row(pair[1], input));
           });
           card.appendChild(context.controls.row('Replace image', upload(panel, item.id)));
-          card.appendChild(context.controls.action('Remove ' + (text(item.label) || item.id), function () { remove(item.id); }));
-          var note = document.createElement('p'); note.className = 'fnote';
-          note.textContent = 'Removing a screen makes its step selections inherit. Undo restores the image and all selections.'; card.appendChild(note);
           box.appendChild(card);
         });
         return context.controls.block('Screens', box);
@@ -4410,14 +4432,18 @@ var FlowAudio = (function () {
           panelOwn(patch, 'screen') ? patch.screen === null ? '@blank' : 'id:' + patch.screen : '', function (value) {
             return update('screen', !value ? undefined : value === '@blank' ? null : value.slice(3));
           }));
+        var dateActions=document.createElement('div');dateActions.className='iacts';dateActions.setAttribute('role','group');dateActions.setAttribute('aria-label','Date and time actions');
+        dateActions.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
+        dateActions.appendChild(context.controls.action('Hide time', function () { return update('clock', ''); }));
+        dateActions.appendChild(context.controls.action('Inherit time', function () { return update('clock', undefined); }));
+        box.appendChild(dateActions);
         var date = context.controls.text(patch.date, function (value) { return update('date', value == null ? undefined : value); },
           {placeholder:patch.date === '' ? 'Hidden at this step' : 'Inherit previous date'});
         date.setAttribute('aria-label', 'Date · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Date', date));
         var clock = context.controls.text(patch.clock, function (value) { return update('clock', value == null ? undefined : value); },
           {placeholder:patch.clock === '' ? 'Hidden at this step' : 'Inherit previous time'});
         clock.setAttribute('aria-label', 'Time · ' + (panel.title || panel.id)); box.appendChild(context.controls.row('Time', clock));
-        box.appendChild(context.controls.action('Hide date', function () { return update('date', ''); }));
-        box.appendChild(context.controls.action('Inherit date', function () { return update('date', undefined); }));
         var help = document.createElement('p'); help.className = 'fnote'; help.textContent = 'The selected screen carries forward until another step changes it. Add or replace images by selecting the App screens panel.'; box.appendChild(help);
         return box;
       }
@@ -4446,10 +4472,18 @@ var FlowAudio = (function () {
     fold:function (panel, steps) { return foldSanitizedPanelStates(panel, steps, function (raw, once) { return clean(panel, raw, once); }); },
     storyTime:function (panel, states, steps, story) { return story ? storyTimeClockOverlay(panel, states, steps, story) : states; },
     authoring:{
+      initialFields:true,
       template:{title:'App screens', screens:[], frame:'phone', transition:'cut', initial:{screen:null}},
       setupFields:[['screens','jsonArr'],['frame','text'],['transition','text'],['initial','json']],
       patchFields:[['screen','text'],['date','text'],['clock','text']],
       expandPatchFields:function (panel) { return [['screen','enum',screens(panel).map(function (item) { return item.id; })],['date','text'],['clock','text']]; },
+      fieldMeta:{
+        screens:{label:'Screens',help:'Upload each exported screen once, then select it in Starting state or a step.',group:'Content'},
+        frame:{label:'Device frame',group:'Presentation'},transition:{label:'Screen transition',group:'Presentation'},
+        screen:{label:'Displayed screen',nullLabel:'Show no screen',initial:{label:'Starting screen',unsetLabel:'Use panel default'},step:{label:'App screen'}},
+        date:{label:'Date',help:'Use an empty string to hide the date while preserving a deliberate assignment.',initial:{label:'Starting date'}},
+        clock:{label:'Time',help:'Use an empty string to hide the time while preserving a deliberate assignment.',initial:{label:'Starting time'}}
+      },
       origin:function (panel, key, snapshot, context) { return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, false); }); },
       picker:{order:26, name:'App screens', category:'Devices & interfaces', tagline:'Your product screens, in step',
         description:'Upload exported Figma screens or screenshots, then change the displayed screen alongside the flow. Choose a phone frame and cut or crossfade transitions.'},
@@ -4935,6 +4969,20 @@ body.sk-editorial .sk-daylight .btnub{background:var(--ed-rule-strong);}`,
 PanelRegistry.extend('battery', {
   authoring: {
     template: { title: 'Battery', low: 30, crit: 10, initial: { charge: 80 } },
+    initialFields: true,
+    fieldMeta: {
+      low: { label: 'Low threshold' },
+      crit: { label: 'Critical threshold' },
+      drainPerHour: { label: 'Drain % per hour' },
+      chargePerHour: { label: 'Charge % per hour' },
+      charge: { label: 'Charge %', group: 'Reading' },
+      drain: { label: 'Extra drain %', group: 'Reading', initial: { hidden: true } },
+      trend: { label: 'Trend', group: 'Power' },
+      source: { label: 'Power source', group: 'Power' },
+      cold: { label: 'Cold conditions', group: 'Context' },
+      note: { label: 'Note', group: 'Context' },
+      label: { label: 'Reading label', group: 'Context' },
+    },
     /* New panels start with the diagram's authored constants. Built-in
        placeholders are not copied, so the inspector keeps showing them as
        placeholders instead of passing them off as this device's rates. */
@@ -5188,6 +5236,7 @@ PanelRegistry.extend('budget', {
 /* budget authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('budget', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Resource budgets',
       metrics: [{ id: 'latency', label: 'Latency', unit: 'ms', max: 300, warn: 240 }],
@@ -5217,6 +5266,17 @@ PanelRegistry.extend('budget', {
       ['values', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      metrics: {label:'Metrics and limits',group:'Content'},
+      values: {label:'Metric values',help:'A complete values snapshot. An omitted metric or No data shows no measurement. Use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='values')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,unit:item.unit,scalar:true};
+      }));
+    }};},
     picker: {
       order: 2,
       name: 'Resource budget',
@@ -5569,8 +5629,60 @@ body.sk-editorial .bfcell{border-radius:1px;}`,
 });
 
 /* buffer authoring contract; merged into this panel definition by the bundle. */
+function bufferStateEditor(context) {
+  function cells(options) {
+    if (options.value !== undefined && !Array.isArray(options.value)) return null;
+    var baseline = options.value !== undefined ? options.value :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var count = bufferSegCount(options.panel), doc = context.document;
+    var wrap = doc.createElement('div');wrap.className = 'buffer-cell-editor';
+    for (var index = 0; index < count; index++) (function (cellIndex) {
+      var current = BUFFER_STATES.indexOf(baseline[cellIndex]) >= 0 ? baseline[cellIndex] :
+        baseline[cellIndex] === undefined ? 'empty' : baseline[cellIndex];
+      var input = context.controls.select(BUFFER_STATES, current, function (state) {
+        var next = baseline.slice();
+        while (next.length < count) next.push('empty');
+        next[cellIndex] = state;
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', 'Cell ' + (cellIndex + 1) + ' state');
+      var label = doc.createElement('label');label.className = 'buffer-cell-control';
+      var number = doc.createElement('span');number.textContent = String(cellIndex + 1);label.appendChild(number);label.appendChild(input);wrap.appendChild(label);
+    })(index);
+    return wrap;
+  }
+  function paints(options) {
+    var current = options.value;
+    if (current !== undefined && (!Array.isArray(current) || current.some(function (op) {
+      return !Array.isArray(op) || op.length < 3 || typeof op[0] !== 'number' || typeof op[1] !== 'number';
+    }))) return null;
+    var rows = (current || []).map(function (op, index) {
+      return { from: op[0], to: op[1], state: op[2], _sourceIndex: index };
+    });
+    var count = bufferSegCount(options.panel);
+    return context.controls.rows('Paint ranges', rows, { cols: [
+      { k: 'from', label: 'First cell', kind: 'num', req: true },
+      { k: 'to', label: 'Last cell', kind: 'num', req: true },
+      { k: 'state', label: 'State', kind: 'enum', options: BUFFER_STATES, req: true }
+    ]}, { raw: false, commitValue: options.commit, collect: function (items) {
+      var operations = [];
+      for (var i = 0; i < items.length; i++) {
+        var item = items[i], from = item.from, to = item.to;
+        if (!Number.isInteger(from) || !Number.isInteger(to) || from < 0 || to < from || to >= count)
+          return { error: 'Use whole-number cell indexes from 0 to ' + (count - 1) + ', with First cell no greater than Last cell.' };
+        var base = current && current[item._sourceIndex], operation = Array.isArray(base) ? base.slice() : [];
+        operation[0] = from;operation[1] = to;operation[2] = item.state;operations.push(operation);
+      }
+      return { value: operations.length ? operations : undefined };
+    }});
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'cells' ? cells(options) : field[0] === 'mark' ? paints(options) : null;
+  }};
+}
 PanelRegistry.extend('buffer', {
   authoring: {
+    initialFields: true,
     template: { title: 'Buffer', initial: {} },
     setupFields: [
       ['segments', 'num'],
@@ -5584,6 +5696,21 @@ PanelRegistry.extend('buffer', {
       ['note', 'text'],
       ['label', 'text'],
     ],
+    expandPatchFields: function (panel) { return [
+      ['cells', 'jsonArr'], ['mark', 'jsonArr'], ['head', 'num', { min: 0, max: bufferSegCount(panel) - 1 }],
+      ['note', 'text'], ['label', 'text']
+    ]; },
+    fieldMeta: {
+      segments: { label: 'Cell count', help: 'Use 2–48 cells.', group: 'Buffer' },
+      capacity: { label: 'Capacity label', help: 'Optional display text such as 4 MiB.', group: 'Buffer' },
+      cells: { label: 'Complete cell snapshot', help: 'Replaces every visible cell and clears earlier range paints. Use Paint ranges for ordinary step changes.', step: { advanced: true } },
+      mark: { label: 'Paint ranges', initial: { help: 'Range paints applied over the starting cell snapshot.' },
+        step: { unsetLabel: 'Paint no ranges at this step', help: 'These range operations apply at this step and accumulate until a complete cell snapshot replaces them.' } },
+      head: { label: 'Write head', help: 'Zero-based cell index. Omit it to hide the marker.' },
+      note: { label: 'Note' },
+      label: { hidden: true },
+    },
+    editor: bufferStateEditor,
     picker: {
       order: 13,
       name: 'Buffer',
@@ -5631,6 +5758,12 @@ PanelRegistry.extend('buffer', {
     },
   },
 });
+
+PanelRegistry.extend('buffer', { editorStyles: String.raw`
+.buffer-cell-editor{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:7px;min-width:0;}
+.buffer-cell-control{display:grid;grid-template-columns:22px minmax(0,1fr);align-items:center;gap:5px;min-width:0;font:10px 'IBM Plex Mono',monospace;}
+.buffer-cell-control>span{text-align:right;color:var(--muted);}
+` });
 /* ---- src/panels/types/checks.js ---- */
 /* Check results are authored status snapshots. */
 var CHECK_STATUSES = ['pending', 'pass', 'fail', 'warn', 'skip'];
@@ -5736,6 +5869,7 @@ PanelRegistry.extend('checks', {
 /* checks authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('checks', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Decision checks',
       checks: [
@@ -5752,6 +5886,17 @@ PanelRegistry.extend('checks', {
       ['results', 'json'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      checks: {label:'Checks',group:'Content'},
+      results: {label:'Check results',help:'A complete results snapshot. Checks omitted from this snapshot use Pending; use Inherit previous to keep the whole earlier snapshot.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]!=='results')return null;
+      return createPanelKeyedStateComposer(context,options,softwarePanelItems(options.panel).map(function(item){
+        return {id:item.id,label:item.label || item.id,fields:[{key:'status',label:'Result',options:CHECK_STATUSES},{key:'detail',label:'Detail'}]};
+      }));
+    }};},
     picker: {
       order: 1,
       name: 'Decision checks',
@@ -6666,12 +6811,13 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
-              ['icon', 'enum', ICON_SET],
+              ['icon', 'enum', ICON_SET, { nullLabel: 'Use declared icon' }],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],
               ['visible', 'bool'],
-              ['reportedAt', 'text'],
+              ['reportedAt', 'text', null, { assignment: false }],
             ],
+            { label: f.label || f.id, group: 'Data cards' },
           ];
         });
       if(!sourceIds.length)appFields.forEach(function(field){field[2]=field[2].filter(function(prop){return prop[0]!=='source';});});
@@ -6876,11 +7022,17 @@ PanelRegistry.extend('deviceapp', {
         {id:'patrol',label:'Patrol unit',kind:'police',callsign:'Unit 24'},
         {id:'backup',label:'Security response',kind:'security',callsign:'Unit 08'}],
         initial:{status:'idle',priority:'routine',timeOfDay:'dusk',patrol:{status:'available'},backup:{status:'available'}}},
+      initialFields:true,
+      fieldMeta:{
+        agency:{label:'Response agency'},responders:{label:'Responders'},
+        status:{label:'Dispatch status',group:'Incident'},priority:{label:'Priority',group:'Incident'},timeOfDay:{label:'Time of day',group:'Incident'},
+        incident:{label:'Incident',group:'Details'},location:{label:'Location',group:'Details'},dispatcher:{label:'Dispatcher',group:'Details'},detail:{label:'Summary',group:'Details'},note:{label:'Internal note',group:'Details'}
+      },
       setupFields:[['agency','text'],['responders','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'callsign'}],max:8}],['initial','json']],
       patchFields:[['status','enum',statuses],['priority','enum',priorities],['timeOfDay','enum',times],['incident','text'],['location','text'],['dispatcher','text'],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('dispatch').authoring.patchFields.concat(items(panel).map(function (unit) {
-          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']]];
+          return [unit.id,'objf',[['status','enum',unitStatuses],['progress','num'],['lights','enum',['on','off']],['eta','text'],['detail','text']],{label:unit.label||unit.id,group:'Responders'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -7020,6 +7172,12 @@ PanelRegistry.extend('gauge', {
 PanelRegistry.extend('gauge', {
   authoring: {
     template: { title: 'Draw', unit: 'mA', max: 400, initial: { value: 12 } },
+    initialFields: true,
+    fieldMeta: {
+      unit: { label: 'Unit' },
+      max: { label: 'Maximum' },
+      value: { label: 'Value', help: 'The number shown by the gauge.' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['max', 'num'],
@@ -9684,11 +9842,13 @@ PanelRegistry.extend('homemap', {
         var group = document.createElement('details');
         group.className = 'home-elements';
         group.open = state.open;
+        if(state.reveal!=null)group.setAttribute('data-inspector-reveal','');
         var summary = document.createElement('summary');
         summary.textContent =
           key[0].toUpperCase() + key.slice(1) + ' (' + (Array.isArray(cur) ? cur.length : 0) + ')';
         group.appendChild(summary);
         group.appendChild(context.controls.rows(key, cur, shape, homeRowOptions(key, state)));
+        delete state.reveal;
         listen(group,'toggle', function () {
           if (group.isConnected) state.open = group.open;
         });
@@ -9805,6 +9965,7 @@ PanelRegistry.extend('homemap', {
             var fold = document.createElement('details');
             fold.className = 'home-element';
             fold.open = !base || folds.items[index] === true;
+            if(folds.reveal===index)fold.setAttribute('data-inspector-reveal','');
             ref.fold = fold;
             var summary = document.createElement('summary');
             var name = document.createElement('span');
@@ -9972,7 +10133,9 @@ PanelRegistry.extend('homemap', {
                 (home[pick.field] || []).findIndex(function (x) {
                   return x.id === pick.id;
                 });
-          if (home && item >= 0)
+          if (home && item >= 0){
+            this.revealElement({section:target.section,index:target.index,field:pick.field,item:item});
+            context.inspect();
             context.selectClipboard({
               kind: 'home',
               section: target.section,
@@ -9980,6 +10143,7 @@ PanelRegistry.extend('homemap', {
               field: pick.field,
               item: item,
             });
+          }
         },
         revealElement: function (t) {
           var identity = JSON.stringify([t.section, t.index, t.field]);
@@ -9987,6 +10151,7 @@ PanelRegistry.extend('homemap', {
             homeElementFolds[identity] || (homeElementFolds[identity] = { open: true, items: [] });
           folds.open = true;
           folds.items[t.item] = true;
+          folds.reveal = t.item;
         },
         decoratePreview: function (card) {
           if (card.querySelector('[data-home-layout]')) return;
@@ -10178,18 +10343,18 @@ PanelRegistry.extend('image', {
             };
             reader.readAsDataURL(file);
           });
-          wrap.appendChild(input);
-          wrap.appendChild(note);
           if (cur) {
             var remove = document.createElement('button');
             remove.type = 'button';
-            remove.className = 'bbtn';
+            remove.className = 'bbtn bdanger';
             remove.textContent = 'Remove image';
             remove.addEventListener('click', function () {
               if (context.commit(key, null)) context.refresh();
             });
             wrap.appendChild(remove);
           }
+          wrap.appendChild(input);
+          wrap.appendChild(note);
           return context.controls.block('Image file', wrap);
         },
       };
@@ -10556,18 +10721,58 @@ PanelRegistry.extend('inflight', {
 });
 
 /* inflight authoring contract; merged into this panel definition by the bundle. */
+function inflightOperationEditor(context) {
+  function laneOptions(panel) {
+    return (Array.isArray(panel.lanes) ? panel.lanes : [])
+      .filter(function (lane) { return lane && typeof lane.id === 'string'; })
+      .map(function (lane) { return lane.id; });
+  }
+  function endRows(options) {
+    if (options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (lane) { return typeof lane !== 'string'; }))) return null;
+    var rows = (options.value || []).map(function (lane, index) { return { lane: lane, _sourceIndex: index }; });
+    return context.controls.rows('Finishes', rows,
+      { cols: [{ k: 'lane', label: 'Lane', kind: 'enum', options: laneOptions(options.panel), req: true }] },
+      { raw: false, commitValue: options.commit, collect: function (items) {
+        return { value: items.length ? items.map(function (item) { return item.lane; }) : undefined };
+      }});
+  }
+  return { patchControl: function (field, options) {
+    var key = field[0], lanes = laneOptions(options.panel), shape;
+    if ((key === 'start' || key === 'mark') && options.value !== undefined &&
+        (!Array.isArray(options.value) || options.value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'start') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'label', label: 'Operation label' }
+    ]};
+    if (key === 'mark') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes, req: true },
+      { k: 'state', label: 'Outcome', kind: 'enum', options: INFLIGHT_STATES, req: true }
+    ]};
+    if (shape) return context.controls.rows(key, options.value, shape,
+      { raw: false, commitValue: options.commit });
+    if (key === 'end') return endRows(options);
+  }};
+}
 PanelRegistry.extend('inflight', {
   authoring: {
     template: { title: 'In flight', lanes: [{ id: 'op', label: 'operation' }] },
-    setupFields: [
-      ['lanes', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
-      ['initial', 'json'],
-    ],
+    setupFields: [['lanes', 'rows', { cols: [{ k: 'id', label: 'Lane ID', req: true }, { k: 'label', label: 'Name' }] }]],
     patchFields: [
       ['start', 'jsonArr'],
       ['end', 'jsonArr'],
       ['mark', 'jsonArr'],
     ],
+    fieldMeta: {
+      lanes: { label: 'Operation lanes', help: 'Declare up to eight lanes before adding operations.', group: 'Content' },
+      start: { label: 'Start operations', unsetLabel: 'Start nothing at this step',
+        help: 'Each row starts a new operation at this step. Starting an already-open lane closes its earlier bar and begins a new one.' },
+      end: { label: 'Finish operations', unsetLabel: 'Finish nothing at this step',
+        help: 'Each lane closes its currently open operation at this step.' },
+      mark: { label: 'Mark open operations', unsetLabel: 'Mark nothing at this step',
+        help: 'Set the outcome of an operation that is still open. This is an event at this step, not an inherited snapshot.' },
+    },
+    editor: inflightOperationEditor,
     picker: {
       order: 6,
       name: 'In-flight work',
@@ -10608,8 +10813,6 @@ PanelRegistry.extend('inflight', {
       };
       states = [{}, {}, {}, {}, {}, {}];
       step = 5;
-
-      panel.initial = builderClone(state);
 
       return { panel: panel, state: state, states: states, step: step };
     },
@@ -10756,6 +10959,10 @@ PanelRegistry.extend('leds', {
       ],
       initial: { power: 'on' },
     },
+    initialFields: true,
+    fieldMeta: {
+      leds: { label: 'Indicators' },
+    },
     setupFields: [
       ['leds', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['initial', 'json'],
@@ -10774,7 +10981,12 @@ PanelRegistry.extend('leds', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
+          return [
+            item.id,
+            'enum',
+            ['on', 'off', 'tx', 'rx'],
+            { label: item.label || item.id, group: 'Indicators' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -10905,6 +11117,7 @@ PanelRegistry.extend('log', {
 /* log authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('log', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Event log',
       tags: { NET: '#38E1FF' },
@@ -10915,6 +11128,13 @@ PanelRegistry.extend('log', {
       ['initial', 'json'],
     ],
     patchFields: [['log', 'jsonArr']],
+    fieldMeta: {
+      tags: {label:'Event tags and colors',group:'Content'},
+      log: {label:'Events',initial:{help:'Events visible before the story begins.'},step:{help:'These events append to the log at this step. An empty list adds nothing; it does not clear earlier events.'}},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='log')return createPanelLogComposer(context,options);
+    }};},
     picker: {
       order: 7,
       name: 'Event log',
@@ -11178,6 +11398,13 @@ PanelRegistry.extend('orbit', {
       title: 'Lifecycle',
       states: ['IDLE', 'ACTIVE', 'DONE'],
       initial: { state: 'IDLE' },
+    },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Lifecycle states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state' },
+      via: { label: 'Transition label', help: 'Describe how the lifecycle reached this state.' },
     },
     setupFields: [
       ['states', 'csv'],
@@ -12219,6 +12446,14 @@ body.sk-editorial .sk-daylight .qside-out{color:var(--ed-warn);}`,
 PanelRegistry.extend('queue', {
   authoring: {
     template: { title: 'Queue', initial: { state: 'empty' } },
+    initialFields: true,
+    fieldMeta: {
+      state: { label: 'Queue state', group: 'Message' },
+      label: { label: 'Message label', group: 'Message' },
+      from: { label: 'From', group: 'Route' },
+      to: { label: 'To', group: 'Route' },
+      reason: { label: 'Waiting reason', group: 'Route' },
+    },
     setupFields: [['initial', 'json']],
     patchFields: [
       ['state', 'enum', ['empty', 'enqueue', 'held', 'dequeue']],
@@ -14244,11 +14479,17 @@ PanelRegistry.extend('screen', {
         {id:'hall',label:'Hall motion',kind:'motion',zone:'Hallway'}],
         initial:{status:'armed',operator:'Monitoring team',assessment:'unverified',video:'closed',scenePlayback:'waiting',
           frontDoor:{health:'online',alarm:'clear'},doorbell:{health:'online',alarm:'clear'},hall:{health:'online',alarm:'clear'}}},
+      initialFields:true,
+      fieldMeta:{
+        site:{label:'Site'},scene:{label:'Camera scene'},videoLabel:{label:'Video label'},sensors:{label:'Sensors'},
+        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},
+        status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
+      },
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
       patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
-          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']]];
+          return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']],{label:sensor.label||sensor.id,group:'Sensors'}];
         }));
       },
       origin:function (panel, key, snapshot, context) {
@@ -14690,6 +14931,10 @@ body.sk-editorial .sk-daylight .sgrow.s-jammed .sgstate{color:var(--ed-bad);}`,
 PanelRegistry.extend('signal', {
   authoring: {
     template: { title: 'Links', links: [{ id: 'up', label: 'uplink', transport: 'wifi' }] },
+    initialFields: true,
+    fieldMeta: {
+      links: { label: 'Connections' },
+    },
     setupFields: [
       [
         'links',
@@ -14742,6 +14987,7 @@ PanelRegistry.extend('signal', {
               ['bars', 'num', { min: 0, max: 4 }],
               ['note', 'text'],
             ],
+            { label: item.label || item.id, group: 'Links' },
           ];
         });
     },
@@ -14899,6 +15145,12 @@ body.sk-editorial .sk-daylight .pchip.cur{
 PanelRegistry.extend('state', {
   authoring: {
     template: { title: 'Device state', states: ['OFF', 'BOOT', 'LIVE'], initial: { state: 'OFF' } },
+    initialFields: true,
+    fieldMeta: {
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+      state: { label: 'Current state', help: 'Choose one of the declared states.' },
+    },
     setupFields: [
       ['states', 'csv'],
       ['colors', 'map'],
@@ -15074,6 +15326,7 @@ PanelRegistry.extend('table', {
 /* table authoring contract; merged into this panel definition by the bundle. */
 PanelRegistry.extend('table', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Data state',
       columns: [
@@ -15092,6 +15345,14 @@ PanelRegistry.extend('table', {
       ['rows', 'jsonArr'],
       ['note', 'text'],
     ],
+    fieldMeta: {
+      columns: {label:'Columns',group:'Content'},
+      rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
+      note: {label:'Explanation'},
+    },
+    editor: function(context){return {patchControl:function(field,options){
+      if(field[0]==='rows')return createPanelTableComposer(context,options);
+    }};},
     picker: {
       order: 0,
       name: 'Data table',
@@ -15647,6 +15908,17 @@ PanelRegistry.extend('thermo', {
       crit: 85,
       initial: { value: 21 },
     },
+    initialFields: true,
+    fieldMeta: {
+      min: { label: 'Minimum' },
+      max: { label: 'Maximum' },
+      warn: { label: 'High warning' },
+      crit: { label: 'High critical' },
+      lowWarn: { label: 'Low warning' },
+      lowCrit: { label: 'Low critical' },
+      value: { label: 'Temperature' },
+      label: { label: 'Reading label' },
+    },
     setupFields: [
       ['unit', 'text'],
       ['min', 'num'],
@@ -15915,6 +16187,12 @@ PanelRegistry.extend('tiles', {
         { id: 't2', label: 'UNIT 2' },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      tiles: { label: 'Devices' },
+      states: { label: 'Available states' },
+      colors: { label: 'State colors' },
+    },
     setupFields: [
       ['tiles', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 12 }],
       ['states', 'csv'],
@@ -15937,7 +16215,12 @@ PanelRegistry.extend('tiles', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'objf', [stateField, ['sub', 'text']]];
+          return [
+            item.id,
+            'objf',
+            [stateField, ['sub', 'text']],
+            { label: item.label || item.id, group: 'Devices' },
+          ];
         });
     },
     example: function (sample, context) {
@@ -16893,8 +17176,29 @@ rect.tlfuture{opacity:.18;}
 });
 
 /* timeline authoring contract; merged into this panel definition by the bundle. */
+function timelineStateEditor(context) {
+  function lanes(panel) { return timelineLaneIds(panel); }
+  return { patchControl: function (field, options) {
+    var key = field[0], value = options.value, shape;
+    if (value !== undefined &&
+        (!Array.isArray(value) || value.some(function (item) { return !panelObject(item); }))) return null;
+    if (key === 'events') shape = { wide: true, cols: [
+      { k: 'at', label: 'Time', kind: 'clock', req: true },
+      { k: 'label', label: 'Event label' },
+      { k: 'kind', label: 'Kind', kind: 'enum', options: TIMELINE_EVENT_KINDS },
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel) }
+    ]};
+    if (key === 'miss') shape = { cols: [
+      { k: 'lane', label: 'Lane', kind: 'enum', options: lanes(options.panel), req: true },
+      { k: 'at', label: 'Expected at', kind: 'clock', req: true }
+    ]};
+    return shape ? context.controls.rows(key, value, shape,
+      { raw: false, commitValue: options.commit }) : null;
+  }};
+}
 PanelRegistry.extend('timeline', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Heartbeat',
       span: '6h',
@@ -16931,6 +17235,18 @@ PanelRegistry.extend('timeline', {
       ['events', 'jsonArr'],
       ['miss', 'jsonArr'],
     ],
+    fieldMeta: {
+      span: { label: 'Timeline span', help: 'A duration such as 6h or 90m.', group: 'Timeline' },
+      cadence: { label: 'Shared cadence', help: 'Used when no per-lane cadences are declared.', group: 'Timeline' },
+      lanes: { label: 'Cadence lanes', help: 'Optional independent periodic tracks; declaring lanes replaces the shared cadence.', group: 'Timeline' },
+      events: { label: 'Events', setup: { label: 'Reference events', help: 'Markers that are always present on the timeline.' },
+        initial: { label: 'Starting events', help: 'Events already present before the first step.' },
+        step: { label: 'Events added here', unsetLabel: 'Add no events at this step', help: 'These markers append at this step. Earlier events remain on the timeline.' } },
+      miss: { label: 'Missed beats', initial: { help: 'Missed lane beats already known before the story starts.' },
+        step: { unsetLabel: 'Add no missed beats at this step', help: 'These misses append at this step. Earlier misses remain visible.' } },
+      now: { label: 'Current time', help: 'Moves the timeline cursor. Later steps keep this value until another valid time is set.' },
+    },
+    editor: timelineStateEditor,
     picker: {
       order: 11,
       name: 'Heartbeat timeline',
@@ -17730,6 +18046,13 @@ PanelRegistry.extend('waterfall', {
         { id: 'work', label: 'processing', ms: 120 },
       ],
     },
+    initialFields: true,
+    fieldMeta: {
+      spans: { label: 'Timed spans' },
+      reveal: { label: 'Visible spans', help: 'Number of spans visible from the start.' },
+      highlight: { label: 'Highlighted span' },
+      total: { label: 'Total label' },
+    },
     setupFields: [
       [
         'spans',
@@ -18044,8 +18367,53 @@ body.sk-editorial .sk-daylight .xfoot.no{color:var(--ed-bad);}`,
 });
 
 /* xray authoring contract; merged into this panel definition by the bundle. */
+function xrayLayerEditor(context) {
+  function composer(options) {
+    var authored = options.value;
+    if (authored !== undefined &&
+        (!Array.isArray(authored) || authored.some(function (item) { return !panelObject(item); }))) return null;
+    var baseline = authored !== undefined ? authored :
+      options.effective && Array.isArray(options.effective.value) ? options.effective.value : [];
+    var ids = Object.create(null);
+    if (baseline.some(function (item) {
+      if (!item || item.id == null) return false;
+      var id = String(item.id);if (ids[id]) return true;ids[id] = true;return false;
+    })) return null;
+    var declarations = Array.isArray(options.panel.layers) ? options.panel.layers : [];
+    var doc = context.document, wrap = doc.createElement('div');wrap.className = 'rowsedit';
+    declarations.forEach(function (layer) {
+      if (!layer || layer.id == null) return;
+      var id = String(layer.id), label = layer.label || id;
+      var current = baseline.find(function (item) { return item && String(item.id) === id; });
+      var input = context.controls.select(['sealed','open'], current && current.open === true ? 'open' : 'sealed', function (state) {
+        var source = baseline, next = source.map(function (item) { return panelObject(item) ? panelCollectionCopy(item) : item; });
+        var index = next.findIndex(function (item) { return item && String(item.id) === id; });
+        if (state === 'open') {
+          var value = index >= 0 && panelObject(next[index]) ? next[index] : { id: id };
+          value.id = layer.id;value.open = true;
+          if (index >= 0) next[index] = value;else next.push(value);
+        } else if (index >= 0) {
+          var sealed = next[index];delete sealed.open;
+          if (Object.keys(sealed).some(function (key) { return key !== 'id'; })) next[index] = sealed;
+          else next.splice(index, 1);
+        }
+        return options.commit(next);
+      });
+      input.setAttribute('aria-label', label + ' layer state');
+      wrap.appendChild(context.controls.row(label, input));
+    });
+    if (!declarations.length) {
+      var empty = doc.createElement('p');empty.className = 'fnote';empty.textContent = 'Declare layers on this panel first.';wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+  return { patchControl: function (field, options) {
+    return field[0] === 'layers' ? composer(options) : null;
+  }};
+}
 PanelRegistry.extend('xray', {
   authoring: {
+    initialFields: true,
     template: {
       title: 'Layers',
       layers: [
@@ -18061,6 +18429,13 @@ PanelRegistry.extend('xray', {
       ['layers', 'jsonArr'],
       ['hop', 'text'],
     ],
+    fieldMeta: {
+      layers: { label: 'Layer states', help: 'A complete snapshot. Layers not listed are sealed; editing an inherited state saves the complete visible snapshot.',
+        setup: { label: 'Layers', help: 'Declare the protection layers from outermost to innermost.' },
+        initial: { label: 'Starting layer states' } },
+      hop: { label: 'Current location', help: 'Names the device or boundary where readability is being evaluated.' },
+    },
+    editor: xrayLayerEditor,
     picker: {
       order: 26,
       name: 'Layer X-ray',

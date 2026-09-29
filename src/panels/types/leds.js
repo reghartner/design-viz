@@ -138,6 +138,10 @@ PanelRegistry.extend('leds', {
       ],
       initial: { power: 'on' },
     },
+    initialFields: true,
+    fieldMeta: {
+      leds: { label: 'Indicators' },
+    },
     setupFields: [
       ['leds', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }] }],
       ['initial', 'json'],
@@ -156,7 +160,12 @@ PanelRegistry.extend('leds', {
           return item && typeof item.id === 'string' && item.id !== '';
         })
         .map(function (item) {
-          return [item.id, 'enum', ['on', 'off', 'tx', 'rx']];
+          return [
+            item.id,
+            'enum',
+            ['on', 'off', 'tx', 'rx'],
+            { label: item.label || item.id, group: 'Indicators' },
+          ];
         });
     },
     example: function (sample, context) {

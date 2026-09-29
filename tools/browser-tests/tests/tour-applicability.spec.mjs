@@ -63,7 +63,7 @@ test('the built-in tour finds later-tab capabilities and numbers only the lesson
     if(detailTopics.includes(title))await expect(activeTab(page)).toHaveText('Details');
     if(title==='Make room to explore'){
       await expect(activeView(page)).toHaveText('Engineering view');
-      await expect(page.locator('.explore-window:visible')).toHaveCount(2);
+      await expect(page.locator('[data-explore-panel]:visible')).toHaveCount(2);
     }
   });
   expect(lessons.map(x=>x.title)).toEqual(expect.arrayContaining(detailTopics));expectContiguous(lessons);

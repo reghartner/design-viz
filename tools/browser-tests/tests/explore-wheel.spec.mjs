@@ -89,9 +89,9 @@ test('wheel units and limits are consistent; inactive and destroyed viewports re
   await dispatch(board,-100000);expect(await width(board)/ratio).toBeCloseTo(4,5);await dispatch(board,100000);expect(await width(board)/ratio).toBeCloseTo(.15,5);
   await host.getByRole('button',{name:'Business',exact:true}).click();
   // The regular view now owns Ctrl-wheel after Explore releases the board.
-  const regularWidth=await board.locator('.boardcanvas>svg').evaluate(el=>el.getBoundingClientRect().width);
+  const regularGraph=host.locator('.board .boardcanvas>svg'),regularWidth=await regularGraph.evaluate(el=>el.getBoundingClientRect().width);
   expect(await held.evaluate(el=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-50});el.dispatchEvent(e);return e.defaultPrevented;})).toBe(true);
-  expect(await board.locator('.boardcanvas>svg').evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(regularWidth);
+  expect(await regularGraph.evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(regularWidth);
   await page.evaluate(()=>__host.left(false));await expect(host.locator('.docview')).toHaveCount(0);
   expect(await held.evaluate(el=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-50});el.dispatchEvent(e);return e.defaultPrevented;})).toBe(false);
   await expect.poll(()=>resources(page)).toEqual(baseline);await held.dispose();

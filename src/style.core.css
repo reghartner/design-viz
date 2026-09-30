@@ -146,11 +146,19 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .board-pan-position:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:4px;}
 .board-pan-button{flex:none;min-width:32px;}
 .board-pan-button:disabled{opacity:.4;cursor:default;}
+.board-zoom{display:flex;align-items:center;gap:5px;}
+.board-zoom-value{min-width:42px;text-align:center;font-variant-numeric:tabular-nums;}
+.board-zoom button:disabled{opacity:.4;cursor:default;}
+.explore-tools .board-zoom{display:none;}
 .board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 @media screen{
-  @container(max-width:640px){
-    .board.board-size-auto .boardcanvas svg{min-width:1180px;}
-  }
+  .board:not(.explore-board){max-height:70dvh;overflow:auto;box-sizing:border-box;}
+  .board:not(.explore-board)>.lg{top:0;z-index:4;}
+  .board:not(.explore-board) .boardcanvas{cursor:grab;touch-action:pan-x pan-y;}
+  .board.board-dragging,.board.board-dragging .boardcanvas{cursor:grabbing;user-select:none;}
+  .board.board-zoomed:not(.explore-board){height:var(--board-viewport-height);box-sizing:border-box;overscroll-behavior:contain;overflow-anchor:none;}
+  .board.board-zoomed:not(.explore-board) .boardcanvas{width:max(100%,var(--board-zoom-width));}
+  .board.board-zoomed:not(.explore-board) .boardcanvas>svg{width:var(--board-zoom-width);min-width:0;max-width:none;margin:0 auto;}
 }
 @media print{
   .board.board-size-readable .boardcanvas svg{min-width:0;}

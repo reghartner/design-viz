@@ -12,7 +12,7 @@ function harness() {
   let nextTimer = 0, document;
   function element(tag = 'div') {
     const events = new Map(), attrs = {}, classes = new Set();
-    const node = {tag, events, children: [], parentNode: null, hidden: false, style: {setProperty() {}},
+    const node = {tag, events, children: [], parentNode: null, hidden: false, style: {setProperty() {}, removeProperty() {}},
       className: '', offsetWidth: 260, offsetHeight: 40, focusCount: 0,
       classList: {add: name => classes.add(name), remove: name => classes.delete(name),
         contains: name => classes.has(name), toggle(name, on) { if (on) classes.add(name); else classes.delete(name); }},

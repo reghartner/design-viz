@@ -2119,6 +2119,97 @@ function createProseController(proseEl, toggleButton, defaultCollapsed, onChange
   return control;
 }
 
+/* The regular reader keeps navigation inside its board. Explore owns its own
+   camera; these styles and gestures are inactive while it borrows the board. */
+function createBoardNavigation(board, group, legend, changed){
+  var canvas=board.querySelector('.boardcanvas');if(!canvas)return null;
+  var retired=false,gesture=null,suppressClick=false,paused=null;
+  var controls=document.createElement('div');controls.className='board-zoom';
+  controls.setAttribute('role','group');controls.setAttribute('aria-label','Diagram zoom');
+  function button(text,label,action){var b=document.createElement('button');b.type='button';b.className='mbtn';b.textContent=text;b.setAttribute('aria-label',label);b.addEventListener('click',action);controls.appendChild(b);return b;}
+  var out=button('−','Zoom out',function(){scale(.8);});
+  var value=document.createElement('span');value.className='board-zoom-value';controls.appendChild(value);
+  var into=button('+','Zoom in',function(){scale(1.25);});
+  button('Fit diagram','Fit diagram',function(){
+    var svg=graph();if(!enabled() || !svg)return;
+    var box=svg.viewBox.baseVal;
+    zoom(Math.min(board.clientWidth/box.width,Math.max(1,board.clientHeight-legend.offsetHeight)/box.height));
+    board.scrollLeft=board.scrollTop=0;
+  });
+  controls.title='Drag the diagram background to pan. Ctrl/⌘ + wheel or pinch to zoom.';
+  group.appendChild(controls);
+  function enabled(){return !retired && !board.classList.contains('explore-board');}
+  function graph(){return canvas.querySelector('svg');}
+  function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/svg.viewBox.baseVal.width:1;}
+  function refresh(){if(!enabled())return;var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;}
+  function zoom(next){
+    var svg=graph();if(!enabled() || !svg || !board.clientWidth)return;
+    var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect();
+    var x=frame.left+board.clientLeft+board.clientWidth/2,y=frame.top+board.clientTop+legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2;
+    var cx=(x-before.left)/before.width,cy=(y-before.top)/before.height;
+    board.style.setProperty('--board-viewport-height',frame.height+'px');
+    board.style.setProperty('--board-zoom-width',(svg.viewBox.baseVal.width*Math.max(.15,Math.min(4,next)))+'px');
+    board.classList.add('board-zoomed');
+    // Updating overflow controls before measuring accounts for their height.
+    changed();
+    var after=svg.getBoundingClientRect();
+    board.scrollLeft+=after.left+cx*after.width-x;
+    board.scrollTop+=after.top+cy*after.height-y;
+    refresh();
+  }
+  function scale(factor){zoom(ratio()*factor);}
+  function reset(){
+    cancel();board.classList.remove('board-zoomed');
+    board.style.removeProperty('--board-zoom-width');board.style.removeProperty('--board-viewport-height');
+    if(paused){paused.width='';paused.height='';}
+  }
+  function down(ev){
+    suppressClick=false;
+    if(!enabled() || ev.button!==0 || ev.pointerType==='touch' || gesture || !ev.target.closest('.boardcanvas') || ev.target.closest('a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    ev.preventDefault();board.focus({preventScroll:true});
+    gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,left:board.scrollLeft,top:board.scrollTop};
+    board.setPointerCapture(ev.pointerId);board.classList.add('board-dragging');
+  }
+  function move(ev){
+    if(!gesture || ev.pointerId!==gesture.id)return;
+    var dx=ev.clientX-gesture.x,dy=ev.clientY-gesture.y;
+    if(Math.abs(dx)+Math.abs(dy)>3)suppressClick=true;
+    board.scrollLeft=gesture.left-dx;board.scrollTop=gesture.top-dy;
+  }
+  function finish(ev,cancelled){
+    if(!gesture || ev && ev.pointerId!==gesture.id)return;
+    var g=gesture;gesture=null;
+    if(cancelled){board.scrollLeft=g.left;board.scrollTop=g.top;}
+    board.classList.remove('board-dragging');
+    if(board.hasPointerCapture(g.id))board.releasePointerCapture(g.id);
+  }
+  function up(ev){finish(ev,false);}
+  function cancel(ev){finish(ev && ev.pointerId!==undefined?ev:null,true);}
+  function lost(ev){finish(ev,(ev.buttons&1)!==0);}
+  function key(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();cancel();}}
+  function click(ev){if(suppressClick){suppressClick=false;ev.preventDefault();ev.stopPropagation();}}
+  function wheel(ev){
+    if(!enabled() || !ev.ctrlKey && !ev.metaKey)return;
+    ev.preventDefault();var delta=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?board.clientHeight:1);
+    scale(Math.exp(-delta*.006));
+  }
+  var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
+  Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
+  board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
+  function snapshot(){return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop};}
+  function restore(state){
+    if(!state || retired)return;
+    if(paused)paused=state;
+    if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
+    if(enabled()){changed();board.scrollLeft=state.x;board.scrollTop=state.y;}
+  }
+  return {refresh:refresh,reset:reset,
+    snapshot:snapshot,restore:restore,
+    suspend:function(){if(retired || paused)return;cancel();paused=snapshot();},
+    resume:function(){if(!paused || retired)return;var state=paused;paused=null;restore(state);},
+    destroy:function(){cancel();retired=true;Object.keys(listeners).forEach(function(type){board.removeEventListener(type,listeners[type]);});board.removeEventListener('click',click,true);board.removeEventListener('wheel',wheel);window.removeEventListener('blur',cancel);}};
+}
+
 /* CSS handles automatic sizing, including hidden tabs and editor resizes.
    Center a newly scrollable view so centered entry nodes start in sight.
    These controls are viewport state only; they never patch the diagram. */
@@ -2126,10 +2217,10 @@ function createBoardSizeControl(board, legend, label){
   var group = document.createElement('div'); group.className = 'board-size';
   group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Diagram size');
   var caption = document.createElement('span'); caption.textContent = 'View'; group.appendChild(caption);
-  var choices = [['auto', 'Auto', 'Readable on narrow diagrams; fit the available width on wider diagrams'],
+  var choices = [['auto', 'Auto', 'Scale smoothly with the available width'],
     ['fit', 'Fit width', 'Show the whole diagram at the available width'],
     ['readable', 'Readable', 'Keep labels at their designed size; scroll sideways to explore']];
-  var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false;
+  var buttons = {}, mode = 'auto', wasScrollable = null, destroyed = false, navigation=null;
   var pan = document.createElement('div'); pan.className = 'board-pan'; pan.hidden = true;
   pan.setAttribute('role', 'group'); pan.setAttribute('aria-label', 'Horizontal diagram scroll');
   var panLabel = document.createElement('span'); panLabel.textContent = 'Scroll'; pan.appendChild(panLabel);
@@ -2167,10 +2258,12 @@ function createBoardSizeControl(board, legend, label){
     board.classList.toggle('board-overflow', scrollable);
     pan.hidden = !scrollable; syncPan();
     wasScrollable = scrollable;
+    if(navigation)navigation.refresh();
   }
   function setMode(value){
     if (destroyed || ['auto', 'fit', 'readable'].indexOf(value) < 0) return;
     mode = value;
+    if(navigation)navigation.reset();
     choices.forEach(function(choice){
       board.classList.toggle('board-size-' + choice[0], mode === choice[0]);
       buttons[choice[0]].setAttribute('aria-pressed', String(mode === choice[0]));
@@ -2182,15 +2275,18 @@ function createBoardSizeControl(board, legend, label){
     button.textContent = choice[1]; button.title = choice[2]; buttons[choice[0]] = button;
     button.addEventListener('click', function(){ setMode(choice[0]); }); group.appendChild(button);
   });
+  navigation=createBoardNavigation(board,group,legend,syncOverflow);
   group.appendChild(pan);
   legend.appendChild(group);
   board.tabIndex = 0; board.setAttribute('role', 'region');
-  board.setAttribute('aria-label', (label || 'Flow') + ' diagram; scroll horizontally to explore');
+  board.setAttribute('aria-label', (label || 'Flow') + ' diagram; drag background to pan, or use zoom and scroll controls');
   setMode('auto');
   var observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(syncOverflow) : null;
   if (observer) observer.observe(board);
   return {mode:function(){ return mode; }, setMode:setMode,
-    destroy:function(){ destroyed = true; board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};
+    snapshot:function(){return navigation && navigation.snapshot();},restore:function(state){if(navigation)navigation.restore(state);},
+    suspend:function(){if(navigation)navigation.suspend();},resume:function(){if(navigation)navigation.resume();},
+    destroy:function(){ destroyed = true; if(navigation)navigation.destroy();board.removeEventListener('scroll', syncPan); if (observer) observer.disconnect(); }};
 }
 
 function appendCanonLinks(host,links){

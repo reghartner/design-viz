@@ -201,16 +201,18 @@ story and panel fields side by side; narrower windows stack them.
 
 On the page, all row diagrams have their own **Auto / Fit width / Readable** controls,
 including default curved edges, explicit `routing:"curves"`, and lane routing.
-Auto uses full-size labels on narrow diagram columns with horizontal scrolling;
-Fit width shows the whole graph. When a diagram overflows, **Scroll** buttons and
+Auto scales smoothly with the column width; Readable keeps labels larger.
+Drag the background to pan, use **− / +** or Ctrl/⌘ + wheel to zoom, and choose
+**Fit diagram** to fit both dimensions. Manual zoom keeps the frame height
+stable; **Fit width** returns to responsive sizing. When a diagram overflows, **Scroll** buttons and
 a draggable slider appear beneath its view choices. Click the arrows or drag/click
 the slider to pan with a regular mouse; trackpad and native scrolling stay in sync.
 Tab to the slider for keyboard positioning, or to the diagram region to pan with arrow
 keys. Phone gutters and larger view buttons leave more room for the content.
-The choice belongs to each diagram and follows the same unique-section match
-as preview playback, even for diagrams without steps. It survives normal
+The choice, zoom and scroll position belong to each diagram and follow the same
+unique-section match as preview playback, even for diagrams without steps. They survive normal
 edits, Render and skin changes, independently of whether a step can be matched.
-It is not saved in JSON, drafts, undo or local storage; reloading resets to
+They are not saved in JSON, drafts, undo or local storage; reloading resets to
 Auto. See [trace viewing](trace-import.md) for sizing and pan behavior.
 
 For saved panel/diagram placement within a section, use

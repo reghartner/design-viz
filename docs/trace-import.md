@@ -144,21 +144,23 @@ for a fictional request with shared dependencies and a service cycle. In lane mo
 cards, with the complete name in the card tooltip and span details.
 
 The diagram's **View** controls select **Auto**, **Fit width** or **Readable**.
-Auto uses the designed 1180-pixel board width when the diagram column is at
-most 640 pixels wide; on wider columns it fits. Readable always keeps that
-minimum width, while Fit width shows the whole graph at the available width.
+Auto and Fit width scale with the available column width, including narrow
+columns. Readable keeps a minimum width of 1180 pixels for larger labels.
 These are viewing controls, not changes to the imported spec or row layout.
 
-For a regular mouse, use the **Scroll** arrows or drag/click the position slider
-below the view choices. They appear only when the board overflows, including in
-Auto mode on narrow columns, and stay synchronized with native scrolling.
+Drag the diagram background to pan with a regular mouse. Use **− / +** or
+Ctrl/⌘ + wheel (including trackpad pinch) to zoom, and **Fit diagram** to fit both
+dimensions. Zoom keeps the diagram frame's height stable; Auto or Fit width
+returns to responsive sizing. Tall diagrams scroll inside a bounded frame.
+The **Scroll** arrows and position slider appear when the board overflows
+horizontally and stay synchronized with native scrolling.
 You can also Tab to the slider or named diagram region and use the arrow keys.
 The legend and view controls stay in sight while you
 pan. A newly overflowing board starts horizontally centered; later resizes
 and tab visits preserve an existing pan. In the workbench, a uniquely matched
-section retains its view choice through normal edits and skin changes. A
-rebuilt board starts with a fresh pan position; reload resets its choice to
-Auto. Printed diagrams fit the page and omit the view controls.
+section retains its view choice, zoom and scroll position through normal edits
+and skin changes. Reload resets its choice to Auto. Printed diagrams fit the
+page and omit the view controls.
 
 `routing: "curves"` (or omitting routing) uses the default no-lanes renderer.
 Lane routing supports one to five unstacked cards per row, without floats or

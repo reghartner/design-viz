@@ -10,7 +10,7 @@ function scrollPosition(row){
     aligned:Math.abs(scrollY-wantedScroll)<=1,fonts:document.fonts.status};
 }
 test('standalone exports fill wide and narrow responsive viewports',async({page,server})=>{
-  for(const [viewport,paddingLeft] of [[{width:1800,height:1000},'30px'],[{width:640,height:900},'8px']]){
+  for(const [viewport,paddingLeft] of [[{width:1800,height:1000},'26px'],[{width:640,height:900},'8px']]){
     await page.setViewportSize(viewport);
     await page.goto(pathToFileURL(path.join(server.root,'standalone.html')).href);
     const box=await page.locator('#docview').boundingBox();

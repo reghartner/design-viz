@@ -40,7 +40,7 @@ test('mouse scroll controls work in the workbench without editing the spec or co
   await page.locator('[data-dv-node="a"]').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
   await page.setViewportSize({width:1000,height:1000});
   await board.getByRole('button',{name:'Auto',exact:true}).click();
-  await expect(board.getByRole('group',{name:'Horizontal diagram scroll'})).toBeVisible();
+  await expect(board.getByRole('group',{name:'Horizontal diagram scroll'})).toBeHidden();
   await expect(page.locator('#src')).toHaveValue(source);
 });
 

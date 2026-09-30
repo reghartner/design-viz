@@ -137,8 +137,11 @@ Every `rows` array renders its slots left to right. Stack members render top to
 bottom within one slot.
 
 All row diagrams offer **Auto**, **Fit width** and **Readable** views, with
-curved edges or lane routing. In a narrow diagram column, Auto keeps labels
-legible and lets you scroll sideways; Fit width shows the complete graph.
+curved edges or lane routing. Auto scales smoothly as the diagram column resizes;
+Readable keeps labels large and lets you scroll. Drag the diagram background to
+pan, use **− / +** or Ctrl/⌘ + wheel (including trackpad pinch) to zoom, and
+**Fit diagram** to see the whole graph. Manual zoom stays inside the diagram
+frame without changing the page height; **Fit width** returns to responsive sizing.
 These controls also work in published pages; no routing setting is required.
 
 **Broader design panels:** `table` shows data snapshots, `checks` shows

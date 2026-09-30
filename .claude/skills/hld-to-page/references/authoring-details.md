@@ -103,7 +103,10 @@ temporary. Forge selects Confluence automatically; catalog viewer links select
 Backstage. Missing profiles fall back to default, then the existing layout.
 Every row diagram has **Auto / Fit width / Readable** viewing controls, including
 curved edges. Do not enable lane routing just to expose sizing; these choices
-do not modify the spec or routing. Overflowing diagrams show mouse-friendly
+do not modify the spec or routing. Auto scales smoothly with column width;
+Readable keeps labels larger. Regular views also support background drag-to-pan,
+−/+ and Ctrl/⌘-wheel zoom, and Fit diagram. These are temporary viewing controls.
+Overflowing diagrams show mouse-friendly
 **Scroll** arrows and a draggable position slider under the view choices;
 no spec field enables them. See `docs/workbench-workspace.md`.
 Use `diagram.layouts:[{id,name,sectionLayout}]` for several named views of one

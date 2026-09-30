@@ -33,6 +33,7 @@ function workbenchPreviewSnapshot(page, ctl){
     var prior = {sectionId:section.sectionId,context:section.context,content:section.content,
       playbackDefault:VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient'};
     if (rec.boardSize) prior.sizeMode = rec.boardSize.mode();
+    if (rec.boardSize && rec.boardSize.snapshot) prior.boardNavigation = rec.boardSize.snapshot();
     if (rec.flowDisclosure){ prior.flowOpen = rec.flowDisclosure.open; prior.primaryPanel = section.diagram.primaryPanel; }
     if (rec.presentation){
       prior.focusMode = rec.presentation.mode(); prior.focusPanel = rec.presentation.panelId;
@@ -78,6 +79,7 @@ function restoreWorkbenchPreview(page, ctl, saved){
     if (rec.presentation && rec.presentation.setDiagramVisible && prior.layoutConfig===JSON.stringify([section.diagram.sectionLayout,section.diagram.layouts]) &&
         (!rec.presentation.layoutId || rec.presentation.layoutId()===prior.layoutId)) rec.presentation.setDiagramVisible(prior.layoutFlowVisible);
     if (rec.boardSize) rec.boardSize.setMode(prior.sizeMode);
+    if (rec.boardSize && rec.boardSize.restore) rec.boardSize.restore(prior.boardNavigation);
     if (rec.flowDisclosure && typeof prior.flowOpen === 'boolean' && prior.primaryPanel === section.diagram.primaryPanel)
       rec.flowDisclosure.open = prior.flowOpen;
     if (!stepper || !prior.mode || prior.playbackDefault!==(VIEW_SET.indexOf(section.diagram.view)>=0 ? section.diagram.view : 'ambient')) return;

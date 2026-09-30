@@ -12,6 +12,7 @@ function element(){
   return {children:[], attrs:{}, events:{}, classList:{
     toggle(name, on){ if(on) classes.add(name); else classes.delete(name); },
     contains:name=>classes.has(name)},
+    querySelector(){return null;},
     appendChild(child){ this.children.push(child); },
     setAttribute(name, value){ this.attrs[name] = value; },
     addEventListener(name, fn){ this.events[name] = fn; },

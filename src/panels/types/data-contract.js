@@ -253,20 +253,34 @@
         if (field.cells != null && !panelObject(field.cells)) warnings.push(at + '.cells: expected an object keyed by column id — cells ignored');
       });
       patchWarnings(panel.initial, path + '.initial', panel, warnings);
-      // Steps may highlight fields introduced earlier, including on alternate paths.
-      var known = fields(panel).slice();
-      function collect(state) {
-        if (!panelObject(state)) return;
-        fields(state).forEach(function (field) {
-          if (!known.some(function (item) { return item.id === field.id; })) known.push(field);
+      // Use the shared folder on each path; future and sibling fields must not
+      // make a missing highlight target appear valid at this stop.
+      var contexts = new Map();
+      if (diagram) diagramPathList(diagram).forEach(function (route) {
+        var steps = route.indices.map(function (index) { return diagram.steps[index]; });
+        var carriedSteps = steps.map(function (step) {
+          var patch = (stepPanelPatch(step) || {})[panel.id], values = {}, patches = Object.create(null);
+          if (panelOwn(patch, 'fields')) values.fields = patch.fields;
+          patches[panel.id] = values;
+          return {panels:patches};
         });
-        if (panelObject(state.enterOnce)) collect(state.enterOnce);
-      }
-      collect(panel.initial);
-      ((diagram && diagram.steps) || []).forEach(function (step) { collect((stepPanelPatch(step) || {})[panel.id]); });
-      return Object.assign({}, panel, {fields:known});
+        var states = foldCommonPanelStates(panel, carriedSteps);
+        steps.forEach(function (step, index) {
+          var patch = (stepPanelPatch(step) || {})[panel.id];
+          if (!panelObject(patch)) return;
+          if (!contexts.has(patch)) contexts.set(patch, []);
+          contexts.get(patch).push(content(panel, states[index]));
+        });
+      });
+      return contexts;
     },
-    validatePatch:function (state, path, panel, warnings, context) { patchWarnings(state, path, context || panel, warnings); }, render:render,
+    validatePatch:function (state, path, panel, warnings, context) {
+      var candidates = context && context.get(state), found = [];
+      (candidates || [content(panel, panel.initial)]).forEach(function (active) {
+        patchWarnings(state, path, active, found);
+      });
+      Array.from(new Set(found)).forEach(function (warning) { warnings.push(warning); });
+    }, render:render,
     authoring:{
       initialFields:true, transientFields:['columns','fields','fieldWidth','highlights'],
       template:{title:'Data contract',fieldWidth:180,

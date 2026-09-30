@@ -138,3 +138,31 @@ test('step widths validate before committing and columns edit through step assig
   config.commitValue(config.collect([{_sourceIndex:0,label:'New type',width:210}]).value);
   assert.deepEqual(saved,[{id:'type',label:'New type',width:210}]);
 });
+
+test('highlight validation uses fields carried on the active path, not removed or future fields',()=>{
+  const p=panel();p.fields=[{id:'a'}];p.initial={};
+  const d=diagram(p,[
+    {id:'replace',panels:{contract:{fields:[{id:'b'}]}}},
+    {id:'highlight',panels:{contract:{highlights:{a:{color:'blue'},b:{color:'green'},future:{color:'red'}}}}},
+    {id:'future',panels:{contract:{fields:[{id:'future'}]}}}
+  ]);
+  let result=C.validate(C.normalize(d));
+  assert.ok(result.warnings.some(w=>w.includes('highlights.a: unknown')));
+  assert.ok(result.warnings.some(w=>w.includes('highlights.future: unknown')));
+  assert.ok(!result.warnings.some(w=>w.includes('highlights.b: unknown')));
+  d.paths=[{id:'left',steps:['replace','highlight']},{id:'right',steps:['future']}];
+  result=C.validate(C.normalize(d));
+  assert.ok(result.warnings.some(w=>w.includes('highlights.future: unknown')));
+  assert.ok(!result.warnings.some(w=>w.includes('highlights.b: unknown')));
+});
+
+test('temporary field declarations validate locally and do not carry into later highlights',()=>{
+  const p=panel();p.initial={};
+  const d=diagram(p,[
+    {panels:{contract:{enterOnce:{fields:[{id:'temporary'}],highlights:{temporary:{color:'blue'}}}}}},
+    {panels:{contract:{highlights:{temporary:{color:'blue'}}}}}
+  ]);
+  const result=C.validate(C.normalize(d));
+  assert.equal(result.warnings.length,1);
+  assert.match(result.warnings[0],/steps\[1\].*highlights.temporary: unknown/);
+});

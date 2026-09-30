@@ -58,6 +58,20 @@ test('table caps rows, skips malformed and duplicate declarations without throwi
   assert.match(C.softwarePanelHTML(p,{rows:false}), /No rows/);
 });
 
+test('table widths accept positive pixels and ignore invalid imported widths safely', () => {
+  const p = {id:'t',type:'table',columns:[{id:'a',width:120},{id:'b'}]};
+  assert.deepEqual(plain(issues([p])), {errors:[],warnings:[]});
+  assert.match(C.softwarePanelHTML(p,{}), /<col style="width:120px"><col><col>/);
+  for (const width of [0,-1,Infinity,NaN,'120','10px" onmouseover="bad()',{}]) {
+    p.columns[0].width = width;
+    const warnings = [];
+    C.PanelRegistry.get('table').validateDeclaration(p,'panel',warnings);
+    assert.match(warnings.join('\n'), /columns\[0\].width: expected a positive number/);
+    const html = C.softwarePanelHTML(p,{});
+    assert.doesNotMatch(html, /swtable-fixed|<colgroup>|onmouseover/);
+  }
+});
+
 test('checks display authored outcomes and unmentioned checks remain pending', () => {
   const p = {type:'checks',checks:[{id:'a'},{id:'b'},{id:'c'}]};
   const s = {results:{a:{status:'fail',detail:'<reason>'},b:{status:'skip'}}};

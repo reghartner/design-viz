@@ -5,6 +5,18 @@ device shadow; checks can show authorization or an actuator interlock; a
 budget can show token consumption or staging memory. Fetch the precise fields
 with `python3 tools/widget_doc.py table checks budget`.
 
+For an API or event contract, choose **Data contract** (`data-contract`): each
+field is a row, with custom columns such as Type, Required, Example and Notes.
+In Inspect, add or reorder fields and columns and set their widths. Names are
+editable without changing the IDs used by cells or highlights. Use
+`python3 tools/widget_doc.py data-contract` for the contract and
+[`examples/data-contract/data-contract.spec.json`](../examples/data-contract/data-contract.spec.json)
+for a complete story. Highlight colors and optional labels belong to starting
+state or step patches; an empty highlights map clears the emphasis, and
+`enterOnce` makes it temporary. Highlights explain authored meaning, not
+automatically inferred validity. The ordinary table also accepts per-column
+`width` in pixels to keep record snapshots steady across steps.
+
 Values below are fictional examples. For a real HLD, replace every value and
 outcome with source evidence. An omitted budget value is unknown, not zero.
 Checks render authored outcomes, not computed guarantees. A failed check may

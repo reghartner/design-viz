@@ -27,6 +27,17 @@ STEP** or connection mode first. If the source, rendered diagram, or destination
 changes while the picker is open, Add is disabled; close and reopen it to use the
 current destination.
 
+Choose **Software & data → Data contract** for one field per row with custom
+columns. Inspect provides **Add field**, **Add column**, names, ordering and
+widths; use **Centerpiece** for a wide contract. **Starting state → Field
+highlights** sets the opening colors. To emphasize fields at another step,
+select that step, use **ADD TO STEP**, click the contract panel and finish
+adding. Its **Field highlights** controls offer preset or custom colors,
+optional explanatory labels, **Clear all highlights**, and **Carry forward**
+or **This step only** duration. Undo restores the edit, including removed
+fields and their highlights. **Data table** remains available for record
+snapshots; its **Columns → Width (px)** controls stabilize column widths.
+
 ## Implementation and verification
 
 Each file in `src/panels/types/` supplies its catalog entry, template and preview

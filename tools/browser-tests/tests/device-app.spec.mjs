@@ -81,6 +81,36 @@ test('notification Markdown edits preview safely and undo separately from the st
  await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);
 });
 
+for(const action of ['Move down','Remove notification']){
+ test(action+' clears notification Markdown drafts without leaking another card’s URL',async({page,server})=>{
+  const spec=structuredClone(raw),d=diagram(spec);
+  d.steps[2].panels.app.notify=[{app:'App',text:'First message'},{app:'App',text:'Second message'}];
+  const original=JSON.stringify(spec,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
+  const guide=page.locator('#guide'),src=page.locator('#src');
+  const caption=guide.locator('.prose-editor').filter({has:page.getByLabel('text',{exact:true})});
+  await caption.getByLabel('Formatting link URL').fill(server.origin+'/step-draft');
+  const patch=guide.locator('.patchedit').filter({has:page.locator('summary').filter({hasText:/^app ·/})});
+  await openInspectorGroup(patch);
+  const cards=patch.locator('.notification-editor'),first=cards.nth(0),second=cards.nth(1);
+  await first.getByLabel('Formatting link URL').fill(server.origin+'/first-draft');
+  await second.getByLabel('Formatting link URL').fill(server.origin+'/second-draft');
+  await first.getByRole('button',{name:action,exact:true}).click();
+  await expect(first.getByLabel('Message',{exact:true})).toHaveValue('Second message');
+  for(const url of await patch.getByLabel('Formatting link URL').all())await expect(url).toHaveValue('');
+  await expect(caption.getByLabel('Formatting link URL')).toHaveValue(server.origin+'/step-draft');
+  const structural=await src.inputValue(),message=first.getByLabel('Message',{exact:true});
+  await first.getByLabel('Formatting link URL').fill(server.origin+'/fresh');
+  await message.focus();await message.evaluate(el=>el.setSelectionRange(0,6));
+  await first.getByRole('button',{name:'Insert link',exact:true}).click();
+  await expect(message).toHaveValue('[Second]('+server.origin+'/fresh) message');
+  await expect(app(page.locator('#docview')).locator('.phonetext a')).toHaveAttribute('href',server.origin+'/fresh');
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(structural);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+ });
+}
+
 test('the picker demonstrates notifications but inserts a plain source-free tiled phone',async({page,server},testInfo)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();

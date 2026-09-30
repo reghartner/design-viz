@@ -1132,6 +1132,12 @@ function panelPatchControl(pid, patch, decl, target, options){
             document:document,value:cur,initial:initial,app:decl.appName || decl.brand && decl.brand.app,
             controls:{row:frow,block:frowBlock,text:textControl,prose:proseControl,action:actionButton},listen:listen,
             proseKey:JSON.stringify([pid,initial,'notify']),
+            resetDrafts:function(){
+              // Array positions change on move/remove. Retire their unsaved
+              // formatting state so another card cannot inherit a draft URL.
+              var prefix=JSON.stringify([pid,initial,'notify'])+':';
+              Object.keys(proseDraft.fields).forEach(function(key){if(key.indexOf(prefix)===0)delete proseDraft.fields[key];});
+            },
             commit:function(value){return commitPatch('notify',value);}
           })));return;
         }

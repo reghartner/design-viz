@@ -7,11 +7,13 @@ function createNotificationComposer(options){
   var note=doc.createElement('p');note.className='fnote';
   note.textContent=options.initial?'Notifications shown when the story begins.':'These cards are added at this step, above earlier notifications. Top card is shown first.';
   wrap.appendChild(note);
-  function update(edit){
-    return options.commit(function(current){
+  function update(edit,resetDrafts){
+    var ok=options.commit(function(current){
       var items=edit(Array.isArray(current)?current.slice():current===undefined?[]:[current]);
       return !items.length?undefined:items.length===1 && !Array.isArray(current)?items[0]:items;
     });
+    if(ok && resetDrafts)options.resetDrafts();
+    return ok;
   }
   list.forEach(function(entry,index){
     var card=doc.createElement('fieldset');card.className='notification-editor';
@@ -42,10 +44,10 @@ function createNotificationComposer(options){
       card.appendChild(preview);
     }
     var actions=doc.createElement('div');actions.className='story-actions';
-    function move(delta){return update(function(items){var other=index+delta;if(index>=items.length || other<0 || other>=items.length)return items;var current=items[index];items[index]=items[other];items[other]=current;return items;});}
+    function move(delta){return update(function(items){var other=index+delta;if(index>=items.length || other<0 || other>=items.length)return items;var current=items[index];items[index]=items[other];items[other]=current;return items;},true);}
     var up=controls.action('Move up',function(){return move(-1);});up.disabled=index===0;
     var down=controls.action('Move down',function(){return move(1);});down.disabled=index===list.length-1;
-    actions.append(up,down,controls.action('Remove notification',function(){return update(function(items){return items.filter(function(_,i){return i!==index;});});}));
+    actions.append(up,down,controls.action('Remove notification',function(){return update(function(items){return items.filter(function(_,i){return i!==index;});},true);}));
     card.appendChild(actions);wrap.appendChild(card);
   });
   wrap.appendChild(controls.action('Add notification',function(){return update(function(items){return items.concat([{app:typeof options.app==='string' && options.app.trim()?options.app:'App'}]);});}));

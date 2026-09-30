@@ -175,6 +175,7 @@ jobs:
         with:
           name: flowview-html
           path: |
+            LICENSE
             template/flowview.html
             workbench/flowspec.html
             workbench/catalog.json

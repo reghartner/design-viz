@@ -169,7 +169,7 @@ npm install --ignore-scripts /absolute/path/to/backstage-package/flowview-backst
 ```
 
 **flowview-html** contains the standalone viewer/workbench, adjacent catalog, Canon
-metadata, diagram folders and starter assets. Open `workbench/flowspec.html` for
+metadata, diagram folders, starter assets and the project `LICENSE`. Open `workbench/flowspec.html` for
 offline authoring, or serve the extracted root (for example,
 `python3 -m http.server --directory flowview-html 8000`) to fetch catalog/Canon
 files. HTML already embeds fonts, licenses and the folder-agent kit. The kit's

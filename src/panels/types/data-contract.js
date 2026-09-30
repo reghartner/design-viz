@@ -1,4 +1,4 @@
-/* Authored contract fields and step-specific emphasis, with stable column geometry. */
+/* Authored contract defaults with step-specific content, layout and emphasis. */
 (function () {
   var MAX_COLUMNS = 12, MAX_FIELDS = 64;
   var colors = {blue:'#3b82f6', green:'#22c55e', amber:'#f59e0b', red:'#ef4444', purple:'#a855f7', teal:'#14b8a6'};
@@ -14,19 +14,52 @@
   function text(value) {
     return value === undefined ? '' : value === null ? 'null' : typeof value === 'object' ? JSON.stringify(value) : String(value);
   }
+  function content(panel, state) {
+    var resolved = Object.assign({}, panel);
+    ['columns', 'fields'].forEach(function (key) {
+      if (Array.isArray(state && state[key])) resolved[key] = state[key];
+    });
+    if (state && width(state.fieldWidth, null) !== null) resolved.fieldWidth = state.fieldWidth;
+    return resolved;
+  }
+  function contentWarnings(value, path, warnings) {
+    if (value.fieldWidth != null && width(value.fieldWidth, null) === null)
+      warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using declared width');
+    ['columns', 'fields'].forEach(function (key) {
+      if (value[key] === undefined || Array.isArray(value[key]) && !value[key].length) return;
+      panelCollectionWarnings(value, path, warnings, key, key === 'columns' ? MAX_COLUMNS : MAX_FIELDS, function (item, at, warnings) {
+        if (key === 'columns' && item.width != null && width(item.width, null) === null)
+          warnings.push(at + '.width: use a width of at least 40 pixels — using 160');
+        if (key === 'fields' && item.cells != null && !panelObject(item.cells))
+          warnings.push(at + '.cells: expected an object keyed by column id — cells ignored');
+      });
+    });
+  }
   function patchWarnings(state, path, panel, warnings) {
-    softwarePanelPatchWarnings(state, path, panel, warnings, function (state, at, panel, warnings) {
-      panelKeyedStateWarnings(state, at, panel, warnings, 'highlights', function (entry, at, warnings) {
+    softwarePanelPatchWarnings(state, path, content(panel, state), warnings, function (state, at, panel, warnings) {
+      contentWarnings(state, at, warnings);
+      var known = Array.isArray(state.fields) ? fields(state) : (Array.isArray(panel.fields) ? panel.fields : []);
+      if (state.highlights == null) return;
+      if (!panelObject(state.highlights)) { warnings.push(at + '.highlights: expected an object keyed by declared id'); return; }
+      Object.keys(state.highlights).forEach(function (id) {
+        var entry = state.highlights[id], entryPath = at + '.highlights.' + id;
+        if (!known.some(function (field) { return panelObject(field) && field.id === id; })) {
+          warnings.push(entryPath + ': unknown declared id — ignored'); return;
+        }
+        validateHighlight(entry, entryPath, warnings);
+      });
+      function validateHighlight(entry, at, warnings) {
         if (!panelObject(entry)) warnings.push(at + ': expected {color, label?} — highlight ignored');
         else {
           if (entry.color != null && !color(entry.color)) warnings.push(at + '.color: use blue, green, amber, red, purple, teal or a six-digit hex color — highlight ignored');
           if (entry.label != null && typeof entry.label !== 'string') warnings.push(at + '.label: expected text');
         }
-      });
+      }
     });
   }
   function render(host, panel, state) {
     state = state || {};
+    panel = content(panel, state);
     var cols = columns(panel), rows = fields(panel), firstWidth = width(panel.fieldWidth, 180);
     var total = cols.reduce(function (sum, col) { return sum + width(col.width, 160); }, firstWidth);
     var h = '<div class="dcontract-scroll" tabindex="0" role="region" aria-label="' + esc(panel.title || 'Data contract') + '">' +
@@ -85,7 +118,7 @@
         return error ? {error:error} : {text:out};
       }, {after:function () { context.refresh(); }});
     }
-    function collection(key, panel) {
+    function collection(key, panel, commit) {
       var isFields = key === 'fields', original = panel[key] === undefined ? [] : panel[key], cols = columns(panel);
       // Unsupported imports retain the ordinary JSON editor without a lossy projection.
       if (!Array.isArray(original) || original.some(function (item) {
@@ -130,7 +163,7 @@
           });
           return error ? {error:error} : {value:out};
         },
-        commitValue:function (items) { return saveCollection(key, panel, items); }
+        commitValue:function (items) { return commit ? commit(items) : saveCollection(key, panel, items); }
       });
       control.querySelector('.rowadd').textContent = isFields ? '+ Add field' : '+ Add column';
       control.setAttribute('data-contract-editor', key);
@@ -187,7 +220,21 @@
           return context.commit('fieldWidth', value === null ? null : String(value));
         }));
       },
-      patchControl:function (field, options) { if (field[0] === 'highlights') return highlights(options); }
+      patchControl:function (field, options) {
+        var state = {};
+        Object.keys(options.effectiveFields || {}).forEach(function (key) { state[key] = options.effectiveFields[key].value; });
+        var resolved = content(options.panel, options.initial ? options.panel.initial : state), key = field[0];
+        var value = options.value === undefined && options.effective ? options.effective.value : options.value;
+        if (key === 'highlights') return highlights(Object.assign({}, options, {panel:resolved}));
+        if (key === 'columns' || key === 'fields') {
+          if (value !== undefined) resolved[key] = value;
+          return collection(key, resolved, options.commit);
+        }
+        if (key === 'fieldWidth') return controls.number(value === undefined ? resolved.fieldWidth : value, function (next) {
+          if (next !== null && width(next, null) === null) { context.error('Field name width must be at least 40 pixels.'); return false; }
+          return options.commit(next === null ? undefined : next);
+        });
+      }
     };
   }
 
@@ -195,7 +242,7 @@
     label:'Data contract', since:'0.1.0', order:23.5,
     itemCollection:{key:'fields',max:MAX_FIELDS},
     layout:{focusByDefault:true,focusLabel:'Contract',large:true,height:12,supporting:false,attachControls:true},
-    validateDeclaration:function (panel, path, warnings) {
+    validateDeclaration:function (panel, path, warnings, errors, diagram) {
       if (panel.fieldWidth != null && width(panel.fieldWidth, null) === null) warnings.push(path + '.fieldWidth: use a width of at least 40 pixels — using 180');
       if (Array.isArray(panel.columns) && !panel.columns.length) { /* A field-only contract is valid. */ }
       else panelCollectionWarnings(panel, path, warnings, 'columns', MAX_COLUMNS, function (col, at, warnings) {
@@ -206,10 +253,22 @@
         if (field.cells != null && !panelObject(field.cells)) warnings.push(at + '.cells: expected an object keyed by column id — cells ignored');
       });
       patchWarnings(panel.initial, path + '.initial', panel, warnings);
+      // Steps may highlight fields introduced earlier, including on alternate paths.
+      var known = fields(panel).slice();
+      function collect(state) {
+        if (!panelObject(state)) return;
+        fields(state).forEach(function (field) {
+          if (!known.some(function (item) { return item.id === field.id; })) known.push(field);
+        });
+        if (panelObject(state.enterOnce)) collect(state.enterOnce);
+      }
+      collect(panel.initial);
+      ((diagram && diagram.steps) || []).forEach(function (step) { collect((stepPanelPatch(step) || {})[panel.id]); });
+      return Object.assign({}, panel, {fields:known});
     },
-    validatePatch:patchWarnings, render:render,
+    validatePatch:function (state, path, panel, warnings, context) { patchWarnings(state, path, context || panel, warnings); }, render:render,
     authoring:{
-      initialFields:true, transientFields:['highlights'],
+      initialFields:true, transientFields:['columns','fields','fieldWidth','highlights'],
       template:{title:'Data contract',fieldWidth:180,
         columns:[{id:'type',label:'Type',width:110},{id:'required',label:'Required',width:90},{id:'example',label:'Example',width:180},{id:'notes',label:'Notes',width:240}],
         fields:[{id:'order-id',label:'order_id',cells:{type:'string',required:'Yes',example:'ord_2048',notes:'Unique order identifier'}},
@@ -217,10 +276,10 @@
           {id:'customer-id',label:'customer_id',cells:{type:'string',required:'No',example:'cus_1024',notes:'Present for registered customers'}}],
         initial:{highlights:{}}},
       setupFields:[['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['initial','json']],
-      patchFields:[['highlights','json'],['note','text']],
+      patchFields:[['columns','jsonArr'],['fields','jsonArr'],['fieldWidth','num'],['highlights','json'],['note','text']],
       fieldMeta:{
-        columns:{label:'Columns',group:'Content',help:'Add, rename, reorder or remove custom columns. Widths stay steady across steps; blank widths use 160 px. Up to 12 custom columns.'},
-        fields:{label:'Fields',group:'Content',help:'One contract field per row. Field and column names can change without losing highlights or values. Up to 64 fields.'},
+        columns:{label:'Columns',group:'Content',help:'Add, rename, reorder or remove custom columns. Set columns and widths for this step or inherit the previous values. Blank widths use 160 px. Up to 12 custom columns.'},
+        fields:{label:'Fields',group:'Content',help:'One contract field per row. Field and column names can change without losing highlights or values. Edit every cell for this step or inherit the previous rows. Up to 64 fields.'},
         fieldWidth:{label:'Field name width (px)',group:'Layout'},
         highlights:{label:'Field highlights',help:'Choose colors and optional labels for the fields to emphasize. Inherit previous keeps earlier highlights; Clear all highlights removes them. Use This step only for temporary emphasis.'},
         note:{label:'Explanation'}

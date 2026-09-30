@@ -1186,7 +1186,7 @@ function panelPatchControl(pid, patch, decl, target, options){
         setValueDisabled(valueControl,current==='null',settings.rememberDisabled);return control;
       }
       var customControl=editor.patchControl && editor.patchControl(f,{initial:initial,panel:decl,value:cur,assigned:has,
-        effective:effectiveFields[key] || null,
+        effective:effectiveFields[key] || null, effectiveFields:effectiveFields,
         commit:function(value){return commitPatch(key,value,false,null,storage);}});
       if(customControl){
         var customWrap=document.createElement('div');customWrap.className='panel-state-assignment panel-state-object';

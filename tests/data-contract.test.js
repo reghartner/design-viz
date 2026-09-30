@@ -78,3 +78,63 @@ test('highlight edits compose before a deferred form refresh, including clear an
   actions[0]();selects[1]('green');
   assert.deepEqual(saved,{status:{color:'green'}});
 });
+
+test('all contract content carries forward and temporary overrides restore the carried values',()=>{
+  const p=panel(), original=JSON.stringify(p);
+  const changed=[{id:'new',label:'New field',cells:{custom:0}}];
+  const d=diagram(p,[{panels:{contract:{columns:[{id:'custom',label:'Custom',width:200}],fields:changed,fieldWidth:240}}},
+    {panels:{contract:{enterOnce:{fields:[],columns:[],fieldWidth:80}}}},
+    {panels:{contract:{highlights:{new:{color:'green'}}}}}]);
+  const states=C.foldPanelStates(d).contract;
+  assert.match(render(p,states[0]),/>Custom<.*New field.*>0</s);
+  assert.match(render(p,states[0]),/<col style="width:240px">/);
+  assert.match(render(p,states[1]),/colspan="1".*No fields declared/);
+  assert.match(render(p,states[1]),/<col style="width:80px">/);
+  assert.match(render(p,states[2]),/>Custom<.*New field.*>0</s);
+  assert.match(render(p,states[2]),/--contract-highlight:#22c55e/);
+  assert.deepEqual(plain(C.validate(C.normalize(d))),{errors:[],warnings:[]});
+  assert.equal(JSON.stringify(p),original);
+});
+
+test('step row editor uses inherited columns and preserves typed and unknown cell values',()=>{
+  let projected,config,saved;
+  const element=()=>({setAttribute(){},querySelector(){return {};}});
+  const editor=definition.authoring.editor({controls:{
+    rows(key,items,shape,options){projected=items;config=options;return element();},
+    block(label,control){return control;}
+  }});
+  const inherited=[{id:'new',label:'New',cells:{custom:0,hidden:{keep:true}},extra:true}];
+  editor.patchControl(['fields','jsonArr'],{panel:panel(),effective:{value:inherited},
+    effectiveFields:{columns:{value:[{id:'custom',label:'Custom'}]},fields:{value:inherited}},
+    commit(value){saved=plain(value);return true;}});
+  assert.equal(projected[0].cell0,'0');
+  projected[0].label='Renamed';
+  config.commitValue(config.collect(projected).value);
+  assert.deepEqual(saved,[{id:'new',label:'Renamed',cells:{custom:0,hidden:{keep:true}},extra:true}]);
+  projected[0].cell0='changed';
+  config.commitValue(config.collect(projected).value);
+  assert.equal(saved[0].cells.custom,'changed');
+});
+
+test('invalid step content warns and renders safe declared fallbacks',()=>{
+  const p=panel(), state={columns:'bad',fields:false,fieldWidth:-5};
+  const result=C.validate(C.normalize(diagram(p,[{panels:{contract:state}}])));
+  for(const key of ['columns','fields','fieldWidth'])assert.ok(result.warnings.some(w=>w.includes('panels.contract.'+key)),key);
+  assert.equal(render(p,state),render(p));
+});
+
+test('step widths validate before committing and columns edit through step assignments',()=>{
+  let change,config,saved,error;
+  const editor=definition.authoring.editor({error(message){error=message;},controls:{
+    number(value,commit){assert.equal(value,240);change=commit;return {};},
+    rows(key,items,shape,options){config=options;return {querySelector(){return {};},setAttribute(){}};},
+    block(label,control){return control;}
+  }});
+  const options={panel:panel(),effective:{value:240},commit(value){saved=plain(value);return true;}};
+  editor.patchControl(['fieldWidth','num'],options);
+  assert.equal(change(20),false);assert.match(error,/at least 40/);assert.equal(saved,undefined);
+  change(300);assert.equal(saved,300);
+  editor.patchControl(['columns','jsonArr'],{panel:panel(),commit(value){saved=plain(value);return true;}});
+  config.commitValue(config.collect([{_sourceIndex:0,label:'New type',width:210}]).value);
+  assert.deepEqual(saved,[{id:'type',label:'New type',width:210}]);
+});

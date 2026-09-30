@@ -839,7 +839,14 @@ perspectives" of one timeline). Types:
   editor. Columns can be added, removed and reordered; removing a column keeps
   its stored cells. `fieldWidth` sets the first column's width (default 180 px);
   other column widths default to 160 px. Widths must be at least 40 px. Long
-  values wrap and wide contracts scroll without resizing between steps.
+  values wrap and wide contracts scroll. Starting state and step controls expose
+  `columns`, `fields` (including every cell), and `fieldWidth`, as well as
+  highlights and explanation text. Omitted content uses the declaration until
+  assigned; step assignments carry forward. Each columns/fields assignment
+  replaces the complete array; `[]` clears it. **Inherit previous** removes the
+  local assignment, and **This step only** writes an `enterOnce` override,
+  restoring carried content on the next step. Widths stay steady unless changed
+  explicitly. Step edits leave the declaration unchanged.
   `initial.highlights` and step `highlights` are objects keyed by field ID:
   `{"highlights":{"order-id":{"color":"blue","label":"Primary key"}}}`.
   Colors are `blue|green|amber|red|purple|teal` or six-digit hex values; the

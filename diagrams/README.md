@@ -1,8 +1,8 @@
 # Diagrams
 
 This is the home for maintained diagrams. Keep each diagram in its own
-descriptively named, kebab-case folder, with its authored JSON and generated HTML
-side by side:
+descriptively named, kebab-case folder. The authored JSON spec is required;
+generated standalone HTML is an optional portable export:
 
 ```text
 diagrams/
@@ -64,8 +64,9 @@ For example, after creating the files above:
 
 Use the actual owning entity reference. Each entry references one immediate
 subfolder of `diagrams/`. The folder name supplies the stable diagram ID and
-filenames: `<folder-name>.spec.json` and `<folder-name>.html`. Both files must
-exist. Keep IDs stable once diagrams have links or reviewed evidence.
+required filename: `<folder-name>.spec.json`. Keep IDs stable once diagrams have
+links or reviewed evidence. A matching `<folder-name>.html` may be committed when
+a portable standalone export is useful, but canon publication reads the spec.
 
 Review changes to `canon.json` alongside the diagram's story and evidence.
 The JSON spec remains the source of diagram content; `canon.json` owns membership

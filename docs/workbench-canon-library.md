@@ -59,9 +59,10 @@ membership. Per-spec `page.canon` flags do not enroll a document. For example:
 }
 ```
 
-Each folder contains `<folder-name>.spec.json` and `<folder-name>.html`. The
-folder name supplies the stable ID. Use the actual owning team's entity reference.
-Both files must exist. See the [folder conventions](../diagrams/README.md).
+Each folder contains the required `<folder-name>.spec.json`; the folder name
+supplies the stable ID. Use the actual owning team's entity reference. A matching
+HTML export is optional because the library loads and renders the JSON spec. See
+the [folder conventions](../diagrams/README.md).
 The provider derives compatibility `page.canon` metadata in memory, preserving
 the authored JSON and its evidence. The central entry controls ID, owner and
 canonical status even when the source spec carries older metadata.

@@ -4,6 +4,10 @@ import {parseCanonManifest,materializeCanonSpec,buildEntityDiagramIndex,diagrams
 describe('central canon membership for GitHub adapters',()=>{
   it('uses manifest identity and ownership before indexing service bindings',()=>{
     const entries=parseCanonManifest({version:1,diagrams:[{folder:'diagrams/checkout',owner:'group:default/team'}]});
+    expect(entries).toEqual([{
+      id:'checkout',folder:'diagrams/checkout',owner:'group:default/team',path:'diagrams/checkout/checkout.spec.json',
+      html:'diagrams/checkout/checkout.html',
+    }]);
     const source={page:{title:'Checkout',canon:{id:'old',kind:'design'},sections:[{heading:'Flow',diagram:{
       nodes:{service:{title:'Service',binding:{entityRef:'component:default/checkout'}}},rows:[['service']],edges:[],steps:[],
     }}]}};

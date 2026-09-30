@@ -8,10 +8,9 @@ export async function canonLibrary(file='canon.json'){
   const root=await realpath(path.dirname(path.resolve(file))),manifest=await json(file),entries=[];
   for(const entry of library.entries(manifest)){
     const filename=await realpath(path.join(root,entry.path));
-    const html=await realpath(path.join(root,entry.html));
-    if(!(await stat(filename)).isFile() || !(await stat(html)).isFile())throw new Error('Canon requires regular JSON and HTML files.');
+    if(!(await stat(filename)).isFile())throw new Error('Canon requires a regular JSON spec file.');
     const folder=path.join(root,entry.folder)+path.sep;
-    if(!filename.startsWith(folder) || !html.startsWith(folder))throw new Error('Canon files must remain inside their diagram folder.');
+    if(!filename.startsWith(folder))throw new Error('Canon specs must remain inside their diagram folder.');
     const spec=library.spec(await json(filename),entry);
     const errors=C.validate(spec).concat(C.validateSpec(spec).errors);
     if(errors.length)throw new Error(entry.path+': '+errors.join('\n'));

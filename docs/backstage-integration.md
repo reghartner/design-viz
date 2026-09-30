@@ -274,7 +274,7 @@ requires the updated viewer/Forge bundle as usual.
 
 The company GitHub adapter and nginx publisher use root `canon.json` as their
 membership authority. It lists `diagrams/<name>` folders and their owners; the
-folder determines the stable ID and `<name>.spec.json` / `<name>.html` paths.
+folder determines the stable ID and required `<name>.spec.json` path.
 Per-spec flags cannot enroll documents. The package's pure `/backend` helpers
 `parseCanonManifest` and `materializeCanonSpec` let the GitHub adapter use the same
 rules as the static publisher while retaining its transport and authorization.

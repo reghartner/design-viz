@@ -17,7 +17,7 @@ def folder_agent_kit(root, runtime):
                 relative = path.relative_to(root)
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
-    for name in ['tools/widget_doc.py', 'tools/validate.js',
+    for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
     # Build from these sources; never depend on an existing generated file.

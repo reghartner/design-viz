@@ -535,7 +535,11 @@ login, CSP and iframe permissions remain deployment requirements.
 
 ## Validating a spec (the agent loop)
 
-```
+From a source checkout, build once after checkout/update before calling the
+validator or compatibility CLI. Downloaded folder-agent kits already include it.
+
+```sh
+python3 tools/build.py --runtime-only
 node tools/validate.js my-page.spec.json          # errors + warnings + lint, field paths
 node tools/validate.js --quiet my-page.spec.json  # errors + summary only
 ```

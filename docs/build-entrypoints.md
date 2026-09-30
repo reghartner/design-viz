@@ -150,6 +150,9 @@ It is a development/CI command, never an installed-consumer hook. Do not run thi
 check concurrently with tests or other builds in the same checkout.
 `node tools/check-generated.mjs --tracking-only` rejects tracked files anywhere in
 the generated directory, the backend runtime and the portable HTML/index paths.
+`tools/page_build.py` generates missing template/backend inputs before validation.
+Direct validator, compatibility, state-walk and Canon commands use the static backend;
+run `python3 tools/build.py` after checkout/update first. Downloaded kits are prebuilt.
 Builds leave tracked files unchanged. After updating an older branch, remove any
 staged generated files and rebuild; merge authored source changes instead of bundles.
 GitHub source ZIPs contain source and require these build commands.

@@ -99,6 +99,7 @@ class BuildTests(unittest.TestCase):
         match = re.search(r'<script type="application/json" id="flowview-folder-kit">(.*?)</script>',
                           self.texts["flowspec.html"], re.S)
         files = json.loads(gzip.decompress(base64.b64decode(json.loads(match.group(1))['gzip'])))['files']
+        self.assertEqual(files['LICENSE'], (ROOT / 'LICENSE').read_text())
         self.assertNotIn('tools/source-loader.cjs', files)
         self.assertFalse(any(name.startswith('src/') and name.endswith('.js') for name in files))
         with tempfile.TemporaryDirectory(prefix='flowview-kit-') as directory:

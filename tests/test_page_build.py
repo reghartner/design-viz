@@ -41,6 +41,31 @@ class PageBuildTest(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
+    def test_first_page_build_generates_absent_runtime_and_template(self):
+        checkout = self.tmp / 'source'
+        checkout.mkdir()
+        # Read authored inputs through links, but build only into an isolated
+        # checkout with no generated outputs. No npm toolchain is needed.
+        for name in ['src', 'docs', 'cookbook', 'contract', '.claude', 'LICENSE']:
+            (checkout / name).symlink_to(ROOT / name, target_is_directory=(ROOT / name).is_dir())
+        (checkout / 'examples').mkdir()
+        (checkout / 'examples/canon').symlink_to(ROOT / 'examples/canon', target_is_directory=True)
+        (checkout / 'canon.json').write_text('{"version":1,"diagrams":[]}')
+        (checkout / 'tools/canon').mkdir(parents=True)
+        for folder in ['tools', 'tools/canon']:
+            for source in (ROOT / folder).iterdir():
+                if source.is_file() and source.suffix in ['.py', '.js', '.cjs', '.mjs'] and source.name != 'generated-runtime.cjs':
+                    shutil.copyfile(source, checkout / folder / source.name)
+        runtime = checkout / 'tools/canon/generated-runtime.cjs'
+        self.assertFalse(runtime.exists())
+        self.assertFalse((checkout / 'template/flowview.html').exists())
+        result = subprocess.run(['python3', str(checkout / 'tools/page_build.py'), str(self.spec),
+                                 '--root', str(self.root)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(runtime.is_file())
+        self.assertTrue((checkout / 'template/flowview.html').is_file())
+        self.assertTrue((self.root / 'temp.html').is_file())
+
     def test_no_slug_builds_beside_spec_without_copy_or_subdirectory(self):
         before = self.spec.read_bytes()
         r = run_tool(str(self.spec), "--desc", "beside")

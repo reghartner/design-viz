@@ -5,7 +5,7 @@ metadata. Canonical promotion is a human review, not an inference from Backstage
 `examples/canon/` is a fictional central repository, catalog and source history.
 
 Maintained diagram pages belong in the top-level [`diagrams/`](../diagrams/README.md)
-directory, with each spec and its generated HTML in one subfolder. Root
+directory, with each required spec in its own subfolder. Root
 [`canon.json`](../canon.json) is the single authority: adding a folder promotes it;
 removing the entry removes it from canon. Backstage and the nginx workbench read
 this same list. Promotion is a reviewed edit to that file, not a flag in a spec.
@@ -13,7 +13,7 @@ this same list. Promotion is a reviewed edit to that file, not a flag in a spec.
 ## Authoring contract, version 1
 
 A canon entry is `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
-The folder supplies the ID and the `doorbell.spec.json` / `doorbell.html` filenames.
+The folder supplies the ID and required `doorbell.spec.json` filename.
 The provider derives `page.canon` metadata for existing viewer/evidence contracts:
 `{"version":1,"id":"doorbell","kind":"canonical","owner":"group:default/home-team"}`.
 Authored `page.canon` values cannot override membership, ID or owner. Legacy
@@ -78,9 +78,10 @@ is unknown, not a failure. Agent suggestions require review before publication.
 The workbench home page exposes **Canon diagrams** as a read-only library with
 an explicit **Edit in Workbench** handoff. Root `canon.json` selects reviewed
 folders under `diagrams/`; the normal Python build and nginx image build generate
-`workbench/diagrams.json`, a metadata index with relative spec URLs, from that list. Keep each folder’s JSON spec and generated
-HTML together. Per-spec flags do not enroll a document. See the [deployment recipe](workbench-canon-library.md). This works
-with the static nginx deployment and needs no read API.
+`workbench/diagrams.json`, a metadata index with relative spec URLs, from that
+list. Per-spec flags do not enroll a document. Standalone HTML exports are
+optional and are not read by the library. See the [deployment recipe](workbench-canon-library.md).
+This works with the static nginx deployment and needs no read API.
 
 ## Run the simulated company repository
 

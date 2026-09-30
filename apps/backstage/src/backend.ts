@@ -38,12 +38,13 @@ export function diagramsForEntity(
   return forEntity(index, entityRef) as EntityDiagrams;
 }
 
-/** Central canon entry resolved to repository-relative document paths. */
+/** Central canon entry resolved to its repository-relative spec path. */
 export interface CanonEntry {
   id: string;
   folder: string;
   owner: string;
   path: string;
+  /** @deprecated Compatibility path for optional standalone exports. Readers use path. */
   html: string;
 }
 

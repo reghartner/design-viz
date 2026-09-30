@@ -8,7 +8,6 @@ async function fixture(t){
  const folder=path.join(root,entry.folder);await fs.mkdir(folder,{recursive:true});
  await fs.writeFile(path.join(root,'canon.json'),JSON.stringify(manifest));
  await fs.writeFile(path.join(folder,'checkout.spec.json'),JSON.stringify(spec()));
- await fs.writeFile(path.join(folder,'checkout.html'),'<!doctype html><title>Checkout</title>');
  return {root,file:path.join(root,'canon.json'),folder};
 }
 test('central membership overrides embedded flags without mutating authored specs',()=>{
@@ -39,9 +38,9 @@ test('Backstage and drift load only central members; removing a folder removes i
 });
 test('missing files, malformed manifests and symlinks out of the folder fail visibly',async t=>{
  const {file,folder,root}=await fixture(t),{canonLibrary}=await import('../tools/canon/registry.mjs');
- await fs.unlink(path.join(folder,'checkout.html'));await assert.rejects(canonLibrary(file),/ENOENT/);
- await fs.writeFile(path.join(root,'outside.html'),'outside');
- await fs.symlink(path.join(root,'outside.html'),path.join(folder,'checkout.html'));
+ await fs.unlink(path.join(folder,'checkout.spec.json'));await assert.rejects(canonLibrary(file),/ENOENT/);
+ await fs.writeFile(path.join(root,'outside.json'),JSON.stringify(spec()));
+ await fs.symlink(path.join(root,'outside.json'),path.join(folder,'checkout.spec.json'));
  await assert.rejects(canonLibrary(file),/inside their diagram folder/);
  await fs.writeFile(file,'{broken');await assert.rejects(canonLibrary(file),SyntaxError);
 });
@@ -70,7 +69,7 @@ test('central publishing refuses output inside diagrams and preserves the source
  const {publishLibrary}=await import('../tools/canon/library.mjs');
  const before=await fs.readFile(file,'utf8');
  await assert.rejects(publishLibrary({registryPath:file,output:file}),/overwrite the source registry/);
- for(const name of ['checkout.spec.json','checkout.html','new.json']){
+ for(const name of ['checkout.spec.json','new.json']){
    await assert.rejects(publishLibrary({registryPath:file,output:path.join(folder,name)}),/outside the diagram source directory/);
  }
  assert.equal(await fs.readFile(file,'utf8'),before);

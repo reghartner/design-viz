@@ -33,7 +33,6 @@ test('nginx image publishes central canon membership and replaces a stale librar
   spec.page.canon.kind='design';
   const source=path.join(directory,'diagrams/feature/feature.spec.json');
   fs.mkdirSync(path.dirname(source),{recursive:true});fs.writeFileSync(source,JSON.stringify(spec));
-  fs.writeFileSync(path.join(directory,'diagrams/feature/feature.html'),'<!doctype html><title>Feature</title>');
   const manifest={version:1,diagrams:[{folder:'diagrams/feature',owner:spec.page.canon.owner}]};
   fs.writeFileSync(path.join(directory,'canon.json'),JSON.stringify(manifest));
   fs.mkdirSync(path.join(directory,'diagrams/unlisted'));
@@ -59,7 +58,6 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
-  assert.equal((await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.html',2000)).status,200);
   const licenseResponse=await probeHttp('http://127.0.0.1:'+port+'/LICENSE',2000);
   assert.equal(licenseResponse.status,200);
   assert.equal(licenseResponse.body,fs.readFileSync(path.join(ROOT,'LICENSE'),'utf8'));

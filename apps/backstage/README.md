@@ -185,20 +185,24 @@ Backstage and the nginx workbench. Its `diagrams` entries reference folders such
 as `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
 A spec's own `page.canon` cannot enroll it or override the central ID/owner.
 
-The company GitHub source adapter reads that manifest, then the listed JSON and
-HTML files at the **same approved Git SHA**. Use the pure `/backend` helpers:
+The company GitHub source adapter reads that manifest and its listed JSON specs
+at the **same approved Git SHA**. Use the pure `/backend` helpers:
 
 ```ts
 import {parseCanonManifest, materializeCanonSpec, buildEntityDiagramIndex}
   from '@flowview/backstage-plugin/backend';
 
 const entries = parseCanonManifest(manifestJson);
-// Read entry.path and verify entry.html exist at the pinned SHA through your
-// authenticated GitHub adapter. Authorize each entry for this requesting viewer.
+// Read entry.path at the pinned SHA through your authenticated GitHub adapter.
+// Authorize each entry for this requesting viewer.
 const specs = authorizedEntries.map(entry =>
   materializeCanonSpec(specJsonByPath[entry.path], entry));
 const index = buildEntityDiagramIndex(specs, {diagramUrls});
 ```
+
+`entry.html` remains as deprecated compatibility metadata for adapters that
+publish optional standalone exports. Canon membership and readers require only
+`entry.path`; new adapters should not fetch or validate the HTML path.
 
 The example's `authorizedEntries`, `specJsonByPath` and `diagramUrls` come from
 your company adapter. Return the same materialized spec from `loadSpec`, with

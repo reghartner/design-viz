@@ -8,9 +8,10 @@ of the same time-aware data — an ambient always-animating view and a guided st
 (click-through) view.
 
 Maintained diagrams belong in [`diagrams/`](diagrams/README.md), one subfolder
-per diagram page with its JSON spec and generated HTML together. The directory
-guide covers building and moving existing diagrams. Root [`canon.json`](canon.json)
-is the shared canon membership list for Backstage and the nginx workbench.
+per diagram page with its required JSON spec and any optional portable HTML
+export. The directory guide covers building and moving existing diagrams. Root
+[`canon.json`](canon.json) is the shared canon membership list for Backstage and
+the nginx workbench.
 
 For live local authoring with a filesystem-only agent, build the workbench and run
 `node tools/agent-session.mjs`. It prints an editor URL and a scratch folder for
@@ -409,8 +410,9 @@ workspace toolbar. The [bundled guide](docs/workbench-user-guide.md) includes
 a first-diagram walkthrough, alternate paths, shared steps, Home animation,
 layouts, catalogs, and sharing. **Canon diagrams** on welcome opens the
 [read-only repository library](docs/workbench-canon-library.md), with an explicit
-**Edit in Workbench** handoff. Keep maintained JSON and HTML together under
-`diagrams/<name>/`, and add the folder and owner to root `canon.json` after review.
+**Edit in Workbench** handoff. Keep maintained JSON under `diagrams/<name>/` and
+optionally add a portable HTML export. Add the folder and owner to root
+`canon.json` after review.
 The normal build and nginx image build publish that central list; per-spec flags
 do not enroll a document. Use **Copy link** in the reader to share a
 direct `?diagram=<canon-id>` URL before Backstage is connected.

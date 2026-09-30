@@ -74,9 +74,18 @@ async function openAgent(page){
   await closeGuide(page);
 }
 async function copyRequest(page,text){
-  await openAgent(page);await page.locator('#folder-agent-mode-external').click();
+  await openAgent(page);
   await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
   await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
+}
+async function connectExternal(page){
+  await openAgent(page);await page.locator('#folder-agent-open-setup').click();
+  await page.locator('#folder-agent-setup-mode-external').click();await page.locator('#folder-agent-connect').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+}
+async function finishCopiedRequest(page,h){
+  const request=await h.read('request.json');h.run('reply','--request',request.id,'--text','Ready for the next request.');
+  await expect(page.locator('#folder-agent-cancel')).toBeHidden();
 }
 async function chooseFolder(page){
   if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
@@ -365,7 +374,7 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
   const h=await setup(page);
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#editor-tab-agent').click();await closeGuide(page);await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
+    await connectExternal(page);await page.locator('#folder-agent-input').fill('Keep this draft while I inspect');
     await page.locator('#editor-tab-inspect').click();
     await expect(page.locator('#editor-agent')).toBeVisible();await expect(page.locator('#editor-inspect')).toBeVisible();
     const before=await page.locator('#src').inputValue(),win=page.locator('#workspace-window-agent'),grip=win.locator('.workspace-window-grip');
@@ -408,12 +417,12 @@ test('diagram itself fills the browser and pans and zooms without editing source
   }finally{await page.close();await h.cleanup();}
 });
 
-test('agent context names the selection before pairing and freezes it beside the sent message',async({page})=>{
+test('agent context hides until pairing and names the selection and freezes it beside the sent message',async({page})=>{
   const h=await setup(page);
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('[data-dv-node="a"]').first().click();await page.locator('#editor-tab-agent').click();
-    await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
+    await expect(page.locator('#folder-agent-context')).toBeHidden();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     await closeGuide(page);await h.listen();await page.locator('#folder-agent-input').fill('Explain this');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-send')).toBeDisabled();
@@ -513,8 +522,8 @@ test('external branch copies context without dispatch, accepts native followups 
     expect((await h.read('session.json')).workflow).toBe('external');
     await page.locator('#folder-agent-copy').click();
     await expect(page.locator('#folder-agent-guide')).not.toBeVisible();await expect(page.locator('#editor-agent')).toBeVisible();
-    await openAgent(page);await page.locator('#folder-agent-mode-embedded').click();
-    await expect(page.locator('#folder-agent-send')).toBeDisabled();expect((await h.read('session.json')).workflow).toBe('external');
+    await openAgent(page);await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
+    await expect(page.locator('#folder-agent-send')).toHaveText('Copy request');expect((await h.read('session.json')).workflow).toBe('external');
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);
     await copyRequest(page,'Build the delivery story. Reference: docs/delivery.md');
     const copied=await page.evaluate(()=>navigator.clipboard.readText()),request=await h.read('request.json');
@@ -577,14 +586,7 @@ test('copy and paste treats the folder as connected without Monitor and keeps co
     await expect(page.locator('#folder-agent-activity')).toBeHidden();await expect(page.locator('#folder-agent-messages')).toBeHidden();
     await expect(page.locator('.folder-agent-history-frame')).toBeHidden();
     await page.screenshot({path:info.outputPath('copy-paste-connected-compact.png')});
-    // A tab switch changes the presentation, never the connection or the request.
-    await page.locator('#folder-agent-mode-embedded').click();
-    await expect(page.locator('#folder-agent-stage')).toHaveText('Reconnect for in-workbench chat');
-    await expect(page.locator('#folder-agent-activity')).toBeVisible();
-    await expect(page.locator('#folder-agent-activity-log')).toContainText('Only the native conversation');
-    await expect(page.locator('#folder-agent-messages')).toContainText('Explain this selected flow');
-    await expect(page.locator('#folder-agent-send')).toBeDisabled();
-    await page.locator('#folder-agent-mode-external').click();
+    await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
     await expect(page.locator('#folder-agent-stage')).toHaveText('Request active · Continue in your agent');
     await expect(page.locator('#folder-agent-activity-log li')).toHaveCount(0);
     await expect(page.locator('#folder-agent-messages article')).toHaveCount(0);
@@ -627,7 +629,7 @@ test('conflicting update preserves local edits and copies actionable feedback fo
   }finally{await page.close();await h.cleanup();}
 });
 
-test('Agent tabs reuse current node, step and panel selection and preserve one draft',async({page},info)=>{
+test('Connected Agent reuses current node, step and panel selection and preserves one draft',async({page},info)=>{
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
@@ -636,32 +638,31 @@ test('Agent tabs reuse current node, step and panel selection and preserve one d
     const input=JSON.stringify(spec,null,2);await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await expect(page.locator('#agent-message-open')).toHaveCount(0);await expect(page.locator('#agent-message-dialog')).toHaveCount(0);
     await page.locator('[data-dv-node="a"]').click();await openAgent(page);
-    await expect(page.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('#folder-agent-input')).toBeHidden();
+    await connectExternal(page);await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
     await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
     await page.locator('#folder-agent-input').fill('Explain the selected item. docs/design.md');
-    await page.locator('#folder-agent-mode-embedded').click();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     await expect(page.locator('#folder-agent-context')).toContainText('Doorbell');
-    await page.locator('#folder-agent-mode-external').click();await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');
-    await page.locator('#folder-agent-send').click();
+    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');
+    await copyRequest(page,'Explain the selected item. docs/design.md');
     let copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toContain('capture.js');expect(copied).toMatch(/"kind":\s*"node"/);expect(copied).not.toContain(input);expect(copied).not.toContain('"rows"');
     await page.locator('#workspace-window-agent .workspace-window-close').click();
     await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();
     await page.locator('#workspace-window-steps .workspace-window-close').click();await openAgent(page);
     await expect(page.locator('#folder-agent-context')).toContainText('step');
-    await page.locator('#folder-agent-mode-embedded').click();await page.locator('#folder-agent-mode-external').click();
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');await page.locator('#folder-agent-send').click();
+    await finishCopiedRequest(page,h);
+    await expect(page.locator('#folder-agent-input')).toHaveValue('Explain the selected item. docs/design.md');await copyRequest(page,'Explain the selected item. docs/design.md');
     copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"kind":\s*"step"/);expect(copied).toMatch(/"steps",\s*1/);
     await page.locator('#workspace-window-agent .workspace-window-close').click();
     if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
     await page.locator('#docview [data-dv-panel="0"] .ptitle').first().click();await openAgent(page);
-    await expect(page.locator('#folder-agent-context')).toContainText('Home');await page.locator('#folder-agent-send').click();
+    await finishCopiedRequest(page,h);await expect(page.locator('#folder-agent-context')).toContainText('Home');await copyRequest(page,'Explain the selected item. docs/design.md');
     copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"kind":\s*"panel"/);expect(copied).toMatch(/"panels",\s*0/);
-    expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);expect(h.writes).toEqual([]);
+    expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);
     await page.screenshot({path:info.outputPath('unified-agent-copy.png')});
-    await page.locator('#folder-agent-mode-embedded').click();await page.screenshot({path:info.outputPath('unified-agent-chat.png')});
-    await page.locator('#folder-agent-mode-external').click();
+
     await page.setViewportSize({width:640,height:360});
-    for(const id of ['folder-agent-mode-external','folder-agent-mode-embedded','folder-agent-input','folder-agent-send']){
+    for(const id of ['folder-agent-input','folder-agent-send']){
       const control=page.locator('#'+id);await control.scrollIntoViewIfNeeded();
       expect(await control.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' reachable at short height').toBe(true);
     }
@@ -677,7 +678,8 @@ test('Copy for agent copies the canvas selection directly and preserves the draf
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    const quick=page.locator('#folder-agent-selection');await expect(quick).toBeDisabled();
+    const quick=page.locator('#folder-agent-selection');await expect(quick).toBeHidden();
+    await connectExternal(page);await page.locator('#workspace-window-agent .workspace-window-close').click();
     await page.locator('#docview [data-dv-node="a"]').click();
     if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
     await expect(quick).toHaveText('Copy for agent · 1 selected');await quick.click();
@@ -688,7 +690,7 @@ test('Copy for agent copies the canvas selection directly and preserves the draf
     await expect(quick).toHaveText('Copy for agent · 2 selected');await quick.focus();await page.keyboard.press('Enter');
     copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).toMatch(/"nodes",\s*"a"/);expect(copied).toMatch(/"nodes",\s*"b"/);
     await openAgent(page);await page.locator('#folder-agent-input').fill('Keep this unfinished request private.');
-    await page.locator('#folder-agent-mode-embedded').click();await page.locator('#workspace-window-agent .workspace-window-close').click();
+    await page.locator('#workspace-window-agent .workspace-window-close').click();
     await quick.click();await expect(quick).toHaveText('Copied · 2 selected');
     expect(await page.evaluate(()=>navigator.clipboard.readText())).not.toContain('Keep this unfinished request private.');
     await expect(page.locator('#editor-agent')).toBeHidden();
@@ -696,10 +698,10 @@ test('Copy for agent copies the canvas selection directly and preserves the draf
     expect(await quick.evaluate(node=>{const r=node.getBoundingClientRect();return document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===node;})).toBe(true);
     await page.screenshot({path:info.outputPath('copy-for-agent-selection.png')});
     await page.setViewportSize({width:1280,height:900});await openAgent(page);
-    await expect(page.locator('#folder-agent-mode-embedded')).toHaveAttribute('aria-selected','true');
+    await expect(page.locator('#folder-agent-send')).toHaveText('Copy request');
     await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this unfinished request private.');
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
-    expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);expect(h.writes).toEqual([]);expect(h.errors).toEqual([]);
+    expect(await page.evaluate(()=>window.pickerCalls)).toBe(1);expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
 
@@ -708,6 +710,7 @@ test('Copy for agent opens manual copy only on denial and retires a late fallbac
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:()=>Promise.reject(Error('denied'))}}));
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await page.locator('#workspace-window-agent .workspace-window-close').click();
     await page.locator('#docview [data-dv-node="a"]').click();await page.locator('#folder-agent-selection').click();
     const preview=page.getByRole('textbox',{name:'Selected context for agent',exact:true});
     await expect(preview).toBeVisible();await expect(preview).toBeFocused();
@@ -749,7 +752,7 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>Promise.reject(Error('denied'))}}));
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await openAgent(page);await page.locator('#folder-agent-input').fill('Review this.');await page.locator('#folder-agent-send').click();
+    await connectExternal(page);await page.locator('#folder-agent-input').fill('Review this.');await page.locator('#folder-agent-send').click();
     await expect(page.locator('#folder-agent-panel-status')).toContainText('Ctrl+C');
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
@@ -773,7 +776,7 @@ test('a late denied copy cannot reveal an old project or steal focus after file 
   try{
     await page.evaluate(()=>Object.defineProperty(navigator,'clipboard',{value:{writeText:()=>new Promise((resolve,reject)=>{window.rejectCopy=reject;})}}));
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await openAgent(page);await page.locator('#folder-agent-input').fill('Old project draft');await page.locator('#folder-agent-send').click();
+    await connectExternal(page);await page.locator('#folder-agent-input').fill('Old project draft');await page.locator('#folder-agent-send').click();
     await page.waitForFunction(()=>typeof window.rejectCopy==='function');
     const replacement=source.replace('Browser contract','Replacement project');
     await page.locator('#file-input').setInputFiles({name:'replacement.spec.json',mimeType:'application/json',buffer:Buffer.from(replacement)});
@@ -958,6 +961,21 @@ test('home explicitly starts new from a saved draft and Continue still restores 
     await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).click();
     await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#welcome-build-continue').check();await page.locator('#welcome-build-external').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#folder-agent-start-description')).toContainText('Choose the folder containing its existing');
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('disconnected recovery actions remain reachable in a short window',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await disconnect(page);await page.setViewportSize({width:640,height:360});
+    await expect(page.locator('#folder-agent-continue')).toBeVisible();
+    for(const id of ['folder-agent-open-setup','folder-agent-continue']){
+      const button=page.locator('#'+id);await button.scrollIntoViewIfNeeded();
+      expect(await button.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return node===hit || node.contains(hit);})).toBe(true);
+    }
+    expect(await page.locator('.folder-agent-header').evaluate(node=>node.clientHeight)).toBeGreaterThan(100);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

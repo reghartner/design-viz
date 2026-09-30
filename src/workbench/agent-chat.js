@@ -63,22 +63,19 @@ function initWorkbenchAgentChat(opts){
   // Keep the public IDs and native controls; only their layout changes.
   var shell=root.querySelector('.folder-agent-shell'),header=element('div','folder-agent-header'),history=element('div','folder-agent-history'),composer=element('div','folder-agent-composer');
   history.id='folder-agent-history';history.tabIndex=0;history.setAttribute('aria-label','Conversation history');
-  var modes=element('div','folder-agent-modes');modes.setAttribute('role','tablist');modes.setAttribute('aria-label','Agent workflow');
-  var externalMode=button('mode-external','Copy & paste'),embeddedMode=button('mode-embedded','In workbench · Beta');
-  [externalMode,embeddedMode].forEach(function(control){control.setAttribute('role','tab');control.setAttribute('aria-controls','folder-agent-workflow-body');});modes.append(externalMode,embeddedMode);
   var modeDescription=element('p','folder-agent-mode-description');modeDescription.id='folder-agent-mode-description';
   var actions=root.querySelector('.folder-agent-actions');actions.appendChild(get('pairing'));
   var stageStatus=element('div','folder-agent-stage'),stageIcon=doc.createElementNS('http://www.w3.org/2000/svg','svg'),stagePath=doc.createElementNS('http://www.w3.org/2000/svg','path'),stageText=element('b');
   stageStatus.id='folder-agent-stage';stageStatus.setAttribute('role','status');stageStatus.setAttribute('aria-live','polite');stageStatus.setAttribute('aria-atomic','true');
   stageIcon.setAttribute('viewBox','0 0 24 24');stageIcon.setAttribute('aria-hidden','true');stageIcon.appendChild(stagePath);stageStatus.append(stageIcon,stageText);
-  var headerControls=element('div','folder-agent-header-controls');headerControls.append(actions,get('panel-status'));header.append(stageStatus,headerControls);
+  var headerControls=element('div','folder-agent-header-controls');header.append(stageStatus,get('connection'),get('folder'));headerControls.append(actions,get('panel-status'));header.append(headerControls);
   var recoveryCard=element('section','folder-agent-recovery'),recoveryTitle=element('b'),recoveryText=element('p'),continueButton=button('continue','Reopen diagram folder');
   recoveryCard.id='folder-agent-recovery';recoveryCard.hidden=true;recoveryCard.append(recoveryTitle,recoveryText,continueButton);
   var activity=get('activity'),activityDetails=element('details'),activitySummary=element('summary','', 'Activity from the latest turn');
   activityDetails.append(activitySummary,get('activity-title'),get('progress'),get('activity-log'));activity.replaceChildren(activityDetails);
   var latest=button('latest','New output · Jump to latest');latest.classList.add('folder-agent-latest');latest.hidden=true;
   var historyFrame=element('div','folder-agent-history-frame');historyFrame.append(history,latest);
-  history.append(recoveryCard,get('messages'),activity);
+  header.appendChild(recoveryCard);history.append(get('messages'),activity);
   var changeHistory=element('details','folder-agent-change-history'),changeSummary=element('summary'),changeLog=element('div');
   changeHistory.id='folder-agent-change-history';changeHistory.hidden=true;changeHistory.append(changeSummary,changeLog);history.append(changeHistory);
   var previousContext=root.querySelector('.folder-agent-context-card'),contextDetails=element('details','folder-agent-context-card'),contextSummary=element('summary'),contextBody=element('div');
@@ -105,8 +102,8 @@ function initWorkbenchAgentChat(opts){
   copyPreview.id='folder-agent-copy-preview';copyPreview.readOnly=true;copyPreview.setAttribute('aria-label','Prepared agent request');copyPreview.rows=5;
   copyFallback.hidden=true;copyFallback.append(copySummary,copyBack,copyPreview);composer.append(composeSettings,form,copyFallback);
   life.listen(copyBack,'click',function(){copyFallback.hidden=true;copyFallback.open=false;get('input').focus();});
-  var workflowBody=element('div','folder-agent-workflow-body');workflowBody.id='folder-agent-workflow-body';workflowBody.setAttribute('role','tabpanel');workflowBody.append(header,historyFrame,composer);
-  shell.replaceChildren(modes,modeDescription,workflowBody);
+  var workflowBody=element('div','folder-agent-workflow-body');workflowBody.id='folder-agent-workflow-body';workflowBody.setAttribute('aria-label','Agent connection');workflowBody.append(header,historyFrame,composer);
+  shell.replaceChildren(modeDescription,workflowBody);
   var prerequisites=element('details','folder-agent-prerequisites'),prerequisiteSummary=element('summary','','Is this machine ready?'),prerequisiteBody=element('div');
   prerequisites.append(prerequisiteSummary,prerequisiteBody);get('new-session').prepend(prerequisites);
   var preflightStatus=element('p','folder-agent-hint');preflightStatus.id='folder-agent-preflight';preflightStatus.setAttribute('role','status');get('guide-waiting').appendChild(preflightStatus);
@@ -118,7 +115,8 @@ function initWorkbenchAgentChat(opts){
     if(selectionFeedback && (selectionFeedback.project!==focus.project || selectionFeedback.source!==focus.source || selectionFeedback.key!==selectionKey(focus)))selectionFeedback=null;
     var label=selectionFeedback?selectionFeedback.label:copying && copying.selection?'Copying…':'Copy for agent';
     setText('selection',label+' · '+(selected.length?selected.length+' selected':'No selection'));
-    control.disabled=!!(copying || connecting || !focus.open || focus.parseError || !selected.length);
+    control.hidden=!state.connected;
+    control.disabled=!!(!state.connected || accessLost || copying || connecting || !focus.open || focus.parseError || !selected.length);
     control.title=selected.length?'Copy selected item references and view context. Your message draft and active request stay as they are.\n'+folderAgentContextLines(focus).join('\n'):'Select items on the canvas, in Steps, or in Outline to copy their context for your agent.';
   }
   function selectionNotice(focus,label){
@@ -146,7 +144,7 @@ function initWorkbenchAgentChat(opts){
     if(copyMode){var payload=composePayload(focus);text=payload.text;error=payload.error;}
     if(!copyMode && get('input').value.length>16000)error='In-workbench messages are limited to 16,000 characters. Use Copy & paste for longer requests.';
     get('send').textContent=copyMode?'Copy request':'Send to Claude';
-    get('send').disabled=copying || connecting || !focus.open || !!error || (copyMode?!!error || !text || !!(state.connected && state.pending && !preparedMatches(focus,text)) || (state.connected && accessLost):!state.connected || workflow!=='embedded' || !state.listening || !!state.pending || accessLost);
+    get('send').disabled=!state.connected || copying || connecting || !focus.open || !!error || (copyMode?!!error || !text || !!(state.connected && state.pending && !preparedMatches(focus,text)) || (state.connected && accessLost):!state.connected || workflow!=='embedded' || !state.listening || !!state.pending || accessLost);
     if(error){setText('panel-status',error);root.dataset.composeError='true';}
     else if(root.dataset.composeError==='true'){setText('panel-status','');delete root.dataset.composeError;}
     paintSelection(focus);
@@ -154,17 +152,13 @@ function initWorkbenchAgentChat(opts){
   function setComposeMode(mode){
     composeMode=mode==='embedded'?'embedded':'external';composeEpoch++;copyFallback.hidden=true;
     root.dataset.workflow=composeMode;
-    [[externalMode,'external'],[embeddedMode,'embedded']].forEach(function(item){var selected=item[1]===composeMode;item[0].setAttribute('aria-selected',String(selected));item[0].tabIndex=selected?0:-1;});
-    workflowBody.setAttribute('aria-labelledby','folder-agent-mode-'+composeMode);
-    modeDescription.textContent=composeMode==='external'?'Copy your request with selected item references and view context. Diagram JSON is not included. Keep the conversation in your agent; no monitor is started.':'Talk to Claude here. Connect explicitly to receive replies and changes in the workbench.';
+    modeDescription.textContent=composeMode==='external'?'Copy & paste · Copy requests with your selected context. Keep the conversation in your agent.':'In workbench · Beta · Talk to Claude here. Permissions and interrupts stay in Claude.';
     history.setAttribute('aria-label',composeMode==='external'?'Diagram updates':'Conversation history');
     form.querySelector('.folder-agent-hint').textContent=composeMode==='external'?'Replies stay in your agent':'⌘ / Ctrl + Enter';
     paint({});
   }
-  life.listen(externalMode,'click',function(){setComposeMode('external');});life.listen(embeddedMode,'click',function(){setComposeMode('embedded');});
-  life.listen(modes,'keydown',function(event){if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();var mode=event.key==='Home'?'external':event.key==='End'?'embedded':composeMode==='external'?'embedded':'external';setComposeMode(mode);(mode==='external'?externalMode:embeddedMode).focus();});
   async function copyRequest(){
-    if(copying || connecting)return;
+    if(!state.connected || accessLost || copying || connecting)return;
     var focus=composeSnapshot(),text;
     try{text=workbenchAgentMessage(focus,{message:get('input').value});if(!text)return;}
     catch(ex){status(ex.message);return;}
@@ -189,7 +183,7 @@ function initWorkbenchAgentChat(opts){
     finally{if(copying===operation)copying=false;if(life.alive())paintCompose();}
   }
   async function copySelection(){
-    if(copying || connecting)return;
+    if(!state.connected || accessLost || copying || connecting)return;
     var focus=composeSnapshot(),text;
     try{text=workbenchAgentMessage(focus,{contextOnly:true});if(!text)return;}
     catch(ex){selectionNotice(focus,'Could not copy');status(ex.message);return;}
@@ -218,7 +212,7 @@ function initWorkbenchAgentChat(opts){
     if(!life.alive() || !cacheReady)return;
     var current=opts.snapshot();if(!current.open || current.project!==seenProject)return;
     var preserve=!activeFolder && !state.connected,previous=remembered || {},sourceKey=folderAgentSourceKey(current.source);
-    var record={draft:get('input').value,level:get('level').value,draftSourceKey:sourceKey,
+    var record={workflow:state.connected?workflow:previous.workflow,draft:get('input').value,level:get('level').value,draftSourceKey:sourceKey,
       sourceKey:preserve?previous.sourceKey:sourceKey,title:preserve?previous.title:sourceTitle(current.source),
       folderName:activeFolder?activeFolder.name:previous.folderName,
       sessionId:client && client.manifest()?client.manifest().sessionId:previous.sessionId,
@@ -254,7 +248,7 @@ function initWorkbenchAgentChat(opts){
     if(recoveryCard.hidden)return;
     recoveryTitle.textContent='Continue '+(remembered.title || 'your story');
     var date=remembered.at?new Date(remembered.at).toLocaleString():'';
-    recoveryText.textContent='Saved conversation in '+remembered.folderName+(date?' · '+date:'')+'. Your diagram is local; Claude is disconnected. Interrupted requests will not replay.';
+    recoveryText.textContent='Saved conversation in '+remembered.folderName+(date?' · '+date:'')+'. Your diagram is local; the agent is disconnected. Interrupted requests will not replay.';
     continueButton.disabled=connecting;
   }
   function renderReceipt(receipt,parent){
@@ -349,7 +343,6 @@ function initWorkbenchAgentChat(opts){
     if(mode==='external' || mode==='embedded')setComposeMode(mode);
     if(!state.connected)workflow=composeMode;setSetupWorkflow(workflow);setSetupIntent(setupIntent);
     if(opts.show)opts.show();
-    if(workflow==='embedded' && state.listening && !accessLost){get('input').focus();return;}
     stage(state.connected?(guideStage==='waiting'?'waiting':'review'):'folder');
     if(!guide.open)guide.showModal();
     get(guideStage==='folder'?'connect':guideStage==='review'?'copy':'show-copy').focus();
@@ -380,7 +373,11 @@ function initWorkbenchAgentChat(opts){
     get('connect').disabled=connecting || state.connected;
     guide.querySelectorAll('[data-agent-workflow-choice],[data-agent-start-choice]').forEach(function(control){control.disabled=connecting || state.connected;});
     guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){button.disabled=connecting;});
-    setText('open-setup',composeMode==='embedded' && state.connected && workflow!=='embedded'?'Reconnect for in-workbench chat':state.connected?'Connection settings':composeMode==='embedded'?'Connect in-workbench chat':'Connect shared folder');
+    setText('open-setup',state.connected?'Show setup instructions':'New Connection');
+    get('open-setup').disabled=connecting;
+    get('pairing').hidden=!state.connected;
+    get('connection').hidden=!state.connected;get('folder').hidden=!state.connected;
+    modeDescription.hidden=!state.connected;composer.hidden=!state.connected;
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
     paintStage(phase);paintDetail();
     root.dataset.connected=String(state.connected);
@@ -431,7 +428,7 @@ function initWorkbenchAgentChat(opts){
     }
     if(composeMode==='external')latest.hidden=true;
     paintRecovery();
-    historyFrame.hidden=composeMode==='external' && recoveryCard.hidden && reviewCard.hidden && changeHistory.hidden;
+    historyFrame.hidden=!state.connected || composeMode==='external' && reviewCard.hidden && changeHistory.hidden;
     saveRecovery();
 
   }
@@ -450,11 +447,12 @@ function initWorkbenchAgentChat(opts){
   async function disconnect(){
     var token=++generation;life.cancelDelay(timer);
     var unlock=releaseLock;releaseLock=null;
-    var old=client,message='Disconnected. Connect Claude when you’re ready.';client=null;accessLost=false;
+    var old=client,message='Disconnected. Reopen your diagram folder or choose New Connection.';client=null;accessLost=false;connecting=true;
+    paint({connected:false,pending:null,listening:false,progress:'',review:null});status('Disconnecting from the diagram folder…');
     if(old){try{await old.disconnect();}catch(ex){message='Disconnected. Could not update the folder: '+ex.message;}old.destroy();}
     if(unlock)unlock();
     if(!life.alive() || token!==generation)return;
-    paint({connected:false,pending:null,listening:false,progress:'',review:null});
+    connecting=false;paint({connected:false,pending:null,listening:false,progress:'',review:null});
     stage('folder');status(message);
   }
   function checkResumeDraft(expected){
@@ -523,6 +521,7 @@ function initWorkbenchAgentChat(opts){
   async function connectionFailure(ex,token){
     if(!life.alive() || token!==generation)return;
     var failed=client,unlock=releaseLock;client=null;releaseLock=null;
+    paint({connected:false,pending:null,listening:false,progress:'',review:null});
     if(failed){try{await failed.disconnect();}catch(ignored){}failed.destroy();}
     if(unlock)unlock();
     if(life.alive() && token===generation){
@@ -610,7 +609,7 @@ function initWorkbenchAgentChat(opts){
   guide.querySelectorAll('[data-agent-start-choice]').forEach(function(control){life.listen(control,'click',function(){setSetupIntent(control.dataset.agentStartChoice);});});
   life.listen(get('file-confirm'),'click',function(){if(!pendingFileChoice)return;get('file-confirm').disabled=true;pendingFileChoice.resolve(get('file-picker').value);});
   life.listen(get('connect'),'click',function(){connect(setupIntent==='resume');});
-  life.listen(continueButton,'click',function(){if(opts.show)opts.show();setSetupIntent('resume');stage('folder');if(!guide.open)guide.showModal();connect(true,true);});
+  life.listen(continueButton,'click',function(){if(opts.show)opts.show();setSetupWorkflow(remembered && remembered.workflow || workflow);setSetupIntent('resume');stage('folder');if(!guide.open)guide.showModal();connect(true,true);});
   life.listen(cancelButton,'click',async function(){
     if(!client || !state.pending)return;state.cancelling=true;paint({});
     try{await client.cancel();status('This turn is no longer accepted. To stop Claude computing, interrupt it in its session. You can send a corrected request here.');}
@@ -619,11 +618,7 @@ function initWorkbenchAgentChat(opts){
   });
   life.listen(get('disconnect'),'click',disconnect);
   life.listen(get('disconnect-guide'),'click',async function(){await disconnect();closeGuide();});
-  life.listen(get('open-setup'),'click',async function(){
-    if(composeMode==='embedded' && state.connected && workflow!=='embedded'){await disconnect();if(life.alive())openSetup('embedded');}
-    else if(state.connected && !accessLost)get('pairing').open=!get('pairing').open;
-    else openSetup(composeMode);
-  });
+  life.listen(get('open-setup'),'click',function(){openSetup(workflow,state.connected?undefined:{newProject:false});});
   life.listen(get('close-guide'),'click',closeGuide);
   life.listen(guide,'cancel',function(event){event.preventDefault();closeGuide();});
   guide.querySelectorAll('[data-agent-later]').forEach(function(button){life.listen(button,'click',closeGuide);});

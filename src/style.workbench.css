@@ -1322,9 +1322,9 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 @media(max-width:1100px){.workspace-provenance{display:none;}}
 @media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:122px;}}
 
-@media(max-height:520px){.workspace-canvas #workspace-window-agent{top:116px!important;height:calc(100dvh - 118px)!important;max-height:none;z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;padding:2px 8px;}.workspace-canvas #workspace-window-agent .folder-agent-header{max-height:26px;overflow:auto;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
+@media(max-height:520px){.workspace-canvas #workspace-window-agent{top:116px!important;height:calc(100dvh - 118px)!important;max-height:none;z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;padding:2px 8px;}.workspace-canvas #workspace-window-agent #editor-agent[data-connected="true"] .folder-agent-header{max-height:26px;overflow:auto;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
 
-@media(max-height:520px){.workspace-canvas:has(#workspace-window-agent:not([hidden])) #spec-editor{z-index:150;}}
+@media(max-height:520px){.workspace-canvas:has(#workspace-window-agent:not([hidden])) .workwrap #spec-editor{z-index:180;}}
 
 /* Compact chrome has its own rows; fixed controls must not overlap the
    buttons in the header or the appearance disclosure. */

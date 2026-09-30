@@ -401,9 +401,10 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   In the recommended copy/paste workflow, wait for messages in the agent app;
   do not start or renew Monitor, a watcher, or a background polling loop. Monitor
   belongs to the explicitly configured Beta connection only. The workbench's
-  **Agent** menu has **Copy & paste** and **In workbench — Beta** tabs sharing one
-  draft and the existing selection context (including steps, panels and edges).
-  Switching tabs does not change the connection workflow or authorize Monitor.
+  **Agent** menu shows the active connection's status, folder, files and controls,
+  without tabs. Disconnected users choose **Reopen diagram folder** for a remembered
+  build or **New Connection** to choose a method and folder. Copy and send controls
+  appear only after connection; Beta sending also requires a live listener.
   Copied requests include selected item identifiers, JSON paths, evidence
   references and view context, not the complete source. Read the current spec and
   ledger from the shared folder before planning. Without a shared folder, ask for

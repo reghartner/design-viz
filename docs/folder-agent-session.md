@@ -30,18 +30,20 @@ changed. Expand it to read, scroll or resize its bounded reading area; switching
 between Current state and Proposed state keeps it open. Collapsing it restores
 the diagram space. Committing still saves the reviewed spec and ledger together.
 
-In the editor, open **Agent** in the left rail. **Copy & paste** is the default;
-**In workbench — Beta** is the other tab. Both share one draft and the existing
-selection context, including steps, panels, nodes, edges and other editor targets.
-Switching tabs preserves that context and draft. A tab switch neither connects a
-folder nor starts a listener, and does not change an active connection's workflow.
-Use the connection setup when changing how the agent listens.
+In the editor, open **Agent** in the left rail. The panel has no workflow tabs.
+When disconnected, it offers **Continue [title] / Reopen diagram folder** for a
+remembered connection and **New Connection** to open setup. Setup chooses
+**Copy & paste** (the default) or **In workbench — Beta** and the diagram folder.
+When connected, the panel shows the connection status, folder and artifact names,
+and only that method's controls. The composer and copy actions are hidden until
+a folder is connected. Reopening a remembered folder keeps its connection method;
+disconnect and use New Connection to choose a different method.
 
 Copy & paste shows **Shared folder ready** once the folder is connected; it does
 not wait for a Claude listener. An active request says **Continue in your agent**.
 Conversation and live progress stay in the agent app. The panel keeps update
 previews, conflict feedback and collapsed **Recent diagram updates**; there is no
-chat feed or empty conversation area. The Beta tab retains its conversation feed
+chat feed or empty conversation area. The Beta connection retains its conversation feed
 and requires its own explicit Monitor connection.
 
 ## Open or create a diagram folder
@@ -144,7 +146,7 @@ recoverable two-file publication, not a filesystem-wide atomic rename.
 
 ## Conversation and request lifecycle
 
-For a quick handoff, select items and click **Copy for agent · N selected** at
+After connecting a folder, select items and click **Copy for agent · N selected** at
 the bottom left. It copies selection identifiers, references and view context
 without opening Agent or requiring a message. **Copied** confirms success.
 This action leaves your message draft and any active request alone; it creates
@@ -156,9 +158,7 @@ include additional URLs or file paths there if useful. **Copy request** includes
 your message, selected item identifiers and JSON paths, their evidence references,
 view/path/step context and detail level. It does not include the complete source,
 panel payloads or the contents of selected sections/documents. The agent reads
-the current spec and ledger from the shared folder before editing. No folder is
-required to copy a request; without one, provide the spec or source files separately
-when needed (for example, with **Download JSON**).
+the current spec and ledger from the shared folder before editing. A connected folder is required to copy a request.
 
 With a connected folder, Copy registers a request and copies its ID with the
 message and context. Long clipboard messages use a bounded registration

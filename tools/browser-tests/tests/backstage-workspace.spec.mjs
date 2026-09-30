@@ -44,7 +44,7 @@ test('Build with Claude carries the actual view and step into a checked workbenc
   const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'Build with Claude',exact:true}).click();const editor=await popupPromise;
   await expect(editor.locator('#workbench-workspace')).toBeVisible();
   await expect(editor.locator('#editor-agent')).toBeVisible();
-  await expect(editor.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
+  await expect(editor.locator('#editor-agent [role=tab]')).toHaveCount(0);
   await expect(editor.locator('#editor-agent')).toHaveAttribute('data-connected','false');
   await expect(editor.getByRole('dialog',{name:'How are you starting?'})).toBeVisible();
   await expect(editor.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
@@ -83,7 +83,7 @@ test('the canon adapter opens Build directly and reload restores the draft witho
   await expect(page.locator('#workbench-workspace')).toBeVisible();
   expect(reads).toHaveLength(1);
   await expect(page.locator('#editor-agent')).toBeVisible();
-  await expect(page.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
+  await expect(page.locator('#editor-agent [role=tab]')).toHaveCount(0);
   await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
   expect(new URL(page.url()).searchParams.has('canon')).toBe(false);
 });

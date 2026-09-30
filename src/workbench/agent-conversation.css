@@ -1,6 +1,6 @@
 /* The conversation scrolls; writing the next message never scrolls away. */
 #editor-agent{overflow:hidden;min-height:0;}
-#editor-agent .folder-agent-shell{height:100%;box-sizing:border-box;padding:0;gap:0;overflow:hidden;display:grid;grid-template-rows:auto auto minmax(0,1fr);font-size:13px;line-height:1.45;}
+#editor-agent .folder-agent-shell{height:100%;box-sizing:border-box;padding:0;gap:0;overflow:hidden;display:grid;grid-template-rows:auto minmax(0,1fr);font-size:13px;line-height:1.45;}
 .folder-agent-header{padding:8px 12px;border-bottom:1px solid var(--line);min-height:0;}
 .folder-agent-header-controls{max-height:110px;overflow:auto;}
 .folder-agent-header .folder-agent-actions{align-items:center;gap:6px;}
@@ -96,10 +96,7 @@
 @media(max-width:760px){.agent-project-choice{grid-template-columns:1fr;}}
 
 /* One Agent entry, one selection and one draft; delivery is an explicit choice. */
-.folder-agent-workflow-body{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;overflow:hidden;}
-.folder-agent-modes{display:flex;gap:10px;margin:0 12px;border-bottom:1px solid var(--line);}
-.folder-agent-modes .bbtn{flex:1;min-width:0;margin:0;padding:12px 2px 9px;border:0;border-bottom:2px solid transparent;border-radius:0;background:none;font-size:12px;color:var(--sub);}
-.folder-agent-modes .bbtn[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);}
+.folder-agent-workflow-body{grid-row:2;display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0;overflow:hidden;}
 .folder-agent-mode-description{margin:0;padding:10px 12px;font-size:12px;color:var(--sub);}
 .folder-agent-copy-fallback{font-size:12px;}
 .folder-agent-copy-fallback .bbtn{margin:4px 0;padding:3px 7px;font-size:11px;}
@@ -112,10 +109,14 @@
 #editor-agent[data-workflow="external"] .folder-agent-history{height:auto;max-height:200px;}
 .folder-agent-change-history{margin-top:8px;font-size:12px;}
 .folder-agent-change-history>summary{cursor:pointer;color:var(--sub);}
-@media(max-height:600px){.folder-agent-modes .bbtn{padding:5px 1px;}.folder-agent-mode-description{font-size:11px;padding:5px 9px;}.folder-agent-workflow-body .folder-agent-header-controls{max-height:44px;}.folder-agent-copy-fallback textarea{max-height:65px;}}
+@media(max-height:600px){.folder-agent-mode-description{font-size:11px;padding:5px 9px;}.folder-agent-workflow-body .folder-agent-header-controls{max-height:44px;}.folder-agent-copy-fallback textarea{max-height:65px;}}
 @media(max-height:520px){
   .folder-agent-mode-description{display:none;}
   .folder-agent-workflow-body .folder-agent-header-controls{max-height:26px;}
   #editor-agent[data-workflow="external"] .folder-agent-context-card{padding:3px 7px;}
   .folder-agent-workflow-body{grid-template-rows:auto minmax(32px,1fr) auto;}
 }
+
+#editor-agent[data-connected="false"] .folder-agent-workflow-body{display:block;overflow:auto;}
+.folder-agent-header>.folder-agent-folder{overflow-wrap:anywhere;margin:4px 0 8px;font-size:12px;}
+.folder-agent-header>#folder-agent-connection{margin:4px 0;font-size:12px;color:var(--sub);}

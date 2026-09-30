@@ -31,9 +31,9 @@ test('existing named spec and ledger open without connection metadata and keep u
 test('empty folders create a stable spec/ledger pair and never a random session folder',async()=>{
   const h=await setup();try{const opened=await (await h.open()).initialize();await opened.files.flushArtifacts('{}','');assert.deepEqual((await fs.readdir(h.folder)).sort(),['.flowview-agent','story.ledger.md','story.spec.json']);}finally{await h.close();}
 });
-test('multiple specs require an explicit filename; malformed JSON is preserved without metadata writes',async()=>{
+test('multiple specs return filename choices; malformed JSON is preserved without metadata writes',async()=>{
   const h=await setup();try{
-    await h.write('one.spec.json','{}');await h.write('two.spec.json','{}');await assert.rejects(h.open(),/several/);
+    await h.write('one.spec.json','{}');await h.write('two.spec.json','{}');const choices=await h.open();assert.equal(choices.selectionRequired,true);assert.deepEqual(Array.from(choices.specs),['one.spec.json','two.spec.json']);
     assert.equal((await h.open('two.spec.json')).spec,'two.spec.json');await h.write('two.spec.json','{broken');await assert.rejects(h.open('two.spec.json'),/JSON|property/i);
     await assert.rejects(fs.stat(path.join(h.folder,'.flowview-agent')),/ENOENT/);
   }finally{await h.close();}

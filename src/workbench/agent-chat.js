@@ -49,7 +49,7 @@ function initWorkbenchAgentChat(opts){
   var doc=opts.document,root=doc.getElementById('editor-agent');
   if(!root)return {destroy:function(){}};
   var life=createWorkbenchLifetime(),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
-  var workflow='external',composeMode='external',freshProject=null,copying=false,preparedCopy=null,composed=null,composeEpoch=0;
+  var workflow='external',composeMode='external',setupIntent='adopt',freshProject=null,pendingFileChoice=null,copying=false,preparedCopy=null,composed=null,composeEpoch=0;
   var selectionFeedback=null,selectionFeedbackTimer=null;
   var state={connected:false,pending:null,transcript:[],changes:[],listening:false};
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
@@ -311,46 +311,55 @@ function initWorkbenchAgentChat(opts){
     if(stageText.textContent!==current[0])stageText.textContent=current[0];
   }
   function status(text){setText('status',text);setText('panel-status',text);}
+  function setSetupWorkflow(value){
+    workflow=value==='embedded'?'embedded':'external';setComposeMode(workflow);
+    guide.querySelectorAll('[data-agent-workflow-choice]').forEach(function(control){control.setAttribute('aria-pressed',String(control.dataset.agentWorkflowChoice===workflow));});
+    setText('workflow-note',workflow==='external'
+      ? 'The diagram folder can be anywhere your agent can access. It does not have to be the agent’s working directory.'
+      : 'Claude Code must run in the selected diagram folder so the Beta connection can find it.');
+  }
+  function setSetupIntent(value){
+    setupIntent=['adopt','resume','new'].includes(value)?value:'adopt';
+    var copy={
+      adopt:{title:'Select Diagram Folder',description:'Choose the folder containing its existing .spec.json file, or choose a different folder to create an agent-working copy.',note:'This is a new agent setup. Flowview does not restore a previous agent connection.',action:'Select Diagram Folder',next:'Next: if the folder contains several diagrams, choose one from a list. Then review and copy the setup instructions.'},
+      resume:{title:'Select Existing Diagram Folder',description:'Choose the diagram folder used by the earlier build—the folder containing its .spec.json file and coverage ledger.',note:'Flowview finds .flowview-agent inside that folder and restores the saved diagram, ledger, and workbench history. The open draft is kept in Earlier drafts, and old pending work is not replayed.',action:'Select Diagram Folder',next:'Next: verify the recovered diagram, then review and copy fresh setup instructions for this connection.'},
+      new:{title:'Select an Empty Diagram Folder',description:'Choose where Flowview should create the new spec, coverage ledger, and agent connection data.',note:'The open workbench draft is kept in Earlier drafts. Existing diagram folders are not reopened from this path.',action:'Select Empty Folder',next:'Next: Flowview creates story.spec.json and story.ledger.md, then you review and copy the setup instructions.'}
+    }[setupIntent];
+    guide.querySelectorAll('[data-agent-start-choice]').forEach(function(control){control.setAttribute('aria-pressed',String(control.dataset.agentStartChoice===setupIntent));});
+    setText('start-title',copy.title);setText('start-description',copy.description);setText('start-note',copy.note);setText('connect',copy.action);setText('start-next',copy.next);
+    if(!state.connected){get('instructions').value='';get('copy').disabled=true;}
+    get('file-choice').hidden=true;
+  }
   function stage(name){
     prerequisiteBody.textContent=workflow==='external'
       ? 'Use desktop Chrome or Edge over HTTPS and an agent with access to your selected local folder, Python 3, and Node. Copy/paste does not start Monitor or a background watcher. A web chat without local file access cannot update the shared diagram.'
       : 'Use desktop Chrome or Edge over HTTPS, Claude Code running in your selected local folder, Python 3, Node, and Claude’s Monitor tool. The helper reports runtime readiness; it does not install tools or change permissions.';
-    guide.querySelector('.folder-agent-guide-header>span').textContent=workflow==='external'?'Your agent · Your conversation':'Your Claude · Your account';
+    guide.querySelector('.folder-agent-guide-header>span').textContent=workflow==='external'?'✧ Your agent · Your conversation':'✧ Your Claude · Your account';
     setupLabel.textContent=workflow==='external'?'How much detail should your agent include?':'How much detail should Claude include?';
-    guide.querySelector('[data-agent-stage=review]').textContent=workflow==='external'?'Copy setup':'Paste in Claude';
-    guide.querySelector('[data-agent-stage=waiting]').textContent=workflow==='external'?'Review updates':'Connect';
-    var fresh=freshProject===opts.snapshot().project;
-    setText('start-description',fresh?'Start fresh in a new, empty diagram folder. Your previous draft is kept in Earlier drafts; existing diagram folders will not be reopened.':'Open the folder containing your spec and coverage ledger, or choose where your agent will create them. Existing files are loaded; your current draft stays in Earlier drafts.');
-    setText('connect',fresh?'Choose new diagram folder':'Choose diagram folder');
-    get('filename').placeholder=fresh?'Create story.spec.json, or enter a new name':'Detect existing spec, or create story.spec.json';
-    setText('folder-help',fresh?'Choose an empty folder. An optional filename gives the new spec and ledger their names.':'If the folder has several .spec.json files, enter the one to open. Its matching .ledger.md stays beside it.');
     setText('launch-command',"claude --no-chrome --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep"+(workflow==='embedded'?',Monitor':'')+"'");
     setText('launch-help',workflow==='external'?'Use your own account and normal permission prompts. Copy and paste does not start Monitor or a background watcher. Review the complete instructions before pasting.':'Use your own account and normal permission prompts. The Beta conversation uses Claude Monitor. Review the complete instructions before pasting.');
-    get('start-new').hidden=typeof opts.newProject!=='function';
-    get('start-new').disabled=connecting;
     guideStage=name;
     ['folder','review','waiting','help'].forEach(function(key){get('guide-'+key).hidden=key!==name;});
-    get('guide-title').textContent={folder:'Choose your diagram folder.',review:workflow==='external'?'Copy setup. Continue in your agent.':'One paste, then talk here.',waiting:'Waiting for the shared folder connection.',help:'Let’s match the folders.'}[name];
-    guide.querySelectorAll('[data-agent-stage]').forEach(function(item){
-      if(item.dataset.agentStage===(name==='help'?'review':name))item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');
-    });
+    get('guide-title').textContent={folder:'How are you starting?',review:workflow==='external'?'Review and copy setup.':'Review and copy setup.',waiting:'Waiting for the shared folder connection.',help:'Let’s match the folders.'}[name];
   }
   function openSetup(mode,options){
     restoreRecoveryForProject(opts.snapshot());
-    if(options && options.newProject===false)freshProject=null;
-    if(options && options.newProject){freshProject=opts.snapshot().project;resetConversationForProject(opts.snapshot());cacheReady=true;get('filename').value='';paint({});}
+    if(options && options.newProject===false){freshProject=null;setupIntent='adopt';}
+    if(options && options.newProject){freshProject=opts.snapshot().project;setupIntent='new';resetConversationForProject(opts.snapshot());cacheReady=true;paint({});}
     if(mode==='external' || mode==='embedded')setComposeMode(mode);
-    if(!state.connected)workflow=composeMode;
-    get('workflow').value=workflow;
+    if(!state.connected)workflow=composeMode;setSetupWorkflow(workflow);setSetupIntent(setupIntent);
     if(opts.show)opts.show();
     if(workflow==='embedded' && state.listening && !accessLost){get('input').focus();return;}
     stage(state.connected?(guideStage==='waiting'?'waiting':'review'):'folder');
     if(!guide.open)guide.showModal();
     get(guideStage==='folder'?'connect':guideStage==='review'?'copy':'show-copy').focus();
     if(guideStage==='folder')guide.scrollTop=0;
-    if(options && options.newProject)status('New diagram. Choose a new, empty folder to begin. Your previous draft is in Earlier drafts.');
+    if(options && options.newProject)status('New diagram. Select a new, empty folder to begin. Your previous draft is in Earlier drafts.');
   }
-  function closeGuide(){if(guide.open)guide.close();}
+  function closeGuide(){
+    if(pendingFileChoice){var pending=pendingFileChoice;pendingFileChoice=null;get('file-choice').hidden=true;pending.reject(new DOMException('Folder selection cancelled.','AbortError'));}
+    if(guide.open)guide.close();
+  }
   function paint(update){
     if(!life.alive())return;
     // A reader can scroll before the browser delivers its queued scroll event.
@@ -368,7 +377,8 @@ function initWorkbenchAgentChat(opts){
     paintCompose();
     get('copy').disabled=connecting || !state.connected || !get('instructions').value;
     get('disconnect').disabled=!state.connected;get('disconnect-guide').hidden=!state.connected;
-    get('start-new').disabled=connecting;get('connect').disabled=connecting || state.connected;get('workflow').disabled=connecting || state.connected;
+    get('connect').disabled=connecting || state.connected;
+    guide.querySelectorAll('[data-agent-workflow-choice],[data-agent-start-choice]').forEach(function(control){control.disabled=connecting || state.connected;});
     guide.querySelectorAll('[data-agent-change-folder]').forEach(function(button){button.disabled=connecting;});
     setText('open-setup',composeMode==='embedded' && state.connected && workflow!=='embedded'?'Reconnect for in-workbench chat':state.connected?'Connection settings':composeMode==='embedded'?'Connect in-workbench chat':'Connect shared folder');
     var activity=state.activity || [],phase=state.activityPhase || 'idle',seconds=state.quietSeconds || 0;
@@ -520,11 +530,19 @@ function initWorkbenchAgentChat(opts){
       status(ex.name==='AbortError'?'Folder selection cancelled.':ex.name==='NotAllowedError'?'Folder access was not granted. Choose the diagram folder again.':ex.message);
     }
   }
+  function chooseDiagramFile(names,token){
+    var picker=get('file-picker');picker.replaceChildren();
+    names.forEach(function(name){var option=doc.createElement('option');option.value=name;option.textContent=name;picker.appendChild(option);});
+    get('file-choice').hidden=false;get('file-confirm').disabled=false;picker.focus();
+    return new Promise(function(resolve,reject){pendingFileChoice={token:token,resolve:function(value){pendingFileChoice=null;get('file-choice').hidden=true;resolve(value);},reject:reject};});
+  }
   async function connect(resume,useRemembered){
     if(connecting || state.connected)return;
     if(typeof window.showDirectoryPicker!=='function' || !window.isSecureContext){
       status('Use this workbench in a desktop Chrome or Edge tab over HTTPS to connect a folder.');return;
     }
+    var intent=useRemembered?'resume':setupIntent;
+    if(intent==='new' && freshProject!==opts.snapshot().project && opts.newProject){opts.newProject(composeMode);intent='new';}
     connecting=true;get('instructions').value='';paint({});var token=++generation,opening=opts.snapshot(),unlockSetup=null;
     try{
       var parent,directory;
@@ -548,15 +566,22 @@ function initWorkbenchAgentChat(opts){
       releaseLock=unlockSetup;
       var projectFolder,preview,recovered;
       if(typeof openFolderAgentProject==='function'){
-        var found=await openFolderAgentProject(directory,get('filename').value);
+        var found=await openFolderAgentProject(directory);
+        if(found.selectionRequired){
+          var selected=await chooseDiagramFile(found.specs,token);
+          if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
+          found=await openFolderAgentProject(directory,selected);
+        }
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
-        if(freshProject===opening.project && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or session. Choose a new, empty diagram folder to start fresh. Existing files were not changed.');
+        if(intent==='new' && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or agent connection. Select a new, empty diagram folder to start fresh. Existing files were not changed.');
+        if(intent==='resume' && !found.hasSession)throw Error('This folder does not contain an existing agent build. Select the diagram folder used by the earlier build.');
+        if(intent==='adopt' && found.hasSession)throw Error('This folder already belongs to an agent build. Choose Continue an existing agent build, then select it again.');
         if(opts.validate && (found.source!==null || !found.recovering)){var invalid=opts.validate(found.source===null?opening.source:found.source);if(invalid)throw Error('The saved spec needs repair before opening: '+invalid);}
         projectFolder=await found.initialize();
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';
         if(projectFolder.source!==null && opts.validate){var recoveredError=opts.validate(projectFolder.source);if(recoveredError)throw Error('The saved spec needs repair: '+recoveredError);}
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
-        resume=!!(await projectFolder.files.read('session.json'));
+        resume=found.hasSession;
         if(resume)preview=await inspectFolderAgentSession(projectFolder.files,opts.snapshot());
         else preview={savedSource:projectFolder.source===null?opening.source:projectFolder.source,newFolder:projectFolder.source===null};
       }else if(resume)preview=await inspectFolderAgentSession(createFolderAgentFiles(directory),opts.snapshot());
@@ -567,7 +592,7 @@ function initWorkbenchAgentChat(opts){
       }
       await beginConnection(directory,parent,resume,token,recovered,projectFolder);
     }catch(ex){await connectionFailure(ex,token);}
-    finally{if(unlockSetup)unlockSetup();if(releaseLock===unlockSetup)releaseLock=null;if(life.alive() && token===generation){connecting=false;paint({});}}
+    finally{if(unlockSetup)unlockSetup();if(releaseLock===unlockSetup)releaseLock=null;if(pendingFileChoice && pendingFileChoice.token===token)pendingFileChoice=null;if(life.alive() && token===generation){get('file-choice').hidden=true;connecting=false;paint({});}}
   }
   life.listen(history,'click',async function(event){
     var control=event.target.closest('[data-receipt-action]'),card=control && control.closest('[data-change-id]');if(!card)return;
@@ -581,10 +606,11 @@ function initWorkbenchAgentChat(opts){
       else if(control.dataset.receiptAction==='undo')status('Change undone.');
     }catch(ex){if(life.alive())status(ex.message);}finally{if(life.alive())control.disabled=false;}
   });
-  life.listen(get('start-new'),'click',function(){if(opts.newProject && !connecting){opts.newProject(composeMode);}});
-  life.listen(get('workflow'),'change',function(){workflow=get('workflow').value;setComposeMode(workflow);if(opts.show)opts.show();stage('folder');});
-  life.listen(get('connect'),'click',function(){connect(false);});
-  life.listen(continueButton,'click',function(){if(opts.show)opts.show();stage('folder');if(!guide.open)guide.showModal();connect(true,true);});
+  guide.querySelectorAll('[data-agent-workflow-choice]').forEach(function(control){life.listen(control,'click',function(){setSetupWorkflow(control.dataset.agentWorkflowChoice);if(opts.show)opts.show();stage('folder');});});
+  guide.querySelectorAll('[data-agent-start-choice]').forEach(function(control){life.listen(control,'click',function(){setSetupIntent(control.dataset.agentStartChoice);});});
+  life.listen(get('file-confirm'),'click',function(){if(!pendingFileChoice)return;get('file-confirm').disabled=true;pendingFileChoice.resolve(get('file-picker').value);});
+  life.listen(get('connect'),'click',function(){connect(setupIntent==='resume');});
+  life.listen(continueButton,'click',function(){if(opts.show)opts.show();setSetupIntent('resume');stage('folder');if(!guide.open)guide.showModal();connect(true,true);});
   life.listen(cancelButton,'click',async function(){
     if(!client || !state.pending)return;state.cancelling=true;paint({});
     try{await client.cancel();status('This turn is no longer accepted. To stop Claude computing, interrupt it in its session. You can send a corrected request here.');}

@@ -75,7 +75,7 @@ test('retired API and invalid full source preserve exact history; a reviewed doc
     await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#redo-builder')).toBeDisabled();
     await page.locator('#editor-tab-agent').click();
     if(!await page.locator('#folder-agent-guide').isVisible())await page.locator('#folder-agent-open-setup').click();
-    await page.locator('#folder-agent-workflow').selectOption('embedded');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await page.locator('#folder-agent-setup-mode-embedded').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await page.locator('#folder-agent-close-guide').click();await h.listen();await expect(page.locator('#folder-agent-send')).toBeEnabled();
     const text='Rename node b in section delivery to Delivery service. Preserve every other authored field.';
     await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();

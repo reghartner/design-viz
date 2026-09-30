@@ -274,25 +274,33 @@ body.workspace-dragging,body.workspace-dragging *{user-select:none!important;cur
 .folder-agent-guide-header,.folder-agent-guide-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
 .folder-agent-guide-header{color:var(--sub);font-size:13px;margin-bottom:20px;}
 .folder-agent-guide h2{font-size:24px;line-height:1.3;margin:22px 0 10px;}
+.folder-agent-guide h3{font-size:17px;line-height:1.35;margin:0 0 6px;}
 .folder-agent-guide p{margin:12px 0;}
 .folder-agent-resume-card{margin:18px 0 24px;padding:18px;border:1px solid var(--accent);border-radius:12px;background:var(--card);}
 .folder-agent-resume-card>b{display:block;font-size:17px;}
 .folder-agent-resume-card .welcome-button{width:100%;justify-content:center;}
-#folder-agent-new-session{border-top:1px solid var(--line);padding-top:8px;}
+#folder-agent-new-session{padding-top:4px;}
 .folder-agent-guide details{margin:15px 0;color:var(--sub);font-size:13px;}
 .folder-agent-guide summary{cursor:pointer;}
-.folder-agent-guide-steps{list-style:none;display:flex;justify-content:space-between;gap:12px;padding:0 0 18px;margin:0;border-bottom:1px solid var(--line);counter-reset:connect;}
-.folder-agent-guide-steps li{counter-increment:connect;display:flex;align-items:center;gap:7px;color:var(--sub);font-size:12px;}
-.folder-agent-guide-steps li:before{content:counter(connect);display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;width:23px;height:23px;flex:none;}
-.folder-agent-guide-steps [aria-current="step"]{color:var(--ink);}
-.folder-agent-guide-steps [aria-current="step"]:before{background:var(--accent);color:#fff;border-color:var(--accent);}
+.folder-agent-choice-label{font-weight:600;color:var(--ink);margin:18px 0 8px!important;}
+.folder-agent-setup-choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.folder-agent-start-choices{display:grid;gap:8px;}
+.folder-agent-setup-choices button,.folder-agent-start-choices button{display:grid;gap:3px;width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:13px/1.4 'IBM Plex Sans',sans-serif;text-align:left;cursor:pointer;}
+.folder-agent-setup-choices button[aria-pressed="true"],.folder-agent-start-choices button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft,#edf4ff);box-shadow:inset 3px 0 0 var(--accent);}
+.folder-agent-setup-choices button[aria-pressed="true"]{background:var(--accent);color:#fff;box-shadow:none;}
+.folder-agent-setup-choices span,.folder-agent-start-choices span{color:var(--sub);font-size:12px;}
+.folder-agent-setup-choices button[aria-pressed="true"] span{color:inherit;}
+.folder-agent-start-detail{margin-top:18px;padding-top:17px;border-top:1px solid var(--line);}
+.folder-agent-start-note{padding:9px 11px;border-left:3px solid var(--warn,#b66a16);background:var(--card);color:var(--sub);}
+.folder-agent-file-choice{margin-top:16px;padding:14px;border-radius:9px;background:var(--card);border:1px solid var(--line);}
+.folder-agent-file-choice .folder-agent-guide-actions{margin-top:12px;}
 .folder-agent-guide .folder-agent-command{padding:14px;background:var(--card);border:1px solid var(--line);border-radius:9px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;}
 .folder-agent-guide-actions{margin-top:24px;}
 .folder-agent-guide label{display:block;font-size:12px;color:var(--sub);margin-bottom:6px;}
 .folder-agent-guide textarea{box-sizing:border-box;display:block;width:100%;min-height:180px;max-height:40dvh;resize:vertical;padding:14px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:12px/1.6 'IBM Plex Mono',monospace;}
 .folder-agent-wait-list{list-style:none;border-left:2px solid var(--line);padding:0 0 0 16px;margin:22px 0;color:var(--sub);}
 .folder-agent-wait-list li{margin:14px 0;}
-@media(max-width:540px){.folder-agent-guide{padding:20px 18px;}.folder-agent-guide-steps{gap:6px;}.folder-agent-guide-steps li{font-size:11px;gap:4px;}.folder-agent-guide-actions .welcome-button-primary{width:100%;}.folder-agent-guide textarea{font-size:16px;}}
+@media(max-width:540px){.folder-agent-guide{padding:20px 18px;}.folder-agent-setup-choices{grid-template-columns:1fr;}.folder-agent-guide-actions .welcome-button-primary,.folder-agent-start-detail>.welcome-button-primary{width:100%;}.folder-agent-guide textarea{font-size:16px;}}
 #folder-agent-connection{font-weight:600;}
 .folder-agent-messages{display:flex;flex-direction:column;gap:14px;}
 .folder-agent-message{padding:12px 0;border-bottom:1px solid var(--line);}
@@ -1330,7 +1338,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas .workspace-tools .editor-add-button{gap:4px;}
   .workspace-canvas .workspace-tools .rbtn{padding:7px 10px;}
 }
-.folder-agent-guide #folder-agent-workflow,.folder-agent-guide #folder-agent-filename{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--card);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
+.folder-agent-guide #folder-agent-file-picker{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
 @media(max-width:540px){
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}

@@ -16,7 +16,8 @@ async function openFolderAgentProject(directory, filename){
   var names=[];
   if(!filename && !config && !legacy && typeof directory.values==='function'){
     for await(var entry of directory.values())if(entry.kind==='file' && valid(entry.name,'.spec.json'))names.push(entry.name);
-    if(names.length>1)throw Error('This folder has several diagram specs. Enter the diagram filename in setup, then choose this folder again.');
+    names.sort();
+    if(names.length>1)return {selectionRequired:true,specs:names,existing:true,hasSession:!!openingOwner};
   }
   var spec=config?config.spec:filename || names[0] || 'story.spec.json';
   var ledger=config?config.ledger:spec.slice(0,-10)+'.ledger.md';
@@ -79,5 +80,5 @@ async function openFolderAgentProject(directory, filename){
       }});
     return {files:result,source:source,ledger:notes || '',hasLedger:notes!==null,legacy:legacy};
   }
-  return {existing:!!metadata || source!==null || notes!==null,source:recovery?null:source,recovering:!!recovery,ledger:notes || '',spec:spec,initialize:initialize};
+  return {existing:!!metadata || source!==null || notes!==null,source:recovery?null:source,recovering:!!recovery,ledger:notes || '',spec:spec,hasSession:!!openingOwner,initialize:initialize};
 }

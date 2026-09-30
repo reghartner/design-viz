@@ -46,8 +46,8 @@ test('Build with Claude carries the actual view and step into a checked workbenc
   await expect(editor.locator('#editor-agent')).toBeVisible();
   await expect(editor.locator('#folder-agent-mode-external')).toHaveAttribute('aria-selected','true');
   await expect(editor.locator('#editor-agent')).toHaveAttribute('data-connected','false');
-  await expect(editor.getByRole('dialog',{name:'Choose your diagram folder.'})).toBeVisible();
-  await expect(editor.locator('#folder-agent-workflow')).toHaveValue('external');
+  await expect(editor.getByRole('dialog',{name:'How are you starting?'})).toBeVisible();
+  await expect(editor.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
   expect(await editor.locator('#src').inputValue().then(JSON.parse)).toEqual(JSON.parse(source));
   await expect(editor.locator('#docview [data-view-id]')).toHaveAttribute('data-view-id','service-flow');
   await expect(editor.locator('#docview .stepid')).toHaveText(address.get('s'));

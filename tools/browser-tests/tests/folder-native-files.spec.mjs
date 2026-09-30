@@ -10,7 +10,7 @@ test('a new connection and explicit resume use native buffered filesystem handle
       return root;
     };
   });
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-workflow').selectOption('embedded');await page.locator('#folder-agent-connect').click();
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await page.locator('#editor-tab-agent').click();await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
   const first=await page.evaluate(async()=>{
     const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');
@@ -19,7 +19,7 @@ test('a new connection and explicit resume use native buffered filesystem handle
   });
   expect(first.state.connectionId).toBe(first.manifest.connectionId);expect(first.state.source).toBe(source);
   await page.locator('#folder-agent-close-guide').click();await page.locator('#folder-agent-pairing>summary').click();await page.locator('#folder-agent-disconnect').click();
-  await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-connect')).toBeVisible();await page.locator('#folder-agent-connect').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-connect')).toBeVisible();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-connection')).toHaveText('Waiting for Claude listener');
   const next=await page.evaluate(async()=>{const root=await navigator.storage.getDirectory(),directory=await root.getDirectoryHandle('.flowview-agent');return JSON.parse(await(await directory.getFileHandle('session.json')).getFile().then(file=>file.text()));});
   expect(next.sessionId).toBe(first.manifest.sessionId);expect(next.connectionId).not.toBe(first.manifest.connectionId);

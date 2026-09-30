@@ -38,9 +38,7 @@ async function mount(page,{stored,denied=false}={}){
     window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){},openEmptyFolder:()=>({ok:true,project:window.testProject}),restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
   },denied);
   if(stored)await page.evaluate(()=>window.hasSavedSession=true);
-  // These fixtures exercise the embedded conversation. Choose it through the
-  // production tab, while the separate folder-agent suite verifies copy defaults.
-  await page.locator('#folder-agent-mode-embedded').click();
+
 }
 async function connect(page){await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await expect(page.locator('#folder-agent-setup-mode-embedded')).toHaveAttribute('aria-pressed','true');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));}
 async function composerVisible(page){
@@ -68,10 +66,10 @@ test('twenty exchanges keep composer reachable and do not force an older-message
 });
 test('reload keeps draft/detail and a visible disconnected recovery without accessing the folder',async({page})=>{
   const draft='Keep this long unsent request. '.repeat(1000);
-  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-mode-external').click();await page.locator('#folder-agent-input').fill(draft);
+  await mount(page);await connect(page);await page.locator('#folder-agent-detail-summary').click();await page.locator('#folder-agent-level').selectOption('engineering');await page.locator('#folder-agent-input').fill(draft);
   await page.evaluate(()=>publish({transcript:[{role:'assistant',text:'A saved answer',requestId:'r1'}]}));
   await mount(page);await expect(page.locator('#folder-agent-input')).toHaveValue(draft);await expect(page.locator('#folder-agent-level')).toHaveValue('engineering');
-  await expect(page.locator('#folder-agent-messages')).toContainText('A saved answer');await expect(page.locator('#folder-agent-recovery')).toContainText('Interrupted requests will not replay');
+  await expect(page.locator('#folder-agent-messages')).toBeHidden();await expect(page.locator('#folder-agent-input')).toBeHidden();await expect(page.locator('#folder-agent-recovery')).toContainText('Interrupted requests will not replay');
   expect(await page.evaluate(()=>({pickerCalls,permissionCalls,starts:starts.length}))).toEqual({pickerCalls:0,permissionCalls:0,starts:0});
 });
 test('denied remembered permission is explicit and preserves draft with a picker fallback',async({page})=>{
@@ -83,7 +81,7 @@ test('denied remembered permission is explicit and preserves draft with a picker
 test('setup separates conversation mode from adopt, resume and new-folder intent',async({page})=>{
   await mount(page);await page.locator('#folder-agent-open-setup').click();
   await expect(page.locator('.folder-agent-guide-steps')).toHaveCount(0);await expect(page.getByText('Connect later',{exact:true})).toHaveCount(0);
-  await expect(page.locator('#folder-agent-setup-mode-embedded')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#folder-agent-start-adopt')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Diagram Folder');
   await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-start-title')).toHaveText('Select Existing Diagram Folder');await expect(page.locator('#folder-agent-start-note')).toContainText('.flowview-agent');
   await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-connect')).toHaveText('Select Empty Folder');
@@ -105,7 +103,7 @@ test('multiple specs are chosen from a generated picker without filename entry',
 test('prominent Resume opens the saved folder story and conversation while preserving the different local draft',async({page})=>{
   await mount(page);await page.evaluate(()=>{window.hasSavedSession=true;window.savedSource=' {"title":"Saved folder story"}\n';window.savedTranscript=[{role:'assistant',text:'The saved conversation is here.',requestId:'previous'}];});
   const original=await page.evaluate(()=>testSource);
-  await page.locator('#folder-agent-open-setup').click();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();
   await page.locator('#folder-agent-start-resume').click();await expect(page.locator('#folder-agent-connect')).toBeVisible();
   expect(await page.locator('#folder-agent-connect').evaluate(n=>n.closest('details')===null)).toBe(true);
   await expect(page.locator('#folder-agent-guide')).toContainText('coverage ledger');
@@ -118,7 +116,7 @@ test('prominent Resume opens the saved folder story and conversation while prese
 
 test('explicit Resume adopts a fresh project even when the saved source is byte-identical',async({page})=>{
   await mount(page);const original=await page.evaluate(()=>{window.hasSavedSession=true;window.savedSource=window.testSource;return window.testSource;});
-  await page.locator('#folder-agent-input').fill('This old unsent draft must not follow the folder');
+  await page.evaluate(()=>{document.getElementById('folder-agent-input').value='This old unsent draft must not follow the folder';});
   await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-start-resume').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();
   expect(await page.evaluate(()=>({source:testSource,project:testProject,restores:restoreCalls.length,expected:restoreCalls[0]?.expected,starts:starts.length}))).toMatchObject({source:original,project:2,restores:1,expected:{source:original,project:1},starts:1});
@@ -232,7 +230,7 @@ test('context stays concise and expandable; setup and next-message detail preser
   });
   await expect(page.locator('#folder-agent-focus-summary')).toHaveText('Focus: 30 items selected');
   await expect(page.locator('#folder-agent-context')).toBeHidden();await expect(page.locator('#folder-agent-level')).toBeHidden();
-  await page.locator('#folder-agent-open-setup').click();await expect(page.locator('#folder-agent-setup-level')).toBeVisible();
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await expect(page.locator('#folder-agent-setup-level')).toBeVisible();
   await page.locator('#folder-agent-setup-level').selectOption('engineering');await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await page.evaluate(()=>publish({listening:true}));
   await expect(page.locator('#folder-agent-detail-summary')).toHaveText('Detail: Engineering');
   await page.locator('#folder-agent-focus-summary').click();
@@ -338,7 +336,7 @@ test('project switch clears the old conversation while disconnect is delayed; la
   await mount(page);await deferredPeers(page,[{disconnect:'old-close'},{}]);await connect(page);
   await page.evaluate(()=>peers[0].publish({pending:'old-r1',transcript:[{role:'user',text:'Old project private conversation',requestId:'old-r1'}],changes:[{id:'old-p1',requestId:'old-r1',status:'applied',summary:'Old project change'}],review:{id:'old-review',version:1,summary:'Old project proposal'}}));
   await page.locator('#folder-agent-input').fill('Old project unsent question');await page.locator('#fixture-open-project').click();await expectCleanNewProject(page);
-  await expect.poll(()=>page.evaluate(()=>peers[0].disconnectCalls)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
   await connect(page);await publishNewProject(page);
   await page.evaluate(()=>{peers[0].publish({connected:true,status:'Old project must not return',transcript:[{role:'assistant',text:'Old project late answer'}],changes:[{id:'old-p1',status:'applied'}]});peerGates['old-close'].resolve();});
   await expect.poll(()=>page.evaluate(()=>peers[0].destroyCalls)).toBeGreaterThan(0);await expectNewProjectIntact(page);await expect(page.locator('#folder-agent-panel-status')).toHaveText('New project is ready.');
@@ -351,10 +349,10 @@ test('an old polling failure after project switch cannot mark the new folder ina
   await expectNewProjectIntact(page);await expect(page.locator('#folder-agent-panel-status')).toHaveText('New project is ready.');
 });
 for(const outcome of ['resolve','reject'])test(`an old start can ${outcome} while the next project connects without retiring its client or enabling duplicate pairing`,async({page})=>{
-  await mount(page);await deferredPeers(page,[{start:'old-start'},{start:'new-start'}]);await page.locator('#folder-agent-input').fill('Old project draft');
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();await expect.poll(()=>page.evaluate(()=>peers[0]?.startCalls)).toBe(1);
+  await mount(page);await deferredPeers(page,[{start:'old-start'},{start:'new-start'}]);
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await page.locator('#folder-agent-connect').click();await expect.poll(()=>page.evaluate(()=>peers[0]?.startCalls)).toBe(1);
   await page.locator('#folder-agent-close-guide').click();await page.locator('#fixture-open-project').click();await expectCleanNewProject(page);
-  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();await expect.poll(()=>page.evaluate(()=>peers[1]?.startCalls)).toBe(1);
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-embedded').click();await page.locator('#folder-agent-connect').click();await expect.poll(()=>page.evaluate(()=>peers[1]?.startCalls)).toBe(1);
   await page.evaluate(()=>peers[1].publish({status:'Connecting the new project.'}));
   await page.evaluate(outcome=>{if(outcome==='reject')peerGates['old-start'].reject(Error('Old project start failed'));else peerGates['old-start'].resolve();},outcome);
   // Both the retired peer's callbacks and its catch/finally have now run.
@@ -362,4 +360,63 @@ for(const outcome of ['resolve','reject'])test(`an old start can ${outcome} whil
   await expect(page.locator('#folder-agent-connect')).toBeDisabled();await expect(page.locator('#folder-agent-connect')).toBeDisabled();await expect(page.locator('#folder-agent-copy')).toBeDisabled();
   await expect(page.locator('#folder-agent-status')).toHaveText('Connecting the new project.');expect(await page.evaluate(()=>peers[1].disconnectCalls)).toBe(0);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
   await page.evaluate(()=>peerGates['new-start'].resolve());await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();await publishNewProject(page);await expectNewProjectIntact(page);
+});
+
+for(const method of ['external','embedded'])test('Agent panel follows the '+method+' connection without tabs',async({page},info)=>{
+  await mount(page,{stored:{sessionId:'s1',folderName:'flowview-session-test',title:'My story',draft:'Preserve my draft',sourceKey:'unknown'}});
+  await expect(page.locator('#editor-agent [role="tab"]')).toHaveCount(0);
+  await expect(page.locator('#folder-agent-recovery')).toContainText('Continue My story');
+  await expect(page.locator('#folder-agent-continue')).toBeVisible();
+  await expect(page.getByRole('button',{name:'New Connection',exact:true})).toBeVisible();
+  for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
+  await page.screenshot({path:info.outputPath('agent-disconnected.png')});
+  await page.getByRole('button',{name:'New Connection',exact:true}).click();
+  await expect(page.locator('#folder-agent-guide')).toBeVisible();
+  await page.locator('#folder-agent-setup-mode-'+method).click();
+  await page.locator('#folder-agent-start-resume').click();await page.locator('#folder-agent-connect').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  await expect(page.locator('#folder-agent-recovery')).toBeHidden();
+  await expect(page.locator('#folder-agent-folder')).toBeVisible();
+  await expect(page.locator('#folder-agent-folder')).toContainText('flowview-session-test');
+  await expect(page.locator('#folder-agent-connection')).toBeVisible();
+  await expect(page.locator('#folder-agent-send')).toHaveText(method==='external'?'Copy request':'Send to Claude');
+  await page.locator('#folder-agent-input').fill('My next request');
+  if(method==='embedded'){
+    await expect(page.locator('#folder-agent-send')).toBeDisabled();await page.evaluate(()=>publish({listening:true}));
+  }
+  await expect(page.locator('#folder-agent-send')).toBeEnabled();
+  await expect(page.locator('#folder-agent-selection')).toBeVisible();
+  await page.locator('#folder-agent-pairing summary').click();await page.locator('#folder-agent-disconnect').click();
+  for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
+  await expect(page.locator('#folder-agent-continue')).toBeVisible();
+  await expect(page.getByRole('button',{name:'New Connection',exact:true})).toBeVisible();
+  await page.locator('#folder-agent-continue').click();
+  await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-workflow',method);
+  await expect(page.locator('#folder-agent-folder')).toBeVisible();
+  await page.screenshot({path:info.outputPath('agent-connected-'+method+'.png')});
+});
+
+for(const method of ['external','embedded'])test('held '+method+' disconnect immediately hides actions until cleanup completes',async({page})=>{
+  await mount(page);await deferredPeers(page,[{disconnect:'close'}]);
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-'+method).click();
+  await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
+  await page.locator('#folder-agent-pairing summary').click();await page.locator('#folder-agent-disconnect').click();
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
+  for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
+  await expect(page.locator('#folder-agent-open-setup')).toBeDisabled();await expect(page.locator('#folder-agent-continue')).toBeDisabled();
+  await page.evaluate(()=>peerGates.close.resolve());
+  await expect(page.locator('#folder-agent-open-setup')).toBeEnabled();await expect(page.locator('#folder-agent-continue')).toBeEnabled();
+});
+test('failed setup immediately hides connected actions while disconnect cleanup is held',async({page})=>{
+  await mount(page);await deferredPeers(page,[{disconnect:'close'}]);
+  await page.evaluate(()=>{window.createFolderAgentFiles=()=>({write:async()=>{throw Error('Injected setup write failure');}});});
+  await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
+  await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
+  for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
+  await expect(page.locator('#folder-agent-copy')).toBeDisabled();await expect(page.locator('#folder-agent-connect')).toBeDisabled();
+  await page.evaluate(()=>peerGates.close.resolve());
+  await expect(page.locator('#folder-agent-status')).toContainText('Injected setup write failure');
+  await expect(page.locator('#folder-agent-connect')).toBeEnabled();
 });

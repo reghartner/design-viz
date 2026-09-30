@@ -157,26 +157,26 @@ working on the canvas or panel handles. Text fields keep their native text undo.
 Temporary geometry history ends when a different project is opened or the page
 reloads; saved editor-window positions still return on reload.
 
-Open **Agent** in the left rail and choose **Copy & paste** (the default) or
-**In workbench — Beta**. Both tabs use the same message draft and current canvas
-selection: nodes, edges, steps, panels and other editor targets. Switching tabs
-preserves that draft and selection; it does not connect a folder or start Monitor.
+Open **Agent** in the left rail to see the current connection. There are no tabs.
+When disconnected, choose **Reopen diagram folder** on a remembered build or
+**New Connection** to launch setup and choose **Copy & paste** or
+**In workbench — Beta**. Once connected, the panel shows its status, folder and
+files, and only the active method's controls. The composer follows the current
+canvas selection: nodes, edges, steps, panels and other editor targets.
 There is no separate toolbar message composer.
 
-The bottom-left **Copy for agent · N selected** button copies selection context
+Once connected, the bottom-left **Copy for agent · N selected** button copies selection context
 in one click, without opening Agent or requiring a message. It briefly shows
 **Copied**. It preserves the current draft and any active request, and is disabled
 when nothing is selected. Clipboard denial opens the manual-copy fallback in Agent.
 
 **Copy request** includes your message, selected item identifiers and evidence
 references, and view context. It omits the full JSON and selected containers'
-contents, and works without a connection. The agent can read the spec and ledger
-from the shared folder; without a folder, provide needed files separately.
-With a diagram folder connected, Copy also
-registers the request for the preview-and-approval workflow. Paste the copied text
+contents. A connected diagram folder is required; the agent reads the spec and
+ledger from that folder. Copy registers the request for the preview-and-approval workflow. Paste the copied text
 into the existing agent conversation; Copy never dispatches it through Monitor.
 If clipboard access is denied, select the prepared text and copy manually.
-**Send to Claude** in the Beta tab requires a connected folder and a live listener.
+**Send to Claude** in the Beta connection requires a connected folder and a live listener.
 Both modes review spec/ledger proposals through **Preview Agent Updates**.
 **Commit update** saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).

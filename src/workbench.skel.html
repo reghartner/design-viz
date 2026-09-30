@@ -161,12 +161,12 @@
     <section class="specbox" id="spec-editor" aria-label="Editing workspace">
       <div class="editor-pane" id="editor-agent" role="tabpanel" aria-labelledby="editor-tab-agent" hidden>
         <div class="folder-agent-shell">
-          <div class="folder-agent-actions"><button type="button" class="bbtn" id="folder-agent-open-setup">Connect Claude</button></div>
+          <div class="folder-agent-actions"><button type="button" class="bbtn" id="folder-agent-open-setup">New Connection</button></div>
           <details id="folder-agent-pairing"><summary>Connection details</summary>
           <p id="folder-agent-connection">Not connected</p><p id="folder-agent-folder" class="folder-agent-folder"></p>
           <button type="button" class="bbtn" id="folder-agent-disconnect" disabled>Disconnect</button>
           </details>
-          <p id="folder-agent-panel-status" class="folder-agent-hint" role="status">Connect your Claude session to start talking here.</p>
+          <p id="folder-agent-panel-status" class="folder-agent-hint" role="status">Choose New Connection to connect an agent to your diagram.</p>
           <div id="folder-agent-messages" class="folder-agent-messages" role="log" aria-label="Conversation with Claude" aria-live="polite"></div>
           <section id="folder-agent-activity" class="folder-agent-activity" aria-label="Claude activity" hidden>
             <b id="folder-agent-activity-title" role="status">Waiting for Claude</b>
@@ -337,7 +337,7 @@
         <div class="docview sk-aurora sk-pastel" id="docview" aria-label="Rendered documentation page"></div>
       </div></div>
     </div>
-    <button type="button" id="folder-agent-selection" class="workspace-selection" aria-live="polite" aria-atomic="true" disabled>Copy for agent · No selection</button>
+    <button type="button" id="folder-agent-selection" class="workspace-selection" hidden aria-live="polite" aria-atomic="true" disabled>Copy for agent · No selection</button>
     <div class="workspace-canvas-controls" role="toolbar" aria-label="Canvas navigation">
       <button type="button" id="workspace-page" class="bbtn" hidden>Back to page</button>
       <button type="button" id="workspace-pan" class="bbtn" aria-pressed="false" title="Drag the canvas; hold Space for temporary pan">Pan</button>

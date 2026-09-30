@@ -3,8 +3,8 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function load(){const context={Math,JSON,Promise};vm.createContext(context);vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench/agent-recovery.js'),'utf8'),context);return context;}
 test('recovery cache persists preferences and unsent text independently of connection source',()=>{
   const c=load(),values=new Map(),storage={getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)},r=c.createWorkbenchAgentRecovery({storage});
-  assert.equal(r.read(),null);r.save({level:'engineering',draft:'Do not lose my question',sourceKey:'old-story',draftSourceKey:'edited-story',folderName:'flowview-session-safe',sessionId:'s1',at:123,transcript:[{role:'user',text:'Hello',requestId:'r1'}]});
-  const record=r.read();assert.equal(record.level,'engineering');assert.equal(record.draft,'Do not lose my question');assert.equal(record.sourceKey,'old-story');assert.equal(record.draftSourceKey,'edited-story');assert.equal(record.transcript[0].text,'Hello');
+  assert.equal(r.read(),null);r.save({workflow:'embedded',level:'engineering',draft:'Do not lose my question',sourceKey:'old-story',draftSourceKey:'edited-story',folderName:'flowview-session-safe',sessionId:'s1',at:123,transcript:[{role:'user',text:'Hello',requestId:'r1'}]});
+  const record=r.read();assert.equal(record.workflow,'embedded');assert.equal(record.level,'engineering');assert.equal(record.draft,'Do not lose my question');assert.equal(record.sourceKey,'old-story');assert.equal(record.draftSourceKey,'edited-story');assert.equal(record.transcript[0].text,'Hello');
   assert.equal(c.folderAgentSourceKey('{"title":"A"}'),c.folderAgentSourceKey('{"title":"A"}'));
   assert.notEqual(c.folderAgentSourceKey('{"title":"A"}'),c.folderAgentSourceKey('{"title":"B"}'));
 });

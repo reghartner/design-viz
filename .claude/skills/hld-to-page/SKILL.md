@@ -194,6 +194,9 @@ When handing off a page for human editing, the workbench’s **Change panel type
 action reviews discarded setup and step state before replacement. See
 [Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).
 
+Data contract step patches can override `fields` (all cell values), `columns`,
+and `fieldWidth`; arrays replace the full list and `enterOnce` makes an override
+temporary. Omitted content falls back to the carried state or declaration.
 For field-by-field contract explanations, use the `data-contract` panel with
 custom columns and step-specific `highlights`; keep values sourced and use
 optional highlight labels to explain the emphasis. See

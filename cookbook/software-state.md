@@ -8,7 +8,10 @@ with `python3 tools/widget_doc.py table checks budget`.
 For an API or event contract, choose **Data contract** (`data-contract`): each
 field is a row, with custom columns such as Type, Required, Example and Notes.
 In Inspect, add or reorder fields and columns and set their widths. Names are
-editable without changing the IDs used by cells or highlights. Use
+editable without changing the IDs used by cells or highlights. Step controls also
+expose every cell, the full field and column lists, and the field-name width.
+Assignments carry forward; choose **This step only** for a temporary override
+or **Inherit previous** to remove the local assignment. Use
 `python3 tools/widget_doc.py data-contract` for the contract and
 [`examples/data-contract/data-contract.spec.json`](../examples/data-contract/data-contract.spec.json)
 for a complete story. Highlight colors and optional labels belong to starting

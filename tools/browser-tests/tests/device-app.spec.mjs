@@ -50,6 +50,37 @@ test('source visibility and notifications edit independently with Undo and Redo'
  await expect(app(root).locator('.phonetitle')).toHaveText(['Doorbell pressed']);
 });
 
+test('notification Markdown edits preview safely and undo separately from the step caption',async({page,server})=>{
+ const spec=structuredClone(raw),d=diagram(spec);
+ d.steps[2].panels.app.notify=[{app:'App',title:'First',text:'First message'},{app:'App',title:'Second',text:'Second message'}];
+ const original=JSON.stringify(spec,null,2);
+ await page.goto(server.origin+'/workbench.html');await paste(page,original);
+ await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="2"]').click();await page.locator('#editor-tab-inspect').click();
+ const guide=page.locator('#guide'),root=page.locator('#docview'),src=page.locator('#src');
+ const patch=guide.locator('.patchedit').filter({has:page.locator('summary').filter({hasText:/^app ·/})});
+ await openInspectorGroup(patch);
+ const first=patch.locator('.notification-editor').nth(0),second=patch.locator('.notification-editor').nth(1);
+ await first.getByLabel('Formatting link URL').fill(server.origin+'/first');
+ await second.getByLabel('Formatting link URL').fill(server.origin+'/second');
+ const message=first.getByLabel('Message',{exact:true});
+ await message.focus();await message.evaluate(el=>el.setSelectionRange(0,5));
+ await first.getByRole('button',{name:'Bold',exact:true}).click();
+ await expect(message).toHaveValue('**First** message');
+ await expect(first.locator('.notification-preview strong')).toHaveText('First');
+ await expect(app(root).locator('.phonetext strong')).toHaveText('First');
+ await expect(first.getByLabel('Formatting link URL')).toHaveValue(server.origin+'/first');
+ await expect(second.getByLabel('Formatting link URL')).toHaveValue(server.origin+'/second');
+ const changed=await src.inputValue();
+ expect(diagram(JSON.parse(changed)).steps[2].text).toBe(d.steps[2].text);
+ await message.fill('**Safe** <img src=x onerror=alert(1)>');await message.press('Tab');
+ await expect(first.locator('.notification-preview img')).toHaveCount(0);
+ await expect(app(root).locator('.phonetext img')).toHaveCount(0);
+ await expect(app(root).locator('.phonetext').first()).toContainText('<img src=x onerror=alert(1)>');
+ await page.locator('#undo-builder').click();await expect(src).toHaveValue(changed);
+ await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+ await page.locator('#redo-builder').click();await expect(src).toHaveValue(changed);
+});
+
 test('the picker demonstrates notifications but inserts a plain source-free tiled phone',async({page,server},testInfo)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,source);
  await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();

@@ -15,6 +15,13 @@ filter keeps normal text-editing behavior. Focusing this editor pauses Play.
 An `ambient-only` diagram still permits source editing but has no step preview;
 change `diagram.view` in JSON to `step` or `ambient` to show one.
 
+Step text supports Markdown: **bold**, *italic*, links, inline code, and fenced
+code blocks. Select text and use **Bold**, **Italic**, **Code**, **Code block**,
+or **Insert link**, or type the syntax directly. The caption preview and exported
+viewer render the formatting. Each formatting action supports Undo/Redo.
+The same controls are available in paragraphs, bullets, contract notes and
+glosses, change notes, and phone notification messages.
+
 Under **Panel changes → Panel visibility**, every declared panel has **Show**,
 **Hide**, and **Inherit**, even if it has no content patch. Show/Hide carries
 forward along the selected path; Inherit removes only this beat’s override.

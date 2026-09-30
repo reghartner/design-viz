@@ -47,7 +47,7 @@ var FlowNotifications = (function () {
       return '<div class="phonecard'+(fresh && i===0?' fresh':'')+'">'+
         '<div class="phoneapp" title="'+esc(card.app)+'">'+esc(card.app)+'</div>'+
         (card.title?'<div class="phonetitle" title="'+esc(card.title)+'">'+esc(card.title)+'</div>':'')+
-        (card.text?'<div class="phonetext" title="'+esc(card.text)+'">'+esc(card.text)+'</div>':'')+'</div>';
+        (card.text?'<div class="phonetext" title="'+esc(card.text)+'">'+proseMarkup(card.text)+'</div>':'')+'</div>';
     }).join('');
   }
   return {clean:clean,warnings:warnings,create:create,model:model,grew:grew,cardsHTML:cardsHTML};

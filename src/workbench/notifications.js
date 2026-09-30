@@ -23,18 +23,21 @@ function createNotificationComposer(options){
       var preview=doc.createElement('div');preview.className='notification-preview';
       [['app','App'],['title','Title'],['text','Message']].forEach(function(field){
         var key=field[0],label=field[1];
-        var input=controls.text(entry[key],function(value){
+        var control=(key==='text'?controls.prose:controls.text)(entry[key],function(value){
           return update(function(items){
             if(!panelObject(items[index]))return items;
             var updated=Object.assign(Object.create(null),items[index]);
             if(value===null)delete updated[key];else updated[key]=value;
             items[index]=updated;return items;
           });
-        },{required:key==='app'?'An app name is required.':undefined,textarea:key==='text'});
-        input.setAttribute('aria-label',label);card.appendChild(controls.row(label,input));
-        var line=doc.createElement(key==='app'?'small':key==='title'?'b':'span');
-        line.textContent=typeof entry[key]==='string'?entry[key]:'';preview.appendChild(line);
-        options.listen(input,'input',function(){line.textContent=input.value;});
+        },{required:key==='app'?'An app name is required.':undefined,key:options.proseKey+':'+index,label:label});
+        var input=key==='text'?control.querySelector('textarea'):control;
+        input.setAttribute('aria-label',label);card.appendChild((key==='text'?controls.block:controls.row)(label,control));
+        var line=doc.createElement(key==='app'?'small':key==='title'?'b':'div');
+        if(key==='text')line.className='notification-preview-text';
+        function show(value){if(key==='text')line.innerHTML=proseMarkup(value);else line.textContent=value;}
+        show(typeof entry[key]==='string'?entry[key]:'');preview.appendChild(line);
+        options.listen(input,'input',function(){show(input.value);});
       });
       card.appendChild(preview);
     }

@@ -1,4 +1,4 @@
-/* Safe prose formatting only. Graph labels and panel values remain literal.
+/* Safe prose formatting only. Graph labels and structured panel values remain literal.
    Parse the source, never generated HTML: code and link URLs are opaque. */
 function proseCodeClose(source,start,length){
   var runs=/`+/g,run;runs.lastIndex=start;

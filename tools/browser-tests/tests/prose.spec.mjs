@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage as paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,openInspectorGroup} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 import {raw,source,code,caption} from '../fixtures/prose-spec.mjs';
 
@@ -42,6 +42,39 @@ test('code renders and edits in the workbench without changing diagram labels or
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();await expect(root.locator('.step-text pre code')).toHaveText('return true;\n');
   await testInfo.attach('prose-workbench',{body:await page.screenshot(),contentType:'image/png'});
+});
+
+test('step Markdown toolbar keeps selections and link drafts separate from change notes',async({page,server},testInfo)=>{
+  const spec=structuredClone(raw),step=spec.page.sections[0].diagram.steps[0];
+  step.text='Send event';step.delta=true;step.deltaText='Change reason';
+  const original=JSON.stringify(spec,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
+  const guide=page.locator('#guide'),src=page.locator('#src');
+  const text=guide.getByLabel('text',{exact:true}),editor=guide.locator('.prose-editor').filter({has:page.getByLabel('text',{exact:true})});
+  await text.focus();await text.evaluate(el=>el.setSelectionRange(5,10));
+  await editor.getByRole('button',{name:'Bold',exact:true}).click();
+  await expect(text).toHaveValue('Send **event**');await expect(page.locator('.step-text strong')).toHaveText('event');
+  await expect(text).toBeFocused();expect(await text.evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd))).toBe('event');
+  const bold=await src.inputValue();
+  await editor.getByLabel('Formatting link URL').fill(server.origin+'/step');
+  await openInspectorGroup(guide.locator('.delta-details-editor'));
+  const note=guide.getByLabel('Delta note',{exact:true}),noteEditor=guide.locator('.prose-editor').filter({has:page.getByLabel('Delta note',{exact:true})});
+  await noteEditor.getByLabel('Formatting link URL').fill(server.origin+'/change');
+  await note.focus();await note.evaluate(el=>el.setSelectionRange(7,13));
+  await noteEditor.getByRole('button',{name:'Code',exact:true}).click();
+  await expect(note).toHaveValue('Change `reason`');
+  await expect(editor.getByLabel('Formatting link URL')).toHaveValue(server.origin+'/step');
+  await expect(noteEditor.getByLabel('Formatting link URL')).toHaveValue(server.origin+'/change');
+  await text.focus();await text.evaluate(el=>el.setSelectionRange(7,12));
+  await editor.getByRole('button',{name:'Insert link',exact:true}).click();
+  await expect(page.locator('.step-text a')).toHaveAttribute('href',server.origin+'/step');
+  const linked=await src.inputValue();
+  await page.locator('#undo-builder').click();await expect(src).not.toHaveValue(linked);
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(linked);
+  await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(src).toHaveValue(bold);
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+  await testInfo.attach('step-markdown-toolbar',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 test('standalone prose and step code survive navigation, printing, six skins and embedded widths',async({page,server},testInfo)=>{

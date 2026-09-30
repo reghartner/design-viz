@@ -138,9 +138,9 @@ One accent-colored bounding box on the page:
   content with its own diagram, steps, paths and panels. See
   [domain drilldowns](../docs/drilldowns.md).
 
-**Prose markup** (in section `text`, `bullets`, step `text`, and a contract
-card's `note` or field gloss `g`): a small, safe subset. Authored HTML is always
-escaped. Node/edge labels, headings, panel values, and contract keys/values stay
+**Prose markup** (in section `text`, `bullets`, step `text`, `deltaText`, notification
+message `text`, and a contract card's `note` or field gloss `g`): a small, safe subset. Authored HTML is always
+escaped. Node/edge labels, headings, other panel values, and contract keys/values stay
 literal; do not add Markdown to those labels.
 - `**bold**` → bold, `*italic*` → italic, `` `code` `` → monospace.
   Italics use `*`, not `_`, so `snake_case` identifiers are left alone.
@@ -165,6 +165,10 @@ as `\n`. Keep snippets short in step captions so the controls and diagram remain
 easy to scan. Longer examples belong in section prose. Formatting is also used
 by the printed step list and native embedded viewers. Existing generated HTML
 must be rebuilt to gain this support; no spec flag is required.
+These prose fields offer Bold, Italic, Code, Code block, and Insert link controls
+in the workbench. Select text before formatting, or type Markdown directly.
+Formatting edits use the same Undo/Redo history as other text edits. Keep phone
+notification messages short; their cards retain the existing two-line preview.
 
 **Bulleting style — match the source document.** A design doc (HLD) usually
 carries its argument as layered bullets, not prose paragraphs. Reproduce that
@@ -424,7 +428,7 @@ with no `title` shows its id:
 ### Delta markers — nodes, edges, and steps
 
 Set `delta: true` to show a green change triangle and enable **Δ ONLY**.
-Optional `deltaText` supplies a plain-text note (line breaks are preserved).
+Optional `deltaText` supplies a note with prose markup (line breaks are preserved).
 Optional `deltaLinks` supplies an array of `{ "label": "Design decision",
 "url": "https://example.com/decision" }`; labels may be omitted. Only absolute
 HTTP(S) URLs are rendered. Invalid detail fields produce warnings and are ignored.

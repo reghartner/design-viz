@@ -5,7 +5,7 @@ function createBuilderInspector(opts){
   var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
-  var proseDraft={key:null,url:''};
+  var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
   function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
@@ -411,9 +411,9 @@ function deltaControls(val){
     var hint = document.createElement('p'); hint.className = 'fnote';
     hint.textContent = 'With the change marker enabled, clicking its triangle opens this note and any links. Clearing the marker keeps these details for later.';
     fold.appendChild(hint);
-    fold.appendChild(frow('Delta note', textControl(val.deltaText, function(v){
+    fold.appendChild(frowBlock('Delta note', proseControl(val.deltaText, function(v){
       return commitSimple('deltaText', v == null ? null : JSON.stringify(v));
-    }, {textarea:true, placeholder:'What changed, and why?'})));
+    }, {key:'deltaText',label:'Delta note',placeholder:'What changed, and why?'})));
     function updateLinks(edit){
       var parsed = parseEditor();
       if (parsed.error){ formError(parsed.error); return false; }
@@ -739,7 +739,7 @@ function stepForm(val, ctx){
         if(v==null){formError('Use a stable step ID to support paths and detail mappings.');return false;}
         return commitCascade(function(raw){return planRenameStep(session.text(),raw,t.section,t.index,v);});
       },{placeholder:'optional stable-step-id'})),
-      frow('text', textControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {textarea: true}))
+      frowBlock('text', proseControl(val.text, function(v){ return commitSimple('text', v == null ? null : JSON.stringify(v)); }, {key:'text',label:'text'}))
     ].concat(stepTimeRows(val,ctx,t));
     var colorBox=document.createElement('div');colorBox.className='step-color-control';
     function commitColor(value){
@@ -1130,7 +1130,8 @@ function panelPatchControl(pid, patch, decl, target, options){
         if(key==='notify'){
           body.appendChild(frowBlock('Notifications',createNotificationComposer({
             document:document,value:cur,initial:initial,app:decl.appName || decl.brand && decl.brand.app,
-            controls:{row:frow,text:textControl,action:actionButton},listen:listen,
+            controls:{row:frow,block:frowBlock,text:textControl,prose:proseControl,action:actionButton},listen:listen,
+            proseKey:JSON.stringify([pid,initial,'notify']),
             commit:function(value){return commitPatch('notify',value);}
           })));return;
         }
@@ -1911,15 +1912,17 @@ function sectionProseActions(val,target){
     });
     return actions.children.length?[frowBlock('Section prose',actions)]:[];
   }
-function proseControl(value,commit){
-    var key=targetIdentity();if(proseDraft.key!==key)proseDraft={key:key,url:''};
-    var draft=proseDraft;
+function proseControl(value,commit,options){
+    options=options || {};
+    var key=targetIdentity();if(proseDraft.key!==key)proseDraft={key:key,fields:Object.create(null)};
+    var fieldKey=options.key || 'prose';
+    var draft=proseDraft.fields[fieldKey] || (proseDraft.fields[fieldKey]={url:''});
     var wrap=document.createElement('div');wrap.className='prose-editor';
-    var input=textControl(value,function(v){var ok=commit(v);if(ok)refreshFormSoon();return ok;},{textarea:true});
+    var input=textControl(value,function(v){var ok=commit(v);if(ok)refreshFormSoon();return ok;},{textarea:true,placeholder:options.placeholder});
     if(draft.text===input.value && Number.isInteger(draft.start))input.setSelectionRange(draft.start,draft.end);
     function remember(){draft.text=input.value;draft.start=input.selectionStart;draft.end=input.selectionEnd;}
     ['select','keyup','mouseup','blur'].forEach(function(event){listen(input,event,remember);});
-    input.setAttribute('aria-label','Prose text');
+    input.setAttribute('aria-label',options.label || 'Prose text');
     var toolbar=document.createElement('div');toolbar.className='prose-toolbar';toolbar.setAttribute('role','group');toolbar.setAttribute('aria-label','Text formatting');
     function insert(kind,url){
       var edit=proseFormatEdit(input.value,input.selectionStart,input.selectionEnd,kind,url);
@@ -1938,6 +1941,9 @@ function proseControl(value,commit){
     var url=document.createElement('input');url.type='url';url.className='fctl';url.placeholder='https://…';url.setAttribute('aria-label','Formatting link URL');
     url.value=draft.url;listen(url,'input',function(){draft.url=url.value;});
     link.appendChild(url);link.appendChild(button('Insert link','link',url));wrap.appendChild(link);
+    var hint=document.createElement('p');hint.className='fnote';
+    hint.textContent='Markdown: **bold**, *italic*, `code`, fenced code blocks, and [links](https://…).';
+    wrap.appendChild(hint);
     return wrap;
   }
 

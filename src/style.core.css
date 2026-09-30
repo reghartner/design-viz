@@ -275,7 +275,8 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .steplink{color:#4956C9;}
 .steplink:hover{text-decoration:underline;}
 /* inline prose links (markdown [label](url) in text/bullets/notes) */
-.sec-text code,.sec-bullets code,.ctg code,.ctnote code,.step-text code,.printsteps code{
+.sec-text code,.sec-bullets code,.ctg code,.ctnote code,.step-text code,.printsteps code,
+.delta-popover-text code,.phonetext code,.notification-preview-text code{
   font:500 .93em/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;
   padding:.08em .3em;border:1px solid color-mix(in srgb,currentColor 16%,transparent);
   border-radius:4px;background:color-mix(in srgb,currentColor 6%,transparent);}

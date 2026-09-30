@@ -3,6 +3,7 @@
 FROM node:24-alpine AS build
 RUN apk add --no-cache python3
 WORKDIR /build
+COPY LICENSE LICENSE
 COPY src/ src/
 COPY tools/*.py tools/*.cjs tools/*.js tools/
 COPY tools/canon/ tools/canon/
@@ -17,6 +18,7 @@ COPY workbench/ workbench/
 RUN python3 tools/build.py
 
 FROM nginx:stable-alpine
+COPY --from=build /build/LICENSE /usr/share/nginx/html/LICENSE
 COPY deploy/workbench/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /build/workbench/ /usr/share/nginx/html/workbench/
 COPY --from=build /build/template/ /usr/share/nginx/html/template/

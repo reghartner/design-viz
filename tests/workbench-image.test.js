@@ -20,6 +20,8 @@ test('nginx image publishes central canon membership and replaces a stale librar
   for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon']){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }
+  fs.copyFileSync(path.join(ROOT,'LICENSE'),path.join(directory,'LICENSE'));
+  fs.rmSync(path.join(directory,'tools/canon/generated-runtime.cjs'),{force:true});
   // Exercise a fresh source-only image context, even if the local checkout was built.
   fs.rmSync(path.join(directory,'workbench/flowspec.html'),{force:true});
   for(const file of fs.readdirSync(path.join(ROOT,'tools'))){
@@ -58,6 +60,9 @@ test('nginx image publishes central canon membership and replaces a stale librar
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
   assert.equal((await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.html',2000)).status,200);
+  const licenseResponse=await probeHttp('http://127.0.0.1:'+port+'/LICENSE',2000);
+  assert.equal(licenseResponse.status,200);
+  assert.equal(licenseResponse.body,fs.readFileSync(path.join(ROOT,'LICENSE'),'utf8'));
   const editorResponse=await probeHttp('http://127.0.0.1:'+port+'/workbench/flowspec.html',2000);
   assert.equal(editorResponse.status,200);assert.match(editorResponse.body,/id="workbench-welcome"/);
   const viewerResponse=await probeHttp('http://127.0.0.1:'+port+'/template/flowview.html',2000);

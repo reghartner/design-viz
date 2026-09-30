@@ -199,7 +199,9 @@ export async function createSession(page, outDir, options = {}) {
   await page.locator('#welcome-paste-form button[type=submit]').click();
   await page.locator('#editor-tab-agent').click();
   if (!await page.locator('#folder-agent-guide').isVisible()) await page.locator('#folder-agent-open-setup').click();
-  await page.locator('#folder-agent-workflow').selectOption(options.workflow ?? 'embedded');
+  const workflow = options.workflow ?? 'embedded';
+  await page.locator('#folder-agent-setup-mode-' + workflow).click();
+  await page.locator('#folder-agent-start-adopt').click();
   await page.locator('#folder-agent-connect').click();
   await waitFor(() => page.locator('#folder-agent-copy').isEnabled(), 'connected editor');
   const instructions = await page.locator('#folder-agent-instructions').inputValue();

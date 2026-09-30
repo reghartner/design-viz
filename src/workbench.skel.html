@@ -554,24 +554,36 @@
   <footer><span>Saves the spec and ledger locally. Undo restores both. Git commit stays in your agent.</span><button type="button" class="bbtn" id="agent-update-discard">Discard update</button><button type="button" class="rbtn" id="agent-update-commit" disabled>Commit update</button></footer>
 </dialog>
 <dialog id="folder-agent-guide" class="folder-agent-guide" aria-labelledby="folder-agent-guide-title">
-  <header class="folder-agent-guide-header"><span>✧ Your Claude · Your account</span><button type="button" class="bbtn" id="folder-agent-start-new">Start new diagram</button><button type="button" class="bbtn" id="folder-agent-close-guide" aria-label="Connect later">×</button></header>
-  <ol class="folder-agent-guide-steps" aria-label="Connection progress"><li data-agent-stage="folder">Choose folder</li><li data-agent-stage="review">Paste in Claude</li><li data-agent-stage="waiting">Connect</li></ol>
-  <h2 id="folder-agent-guide-title">Let’s connect your Claude.</h2>
+  <header class="folder-agent-guide-header"><span>✧ Your agent · Your conversation</span><button type="button" class="bbtn" id="folder-agent-close-guide" aria-label="Exit setup">×</button></header>
+  <h2 id="folder-agent-guide-title">How are you starting?</h2>
   <p><button type="button" class="welcome-text-button" data-open-human-guide="hg-agent" aria-haspopup="dialog">How this works · Agent walkthrough</button></p>
   <div id="folder-agent-guide-folder">
-    <p id="folder-agent-start-description">Open the folder containing your spec and coverage ledger, or choose where your agent will create them. Existing files are loaded; your current draft stays in Earlier drafts.</p>
     <div id="folder-agent-new-session">
-    <label for="folder-agent-workflow">Where you talk</label><select id="folder-agent-workflow"><option value="external">In my agent — copy and paste (Recommended)</option><option value="embedded">Inside the workbench (Beta)</option></select>
-    <p>Use an agent with access to this folder. You can return to the same diagram with another conversation or agent.</p>
-    <pre class="folder-agent-command">your-diagram/
-├─ story.spec.json       diagram
-├─ story.ledger.md       evidence, decisions and open work
-└─ .flowview-agent/      connection data and workbench history</pre>
-    <label for="folder-agent-filename">Diagram filename <span class="folder-agent-hint">— optional</span></label><input class="fctl" id="folder-agent-filename" placeholder="Detect existing spec, or create story.spec.json" aria-describedby="folder-agent-folder-help">
-    <p id="folder-agent-folder-help" class="folder-agent-hint">If the folder has several .spec.json files, enter the one to open. Its matching .ledger.md stays beside it.</p>
+    <p class="folder-agent-choice-label">Where will you talk with your agent?</p>
+    <div class="folder-agent-setup-choices" role="group" aria-label="Conversation mode">
+      <button type="button" id="folder-agent-setup-mode-external" data-agent-workflow-choice="external" aria-pressed="true"><b>Copy &amp; paste</b><span>Use your agent’s own app</span></button>
+      <button type="button" id="folder-agent-setup-mode-embedded" data-agent-workflow-choice="embedded" aria-pressed="false"><b>Inside workbench · Beta</b><span>Use Claude Monitor</span></button>
+    </div>
+    <p id="folder-agent-workflow-note" class="folder-agent-hint">The diagram folder can be anywhere your agent can access. It does not have to be the agent’s working directory.</p>
+    <p class="folder-agent-choice-label">What are you doing?</p>
+    <div class="folder-agent-start-choices" role="group" aria-label="How you are starting">
+      <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Add an agent to this open diagram</b><span>This document has never used an agent diagram folder.</span></button>
+      <button type="button" id="folder-agent-start-resume" data-agent-start-choice="resume" aria-pressed="false"><b>Continue an existing agent build</b><span>Reopen the diagram folder used by an earlier agent build.</span></button>
+      <button type="button" id="folder-agent-start-new" data-agent-start-choice="new" aria-pressed="false"><b>Start a new diagram with an agent</b><span>Create a new agent-backed diagram in an empty folder.</span></button>
+    </div>
+    <section class="folder-agent-start-detail" aria-live="polite">
+      <h3 id="folder-agent-start-title">Select Diagram Folder</h3>
+      <p id="folder-agent-start-description">Choose the folder containing its existing .spec.json file, or choose a different folder to create an agent-working copy.</p>
+      <p id="folder-agent-start-note" class="folder-agent-start-note">This is a new agent setup. Flowview does not restore a previous agent connection.</p>
+      <button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect">Select Diagram Folder</button>
+      <p id="folder-agent-start-next" class="folder-agent-hint">Next: if the folder contains several diagrams, choose one from a list. Then review and copy the setup instructions.</p>
+    </section>
+    <section id="folder-agent-file-choice" class="folder-agent-file-choice" hidden>
+      <label for="folder-agent-file-picker">Diagram file</label><select id="folder-agent-file-picker"></select>
+      <p class="folder-agent-hint">Flowview found more than one diagram. Choose one from this folder; no filename entry is required.</p>
+      <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-file-confirm">Open selected diagram</button></div>
+    </section>
     <details><summary>I need help opening Claude Code</summary><p>Open Claude Code in a project folder on this computer. Regular Claude web chat cannot read this local folder. For a fresh session with browser integrations disabled, run:</p><pre class="folder-agent-command" id="folder-agent-launch-command">claude --no-chrome --strict-mcp-config --mcp-config '{"mcpServers":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep'</pre><p id="folder-agent-launch-help">Use your own account and normal permission prompts. Copy and paste does not start Monitor or a background watcher. You’ll review the complete connection instructions before pasting them into Claude.</p></details>
-    <div class="folder-agent-guide-actions"><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-connect" aria-describedby="folder-agent-folder-help">Choose diagram folder</button><button type="button" class="welcome-text-button" data-agent-later>Connect later</button></div>
-    <p class="folder-agent-hint">Your browser will ask for folder access. Flowview stores connection files in .flowview-agent/ inside it. Your spec and ledger remain at the top level.</p>
     </div>
   </div>
   <div id="folder-agent-guide-review" hidden>

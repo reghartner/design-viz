@@ -46,17 +46,19 @@ and requires its own explicit Monitor connection.
 
 ## Open or create a diagram folder
 
-Choose **Choose diagram folder**. Select the folder containing the existing spec
-and ledger, or where the agent should create them. Existing valid files are opened
-without needing prior connection metadata. A different current draft is preserved
-in **Earlier drafts**. Opening an existing spec starts fresh Undo/Redo history.
+The setup first asks whether you are adding an agent to the open diagram,
+continuing an existing agent build, or starting a new diagram with an agent.
+Adding an agent selects the folder containing the existing spec and ledger, or
+where an agent-working copy should live. Continuing selects the durable diagram
+folder used by the earlier build; Flowview finds `.flowview-agent` inside it.
+Starting new requires an empty folder. A different current draft is preserved in
+**Earlier drafts**. Opening an existing spec starts fresh Undo/Redo history.
 
 One existing `*.spec.json` is detected automatically. Its matching `*.ledger.md`
 is used; for example `payments.spec.json` and `payments.ledger.md`. If several
-specs exist, enter the exact **Diagram filename** and choose the folder again.
-An empty folder receives the current diagram and ledger as a new project and
-defaults to `story.spec.json` and `story.ledger.md`; an optional filename can
-choose another pair. An existing ledger is preserved even when the
+specs exist, the setup lists them after folder selection so the user can pick one
+without typing a filename. An empty folder receives the current diagram and ledger
+as a new project and defaults to `story.spec.json` and `story.ledger.md`. An existing ledger is preserved even when the
 spec has not been created yet. Invalid JSON or validation errors stop opening;
 they do not overwrite the saved artifact.
 

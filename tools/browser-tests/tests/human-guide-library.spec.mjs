@@ -79,14 +79,14 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   // Opening help from an existing modal must not dismiss or reset that modal.
   await page.locator('#welcome-build-external').click();
   const setup=page.locator('#folder-agent-guide'),help=setup.locator('[data-open-human-guide]');
-  await page.locator('#folder-agent-filename').fill('existing.spec.json');
+  await page.locator('#folder-agent-start-resume').click();
   await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
   await guide(page).getByRole('link',{name:'05 · Alternate outcomes'}).click();
   for(const key of ['Delete','ControlOrMeta+z'])await page.keyboard.press(key);
   await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();
   await expect(setup).toBeVisible();await expect(help).toBeFocused();
-  await expect(page.locator('#folder-agent-filename')).toHaveValue('existing.spec.json');
-  await expect(page.locator('#folder-agent-workflow')).toHaveValue('external');
+  await expect(page.locator('#folder-agent-start-resume')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
   await expect(page.locator('#src')).toHaveValue(edited);
   // Contextual reopening resets only the guide chapter, not the folder form.
   await help.click();await expect(page.locator('#hg-agent')).toBeFocused();

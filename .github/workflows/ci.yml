@@ -166,7 +166,7 @@ jobs:
           docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
           docker run -d --name flowview-workbench-test -p 8080:80 flowview-workbench
           trap 'docker rm -f flowview-workbench-test' EXIT
-          curl --retry 10 --retry-connrefused --retry-delay 1 -fsSL http://localhost:8080/ -o /tmp/workbench.html
+          curl --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 -fsSL http://localhost:8080/ -o /tmp/workbench.html
           grep -q 'id="workbench-welcome"' /tmp/workbench.html
           grep -q 'id="flowview-folder-kit"' /tmp/workbench.html
           curl -fsS http://localhost:8080/template/flowview.html -o /tmp/viewer.html

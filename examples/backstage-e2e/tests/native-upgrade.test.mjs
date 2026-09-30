@@ -90,6 +90,10 @@ test('runtime vendoring preserves package build inputs and excludes unrelated pr
   await file(source, 'src/compatibility.d.ts', 'export interface CompatibilityReport {}');
   await file(source, 'src/native/mount.d.ts', 'export interface NativeViewer {}');
   await file(source, 'tools/canon/entity-diagrams.d.mts', 'export function buildEntityDiagramIndex(): unknown;');
+  // This isolated package-boundary fixture supplies a tiny builder; the full
+  // rehearsal test exercises the actual engine build from a clean clone.
+  await file(source, 'tools/build.py', 'from pathlib import Path\nfor name in ["template/flowview.html", "workbench/flowspec.html"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
+  await file(source, 'deploy/workbench/Dockerfile.prebuilt', 'FROM nginx:stable-alpine\n');
   await file(source, 'company-private.txt', 'DO_NOT_VENDOR');
   for (const args of [['init', '--quiet'], ['config', 'user.name', 'Fixture'], ['config', 'user.email', 'fixture@example.test'], ['remote', 'add', 'origin', 'https://github.com/fixture/runtime'], ['add', '.'], ['commit', '--quiet', '-m', 'Native fixture']])
     await exec('git', args, {cwd: source});

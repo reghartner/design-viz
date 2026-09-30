@@ -13,6 +13,8 @@ node_modules/
 /apps/confluence/static/
 /apps/confluence/preview/
 /apps/backstage/release/
+# npm pack ./apps/backstage writes its distribution to the repository root.
+/flowview-backstage-plugin-*.tgz
 
 # Generated from reviewed specs under docs/diagrams on each build.
 /workbench/diagrams.json

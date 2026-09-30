@@ -239,6 +239,8 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     const skillFile=path.join(h.session,'authoring/.claude/skills/hld-to-page/SKILL.md');
     await writeFile(skillFile,'Stale skill: use the old API');
     await writeFile(path.join(h.session,'authoring/docs/agent-operations.md'),'Stale operation guidance');
+    // Model an old kit explicitly; current source-free kits have no workbench sources.
+    await mkdir(path.join(h.session,'authoring/src/workbench'),{recursive:true});
     await writeFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'),'Stale planner');
     await disconnect(page);
     await expect.poll(async()=> (await h.read('editor.json')).connected).toBe(false);

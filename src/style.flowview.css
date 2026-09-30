@@ -2,7 +2,12 @@
 body{margin:0; font:15px/1.6 'IBM Plex Sans',system-ui,sans-serif; background:#0B1220;}
 body.sk-aurora{background:#0B1220;}
 body.sk-daylight{background:#F4F2EC;}
-.docview{max-width:1240px; margin:0 auto; padding:34px 26px 60px;}
+/* Standalone exports use the full responsive viewport, matching the workbench's
+   Standard page preview. The ID keeps the rule ahead of skin-specific legacy
+   max-width declarations that are bundled after this page chrome; padding stays
+   class-scoped so each skin's desktop, narrow, and print gutters still win. */
+#docview{box-sizing:border-box; width:100%; max-width:none; margin:0;}
+.docview{padding:34px 26px 60px;}
 .docview.sk-aurora{--dtext:#B9C7DD; --dink:#EAF2FF; --dfaint:#7E93B8;}
 .docview.sk-daylight{--dtext:#4A4F58; --dink:#23272E; --dfaint:#79808B;}
 .doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:26px; color:var(--dink); margin:0 0 4px;}

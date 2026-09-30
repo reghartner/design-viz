@@ -9,6 +9,15 @@ function scrollPosition(row){
   return {rowTop,rowDocTop,maxScroll,currentScroll:scrollY,wantedScroll,
     aligned:Math.abs(scrollY-wantedScroll)<=1,fonts:document.fonts.status};
 }
+test('standalone exports fill wide and narrow responsive viewports',async({page,server})=>{
+  for(const [viewport,paddingLeft] of [[{width:1800,height:1000},'30px'],[{width:640,height:900},'8px']]){
+    await page.setViewportSize(viewport);
+    await page.goto(pathToFileURL(path.join(server.root,'standalone.html')).href);
+    const box=await page.locator('#docview').boundingBox();
+    expect(box.x).toBe(0);expect(box.width).toBe(viewport.width);
+    expect(await page.locator('#docview').evaluate(el=>getComputedStyle(el).paddingLeft)).toBe(paddingLeft);
+  }
+});
 test('new single-file HTML works offline with exact composed navigation and local fonts',async({page,context,server},testInfo)=>{
   await expect(access(path.join(server.root,'spec.json'))).rejects.toThrow();
   await page.setViewportSize({width:1280,height:720});await context.setOffline(true);

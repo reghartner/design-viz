@@ -146,6 +146,13 @@ literal; do not add Markdown to those labels.
   Italics use `*`, not `_`, so `snake_case` identifiers are left alone.
 - `[label](https://url)` → an underlined link (new tab). Only `http`/`https`
   URLs become links; anything else renders as literal text.
+- Start each bullet on its own line with `- `, `* `, or `+ `. Indent child
+  bullets by two spaces; indent continuation lines beneath their item. Blank
+  lines end the list. Bullet contents support the same inline formatting.
+  In step `text`, use `\n` between items in JSON, for example:
+  `"text": "Request accepted.\n- **Validate** the payload\n- Save the event\n  - Acknowledge receipt"`.
+  Use section `bullets` / `sub` for independently editable or revealed section
+  points; Markdown bullets within a step belong to that single beat.
 - Code spans are literal: Markdown, HTML, and links inside backticks are not
   interpreted. Double backticks can enclose a single backtick.
 - Triple backticks on their own lines enclose a code block. An optional language
@@ -1585,7 +1592,7 @@ An ordered array walking the flow. Each step:
   with the elapsed hours. Earlier than the previous step or unparsable warns.
 - `lane` — optional lane tag (declare colors in `page.lanes`).
 - `text` — caption for the step (shown during click-through playback).
-  Supports the prose markup and fenced code blocks described above. Prefer a
+  Supports the prose markup, bullet lists, and fenced code blocks described above. Prefer a
   short explanation and only a small snippet. Required in practice.
 - `id` — optional stable step id, e.g. `"ota.3"`. Shown subtly on the caption
   line and addressable in deep links (`#d=ota-rollout&m=step&s=ota.3`), so meeting

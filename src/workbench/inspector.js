@@ -1948,7 +1948,7 @@ function proseControl(value,commit,options){
     url.value=draft.url;listen(url,'input',function(){draft.url=url.value;});
     link.appendChild(url);link.appendChild(button('Insert link','link',url));wrap.appendChild(link);
     var hint=document.createElement('p');hint.className='fnote';
-    hint.textContent='Markdown: **bold**, *italic*, `code`, fenced code blocks, and [links](https://…).';
+    hint.textContent='Markdown: **bold**, *italic*, `code`, fenced code blocks, bullet lists (-, *, + at line start), and [links](https://…).';
     wrap.appendChild(hint);
     return wrap;
   }

@@ -47,6 +47,40 @@ function inlineMarkup(value, links){
   return html+esc(source.slice(position));
 }
 
+/* Block lists share inline escaping and keep multiline code spans opaque. */
+function proseLists(source){
+  var lines=source.split('\n'),html='',plain='',stack=[],offset=0,ranges=[],runs=/`+/g,run;
+  while((run=runs.exec(source))){
+    var close=proseCodeClose(source,runs.lastIndex,run[0].length);
+    if(close){ranges.push({start:run.index,end:close.end});runs.lastIndex=close.end;}
+  }
+  var rangeIndex=0;
+  function flush(){html+=inlineMarkup(plain);plain='';}
+  function closeList(){html+='</li></ul>';stack.pop();}
+  lines.forEach(function(line,index){
+    while(rangeIndex<ranges.length && ranges[rangeIndex].end<=offset)rangeIndex++;
+    var inCode=rangeIndex<ranges.length && ranges[rangeIndex].start<offset;
+    var bullet=!inCode && /^( *)([-+*])[ \t]+(.*)$/.exec(line);
+    if(bullet){
+      flush();
+      var indent=bullet[1].length;
+      while(stack.length && indent<stack[stack.length-1])closeList();
+      if(!stack.length || indent>stack[stack.length-1]){
+        html+='<ul class="prose-list"><li>';stack.push(indent);
+      }else html+='</li><li>';
+      plain=bullet[3];
+    }else if(stack.length && (inCode || (line.trim() && /^ */.exec(line)[0].length>stack[stack.length-1]))){
+      plain+='\n'+line;
+    }else{
+      if(stack.length){flush();while(stack.length)closeList();}
+      plain+=line+(index<lines.length-1?'\n':'');
+    }
+    offset+=line.length+1;
+  });
+  flush();while(stack.length)closeList();
+  return html;
+}
+
 /* Backtick fences occupy their own lines, optionally with a language label.
    A longer fence can quote shorter fences. An unfinished fence extends to EOF,
    so editing a snippet never exposes its contents as prose/HTML. */
@@ -54,7 +88,7 @@ function proseMarkup(value){
   var source=String(value == null ? '' : value).replace(/\r\n?/g,'\n');
   var fences=/^ {0,3}(`{3,})([^`\n]*)$/gm,position=0,html='',match;
   while((match=fences.exec(source))){
-    html+=inlineMarkup(source.slice(position,match.index));
+    html+=proseLists(source.slice(position,match.index));
     var start=fences.lastIndex+(source[fences.lastIndex]==='\n'?1:0);
     var closing=new RegExp('^ {0,3}`{'+match[1].length+',}[ \\t]*$','gm');closing.lastIndex=start;
     var end=closing.exec(source),language=match[2].trim().split(/\s+/)[0];
@@ -64,5 +98,5 @@ function proseMarkup(value){
     position=end?closing.lastIndex:source.length;
     fences.lastIndex=position;
   }
-  return html+inlineMarkup(source.slice(position));
+  return html+proseLists(source.slice(position));
 }

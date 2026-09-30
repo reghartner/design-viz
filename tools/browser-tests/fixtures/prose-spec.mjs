@@ -1,5 +1,5 @@
 export const code='  {"event": "button_press", "tag": "<img src=x onerror=window.__unsafe=1>"}\n\t**literal** [link](https://example.test) `tick`\n'+ 'long_identifier_'.repeat(24)+'\n';
-export const caption='Send `eventId` to the recording service.\n```json\n'+code+'```\nThen **acknowledge** the request.';
+export const caption='Send `eventId` to the recording service.\n```json\n'+code+'```\nThen **acknowledge** the request.\n- Validate the payload\n  * Check the event\n+ Save the request.';
 export const raw={page:{title:'Code in the story',sections:[{
   id:'code-story',heading:'A button press, explained',text:[caption,'A second paragraph with `status=202`.'],
   bullets:[{text:'Inspect `eventId`.',sub:[caption]}],

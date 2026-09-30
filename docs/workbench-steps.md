@@ -16,7 +16,9 @@ An `ambient-only` diagram still permits source editing but has no step preview;
 change `diagram.view` in JSON to `step` or `ambient` to show one.
 
 Step text supports Markdown: **bold**, *italic*, links, inline code, and fenced
-code blocks. Select text and use **Bold**, **Italic**, **Code**, **Code block**,
+code blocks, and bullet lists. Put `- `, `* `, or `+ ` at the start of each
+line; indent sub-bullets by two spaces. Blank lines end a list. In JSON, encode
+line breaks as `\n`; in the text field, press Enter. Select text and use **Bold**, **Italic**, **Code**, **Code block**,
 or **Insert link**, or type the syntax directly. The caption preview and exported
 viewer render the formatting. Each formatting action supports Undo/Redo.
 The same controls are available in paragraphs, bullets, contract notes and

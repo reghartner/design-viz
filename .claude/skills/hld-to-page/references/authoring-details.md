@@ -328,7 +328,11 @@ is added. Nested bullets support siblings/subpoints, indent/outdent, reorder
 and deletion of complete subtrees. Each structural action has one Undo/Redo.
 Prose formatting buttons write the existing safe emphasis, HTTP(S) link,
 inline-code and fenced-code syntax. Bare diagrams need a page section before
-they can hold prose.
+they can hold prose. Step captions and other prose fields also accept typed
+Markdown bullets: start each line with `- `, `* `, or `+ `, indent child bullets
+by two spaces, and end a list with a blank line. Encode newlines as `\n` in JSON.
+Keep one beat’s bullet details inside its `text`; section points with independent
+reveal timing belong in the structured `bullets` / `sub` fields.
 
 Fragment inspectors expose **Visibility by path position** for edges, bullets,
 and contract rows. The UI is one-based; `revealAt` / `hideAt` remain zero-based

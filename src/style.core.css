@@ -280,6 +280,9 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
   font:500 .93em/1.5 'IBM Plex Mono',monospace;overflow-wrap:anywhere;
   padding:.08em .3em;border:1px solid color-mix(in srgb,currentColor 16%,transparent);
   border-radius:4px;background:color-mix(in srgb,currentColor 6%,transparent);}
+.prose-list{margin:.5em 0;padding-left:1.5em;list-style:disc;}
+.prose-list .prose-list{margin:.25em 0;list-style:circle;}
+.prose-list>li{margin:.2em 0;}
 .prose-code{box-sizing:border-box;max-width:100%;min-width:0;margin:10px 0;padding:12px 14px;
   border:1px solid color-mix(in srgb,currentColor 20%,transparent);border-radius:9px;
   background:color-mix(in srgb,currentColor 5%,transparent);color:inherit;

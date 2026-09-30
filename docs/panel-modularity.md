@@ -204,7 +204,7 @@ custom controls through the real editor's shared Undo/Redo commands.
 
 For a new panel, add focused tests and an authored example, document its fields in
 the authoring contract, and browser-check its controls, layouts, motion and print
-presentation. Rebuild and commit generated assets. Documentation, tests and
+presentation. Rebuild generated assets for validation and distribution; commit their authored sources only. Documentation, tests and
 output are expected additions; existing implementation files should need no new
 panel-specific branches or registration entries.
 

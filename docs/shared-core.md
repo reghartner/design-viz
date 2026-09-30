@@ -87,8 +87,8 @@ existing refusal if the view has no visible stops.
 `tools/canon/core.cjs` statically imports the generated backend runtime. Its
 module exports come from the named `backend` entrypoint and `core/backend.js`;
 see [build entrypoints](build-entrypoints.md). Run
-`python3 tools/build.py` after shared source changes and commit its generated
-output. Production bundles need no source checkout, runtime filesystem reads or
+`python3 tools/build.py` after checkout or shared source changes; commit authored sources only.
+The backend runtime is ignored and regenerated before testing or packaging. Production bundles need no source checkout, runtime filesystem reads or
 VM evaluation. Creating the cached `viewerRouting()` facade never initializes the
 DOM renderer.
 

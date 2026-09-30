@@ -24,12 +24,6 @@ jobs:
       - run: npm ci --prefix apps/confluence --no-fund --no-audit
       - name: Install the pinned Playwright Chromium and Linux dependencies
         run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
-      # Build ignored HTML from this revision before testing.
-      - name: Rebuild HTML and verify packaged JavaScript
-        run: |
-          python3 tools/build.py
-          npm run check:viewer --prefix apps/backstage
-          git diff --exit-code -- tools/canon/generated-runtime.cjs apps/backstage/src/generated/
       - name: Required browser contracts (no retries or missing-browser skips)
         run: npm test --prefix tools/browser-tests
       - uses: actions/upload-artifact@v4
@@ -50,6 +44,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - run: python3 tools/build.py --runtime-only
       - run: node --test examples/backstage-e2e/tests/*.test.mjs
 
   catalog-sync:
@@ -62,6 +57,7 @@ jobs:
           cache: npm
           cache-dependency-path: tools/catalog-sync/package-lock.json
       - run: npm ci --prefix tools/catalog-sync --ignore-scripts --no-fund --no-audit
+      - run: python3 tools/build.py --runtime-only
       - run: npm test --prefix tools/catalog-sync
 
   backstage-plugin:
@@ -81,6 +77,7 @@ jobs:
       - run: npm run verify
       - run: node --test ../../tests/canon-bundle.test.mjs
       - run: node ../../tools/verify-backstage-package.mjs
+      - run: git diff --exit-code
       - name: Pack the reviewed release without rebuilding on install
         run: |
           mkdir -p release
@@ -141,10 +138,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Rebuild HTML and verify packaged Node runtime
-        run: |
-          python3 tools/build.py
-          git diff --exit-code -- tools/canon/generated-runtime.cjs
+      - name: Generate HTML and backend runtime from source
+        run: python3 tools/build.py
       - name: example pages inject cleanly
         run: |
           python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json template/flowview.html /tmp/cumulus.html
@@ -159,8 +154,10 @@ jobs:
             examples/doorbell/doorbell.spec.json \
             examples/doorbell-atlas/atlas.spec.json
 
-      - name: Entrypoint HTML stays out of Git
-        run: test -z "$(git ls-files -- template/flowview.html workbench/flowspec.html)"
+      - name: Generated outputs stay out of Git
+        run: node tools/check-generated.mjs --tracking-only
+      - name: Builds leave tracked files unchanged
+        run: git diff --exit-code
       - name: Build and smoke-test the source-based nginx image
         run: |
           docker build -f deploy/workbench/Dockerfile -t flowview-workbench .

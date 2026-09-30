@@ -36,6 +36,8 @@ function checkManifest(manifest) {
       'Consumers must receive built exports rather than TypeScript source.');
   }
   assert.notEqual(manifest.private, true, 'The tarball must be publishable.');
+  for (const hook of ['preinstall', 'install', 'postinstall', 'prepare'])
+    assert.equal(manifest.scripts?.[hook], undefined, 'Consumers must not run install-time builds: ' + hook);
 }
 
 async function run(command, args, cwd, { quiet = false, ...extra } = {}) {
@@ -223,6 +225,12 @@ try {
     assert.ok(requireConsumer.resolve('@flowview/backstage-plugin' + subpath).startsWith(installed + '/dist/'),
       'CommonJS subpath must resolve to the installed dist: ' + subpath);
   }
+  assert.equal(await readFile(path.join(installed, 'dist/LICENSE'), 'utf8'),
+    await readFile(new URL('../LICENSE', import.meta.url), 'utf8'));
+  const {entrypointAssets} = toolRequire('../../tools/source-loader.cjs');
+  const expectedLicenses = entrypointAssets('native').licenses.map(license => license.text).join('\n\n');
+  assert.equal(await readFile(path.join(installed, 'dist/FONT-LICENSES.txt'), 'utf8'), expectedLicenses);
+  console.log('Package includes the project license and every selected native font license.');
   const packageFiles = await files(installed);
   assert.ok(packageFiles.some(name => name.startsWith('dist/')));
   for (const name of packageFiles) {

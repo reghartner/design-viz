@@ -12,6 +12,7 @@ import {fileURLToPath} from 'node:url';
 const app=path.dirname(fileURLToPath(import.meta.url));
 const require=createRequire(import.meta.url);
 const out=path.join(app,'dist');
+execFileSync('npm',['run','build:runtime'],{cwd:app,stdio:'inherit'});
 const entries=['index','reference-proxy','new-frontend','backend'];
 const external=id=>!id.startsWith('.') && !path.isAbsolute(id);
 const types=await mkdtemp(path.join(tmpdir(),'flowview-package-types-'));

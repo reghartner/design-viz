@@ -51,10 +51,14 @@
     "test": "vitest run",
     "verify": "npm run check && npm test",
     "build:viewer": "node build-viewer.mjs",
-    "check:viewer": "node build-viewer.mjs --check",
+    "check:viewer": "node ../../tools/check-generated.mjs",
     "preview:build": "node preview.mjs",
     "build": "node build.mjs",
-    "prepack": "npm run build"
+    "prepack": "npm run build",
+    "build:runtime": "python3 ../../tools/build.py --runtime-only && node build-viewer.mjs",
+    "precheck": "npm run build:runtime",
+    "pretest": "npm run build:runtime",
+    "prepreview:build": "npm run build:runtime"
   },
   "peerDependencies": {
     "react": "^18.0.0",

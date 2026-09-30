@@ -101,20 +101,84 @@ when changing a wrapper; identical input should produce identical output.
 
 ## Build outputs and distribution
 
-`template/flowview.html` and `workbench/flowspec.html` are ignored local build
-outputs. Run `python3 tools/build.py` after checking out or updating source;
-commit source, specs and documentation instead of these generated entrypoints.
-The builder creates missing output directories on a fresh clone. Authored pages
-under `diagrams/`, `docs/diagrams/` and `examples/` keep their own export workflow;
-an engine change does not require rewriting them.
+Generated entrypoints and runtime bundles are ignored local build outputs. Commit
+sources, declarations and license inputs, never the generated copies. This replaces
+the former policy requiring committed runtime JavaScript. Authored pages under
+`diagrams/`, `docs/diagrams/` and `examples/` retain their own export workflow.
 
-CI builds HTML before tests and attaches **flowview-html** to successful
-`examples-build` jobs. Download and extract that archive to use the standalone
-workbench/viewer without Node or Python. It includes the adjacent catalog,
-Canon metadata, diagram folders and starter assets; serve over HTTP for fetching
-those files, or open the standalone workbench file for offline authoring.
-Artifacts are retained for 30 days. GitHub source ZIPs contain source, not built
-entrypoints. CI rejects reintroducing either entrypoint as a tracked file.
+| Ignored output | Authored inputs / generator |
+| --- | --- |
+| `tools/canon/generated-runtime.cjs` | Named `backend` in `src/source-bundles.json`, including `src/core/backend.js`; `tools/build.py` through the source loader |
+| `apps/backstage/src/generated/nativeViewer.js` | Named `native`, shared styles/icons/fonts, `src/native/environment.js` and `src/native/mount.js`; `tools/native-viewer-build.mjs` and `apps/backstage/build-viewer.mjs` |
+| `apps/backstage/src/generated/compatibility.js` | Named `compatibility`, `src/compatibility.js` and registry-derived panel/icon metadata; `apps/backstage/build-viewer.mjs` |
+| `apps/backstage/src/generated/nativeViewer.d.ts` | Exact copy of authored `src/native/mount.d.ts` |
+| `apps/backstage/src/generated/compatibility.d.ts` | Exact copy of authored `src/compatibility.d.ts` |
+| `apps/backstage/src/generated/FONT-LICENSES.txt` | License files selected by `src/fonts/manifest.json` through the named native asset profile |
+| `template/flowview.html`, `workbench/flowspec.html`, `workbench/diagrams.json` | Shared manifest, HTML skeletons, authoring kit and Canon inputs; `tools/build.py` |
+
+Use Node 24 and Python 3.10+ from a clean checkout:
+
+```sh
+# Shared CLIs, mock servers, drift tools, Node/Python tests and portable HTML:
+python3 tools/build.py
+node --test tests/*.test.js
+python3 -m unittest discover -s tests -v
+
+# Backend alone, when HTML is unnecessary (no npm dependencies):
+python3 tools/build.py --runtime-only
+
+# Backstage: check/test/verify/build/pack generate their inputs automatically.
+npm ci --prefix apps/backstage --no-fund --no-audit
+npm run verify --prefix apps/backstage
+npm run check:viewer --prefix apps/backstage
+npm run build --prefix apps/backstage
+node --test tests/canon-bundle.test.mjs
+node tools/verify-backstage-package.mjs --skip-build
+npm pack ./apps/backstage
+
+# Forge and the required browser fixtures build their own inputs:
+npm ci --prefix apps/confluence --no-fund --no-audit
+npm run verify --prefix apps/confluence
+# Install the locked runner/browser as described in tools/browser-tests/README.md.
+npm test --prefix tools/browser-tests
+```
+
+`build:viewer` emits native artifacts only; `build:runtime` emits native and backend
+artifacts. `check:viewer` now deletes the known generated outputs and compares two
+fresh builds byte for byte, including declarations, licenses, HTML and the backend.
+It is a development/CI command, never an installed-consumer hook. Do not run this
+check concurrently with tests or other builds in the same checkout.
+`node tools/check-generated.mjs --tracking-only` rejects tracked files anywhere in
+the generated directory, the backend runtime and the portable HTML/index paths.
+Builds leave tracked files unchanged. After updating an older branch, remove any
+staged generated files and rebuild; merge authored source changes instead of bundles.
+GitHub source ZIPs contain source and require these build commands.
+
+CI already provides the two distribution formats needed here; no registry
+publication or new archive format is required. Choose a successful **ci** run for
+the desired commit in GitHub Actions, then download and extract its artifacts, or:
+
+```sh
+gh run download RUN_ID --name flowview-html --dir flowview-html
+gh run download RUN_ID --name backstage-plugin-package --dir backstage-package
+# In the consumer workspace, install the downloaded .tgz (no build scripts):
+npm install --ignore-scripts /absolute/path/to/backstage-package/flowview-backstage-plugin-1.1.0.tgz
+```
+
+**flowview-html** contains the standalone viewer/workbench, adjacent catalog, Canon
+metadata, diagram folders and starter assets. Open `workbench/flowspec.html` for
+offline authoring, or serve the extracted root (for example,
+`python3 -m http.server --directory flowview-html 8000`) to fetch catalog/Canon
+files. HTML already embeds fonts, licenses and the folder-agent kit. The kit's
+validators and state walker load its static backend without source assembly.
+HTML artifacts are retained for 30 days.
+
+**backstage-plugin-package** contains the prebuilt npm tarball: ESM/CJS exports,
+flattened declarations, project/font licenses and the static renderer/backend.
+React is a consumer peer; optional Backstage adapters need their documented host
+peers. Install the tarball and follow the [plugin integration guide](../apps/backstage/README.md).
+The portable Backstage rehearsal likewise builds the package before copying it;
+its host installer repacks prebuilt files without upstream sources or build tools.
 
 `deploy/workbench/Dockerfile` builds from the company fork's source in a Node +
 Python stage, then copies only the web assets into nginx. No local build is
@@ -131,10 +195,10 @@ determinism compares two fresh builds. The image smoke test verifies its served
 workbench includes the launch screen and agent kit, and compares the served
 viewer and catalog with the checkout's build outputs.
 
-Committed backend/native JavaScript retains its freshness checks: those modules
-are packaged runtime inputs consumed without this repository's sources. The
-build also regenerates ignored `workbench/diagrams.json` and fails if Canon
-index generation fails. This change does not alter package publication.
+CI generates backend/native JavaScript before any consumer imports it and checks
+two builds from absent outputs. The build also regenerates ignored
+`workbench/diagrams.json` and fails if Canon index generation fails. Distribution
+checks install with scripts disabled and execute with upstream source reads denied.
 
 `tests/source-loader.test.js` covers physical alias substitution, sorted expansion,
 boot separation, CLI/API agreement, export failures, duplicate inputs, DOM-free
@@ -146,11 +210,10 @@ the copy test also verifies font inventory and license text.
 
 Run `python3 tools/build.py`, the matching shared Node/Python suites,
 `npm run build:viewer --prefix apps/backstage` and
-`npm run verify --prefix apps/confluence` when changing assembly. Check Backstage
-freshness with `npm run check:viewer --prefix apps/backstage`; upstream CJS/ESM
+`npm run verify --prefix apps/confluence` when changing assembly. Check generation/determinism with `npm run check:viewer --prefix apps/backstage`; upstream CJS/ESM
 backend and isolated plugin-copy checks verify source-unavailable distribution.
 Keep emitted-content assertions alongside source-level tests. The required
 [browser contracts](../tools/browser-tests/README.md) use a pinned downloaded
 Chromium across offline HTML, workbench/lifetime, native React and copied Forge
-resources. Its CI job must pass alongside package freshness and pure checks. These
+resources. Its CI job must pass alongside package distribution and pure checks. These
 fixtures do not establish company host or CSP acceptance.

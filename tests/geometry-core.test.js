@@ -116,16 +116,10 @@ test('headless validator and standalone geometry match viewer layouts, routes an
 test('the CLI retains findings and batch exit status when no renderer source is available', () => {
   const isolated = fs.mkdtempSync(path.join(os.tmpdir(), 'flowview-headless-cli-'));
   try {
-    const files = new Set(['source-bundles.json', 'compatibility.js', 'canon.js', ...sourceFiles('validator.js')]);
-    for (const file of files) {
-      const destination = path.join(isolated, 'src', file);
-      fs.mkdirSync(path.dirname(destination), {recursive: true});
-      fs.copyFileSync(path.join(root, 'src', file), destination);
-    }
-    fs.mkdirSync(path.join(isolated, 'tools'));
-    for (const file of ['validate.js', 'source-loader.cjs'])
+    fs.mkdirSync(path.join(isolated, 'tools/canon'), {recursive:true});
+    for (const file of ['validate.js', 'canon/core.cjs', 'canon/generated-runtime.cjs'])
       fs.copyFileSync(path.join(root, 'tools', file), path.join(isolated, 'tools', file));
-    assert.equal(fs.existsSync(path.join(isolated, 'src/engine.js')), false);
+    assert.equal(fs.existsSync(path.join(isolated, 'src')), false);
     const inputs = ['tests/fixtures/lint-crowded.json', 'tests/fixtures/warn-malformed-contract.json',
       'tests/fixtures/broken-missing-rows.json', 'src/starters/minimal.json'].map(file => path.join(root, file));
     for (const quiet of [false, true]) {

@@ -77,22 +77,37 @@ test('install preparation builds and packs the publisher, and changed bytes refr
   assert.equal(await readFile(path.join(sandbox, 'plugins/other/keep.txt'), 'utf8'), 'other plugin');
   assert.equal(await readFile(path.join(mock, '.local/secrets.json'), 'utf8'), secrets);
   assert.deepEqual((await readdir(path.join(mock, '.local'))).sort(), ['designer.json', 'secrets.json']);
+  // A copied integration contains prebuilt dist and no publisher scripts or
+  // lockfile. Installation must pack it without npm ci or any source build.
+  delete manifest.scripts;
+  await file(publisher, 'package.json', JSON.stringify(manifest));
+  await rm(path.join(publisher, 'package-lock.json'));
+  await rm(path.join(publisher, 'build.mjs'));
+  const prebuilt = await preparePluginPackage(mock, async (command, args, cwd) => {
+    assert.equal(command, 'npm');
+    assert.equal(args[0], 'pack');
+    return (await exec(command, args, {cwd})).stdout;
+  });
+  assert.equal((await exec('tar', ['-xOf', prebuilt, 'package/dist/index.js'])).stdout, 'export const version = 2;\n');
 });
 
-test('runtime vendoring preserves package build inputs and excludes unrelated private files', async t => {
+test('runtime vendoring builds distributions and excludes source and unrelated private files', async t => {
   const temp = await mkdtemp(path.join(tmpdir(), 'native-vendor-'));
   t.after(() => rm(temp, {recursive: true, force: true}));
   const source = path.join(temp, 'source'), designer = path.join(temp, 'designer');
   await mkdir(source);
   await mkdir(designer);
   await file(source, 'LICENSE', 'fixture license');
-  await file(source, 'apps/backstage/src/generated/nativeViewer.js', 'export const native=true;');
+  const manifest = {name:'@flowview/backstage-plugin', version:'1.0.0', files:['dist'], scripts:{build:'node build.mjs'}};
+  await file(source, 'apps/backstage/package.json', JSON.stringify(manifest));
+  await file(source, 'apps/backstage/package-lock.json', JSON.stringify({name:manifest.name, version:manifest.version, lockfileVersion:3, packages:{'':manifest}}));
+  await file(source, 'apps/backstage/build.mjs', "import {mkdir,writeFile} from 'node:fs/promises'; await mkdir('dist',{recursive:true}); await writeFile('dist/index.js','export const native=true;');");
   await file(source, 'src/compatibility.d.ts', 'export interface CompatibilityReport {}');
   await file(source, 'src/native/mount.d.ts', 'export interface NativeViewer {}');
   await file(source, 'tools/canon/entity-diagrams.d.mts', 'export function buildEntityDiagramIndex(): unknown;');
   // This isolated package-boundary fixture supplies a tiny builder; the full
   // rehearsal test exercises the actual engine build from a clean clone.
-  await file(source, 'tools/build.py', 'from pathlib import Path\nfor name in ["template/flowview.html", "workbench/flowspec.html"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
+  await file(source, 'tools/build.py', 'from pathlib import Path\nfor name in ["template/flowview.html", "workbench/flowspec.html", "tools/canon/generated-runtime.cjs"]:\n    p = Path(name)\n    p.parent.mkdir(parents=True, exist_ok=True)\n    p.write_text("built fixture")\n');
   await file(source, 'deploy/workbench/Dockerfile.prebuilt', 'FROM nginx:stable-alpine\n');
   await file(source, 'company-private.txt', 'DO_NOT_VENDOR');
   for (const args of [['init', '--quiet'], ['config', 'user.name', 'Fixture'], ['config', 'user.email', 'fixture@example.test'], ['remote', 'add', 'origin', 'https://github.com/fixture/runtime'], ['add', '.'], ['commit', '--quiet', '-m', 'Native fixture']])
@@ -103,12 +118,17 @@ test('runtime vendoring preserves package build inputs and excludes unrelated pr
   await assert.rejects(access(path.join(designer, 'apps/backstage/viewer/frame.js')), {code: 'ENOENT'});
   await assert.rejects(access(path.join(designer, 'company-private.txt')), {code: 'ENOENT'});
   assert.equal(await readFile(path.join(designer, 'specs/company.json'), 'utf8'), 'company data');
-  for (const name of ['LICENSE', 'src/compatibility.d.ts', 'src/native/mount.d.ts', 'tools/canon/entity-diagrams.d.mts', 'apps/backstage/src/generated/nativeViewer.js'])
+  for (const name of ['LICENSE', 'tools/canon/entity-diagrams.d.mts'])
     assert.equal(await readFile(path.join(designer, name), 'utf8'), await readFile(path.join(source, name), 'utf8'));
   await assert.rejects(vendorFlowview(source, source), /separate designer/);
   const alias = path.join(temp, 'source-alias');
   await symlink(source, alias, 'dir');
   await assert.rejects(vendorFlowview(source, alias), /separate designer/);
   await assert.rejects(vendorFlowview(source, path.join(alias, 'new-designer')), /separate designer/);
-  assert.equal(await readFile(path.join(source, 'apps/backstage/src/generated/nativeViewer.js'), 'utf8'), 'export const native=true;');
+  assert.equal(await readFile(path.join(designer, 'apps/backstage/dist/index.js'), 'utf8'), 'export const native=true;');
+  assert.equal(await readFile(path.join(designer, 'tools/canon/generated-runtime.cjs'), 'utf8'), 'built fixture');
+  const distribution = JSON.parse(await readFile(path.join(designer, 'apps/backstage/package.json'), 'utf8'));
+  assert.equal(distribution.scripts, undefined);
+  for (const name of ['apps/backstage/build.mjs', 'apps/backstage/src', 'src/native/mount.d.ts', 'tools/canon/generated-runtime.cjs'])
+    await assert.rejects(access(path.join(name.startsWith('tools/') ? source : designer, name)), {code:'ENOENT'});
 });

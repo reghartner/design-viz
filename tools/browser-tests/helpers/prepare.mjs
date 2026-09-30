@@ -13,6 +13,8 @@ export default async function prepare(){
   try{browser=await chromium.launch();console.log('Required Chromium: '+browser.version());}
   catch(error){throw new Error('Required Chromium could not launch. Run npm run install:browser --prefix tools/browser-tests (CI: playwright install --with-deps chromium).',{cause:error});}
   finally{if(browser)await browser.close();}
+  execFileSync('python3',[path.join(repo,'tools/build.py')],{stdio:'inherit'});
+  execFileSync(process.execPath,[path.join(repo,'apps/backstage/build-viewer.mjs')],{stdio:'inherit'});
   const output=await mkdtemp(path.join(tmpdir(),'flowview-browser-'));
   process.env.FLOWVIEW_BROWSER_ROOT=output;
   try {

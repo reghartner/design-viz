@@ -547,7 +547,7 @@ leaving the separately owned preview/workspace/Canon mounted.
 Run the source-edit and builder tests plus the relevant clipboard, step-reuse,
 layout and panel-reference suites when these boundaries change. Shared workbench
 extractions also run the full root Node suite and Python build tests. Rebuild with
-`python3 tools/build.py` and commit generated changes; a source-only workbench
+`python3 tools/build.py` and commit only authored changes; a source-only workbench
 extraction should leave the standalone viewer and backend runtime unchanged.
 Browser verification should include a nested-tab inspector edit, exact source
 preservation, Undo/Redo and repair after invalid source. For deferred form refresh,

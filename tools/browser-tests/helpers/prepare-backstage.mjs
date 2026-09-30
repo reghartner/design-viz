@@ -4,10 +4,9 @@ import {pathToFileURL} from 'node:url';
 import path from 'node:path';
 import prepareEditor from './prepare-editor.mjs';
 import {repo} from './prepare.mjs';
-import {publishLibrary} from '../../canon/library.mjs';
-import {buildEntityDiagramIndex,diagramsForEntity} from '../../canon/entity-diagrams.mjs';
 export default async function prepare(){
   execFileSync('python3',[path.join(repo,'tools/build.py')],{stdio:'inherit'});
+  execFileSync(process.execPath,[path.join(repo,'apps/backstage/build-viewer.mjs')],{stdio:'inherit'});
   const cleanup=await prepareEditor(),output=process.env.FLOWVIEW_BROWSER_ROOT,app=path.join(repo,'apps/backstage');
   try {
     const {build}=await import(pathToFileURL(path.join(app,'node_modules/esbuild/lib/main.js')));
@@ -20,6 +19,8 @@ export default async function prepare(){
 }
 
 export async function prepareBackstageWorkspace(output){
+  const {publishLibrary}=await import('../../canon/library.mjs');
+  const {buildEntityDiagramIndex,diagramsForEntity}=await import('../../canon/entity-diagrams.mjs');
   const app=path.join(repo,'apps/backstage');
   const {build}=await import(pathToFileURL(path.join(app,'node_modules/esbuild/lib/main.js')));
     const spec=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));

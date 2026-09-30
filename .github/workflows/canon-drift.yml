@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Generate the static backend before importing Canon tools
+        run: python3 tools/build.py --runtime-only
       - name: Check configuration
         env:
           FLOWVIEW_REGISTRY: ${{ vars.FLOWVIEW_REGISTRY }}

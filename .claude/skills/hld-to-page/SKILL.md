@@ -338,8 +338,10 @@ Use an absolute OUT. Require **zero errors and zero warnings**; do not pass
 not that the story is right. That is the next phase.
 
 When working from a source checkout, first run `python3 <VIZ>/tools/build.py`
-to create the local viewer/workbench HTML. Those two entrypoints are ignored
-build outputs; do not commit them. Authored spec/page outputs follow the chosen
+before running validators or exporting pages. It creates the local viewer/workbench
+HTML and static backend. These and Backstage runtime bundles are ignored build
+outputs; commit their authored inputs only. Downloaded folder-agent kits already
+contain their static backend and need no source checkout or build. Authored spec/page outputs follow the chosen
 diagram folder workflow.
 
 ## Phase 6: Self-audit against the worksheet

@@ -74,8 +74,8 @@
   native adapters. Do not hand-edit generated code or restore runtime
   source evaluation. Rebuild and verify the isolated copy install after changes.
 
-Validate fresh builds and behavior from the reviewed head; check committed
-freshness for packaged JavaScript, not HTML exports. Keep local build output
+Validate fresh builds and behavior from the reviewed head; check generation from absent outputs, determinism and source-free packaging.
+Runtime bundles and portable HTML must stay ignored; never stage them. Keep local build output
 separate from authored changes until explained; don't discard somebody else's
 work to obtain a clean result. Check required remote CI for that same head before
 merging. Repeat only affected validation after subsequent changes.

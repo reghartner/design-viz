@@ -336,7 +336,7 @@ test('project switch clears the old conversation while disconnect is delayed; la
   await mount(page);await deferredPeers(page,[{disconnect:'old-close'},{}]);await connect(page);
   await page.evaluate(()=>peers[0].publish({pending:'old-r1',transcript:[{role:'user',text:'Old project private conversation',requestId:'old-r1'}],changes:[{id:'old-p1',requestId:'old-r1',status:'applied',summary:'Old project change'}],review:{id:'old-review',version:1,summary:'Old project proposal'}}));
   await page.locator('#folder-agent-input').fill('Old project unsent question');await page.locator('#fixture-open-project').click();await expectCleanNewProject(page);
-  await expect.poll(()=>page.evaluate(()=>peers[0].disconnectCalls)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
   await connect(page);await publishNewProject(page);
   await page.evaluate(()=>{peers[0].publish({connected:true,status:'Old project must not return',transcript:[{role:'assistant',text:'Old project late answer'}],changes:[{id:'old-p1',status:'applied'}]});peerGates['old-close'].resolve();});
   await expect.poll(()=>page.evaluate(()=>peers[0].destroyCalls)).toBeGreaterThan(0);await expectNewProjectIntact(page);await expect(page.locator('#folder-agent-panel-status')).toHaveText('New project is ready.');
@@ -402,7 +402,7 @@ for(const method of ['external','embedded'])test('held '+method+' disconnect imm
   await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-setup-mode-'+method).click();
   await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
   await page.locator('#folder-agent-pairing summary').click();await page.locator('#folder-agent-disconnect').click();
-  await expect.poll(()=>page.evaluate(()=>peers[0].disconnectCalls)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
   for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
   await expect(page.locator('#folder-agent-open-setup')).toBeDisabled();await expect(page.locator('#folder-agent-continue')).toBeDisabled();
   await page.evaluate(()=>peerGates.close.resolve());
@@ -412,7 +412,7 @@ test('failed setup immediately hides connected actions while disconnect cleanup 
   await mount(page);await deferredPeers(page,[{disconnect:'close'}]);
   await page.evaluate(()=>{window.createFolderAgentFiles=()=>({write:async()=>{throw Error('Injected setup write failure');}});});
   await page.locator('#folder-agent-open-setup').click();await page.locator('#folder-agent-connect').click();
-  await expect.poll(()=>page.evaluate(()=>peers[0].disconnectCalls)).toBe(1);
+  await expect.poll(()=>page.evaluate(()=>peers[0]?.disconnectCalls)).toBe(1);
   await expect(page.locator('#editor-agent')).toHaveAttribute('data-connected','false');
   for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
   await expect(page.locator('#folder-agent-copy')).toBeDisabled();await expect(page.locator('#folder-agent-connect')).toBeDisabled();

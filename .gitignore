@@ -13,6 +13,8 @@ node_modules/
 /apps/confluence/static/
 /apps/confluence/preview/
 /apps/backstage/release/
+# npm pack ./apps/backstage writes its distribution to the repository root.
+/flowview-backstage-plugin-*.tgz
 
 # Generated from reviewed specs under docs/diagrams on each build.
 /workbench/diagrams.json
@@ -20,3 +22,7 @@ node_modules/
 # Portable entrypoints are built locally and in CI/deployment, never committed.
 /template/flowview.html
 /workbench/flowspec.html
+
+# Runtime bundles are generated before tests/packaging; authored inputs stay in src/.
+/apps/backstage/src/generated/
+/tools/canon/generated-runtime.cjs

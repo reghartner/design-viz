@@ -239,7 +239,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | path | what it is |
 |---|---|
 | `src/panels/types/<type>.js` | One complete panel definition: validation, state rules, renderer, editor controls/metadata, picker example, styles, layout/reference capabilities and release metadata. Shared primitives stay in `src/panels/shared.js`; see [panel development](docs/panel-modularity.md). |
-| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Viewer/workbench HTML is ignored and generated for local use, CI artifacts and image builds. Authored diagram exports remain independent. Packaged JavaScript must remain current; the Canon index is regenerated during the build. |
+| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Viewer/workbench HTML is ignored and generated for local use, CI artifacts and image builds. Authored diagram exports remain independent. Runtime JavaScript and copied declarations/licenses are ignored build outputs too. Local commands and CI generate them before tests and packaging; see [build and distribution instructions](docs/build-entrypoints.md#build-outputs-and-distribution). The Canon index is regenerated during the build. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/browser-tests/` | Required pinned-Chromium contracts for offline HTML, editor source/history and teardown, native React isolation, and copied Forge resources. [Commands and boundaries](tools/browser-tests/README.md). |
 | `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
@@ -535,7 +535,11 @@ login, CSP and iframe permissions remain deployment requirements.
 
 ## Validating a spec (the agent loop)
 
-```
+From a source checkout, build once after checkout/update before calling the
+validator or compatibility CLI. Downloaded folder-agent kits already include it.
+
+```sh
+python3 tools/build.py --runtime-only
 node tools/validate.js my-page.spec.json          # errors + warnings + lint, field paths
 node tools/validate.js --quiet my-page.spec.json  # errors + summary only
 ```

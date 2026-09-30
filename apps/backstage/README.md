@@ -393,7 +393,9 @@ valid diagram available for another jump.
 The generated native viewer and compatibility checker are compiled into `dist`;
 bundled declarations, `LICENSE` and `FONT-LICENSES.txt` travel with the package. Company builds do not need this
 repository's source tree. Runtime maintainers run `npm run build:viewer` here;
-CI checks freshness with `npm run check:viewer`. The artifact includes the shared
+CI checks two builds from absent outputs with `npm run check:viewer`.
+The outputs are ignored; commit their authored sources only. Local `check`,
+`test`, `build`, `verify` and `npm pack` generate their runtime inputs first. The artifact includes the shared
 engine, validation, styles, icons and licensed Latin fonts selected by the shared
 named `native` entrypoint. The adapter retains mount/environment and CSS/font
 ownership; see the upstream [build guide](../../docs/build-entrypoints.md).
@@ -489,7 +491,14 @@ npm pack ./apps/backstage
 
 For an explicit package path, run `npm pack ./apps/backstage` from the repository
 root. CI uploads the built tarball as `backstage-plugin-package`; it does not
-publish it. Test the installed company backend image and host CSP/SSO before the
+publish it. Download it from the successful GitHub Actions **ci** run for the
+reviewed commit, or use `gh run download RUN_ID --name backstage-plugin-package
+--dir backstage-package`. Install its `.tgz` with `npm install --ignore-scripts
+/absolute/path/to/flowview-backstage-plugin-1.1.0.tgz`; no upstream checkout, Python,
+runtime compilation or install-time build is needed. The existing **flowview-html**
+artifact provides the external editor and embedded folder-agent kit; see the
+[download guide](../../docs/build-entrypoints.md#build-outputs-and-distribution).
+Test the installed company backend image and host CSP/SSO before the
 company app release. Upgrade the package version through a normal dependency PR;
 new specs can be read from GitHub independently.
 

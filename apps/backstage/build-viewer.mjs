@@ -1,5 +1,5 @@
-/* Portable committed artifacts: company copies need no upstream source tree.
-   Regenerate here whenever the shared native viewer inputs change. */
+/* Build-time artifacts compiled into source-free distributions.
+   Authored sources, declarations and license inputs remain in src/. */
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
@@ -18,9 +18,5 @@ const outputs={
   'compatibility.d.ts':await read('src/compatibility.d.ts'),
 };
 const out=path.join(app,'src/generated');await mkdir(out,{recursive:true});
-for(const [name,content] of Object.entries(outputs)){
-  if(process.argv.includes('--check')){
-    if(await readFile(path.join(out,name),'utf8')!==content)throw new Error('Bundled Backstage '+name+' is stale. Run npm run build:viewer in apps/backstage.');
-  }else await writeFile(path.join(out,name),content);
-}
-console.log('Backstage native viewer '+(process.argv.includes('--check')?'is fresh':'built')+' ('+Buffer.byteLength(js)+' bytes; embedded assets)');
+for(const [name,content] of Object.entries(outputs)) await writeFile(path.join(out,name),content);
+console.log('Backstage native viewer built ('+Buffer.byteLength(js)+' bytes; embedded assets)');

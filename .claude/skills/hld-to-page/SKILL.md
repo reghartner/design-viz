@@ -37,6 +37,14 @@ checkout that contains `tools/page_build.py` (read-only for you; never edit the
 renderer to make a spec pass). **OUT** is the destination folder. Repository
 paths below are relative to VIZ. Links to `references/` are relative to this file.
 
+When working from a source checkout, first run `python3 <VIZ>/tools/build.py`
+before running validators or exporting pages. It creates the local viewer/workbench
+HTML and static backend. These and Backstage runtime bundles are ignored build
+outputs; commit their authored inputs only. Downloaded folder-agent kits already
+contain their static backend and need no source checkout or build. Authored spec/page outputs follow the chosen
+diagram folder workflow. `tools/page_build.py` also generates missing
+prerequisites before validating a page.
+
 ## The rules that matter most
 
 1. **Questions first, always.** For a new diagram or a changed story, your
@@ -337,10 +345,7 @@ Use an absolute OUT. Require **zero errors and zero warnings**; do not pass
 `cookbook/adjustments.md` and rebuild. A clean build proves the JSON is valid,
 not that the story is right. That is the next phase.
 
-When working from a source checkout, first run `python3 <VIZ>/tools/build.py`
-to create the local viewer/workbench HTML. Those two entrypoints are ignored
-build outputs; do not commit them. Authored spec/page outputs follow the chosen
-diagram folder workflow.
+
 
 ## Phase 6: Self-audit against the worksheet
 

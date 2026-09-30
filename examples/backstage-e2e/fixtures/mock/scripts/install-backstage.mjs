@@ -32,8 +32,12 @@ export async function preparePluginPackage(root = process.cwd(), execute = run) 
   if (manifest.name !== '@flowview/backstage-plugin') throw new Error('The recorded designer does not contain @flowview/backstage-plugin.');
   const packed = await mkdtemp(path.join(root, '.local/flowview-pack-'));
   try {
-    await execute('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], publisher);
-    await execute('npm', ['run', 'build'], publisher);
+    if (manifest.scripts?.build) {
+      // A full company source fork can still publish here. Portable rehearsals
+      // already contain the complete package and need no build dependencies.
+      await execute('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], publisher);
+      await execute('npm', ['run', 'build'], publisher);
+    }
     const result = JSON.parse(await execute('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packed], publisher, true));
     const item = result[0];
     if (result.length !== 1 || item.name !== manifest.name || path.basename(item.filename) !== item.filename)

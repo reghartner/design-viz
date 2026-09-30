@@ -9,6 +9,7 @@
 The source loader owns entrypoint expansion, exports and asset inventory.
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
+import argparse
 import json
 import pathlib
 import sys
@@ -130,7 +131,16 @@ def fill(skel: str, mapping: dict) -> str:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--runtime-only", action="store_true", help="build the static Node runtime without HTML")
+    args = parser.parse_args()
     runtime = canon_runtime()
+    runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
+    runtime_path.parent.mkdir(parents=True, exist_ok=True)
+    runtime_path.write_text(runtime)
+    if args.runtime_only:
+        print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
+        return 0
     for name, skeleton, output in [
         ('standalone', 'flowview.skel.html', ROOT / 'template/flowview.html'),
         ('workbench', 'workbench.skel.html', ROOT / 'workbench/flowspec.html'),
@@ -154,8 +164,6 @@ def main() -> int:
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(fill(read(skeleton), mapping))
-
-    (ROOT / "tools" / "canon" / "generated-runtime.cjs").write_text(runtime)
 
     # Publish against the runtime just built, so newly added panels validate.
     subprocess.run([

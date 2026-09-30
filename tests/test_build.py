@@ -9,6 +9,7 @@ import re
 import runpy
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -93,6 +94,29 @@ class BuildTests(unittest.TestCase):
             self.assertEqual(files[name], (ROOT / name).read_text())
         self.assertEqual(packed['watcher'], (ROOT / 'tools/folder-agent.py').read_text())
         self.assertFalse(any('node_modules/' in name or '/agents/' in name or '/research/' in name for name in files))
+
+    def test_extracted_folder_kit_runs_without_sources_or_compilation(self):
+        match = re.search(r'<script type="application/json" id="flowview-folder-kit">(.*?)</script>',
+                          self.texts["flowspec.html"], re.S)
+        files = json.loads(gzip.decompress(base64.b64decode(json.loads(match.group(1))['gzip'])))['files']
+        self.assertEqual(files['LICENSE'], (ROOT / 'LICENSE').read_text())
+        self.assertNotIn('tools/source-loader.cjs', files)
+        self.assertFalse(any(name.startswith('src/') and name.endswith('.js') for name in files))
+        with tempfile.TemporaryDirectory(prefix='flowview-kit-') as directory:
+            root = pathlib.Path(directory)
+            for name, content in files.items():
+                target = root / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(content)
+            spec = root / 'src/starters/minimal.json'
+            for command in [['tools/validate.js', '--quiet', str(spec)],
+                            ['tools/compatibility.js', '--stamp', str(spec)],
+                            ['.claude/skills/hld-to-page/scripts/fold_states.cjs', str(spec)]]:
+                result = subprocess.run(['node', '--disallow-code-generation-from-strings', *command],
+                                        cwd=root, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            folded = json.loads(result.stdout)
+            self.assertTrue(folded)
 
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)

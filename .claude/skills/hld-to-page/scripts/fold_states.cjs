@@ -4,7 +4,7 @@
 
    Usage: node fold_states.cjs <spec.json> [--viz <VIZ checkout>]
 
-   Loads the repository's own validator and engine sources (the same bundles
+   Loads the prebuilt static backend (the same pure core
    tools/validate.js and the pages use), normalizes the spec the way the
    builder does, finds every diagram section, and resolves each declared path
    to its step list (a diagram without `paths` is one path of all steps). For
@@ -26,7 +26,6 @@
 
 const fs = require('fs');
 const path = require('path');
-const vm = require('vm');
 
 function main(argv) {
   let viz = path.resolve(__dirname, '..', '..', '..', '..'), spec = null;
@@ -39,26 +38,20 @@ function main(argv) {
     process.stderr.write('usage: node fold_states.cjs <spec.json> [--viz <VIZ checkout>]\n');
     return 2;
   }
-  const loaderPath = path.join(viz, 'tools', 'source-loader.cjs');
-  if (!fs.existsSync(loaderPath)) {
-    process.stderr.write('fold_states: no VIZ checkout at ' + viz + ' (missing tools/source-loader.cjs); pass --viz <path>\n');
+  const runtimePath = path.join(viz, 'tools', 'canon', 'core.cjs');
+  if (!fs.existsSync(runtimePath)) {
+    process.stderr.write('fold_states: missing tools/canon/core.cjs at ' + viz + '; pass --viz <path>\n');
     return 2;
   }
-  const {readSource} = require(loaderPath);
-  const context = vm.createContext({URL, TextEncoder, console});
-  for (const name of ['compatibility.js', 'canon.js', 'validator.js', 'engine.js'])
-    vm.runInContext(readSource(name), context, {filename: name});
-  vm.runInContext('__api = {normalize, validate, sectionRecords, diagramPathList, diagramForPath,' +
-    ' foldPanelStates, foldNodeTones, stepKeys, stepFailures, stepNodes, stepPanelPatch, stepTonePatch,' +
-    ' storyTimeConfig, storyTimeSequence, storyTimeLabel, storyBatteryConstants, storyBatteryConstantSources};', context);
-  const C = context.__api;
+  const core = require(runtimePath);
+  const C = core.viewerRouting();
 
   let raw;
   try { raw = JSON.parse(fs.readFileSync(spec, 'utf8')); }
   catch (ex) { process.stderr.write('fold_states: cannot read ' + spec + ': ' + ex.message + '\n'); return 2; }
   const page = C.normalize(raw);
   if (!page) { process.stderr.write('fold_states: ' + spec + ' is not a Flowview spec\n'); return 2; }
-  const v = C.validate(page);
+  const v = core.validateSpec(raw);
   const plain = value => JSON.parse(JSON.stringify(value === undefined ? null : value));
 
   const diagrams = [];

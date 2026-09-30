@@ -45,14 +45,15 @@ Only the current request can mount; cleanup aborts reads, destroys the native
 handle and disconnects host visibility observers. Late reads and retired mount
 callbacks cannot update the active host.
 
-`src/generated/` is committed build output. Do not hand-edit it. The source build
+`src/generated/` is ignored build output. Do not hand-edit it. The source build
 uses `tools/native-viewer-build.mjs` to combine the shared named `native`
 entrypoint and asset inventory with `src/native/` into one ESM artifact. The
 adapter owns CSS scoping, namespaced fonts and instance mount/environment code.
 The named `compatibility` entrypoint supplies the checker and its panel metadata.
 Source order, exports and font profiles are described in the upstream
 [build guide](../../docs/build-entrypoints.md). Company
-releases compile these artifacts into `dist` without reading the upstream `src/` tree. Changes to
+releases build from the full fork and compile these artifacts into `dist`.
+Installed packages and portable rehearsal copies contain prebuilt `dist` and need no upstream sources. Changes to
 shared source or native ownership require `npm run build:viewer` upstream.
 ShadowRoot isolation and the host script/style/font/image policy are documented
 in the README; there is no frame channel or generated script hash.

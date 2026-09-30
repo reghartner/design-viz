@@ -13,8 +13,6 @@ npm ci --prefix apps/backstage --no-fund --no-audit
 npm ci --prefix apps/confluence --no-fund --no-audit
 npm ci --prefix tools/browser-tests --no-fund --no-audit
 npm run install:browser --prefix tools/browser-tests
-python3 tools/build.py
-npm run check:viewer --prefix apps/backstage
 npm test --prefix tools/browser-tests
 ```
 
@@ -33,15 +31,15 @@ existing pure, build and host checks; merge only after this job passes too.
 | Built workbench | The production HTML rebuilt from current source edits an inspector field with exact surrounding bytes and focus; Undo/Redo retains handwritten source; a real pointer swap has one Undo; a wholly hidden alternate remains the exact source step; a held file read cannot replace a newer project. |
 | Workbench browser navigation | Native Back/Forward follows welcome, paste, templates, agent guidance and editor screens; unfinished text and editor Undo survive; reload restores a local draft; pending imports stay retired; detached canonical review URLs cannot reappear. The first app entry still allows Back to leave normally. |
 | Builder lifetime | The production named workbench assembly and skeleton receive an appended test-only facade. Destroy retires held graph and captured Home gestures, old controls and public callbacks; two same-DOM remounts each retain one exact Undo. Open picker cleanup and global resource counts return to the still-mounted boot/workspace/Canon/preview baseline. |
-| Native React host | The actual `InlineFlowview` component imports its committed static renderer. Two viewers resist hostile host CSS, retain independent state and exact hidden/numeric navigation, reject stale revisions, remount and release their listeners/timers/observers/fonts. |
+| Native React host | The actual `InlineFlowview` component imports its freshly built static renderer. Two viewers resist hostile host CSS, retain independent state and exact hidden/numeric navigation, reject stale revisions, remount and release their listeners/timers/observers/fonts. |
 | Forge resource | The normal production build is copied to an isolated serving root. Only the installed bridge transport is simulated: import/save/reload, invalid-save refusal, alternate/view/transport behavior and explicit link routing run through the shipped app. |
 | Tracker contract | Real browser listeners verify duplicate/capture/once/abort and callback receivers; timers, RAF and observer retirement validate the shared instrumentation. |
 
 The server binds an ephemeral loopback port and serves only temporary fixture
 outputs. The workbench fixtures include the real local catalog. Global setup
 uses normal build commands and shared named entrypoints; no private source or
-neighboring-comment slicing is used. Run `python3 tools/build.py` first, as CI
-does; entrypoint HTML is an ignored output, absent from fresh clones. Temporary
+neighboring-comment slicing is used. Global setup generates HTML, the backend and native artifacts before fixtures
+import or copy them, including on fresh clones. Temporary
 serving roots are removed after the suite. Forge's ordinary ignored
 `static/viewer` build remains in its normal
 location. The full installed Backstage rehearsal remains a separate documented

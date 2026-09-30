@@ -24,6 +24,7 @@ updated after every successful build so --diff-prev can compare with the last
 built state without making a redundant destination spec copy.
 
 Does, in order, stopping loudly at the first failure:
+  0. Generates missing template/backend inputs from this source checkout.
   1. Validates the spec with tools/validate.js (the real validator + lint).
      Requires 0 errors AND 0 warnings (pass --allow-warnings only when a
      human told you a specific warning is acceptable — say which in the
@@ -222,6 +223,14 @@ def main() -> int:
     title = page.get("title")
     if not title:
         fail("spec has no page.title — the manifest needs it; add one")
+
+    # Source-checkout authoring is a single command even before the first build.
+    # Installed validators/kits already carry a static backend and never build it.
+    if not TEMPLATE.is_file() or not (ROOT / "tools/canon/generated-runtime.cjs").is_file():
+        built = subprocess.run([sys.executable, str(ROOT / "tools/build.py")],
+                               capture_output=True, text=True, cwd=ROOT)
+        if built.returncode:
+            fail("could not generate page build inputs:\n" + built.stdout + built.stderr)
 
     # 1. validate
     r = subprocess.run(

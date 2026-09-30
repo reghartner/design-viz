@@ -42,8 +42,8 @@ closest route; don't silently omit it.
 `template/flowview.html` and `workbench/flowspec.html` are ignored build outputs.
 Run `python3 tools/build.py` before testing or distributing them; do not stage or
 force-add them. Commit their source changes. CI publishes downloadable HTML and
-the nginx image builds from source. Keep packaged JavaScript freshness checks;
-those runtime artifacts remain tracked. Authored diagram exports have a separate
+the nginx image builds from source. Runtime bundles are ignored too: generate them before tests and packaging,
+check determinism and source-free distributions, and guard against tracking them. Authored diagram exports have a separate
 workflow and need not be regenerated for unrelated engine changes.
 
 ## 3. Resolve and finish

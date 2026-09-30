@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-const {readSource} = require('./source-loader.cjs');
+const core = require('./canon/core.cjs');
 /* validate.js — flowspec validator + lint CLI.
 
    Usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]
@@ -15,22 +15,6 @@ const {readSource} = require('./source-loader.cjs');
    results and in-page results cannot drift. No DOM renderer is loaded. */
 
 const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-
-const ROOT = path.join(__dirname, '..');
-
-function loadCore(){
-  const code =
-    readSource('compatibility.js') + '\n' +
-    readSource('canon.js') + '\n' +
-    readSource('validator.js') + '\n' +
-    ';__exports = {normalize, validate, lintPage, compatibility:FlowviewCompatibility};';
-  const sandbox = {console, URL};
-  vm.runInNewContext(code, sandbox);
-  return sandbox.__exports;
-}
-
 function main(argv){
   const args = argv.slice(2);
   const quiet = args.includes('--quiet');
@@ -39,7 +23,7 @@ function main(argv){
     console.error('usage: node tools/validate.js [--quiet] <spec.json> [<spec.json> ...]');
     return 2;
   }
-  const C = loadCore();
+  const C = core.viewerRouting();
   let anyErrors = false;
 
   for (const file of files){
@@ -53,8 +37,8 @@ function main(argv){
       continue;
     }
     const page = C.normalize(raw);
-    const v = C.validate(page);
-    for (const message of C.compatibility.check(raw).messages)
+    const v = core.validateSpec(raw);
+    for (const message of core.compatibility.check(raw).messages)
       if (!quiet) console.log(file + ': compatibility: ' + message);
     const lint = v.errors.length ? [] : C.lintPage(page);
     for (const e of v.errors) console.log(file + ': ERROR ' + e);

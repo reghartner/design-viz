@@ -33,7 +33,7 @@ Usage:
              directory four levels above this script.
 
 State comes from the real engine: scripts/fold_states.cjs loads the VIZ
-validator and engine sources in Node and folds each path exactly as the
+prebuilt static backend in Node and folds each path exactly as the
 viewer does (notification stacks, enterOnce, step-local signals, whole-item
 replacement). Node is required; there is no Python fallback fold.
 

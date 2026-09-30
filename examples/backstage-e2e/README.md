@@ -23,8 +23,11 @@ native build tools needed by Backstage's SQLite dependency. Google Chrome is
 needed for the optional browser test. The larger Backstage install takes several
 minutes. No GitHub credentials or hosted sandbox are needed for local playback.
 
-The packager builds HTML from tracked source in a temporary directory; ignored
-local HTML is never copied.
+The packager builds HTML, the static backend and the complete Backstage package
+from tracked source in a temporary directory. It installs locked publisher
+dependencies there; ignored local bundles are never copied. The generated
+designer contains prebuilt `apps/backstage/dist` with declarations and licenses,
+so its host installer needs no upstream sources or runtime build.
 
 From a clean checkout of this public repository with Node 24 and Python 3.10+:
 
@@ -53,7 +56,7 @@ The creator:
 
 1. Copies only the package's selected fictional source files and initializes a
    new source history with a healthy 500 ms recording deadline.
-2. Copies the actual tracked Flowview runtime/plugin from this checkout and
+2. Builds and copies the Flowview runtime/plugin from this checkout and
    records its exact commit. Local dependencies and private files are excluded.
 3. Starts the mock on a temporary port and makes an authenticated Catalog API
    GET using the production importer. Three services and three APIs seed the editor.
@@ -65,8 +68,8 @@ The creator:
 
 The real Backstage host is the official create-app 0.9.2 scaffold with a committed
 host dependency lockfile and selected plugins. It ingests the mock repository's
-catalog/OpenAPI files through real processors. The install script builds and packs
-`@flowview/backstage-plugin` from the designer, then installs that tarball in the
+catalog/OpenAPI files through real processors. The install script packs the prebuilt
+`@flowview/backstage-plugin` in the designer, then installs that tarball in the
 app. Its `/new-frontend` entry renders approved specs through the reference
 authenticated proxy. This is development Guest
 auth with fictional data; company SSO and production hosting are separate work.
@@ -81,7 +84,7 @@ archive. Repeat the installer after a reviewed runtime change. Review the app
 manifest and lockfile diff; changed package bytes get a new file locator even at
 the same version. Tarballs stay under ignored `sandbox/backstage/.local/`.
 Keep the staged archive when running a later `yarn install --immutable`; a fresh
-clone needs setup and the installer to rebuild its local package first.
+clone needs setup and the installer to repack its prebuilt files first.
 
 ## 2. Verify locally
 

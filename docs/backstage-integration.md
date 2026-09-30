@@ -118,10 +118,10 @@ remain supported independently. This seam needs no Backstage platform API or
 company credentials; installed routing and package rollout belong to the host.
 
 Runtime maintainers regenerate it with `python3 tools/build.py` whenever the shared
-sources change, and commit the output. CI checks freshness and runs standalone
+sources change; the output is ignored. CI checks generation and determinism and runs standalone
 CommonJS and ESM backend bundles with filesystem access restricted to the bundle
 directory. Those tests exercise validation and service links into happy/alternate
-steps. Consumers of the committed runtime do not need Python or the source tree
+steps. Consumers of the packaged runtime do not need Python or the source tree
 at runtime. The packed-consumer check also installs the actual release, bundles
 its declarations, renders with injected loaders, and runs its backend bundle
 without the source checkout.

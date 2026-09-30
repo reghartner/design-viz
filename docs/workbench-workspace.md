@@ -181,6 +181,11 @@ Both modes review spec/ledger proposals through **Preview Agent Updates**.
 **Commit update** saves both artifacts as one Undo action; a Git commit remains
 a separate action in the agent. See [diagram folders](folder-agent-session.md).
 
+While a connected, registered request is active, an **Agent working** pill stays
+visible in the top project bar even when the Agent window is closed. It changes when the agent
+needs permission or has an update ready for review; click it to reopen Agent. The
+pill disappears when the request is completed or stopped.
+
 The Agent window names the current selection and view/path/step context.
 Copy & paste shows **Shared folder ready** without waiting for a listener, or
 **Request active · Continue in your agent** while a request is active. Replies and

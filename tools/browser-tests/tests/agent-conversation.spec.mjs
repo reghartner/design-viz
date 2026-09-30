@@ -7,17 +7,20 @@ const read=name=>readFile(path.join(root,'src',name),'utf8');
 // UI contract fixture: production DOM, styles and conversation modules; a fake
 // protocol peer isolates layout/recovery intent. Folder protocol tests separately
 // exercise real disk, helper, ownership and cancellation races.
-async function mount(page,{stored,denied=false}={}){
+async function mount(page,{stored,denied=false,chrome=false}={}){
   await page.route('https://conversation.test/**',r=>r.fulfill({contentType:'text/html',body:'<!doctype html><html><body></body></html>'}));
   await page.goto('https://conversation.test/');
   if(stored)await page.evaluate(value=>localStorage.setItem('dv-folder-agent-recovery-v1',JSON.stringify(value)),stored);
-  await page.evaluate(skeleton=>{
+  await page.evaluate(({skeleton,chrome})=>{
     const parsed=new DOMParser().parseFromString(skeleton,'text/html');
+    if(chrome){document.body.className='workspace-canvas';document.body.appendChild(parsed.querySelector('.workbench-header'));}
+    else document.body.appendChild(parsed.getElementById('folder-agent-working'));
     for(const id of ['editor-agent','folder-agent-guide','editor-tab-agent','folder-agent-selection','agent-update-banner','agent-update-dialog'])document.body.appendChild(parsed.getElementById(id));
+    if(chrome)document.body.appendChild(parsed.querySelector('.workspace-canvas-controls'));
     const panel=document.createElement('section');panel.className='workspace-window';panel.id='test-window';panel.style.cssText='left:20px;top:60px;width:min(420px,calc(100vw - 40px));height:calc(100dvh - 80px)';
     panel.appendChild(document.getElementById('editor-agent'));document.body.appendChild(panel);document.getElementById('editor-agent').hidden=false;
     const kit=document.createElement('script');kit.id='flowview-folder-kit';kit.type='application/json';kit.textContent=JSON.stringify({watcher:'# harmless test fixture',gzip:'',sha256:''});document.body.appendChild(kit);
-    window.testSource='{"title":"My story"}';window.testProject=1;window.testSelection=[{id:'customer',label:'Customer',kind:'node'}];window.testViews=[];window.permissionCalls=0;window.pickerCalls=0;window.filePickerCalls=0;window.diskWrites=[];window.starts=[];window.restoreCalls=[];window.inspectCalls=0;
+    window.testSource='{"title":"My story"}';window.testProject=1;window.testSelection=[{id:'customer',label:'Customer',kind:'node'}];window.testViews=[];window.permissionCalls=0;window.pickerCalls=0;window.filePickerCalls=0;window.diskWrites=[];window.starts=[];window.restoreCalls=[];window.inspectCalls=0;window.showCalls=0;
     window.savedIdentity={sessionId:'s1',connectionId:'c0'};window.savedRevision='old-1';window.savedTranscript=[];window.hasSavedSession=false;
     window.testDirectory={name:'flowview-session-test',requestPermission:async()=>{window.permissionCalls++;return window.denyPermission?'denied':'granted';},getDirectoryHandle:async()=>window.testDirectory};
     window.showDirectoryPicker=async()=>{window.pickerCalls++;return window.testDirectory;};
@@ -29,13 +32,13 @@ async function mount(page,{stored,denied=false}={}){
       window.publish=update=>{if('review' in update)window.testReview=update.review;options.changed(update);};window.pendingId=null;const manifest={sessionId:'s1',connectionId:'c1'};
       return {manifest:()=>manifest,start:async(resume,choice)=>{window.starts.push({resume,choice});if(window.startFailure)throw Error(window.startFailure);options.changed({connected:true,transcript:resume?window.savedTranscript:[],changes:[]});return manifest;},poll:async()=>{},send:async text=>{window.lastSent=text;window.pendingId='r1';window.lastSentRequest=structuredClone({...options.snapshot(),technicalLevel:options.level()});options.changed({pending:'r1',activityPhase:'waiting',transcript:[{role:'user',text,requestId:'r1',context:lastSentRequest}]});},cancel:async()=>{window.pendingId=null;options.changed({pending:null});return true;},disconnect:async()=>options.changed({connected:false,pending:null,listening:false}),destroy(){},setReviewMode:value=>{window.reviewEnabled=value;},reviewSnapshot:()=>window.testReview?{review:window.testReview,source:null,current:window.testSource}:null,acceptReview:async()=>{window.reviewAccepted=true;window.publish({review:null});},rejectReview:async()=>{window.reviewRejected=true;window.publish({review:null});},readLedger:async()=>null};
     };
-  },await read('workbench.skel.html'));
+  },{skeleton:await read('workbench.skel.html'),chrome});
   for(const file of ['style.core.css','style.workbench.css','workbench/agent-conversation.css'])await page.addStyleTag({content:await read(file)});
   for(const file of ['workbench/lifetime.js','workbench/targets.js','workbench/agent-message.js','workbench/agent-recovery.js','workbench/agent-review.js','workbench/agent-chat.js'])await page.addScriptTag({content:await read(file)});
   await page.evaluate(denied=>{
     window.denyPermission=denied;
     if(denied){const original=createWorkbenchAgentRecovery;window.createWorkbenchAgentRecovery=options=>{const store=original(options);return {...store,handle:async()=>({handle:window.testDirectory,sessionId:'s1'})};};}
-    window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){},openEmptyFolder:()=>({ok:true,project:window.testProject}),restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
+    window.agentUI=initWorkbenchAgentChat({document,snapshot:()=>({open:true,project:window.testProject,source:window.testSource,selection:window.testSelection,views:window.testViews}),busy:()=>false,apply:()=>({ok:true}),show(){window.showCalls++;},openEmptyFolder:()=>({ok:true,project:window.testProject}),restoreSavedStory:(source,expected)=>{window.restoreCalls.push({source,expected});if(window.restoreFailure)return {ok:false,error:window.restoreFailure};window.preservedSource=window.testSource;window.testSource=source;window.testProject++;return {ok:true,project:window.testProject};},showChanges:receipt=>{window.shownChange=receipt.id;},undoChange:()=>({ok:false,error:'Later manual edits are preserved.'})});
   },denied);
   if(stored)await page.evaluate(()=>window.hasSavedSession=true);
 
@@ -50,6 +53,22 @@ async function stageVisible(page){
   const stage=await page.locator('#folder-agent-stage').boundingBox(),header=await page.locator('.folder-agent-header').boundingBox();
   expect(stage.y).toBeGreaterThanOrEqual(header.y);expect(stage.y+stage.height).toBeLessThanOrEqual(header.y+header.height);
 }
+test('a connected registered request stays visible in the corner until it is released',async({page})=>{
+  await page.setViewportSize({width:1280,height:720});await mount(page,{chrome:true});await connect(page);
+  const indicator=page.locator('#folder-agent-working');await expect(indicator).toBeHidden();
+  await page.locator('#folder-agent-input').fill('Explain the checkout path');await page.locator('#folder-agent-input').press('Control+Enter');
+  await expect(indicator).toBeVisible();await expect(indicator).toHaveText('Agent working');
+  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){
+    await page.setViewportSize(viewport);
+    const boxes=await Promise.all(['#folder-agent-working','#folder-agent-selection','.workspace-canvas-controls'].map(selector=>page.locator(selector).boundingBox()));
+    const overlaps=(a,b)=>a.x<b.x+b.width && a.x+a.width>b.x && a.y<b.y+b.height && a.y+a.height>b.y;
+    expect(overlaps(boxes[0],boxes[1])).toBe(false);expect(overlaps(boxes[0],boxes[2])).toBe(false);
+  }
+  await page.evaluate(()=>publish({activityPhase:'permission-needed'}));await expect(indicator).toHaveText('Agent needs permission');
+  await page.evaluate(()=>publish({review:{id:'proposal-1',version:1,summary:'Updated checkout path'}}));await expect(indicator).toHaveText('Review agent update');
+  await indicator.click();expect(await page.evaluate(()=>showCalls)).toBeGreaterThan(0);
+  await page.evaluate(()=>publish({pending:null,review:null}));await expect(indicator).toBeHidden();
+});
 test('twenty exchanges keep composer reachable and do not force an older-message reader to the bottom',async({page})=>{
   await page.setViewportSize({width:1280,height:720});await mount(page);await connect(page);
   await page.evaluate(()=>{window.turns=Array.from({length:40},(_,i)=>({role:i%2?'assistant':'user',text:'Message '+i+' · '+('Long story context. '.repeat(i%4*20+1)),requestId:'r'+Math.floor(i/2)}));publish({connected:true,listening:true,transcript:turns});});

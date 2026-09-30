@@ -12,6 +12,10 @@ async function checkProse(root){
   expect(await root.locator('.ctg').evaluate(el=>el.clientWidth/el.closest('table').clientWidth)).toBeGreaterThan(.4);
   await expect(root.locator('.step-text pre code')).toHaveText(code,{useInnerText:false});
   await expect(root.locator('.step-text strong')).toHaveText('acknowledge');
+  await expect(root.locator('.step-text > .prose-list > li')).toHaveCount(2);
+  await expect(root.locator('.step-text .prose-list .prose-list > li')).toHaveText('Check the event');
+  await expect(root.locator('.step-text > .prose-list')).toHaveCSS('list-style-type','disc');
+  await expect(root.locator('.printsteps > li').first().locator('.prose-list > li')).toHaveCount(3);
   await expect(root.locator('[data-dv-node=device]')).toContainText('`Doorbell`');
   await expect(root.locator('.ctv')).toHaveText('`sample-value`');
   await expect(root.locator('.prose-code img,.prose-code a,.prose-code strong,.prose-code script')).toHaveCount(0);

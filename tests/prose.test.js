@@ -67,3 +67,24 @@ test('notification messages format prose while app names, titles, code and unsaf
   assert.ok(!html.includes('<img')&&!html.includes('href="javascript:'));
   assert.ok(html.includes('title="'+C.esc(text)+'"'));
 });
+
+test('bullet lists mix markers, nest, resume siblings and retain inline formatting',()=>{
+  const raw='Accepted.\n- **Validate**\n  * Check `eventId`\n  + Check *type*\n- Save\n  and acknowledge\n\nDone.';
+  const html=C.proseMarkup(raw);
+  assert.equal(html,'Accepted.\n<ul class="prose-list"><li><strong>Validate</strong><ul class="prose-list"><li>Check <code>eventId</code></li><li>Check <em>type</em></li></ul></li><li>Save\n  and acknowledge</li></ul>\nDone.');
+  assert.equal(C.proseMarkup(raw.replace(/\n/g,'\r\n')),html);
+  assert.equal(C.proseMarkup('- First\nAfter'),'<ul class="prose-list"><li>First</li></ul>After');
+  assert.equal(C.proseMarkup('- First\n\n+ Second'),'<ul class="prose-list"><li>First</li></ul>\n<ul class="prose-list"><li>Second</li></ul>');
+});
+
+test('bullet parsing preserves literal code and non-list punctuation and escapes unsafe items',()=>{
+  assert.equal(C.proseMarkup('Use `literal\n- not a list\n` here'), 'Use <code>literal - not a list </code> here');
+  assert.equal(C.proseMarkup('- `literal\n\n- still code`'), '<ul class="prose-list"><li><code>literal  - still code</code></li></ul>');
+  assert.equal(C.proseMarkup('**Bold**\n*italic*\n-2\na + b\n---'), '<strong>Bold</strong>\n<em>italic</em>\n-2\na + b\n---');
+  const html=C.proseMarkup('- [details](https://example.test)\n- <img src=x onerror=alert(1)>\n- [unsafe](javascript:alert(1))\n```\n- literal\n* literal\n```\n+ After');
+  assert.ok(html.includes('href="https://example.test"'));
+  assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'));
+  assert.ok(!html.includes('<img')&&!html.includes('href="javascript:'));
+  assert.ok(html.includes('<code class="prose-block-code">- literal\n* literal\n</code>'));
+  assert.ok(html.endsWith('<ul class="prose-list"><li>After</li></ul>'));
+});

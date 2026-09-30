@@ -182,7 +182,10 @@ and bullet lists through Add and Inspect. See
 [Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
 for these controls and the existing prose syntax. Step captions, change notes
 (`deltaText`), and notification messages also support the same Markdown subset:
-bold, italic, links, inline code, and fenced code blocks. Their workbench fields
+bold, italic, links, inline code, fenced code blocks, and bullet lists.
+For step text, put `- `, `* `, or `+ ` at the start of each line (JSON `\n`);
+indent sub-bullets by two spaces and use a blank line to end the list.
+Use section `bullets` / `sub` for points requiring separate editing or reveal timing. Their workbench fields
 offer the shared formatting toolbar. Keep notification messages short for the
 phone card's two-line preview; app names and notification titles remain literal.
 Inspector object actions appear above their fields. Collapsible groups start

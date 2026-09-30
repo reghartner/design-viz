@@ -326,6 +326,11 @@ Use an absolute OUT. Require **zero errors and zero warnings**; do not pass
 `cookbook/adjustments.md` and rebuild. A clean build proves the JSON is valid,
 not that the story is right. That is the next phase.
 
+When working from a source checkout, first run `python3 <VIZ>/tools/build.py`
+to create the local viewer/workbench HTML. Those two entrypoints are ignored
+build outputs; do not commit them. Authored spec/page outputs follow the chosen
+diagram folder workflow.
+
 ## Phase 6: Self-audit against the worksheet
 
 Follow [self-audit](references/self-audit.md). In short:

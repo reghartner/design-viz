@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the committed single-file pages and Node runtime from src/.
+"""Assemble local single-file pages and the packaged Node runtime from src/.
 
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
@@ -152,6 +152,7 @@ def main() -> int:
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
+        output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(fill(read(skeleton), mapping))
 
     (ROOT / "tools" / "canon" / "generated-runtime.cjs").write_text(runtime)

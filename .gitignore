@@ -16,3 +16,7 @@ node_modules/
 
 # Generated from reviewed specs under docs/diagrams on each build.
 /workbench/diagrams.json
+
+# Portable entrypoints are built locally and in CI/deployment, never committed.
+/template/flowview.html
+/workbench/flowspec.html

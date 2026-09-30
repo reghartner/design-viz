@@ -3,7 +3,8 @@
 - Use `.github/workflows/ci.yml` for current runtimes and required commands;
   don't freeze version numbers or test counts in review policy. Shared runtime
   source is in `src/`; `tools/build.py` builds both HTML entry points before CI
-  tests. Checked-in HTML does not have to match the current engine byte for byte.
+  tests. Both entrypoint HTML files are ignored outputs: never force-add them.
+  CI publishes HTML artifacts and the source-based Dockerfile builds its own pages.
   Generated-only edits need a source explanation or correction, not acceptance
   of a hand patch that the next build erases.
 - Named `standalone`, `workbench`, `backend`, `native`, `forge` and

@@ -39,12 +39,12 @@ changes need only the content route unless they change a contract or executable
 example. Unmapped code: inspect its callers and nearest tests, then choose the
 closest route; don't silently omit it.
 
-`template/flowview.html` and `workbench/flowspec.html` are generated. When their
-inputs or outputs change, review source once and run `python3 tools/build.py`
-before testing. Checked-in HTML may differ from the current build; that alone
-is not a defect or merge blocker. Rebuild pages before distributing them. Keep
-packaged JavaScript freshness checks from CI. If only generated
-files changed, use the build route to understand their source and intended output.
+`template/flowview.html` and `workbench/flowspec.html` are ignored build outputs.
+Run `python3 tools/build.py` before testing or distributing them; do not stage or
+force-add them. Commit their source changes. CI publishes downloadable HTML and
+the nginx image builds from source. Keep packaged JavaScript freshness checks;
+those runtime artifacts remain tracked. Authored diagram exports have a separate
+workflow and need not be regenerated for unrelated engine changes.
 
 ## 3. Resolve and finish
 

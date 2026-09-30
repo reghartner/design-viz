@@ -23,7 +23,10 @@ native build tools needed by Backstage's SQLite dependency. Google Chrome is
 needed for the optional browser test. The larger Backstage install takes several
 minutes. No GitHub credentials or hosted sandbox are needed for local playback.
 
-From a clean checkout of this public repository:
+The packager builds HTML from tracked source in a temporary directory; ignored
+local HTML is never copied.
+
+From a clean checkout of this public repository with Node 24 and Python 3.10+:
 
 ```sh
 node examples/backstage-e2e/create.mjs \

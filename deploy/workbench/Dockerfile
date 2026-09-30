@@ -1,17 +1,25 @@
-# Build from the company fork root. Root canon.json selects diagram folders.
-# No credentials are image inputs.
-FROM node:24-alpine AS library
+# Build from the company fork root. HTML is generated from source in this stage.
+# Explicit inputs keep local credentials and development dependencies out.
+FROM node:24-alpine AS build
+RUN apk add --no-cache python3
 WORKDIR /build
+COPY src/ src/
+COPY tools/*.py tools/*.cjs tools/*.js tools/
 COPY tools/canon/ tools/canon/
+COPY contract/ contract/
+COPY cookbook/ cookbook/
+COPY docs/ docs/
+COPY .claude/skills/hld-to-page/ .claude/skills/hld-to-page/
+COPY examples/canon/ examples/canon/
 COPY canon.json canon.json
 COPY diagrams/ diagrams/
-RUN node tools/canon/library.mjs --out /build/workbench/diagrams.json
+COPY workbench/ workbench/
+RUN python3 tools/build.py
 
 FROM nginx:stable-alpine
 COPY deploy/workbench/nginx.conf /etc/nginx/conf.d/default.conf
-COPY workbench/ /usr/share/nginx/html/workbench/
-COPY --from=library /build/workbench/diagrams.json /usr/share/nginx/html/workbench/diagrams.json
-COPY template/ /usr/share/nginx/html/template/
-COPY src/starters/ /usr/share/nginx/html/src/starters/
-COPY canon.json /usr/share/nginx/html/canon.json
-COPY diagrams/ /usr/share/nginx/html/diagrams/
+COPY --from=build /build/workbench/ /usr/share/nginx/html/workbench/
+COPY --from=build /build/template/ /usr/share/nginx/html/template/
+COPY --from=build /build/src/starters/ /usr/share/nginx/html/src/starters/
+COPY --from=build /build/canon.json /usr/share/nginx/html/canon.json
+COPY --from=build /build/diagrams/ /usr/share/nginx/html/diagrams/

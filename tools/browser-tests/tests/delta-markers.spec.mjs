@@ -9,7 +9,7 @@ const diagram = value => value.page.sections[0].diagram;
 async function standalone(page, server){
   const spec = structuredClone(raw);
   diagram(spec).nodes.device.deltaLinks = [{label:'Design decision',url:server.origin+'/decision.html'}];
-  diagram(spec).nodes.cloud.deltaText = '<img src=x onerror=alert(1)>\nPlain text only.';
+  diagram(spec).nodes.cloud.deltaText = '<img src=x onerror=alert(1)>\n**Changed** *behavior* with `id`.\n```json\n{"safe": "<script>"}\n```';
   diagram(spec).steps[2].delta = true;
   await writeFile(path.join(server.root,'decision.html'), '<p>Decision destination</p>');
   await writeFile(path.join(server.root,'deltas.json'), JSON.stringify(spec));
@@ -39,6 +39,10 @@ test('delta details support notes, multiple links, keyboard and independent step
   await root.locator('[data-dv-node="cloud"] .dvdelta').click();
   const note = root.getByRole('dialog',{name:'Change details for Recording'});
   await expect(note.locator('img')).toHaveCount(0); await expect(note).toContainText('<img src=x onerror=alert(1)>');
+  await expect(note.locator('.delta-popover-text strong')).toHaveText('Changed');
+  await expect(note.locator('.delta-popover-text em')).toHaveText('behavior');
+  await expect(note.locator('pre code')).toHaveText('{"safe": "<script>"}\n');
+  await expect(note.locator('script')).toHaveCount(0);
   await note.getByRole('button',{name:'Close change details'}).click();
   await root.getByRole('button',{name:'Change details for acknowledge',exact:true}).click();
   await expect(root.getByRole('dialog',{name:'Change details for acknowledge'}).getByRole('link')).toHaveCount(2);

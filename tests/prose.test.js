@@ -56,3 +56,14 @@ test('prose containers use valid block markup and retain editor addresses',()=>{
   assert.match(contract,/<div class="ctnote">Payload\n<pre /);
   assert.ok(contract.includes('`literal-key`')&&contract.includes('`literal-value`'));
 });
+
+test('notification messages format prose while app names, titles, code and unsafe HTML stay literal',()=>{
+  const text='**Ready** *now* `id` [details](https://example.test) <img src=x onerror=alert(1)> [unsafe](javascript:alert(1))\n```js\n<strong>literal</strong>\n```';
+  const html=C.FlowNotifications.cardsHTML({cards:[{app:'**App**',title:'*Title*',text}]},false);
+  assert.ok(html.includes('>**App**</div>')&&html.includes('>*Title*</div>'));
+  assert.ok(html.includes('<strong>Ready</strong> <em>now</em> <code>id</code>'));
+  assert.ok(html.includes('href="https://example.test"'));
+  assert.ok(html.includes('&lt;strong&gt;literal&lt;/strong&gt;\n</code></pre>'));
+  assert.ok(!html.includes('<img')&&!html.includes('href="javascript:'));
+  assert.ok(html.includes('title="'+C.esc(text)+'"'));
+});

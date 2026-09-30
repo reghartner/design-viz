@@ -78,7 +78,7 @@ function wireDeltaDetails(host, prefix, scope){
     var dismiss = document.createElement('button'); dismiss.type = 'button'; dismiss.className = 'node-link-close';
     dismiss.textContent = '×'; dismiss.setAttribute('aria-label', 'Close change details'); dismiss.addEventListener('click', function(){ close(true); }); pop.appendChild(dismiss);
     if (details.text){
-      var note = document.createElement('p'); note.className = 'delta-popover-text'; note.textContent = details.text; pop.appendChild(note);
+      var note = document.createElement('div'); note.className = 'delta-popover-text'; note.innerHTML = proseMarkup(details.text); pop.appendChild(note);
     }
     details.links.forEach(function(link){
       var a = document.createElement('a'); a.className = 'nbacklink node-reference-link'; a.href = link.url;

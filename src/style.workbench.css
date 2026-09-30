@@ -1163,7 +1163,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .notification-preview{display:grid;gap:4px;margin:8px 0;padding:12px;border:1px solid #d5ddef;border-radius:10px;background:#f6f8ff;color:#253653;overflow-wrap:anywhere;}
 .notification-preview small{font-size:10px;text-transform:uppercase;}
 .notification-preview b{font-size:12px;}
-.notification-preview span{font-size:12px;white-space:pre-wrap;}
+.notification-preview-text{font-size:12px;white-space:pre-wrap;}
 
 .vocabulary-control{display:grid;gap:7px;min-width:0;}
 .vocabulary-control details{min-width:0;}

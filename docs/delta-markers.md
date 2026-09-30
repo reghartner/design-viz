@@ -5,7 +5,7 @@ triangle outline and a soft glow. The same marker appears in the step controls.
 The **Δ ONLY** control dims unchanged diagram elements. Existing boolean-only
 markers remain visual indicators and do not open empty popovers.
 
-Add optional plain text with `deltaText` and links with `deltaLinks`:
+Add an optional Markdown note with `deltaText` and links with `deltaLinks`:
 
 ```json
 {
@@ -21,11 +21,12 @@ Add optional plain text with `deltaText` and links with `deltaLinks`:
 
 These fields work identically on nodes, edges, and steps. Text and links are
 independently optional. Links require absolute HTTP(S) URLs; omitted labels use
-the URL. Text is displayed literally, including line breaks. Invalid links are
+the URL. Notes support bold, italic, links, inline code, and fenced code blocks;
+line breaks are preserved and authored HTML is escaped. Invalid links are
 warned about and omitted. Details are retained when the delta flag is cleared.
 
 In the workbench, select an element, enable **delta (change marker)**, and expand
-**Change details (optional)**. Write a **Delta note**, paste a URL into
+**Change details (optional)**. Write a **Delta note** using the Markdown toolbar, paste a URL into
 **Add delta link**, then optionally set its label. Changes participate in Undo/Redo.
 
 Click a triangle with details, or focus it and press Enter/Space. Escape or the

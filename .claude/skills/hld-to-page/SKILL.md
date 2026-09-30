@@ -172,7 +172,11 @@ contract blocks remain visible, and reader toggles do not rewrite that default.
 For human editing, the workbench can create and reorder section paragraphs
 and bullet lists through Add and Inspect. See
 [Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
-for these controls and the existing prose syntax.
+for these controls and the existing prose syntax. Step captions, change notes
+(`deltaText`), and notification messages also support the same Markdown subset:
+bold, italic, links, inline code, and fenced code blocks. Their workbench fields
+offer the shared formatting toolbar. Keep notification messages short for the
+phone card's two-line preview; app names and notification titles remain literal.
 Inspector object actions appear above their fields. Collapsible groups start
 closed for a fresh selection; open the named group before using its controls.
 Ordinary fields save as edited; handoff/detail composers have their own Apply

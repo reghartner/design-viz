@@ -1,5 +1,10 @@
 /* Table snapshots are authored rows, never executable queries. */
 var TABLE_STATUSES = ['neutral', 'added', 'changed', 'removed'];
+function tableColumnWidth(column) {
+  return typeof column.width === 'number' && isFinite(column.width) && column.width > 0
+    ? column.width
+    : null;
+}
 function tablePatchWarnings(state, path, panel, warnings) {
   softwarePanelPatchWarnings(state, path, panel, warnings, function (state, path, p, warnings) {
     var ids = softwarePanelItems(p).map(function (item) {
@@ -45,7 +50,10 @@ function tablePatchWarnings(state, path, panel, warnings) {
 PanelRegistry.extend('table', {
   itemCollection: { key: 'columns', max: 4 },
   validateDeclaration: function (panel, path, warnings) {
-    panelCollectionWarnings(panel, path, warnings, 'columns', 4);
+    panelCollectionWarnings(panel, path, warnings, 'columns', 4, function (column, at, warnings) {
+      if (column.width != null && tableColumnWidth(column) === null)
+        warnings.push(at + '.width: expected a positive number of pixels — using automatic width');
+    });
     tablePatchWarnings(panel.initial, path + '.initial', panel, warnings);
   },
   validatePatch: tablePatchWarnings,
@@ -81,13 +89,26 @@ function tableModel(panel, state) {
 PanelViews.register('table', function (host, panel, state, skin, states, stepIdx, animate) {
   var h = '';
   var table = tableModel(panel, state);
+  var widths = table.columns.map(tableColumnWidth);
+  var fixed = widths.some(function (width) { return width !== null; });
+  // Leave room for unset columns and the Change badge when fixed widths exceed the card.
+  var minWidth = widths.reduce(function (total, width) { return total + (width || 80); }, 80);
   h +=
     '<div class="swtablewrap" tabindex="0" role="region" aria-label="' +
     esc(panel.title || 'Data state') +
     '">' +
-    '<table class="swtable"><caption class="swcaption">' +
+    '<table class="swtable' + (fixed ? ' swtable-fixed' : '') + '"' +
+    (fixed ? ' style="min-width:' + minWidth + 'px"' : '') + '><caption class="swcaption">' +
     esc(panel.title || 'Data state') +
-    '</caption><thead><tr>';
+    '</caption>';
+  if (fixed) {
+    h += '<colgroup>';
+    widths.forEach(function (width) {
+      h += width === null ? '<col>' : '<col style="width:' + width + 'px">';
+    });
+    h += '<col></colgroup>';
+  }
+  h += '<thead><tr>';
   table.columns.forEach(function (col) {
     h += '<th scope="col">' + esc(col.label || col.id) + '</th>';
   });
@@ -130,6 +151,8 @@ PanelRegistry.extend('table', {
 .swtable th,.swtable td{padding:7px 8px; border-bottom:1px solid color-mix(in srgb,var(--dtext) 14%,transparent); vertical-align:top;}
 .swtable th{font-size:10px; color:var(--dink);}
 .swtable td{min-width:45px; max-width:180px;}
+.swtable-fixed{table-layout:fixed;}
+.swtable-fixed th,.swtable-fixed td{min-width:0; max-width:none; overflow-wrap:anywhere;}
 .swtable tr:last-child td{border-bottom:0;}
 .swcaption{position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%);}
 .swrow-added{background:color-mix(in srgb,var(--dtext) 5%,transparent);}
@@ -154,7 +177,7 @@ PanelRegistry.extend('table', {
       },
     },
     setupFields: [
-      ['columns', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }], max: 4 }],
+      ['columns', 'rows', { cols: [{ k: 'id', req: true }, { k: 'label' }, { k: 'width', kind: 'num', label: 'Width (px)' }], max: 4 }],
       ['initial', 'json'],
     ],
     patchFields: [
@@ -162,7 +185,7 @@ PanelRegistry.extend('table', {
       ['note', 'text'],
     ],
     fieldMeta: {
-      columns: {label:'Columns',group:'Content'},
+      columns: {label:'Columns',group:'Content',help:'Set a positive Width (px) to keep columns steady across steps. Unset columns share the remaining space. Leave every width blank for automatic sizing.'},
       rows: {label:'Table rows',help:'A complete table snapshot. Add, reorder or remove records and choose the type of each cell. An empty list clears the table; Inherit previous keeps the earlier rows.'},
       note: {label:'Explanation'},
     },

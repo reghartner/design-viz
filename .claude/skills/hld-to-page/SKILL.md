@@ -182,6 +182,13 @@ When handing off a page for human editing, the workbench’s **Change panel type
 action reviews discarded setup and step state before replacement. See
 [Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).
 
+For field-by-field contract explanations, use the `data-contract` panel with
+custom columns and step-specific `highlights`; keep values sourced and use
+optional highlight labels to explain the emphasis. See
+[`cookbook/software-state.md`](../../../cookbook/software-state.md) and fetch
+the field reference with `python3 tools/widget_doc.py data-contract`.
+The `table` panel remains the record-snapshot view and accepts fixed column widths.
+
 ## Phase 1: Inventory the source
 
 Read SOURCE fully. Build the coverage ledger as described in

@@ -821,7 +821,33 @@ perspectives" of one timeline). Types:
   removed rows stay visible with a strike-through. Badges are AUTHOR-DECLARED,
   not a computed diff. Every `rows` patch REPLACES the full snapshot; use
   `[]` to clear it. At most 12 rows render; larger inputs warn. The table
-  scrolls inside its card. Optional `note` persists until replaced/cleared.
+  scrolls inside its card. Each column accepts an optional positive numeric
+  `width` in pixels, editable as **Width (px)** in the table's Columns setup.
+  Setting any width fixes the layout across steps; unset columns and the Change
+  column share the remaining space. Long values wrap, and wide tables scroll
+  horizontally. With all widths omitted, sizing stays content-driven.
+  Optional `note` persists until replaced/cleared.
+- `data-contract` — contract fields in rows, with up to 12 custom columns and
+  64 fields. Add it from **Software & data → Data contract**. Declare
+  `columns:[{id:"type",label:"Type",width:110},{id:"example",label:"Example",width:180}]`
+  and `fields:[{id:"order-id",label:"order_id",cells:{type:"string",example:"ord_2048"}}]`.
+  Field and column IDs remain stable when their display names change in the
+  editor. Columns can be added, removed and reordered; removing a column keeps
+  its stored cells. `fieldWidth` sets the first column's width (default 180 px);
+  other column widths default to 160 px. Widths must be at least 40 px. Long
+  values wrap and wide contracts scroll without resizing between steps.
+  `initial.highlights` and step `highlights` are objects keyed by field ID:
+  `{"highlights":{"order-id":{"color":"blue","label":"Primary key"}}}`.
+  Colors are `blue|green|amber|red|purple|teal` or six-digit hex values; the
+  editor includes a custom color picker. Labels are optional explanatory text.
+  To author highlights on a new step, select the step, use **ADD TO STEP** to
+  include the contract panel, then edit its **Field highlights** controls.
+  Each highlights assignment replaces the complete map and carries forward;
+  `{}` clears every highlight. `enterOnce:{highlights:{...}}` highlights only
+  that step before returning to the carried colors. Highlight edits leave the
+  declared contract unchanged. Removing a field through the editor removes its
+  starting and step highlights in the same undoable edit. Optional `note` adds
+  an explanation. See [example](../examples/data-contract/data-contract.spec.json).
 - `checks` — authored decisions and invariants for authorization, idempotency,
   rollout gates, or hardware interlocks: `{"id":"gate","type":"checks",
   "checks":[{"id":"scope","label":"Caller authorized"}],

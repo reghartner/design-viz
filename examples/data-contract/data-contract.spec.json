@@ -1,0 +1,40 @@
+{
+  "page": {
+    "title": "An order contract, field by field",
+    "skin": "pastel",
+    "sections": [{
+      "heading": "OrderCreated",
+      "text": "The contract stays in place while each step calls attention to the fields a consumer needs.",
+      "diagram": {
+        "view": "step", "autoplay": false, "primaryPanel": "contract",
+        "nodes": {"orders": {"title": "Orders service"}},
+        "rows": [["orders"]],
+        "panels": [{
+          "id": "contract", "type": "data-contract", "title": "OrderCreated · v1",
+          "fieldWidth": 170,
+          "columns": [
+            {"id": "type", "label": "Type", "width": 100},
+            {"id": "required", "label": "Required", "width": 90},
+            {"id": "example", "label": "Example", "width": 150},
+            {"id": "notes", "label": "Notes", "width": 260}
+          ],
+          "fields": [
+            {"id": "order-id", "label": "order_id", "cells": {"type": "string", "required": "Yes", "example": "ord_2048", "notes": "Stable identifier used for idempotency."}},
+            {"id": "status", "label": "status", "cells": {"type": "enum", "required": "Yes", "example": "confirmed", "notes": "pending | confirmed | cancelled"}},
+            {"id": "total", "label": "total_minor", "cells": {"type": "integer", "required": "Yes", "example": 2499, "notes": "Total in the currency's minor unit."}},
+            {"id": "currency", "label": "currency", "cells": {"type": "string", "required": "Yes", "example": "USD", "notes": "Currency code for total_minor."}},
+            {"id": "customer-id", "label": "customer_id", "cells": {"type": "string", "required": "No", "example": "cus_1024", "notes": "Omitted for guest checkout."}}
+          ],
+          "initial": {"highlights": {}}
+        }],
+        "steps": [
+          {"id": "identify", "text": "Deduplicate with the order identifier.", "panels": {"contract": {"highlights": {"order-id": {"color": "blue", "label": "Idempotency key"}}, "note": "Repeated delivery of the same order must not create a duplicate."}}},
+          {"id": "validate", "text": "Read the amount and its currency together.", "panels": {"contract": {"highlights": {"total": {"color": "amber", "label": "Validate together"}, "currency": {"color": "amber", "label": "Validate together"}}, "note": "Both fields are required to interpret the payment amount."}}},
+          {"id": "optional", "text": "Guest orders do not include a customer identifier.", "panels": {"contract": {"enterOnce": {"highlights": {"customer-id": {"color": "purple", "label": "Optional field"}}, "note": "Do not reject a guest order because customer_id is absent."}}}},
+          {"id": "resume", "text": "Return to the amount validation fields.", "nodes": ["orders"]},
+          {"id": "complete", "text": "The complete contract remains available.", "panels": {"contract": {"highlights": {}, "note": "All consumers share this contract."}}}
+        ]
+      }
+    }]
+  }
+}

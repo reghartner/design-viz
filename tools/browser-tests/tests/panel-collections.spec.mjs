@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement,closeTools} from '../helpers/test.mjs';
 
 const spec={page:{sections:[{heading:'Operational story',diagram:{nodes:{service:{title:'Service'}},rows:[['service']],panels:[
   {id:'checks',type:'checks',title:'Decision checks',checks:[{id:'auth',label:'Authorization'}],initial:{results:{auth:{status:'pass',future:true},unknown:{keep:true}}}},
@@ -48,4 +48,55 @@ test('step collection controls retain earlier snapshots and append-log semantics
   await expect.poll(async()=>(await diagram()).steps[1].panels.events.log[0].text).toBe('Acknowledged');
   expect((await diagram()).steps[1].panels.events.log[0].future).toBe(3);
   expect((await diagram()).panels[3].initial.log).toEqual(['Started']);
+});
+
+test('authored table widths stay fixed across snapshots, empty rows and history',async({page,server},testInfo)=>{
+  const raw={page:{sections:[{heading:'Stable columns',diagram:{view:'step',autoplay:false,
+    nodes:{service:{title:'Service'}},rows:[['service']],
+    panels:[{id:'table',type:'table',title:'Data rows',columns:[{id:'key',label:'Key'},{id:'value',label:'Value'}],
+      initial:{rows:[{id:'one',cells:{key:'a',value:'b'}}]}}],
+    steps:[{id:'short',text:'Short values'},
+      {id:'long',text:'Long values',panels:{table:{rows:[{id:'one',cells:{key:'record_identifier_'.repeat(8),value:'a much longer value '.repeat(15)},status:'changed'}]}}},
+      {id:'empty',text:'Empty snapshot',panels:{table:{rows:[]}}}]
+  }}]}};
+  const original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
+  const table=root.locator('.pt-table .swtable');
+  const columns=async()=>JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].columns;
+  const widths=()=>table.locator('th').evaluateAll(cells=>cells.map(cell=>cell.getBoundingClientRect().width));
+  await expect(table).toHaveCSS('table-layout','auto');
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  const width=guide.getByLabel('Width (px)',{exact:true});
+  await width.first().fill('160');await width.first().press('Tab');
+  await expect.poll(async()=>(await columns())[0].width).toBe(160);
+  await expect(table).toHaveCSS('table-layout','fixed');
+  const changed=await source.inputValue();
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
+  await expect(table).toHaveCSS('table-layout','auto');
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+  await page.evaluate(()=>document.fonts.ready);
+  const partial=await widths();expect(partial[0]).toBeCloseTo(160,0);
+  await root.getByRole('button',{name:'Next step',exact:true}).click();
+  await expect(table).toContainText('record_identifier_');expect(await widths()).toEqual(partial);
+  await root.getByRole('button',{name:'Next step',exact:true}).click();
+  await expect(table).toContainText('No rows at this step');expect(await widths()).toEqual(partial);
+
+  // Widths wider than the panel scroll inside it, including the Change column.
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  await width.nth(1).fill('320');await width.nth(1).press('Tab');
+  await expect.poll(async()=>(await columns())[1].width).toBe(320);
+  const full=await widths();expect(full[0]).toBeCloseTo(160,0);expect(full[1]).toBeCloseTo(320,0);
+  const wrap=root.locator('.pt-table .swtablewrap');
+  expect(await wrap.evaluate(el=>el.scrollWidth>el.clientWidth)).toBe(true);
+  await root.getByRole('button',{name:'Previous step',exact:true}).click();
+  await expect(table).toContainText('record_identifier_');expect(await widths()).toEqual(full);
+  await closeTools(page);
+  await root.locator('.pt-table').screenshot({path:testInfo.outputPath('fixed-table-columns.png')});
+  await inspectPageElement(page,root.locator('.pt-table .ptitle'));
+  await width.first().fill('');await width.first().press('Tab');
+  await expect.poll(async()=>(await columns())[0].width).toBeUndefined();
+  await width.nth(1).fill('');await width.nth(1).press('Tab');
+  await expect.poll(async()=>(await columns())[1].width).toBeUndefined();
+  await expect(table).toHaveCSS('table-layout','auto');
 });

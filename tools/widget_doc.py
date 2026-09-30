@@ -19,7 +19,7 @@ from pathlib import Path
 CONTRACT = Path(__file__).resolve().parent.parent / "contract" / "authoring-contract.md"
 PANELS_HEAD = "### panels"
 CARD_HEAD = "### message-contract card"
-BULLET_RE = re.compile(r"^- `([a-z]+)` ")
+BULLET_RE = re.compile(r"^- `([a-z][a-z0-9-]*)` ")
 
 
 def load_sections(text):

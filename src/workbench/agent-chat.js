@@ -55,6 +55,7 @@ function initWorkbenchAgentChat(opts){
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
   var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
+  var workingIndicator=get('working');
   var kitNode=doc.getElementById('flowview-folder-kit'),kit=null;
   function setText(id,text){var node=get(id);if(node && node.textContent!==text)node.textContent=text;}
   var guide=get('guide'),guideStage='folder';
@@ -157,6 +158,7 @@ function initWorkbenchAgentChat(opts){
     form.querySelector('.folder-agent-hint').textContent=composeMode==='external'?'Replies stay in your agent':'⌘ / Ctrl + Enter';
     paint({});
   }
+  if(workingIndicator)life.listen(workingIndicator,'click',function(){if(opts.show)opts.show();});
   async function copyRequest(){
     if(!state.connected || accessLost || copying || connecting)return;
     var focus=composeSnapshot(),text;
@@ -388,6 +390,14 @@ function initWorkbenchAgentChat(opts){
       var agentStatus=accessLost?'Folder access needs attention':state.review?'Updates ready for review':state.pending?(externalConnection?'Request active in your agent':phase==='responding'?'Claude working':phase==='permission-needed'?'Claude needs permission':phase==='quiet'?'No recent update':'Claude waiting'):state.connected?(externalConnection?'Shared folder ready':state.listening?'Claude ready':'Connecting'):'Choose a workflow';
       agentTab.title='Agent · '+agentStatus;
       agentTab.setAttribute('aria-label','Agent · '+agentStatus);
+    }
+    if(workingIndicator){
+      var indicatorStatus=accessLost?'Agent needs attention':state.review?'Review agent update':phase==='permission-needed'?'Agent needs permission':'Agent working';
+      workingIndicator.hidden=!(state.connected && state.pending);
+      workingIndicator.dataset.phase=accessLost?'attention':state.review?'review':phase;
+      workingIndicator.querySelector('b').textContent=indicatorStatus;
+      workingIndicator.title=indicatorStatus+' · Open Agent';
+      workingIndicator.setAttribute('aria-label',indicatorStatus+'. Open Agent.');
     }
     get('activity').hidden=composeMode==='external' || !state.pending && !activity.length;
     get('activity').dataset.phase=phase;

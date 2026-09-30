@@ -17,6 +17,25 @@ For live local authoring with a filesystem-only agent, build the workbench and r
 document/selection snapshots and undoable agent proposals. See
 [local design sessions](docs/local-agent-session.md); no browser access is needed.
 
+## Build or download the workbench
+
+With Python 3.10+ and Node 24 installed, run:
+
+```sh
+python3 tools/build.py
+```
+
+Open `workbench/flowspec.html` locally, or serve the checkout with
+`python3 -m http.server 8765` and visit `/workbench/flowspec.html`. The build also
+creates `template/flowview.html`. Both HTML entrypoints are ignored build outputs;
+commit their source changes, not these files. Rebuild after pulling source changes.
+
+For ready-to-open files without build tools, download **flowview-html** from a
+successful [CI run](https://github.com/reghartner/design-viz/actions/workflows/ci.yml)
+and extract the archive. The workbench and viewer are self-contained; HTTP is
+needed for fetching the adjacent catalog and Canon library. The nginx image
+builds the HTML from source automatically. See [build outputs and distribution](docs/build-entrypoints.md#build-outputs-and-distribution).
+
 ## Connected company flows
 
 For the complete reproducible integration, use the
@@ -220,17 +239,17 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | path | what it is |
 |---|---|
 | `src/panels/types/<type>.js` | One complete panel definition: validation, state rules, renderer, editor controls/metadata, picker example, styles, layout/reference capabilities and release metadata. Shared primitives stay in `src/panels/shared.js`; see [panel development](docs/panel-modularity.md). |
-| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. CI rebuilds the viewer and workbench before testing; checked-in HTML does not need to match the latest engine byte for byte. Rebuild pages before distributing them. Packaged JavaScript must remain current; the Canon index is regenerated during the build. |
+| `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Viewer/workbench HTML is ignored and generated for local use, CI artifacts and image builds. Authored diagram exports remain independent. Packaged JavaScript must remain current; the Canon index is regenerated during the build. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/browser-tests/` | Required pinned-Chromium contracts for offline HTML, editor source/history and teardown, native React isolation, and copied Forge resources. [Commands and boundaries](tools/browser-tests/README.md). |
 | `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
-| `template/flowview.html` | The render target (GENERATED — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
+| `template/flowview.html` | The render target (generated locally, not tracked — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
 | `tools/inject.py` | The injection step: `inject.py <spec.json> <template.html> <out.html>`. Validates the JSON, refuses unescaped `</script`, sets the page title from `page.title`, and discovers derived sibling links when the conventional output root already has `crossref.json`. |
 | `tools/build_index.py` | Generates a root's `index.html` and `crossref.json` from `manifest.json` plus every named spec. The index groups pages by family and lists exact-title services shared by 2+ pages; the JSON catalog supplies derived per-page backlinks. |
 | `tools/mermaid2spec.py` | Converts a mermaid `sequenceDiagram` (bare, or the first ```mermaid fence in markdown) into a deliberately bland skeleton spec: `python3 tools/mermaid2spec.py <input.(md\|mmd)> [-o out.json] [--title "..."]`. Enriching icons, tints, protocols, and prose stays the authoring LLM's job; unsupported mermaid constructs fail loud. |
 | `contract/authoring-contract.md` | The complete authoring contract. Self-sufficient: hand this file plus a source document to any LLM and it can emit a valid spec with zero other context. |
 | `cookbook/` | Task-shaped recipes for authoring agents: one file per common request (temperature thresholds, battery drain, Radar sensing geometry and authored alerts, wake-up mailbox, persistent-connection-while-awake, LP-chip MQTT relay, egress routing) plus `adjustments.md`, a phrase-to-knob table for visual feedback ("move that up and to the right"). Every ```json fence in it is a complete spec kept lint-clean by `tests/test_cookbook.py`. |
-| `workbench/flowspec.html` | Interactive workbench: the same engine plus an editable JSON panel with a Render button, click-to-definition selection with per-element inspector forms (field edits, id renames with reference rewrite, deletes with reference pruning, step reorder, undo), snippet INSERT buttons, schema reference, and known-limits notes. For hand-tuning specs. |
+| `workbench/flowspec.html` | Generated locally, not tracked. Interactive workbench: the same engine plus an editable JSON panel with a Render button, click-to-definition selection with per-element inspector forms (field edits, id renames with reference rewrite, deletes with reference pruning, step reorder, undo), snippet INSERT buttons, schema reference, and known-limits notes. For hand-tuning specs. |
 | `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output. |
 | `mockups/` | The hand-built design explorations that defined the target: `flowline-mockups.html` (four visual treatments; mockup 04 "Aurora Combined" is the chosen direction), `device-lens.html` (click-through with a device-internals inspector), `doorbell-northstar.html` (the northstar: three synchronized panels — flow board, two-chip hardware view with wake states, camera viewfinder that visibly starts recording). |
 
@@ -242,6 +261,7 @@ and engine file reads omit the registered panel implementations.
 ## Regenerating the example
 
 ```
+python3 tools/build.py
 python3 tools/inject.py examples/cumulus/cumulus-page.spec.v2.json \
     template/flowview.html examples/cumulus/cumulus-flow.html
 ```

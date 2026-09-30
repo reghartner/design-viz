@@ -18,6 +18,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { options } from '../create.mjs';
+import { vendorFlowview } from '../fixtures/designer/scripts/vendor-flowview.mjs';
 
 const exec = promisify(execFile),
   require = createRequire(import.meta.url);
@@ -200,6 +201,8 @@ test(
       runtime.revision,
       (await run('git', ['rev-parse', 'HEAD'], root)).stdout.trim()
     );
+    // The source checkout need not contain generated HTML before packaging.
+    await run('python3', ['tools/build.py'], root);
     assert.equal(
       await readFile(path.join(designer, 'workbench/flowspec.html'), 'utf8'),
       await readFile(path.join(root, 'workbench/flowspec.html'), 'utf8')
@@ -358,3 +361,29 @@ test(
     );
   }
 );
+
+
+test('runtime packaging builds missing HTML from source and ignores stale local pages', {timeout:120000}, async t => {
+  const temporary = await mkdtemp(path.join(tmpdir(), 'flowview-source-package-'));
+  t.after(() => rm(temporary, {recursive:true, force:true}));
+  const source = path.join(temporary, 'source'), destination = path.join(temporary, 'designer');
+  await run('git', ['clone', '--shared', '--quiet', root, source], temporary);
+  for (const name of ['template/flowview.html', 'workbench/flowspec.html']) {
+    await assert.rejects(access(path.join(source, name)), {code:'ENOENT'});
+    await mkdir(path.dirname(path.join(source, name)), {recursive:true});
+    await writeFile(path.join(source, name), 'STALE_LOCAL_HTML_MUST_NOT_SHIP');
+  }
+  await mkdir(path.join(destination, 'workbench'), {recursive:true});
+  await writeFile(path.join(destination, 'workbench/catalog.json'), '{"companyCatalog":true}');
+  await vendorFlowview(source, destination);
+  for (const name of ['template/flowview.html', 'workbench/flowspec.html']) {
+    const html = await readFile(path.join(destination, name), 'utf8');
+    assert.match(html, /GENERATED FILE/);
+    assert.doesNotMatch(html, /STALE_LOCAL_HTML_MUST_NOT_SHIP/);
+    assert.equal(await readFile(path.join(source, name), 'utf8'), 'STALE_LOCAL_HTML_MUST_NOT_SHIP');
+  }
+  assert.equal(await readFile(path.join(destination, 'workbench/catalog.json'), 'utf8'), '{"companyCatalog":true}');
+  assert.equal(await readFile(path.join(destination, 'deploy/workbench/Dockerfile'), 'utf8'),
+    await readFile(path.join(source, 'deploy/workbench/Dockerfile.prebuilt'), 'utf8'));
+  assert.equal((await run('git', ['status', '--porcelain'], source)).stdout, '');
+});

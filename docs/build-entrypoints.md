@@ -99,19 +99,42 @@ font records with embedded data and deduplicated license text. The host decides
 how to package those assets. Keep the current license ordering and font selection
 when changing a wrapper; identical input should produce identical output.
 
+## Build outputs and distribution
+
+`template/flowview.html` and `workbench/flowspec.html` are ignored local build
+outputs. Run `python3 tools/build.py` after checking out or updating source;
+commit source, specs and documentation instead of these generated entrypoints.
+The builder creates missing output directories on a fresh clone. Authored pages
+under `diagrams/`, `docs/diagrams/` and `examples/` keep their own export workflow;
+an engine change does not require rewriting them.
+
+CI builds HTML before tests and attaches **flowview-html** to successful
+`examples-build` jobs. Download and extract that archive to use the standalone
+workbench/viewer without Node or Python. It includes the adjacent catalog,
+Canon metadata, diagram folders and starter assets; serve over HTTP for fetching
+those files, or open the standalone workbench file for offline authoring.
+Artifacts are retained for 30 days. GitHub source ZIPs contain source, not built
+entrypoints. CI rejects reintroducing either entrypoint as a tracked file.
+
+`deploy/workbench/Dockerfile` builds from the company fork's source in a Node +
+Python stage, then copies only the web assets into nginx. No local build is
+required before `docker build`. The Backstage rehearsal builds HTML in a
+temporary directory from the pinned checkout's tracked source, ignoring local
+HTML. Its runtime-only package uses `Dockerfile.prebuilt`, installed as its
+ordinary Dockerfile by the packager; company source forks use the default
+source-building Dockerfile.
+
 ## Verification
 
-CI rebuilds `template/flowview.html` and `workbench/flowspec.html` before the
-HTML-consuming Python, Node and browser suites and example injection checks.
-It does not compare those pages with their checked-in bytes or require older
-authored HTML exports to be regenerated when the engine changes. A failed build
-or behavior test still fails CI. Build determinism compares two fresh builds
-from the same source, not a fresh build with an older checked-in page.
+CI rebuilds the HTML for Python, Node, browser and example checks. Build
+determinism compares two fresh builds. The image smoke test verifies its served
+workbench includes the launch screen and agent kit, and compares the served
+viewer and catalog with the checkout's build outputs.
 
-Rebuild HTML before distributing a viewer or workbench so it includes the desired
-engine version. Committed backend/native JavaScript artifacts still have
-freshness gates because they are packaged runtime inputs. The build regenerates
-the ignored `workbench/diagrams.json` Canon index and fails if generation fails.
+Committed backend/native JavaScript retains its freshness checks: those modules
+are packaged runtime inputs consumed without this repository's sources. The
+build also regenerates ignored `workbench/diagrams.json` and fails if Canon
+index generation fails. This change does not alter package publication.
 
 `tests/source-loader.test.js` covers physical alias substitution, sorted expansion,
 boot separation, CLI/API agreement, export failures, duplicate inputs, DOM-free

@@ -212,7 +212,9 @@ Keep company catalogs in the company designs repository, not the public fork.
 
 ## Editor image
 
-The reference image copies the committed catalog alongside the generated editor.
+The reference image builds the editor and viewer from source, then copies the
+committed catalog alongside them. No generated HTML needs to be committed or
+built locally before running Docker.
 It also reads root `canon.json` to select folders under `diagrams/` and generates
 the canon library during the image build. Enroll each reviewed folder and owner
 in `canon.json`; no separate publishing command or second registry is needed. See [canon library publishing](workbench-canon-library.md).

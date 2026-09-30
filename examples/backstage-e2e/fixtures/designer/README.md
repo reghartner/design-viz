@@ -6,7 +6,8 @@ snapshot, external workbench, read API and GitHub automation.
 
 Flowview engine/plugin source remains in the public Flowview repository.
 `.flowview/runtime.json` records the exact copied runtime commit. Upgrade by
-running `node scripts/vendor-flowview.mjs PATH_TO_CLEAN_FLOWVIEW_CHECKOUT` and
+running `node scripts/vendor-flowview.mjs PATH_TO_CLEAN_FLOWVIEW_CHECKOUT` (with
+Node 24 and Python 3.10+ available to build the portable HTML) and
 reviewing the resulting PR. The service catalog is preserved by runtime upgrades.
 
 The real Backstage host is in the mock repository. Its installer builds and packs

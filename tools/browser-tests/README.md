@@ -41,7 +41,7 @@ The server binds an ephemeral loopback port and serves only temporary fixture
 outputs. The workbench fixtures include the real local catalog. Global setup
 uses normal build commands and shared named entrypoints; no private source or
 neighboring-comment slicing is used. Run `python3 tools/build.py` first, as CI
-does; checked-in HTML is allowed to differ from that fresh build. Temporary
+does; entrypoint HTML is an ignored output, absent from fresh clones. Temporary
 serving roots are removed after the suite. Forge's ordinary ignored
 `static/viewer` build remains in its normal
 location. The full installed Backstage rehearsal remains a separate documented

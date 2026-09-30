@@ -24,7 +24,7 @@ jobs:
       - run: npm ci --prefix apps/confluence --no-fund --no-audit
       - name: Install the pinned Playwright Chromium and Linux dependencies
         run: npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium
-      # Test HTML rebuilt from this revision; checked-in pages may use an older engine.
+      # Build ignored HTML from this revision before testing.
       - name: Rebuild HTML and verify packaged JavaScript
         run: |
           python3 tools/build.py
@@ -158,3 +158,32 @@ jobs:
             examples/cumulus/cumulus-page.spec.v2.json \
             examples/doorbell/doorbell.spec.json \
             examples/doorbell-atlas/atlas.spec.json
+
+      - name: Entrypoint HTML stays out of Git
+        run: test -z "$(git ls-files -- template/flowview.html workbench/flowspec.html)"
+      - name: Build and smoke-test the source-based nginx image
+        run: |
+          docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
+          docker run -d --name flowview-workbench-test -p 8080:80 flowview-workbench
+          trap 'docker rm -f flowview-workbench-test' EXIT
+          curl --retry 10 --retry-all-errors --retry-delay 1 --max-time 5 -fsSL http://localhost:8080/ -o /tmp/workbench.html
+          grep -q 'id="workbench-welcome"' /tmp/workbench.html
+          grep -q 'id="flowview-folder-kit"' /tmp/workbench.html
+          curl -fsS http://localhost:8080/template/flowview.html -o /tmp/viewer.html
+          cmp /tmp/viewer.html template/flowview.html
+          curl -fsS http://localhost:8080/workbench/catalog.json -o /tmp/catalog.json
+          cmp /tmp/catalog.json workbench/catalog.json
+      - name: Upload portable viewer and workbench
+        uses: actions/upload-artifact@v4
+        with:
+          name: flowview-html
+          path: |
+            template/flowview.html
+            workbench/flowspec.html
+            workbench/catalog.json
+            workbench/diagrams.json
+            src/starters/
+            canon.json
+            diagrams/
+          if-no-files-found: error
+          retention-days: 30

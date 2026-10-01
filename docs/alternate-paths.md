@@ -5,17 +5,13 @@ Use **Open file** with
 in the workbench for a six-step happy path and a four-step **Dropped signal**
 path on the same command diagram.
 The transport controls stay at the upper left. Below them, each path has a
-colored chip on the left and a row of aligned step numbers on the right. Both
-paths share steps 1–3. The alternate row shows all three as shadows at 35%
-opacity in the happy-path color, then its distinct step 4 at full strength. Space after
-its ending stays blank. Shared shadows are clickable and keep the alternate
-selected; the current step and keyboard-focused shadow have full opacity.
-Nested alternates inherit each shared beat's earlier path color. Selecting
-the path chip pauses at step 1, including the shared lead-in; clicking a number
-selects that path and step. Clicking the selected path chip also returns to
-step 1. The colored chip,
-step count, playback ending, highlighted hops, node tones and panel state all
-follow that path. Chips retain their order when switching.
+colored chip on the left, connected to its first visible step. Both paths share
+steps 1–3, which appear once as a common track before splitting into their
+distinct outcomes. Shared steps follow the selected path's color and numbering.
+Selecting the path chip pauses at step 1, including the shared lead-in; clicking
+a shared number keeps that path selected. Clicking the selected path chip also
+returns to step 1. The step count, playback ending, highlighted hops, node tones
+and panel state all follow that path. Chips retain their order when switching.
 
 A path ends at its last referenced step. Next is disabled there; Play replays
 from its first step. Returning to the happy path recomputes its state from the
@@ -142,18 +138,16 @@ Use distinct step bodies for retry attempts. Optional `label` defaults to
 “Happy path” for the first path and the path ID for others. Optional `color`
 accepts hex; defaults cycle cyan, orange, purple, pink and green.
 
-Paths with only a shared beginning keep the aligned rows described above.
-The longest common prefix with an earlier declared path determines where each
-row's colored branch begins. A path that ends within that prefix shows only
-shared shadows, with no invented branch. Space after an ending stays blank.
+Shared steps appear once, whether they begin the paths or occur later.
+Consecutive shared IDs form common tracks with connections showing where the
+participating paths join and split. Each path name connects to its first visible
+step, including a shared opening. A path that ends within the shared beginning
+stops there without an invented branch.
 
-When paths reuse later steps, consecutive shared IDs form common tracks with
-connections showing where the participating paths join and split. The selected
-path owns playback, numbering, captions and state throughout. Compact rows and
-connecting lines show the joins and splits without enclosing boxes or repeated
-captions. A shared ending occurs only when every participating path finishes
-there. Sharing does not add steps
-to any path or change their order.
+The selected path owns playback, numbering, captions and state throughout.
+Compact rows and connecting lines show the joins and splits without enclosing
+boxes or repeated captions. A shared ending occurs only when every participating
+path finishes there. Sharing does not add steps to any path or change their order.
 
 The full authored sequences determine blocks and endings. Hiding stops in a
 view does not turn a downstream join into a shared beginning, combine operations
@@ -165,7 +159,7 @@ cues so the timeline can preserve both sequences.
 This models authored outcomes, not executable conditions or failure probabilities.
 A step may set `color:"#RRGGBB"` to override its numbered markers without
 creating a branch. This travels with its shared body and never changes the path
-chip. Shared beginning shadows retain their opacity behavior. See
+chip. Shared opening circles retain the selected path's color unless overridden. See
 [step colors](step-colors.md).
 Nodes and edges stay in their declared layout; path colors identify choices
 while edge colors continue to identify protocols. Print uses the selected

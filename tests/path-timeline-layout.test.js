@@ -39,7 +39,7 @@ test('three converging tracks use the middle route instead of adding a blank row
 });
 test('a middle join and later rejoin use the gap between their routes',()=>{
   const result=layout(paths([0,1,4,5,6,9],[0,2,3,4,5,7,9],[0,8]));
-  assert.deepEqual([...result.rows.shared.values()],[.5,.5]);
+  assert.deepEqual([...result.rows.shared.values()],[1,.5,.5]);
 });
 test('a shared track avoids an unrelated route that continues through its columns',()=>{
   const result=layout(paths([0,1,9,10],[2,3,4,5,6],[7,8,9,10]));

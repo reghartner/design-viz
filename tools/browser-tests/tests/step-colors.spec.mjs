@@ -47,7 +47,7 @@ test('standalone phase colors survive all skins, current-step and hover states, 
  await page.emulateMedia({media:'print'});await expect(coin(root,2).locator('circle')).toHaveCSS('fill','rgb(139, 92, 246)');
 });
 
-test('native Backstage preserves phase overrides on shared shadows, branches, and filtered source steps',async({page,server})=>{
+test('native Backstage preserves phase overrides on shared openings, branches, and filtered source steps',async({page,server})=>{
  const branched=structuredClone(raw),diagram=d(branched);
  diagram.edges.push({from:'b',to:'d'});diagram.steps.push({id:'failed',edge:'b->d',text:'Alternate.',color:'#f97316'});
  diagram.paths=[{id:'happy',label:'Happy',color:'#2563eb',steps:['start','send','record','play','done']},{id:'failed',label:'Failed',color:'#f43f5e',steps:['start','send','failed']}];
@@ -58,10 +58,11 @@ test('native Backstage preserves phase overrides on shared shadows, branches, an
  await writeFile(path.join(server.root,'step-native.html'),'<div id="host" style="width:1100px"></div><script type="module">import {mountNativeViewer} from "./step-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/step-native.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(raw=>window.viewer=mount(document.querySelector('#host'),raw),branched);const root=page.locator('#host');
- // Explicitly restore the full flow before checking shared-prefix shadows.
+ // Explicitly restore the full flow before checking shared opening circles.
  await root.getByRole('button',{name:'Full',exact:true}).click();
  const failed=root.locator('[data-dv-path=failed]');await expect(failed).toHaveAttribute('aria-pressed','false');
- const shared=root.locator('.schip[data-step-path=failed][data-step-source="1"]');await expect(shared).toHaveCSS('background-color','rgb(2, 132, 199)');await expect(shared).toHaveCSS('opacity','0.2');
+ await failed.click();
+ const shared=root.locator('.schip[data-step-source="1"]');await expect(shared).toHaveCount(1);await expect(shared).toHaveCSS('background-color','rgb(2, 132, 199)');await expect(shared).toHaveCSS('opacity','1');
  await shared.click();await expect(shared).toHaveCSS('opacity','1');await expect(shared).toHaveAttribute('aria-current','true');
  await expect(failed).toHaveAttribute('aria-pressed','true');
  await root.locator('.schip[data-step-source="5"]').click();await colors(root,5,'rgb(249, 115, 22)');

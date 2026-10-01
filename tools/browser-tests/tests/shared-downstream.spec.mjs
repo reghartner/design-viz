@@ -141,10 +141,13 @@ test('middle shared operations split and rejoin with route state intact while of
  await expect(root.locator('.path-timeline')).toHaveCount(1);await expect(root.locator('.path-matrix')).toHaveCount(0);
  expect(await root.locator('.path-timeline').evaluate(el=>el.offsetHeight)).toBeLessThanOrEqual(108);
  await expect(root.locator('.path-shared-block,.path-shared-heading,.path-shared-caption')).toHaveCount(0);
- for(const index of [indices.store,indices.index,indices.ready]){
+ for(const index of [indices.press,indices.store,indices.index,indices.ready]){
   await expect(step(root,index)).toHaveCount(1);await expect(step(root,index)).toHaveClass(/shared-downstream-step/);
  }
  await expect(root.locator('.shared-step-link')).toHaveCount(0);await checkGeometry(root);
+ const entries=await root.locator('[data-path-entry]').evaluateAll(lines=>lines.map(line=>{const end=line.getPointAtLength(line.getTotalLength());return {id:line.dataset.pathEntry,end:{x:end.x,y:end.y}};}));
+ expect(entries.map(entry=>entry.id)).toEqual(['normal','retry','offline']);
+ expect(entries.every(entry=>Math.abs(entry.end.x-entries[0].end.x)<.01 && Math.abs(entry.end.y-entries[0].end.y)<.01)).toBe(true);
  const positions=await root.locator('.path-timeline').evaluate((timeline,indices)=>Object.fromEntries(
   ['store','index','notify','notify-recovery','ready'].map(id=>{
    const rect=timeline.querySelector('button.schip[data-step-source="'+indices[id]+'"]').getBoundingClientRect();

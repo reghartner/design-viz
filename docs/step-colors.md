@@ -21,8 +21,8 @@ and `#RRGGBB` are supported; invalid values warn and fall back. No schema-versio
 switch is required. Rebuild older generated HTML to display these overrides;
 exports declare `flow.step-colors` for viewer compatibility checks.
 
-Shared steps use the same color wherever they appear. Shared alternate shadows
-remain at 35% opacity except when current or keyboard-focused. Path chips retain
+Shared steps render once and retain their authored color when switching paths.
+Path chips retain
 their path color. To give an alternate a different circle, first use **Make
 independent here**. Copies retain the authored color and can be customized.
 Filtered layout views retain the colors of their visible source steps.

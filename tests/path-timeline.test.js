@@ -75,28 +75,28 @@ function verify(paths,shown=paths){
 
 test('unequal incoming routes converge once with their original occurrence numbers',()=>{
   const paths=routes([0,1,5,6],[0,2,3,4,5,6]),model=verify(paths);
-  assert.deepEqual(sharedSources(model),[5,6]);
-  assert.deepEqual(blockSources(model),[[5,6]]);
-  assert.equal(model.blocks[0].ending,true);
+  assert.deepEqual(sharedSources(model),[0,5,6]);
+  assert.deepEqual(blockSources(model),[[0],[5,6]]);
+  assert.equal(model.blocks[1].ending,true);
   const join=model.nodes.find(node=>node.sourceIndex===5);
   assert.deepEqual(join.occurrences,[{pathId:'a',index:2,visibleIndex:2},{pathId:'b',index:4,visibleIndex:4}]);
   assert.equal(join.column,4);
-  assert.equal(model.nodes.filter(node=>node.sourceIndex===0).length,2,'prefix shadows remain separate');
+  assert.equal(model.nodes.filter(node=>node.sourceIndex===0).length,1,'the shared opening renders once');
   assert.deepEqual(model.edges.find(edge=>edge.from===join.id).pathIds,['a','b']);
 });
 
 test('routes share a middle block, split again, and rejoin for a shared ending',()=>{
   const paths=routes([0,1,4,5,6,9,10],[0,2,3,4,5,7,9,10]),model=verify(paths);
-  assert.deepEqual(blockSources(model),[[4,5],[9,10]]);
-  assert.deepEqual(model.blocks.map(block=>block.ending),[false,true]);
-  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b'],['a','b']]);
+  assert.deepEqual(blockSources(model),[[0],[4,5],[9,10]]);
+  assert.deepEqual(model.blocks.map(block=>block.ending),[false,false,true]);
+  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b'],['a','b'],['a','b']]);
 });
 
 test('membership changes split blocks across three routes',()=>{
   const paths=routes([0,1,7,8,9],[0,2,7,8,9],[0,3,8,9]),model=verify(paths);
-  assert.deepEqual(blockSources(model),[[7],[8,9]]);
-  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b'],['a','b','c']]);
-  assert.deepEqual(model.blocks.map(block=>block.ending),[false,true]);
+  assert.deepEqual(blockSources(model),[[0],[7],[8,9]]);
+  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b','c'],['a','b'],['a','b','c']]);
+  assert.deepEqual(model.blocks.map(block=>block.ending),[false,false,true]);
 });
 
 test('one isolated shared operation is a middle block and can split immediately',()=>{
@@ -107,24 +107,27 @@ test('one isolated shared operation is a middle block and can split immediately'
 
 test('a member ending earlier does not turn another route continuation into a shared ending',()=>{
   const model=verify(routes([0,1,4],[0,2,4,5]));
-  assert.deepEqual(blockSources(model),[[4]]);
-  assert.equal(model.blocks[0].ending,false);
+  assert.deepEqual(blockSources(model),[[0],[4]]);
+  assert.equal(model.blocks[1].ending,false);
 });
 
-test('prefix-only, wholly shared and single paths preserve separate rows',()=>{
-  for(const paths of [routes([0,1,2],[0,1,3]),routes([0,1],[0,1]),routes([0,1,2],[0,1]),routes([0,1,2])]){
+test('shared beginnings and wholly shared paths render each identity once',()=>{
+  for(const paths of [routes([0,1,2],[0,1,3]),routes([0,1],[0,1]),routes([0,1,2],[0,1])]){
     const model=verify(paths);
-    assert.equal(model.hasShared,false);
-    assert.deepEqual(model.blocks,[]);
-    assert.equal(model.nodes.length,paths.reduce((count,path)=>count+path.indices.length,0));
+    assert.equal(model.hasShared,true);
+    assert.deepEqual(blockSources(model),[[0,1]]);
+    assert.equal(model.nodes.length,new Set(paths.flatMap(path=>path.indices)).size);
+    assert.equal(model.blocks[0].ending,paths.every(path=>path.indices.length===2));
   }
+  const single=verify(routes([0,1,2]));
+  assert.equal(single.hasShared,false);assert.deepEqual(single.blocks,[]);
 });
 
 test('an identity can join a third downstream route while two peers share its prefix',()=>{
   const model=verify(routes([0,1,2],[0,1,3],[4,1,2]));
-  assert.deepEqual(blockSources(model),[[1],[2]]);
-  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b','c'],['a','c']]);
-  assert.equal(model.nodes.filter(node=>node.sourceIndex===0).length,2);
+  assert.deepEqual(blockSources(model),[[0],[1],[2]]);
+  assert.deepEqual(model.blocks.map(block=>block.pathIds),[['a','b'],['a','b','c'],['a','c']]);
+  assert.equal(model.nodes.filter(node=>node.sourceIndex===0).length,1);
 });
 
 test('reversed shared identities stay separate while a later safe join survives',()=>{

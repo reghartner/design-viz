@@ -887,6 +887,39 @@ test('diagram folder opens an existing named pair without metadata and reviews l
   }finally{await page.close();await h.cleanup();}
 });
 
+test('seeded candidate pair is edited in place, proposed, previewed, committed and undone through real files',async({page})=>{
+  const h=await setup(page);
+  const beforeLedger='# Coverage ledger\n\nDoorbell evidence is reviewed.\n',afterLedger=beforeLedger+'\nRenamed Doorbell to Seeded doorbell at the user’s request.\n';
+  try{
+    await writeFile(path.join(h.folder,'payments.spec.json'),source);await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+    await copyRequest(page,'Rename the doorbell.');
+    const request=await h.read('request.json'),state=await h.read('state.json'),candidate=request.candidate;
+    expect(candidate).toEqual({spec:`candidate-${request.id}.spec.json`,ledger:`candidate-${request.id}.ledger.md`,baseRevision:state.revision});
+    expect(request.revision).toBe(state.revision);
+    const seeded=await readFile(path.join(h.session,candidate.spec),'utf8');
+    expect(seeded).toBe(source);expect(await readFile(path.join(h.session,candidate.ledger),'utf8')).toBe(beforeLedger);
+    // One targeted edit to each seeded copy, then the unchanged propose command.
+    const edited=seeded.replace('"Doorbell"','"Seeded doorbell"');expect(edited).not.toBe(seeded);
+    await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
+    h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Rename the doorbell');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Seeded doorbell');
+    await expect(page.locator('#src')).toHaveValue(source);
+    expect(await readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(source);expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(edited);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(edited);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
+    h.run('reply','--request',request.id,'--text','Renamed the doorbell.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(source);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
 test('transient failures at each paired commit stage recover once and preserve paired Undo/Redo',async({page})=>{
   test.setTimeout(60000);
   const h=await setup(page);

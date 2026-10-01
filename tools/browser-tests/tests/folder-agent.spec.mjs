@@ -601,6 +601,10 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     }
     await page.screenshot({path:info.outputPath('explore-review.png')});await contained();
     await expect(view.locator('[data-dv-node="b"]')).toContainText('Delivery service');
+    await view.locator('.explore-legend-menu>summary').click();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeVisible();
+    await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true})).toBeHidden();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
     const zoom=view.locator('.explore-zoom'),beforeZoom=await zoom.innerText();
     await view.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(zoom).not.toHaveText(beforeZoom);
@@ -626,7 +630,10 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await page.locator('#agent-update-open').click();await contained();
     await page.screenshot({path:info.outputPath('explore-review-ready.png')});
     await page.setViewportSize({width:640,height:800});await contained();
+    await view.locator('.explore-legend-menu>summary').click();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeInViewport();
     await page.screenshot({path:info.outputPath('explore-review-narrow.png')});
+    await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
     await page.setViewportSize({width:1440,height:1000});
     await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
     await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');

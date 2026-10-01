@@ -1,0 +1,66 @@
+import {test,expect,pastePage,inspectPageElement,openInspectorGroup} from '../helpers/test.mjs';
+import {readFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+const repo=fileURLToPath(new URL('../../..',import.meta.url));
+const fixture=path.join(repo,'src/starters/messaging-cost.json');
+
+test('portable cost comparison follows alternate paths, resets volume, and fits narrow/print layouts',async({page,server},testInfo)=>{
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),fixture,path.join(repo,'template/flowview.html'),path.join(server.root,'cost.html')]);
+  await page.goto(server.origin+'/cost.html');
+  const panel=page.locator('.cost-panel'),next=page.getByRole('button',{name:'Next step',exact:true});
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 3.20','USD 13.40']);
+  await expect(panel.locator('.cost-delta')).toContainText('USD 10.20 more');
+  await expect(panel.locator('.cost-nodes')).toHaveText(['3 linked engineering nodes','4 linked engineering nodes']);
+  await next.click();await expect(panel.locator('.cost-route-0')).toHaveClass(/cost-active/);
+  await next.click();await next.click();
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 32.00','USD 26.00']);
+  await expect(panel.locator('.cost-delta')).toContainText('USD 6.00 less');
+  await page.locator('.path-chip[data-dv-path="queue"]').click();
+  await expect(panel.locator('.cost-basis')).toContainText('1,000,000 messages');
+  await expect(panel.locator('.cost-active')).toHaveCount(0);
+  await next.click();await expect(panel.locator('.cost-route-1')).toHaveClass(/cost-active/);
+  for(let i=0;i<4;i++)await next.click();
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 320.00','USD 152.00']);
+  await expect(panel.locator('.cost-delta')).toContainText('USD 168.00 less');
+  await page.evaluate(()=>document.fonts.ready);
+  await page.screenshot({path:testInfo.outputPath('cost-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1);
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow.png')});
+  // Narrow arranged panels scroll internally; the conclusion must remain reachable.
+  await panel.locator('.cost-assumptions').scrollIntoViewIfNeeded();
+  await expect(panel.locator('.cost-delta')).toBeInViewport();
+  await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow-conclusion.png')});
+  await page.setViewportSize({width:1400,height:1000});await page.emulateMedia({media:'print'});
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 320.00','USD 152.00']);
+  await expect(page.locator('.pt-cost')).toHaveCSS('background-color','rgb(255, 255, 255)');
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({path:testInfo.outputPath('cost-print.png'),fullPage:true});
+});
+
+test('cost editor changes starting volume and rates with exact Undo/Redo',async({page,server})=>{
+  const raw=JSON.parse(await readFile(fixture,'utf8'));
+  // Omit the opening workload override to make starting-state edits visible.
+  delete raw.page.sections[0].diagram.steps[0].panels.costs.messages;
+  const original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,original);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
+  await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
+  const messages=initial.getByLabel('messages',{exact:true});
+  await messages.fill('10000000');await messages.press('Tab');
+  await expect(root.locator('.cost-total')).toHaveText(['USD 32.00','USD 26.00']);
+  const changed=await source.inputValue();expect(changed).not.toBe(original);
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
+  await expect(root.locator('.cost-total')).toHaveText(['USD 3.20','USD 13.40']);
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+  await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  const rate=guide.getByLabel('Cost per 1M messages',{exact:true}).nth(1);
+  await rate.fill('3.8');await rate.press('Tab');
+  await expect(root.locator('.cost-total')).toHaveText(['USD 42.00','USD 26.00']);
+  expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].items[1].node).toBe('bus');
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(changed);
+});

@@ -148,6 +148,10 @@ These controls also work in published pages; no routing setting is required.
 **Broader design panels:** `table` shows data snapshots, `checks` shows
 authored decisions and invariants, and `budget` compares resource usage with
 explicit limits. Open the [software & IoT example](src/starters/software-systems.json) for both domains.
+The [messaging cost comparison](cookbook/messaging-cost.md) adds a `cost` panel:
+two delivery routes, per-million usage and fixed charges, engineering nodes,
+cost difference and break-even volume. Open **Messaging cost tradeoffs** in
+the workbench templates to explore the illustrative 1M / 10M / 100M scenarios.
 Use the [retries & circuits example](src/starters/resilience.json) for retry success, deadline admission,
 and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
 how to adapt their authored policies and timing.

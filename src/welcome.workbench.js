@@ -257,7 +257,7 @@ function initWorkbenchWelcome(opts){
   }
   document.addEventListener('dv:agentnew',function(event){buildWithAgent(event.detail && event.detail.workflow==='embedded'?'embedded':'external',true);});
   ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){
-    buildWithAgent('external',id!=='welcome-agent' || !builder.isProjectOpen() && !builder.draftInfo());
+    buildWithAgent('external',id==='welcome-new-agent' || !builder.isProjectOpen() && !builder.draftInfo());
   });});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });

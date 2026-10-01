@@ -23,6 +23,7 @@
 .workbench-practice #workspace-home,.workbench-practice #workbench-home{pointer-events:none}
 .practice-conversation{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;overflow:hidden;background:#324868;color:#25354c}
 .practice-conversation[open]{display:grid;place-items:center}
+.practice-conversation .dv-tour-dim-fill{fill:rgba(11,18,32,.28)}
 .practice-desktop{position:absolute;inset:-12px;overflow:hidden;pointer-events:none;filter:blur(5px);background:radial-gradient(ellipse at 80% 100%,#efb5a6 0%,transparent 48%),radial-gradient(ellipse at 4% 110%,#203c57 0%,#367b88 35%,transparent 65%),radial-gradient(ellipse at 72% 0%,#828cc9 0%,#5b699b 42%,#334f74 80%)}
 .practice-desktop::before{content:"";position:absolute;width:120%;height:75%;left:12%;top:52%;border-radius:50%;transform:rotate(-22deg);background:linear-gradient(165deg,#bbabc2 5%,#6599b4 45%,#1e687a 90%);box-shadow:0 -24px 80px #bdd2e047}
 .practice-desktop-menubar{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:22px;padding:9px 22px;background:#ffffff38;color:#fff;font:12px/1.2 system-ui}

@@ -21,6 +21,20 @@ test('canonical homepage setup defaults to copy/paste with user-owned agent',asy
   await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','true');
 });
 
+test('Build with my agent from the standalone brief preserves the current draft and Undo',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(editorSpec(),null,2));
+  await page.locator('#docview .node').first().click();await page.locator('#object-duplicate').click();
+  const edited=await page.locator('#src').inputValue();
+  await page.locator('#workspace-home').click();await page.locator('#welcome-agent-prompt').click();
+  await page.locator('#welcome-agent-live').click();
+  await expect(page.locator('#folder-agent-guide')).toBeVisible();
+  await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','false');
+  await expect(page.locator('#src')).toHaveValue(edited);
+  await page.keyboard.press('Escape');await expect(page.locator('#undo-builder')).toBeEnabled();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).not.toHaveValue(edited);
+});
+
 test('every viewer, agent and manual lesson resolves against a real visible control',async({page,server},info)=>{
   test.setTimeout(120000);
   const missing=[];page.on('console',m=>{if(m.type()==='warning' && /tour step|tour.*fail/i.test(m.text()))missing.push(m.text());});

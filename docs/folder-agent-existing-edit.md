@@ -1,8 +1,8 @@
 # Connected request: existing-diagram edit guide
 
-Read this first for every connected request after `prepare`. VIZ is
-`.flowview-agent/authoring/`; paths below are relative to it. The support
-folder's `CONNECT.md` remains the authority for transport commands and files.
+Read this first for every connected request after `prepare`. VIZ is the
+authoring directory named in `CONNECT.md`; paths below are relative to it. The
+support folder's `CONNECT.md` remains the authority for transport commands and files.
 
 ## Scope
 

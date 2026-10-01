@@ -3,6 +3,23 @@ const C=require('./workbench-command-context.cjs')(['prose','visibility']);
 const fixture=()=>({sections:[{bullets:['First',{text:'Parent',future:{keep:true},sub:['Child',{text:'Deep',revealAt:1,sub:['Grandchild']} ]},'Last']} ]});
 const target=(...indices)=>({kind:'bullet',section:0,index:indices[0],bulletPath:indices});
 function edit(raw,t,action){const plan=C.planBulletStructure(JSON.stringify(raw),raw,t,action);assert.equal(plan.error,undefined);return {raw:JSON.parse(plan.text),target:plan.target};}
+test('deleting the notes surface removes only prose, preserving section and diagram source bytes',()=>{
+ const section={id:'story',heading:'Story',text:['One','Two'],bullets:fixture().sections[0].bullets,collapsed:true,
+  diagram:{nodes:{a:{}},rows:[['a']],sectionLayout:{default:[{x:0,y:0,w:12,h:8}]}},future:{keep:true}};
+ for(const raw of [{sections:[section]},{page:{blocks:[{heading:'Keep',text:'Unchanged'},{tabs:[{label:'Notes',sections:[section]}]}]}}]){
+  const index=C.specSectionPaths(raw).length-1,path=Array.from(C.specSectionPaths(raw)[index].section),source=JSON.stringify(raw,null,3);
+  const diagram=C.jsonLocate(source,path.concat('diagram')),target={kind:'prose',section:index};
+  assert.deepEqual(Array.from(C.builderTargetPath(raw,target)),path);
+  const plan=C.builderDeletePlan(source,raw,target);assert.equal(plan.error,undefined);
+  const expected=structuredClone(raw),sec=C.specValueAt(expected,path);delete sec.text;delete sec.bullets;
+  assert.deepEqual(JSON.parse(plan.text),expected);
+  const after=C.jsonLocate(plan.text,path.concat('diagram'));
+  assert.equal(plan.text.slice(after.start,after.end),source.slice(diagram.start,diagram.end));
+  assert.equal(JSON.stringify(raw,null,3),source);
+ }
+ const bare={nodes:{a:{}},rows:[['a']]};assert.ok(C.builderDeletePlan(JSON.stringify(bare),bare,{kind:'prose',section:0}).error);
+ const raw={sections:[section]};assert.ok(C.builderDeletePlan(JSON.stringify(raw),raw,{kind:'unknown',section:0}).error);
+});
 test('first prose additions preserve wrappers, tab destination and unrelated source bytes',()=>{
  for(const raw of [{sections:[{heading:'Blank'}]},{page:{blocks:[{heading:'Keep',text:['Untouched']},{tabs:[{label:'Story',sections:[{heading:'Blank',future:{keep:true}}]}]}]}}]){
   const section=C.specSectionPaths(raw).length-1,path=Array.from(C.specSectionPaths(raw)[section].section);

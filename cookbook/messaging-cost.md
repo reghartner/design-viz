@@ -5,10 +5,13 @@ at the same workload. The [complete example](../src/starters/messaging-cost.json
 follows a managed event bus and a queue with a relay. Both deliver to the same
 consumer. Choose a path, then advance from 1M to 10M and 100M monthly messages.
 It is also a built-in **Messaging cost tradeoffs** workbench template.
+Switch between **Architecture & cost** for a wide chart and **Compact comparison**
+for a narrow cost sidebar beside the same diagram and timeline. The starter uses
+Auto density, so resizing the panel changes the chart orientation automatically.
 
 Large stacked bars compare both totals from zero on the same scale. Each
 engineering component has a matching color in the bar and its route below;
-hatched segments are fixed infrastructure charges. The dotted gap shows the
+hatched segments are fixed charges. The dotted gap shows the
 cost difference. Panels up to 520 px wide automatically use compact horizontal
 bars, retaining the shared scale, component colors and cost difference in about
 300 px of height. **Display density** in the panel inspector offers **Auto**,

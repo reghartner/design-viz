@@ -150,8 +150,11 @@ authored decisions and invariants, and `budget` compares resource usage with
 explicit limits. Open the [software & IoT example](src/starters/software-systems.json) for both domains.
 The [messaging cost comparison](cookbook/messaging-cost.md) adds a `cost` panel:
 two delivery routes, per-million usage and fixed charges, engineering nodes,
-cost difference and break-even volume. Open **Messaging cost tradeoffs** in
-the workbench templates to explore the illustrative 1M / 10M / 100M scenarios.
+cost difference and break-even volume. Stacked bars share one zero-based scale;
+**Auto**, **Compact** and **Expanded** display density support a small horizontal
+comparison or a tall chart. Open **Messaging cost tradeoffs** in the workbench
+templates to explore illustrative 1M / 10M / 100M scenarios and its
+**Compact comparison** view.
 Use the [retries & circuits example](src/starters/resilience.json) for retry success, deadline admission,
 and circuit recovery; the [recipe](cookbook/retries-and-circuits.md) explains
 how to adapt their authored policies and timing.

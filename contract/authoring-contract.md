@@ -1882,6 +1882,7 @@ contract stays the authority; a recipe shows the working subset for one task.
    | an ordered event stream (firmware log, audit trail) | `log` |
    | what a camera sees at each step | `screen` |
    | a latency / timing budget across spans | `waterfall` |
+   | messaging route costs and engineering tradeoffs at one workload | `cost` (stacked bars; Auto, Compact or Expanded density) |
    | replica or consumer positions, lag, and incomparable histories | `replicas` |
    | which regions of a frame are armed / ignored / masked | `zoneframe` |
    | line of sight / wake-on-motion (show geometry and the reported event) | `radar` with explicit `alert` |

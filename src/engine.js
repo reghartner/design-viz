@@ -3067,7 +3067,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
     try {
-      win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](null, '',
+      var historyState=ctl.handoffs?Object.assign({},win.history.state,{dvHandoff:ctl.handoffs.historyState()}):null;
+      win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](historyState, '',
         withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
@@ -3152,6 +3153,7 @@ function wireDeepLinks(ctl, win, preservedHash){
       ctl.activeTarget = {kind:'tab', tabBlock:target.tabBlock, tab:target.tab};
     else ctl.activeTarget = {kind:'page'};
     if(ctl.details && st.q){try{ctl.details.restore(JSON.parse(st.q));}catch(_) {/* stale drill target leaves its valid ancestor visible */}}
+    if(ctl.handoffs)ctl.handoffs.restoreHistory(win.history.state && win.history.state.dvHandoff,diagramTarget && section(diagramTarget.section));
     ctl.detailHistoryPush=false;
     if (targetEl && typeof targetEl.scrollIntoView === 'function'){
       targetEl.scrollIntoView({block: 'start', behavior: 'instant'});

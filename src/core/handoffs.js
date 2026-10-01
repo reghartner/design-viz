@@ -33,8 +33,11 @@ function validateLocalHandoffs(page, errors){
   sectionRecords(page).forEach(function(record){
     Object.keys(record.section.diagram && record.section.diagram.nodes || {}).forEach(function(id){
       var value=record.section.diagram.nodes[id].handoff;
-      if(specObject(value) && value.localSection!=null && !localHandoffTarget(page,value))
-        errors.push(record.path+'.diagram.nodes.'+id+'.handoff.localSection: choose an existing diagram section that is not detail-only');
+      if(specObject(value) && value.localSection!=null){
+        var target=localHandoffTarget(page,value),at=record.path+'.diagram.nodes.'+id+'.handoff.localSection';
+        if(!target)errors.push(at+': choose an existing diagram section that is not detail-only');
+        else if(target.number===record.number)errors.push(at+': choose a different diagram section');
+      }
     });
   });
 }

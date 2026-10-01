@@ -55,3 +55,12 @@ test('local handoffs resolve across tabs, are distinct from external selectors a
  assert.match(html,/role="button" tabindex="0" data-dv-handoff="delivery"/);
  assert.doesNotMatch(html,/href=|target="_blank"/);assert.match(html,/CONTINUE/);
 });
+
+test('self handoffs are rejected while detail-to-overview handoffs remain valid',()=>{
+ const page=B.normalize(structuredClone(require('../examples/tab-handoffs/tab-handoffs.spec.json')));
+ page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff={localSection:'orders'};
+ assert.match(B.validate(page).errors.join('\n'),/choose a different diagram section/);
+ page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff={localSection:'delivery'};
+ page.blocks.push({id:'child',heading:'Child',detailOnly:true,diagram:{nodes:{back:{handoff:{localSection:'orders'}}},rows:[['back']]}});
+ assert.deepEqual(Array.from(B.validate(page).errors),[]);
+});

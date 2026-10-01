@@ -117,3 +117,34 @@ test('a section embed follows local handoffs and restores the destination after 
  await expect(section(page,'orders')).toBeVisible();
  await page.goBack();await expect(section(page,'delivery')).toBeVisible();
 });
+
+test('a focused detail can hand off to its own overview and return to its child beat and node',async({page,server})=>{
+ const raw=structuredClone(example);
+ raw.page.blocks[0].tabs[0].sections[0].diagram.nodes.middle.detail={section:'child'};
+ raw.page.blocks.push({id:'child',heading:'Child flow',detailOnly:true,diagram:{view:'step',autoplay:false,nodes:{go:{title:'Overview',handoff:{localSection:'orders'}}},rows:[['go']],steps:[{id:'ready',nodes:['go'],text:'Ready'},{id:'done',nodes:['go'],text:'Done'}]}});
+ await standalone(page,server,raw);
+ await section(page,'orders').locator('[data-dv-detail="middle"]').click();
+ const child=page.locator('[data-dv-detail-preview]:visible');
+ await child.getByRole('button',{name:'Go to step 2',exact:true}).click();
+ const handoff=child.getByRole('button',{name:'Open Overview diagram in this spec',exact:true});
+ await handoff.focus();await handoff.press('Enter');
+ await expect(page.locator('[data-dv-detail-preview]')).toHaveCount(0);await expect(section(page,'orders')).toBeVisible();
+ await page.getByRole('button',{name:'Back to Child flow',exact:false}).click();
+ await expect(child).toBeVisible();await expect(child.locator('.step-text')).toHaveText('Done');
+ await expect(handoff).toBeFocused();await expect(child.locator('.handoff-back')).toHaveCount(0);
+});
+
+test('browser Back rewinds the return trail before another handoff and preserves host history state',async({page,server})=>{
+ await standalone(page,server);
+ await page.evaluate(()=>history.replaceState({...history.state,hostValue:'keep'},'',location.href));
+ const orders=section(page,'orders'),delivery=section(page,'delivery');
+ const next=orders.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true});
+ await next.click();await page.goBack();await expect(orders).toBeVisible();
+ await next.click();await expect(delivery).toBeVisible();
+ await delivery.getByRole('button',{name:'Back to Order intake',exact:false}).click();
+ await expect(orders).toBeVisible();await expect(page.locator('.handoff-back')).toHaveCount(0);
+ expect(await page.evaluate(()=>history.state.hostValue)).toBe('keep');
+ await page.goBack();await expect(delivery).toBeVisible();
+ await expect(delivery.getByRole('button',{name:'Back to Order intake',exact:false})).toBeVisible();
+ await page.goForward();await expect(orders).toBeVisible();await expect(page.locator('.handoff-back')).toHaveCount(0);
+});

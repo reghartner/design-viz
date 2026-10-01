@@ -22,7 +22,8 @@ position; a reciprocal handoff node can lead back as well. Enter and Space
 activate the node. In the editor, the body selects the node and the arrow tip
 previews navigation. Standalone browser Back/Forward also follows handoffs.
 
-Targets must be ordinary diagram sections, not `detailOnly` sections. Local
+Targets must be different, ordinary diagram sections, not `detailOnly` sections.
+A handoff inside a local detail may return to its ordinary overview. Local
 handoffs use `localSection` alone; do not combine it with external fields.
 Tab labels can change freely. Editor section renames and moves update references;
 deleting the target removes the handoff in the same undoable edit. The return

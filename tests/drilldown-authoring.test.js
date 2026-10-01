@@ -480,3 +480,9 @@ test('local handoffs follow section identity, move and deletion while external d
  assert.equal(parent(removed).nodes.other.handoff.section,'inside');
  const hidden=fixture();assert.match(B.planSetNodeHandoff(JSON.stringify(hidden),hidden,0,'domain',{localSection:'inside'}).error,/not detail-only/);
 });
+
+test('handoff authoring rejects the current section without changing source',()=>{
+ const raw=fixture(),text=JSON.stringify(raw);
+ const result=B.planSetNodeHandoff(text,raw,0,'domain',{localSection:'overview'});
+ assert.match(result.error,/different diagram section/);assert.equal(result.text,undefined);assert.equal(JSON.stringify(raw),text);
+});

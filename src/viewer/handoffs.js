@@ -28,12 +28,20 @@ function handoffNodeContent(node, position, id, prefix, options){
 /* Switch mounted sections instead of creating a drill-down. The return trail is
    owned by this viewer; playback stays paused and each diagram keeps its state. */
 function wireLocalHandoffs(ctl, page){
-  var trail=[],disposed=false;
+  var trail=[],disposed=false,checkpoint=0,nextCheckpoint=0;
+  var historyOwner=Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),checkpoints=new Map([[0,[]]]);
+  function remember(){
+    checkpoint=++nextCheckpoint;checkpoints.set(checkpoint,trail.slice());
+    if(checkpoints.size>100)checkpoints.delete(checkpoints.keys().next().value);
+  }
   var back=document.createElement('button');back.type='button';back.className='mbtn handoff-back';
   function reader(rec){return rec.presentation && rec.presentation.snapshotReaderState?rec.presentation:rec.viewport;}
   function save(rec, trigger){
     var sp=rec.stepper,r=reader(rec),board=rec.sectionEl.querySelector('.board');
-    return {rec:rec,trigger:trigger,view:rec.presentation && rec.presentation.viewId(),
+    var active=ctl.details && ctl.details.activeSection(),node=trigger.closest('[data-dv-node]');
+    var heading=(active || rec).sectionEl.querySelector('.sec-h'),detailReader=active && reader(active);
+    return {rec:rec,trigger:trigger,node:node && node.getAttribute('data-dv-node'),label:heading && heading.textContent.trim(),
+      detailReader:detailReader && detailReader.snapshotReaderState(),view:rec.presentation && rec.presentation.viewId(),
       mode:sp && sp.mode(),path:sp && sp.path(),sourceIndex:sp && sp.sourceIndex(),
       reader:r && r.snapshotReaderState(),scroll:board && {x:board.scrollLeft,y:board.scrollTop},
       drill:ctl.details && ctl.details.snapshot()};
@@ -49,18 +57,22 @@ function wireLocalHandoffs(ctl, page){
     if(r && saved.reader)r.restoreReaderState(saved.reader);
     var board=rec.sectionEl.querySelector('.board');
     if(board && saved.scroll){board.scrollLeft=saved.scroll.x;board.scrollTop=saved.scroll.y;}
-    if(saved.drill && ctl.details)ctl.details.restore(saved.drill);
+    if(saved.drill && ctl.details){
+      ctl.details.restore(saved.drill);
+      var active=ctl.details.activeSection(),detailReader=active && reader(active);
+      if(detailReader && saved.detailReader)detailReader.restoreReaderState(saved.detailReader);
+    }
   }
   function paintBack(rec){
     back.remove();
-    if(!trail.length)return;
+    if(!trail.length || !rec)return;
     var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
-    back.textContent='← Back to '+(record.section.heading || record.tabLabel || previous.reference);
+    back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
     (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
   }
   function activate(rec, saved){
     if(disposed)return;
-    var notify=ctl.onChange;
+    var notify=ctl.onChange,visible=rec;
     // Restoring a view or step can emit changes. Publish only the final route so
     // hosts and browser history never observe an intermediate destination.
     ctl.onChange=null;
@@ -75,13 +87,18 @@ function wireLocalHandoffs(ctl, page){
       if(rec.stepper){rec.stepper.onShow();rec.stepper.pause();}
       if(saved)restore(saved);
       ctl.activeTarget={kind:'diagram',section:rec.number};
-      paintBack(rec);
+      visible=ctl.details && ctl.details.activeSection() || rec;
+      paintBack(visible);
+      remember();
     }finally{ctl.onChange=notify;}
     ctl.handoffHistoryPush=true;
     if(ctl.onChange)ctl.onChange();
     ctl.handoffHistoryPush=false;
-    rec.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
-    var focus=saved && saved.trigger && saved.trigger.isConnected?saved.trigger:back.isConnected?back:rec.sectionEl.querySelector('.sec-h');
+    visible.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
+    var restoredTrigger=saved && Array.from(visible.sectionEl.querySelectorAll('[data-dv-handoff]')).find(function(el){
+      var node=el.closest('[data-dv-node]');return node && node.getAttribute('data-dv-node')===saved.node;
+    });
+    var focus=restoredTrigger || (back.isConnected?back:visible.sectionEl.querySelector('.sec-h'));
     if(focus){if(!focus.hasAttribute('tabindex') && focus.tagName!=='BUTTON')focus.setAttribute('tabindex','-1');focus.focus({preventScroll:true});}
   }
   function follow(event){
@@ -92,13 +109,22 @@ function wireLocalHandoffs(ctl, page){
     var reference=trigger.getAttribute('data-dv-handoff');
     var target=ctl.sections.find(function(rec){return rec.reference===reference && rec.hasDiagram && !rec.detailOnly;});
     var source=ctl.sections.find(function(rec){return rec.sectionEl.contains(trigger);});
-    if(!source && ctl.details){var drill=ctl.details.snapshot();source=drill && ctl.sections.find(function(rec){return rec.reference===drill.section;});}
-    if(!target || !source || target===source)return;
+    var drill=null;
+    if(!source && ctl.details){drill=ctl.details.snapshot();source=drill && ctl.sections.find(function(rec){return rec.reference===drill.section;});}
+    if(!target || !source || (target===source && !drill))return;
     trail.push(save(source,trigger));if(trail.length>50)trail.shift();
     activate(target);
   }
   function goBack(){if(!disposed && trail.length){var saved=trail.pop();activate(saved.rec,saved);}}
   ctl.view.addEventListener('click',follow);ctl.view.addEventListener('keydown',follow);
   back.addEventListener('click',goBack);
-  return {destroy:function(){disposed=true;trail=[];back.remove();back.removeEventListener('click',goBack);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);}};
+  return {
+    historyState:function(){return {owner:historyOwner,checkpoint:checkpoint};},
+    restoreHistory:function(state,rec){
+      if(state && state.owner===historyOwner && checkpoints.has(state.checkpoint)){checkpoint=state.checkpoint;trail=checkpoints.get(checkpoint).slice();}
+      else {trail=[];remember();}
+      paintBack(ctl.details && ctl.details.activeSection() || rec);
+    },
+    destroy:function(){disposed=true;trail=[];checkpoints.clear();back.remove();back.removeEventListener('click',goBack);ctl.view.removeEventListener('click',follow);ctl.view.removeEventListener('keydown',follow);}
+  };
 }

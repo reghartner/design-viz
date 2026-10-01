@@ -296,6 +296,7 @@ function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
     if(handoff.localSection!=null){
       var destination=localHandoffTarget(normalize(raw),handoff);
       if(!destination)errors.push('Choose an existing diagram section that is not detail-only.');
+      else if(destination.number===sectionIdx+1)errors.push('Choose a different diagram section.');
       else handoff=Object.assign({},handoff,{localSection:destination.reference});
     }
     if(errors.length)return {error:errors.join('\n')};

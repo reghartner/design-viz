@@ -1,6 +1,6 @@
 {
   "format": "authoring-experiment-status-v1",
-  "asOfUtc": "2026-10-01T03:39:13.702015+00:00",
+  "asOfUtc": "2026-10-01T04:43:57.835924+00:00",
   "purpose": "Preserve decisions and distinguish promising experiments from adopted changes. This snapshot is research provenance, not a performance promise.",
   "promotionStatus": "No tested context-reduction strategy has cleared its entire predeclared promotion screen.",
   "modelPolicy": {
@@ -101,6 +101,24 @@
         "report": "edit-pipeline-closure.md",
         "retention": "Raw logs, frozen inputs, public diagnostic reviews and unapproved render retained locally; original trial outcomes unchanged."
       }
+    },
+    {
+      "name": "exact-v1 contemporary feasibility trial",
+      "kind": "one unscored initial-authoring trial; historical eleven-path v1 guidance on common current runtime",
+      "status": "mechanical pass with recorded own-report command deviation; registered cohort not launched",
+      "authors": 1,
+      "scoredAuthors": 0,
+      "scoredJudgments": 0,
+      "peakRequestContextTokens": 175697,
+      "firstSpecContextTokens": 144322,
+      "preFirstSpecGuidanceReadBytes": 131180,
+      "currentProductBase": "3799dfa25e637290ea828e6acbb1b8bcbea674f4",
+      "evidence": {
+        "report": "v1-replication-feasibility.md",
+        "trialPassSha256": "e8ddad96462f43e4c83ef838cb052d7227cae9fad21c77b4c501c8a0b9186cf0",
+        "trialResultSha256": "76d40a57c787d60ca5ea84416735beeffc2cb90626d12c3926f5e44e2e62ea1f",
+        "retention": "Exact inputs, one author, original and supplemental reviews, source/capture/metrics retained locally. No efficacy comparison."
+      }
     }
   ],
   "rejectedBeforeTrial": [
@@ -148,6 +166,11 @@
     "withdrawnHypotheses": [
       "v2 authors skipped presentation references",
       "file-payload output allocation inferred from output minus thinking"
-    ]
+    ],
+    "trialAdjudication": {
+      "adviceSha256": "5bbdaa8e69db972d70fae123ed77bd90c008e91a4dc69a6eb4156d339c454051",
+      "decision": "Reuse proven author flow for fresh comparison; retain local own-output read deviation under existing mechanical criteria and audit both arms symmetrically.",
+      "newItemSixThresholdAdopted": false
+    }
   }
 }

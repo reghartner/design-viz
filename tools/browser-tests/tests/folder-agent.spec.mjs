@@ -286,6 +286,9 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     // watch() performs this same preparation before emitting any request.
     h.run('prepare');
     expect(await readFile(skillFile,'utf8')).toBe(await readFile(path.join(root,'.claude/skills/hld-to-page/SKILL.md'),'utf8'));
+    const guide='docs/folder-agent-existing-edit.md';
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('/authoring/'+guide+' first');
+    expect(await readFile(path.join(h.session,'authoring',guide),'utf8')).toBe(await readFile(path.join(root,guide),'utf8'));
     await expect(readFile(path.join(h.session,'authoring/docs/agent-operations.md'))).rejects.toMatchObject({code:'ENOENT'});
     await expect(readFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'))).rejects.toMatchObject({code:'ENOENT'});
     await disconnect(page);

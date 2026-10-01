@@ -16,3 +16,11 @@ test('explicit Beta setup retains its bounded Monitor instructions',()=>{
   assert.match(prompt,/Start Monitor/);assert.match(prompt,/watch --minutes 25/);assert.match(prompt,/Renew Monitor only while editor.json is connected/);
   assert.match(prompt,/progress --request/);
 });
+test('both setups load the existing-edit guide first instead of the full skill and session guide',()=>{
+  for(const workflow of ['external','embedded']){
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',false,identity,workflow);
+    assert.ok(prompt.includes('Read .flowview-agent/CONNECT.md and folder-agent.py before running anything.'));
+    assert.ok(prompt.includes('prepare. Read .flowview-agent/authoring/docs/folder-agent-existing-edit.md first'));
+    assert.doesNotMatch(prompt,/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+  }
+});

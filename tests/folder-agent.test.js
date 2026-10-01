@@ -3,16 +3,17 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function harness(extra={}){
   const context={TextEncoder,SyntaxError};vm.createContext(context);
   for(const file of ['agent-merge.js','agent-session.js','folder-agent.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/workbench',file),'utf8'),context);
-  const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
+  const disk=new Map(),writes=[],updates=[];let time=100000,number=0,source='{"title":"before"}',ledger,project=1,busy=false,open=true,level='story',selection=[{kind:'node',id:'customer'}],views=[],failure=null,gate=null,writeGate=null;
   const copy=value=>value===undefined?undefined:JSON.parse(JSON.stringify(value));
+  // Like the directory adapter, guards learn whether this write created the file.
   const files={async read(name){if(gate)await gate(name);const value=disk.get(name);if(value instanceof Error)throw value;return copy(value)||null;},
     async readText(name){if(gate)await gate(name);return disk.has(name)?String(disk.get(name)):null;},
-    async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard();if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));}};
-  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,project,open,selection,views}),busy:()=>busy,
+    async write(name,value,guard){if(writeGate)await writeGate(name);if(guard)await guard({name,created:!disk.has(name),phase:'before-write'});if(failure===name){failure=null;throw Error('Disk unavailable');}disk.set(name,copy(value));}};
+  const options={reviewMode:false,...extra,files,level:()=>level,now:()=>time,uuid:()=>`id-${++number}`,snapshot:()=>({source,ledger,project,open,selection,views}),busy:()=>busy,
     apply(text){writes.push(text);source=text;return {ok:true,rendered:true};},changed:s=>updates.push(copy(s))};
   let client=context.createFolderAgentClient(options);
   const h={disk,writes,updates,files,context,client,get last(){return updates.at(-1);},fresh(){return context.createFolderAgentClient(options);},
-    level:s=>level=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
+    level:s=>level=s,notes:s=>ledger=s,selection:s=>selection=s,views:s=>views=s,type:s=>source=s,project:()=>project++,busy:b=>busy=b,open:b=>open=b,advance:n=>time+=n,fail:n=>failure=n,gate:g=>gate=g,writeGate:g=>writeGate=g,
     envelope:value=>({...client.manifest(),...value}),proposal:(extra={})=>h.disk.set('proposal.json',h.envelope({id:'proposal-1',requestId:h.disk.get('request.json').id,baseRevision:h.disk.get('state.json').revision,source:'{"title":"after"}',...extra})),
     reply:(extra={})=>h.disk.set('reply.json',h.envelope({id:'reply-1',requestId:h.disk.get('request.json').id,text:'Done <script>unsafe()</script>',...extra}))};
   return h;
@@ -500,7 +501,206 @@ test('native request pins the exact published revision despite edits during its 
   h.disk.set('agent-request.json',h.envelope({id:'planning',text:'Edit B',expiresAt:108000}));
   h.gate(name=>{if(name==='agent-request.json')h.type('{"a":1,"b":0}');});await h.client.poll();h.gate(null);
   assert.equal(h.disk.get('request.json').revision,base);
+  // The seed is the pinned base the proposal will merge from, not the newer edit.
+  assert.equal(h.disk.get(h.disk.get('request.json').candidate.spec),'{"a":0,"b":0}');
   for(let i=2;i<45;i++){h.type(JSON.stringify({a:i,b:0}));await h.client.poll();}
   h.proposal({baseRevision:base,source:'{"a":0,"b":2}'});await h.client.poll();
   assert.equal(h.last.review.ok,true);assert.deepEqual(JSON.parse(h.client.reviewContent()),{a:44,b:2});
+});
+
+test('send seeds the exact pinned pair under request names before publishing its metadata',async()=>{
+  const h=harness(),ledger='# Coverage ledger\n\nCustomer evidence — keep “exact” bytes.\n';
+  h.type('{"title":"before",  "nodes":{"customer":{"title":"Customer"}}}\n');h.notes(ledger);await h.client.start();
+  const order=[];let atPublication=null;
+  h.writeGate(name=>{order.push(name);if(name==='request.json')atPublication=[...h.disk].filter(([name])=>name.startsWith('candidate-'));});
+  const returned=await h.client.send('Rename the customer');h.writeGate(null);
+  const request=h.disk.get('request.json'),state=h.disk.get('state.json');
+  const candidate={spec:`candidate-${request.id}.spec.json`,ledger:`candidate-${request.id}.ledger.md`,baseRevision:state.revision};
+  assert.deepEqual(request.candidate,candidate);assert.deepEqual({...returned.candidate},candidate);assert.equal(request.revision,state.revision);
+  assert.deepEqual(request.selection,[{kind:'node',id:'customer'}]);
+  assert.deepEqual(order.filter(name=>name.startsWith('candidate-') || name==='request.json'),[candidate.spec,candidate.ledger,'request.json']);
+  assert.deepEqual(atPublication,[[candidate.spec,state.source],[candidate.ledger,ledger]]);
+  assert.equal(state.ledger,ledger);assert.equal(h.disk.get('story.spec.json'),state.source);assert.equal(h.writes.length,0);
+});
+test('registered Copy and native begin seed the same exact pair as Send and keep their selection',async()=>{
+  const ledger='# Ledger\n\nCopy and native evidence.\n';
+  const copied=harness({reviewMode:true});copied.notes(ledger);await copied.client.start();
+  const selection=[{kind:'node',id:'specific',label:'Specific'}];
+  const focus={source:copied.disk.get('state.json').source,project:1,selection,replySurface:'agent',delivery:'clipboard'};
+  const request=await copied.client.send('Copy this',focus),published=copied.disk.get('request.json');
+  assert.deepEqual(published.selection,selection);assert.deepEqual({...request.candidate},published.candidate);
+  assert.deepEqual(published.candidate,{spec:`candidate-${published.id}.spec.json`,ledger:`candidate-${published.id}.ledger.md`,baseRevision:published.revision});
+  assert.equal(copied.disk.get(published.candidate.spec),copied.disk.get('state.json').source);assert.equal(copied.disk.get(published.candidate.ledger),ledger);
+  const native=harness({workflow:'external',reviewMode:true});native.notes(ledger);await native.client.start();
+  native.disk.set('agent-request.json',native.envelope({id:'native-1',text:'Edit from my agent',expiresAt:108000}));await native.client.poll();
+  const begun=native.disk.get('request.json');assert.equal(native.last.pending,'native-1');assert.deepEqual(begun.selection,[]);
+  assert.deepEqual(begun.candidate,{spec:'candidate-native-1.spec.json',ledger:'candidate-native-1.ledger.md',baseRevision:begun.revision});
+  assert.equal(native.disk.get(begun.candidate.spec),native.disk.get('state.json').source);assert.equal(native.disk.get(begun.candidate.ledger),ledger);
+});
+test('pending requests and existing candidate files are never reseeded or replaced',async()=>{
+  const h=harness();await h.client.start();await h.client.send('First');
+  const first=h.disk.get('request.json'),n=Number(first.id.slice(3)),work='{"title":"agent work in progress"}';
+  h.disk.set(first.candidate.spec,work);
+  await assert.rejects(h.client.send('Second'),/Wait/);await h.client.poll();
+  assert.equal(h.disk.get(first.candidate.spec),work);assert.equal(h.disk.get('request.json').id,first.id);
+  h.reply();await h.client.poll();assert.equal(h.last.pending,null);
+  // A file already at the next request's name is not assumed to be ours.
+  h.disk.set(`candidate-id-${n+1}.ledger.md`,'someone else’s notes');
+  await assert.rejects(h.client.send('Third'),/already exists/);
+  assert.equal(h.disk.get('request.json').id,first.id);assert.equal(h.last.pending,null);
+  assert.equal(h.disk.has(`candidate-id-${n+1}.spec.json`),false);assert.equal(h.disk.get(`candidate-id-${n+1}.ledger.md`),'someone else’s notes');
+  // A file created after the existence check is detected before it is written.
+  h.writeGate(name=>{if(name===`candidate-id-${n+2}.ledger.md`)h.disk.set(name,'raced notes');});
+  await assert.rejects(h.client.send('Fourth'),/appeared/);h.writeGate(null);
+  assert.equal(h.disk.get(`candidate-id-${n+2}.ledger.md`),'raced notes');assert.equal(h.disk.get('request.json').id,first.id);assert.equal(h.last.pending,null);
+  await h.client.send('Fifth');assert.equal(h.disk.get('request.json').candidate.spec,`candidate-id-${n+3}.spec.json`);
+  assert.equal(h.disk.get(first.candidate.spec),work);
+  const native=harness({workflow:'external',reviewMode:true});await native.client.start();native.disk.set('candidate-taken.spec.json','existing');
+  native.disk.set('agent-request.json',native.envelope({id:'taken',text:'Edit',expiresAt:108000}));await native.client.poll();
+  assert.equal(native.last.pending,null);assert.match(native.last.status,/already exists.*retry/);assert.equal(native.disk.has('request.json'),false);
+  await native.client.poll();assert.equal(native.disk.has('request.json'),false);assert.equal(native.disk.get('candidate-taken.spec.json'),'existing');
+});
+test('a stopped request keeps its own candidate names and cannot reach the next request’s files',async()=>{
+  const h=harness();h.notes('# Ledger\n');await h.client.start();
+  let release,reached;const hit=new Promise(r=>reached=r);
+  h.writeGate(name=>name.startsWith('candidate-') && name.endsWith('.ledger.md')?new Promise(r=>{release=r;reached();}):null);
+  const sending=h.client.send('Stopped while seeding');await hit;const stopped=h.last.pending,cancelling=h.client.cancel();
+  h.writeGate(null);release();await assert.rejects(sending,/stopped/);await cancelling;
+  assert.equal(h.disk.has('request.json'),false);assert.equal(h.disk.get('cancel.json').requestId,stopped);
+  assert.equal(h.disk.get(`candidate-${stopped}.spec.json`),h.disk.get('state.json').source);assert.equal(h.disk.has(`candidate-${stopped}.ledger.md`),false);
+  await h.client.send('Second turn');const second=h.disk.get('request.json');assert.notEqual(second.id,stopped);
+  assert.equal(h.disk.has(`candidate-${stopped}.ledger.md`),false);
+  await h.client.cancel();await h.client.send('Third turn');const third=h.disk.get('request.json');
+  // The stopped agent may keep editing its own copies; the new pair stays exact.
+  h.disk.set(second.candidate.spec,'{"late":"stale agent"}');
+  assert.notEqual(third.candidate.spec,second.candidate.spec);assert.notEqual(third.candidate.ledger,second.candidate.ledger);
+  assert.equal(h.disk.get(third.candidate.spec),h.disk.get('state.json').source);assert.equal(h.disk.get(third.candidate.ledger),'# Ledger\n');
+  h.disk.set('proposal.json',h.envelope({id:'late',requestId:second.id,baseRevision:second.revision,source:'{"late":"stale agent"}'}));
+  await h.client.poll();assert.equal(h.writes.length,0);assert.equal(h.last.pending,third.id);
+});
+test('source, ledger, project or owner drift during preparation publishes no request',async()=>{
+  for(const drift of ['source','ledger','project','owner'])for(const phase of ['write','reread','publication']){
+    const h=harness(),label=drift+' during '+phase;h.notes('# Ledger\n');await h.client.start();const accepted=h.disk.get('story.spec.json');let done=false;
+    function change(){
+      if(done)return;done=true;
+      if(drift==='source')h.type('{"title":"human edit"}');else if(drift==='ledger')h.notes('# Ledger\n\nHuman note.\n');
+      else if(drift==='project')h.project();else h.disk.set('session.json',{...h.disk.get('session.json'),connectionId:'other'});
+    }
+    if(phase==='write')h.writeGate(name=>{if(name.startsWith('candidate-') && name.endsWith('.ledger.md'))change();});
+    if(phase==='reread')h.gate(name=>{if(name.startsWith('candidate-') && h.disk.has(name))change();});
+    if(phase==='publication')h.writeGate(name=>{if(name==='request.json')change();});
+    await assert.rejects(h.client.send('Edit'),drift==='owner'?/ownership changed/:/changed while preparing/,label);h.gate(null);h.writeGate(null);
+    assert.equal(done,true,label);assert.equal(h.disk.has('request.json'),false,label);assert.equal(h.last.pending,null,label);
+    assert.equal(h.writes.length,0,label);assert.equal(h.disk.get('story.spec.json'),accepted,label);
+    if(drift==='source' || drift==='ledger'){
+      await h.client.send('Retry');const retry=h.disk.get('request.json'),state=h.disk.get('state.json');
+      assert.equal(h.disk.get(retry.candidate.spec),state.source,label);assert.equal(h.disk.get(retry.candidate.ledger),state.ledger,label);
+    }
+  }
+  const native=harness({workflow:'external',reviewMode:true});await native.client.start();
+  native.writeGate(name=>{if(name.startsWith('candidate-'))native.type('{"title":"typing during begin"}');});
+  native.disk.set('agent-request.json',native.envelope({id:'drifted',text:'Edit',expiresAt:108000}));await native.client.poll();native.writeGate(null);
+  assert.equal(native.last.pending,null);assert.match(native.last.status,/changed while preparing/);assert.equal(native.disk.has('request.json'),false);
+  await native.client.poll();assert.equal(native.disk.has('request.json'),false);
+  native.disk.set('agent-request.json',native.envelope({id:'retry',text:'Edit',expiresAt:108000}));await native.client.poll();assert.equal(native.last.pending,'retry');
+});
+test('partial candidate writes or inexact rereads leave no authorized request',async()=>{
+  const h=harness();h.notes('# Ledger\n');await h.client.start();const n=Number(h.client.manifest().connectionId.slice(3));
+  h.fail(`candidate-id-${n+1}.ledger.md`);await assert.rejects(h.client.send('Edit'),/Disk/);
+  assert.equal(h.disk.has('request.json'),false);assert.equal(h.last.pending,null);
+  // The partial seed is left for inspection, never deleted or reused.
+  assert.equal(h.disk.get(`candidate-id-${n+1}.spec.json`),h.disk.get('state.json').source);assert.equal(h.disk.has(`candidate-id-${n+1}.ledger.md`),false);
+  const raw=h.files.readText;
+  h.files.readText=async name=>{const text=await raw(name);return text!==null && name.startsWith('candidate-')?text+' ':text;};
+  await assert.rejects(h.client.send('Edit'),/not the exact story copy/);
+  h.files.readText=async name=>{if(name.startsWith('candidate-') && h.disk.has(name))throw Object.assign(Error('Unreadable'),{name:'NotReadableError'});return raw(name);};
+  await assert.rejects(h.client.send('Edit'),/Unreadable/);
+  delete h.files.readText;await assert.rejects(h.client.send('Edit'),/raw folder reads/);
+  assert.equal(h.disk.has('request.json'),false);assert.equal(h.last.pending,null);assert.equal(h.writes.length,0);
+  h.files.readText=raw;await h.client.send('Edit');assert.equal(h.disk.get('request.json').id,`id-${n+5}`);
+  const native=harness({workflow:'external',reviewMode:true});await native.client.start();native.fail('candidate-partial.ledger.md');
+  native.disk.set('agent-request.json',native.envelope({id:'partial',text:'Edit',expiresAt:108000}));await assert.rejects(native.client.poll(),/Disk/);
+  assert.equal(native.disk.has('request.json'),false);assert.equal(native.last.pending,null);
+  await native.client.poll();assert.equal(native.disk.has('request.json'),false);
+});
+test('an invalid draft is seeded verbatim so its repair can be requested and applied',async()=>{
+  const h=harness({validate:text=>{try{JSON.parse(text);return null;}catch{return 'Invalid JSON';}}});await h.client.start();
+  let flushed=0;h.files.flushArtifacts=async()=>{flushed++;};
+  const broken='{"title": "missing brace"';h.type(broken);await h.client.send('Repair my JSON');
+  const request=h.disk.get('request.json');assert.equal(flushed,0);
+  assert.equal(h.disk.get(request.candidate.spec),broken);assert.equal(h.disk.get(request.candidate.ledger),'');
+  h.proposal({baseRevision:request.candidate.baseRevision,source:'{"title": "missing brace"}'});await h.client.poll();
+  assert.deepEqual(h.writes,['{"title": "missing brace"}']);assert.equal(h.disk.get('result.json').status,'applied');
+});
+test('a seeded pair edited in place flows through the existing preview and explicit Commit once',async()=>{
+  const h=harness({reviewMode:undefined});h.type('{"nodes":{"a":{"title":"A"},"b":{"title":"B"}}}');h.notes('# Ledger\n\nA and B covered.\n');
+  await h.client.start();await h.client.send('Rename B');
+  const {spec,ledger,baseRevision}=h.disk.get('request.json').candidate;
+  h.disk.set(spec,h.disk.get(spec).replace('"B"}','"Agent B"}'));h.disk.set(ledger,h.disk.get(ledger)+'B renamed at the user’s request.\n');
+  h.type('{"nodes":{"a":{"title":"Human A"},"b":{"title":"B"}}}');
+  h.proposal({baseRevision,source:h.disk.get(spec),ledger:h.disk.get(ledger)});await h.client.poll();
+  assert.equal(h.writes.length,0);assert.equal(h.last.review.ok,true);assert.equal(h.last.review.merged,true);
+  const expected=h.client.reviewContent();assert.deepEqual(JSON.parse(expected),{nodes:{a:{title:'Human A'},b:{title:'Agent B'}}});
+  await h.client.acceptReview(h.last.review.version);assert.deepEqual(h.writes,[expected]);
+  assert.equal(h.disk.get('result.json').status,'applied');assert.equal(h.disk.get('result.json').baseRevision,baseRevision);
+  await h.client.poll();assert.equal(h.writes.length,1);assert.match(h.disk.get(spec),/Agent B/);
+});
+test('the directory adapter refuses candidate work that appears between lookups or before close',async()=>{
+  for(const race of ['second lookup','before close']){
+    const h=harness();await h.client.start();let raced=null;
+    const missing=()=>Object.assign(Error('Missing'),{name:'NotFoundError'});
+    // Like File System Access: create makes an empty entry; bytes land on close.
+    const directory={async getFileHandle(name,options){
+      if(options?.create && race==='second lookup' && name.endsWith('.ledger.md') && !raced){raced=name;h.disk.set(name,'agent work');}
+      if(!h.disk.has(name)){if(!options?.create)throw missing();h.disk.set(name,'');}
+      return {async getFile(){const text=h.disk.get(name);return {size:new TextEncoder().encode(text).length,text:async()=>text};},
+        async createWritable(){let buffered=null;return {
+          async write(text){buffered=text;if(race==='before close' && name.endsWith('.ledger.md') && !raced){raced=name;h.disk.set(name,'agent work');}},
+          async close(){h.disk.set(name,buffered);},async abort(){}};}};
+    }};
+    const real=h.context.createFolderAgentFiles(directory),{write,readText}=h.files;
+    h.files.write=(name,...rest)=>(name.startsWith('candidate-')?real.write:write)(name,...rest);
+    h.files.readText=(name,...rest)=>(name.startsWith('candidate-')?real.readText:readText)(name,...rest);
+    await assert.rejects(h.client.send('Edit'),/appeared/,race);
+    assert.equal(h.disk.get(raced),'agent work',race);assert.equal(h.disk.has('request.json'),false,race);assert.equal(h.last.pending,null,race);
+    // The spec's own empty placeholder was filled; nothing else was replaced.
+    assert.equal(h.disk.get(raced.replace('.ledger.md','.spec.json')),h.disk.get('state.json').source,race);
+  }
+});
+test('candidate edits during request publication publish no request and keep the edit',async()=>{
+  for(const change of ['edited','removed']){
+    const h=harness();h.notes('# Ledger\n');await h.client.start();let touched=null;
+    h.writeGate(name=>{
+      if(name!=='request.json')return;
+      touched=[...h.disk.keys()].find(item=>item.startsWith('candidate-') && item.endsWith('.ledger.md'));
+      if(change==='edited')h.disk.set(touched,'# Foreign edit\n');else h.disk.delete(touched);
+    });
+    await assert.rejects(h.client.send('Edit'),/not the exact story copy/,change);h.writeGate(null);
+    assert.equal(h.disk.has('request.json'),false,change);assert.equal(h.last.pending,null,change);
+    assert.equal(h.disk.get(touched),change==='edited'?'# Foreign edit\n':undefined,change);
+    await h.client.send('Retry');const retry=h.disk.get('request.json');
+    assert.notEqual(retry.candidate.ledger,touched,change);assert.equal(h.disk.get(touched),change==='edited'?'# Foreign edit\n':undefined,change);
+  }
+  const native=harness({workflow:'external',reviewMode:true});await native.client.start();
+  native.writeGate(name=>{if(name==='request.json')native.disk.set('candidate-drifted.spec.json','{"foreign":true}');});
+  native.disk.set('agent-request.json',native.envelope({id:'drifted',text:'Edit',expiresAt:108000}));await native.client.poll();native.writeGate(null);
+  assert.equal(native.last.pending,null);assert.match(native.last.status,/not the exact story copy/);assert.equal(native.disk.has('request.json'),false);
+  await native.client.poll();assert.equal(native.disk.has('request.json'),false);assert.equal(native.disk.get('candidate-drifted.spec.json'),'{"foreign":true}');
+});
+test('only an accepted publication pins its base for proposals after many edits',async()=>{
+  const h=harness({reviewMode:true});h.type('{"a":0,"b":0}');await h.client.start();
+  h.fail('request.json');await assert.rejects(h.client.send('Edit B'),/Disk/);assert.equal(h.last.pending,null);
+  await h.client.send('Edit B');const request=h.disk.get('request.json');
+  // More than 32 later revisions evict the base from history; only the pin keeps it.
+  for(let i=1;i<45;i++){h.type(JSON.stringify({a:i,b:0}));await h.client.poll();}
+  h.proposal({baseRevision:request.candidate.baseRevision,source:'{"a":0,"b":2}'});await h.client.poll();
+  assert.equal(h.last.review.ok,true);assert.deepEqual(JSON.parse(h.client.reviewContent()),{a:44,b:2});
+  // A turn stopped during publication is not accepted, so its late proposal never applies.
+  await h.client.cancel();let release,reached;const hit=new Promise(r=>reached=r);
+  h.writeGate(name=>name==='request.json'?new Promise(r=>{release=r;reached();}):null);
+  const sending=h.client.send('Stopped at publication');await hit;const stopped=h.last.pending,cancelling=h.client.cancel();
+  h.writeGate(null);release();await assert.rejects(sending,/stopped/);await cancelling;
+  const published=h.disk.get('request.json');assert.equal(published.id,stopped);
+  h.proposal({id:'late',requestId:stopped,baseRevision:published.revision,source:'{"a":44,"b":3}'});await h.client.poll();
+  assert.equal(h.writes.length,0);assert.equal(h.last.review,null);
 });

@@ -93,7 +93,19 @@ export async function createSession(page, outDir, options = {}) {
   const source = options.seedSource ?? defaultSource;
   if (typeof source !== 'string' || Buffer.byteLength(source) > 4 * 1024 * 1024) throw new Error('Seed must be a source string of at most 4 MiB.');
   JSON.parse(source);
+  const ledger = options.seedLedger;
+  if (ledger !== undefined) {
+    if (typeof options.seedSource !== 'string') throw new Error('A seed ledger requires an explicit seed source.');
+    if (typeof ledger !== 'string' || !ledger || Buffer.byteLength(ledger) > 256 * 1024) throw new Error('Seed ledger must be a nonempty string of at most 256 KiB.');
+  }
   await writeFile(path.join(outDir, 'initial.spec.json'), source, {flag: 'wx'});
+  if (ledger !== undefined) {
+    // Fixture setup only: an ordinary existing pair for the Workbench's own
+    // adopt discovery to read. Its session metadata is still created by it.
+    await writeFile(path.join(outDir, 'initial.ledger.md'), ledger, {flag: 'wx'});
+    await writeFile(path.join(projectPath, 'story.spec.json'), source, {flag: 'wx'});
+    await writeFile(path.join(projectPath, 'story.ledger.md'), ledger, {flag: 'wx'});
+  }
   const html = options.workbenchHtml ?? await readFile(path.join(root, 'workbench/flowspec.html'), 'utf8');
   const errors = options.diagnostics?.errors ?? [], unexpectedRequests = options.diagnostics?.unexpectedRequests ?? [], archiveHashes = new Map();
   let sessionPath, archiveSequence = 0, lastSequence = 0, lastControlBytes, closed = false, listener, listenerError;

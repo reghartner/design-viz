@@ -62,7 +62,12 @@ prerequisites before validating a page.
    its best moment. If a panel has no job, drop it. What the source says the
    customer sees (a timeline gap, a banner, an icon) goes in a panel field, not
    only in a caption. Use a camera scene only if it fits the story; if none
-   fits, omit the screen and say so.
+   fits, omit the screen and say so. For a source-required clip opening, if a
+   source-backed matching scene is available, include a `screen` with it and
+   keep or make it visible at that step; if none is, omit the screen and say
+   so instead of showing an unmatched scene. A retained matching still
+   qualifies; no `Playing` label is required. A textual `deviceapp.clip` card
+   alone does not qualify.
 3. **Every step decides every panel.** In the step x panel matrix each cell is
    either `patch: ...` or `holds: <reason>`. An empty cell is not allowed.
 4. **Time is a property of the step.** Declare `diagram.storyTime` (start,
@@ -418,22 +423,36 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   build or **New Connection** to choose a method and folder. Copy and send controls
   appear only after connection; Beta sending also requires a live listener.
   Copied requests include selected item identifiers, JSON paths, evidence
-  references and view context, not the complete source. Read the current spec and
-  ledger from the shared folder before planning. Without a shared folder, ask for
+  references and view context, not the complete source. A registered request's
+  `request.candidate` names complete seeded copies of the spec and ledger and
+  their `baseRevision`; edit those copies instead of regenerating unrelated
+  source. Selection paths locate the edit but do not show that other parts are
+  unaffected: in the seeded copies, inspect every region it depends on,
+  including inherited state, neighboring steps and supporting ledger evidence.
+  Do not open the accepted files or all of `state.json` just to recreate the
+  candidates; read `state.json` only for context the request and candidates
+  lack. A request without `candidate`
+  uses the earlier flow: read the current spec and ledger from `state.json`
+  before planning. Without a shared folder, ask for
   any required source files; do not treat the copied context as a complete diagram.
   The bottom-left **Copy for agent** action copies selection context without
   registering or replacing a request. Wait for the user's accompanying instruction;
   use an existing active request or the normal native `begin` flow as appropriate.
   The project is the spec and coverage ledger at the folder root; `project.json`
-  names them. Existing artifacts must be preserved and read before planning.
+  names them. Existing artifacts must be preserved; read what the edit depends
+  on before planning.
   Connection identity is temporary and can change without changing the project.
   Maintain the worksheet, answers, coverage, evidence, decisions and open work
-  in a complete candidate ledger alongside the candidate spec. Submit both with
-  `propose --file candidate.spec.json --ledger candidate.ledger.md`; never write
-  accepted artifacts directly while connected. Even ledger-only changes require
-  a paired proposal. Every update waits for preview and explicit approval; one
-  Undo restores both. Reconcile conflicts against the current spec and ledger,
-  never merely relabel an old proposal with a new revision. After acceptance,
+  in the complete candidate ledger alongside the candidate spec, updating it when
+  coverage, evidence or decisions change. Submit both with `propose` using the
+  `request.candidate` files and `baseRevision` (without them, `--file
+  candidate.spec.json --ledger candidate.ledger.md`); never write another
+  request's candidates or accepted artifacts directly while connected. Even
+  ledger-only changes require a paired proposal. Every update waits for preview
+  and explicit approval; one Undo restores both. After a rejection, conflict or
+  stale base, reread `state.json` and reconcile the current spec and ledger into
+  the candidates without discarding their edits; never merely relabel an old
+  proposal with a new revision. After acceptance,
   reread both artifacts and reconcile the ledger with any merged human edits
   before claiming they are ready to commit. Keep `.flowview-agent/` metadata,
   candidates and workbench conversation history out of the repository commit.

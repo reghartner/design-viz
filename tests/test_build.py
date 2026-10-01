@@ -5,6 +5,7 @@ import base64
 import gzip
 import hashlib
 import pathlib
+import posixpath
 import re
 import runpy
 import subprocess
@@ -90,8 +91,18 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(), packed['sha256'])
         files = json.loads(raw)['files']
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'docs/folder-agent-session.md',
-                     'tools/canon/generated-runtime.cjs']:
+                     'docs/folder-agent-existing-edit.md', 'tools/canon/generated-runtime.cjs']:
             self.assertEqual(files[name], (ROOT / name).read_text())
+        # The short entry guide stays short and its relative links resolve inside the kit.
+        guide = files['docs/folder-agent-existing-edit.md']
+        self.assertLessEqual(len(guide), 4500)
+        links = re.findall(r'\]\(([^)#]+)\)', guide)
+        self.assertIn('../.claude/skills/hld-to-page/SKILL.md', links)
+        self.assertIn('folder-agent-session.md', links)
+        for link in links:
+            normalized = posixpath.normpath('docs/' + link)
+            self.assertIn(normalized, files, link)
+            self.assertTrue((ROOT / normalized).is_file(), link)
         self.assertEqual(packed['watcher'], (ROOT / 'tools/folder-agent.py').read_text())
         self.assertFalse(any('node_modules/' in name or '/agents/' in name or '/research/' in name for name in files))
 

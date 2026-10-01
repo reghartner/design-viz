@@ -286,6 +286,9 @@ test('refused folder Resume preserves the draft and instructions; successful Res
     // watch() performs this same preparation before emitting any request.
     h.run('prepare');
     expect(await readFile(skillFile,'utf8')).toBe(await readFile(path.join(root,'.claude/skills/hld-to-page/SKILL.md'),'utf8'));
+    const guide='docs/folder-agent-existing-edit.md';
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('/authoring/'+guide+' first');
+    expect(await readFile(path.join(h.session,'authoring',guide),'utf8')).toBe(await readFile(path.join(root,guide),'utf8'));
     await expect(readFile(path.join(h.session,'authoring/docs/agent-operations.md'))).rejects.toMatchObject({code:'ENOENT'});
     await expect(readFile(path.join(h.session,'authoring/src/workbench/agent-operations.js'))).rejects.toMatchObject({code:'ENOENT'});
     await disconnect(page);
@@ -879,7 +882,7 @@ test('connected Copy preserves a large message while registering a bounded nativ
     await page.locator('#folder-agent-send').click();expect((await h.read('request.json')).id).toBe(request.id);
     h.run('reply','--request',request.id,'--text','Ready for the next request.');
     await expect.poll(async()=> (await h.read('transcript.json')).messages.at(-1).role).toBe('assistant');
-    const large=JSON.parse(await page.locator('#src').inputValue());large.page.blocks[0].text='Complete evidence. '.repeat(1000)+'SOURCE END';const largeSource=JSON.stringify(large,null,2);
+    const priorSource=await page.locator('#src').inputValue(),large=JSON.parse(priorSource);large.page.blocks[0].text='Complete evidence. '.repeat(1000)+'SOURCE END';const largeSource=JSON.stringify(large,null,2);
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill(largeSource);await page.locator('#go').click();
     await expect.poll(async()=>(await h.read('state.json')).source).toBe(largeSource);
     await page.locator('#workspace-window-json .workspace-window-close').click();await copyRequest(page,'Review the full source.');
@@ -889,6 +892,18 @@ test('connected Copy preserves a large message while registering a bounded nativ
     expect(fullCopy).not.toContain('SOURCE END');expect(fullCopy).not.toContain('Complete evidence.');
     expect(fullCopy.length).toBeLessThan(3000);
     expect((await h.read('state.json')).source).toBe(largeSource);
+    // A valid published request's named pair is exactly its Workbench pair, read between matching states.
+    const project=await h.read('project.json'),owner=await h.read('session.json'),stateBefore=await h.read('state.json');
+    expect(project).toMatchObject({version:1,spec:expect.any(String),ledger:expect.any(String)});
+    const pair={source:await readFile(path.join(h.folder,project.spec),'utf8'),ledger:await readFile(path.join(h.folder,project.ledger),'utf8')};
+    const stateAfter=await h.read('state.json'),active={sessionId:largeRequest.sessionId,connectionId:largeRequest.connectionId,revision:largeRequest.revision};
+    expect(active).toEqual({sessionId:owner.sessionId,connectionId:owner.connectionId,revision:expect.any(String)});
+    expect(largeRequest.revision).not.toBe(request.revision);
+    for(const state of [stateBefore,stateAfter]){
+      expect({sessionId:state.sessionId,connectionId:state.connectionId,revision:state.revision}).toEqual(active);
+      expect(pair).toEqual({source:state.source,ledger:state.ledger ?? ''});
+    }
+    expect(priorSource).not.toBe(largeSource);expect(pair.source).toBe(largeSource);
 
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
@@ -960,6 +975,78 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     expect(await readFile(path.join(h.folder,'second-diagram/story.ledger.md'),'utf8')).toBe(afterLedger);
     await page.locator('#editor-tab-agent').click();await disconnect(page);await resumeFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#src')).toHaveValue(outside);
     expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).ledger)).toBe(afterLedger);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('seeded candidate pair is edited in place, proposed, previewed, committed and undone through real files',async({page})=>{
+  const h=await setup(page);let native;
+  const beforeLedger='# Coverage ledger\n\nDoorbell evidence is reviewed.\n',afterLedger=beforeLedger+'\nRenamed Doorbell to Seeded doorbell at the user’s request.\n';
+  try{
+    await writeFile(path.join(h.folder,'payments.spec.json'),source);await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+    await copyRequest(page,'Rename the doorbell.');
+    const request=await h.read('request.json'),state=await h.read('state.json'),candidate=request.candidate;
+    expect(candidate).toEqual({spec:`candidate-${request.id}.spec.json`,ledger:`candidate-${request.id}.ledger.md`,baseRevision:state.revision});
+    expect(request.revision).toBe(state.revision);
+    // Copy request delivers the seeded files with the short existing-edit guide.
+    const copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(copied).toContain(request.id);expect(copied).toContain(JSON.stringify(candidate.spec));expect(copied).toContain(JSON.stringify(candidate.ledger));
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8'),guide='docs/folder-agent-existing-edit.md';
+    expect(connect).toContain('/authoring/'+guide+' first');expect(connect).toContain('request.candidate names them');
+    expect(connect).not.toMatch(/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+    h.run('prepare');expect(await readFile(path.join(h.session,'authoring',guide),'utf8')).toBe(await readFile(path.join(root,guide),'utf8'));
+    const seeded=await readFile(path.join(h.session,candidate.spec),'utf8');
+    expect(seeded).toBe(source);expect(await readFile(path.join(h.session,candidate.ledger),'utf8')).toBe(beforeLedger);
+    // One targeted edit to each seeded copy, then the unchanged propose command.
+    const edited=seeded.replace('"Doorbell"','"Seeded doorbell"');expect(edited).not.toBe(seeded);
+    await writeFile(path.join(h.session,candidate.spec),edited);await writeFile(path.join(h.session,candidate.ledger),afterLedger);
+    h.run('propose','--request',request.id,'--revision',candidate.baseRevision,'--file',candidate.spec,'--ledger',candidate.ledger,'--summary','Rename the doorbell');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-view')).toContainText('Seeded doorbell');
+    await expect(page.locator('#src')).toHaveValue(source);
+    expect(await readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(source);expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    await page.locator('#agent-update-commit').click();await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(edited);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(edited);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(afterLedger);
+    h.run('reply','--request',request.id,'--text','Renamed the doorbell.');await expect(page.locator('#folder-agent-send')).toBeEnabled();
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(source);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(beforeLedger);
+    // A native begin request is seeded from the current saved pair the same way.
+    native=spawn('python3',[path.join(h.session,'folder-agent.py'),'begin','--text','Check the doorbell'],{stdio:['ignore','pipe','pipe']});
+    let output='',failure='';native.stdout.on('data',d=>output+=d);native.stderr.on('data',d=>failure+=d);
+    expect(await new Promise(resolve=>native.on('close',resolve)),failure).toBe(0);
+    const begun=await h.read('request.json'),current=await h.read('state.json');
+    expect(begun.id).toBe(JSON.parse(output).id);expect(begun.delivery).toBe('native');
+    expect(begun.candidate).toEqual({spec:`candidate-${begun.id}.spec.json`,ledger:`candidate-${begun.id}.ledger.md`,baseRevision:begun.revision});
+    expect(begun.revision).toBe(current.revision);
+    expect(await readFile(path.join(h.session,begun.candidate.spec),'utf8')).toBe(source);expect(await readFile(path.join(h.session,begun.candidate.ledger),'utf8')).toBe(beforeLedger);
+    expect(await readFile(path.join(h.session,candidate.spec),'utf8')).toBe(edited);
+    expect(h.errors).toEqual([]);
+  }finally{native?.kill();await page.close();await h.cleanup();}
+});
+
+test('Beta Send delivers seeded candidates with the short existing-edit guide',async({page})=>{
+  const h=await setup(page);
+  try{
+    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await chooseFolder(page);await h.listen();
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    expect(connect).toContain('/authoring/docs/folder-agent-existing-edit.md first');expect(connect).toContain('request.candidate names them');expect(connect).toContain('Start Monitor');
+    expect(connect).not.toMatch(/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+    await closeGuide(page);await page.locator('#folder-agent-input').fill('Rename the doorbell');await page.locator('#folder-agent-send').click();
+    const request=await publishedRequest(h,'Rename the doorbell'),state=await h.read('state.json');
+    expect(request.delivery).not.toBe('clipboard');expect(request.revision).toBe(state.revision);
+    expect(request.candidate).toEqual({spec:`candidate-${request.id}.spec.json`,ledger:`candidate-${request.id}.ledger.md`,baseRevision:state.revision});
+    expect(await readFile(path.join(h.session,request.candidate.spec),'utf8')).toBe(state.source);
+    expect(await readFile(path.join(h.session,request.candidate.ledger),'utf8')).toBe(state.ledger ?? '');
+    const edited=state.source.replace(/"title": ?"([^"]+)"/,'"title":"Seeded $1"');expect(edited).not.toBe(state.source);
+    await writeFile(path.join(h.session,request.candidate.spec),edited);await writeFile(path.join(h.session,request.candidate.ledger),'# Coverage ledger\n\nRenamed one title in the seeded copy.\n');
+    h.run('propose','--request',request.id,'--revision',request.candidate.baseRevision,'--file',request.candidate.spec,'--ledger',request.candidate.ledger,'--summary','Rename from seeded copy');
+    await expect(page.locator('#agent-update-open')).toBeVisible();await expect(page.locator('#src')).toHaveValue(state.source);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

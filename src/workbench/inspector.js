@@ -2229,6 +2229,18 @@ function renderMultiInspector(multiSel){
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
     }
     if (kind === 'node'){
+      ['horizontal','vertical'].forEach(function(direction){
+        var button=actionButton('Align '+direction,function(){
+          var snapshot=parseEditor();
+          if(snapshot.error){formError(snapshot.error);return;}
+          if(snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text){
+            formError('The JSON changed since the preview. Render it before aligning nodes.');return;
+          }
+          return applyPlan(planTransformFloats(snapshot.text,snapshot.raw,multiSel,{type:direction}),null,snapshot);
+        });
+        button.title='Set the same '+(direction==='horizontal'?'Y':'X')+' center as the first selected float';
+        acts.appendChild(button);
+      });
       acts.appendChild(actionButton('Create domain from selected nodes',function(){
         if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
           formError('Choose nodes from a single section to create a domain.');return;

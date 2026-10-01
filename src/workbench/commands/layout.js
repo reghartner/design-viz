@@ -135,6 +135,42 @@ function planPlaceFloat(text,raw,sectionIdx,id,x,y){
   });
 }
 
+/* Selection order defines the alignment anchor. Automatic floats are resolved
+   together before pinning, so moving one cannot move another's starting point. */
+function builderSelectedFloats(text,raw,targets){
+  if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
+  var section=targets[0].section;
+  if(targets.some(function(t){return t.kind!=='node' || t.section!==section;}))
+    return {error:'Choose floating nodes from a single section.'};
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var ids=targets.map(function(t){return t.id;});
+  if(new Set(ids).size!==ids.length)return {error:'Select each node only once.'};
+  if(ids.some(function(id){return !Object.prototype.hasOwnProperty.call(got.d.nodes || {},id) ||
+      !(got.d.floats || []).some(function(f){return f && f.id===id;});}))
+    return {error:'Use Free placement for every selected node before aligning or moving them together.'};
+  got.ids=ids;return got;
+}
+function planTransformFloats(text,raw,targets,change){
+  var got=builderSelectedFloats(text,raw,targets);if(got.error)return got;
+  if(!change || ['horizontal','vertical','move'].indexOf(change.type)<0)return {error:'Choose horizontal or vertical alignment, or a move.'};
+  if(change.type==='move' && (!Number.isFinite(change.dx) || !Number.isFinite(change.dy)))return {error:'Move distances must be finite.'};
+  var positions=layout(got.d).pos,anchor=positions[got.ids[0]],updated=Object.create(null);
+  for(var i=0;i<got.ids.length;i++){
+    var id=got.ids[i],p=positions[id];
+    if(!p || !anchor)return {error:'Render the selected nodes before arranging them.'};
+    var x=change.type==='vertical'?anchor.cx:p.cx+(change.type==='move'?change.dx:0);
+    var y=change.type==='horizontal'?anchor.cy:p.cy+(change.type==='move'?change.dy:0);
+    if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
+    updated[id]={x:Math.round(x*10)/10,y:Math.round(y*10)/10};
+  }
+  var floats=got.d.floats.map(function(f){
+    if(!updated[f.id])return f;
+    var next=Object.assign({},f,updated[f.id]);delete next.dx;delete next.dy;return next;
+  });
+  if(JSON.stringify(floats)===JSON.stringify(got.d.floats))return {error:'The selected nodes are already there.'};
+  return planSetField(text,raw,got.path,'floats',JSON.stringify(floats));
+}
+
 function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;

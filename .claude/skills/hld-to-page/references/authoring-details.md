@@ -259,6 +259,10 @@ Inspect the rendered result and use bends/label nudges if needed. Workbench
 controls are **float → Free placement**, **Float X/Y**, and **Exit / Entry side**
 with **position (%)**. See `docs/free-node-placement.md` and the executable
 `examples/free-placement/free-placement.spec.json` example.
+Shift-select floats in one section and use **Align horizontal** (same Y) or
+**Align vertical** (same X), anchored to the first selected node. Drag any member
+to move the selection together; each alignment or group drag is one Undo action.
+Row nodes must first be switched to Free placement.
 
 ## Human handoff in the workbench
 

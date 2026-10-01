@@ -26,7 +26,7 @@ function initWorkbenchAgentReview(opts){
     try{
       var page=normalize(JSON.parse(source)),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});
-      canvas=initViewerExploreCanvas(ctl,el('view'));rendered=true;
+      canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll')});rendered=true;
       el('commit').disabled=!shown.review.ok || viewing!=='proposed';
     }catch(ex){el('view').textContent='Could not render this preview: '+ex.message;}
   }

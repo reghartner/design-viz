@@ -72,7 +72,10 @@
 .agent-update-dialog footer{border-top:1px solid var(--line);}.agent-update-dialog footer span{flex:1;color:var(--sub);font-size:12px;}
 .agent-update-dialog nav{padding:8px 24px;display:flex;gap:8px;}.agent-update-dialog nav [aria-pressed="true"]{background:#dfe7fc;color:#203761;}
 .agent-update-dialog>p,.agent-update-dialog>details{margin:10px 24px;}.agent-update-dialog textarea{box-sizing:border-box;width:100%;background:var(--bg);color:var(--ink);padding:12px;border:1px solid var(--line);font:12px/1.5 'IBM Plex Mono',monospace;}
-#agent-update-scroll{flex:1;min-height:100px;overflow:auto;background:var(--bg);padding:16px 24px;}
+/* Contain the reader's fixed canvas, navigation and detail overlays inside the
+   review surface, leaving comparison, evidence and approval controls outside. */
+#agent-update-scroll{flex:1;min-height:100px;overflow:auto;background:var(--bg);padding:16px 24px;contain:layout paint;}
+#agent-update-scroll.viewer-exploring{overflow:hidden;}
 #agent-update-issues{padding:12px 24px;background:#fff3df;max-height:38vh;overflow:auto;color:#493513;}#agent-update-issues[hidden]{display:none;}
 #agent-update-view{max-width:1500px;margin:auto;}#agent-update-view .doc-title{display:block;}
 .agent-update-dialog button:disabled{opacity:.45;cursor:default;}

@@ -120,7 +120,10 @@ both artifacts. Oversized handwritten artifacts are refused before replacing
 the last saved pair.
 
 **Preview Agent Updates** shows the proposed rendered diagram and full ledger,
-with **Current state** and **Proposed state** controls. Neither candidate is
+with **Current state** and **Proposed state** controls. Explore stays inside the
+preview area so you can navigate its paths, zoom and panels while comparison,
+ledger and commit controls remain available. Preview navigation does not edit
+the proposed source. Neither candidate is
 accepted until **Commit update**. One Undo/Redo restores both. This saves local
 artifacts; it does not make a Git commit. The agent should reread the accepted
 pair after approval, especially after a merge, and submit a correction if the

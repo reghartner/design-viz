@@ -37,10 +37,16 @@ Both the helper and the mandatory skill carry this wording:
 
 ## Evidence
 
-**What was tested: the historical focused-v1 cue, not this main-branch
-version.** One Opus 5.5 (high) author ran the historical two-stage focused-v1
-flow. The only changes were this cue, added to focused-v1's `--catalog`
-response, and the matching skill wording.
+There are two author trials. Each is one unscored diagnostic run, and they
+used different routes. They are not replications of each other, and their
+results must not be pooled as an effect.
+
+### Historical: focused-v1 placement
+
+One Opus 5.5 (high) author ran the historical two-stage focused-v1 flow. The
+only changes were this cue, added to focused-v1's `--catalog` response, and
+the matching skill wording. This tested the focused-v1 placement, not the
+main-branch one.
 
 - The cue arrived once, inline in the catalog result the flow already used,
   before the first spec write. No new helper operation or report was needed.
@@ -50,26 +56,83 @@ response, and the matching skill wording.
   at both widths. The caption names the opening, and a separate camera
   `screen` shows the matching package scene. That scene is a retained still,
   which the cue accepts.
+- At both widths the `screen` started below the initial 1000 px viewport; you
+  had to scroll the page to see it. The clip check has no above-the-fold
+  requirement. This viewport observation belongs to this run only.
 - In this one run, the other two defect families were absent. That is a
   description only; it is not scored and shows no repair.
 
-**Not yet tested: this main-branch placement.** Main does not have
-focused-v1's `--catalog`, `--guide`, or `--section` modes, and this draft does
-not port them. Here the cue comes from the existing positional
-`widget_doc.py deviceapp|screen` output and from the mandatory skill. Getting
-the same wording through this other route has not been tried with an author.
+### Current main: prepared-kit author trial
+
+Main does not have focused-v1's `--catalog`, `--guide`, or `--section` modes,
+and this draft does not port them. On main the cue comes from the mandatory
+skill and from the existing positional `widget_doc.py` output.
+
+One author ran the ordinary two-stage flow in a prepared folder kit built from
+this branch. The requested and observed model was `claude-opus-5-5`, the CLI
+effort setting was `high`, and the same session was observed resuming across
+both phases. This is the prepared-kit author
+flow. It is not a live registered Copy for agent, Monitor, or Beta session.
+
+- **Cue exposure, before the first spec write.** Phase one read the mandatory
+  skill, which contained the cue once. Phase two ran the positional helper for
+  `homemap deviceapp battery screen`, whose output also contained the cue
+  once. The first spec write came after both. The fixed prompts contain no cue
+  text. This shows exposure only, not understanding, use, or effect.
+- **Integrity.** All 141 protected workspace files and all 458 frozen pins
+  were unchanged.
+- **Mechanical.** Candidate and stamped source each validated with 0 errors
+  and 0 warnings. The state walk exited 0 with 0 warnings. Capture produced 40
+  unique state views, 20 at each of 1440 and 800 px (ten `normal` and ten
+  `wifi-down` steps per width), with 0 page errors. A separate copy of the
+  final source also passed validation, page build, and state folding.
+- **Source identity.** The stamped and final source are byte-identical. The
+  raw candidate differs from them only in formatting and the
+  `page.flowview` compatibility metadata that stamping adds.
+- **Clip opening.** A selection frozen before capture fixed `normal/open-clip`
+  (source index 9) at both widths. An independent visual check and the
+  coordinator each viewed the actual full-page screenshots. At both widths the
+  caption says the resident opens the clip, and the separate **Porch Cam
+  Clip** `screen` shows the matching front-door package-drop scene with the
+  banner "Opened on the phone · 8:13 AM". The scene is a retained still from
+  index 6, which the cue accepts. This is an unscored pass of this narrow gate
+  only.
+- **Retained command-policy deviation (low).** After stamping and walking, one
+  Bash call appended an undeclared `tail -c 200 candidate.ledger.md` to a
+  permitted `widget --list` call. It read only the end of the author's own
+  ledger. No protected or outside file was accessed, the source was not
+  changed afterward, and there was no retry or repair. The run is therefore
+  not fully command-clean, and the extra
+  `--list` call is included in its diagnostic metrics.
+
+Evidence hashes (SHA-256):
+
+| Artifact | SHA-256 |
+|---|---|
+| Final (stamped) source | `cd7d160e34d90b397a64f26a52671df8cb04290d1691bcd858ded05f1e7b8402` |
+| Terminal/public-flow inspection | `9d77932a276d3dc08d7691137e530f61ee6a50534665d346bb777b7e5495502c` |
+| Coordinator terminal check | `3b2fac1455cb7f09afaf7fc9b5423d45889950ef2a85ea4bcfb149b613642b7d` |
+| Independent visual inspection | `f427f9a419868992009b832cc71c01adb9d43a68c2e7943fd0c63334d0970f8e` |
+| Coordinator visual inspection | `c5ac44b9b8f2f72bec459b5d481d265f7264d32d6ec8ab3bc8c21bcf08c77912` |
+| Capture verification | `3c840f156527d12cefef3f93648dcdf9a33198a8e9f283d8d6063788a485315d` |
+| Pre-capture selection | `2c0e92d34fb97914dd8afe90b202bc1c99833f9a5b7c30f4eddf203c3269a173` |
+| Screenshot, 1440 `normal/open-clip` | `3de036dfc20909380fae9332ba709710eb1fec5561d4a6f8a062c3c66c9c6d07` |
+| Screenshot, 800 `normal/open-clip` | `fe3fe8c554582aa23963c73f29ba2c7d15065aa8d0135b8bc43a397e83e076f0` |
 
 ## Limits
 
-- One unscored trial. It is not an overall presentation pass and gives no
-  quality-preservation or cohort result.
-- At both widths the `screen` starts below the initial 1000 px viewport; you
-  have to scroll the page to see it. The clip check has no above-the-fold
-  requirement.
-- The device app's "Last event" value is clipped inside the phone viewport at
-  both widths. This is an unscored presentation limit, investigated
-  separately; it does not affect the separate `screen`.
-- No Claude Monitor or Beta session has been observed using the cue.
+- Each trial is one unscored run. Neither is an overall presentation pass, and
+  neither supports a comparative, causal, context-saving, adoption,
+  quality-preservation, or cohort claim.
+- Current main: the screenshots are full-page, and the recorded DOM
+  coordinates include a scroll offset that was not recorded. No claim is made
+  about whether the `screen` is inside the initial viewport.
+- In both trials the device app's "Last event" value is clipped inside the
+  phone at both widths. In the current-main trial the home-map labels also
+  overlap. These presentation limits are unscored. A matching scene being
+  present at the clip opening does not fix them.
+- No registered Copy for agent, Monitor, or Beta session has been observed
+  using the cue.
 
 ## Workbench delivery route
 
@@ -85,7 +148,9 @@ context only and does not start authoring.
 
 These bounded checks were run after the skill edit was applied, and all
 passed. They check this route's delivery and existing regressions. They do not
-show what an author does with the cue on this route.
+show what an author does with the cue; the prepared-kit trial above covers
+that for one run only. These checks were not rerun for this evidence update,
+which changes no product code or guidance.
 
 - Helper case: `python3 tools/widget_doc.py deviceapp screen` exited 0 and
   printed the cue once, before the panels intro (12,515 stdout bytes, empty

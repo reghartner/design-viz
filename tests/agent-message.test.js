@@ -26,6 +26,7 @@ test('copy includes the request and URLs without the complete source or unrelate
   const message=c.workbenchAgentMessage(current,{message:request});
   assert.ok(message.includes(request));assert.ok(!message.includes(current.source));
   assert.doesNotMatch(message,/Other camera|capture\.js|retry\.js|Complete diagram source/);
+  assert.match(message,/seeded candidate files, work in those copies/);assert.doesNotMatch(message,/Read the current spec and ledger/);
   assert.equal(c.workbenchAgentMessage(current,{message:'  '}),'');
 });
 test('bare diagram paths and script-looking labels are serialized as data',()=>{

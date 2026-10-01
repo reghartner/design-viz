@@ -74,7 +74,7 @@ your-diagram/
     ├── state.json        source + ledger + revision + current focus
     ├── transcript.json   workbench messages, not native chat history
     ├── changes.json      bounded change receipts
-    ├── candidate.spec.json / candidate.ledger.md
+    ├── candidate-REQUEST_ID.spec.json / candidate-REQUEST_ID.ledger.md
     ├── folder-agent.py / CONNECT.md / authoring/
     └── …                 request/result, heartbeat and recovery data
 ```
@@ -95,24 +95,54 @@ The chosen diagram folder need not be the agent's working directory.
 
 Maintain the coverage ledger throughout authoring: worksheet, operator answers,
 evidence, coverage, decisions, illustrative assumptions, and open questions.
-Read the existing spec and ledger before changing them. A ledger is required for
-every proposed change, including a ledger-only update.
+Preserve the existing spec and ledger, and read the parts a change depends on
+before making it. A ledger is required for every proposed change, including a
+ledger-only update.
 
-Read `.flowview-agent/state.json` immediately before planning and retain its
-revision. Write complete candidates inside the support folder. While connected,
-the agent must not directly overwrite either accepted artifact. Validate the
-candidate spec with the bundled authoring kit, and reconcile ledger claims with
-that spec. The helper does not grant browser access or establish visual QA.
+Before publishing a registered request (Copy request, Beta Send, or native
+`begin`), Flowview copies the request's exact spec and ledger into complete
+candidate files in the support folder. `request.json` names them:
+
+```json
+"candidate": {
+  "spec": "candidate-REQUEST_ID.spec.json",
+  "ledger": "candidate-REQUEST_ID.ledger.md",
+  "baseRevision": "REQUEST_REVISION"
+}
+```
+
+The agent confirms `baseRevision` equals `request.revision`, then edits those
+copies instead of regenerating unrelated source; ordinary file edits work. The
+selection paths locate the edit, but they do not show that other parts are
+unaffected. In the seeded copies, inspect every region the edit depends on,
+including inherited state, neighboring steps and supporting ledger evidence. Do
+not open the accepted files or all of `state.json` just to recreate the
+candidates; read `state.json` only for context the request and candidates lack.
+Full rereads of the current pair are for requests without `candidate` and for
+stale, rejected or conflicting proposals. Update the ledger copy when
+coverage, evidence or decisions change. Each request has its own filenames;
+never write another request's candidates. Flowview never reseeds a pending
+request's candidates.
+
+A request without `candidate` uses the earlier flow: read
+`.flowview-agent/state.json` immediately before planning, retain its revision,
+and write complete `candidate.spec.json` and `candidate.ledger.md` files. While
+connected, the agent must not directly overwrite either accepted artifact.
+Validate the candidate spec with the bundled authoring kit, and reconcile ledger
+claims with that spec. The helper does not grant browser access or establish
+visual QA.
 
 ```sh
 python3 /path/to/diagram/.flowview-agent/folder-agent.py prepare
 python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \
-  --request REQUEST_ID --revision REVISION_READ_BEFORE_PLANNING \
-  --file candidate.spec.json --ledger candidate.ledger.md \
+  --request REQUEST_ID --revision BASE_REVISION \
+  --file candidate-REQUEST_ID.spec.json --ledger candidate-REQUEST_ID.ledger.md \
   --summary "Describe the diagram and ledger changes"
 ```
 
-Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
+Use the `request.candidate` filenames and `baseRevision`; a request without
+`candidate` uses `candidate.spec.json`, `candidate.ledger.md` and the revision
+read before planning. Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
 ledger limit: 256 KiB of nonempty UTF-8 text. The helper rejects symlinks,
 nonregular files, and filename traversal. Metadata/protocol files are bounded
 at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
@@ -134,9 +164,11 @@ Separate object fields and stable-ID items can merge against their original
 revision. Overlapping changes, deletion/edit collisions, ambiguous ordering,
 invalid combined specs, and incompatible ledger edits block approval. Ledger text
 merges conservatively as a whole document. **Copy feedback for your agent** names
-conflicts and releases the rejected proposal so the agent can revise it. Reread
-both current artifacts and submit a reconciled pair; never just put a new revision
-on an old proposal. Later edits invalidate an earlier approval.
+conflicts and releases the rejected proposal so the agent can revise it. After a
+rejection, conflict or stale base, reread `state.json` for both current artifacts
+and its revision, reconcile them into the candidate files without discarding
+their edits, and submit a reconciled pair; never just put a new revision on an
+old proposal. Later edits invalidate an earlier approval.
 
 Incomplete or invalid handwritten JSON stays in the browser draft and shared state;
 the artifact files retain their last valid pair until the JSON is repaired.
@@ -153,18 +185,19 @@ After connecting a folder, select items and click **Copy for agent · N selected
 the bottom left. It copies selection identifiers, references and view context
 without opening Agent or requiring a message. **Copied** confirms success.
 This action leaves your message draft and any active request alone; it creates
-no request and sends nothing to Monitor. With no selection it is disabled.
+no request, seeds no candidates and sends nothing to Monitor. With no selection it is disabled.
 If clipboard access is denied, Agent opens with the selected text for manual copy.
 
 In **Agent → Copy & paste**, write the request in the shared message box;
 include additional URLs or file paths there if useful. **Copy request** includes
 your message, selected item identifiers and JSON paths, their evidence references,
 view/path/step context and detail level. It does not include the complete source,
-panel payloads or the contents of selected sections/documents. The agent reads
-the current spec and ledger from the shared folder before editing. A connected folder is required to copy a request.
+panel payloads or the contents of selected sections/documents. The agent edits
+the request's seeded candidate copies in the shared folder after inspecting the
+regions the change depends on. A connected folder is required to copy a request.
 
-With a connected folder, Copy registers a request and copies its ID with the
-message and context. Long clipboard messages use a bounded registration
+With a connected folder, Copy registers a request, seeds its candidate files and
+copies its ID and candidate filenames with the message and context. Long clipboard messages use a bounded registration
 placeholder while preserving the complete message on the clipboard. Clipboard
 requests are not dispatched by Monitor. Recopy of the same pending request reuses
 its ID. If clipboard permission is denied, the prepared request is shown for

@@ -13,8 +13,11 @@ function workbenchPracticeSource(source,chapter,viewState){
   if(['viewer','agent','manual','example'].indexOf(chapter)<0)throw Error('Unknown tour chapter');
   // No same-origin capability: storage, the parent's DOM and file handles are
   // inaccessible. CSP also forbids network requests and external navigations.
+  // The pristine document starts on Home. Conceal it before the parser reaches
+  // the body, so a slow chapter boot cannot briefly paint homepage chrome.
+  var startupStyle='<style>html[data-flowview-practice] #workbench-welcome{display:none!important}html[data-flowview-practice] body:not(.workbench-practice){visibility:hidden}</style>';
   return source.replace(/<html\b/i,'<html data-flowview-practice="'+chapter+'" data-flowview-view="'+encodeURIComponent(JSON.stringify(viewState || null))+'"')
-    .replace(/<head\b[^>]*>/i,function(head){return head+'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'; base-uri \'none\'">';});
+    .replace(/<head\b[^>]*>/i,function(head){return head+'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'; base-uri \'none\'">'+startupStyle;});
 }
 function workbenchTourCatalog(){
   return {version:1,source:'Fictional tour catalog · example of a Backstage snapshot',services:[

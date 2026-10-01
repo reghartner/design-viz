@@ -21,6 +21,22 @@ test('canonical homepage setup defaults to copy/paste with user-owned agent',asy
   await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','true');
 });
 
+test('practice chapters conceal homepage chrome before their bootstrap runs',async({page,server})=>{
+  await start(page,server,'3. Edit in workbench');
+  const source=await page.locator('.workbench-tour-host iframe').getAttribute('srcdoc');
+  // Hold the actual generated chapter in its pre-boot state, rather than
+  // relying on a screenshot happening to catch a single loading frame.
+  const beforeBoot=await page.evaluate(html=>{
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    doc.querySelectorAll('script').forEach(script=>script.remove());
+    return '<!doctype html>'+doc.documentElement.outerHTML;
+  },source);
+  await page.setContent(beforeBoot);
+  await expect(page.locator('#workbench-welcome')).toHaveCount(1);
+  await expect(page.locator('#workbench-welcome')).toBeHidden();
+  await expect(page.locator('.workbench-header')).toBeHidden();
+});
+
 test('Build with my agent from the standalone brief preserves the current draft and Undo',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(editorSpec(),null,2));
   await page.locator('#docview .node').first().click();await page.locator('#object-duplicate').click();

@@ -13,6 +13,8 @@ The spec and ledger may have custom names or live in subfolders. That does not m
 
 File names given to the helper (`--task`, `--fragment`, `--file`, `--ledger`) are relative to the helper folder.
 
+The connection instructions, also saved as `<helper>/CONNECT.md`, are the command contract for `folder-agent.py`; reading its source is optional, for troubleshooting. If they are already in your conversation, do not open `CONNECT.md` again; read it once only when a request arrives without them.
+
 ## Prepare first
 
 From the diagram folder, run the exact command from your instructions:

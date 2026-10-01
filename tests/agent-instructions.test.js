@@ -27,7 +27,6 @@ test('setup keeps the main helper and kit steps but defers diagram reads and aut
   for(const workflow of ['external','embedded']){
     const prompt=context.folderAgentInstructions('Payments','story',false,custom,workflow),{setup}=routes(prompt);
     assert.match(setup,/sessionId "session" and connectionId "connection"/);
-    assert.ok(setup.includes('Read .agent meta/CONNECT.md and folder-agent.py before running anything.'));
     assert.ok(setup.includes('Run python3 "<diagram folder>/.agent meta/folder-agent.py" prepare to set up the authoring kit.'));
     assert.ok(setup.includes('VIZ is .agent meta/authoring/'));
     assert.ok(setup.includes('"payments flow.spec.json"') && setup.includes('"payments flow.ledger.md"'));
@@ -36,6 +35,29 @@ test('setup keeps the main helper and kit steps but defers diagram reads and aut
     assert.doesNotMatch(setup,/state\.json|SKILL\.md|spec_walk|reread|Open and preserve/,'setup reads no full pair or skill');
     assert.match(setup,/Copy for agent action copies selection context only/);
     assert.match(setup,/the focused route when request\.mode is "focused-deviceapp", otherwise the full route/);
+  }
+});
+const contractOf=prompt=>prompt.split('\n\n').find(part=>part.startsWith('These instructions are the full text'));
+test('setup carries the helper command contract and makes no source or duplicate CONNECT.md read mandatory',()=>{
+  const cases=[[custom,'.agent meta/CONNECT.md'],[identity,'.flowview-agent/CONNECT.md'],[{sessionId:'s',connectionId:'c'},'saved as CONNECT.md.']];
+  for(const [who,connect] of cases){
+    const contracts=[];
+    for(const workflow of ['external','embedded'])for(const resume of [false,true]){
+      const prompt=context.folderAgentInstructions('Payments','story',resume,who,workflow),contract=contractOf(prompt);
+      assert.ok(contract && routes(prompt).setup.includes(contract),'the contract is common setup, before either route');
+      assert.ok(contract.includes(connect),'names the CONNECT.md this text was saved as');
+      assert.match(contract,/Keep following them for every request in this conversation; do not open that file again while they are here/);
+      assert.match(contract,/Use only the helper commands these instructions name/);
+      assert.match(contract,/continue only on the success each step describes/);
+      assert.match(contract,/nonzero exit is a refusal or error \(prepare --request and assemble-deviceapp print JSON with refused and reason\)/);
+      assert.match(contract,/otherwise stop and report it/);
+      assert.match(contract,/it never approves an update/);
+      assert.match(contract,/Reading the helper source is not a prerequisite; you may inspect it to troubleshoot/);
+      // No mandatory helper-source or connection-file read anywhere in the setup.
+      assert.doesNotMatch(prompt,/before running anything|Read [^.]*(?:CONNECT\.md|folder-agent\.py)/);
+      contracts.push(contract);
+    }
+    assert.equal(new Set(contracts).size,1,'Copy and Beta, new and resumed setups share one contract');
   }
 });
 test('the default route carries no compact-entrypoint, catalog or guide-map treatment',()=>{
@@ -133,6 +155,19 @@ test('copied request headers give the exact relative prepare command and name on
   assert.ok(context.folderAgentRequestHeader('Doorbell','.',focused).includes('python3 "folder-agent.py" prepare --request req-1'));
   assert.ok(context.folderAgentRequestHeader('Doorbell','.',focused).includes('python3 "folder-agent.py" assemble-deviceapp'));
 });
+test('copied request headers continue the established setup and read CONNECT.md only to recover it',()=>{
+  const focused={id:'req-1',sessionId:'s',connectionId:'c',revision:'c-4',mode:'focused-deviceapp',focus:{format:'flowview-deviceapp-focus-v1',file:'focus-req-1.json',sha256:'a'.repeat(64)}};
+  const full={id:'req-2',sessionId:'s',connectionId:'c',revision:'c-5'};
+  for(const [support,connect] of [['.agent meta','.agent meta/CONNECT.md'],['.flowview-agent','.flowview-agent/CONNECT.md'],['.','read CONNECT.md']])
+    for(const request of [focused,full]){
+      const header=context.folderAgentRequestHeader('Payments',support,request);
+      assert.ok(header.startsWith('Use registered request '+JSON.stringify(request.id)+' (session "s", connection "c") in our shared folder "Payments".'));
+      assert.ok(header.includes('Continue with this connection\'s setup instructions; read '),'continues the setup already in the conversation');
+      assert.ok(header.includes(connect+' once only if they are not already in this conversation.'),'recovers the setup from CONNECT.md once');
+      assert.doesNotMatch(header,/^Read |\. Read CONNECT|folder-agent\.py before|helper source/,'no unconditional CONNECT.md or helper-source read');
+      assert.ok(header.indexOf('CONNECT.md once')<header.indexOf('prepare --request'),'recovery precedes preparation');
+    }
+});
 const guide=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
 test('the skill\'s shared-folder section defers file access to CONNECT.md and the preparation receipt',()=>{
   const skill=guide('.claude/skills/hld-to-page/SKILL.md'),start=skill.indexOf('- **Shared diagram folder.**'),end=skill.indexOf('\n- **',start+1);
@@ -146,6 +181,19 @@ test('the skill\'s shared-folder section defers file access to CONNECT.md and th
   assert.doesNotMatch(section,/Read the current spec and\s+ledger|read before planning|candidate\.spec\.json|candidate\.ledger\.md|reread both/,'no direct durable read, fixed candidate or unconditional reread');
   // The focused redirect near the top is unchanged.
   assert.match(skill,/"mode": "focused-deviceapp"` follows\n\[focused-panel-edit\.md\]\(references\/focused-panel-edit\.md\) instead of this skill/);
+});
+test('skill, focused guide and public doc treat the setup as the command contract and read CONNECT.md only to recover it',()=>{
+  const recovery={
+    '.claude/skills/hld-to-page/SKILL.md':/do not open `CONNECT\.md` again; read it once only when a\s+request arrives without that setup/,
+    '.claude/skills/hld-to-page/references/focused-panel-edit.md':/do not open `CONNECT\.md` again; read it once only when a\s+request arrives without them/,
+    'docs/folder-agent-session.md':/continue the setup already in the agent conversation; only an\s+agent without it, such as a resumed or separate conversation, reads `CONNECT\.md`,\s+once/};
+  for(const [file,recovers] of Object.entries(recovery)){
+    const text=guide(file);
+    assert.match(text,/command\s+contract for `folder-agent\.py`/,file);
+    assert.match(text,/(?:helper|its)\s+source is optional,\s+for troubleshooting/i,file);
+    assert.match(text,recovers,file);
+    assert.doesNotMatch(text,/read (?:its )?`CONNECT\.md` and|before running anything|(?:read|open)\s+`?folder-agent\.py`?\s+(?:first|before)/i,file+' mandates no duplicate setup or helper-source read');
+  }
 });
 test('focused examples pass the authoritative request.focus.file to --task',()=>{
   for(const file of ['.claude/skills/hld-to-page/references/focused-panel-edit.md','docs/folder-agent-session.md']){

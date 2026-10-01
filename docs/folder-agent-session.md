@@ -93,6 +93,14 @@ folder's metadata. If it cannot identify the folder as its working directory or
 a direct child, it asks for the full path instead of searching unrelated folders.
 The chosen diagram folder need not be the agent's working directory.
 
+The copied setup, also saved as `.flowview-agent/CONNECT.md`, is the command
+contract for `folder-agent.py`: it names each helper command, the success to
+continue on and how to handle a refusal. Reading the helper source is optional,
+for troubleshooting a refusal or unexpected output. Copied requests and **Copy for
+agent** context continue the setup already in the agent conversation; only an
+agent without it, such as a resumed or separate conversation, reads `CONNECT.md`,
+once.
+
 ## Author and review both artifacts
 
 Maintain the coverage ledger throughout authoring: worksheet, operator answers,

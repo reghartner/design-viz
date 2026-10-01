@@ -742,7 +742,7 @@ test('Copy for agent keeps an existing shared-folder request intact',async({page
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').click();
     await page.locator('#folder-agent-selection').click();await expect(page.locator('#folder-agent-selection')).toHaveText('Copied · 1 selected');
     const copied=await page.evaluate(()=>navigator.clipboard.readText());
-    expect(copied).toContain(manifest.connectionId);expect(copied).toContain('.flowview-agent/CONNECT.md');
+    expect(copied).toContain(manifest.connectionId);expect(copied).toContain(continueSetup);
     expect(copied).toContain('Selection context only');expect(copied).not.toContain(request.id);expect(copied).not.toContain('Keep this request active.');
     expect(await h.read('request.json')).toEqual(request);await expect(page.locator('#editor-agent')).toBeHidden();
     await openAgent(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this request active.');
@@ -1005,6 +1005,16 @@ async function selectDeviceApp(page){
 }
 async function focusFiles(h){return (await readdir(h.session)).filter(name=>name.startsWith('focus-'));}
 function publishedOrder(h,from){return h.writes.slice(from).map(name=>path.basename(name)).filter(name=>name==='request.json' || name.startsWith('focus-'));}
+/* The written setup is its own helper command contract; nothing mandates a helper-source or repeated CONNECT.md read. */
+const continueSetup='Continue with this connection\'s setup instructions; read .flowview-agent/CONNECT.md once only if they are not already in this conversation.';
+function expectCommandContract(connect){
+  const common=connect.slice(0,connect.indexOf('Full route.'));
+  expect(common).toContain('These instructions are the full text the workbench saved as .flowview-agent/CONNECT.md.');
+  expect(common).toContain('do not open that file again while they are here');
+  expect(common).toContain('A nonzero exit is a refusal or error');expect(common).toContain('it never approves an update');
+  expect(common).toContain('Reading the helper source is not a prerequisite');
+  expect(connect).not.toMatch(/before running anything|Read [^.]*(?:CONNECT\.md|folder-agent\.py)/);
+}
 
 test('focused Copy registers its packet before the request, stays context-bounded, then previews, applies and undoes the full pair',async({page})=>{
   const h=await setup(page),story=JSON.stringify(focusedStory(),null,2);
@@ -1017,6 +1027,8 @@ test('focused Copy registers its packet before the request, stays context-bounde
     expect(common).toContain('connectionId');expect(common).not.toMatch(/state\.json|SKILL\.md|Open and preserve/);
     expect(connect).toContain('"payments.spec.json"');expect(connect).toContain('assemble-deviceapp');expect(connect).toContain('Do not start Monitor');
     expect(await readFile(path.join(h.session,'README.md'),'utf8')).toBe(connect);
+    // The copied setup is exactly the CONNECT.md text it says it is.
+    expectCommandContract(connect);expect(await page.locator('#folder-agent-instructions').inputValue()+'\n').toBe(connect);
     h.run('prepare'); // the documented setup step; it unpacks the kit the assembler uses
     await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await openAgent(page);const toggle=page.locator('#folder-agent-focused');await expect(toggle).toBeHidden();
@@ -1025,6 +1037,7 @@ test('focused Copy registers its packet before the request, stays context-bounde
     await expect(quick).toHaveText('Copy for agent · 1 selected');await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
     let copied=await page.evaluate(()=>navigator.clipboard.readText());
     expect(copied).toContain('Selection context only');expect(copied).toContain('Only the workbench Agent composer can start that mode');
+    expect(copied).toContain(continueSetup);
     expect(copied).not.toMatch(/focus-[\w-]+\.json|assemble-deviceapp|candidate\.panel\.json/);
     expect(await readdir(h.session)).not.toContain('request.json');expect(await focusFiles(h)).toEqual([]);
     // The explicit focused choice registers a packet, then the request that names it.
@@ -1042,6 +1055,9 @@ test('focused Copy registers its packet before the request, stays context-bounde
     expect(packet.ledgerSha256).toBe(sha256(focusedLedger));expect(corePacket(request,state).text).toBe(packetText);
     copied=await page.evaluate(()=>navigator.clipboard.readText());
     expect(copied).toContain(request.id);expect(copied).toContain('.flowview-agent/'+request.focus.file);expect(copied).toContain(request.focus.sha256);
+    // The header continues the pasted setup; CONNECT.md is only the recovery path, read before prepare.
+    expect(copied).toContain(continueSetup);expect(copied.indexOf(continueSetup)).toBeLessThan(copied.indexOf('prepare --request'));
+    expect(copied).not.toMatch(/^Read CONNECT\.md|folder-agent\.py before/);
     expect(copied).toContain('python3 ".flowview-agent/folder-agent.py" prepare --request '+request.id);
     expect(copied).toContain('python3 ".flowview-agent/folder-agent.py" assemble-deviceapp --request '+request.id+' --task '+request.focus.file);
     expect(copied).toContain('Move the clip card to the top.');
@@ -1105,6 +1121,7 @@ test('Beta focused Send publishes the same core packet before a watcher-visible 
     const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
     expect(connect).toContain('Start Monitor on python3');expect(connect).toContain('Renew Monitor only while editor.json is connected');
     expect(connect.slice(0,connect.indexOf('Full route.'))).not.toMatch(/state\.json|SKILL\.md/);
+    expectCommandContract(connect);expect(await page.locator('#folder-agent-instructions').inputValue()+'\n').toBe(connect);
     await closeGuide(page);await h.listen();
     await selectDeviceApp(page);await openAgent(page);
     const toggle=page.locator('#folder-agent-focused');await expect(toggle).toBeEnabled();await toggle.check();

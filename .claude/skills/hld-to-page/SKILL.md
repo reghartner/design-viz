@@ -401,8 +401,13 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
 
 - **Shared diagram folder.** When the selected folder contains
   `.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
-  `flowview-folder-v1`, read its `CONNECT.md` and follow
+  `flowview-folder-v1`, follow its connection setup (the copied text the
+  workbench also saves as `CONNECT.md`) and
   [diagram-folder collaboration](../../../docs/folder-agent-session.md).
+  That setup is the command contract for `folder-agent.py`; reading the helper
+  source is optional, for troubleshooting. If the setup is already in your
+  conversation, do not open `CONNECT.md` again; read it once only when a
+  request arrives without that setup.
   In the recommended copy/paste workflow, wait for messages in the agent app;
   do not start or renew Monitor, a watcher, or a background polling loop. Monitor
   belongs to the explicitly configured Beta connection only. The workbench's

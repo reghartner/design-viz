@@ -682,6 +682,14 @@ function edgeForm(val, ctx){
     }
     var portHint=document.createElement('p');portHint.className='fnote';
     portHint.textContent='Entry/exit positions run from 0% at the left or top to 100% at the right or bottom. Pinned ports use a curve, including in lane routing; Auto restores automatic routing.';
+    var curveControls=document.createElement('div'),curveHint=document.createElement('p');curveHint.className='fnote';
+    curveHint.textContent='Drag the arrow or its round handles to shape a smooth curve. Drag another part to add a point. Double-click a point to remove it. Focus a point to use arrow keys or Delete.';
+    curveControls.appendChild(curveHint);
+    if(hasEdgeCurve(val) || val.bend!=null){
+      curveControls.appendChild(actionButton('Reset curve',function(){
+        return commitCascade(function(raw){return planEdgeCurve(session.text(),raw,t.section,t.index,[]);});
+      }));
+    }
     return [
       frow('from', endpoint('from')),
       frow('to', endpoint('to'))
@@ -691,7 +699,7 @@ function edgeForm(val, ctx){
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val),
       frow('label', textControl(val.label, function(v){ return commitSimple('label', v == null ? null : JSON.stringify(v)); })),
-      frow('bend', numberControl(val.bend, function(v){ return commitSimple('bend', v == null ? null : String(v)); })),
+      frowBlock('Curve',curveControls),
       frow('labelDx', numberControl(val.labelDx, function(v){ return commitSimple('labelDx', v == null ? null : String(v)); })),
       frow('labelDy', numberControl(val.labelDy, function(v){ return commitSimple('labelDy', v == null ? null : String(v)); })),
       visibilityControl(val,ctx)

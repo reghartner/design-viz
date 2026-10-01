@@ -31,7 +31,10 @@ composer; the inspector supplies its transactions and form lifetime.
 15. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
 16. `workbench/io-browser.js`: bound browser resource adapters.
 17. `workbench/io.js`: import/export controls and independent operation lifetimes.
-18. `workbench/interactions.js`: selection, board markers, modes and graph gestures.
+18. `workbench/edge-curves.js`: direct curve gestures and temporary SVG handles,
+owned and retired by `workbench/interactions.js`, which coordinates selection,
+board markers, modes and graph gestures. Curve geometry stays in the shared
+core; saved edits use `planEdgeCurve()` and the ordinary session transaction.
 19. `workbench/add-menu.js`: destination selector and modal insertion chooser; commands and history stay in their existing owners.
 20. `builder.workbench.js`: composition, outline, source focus, insertion and preview coordination.
     Callers load the validator/panel assembly first.

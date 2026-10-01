@@ -323,7 +323,10 @@ docs for your panels together: `python3 <VIZ>/tools/widget_doc.py <types>`.
 Start from the closest cookbook example and replace its facts with yours. The
 [routing table](references/recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
-Confluence, named views, free placement).
+Confluence, named views, free placement). For manually shaped arrows, use
+`edges[].curvePoints` from the authoring contract and `cookbook/adjustments.md`:
+these are smooth through-points that override automatic routing. The workbench
+can author them by dragging the arrow; check the rendered curve for collisions.
 
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths

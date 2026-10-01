@@ -239,7 +239,7 @@ function ui(spec=fixture(),options={}){
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
   for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
-    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/icon-picker','workbench/brand','workbench/inspector','workbench/io-model','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
+    'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/icon-picker','workbench/brand','workbench/inspector','workbench/io-model','workbench/edge-curves','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
   const session=C.createBuilderSession({source:{read:()=>text,write:v=>text=v},render(){renders++;},persistence:{read:()=>({}),save(){},preserve(){},cancel(){}}});

@@ -21,7 +21,7 @@ of knobs. This file maps the feedback to the knob. Two facts first:
 | "put it on the row below" | move the id between `rows` arrays | every row renders LEFT-TO-RIGHT in its authored order; other rows keep their horizontal order |
 | "those two chips should read as one device" | make them one stacked slot: `["lp", "soc"]` inside a row, plus a `groups` boundary | stacked cards share a column |
 | "that label is sitting on the line / hanging off" | shorten the label, or nudge with `edges[i].labelDx` / `labelDy` (px) | budget ≈ 6.4 px per character vs the edge's length; the lint prints both numbers |
-| "curve that arrow / it cuts through a box" | `edges[i].bend` | positive/negative bows the path to either side |
+| "curve that arrow / it cuts through a box" | `edges[i].curvePoints` | drag the arrow through the desired position; add more points for S-curves; Reset curve restores automatic routing |
 | "several step numbers crowd one edge" | nothing to fix unless the story is wrong — keep each step's real first hop | steps sharing a first edge get one coin each, side by side along that edge in step order |
 | "zoom the sensing wedge out — I can't see all of it" | Radar `range`, or `scale.pxPerUnit` when using physical units | keep sourced range unchanged; adjust display scale/placement and inspect wedge fit in the 320×180 frame |
 | "have the sensor face up instead of left" | Radar `facing` | degrees clockwise from +x: 0 right, 90 down, 180 left, 270 up |

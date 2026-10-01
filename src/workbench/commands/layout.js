@@ -1,6 +1,15 @@
 /* Pure authored placement, layout and named-view commands. Measured boxes
    are inputs; DOM measurements and pointer lifetimes belong to controllers. */
 
+function planEdgeCurve(text,raw,sectionIdx,index,points){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!got.d.edges || !got.d.edges[index])return {error:'Connection not found.'};
+  if(!validCurvePoints(points))return {error:'Use up to 32 curve points with finite coordinates.'};
+  return planSetFields(text,raw,got.path.concat(['edges',index]),[
+    ['curvePoints',points.length?JSON.stringify(points):null],['bend',null]
+  ]);
+}
+
 function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
   /* lift one layout row out of diagram.rows and re-insert it at toIdx
      (index AFTER removal — the drop code converts gap positions) */

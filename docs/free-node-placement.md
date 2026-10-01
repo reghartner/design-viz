@@ -70,7 +70,7 @@ to Auto to remove that port. With both Auto, normal routing applies. A pinned ed
 uses a curve even in a lane diagram; other lane edges and the row grid are
 preserved. Ports stay anchored during avoidance/bend adjustments, and labels,
 packets and step highlights follow the resulting path. Pinning does not guarantee
-that a path avoids every other card; use `bend` and label nudges for crowded routes.
+that a path avoids every other card; drag the arrow to add smooth through-points (`curvePoints`) and use label nudges for crowded routes. Manual curves override avoidance and can be reset in Inspect.
 Float layouts use curve routing, as reported by validation when lanes are requested.
 
 The feature is shared by standalone HTML, native Backstage and Forge viewers.

@@ -17,10 +17,20 @@ function createBuilderInteractions(opts){
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
   function inDetailPreview(el){return !!(el && el.closest && el.closest('[data-dv-detail-preview]'));}
   var selectedEl=null,clipboardHomeTarget=null;
+  var curveEditor=createEdgeCurveEditor({view:view,document:document,window:window,src:src,session:session,
+    disabled:function(){return !!(addToStep || connect || multiSel && multiSel.length>1 || opts.isActive && !opts.isActive());},
+    message:inspectorMessage,pause:pausePreview,
+    select:function(el,section,index){clearMultiSelect();selectTarget({el:el,section:section,kind:'edge',index:index},false,true);},
+    commit:function(plan,snapshot,section,index){
+      if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      session.target={section:section,kind:'edge',index:index};rehighlight();renderInspector();
+    }});
+  life.own(function(){curveEditor.destroy();});
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
     if (selectedEl) selectedEl.classList.add('dv-sel');
+    curveEditor.refresh(selectedEl);
     if(opts.selectionChanged)opts.selectionChanged();
   }
 
@@ -449,6 +459,7 @@ function createBuilderInteractions(opts){
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */
   var addToStep = null; /* {section, step} while active */
   function addToStepStatus(){
+    curveEditor.clear();
     opts.refreshInsertion();
     if (targetLabel && addToStep)
       targetLabel.textContent = 'ADD TO STEP ' + (addToStep.step + 1) +
@@ -624,6 +635,7 @@ function createBuilderInteractions(opts){
     }
   }
   function startConnect(section,fromId){
+    curveEditor.clear();
     if (addToStep) cancelAddToStep(null);
     if (connect){ cancelConnect('connect cancelled');if(fromId==null)return; }
     var parsed = connectSnapshot();
@@ -1412,6 +1424,7 @@ function createBuilderInteractions(opts){
 
 
   function cancelGestures(){
+    curveEditor.cancel();
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
   }
@@ -1428,6 +1441,7 @@ function createBuilderInteractions(opts){
     setSelected(null);
   }
   function retire(){
+    curveEditor.clear();
     cancelGestures();clearConnectChrome();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
     if(buildRow)buildRow.classList.remove('dv-connectmode');
     clearAddModeChrome();clearMultiSelect();clearStepMarkers();setSelected(null);rowGrabRows={};
@@ -1459,7 +1473,7 @@ function createBuilderInteractions(opts){
     clearHome:life.guard(function(){clipboardHomeTarget=null;}),
     adding:function(){return life.alive()?addToStep:null;},connecting:function(){return life.alive()?connect:null;},
     selection:function(){return life.alive()?multiSel:[];},
-    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag);},
+    busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();

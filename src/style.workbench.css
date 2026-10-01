@@ -1054,6 +1054,9 @@ body.sk-aurora.sk-blueprint{
 /* Shared catalog chooser: a searchable service list and a persistent summary. */
 .dv-free-edge-source{opacity:.18!important;}
 .dv-free-edge-preview{pointer-events:none;opacity:.8;}
+.dv-curve-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:grab;vector-effect:non-scaling-stroke;}
+.dv-curve-point{fill:var(--bg,#fff);stroke:var(--accent,#448aff);stroke-width:2;cursor:grab;pointer-events:all;vector-effect:non-scaling-stroke;}
+.dv-curve-point:focus{outline:none;stroke-width:4;}
 .dv-connect-preview{pointer-events:none;}
 .dv-connect-line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;}
 .dv-connect-arrow{fill:var(--accent);}

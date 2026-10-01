@@ -13,8 +13,11 @@ function workbenchPracticeSource(source,chapter,viewState){
   if(['viewer','agent','manual','example'].indexOf(chapter)<0)throw Error('Unknown tour chapter');
   // No same-origin capability: storage, the parent's DOM and file handles are
   // inaccessible. CSP also forbids network requests and external navigations.
+  // The pristine document starts on Home. Conceal it before the parser reaches
+  // the body, so a slow chapter boot cannot briefly paint homepage chrome.
+  var startupStyle='<style>html[data-flowview-practice] #workbench-welcome{display:none!important}html[data-flowview-practice] body:not(.workbench-practice){visibility:hidden}</style>';
   return source.replace(/<html\b/i,'<html data-flowview-practice="'+chapter+'" data-flowview-view="'+encodeURIComponent(JSON.stringify(viewState || null))+'"')
-    .replace(/<head\b[^>]*>/i,function(head){return head+'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'; base-uri \'none\'">';});
+    .replace(/<head\b[^>]*>/i,function(head){return head+'<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; script-src \'unsafe-inline\'; style-src \'unsafe-inline\'; img-src data:; font-src data:; media-src data:; connect-src \'none\'; frame-src \'none\'; form-action \'none\'; base-uri \'none\'">'+startupStyle;});
 }
 function workbenchTourCatalog(){
   return {version:1,source:'Fictional tour catalog · example of a Backstage snapshot',services:[
@@ -71,19 +74,24 @@ function installWorkbenchTourKeyGuard(win){
 }
 function initWorkbenchOnboarding(opts){
   var doc=document,example=doc.getElementById('welcome-example-view'),sample=JSON.parse(JSON.stringify(WORKBENCH_ONBOARDING));
-  sample.page.sections[0].diagram.sectionLayout={default:[
-    {x:0,y:0,w:7,h:7},{panel:'home',x:7,y:0,w:5,h:7},
-    {panel:'app',x:0,y:7,w:4,h:10},{panel:'device',x:4,y:7,w:8,h:10},
-    {controls:'steps',x:0,y:17,w:12,h:4}
-  ]};
   var ctl=null,home=doc.getElementById('welcome-home'),welcomeRoot=doc.getElementById('workbench-welcome');
   var stage=doc.createElement('div');stage.id='welcome-example-stage';
-  function sizeExample(){var scale=example.clientWidth/1100;stage.style.transform='scale('+scale+')';example.style.height=(900*scale)+'px';}
+  function sizeExample(){
+    if(!ctl || home.hidden || welcomeRoot.hidden || !example.clientWidth)return;
+    var scale=example.clientWidth/stage.offsetWidth;
+    stage.style.transform='scale('+scale+')';
+    example.style.height=(stage.offsetHeight*scale)+'px';
+  }
   function paintExample(){
     if(home.hidden || welcomeRoot.hidden){if(ctl){ctl.destroy();ctl=null;example.replaceChildren();}return;}
     if(!ctl){example.appendChild(stage);ctl=renderPage(stage,normalize(sample),'pastel',null,{autoplay:false});ctl.suppressFragmentWrites=true;sizeExample();}
   }
-  var exampleSize=new ResizeObserver(sizeExample);exampleSize.observe(example);
+  var sizeFrame=null;
+  var exampleSize=new ResizeObserver(function(){
+    if(sizeFrame!==null)return;
+    sizeFrame=requestAnimationFrame(function(){sizeFrame=null;sizeExample();});
+  });
+  exampleSize.observe(example);exampleSize.observe(stage);
   var welcomeVisibility=new MutationObserver(paintExample);
   welcomeVisibility.observe(home,{attributes:true,attributeFilter:['hidden']});
   welcomeVisibility.observe(welcomeRoot,{attributes:true,attributeFilter:['hidden']});paintExample();
@@ -112,8 +120,8 @@ function initWorkbenchOnboarding(opts){
     if(frame)frame.remove();chapter=next;
     Object.keys(buttons).forEach(function(key){buttons[key].setAttribute('aria-pressed',String(key===next));});
     frame=doc.createElement('iframe');frame.title='Interactive Flowview practice';frame.setAttribute('sandbox','allow-scripts');
-    var sp=next==='example' && ctl && ctl.steppers[0] && ctl.steppers[0].stepper;
-    var state=sp?{mode:sp.mode(),path:sp.path(),step:sp.sourceIndex()}:null;
+    var section=next==='example' && ctl && ctl.sections[0],sp=section && section.stepper;
+    var state=section?{view:section.presentation && section.presentation.viewId(),mode:sp && sp.mode(),path:sp && sp.path(),step:sp && sp.sourceIndex()}:null;
     frame.addEventListener('load',function(){if(frame && dialog.open)frame.focus();});
     frame.srcdoc=workbenchPracticeSource(opts.source,next,state);dialog.appendChild(frame);
   }
@@ -205,7 +213,8 @@ function initWorkbenchPractice(opts){
     reader=renderPage(readerView,normalize(sample),'pastel',null,{autoplay:false});reader.suppressFragmentWrites=true;
     if(chapter==='example'){
       var initial=JSON.parse(decodeURIComponent(doc.documentElement.dataset.flowviewView || 'null'));
-      var player=reader.steppers[0] && reader.steppers[0].stepper;
+      var section=reader.sections[0],player=section && section.stepper;
+      if(initial && initial.view && section && section.presentation)section.presentation.setView(initial.view);
       if(initial && player){player.jumpSource(initial.step,initial.path);if(initial.mode==='ambient')player.enterAmbient();}
     }
     doc.body.classList.add('practice-viewer');

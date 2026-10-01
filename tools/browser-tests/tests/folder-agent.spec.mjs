@@ -985,7 +985,9 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
   const beforeLedger='# Coverage ledger\n\nDoorbell evidence is reviewed.\n',afterLedger=beforeLedger+'\nRenamed Doorbell to Seeded doorbell at the user’s request.\n';
   try{
     await writeFile(path.join(h.folder,'payments.spec.json'),source);await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();
+    await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
+    await page.locator('#folder-agent-start-adopt').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write']);
     await copyRequest(page,'Rename the doorbell.');
@@ -1033,7 +1035,7 @@ test('seeded candidate pair is edited in place, proposed, previewed, committed a
 test('Beta Send delivers seeded candidates with the short existing-edit guide',async({page})=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();
     await chooseFolder(page);await h.listen();
     const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
     expect(connect).toContain('/authoring/docs/folder-agent-existing-edit.md first');expect(connect).toContain('request.candidate names them');expect(connect).toContain('Start Monitor');

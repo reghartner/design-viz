@@ -2,13 +2,12 @@
 .welcome-example{min-width:0;border:1px solid #ced6e1;border-radius:20px;background:#f8fafc;box-shadow:0 18px 55px #34466415;overflow:hidden}
 .welcome-example>header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px;font-size:12px;color:#445267}
 .welcome-example>footer{padding:12px 18px;font-size:12px;color:#65718a;border-top:1px solid #dbe0e8}
-#welcome-example-view{height:470px;overflow:hidden;position:relative}
-#welcome-example-stage{width:1100px;height:900px;position:relative;border:0;border-radius:0;transform-origin:top left;padding:0 12px 10px;box-sizing:border-box}
+#welcome-example-view{overflow:hidden;position:relative}
+#welcome-example-stage{width:1100px;position:relative;border:0;border-radius:0;transform-origin:top left;padding:0 12px 10px;box-sizing:border-box}
 #welcome-example-stage>.doc-title,#welcome-example-stage>.doc-sub,#welcome-example-stage>.presentbtn,#welcome-example-stage #section-event-detail{display:none}
 #welcome-example-stage .doc-sec{margin:0;padding:8px;border:0;box-shadow:none;background:transparent}
 #welcome-example-stage .sec-eyebrow,#welcome-example-stage .sec-heading-row,#welcome-example-stage .sec-prose,#welcome-example-stage .section-viewbar,#welcome-example-stage .legend{display:none!important}
-#welcome-example-stage .section-layout-grid{display:grid!important}
-#welcome-example-stage .section-layout-tile{height:auto!important}
+#welcome-example-stage [aria-label="Expand diagram view"]{display:none}
 .workbench-tour-host{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border:0;background:#f5f7fb;color:#24354b}
 .workbench-tour-host[open]{display:flex;flex-direction:column}
 .workbench-tour-header{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:12px 16px;border-bottom:1px solid #d2dbe7;background:#fff}
@@ -48,4 +47,4 @@
 #folder-agent-setup-mode-external{border-width:2px}
 #folder-agent-setup-mode-embedded{padding:9px 12px;font-size:12px;background:transparent}
 [data-open-human-guide]+.welcome-text-button{margin-left:14px}
-@media(max-width:800px){.welcome-hero{grid-template-columns:1fr}.workbench-tour-header>b{width:100%}#welcome-example-view{height:420px}}
+@media(max-width:800px){.welcome-hero{grid-template-columns:1fr}.workbench-tour-header>b{width:100%}}

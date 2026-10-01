@@ -1,5 +1,6 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
+import {readFile} from 'node:fs/promises';
 
 const practice=page=>page.frameLocator('.workbench-tour-host iframe');
 const next=frame=>frame.getByRole('button',{name:'Next',exact:true}).click();
@@ -19,6 +20,65 @@ test('canonical homepage setup defaults to copy/paste with user-owned agent',asy
   await expect(page.locator('#folder-agent-setup-mode-external')).toHaveAttribute('aria-pressed','true');
   await expect(page.getByLabel('What is the focus of your visualization?')).toBeVisible();
   await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','true');
+});
+
+test('homepage fits the authored default view and supports Explore through expansion',async({page,server},info)=>{
+  await page.goto(server.origin+'/workbench.html');
+  const example=page.locator('#welcome-example-view'),stage=example.locator('#welcome-example-stage');
+  const section=example.locator('#section-visitor'),grid=section.locator('.section-layout-grid');
+  await expect(section.getByRole('button',{name:'Story',exact:true})).toHaveAttribute('aria-pressed','true');
+  const diagram=grid.locator('[data-layout-key="diagram"]'),app=grid.locator('[data-layout-key="panel:app"]');
+  await expect(diagram).toHaveCSS('grid-row','1 / span 9');
+  await expect(app).toHaveCSS('grid-row','10 / span 15');
+  async function fits(){
+    await expect.poll(async()=>{
+      const outer=await example.boundingBox(),inner=await stage.boundingBox();
+      return Math.abs(outer.height-inner.height)+Math.abs(outer.width-inner.width);
+    }).toBeLessThan(2);
+  }
+  await fits();await page.screenshot({path:info.outputPath('landing-default-view.png')});
+  const defaultHeight=(await example.boundingBox()).height;
+  await section.getByRole('button',{name:'Explore',exact:true}).click();
+  await expect(grid).toBeHidden();await expect(section.locator('.explore-board')).toBeVisible();
+  await expect(section.locator('.explore-zoom')).toHaveText('52%');
+  await fits();expect((await example.boundingBox()).height).not.toBe(defaultHeight);
+  const zoom=await section.locator('.explore-zoom').innerText();
+  await section.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await expect(section.locator('.explore-zoom')).not.toHaveText(zoom);
+  await section.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();
+  const caption=await section.locator('.stepline').innerText();
+  await page.screenshot({path:info.outputPath('landing-explore-view.png')});
+  await page.locator('#welcome-example-expand').click();
+  const expanded=practice(page).locator('#section-visitor');
+  await expect(expanded.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(expanded.locator('.explore-board')).toBeVisible();
+  await expect.poll(()=>expanded.locator('.stepline').innerText()).toBe(caption);
+  await page.getByRole('button',{name:'Close tour',exact:true}).click();
+  await section.getByRole('button',{name:'Story',exact:true}).click();
+  await expect(grid).toBeVisible();await fits();
+  await page.setViewportSize({width:390,height:844});await fits();
+  await expect(app).toHaveCSS('grid-row','10 / span 15');
+  await page.locator('.welcome-example').screenshot({path:info.outputPath('landing-narrow-view.png')});
+});
+
+test('homepage opens an authored Explore default without exposing the Standard grid',async({page,server})=>{
+  const sample=JSON.parse(await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8'));
+  sample.page.sections[0].diagram.defaultLayout='explore';
+  await page.route(server.origin+'/workbench.html',async route=>{
+    const response=await route.fetch(),html=await response.text();
+    const body=html.replace(/var WORKBENCH_ONBOARDING = [^\n]*;\n/,'var WORKBENCH_ONBOARDING = '+JSON.stringify(sample).replace(/</g,'\\u003c')+';\n');
+    expect(body).not.toBe(html);
+    await route.fulfill({response,body});
+  });
+  await page.goto(server.origin+'/workbench.html');
+  const section=page.locator('#welcome-example-view #section-visitor');
+  await expect(section.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(section.locator('.explore-board')).toBeVisible();
+  await expect(section.locator('.section-layout-grid')).toBeHidden();
+  await expect(section.locator('.explore-player')).toBeVisible();
+  await section.getByRole('button',{name:'Story',exact:true}).click();
+  await expect(section.locator('.section-layout-grid')).toBeVisible();
+  await expect(section.locator('.explore-board')).toHaveCount(0);
 });
 
 test('practice chapters conceal homepage chrome before their bootstrap runs',async({page,server})=>{

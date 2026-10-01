@@ -404,44 +404,133 @@
             }
           ],
           "autoplay": false,
-          "sectionLayout": {
-            "default": [
-              {
-                "x": 0,
-                "y": 0,
-                "w": 7,
-                "h": 9
-              },
-              {
-                "panel": "home",
-                "x": 7,
-                "y": 0,
-                "w": 5,
-                "h": 9
-              },
-              {
-                "controls": "steps",
-                "x": 0,
-                "y": 9,
-                "w": 7,
-                "h": 5
-              },
-              {
-                "panel": "device",
-                "x": 0,
-                "y": 14,
-                "w": 7,
-                "h": 10
-              },
-              {
-                "panel": "app",
-                "x": 7,
-                "y": 9,
-                "w": 5,
-                "h": 15
+          "layouts": [
+            {
+              "id": "story",
+              "name": "Story",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 7,
+                    "h": 9
+                  },
+                  {
+                    "panel": "home",
+                    "x": 7,
+                    "y": 0,
+                    "w": 5,
+                    "h": 9
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 9,
+                    "w": 7,
+                    "h": 5
+                  },
+                  {
+                    "panel": "device",
+                    "x": 0,
+                    "y": 14,
+                    "w": 7,
+                    "h": 10
+                  },
+                  {
+                    "panel": "app",
+                    "x": 7,
+                    "y": 9,
+                    "w": 5,
+                    "h": 15
+                  }
+                ]
               }
-            ]
-          }
+            },
+            {
+              "id": "explore",
+              "name": "Explore",
+              "presentation": "explore",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 7,
+                    "h": 9
+                  },
+                  {
+                    "panel": "home",
+                    "x": 7,
+                    "y": 0,
+                    "w": 5,
+                    "h": 9
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 9,
+                    "w": 7,
+                    "h": 5
+                  },
+                  {
+                    "panel": "device",
+                    "x": 0,
+                    "y": 14,
+                    "w": 7,
+                    "h": 10
+                  },
+                  {
+                    "panel": "app",
+                    "x": 7,
+                    "y": 9,
+                    "w": 5,
+                    "h": 15
+                  }
+                ]
+              },
+              "exploreLayout": {
+                "panels": [
+                  {
+                    "panel": "home",
+                    "x": 0.02,
+                    "y": 0.52,
+                    "w": 0.34,
+                    "h": 0.36
+                  },
+                  {
+                    "panel": "device",
+                    "x": 0.67,
+                    "y": 0.07,
+                    "w": 0.29,
+                    "h": 0.37
+                  },
+                  {
+                    "panel": "app",
+                    "x": 0.71,
+                    "y": 0.47,
+                    "w": 0.23,
+                    "h": 0.37
+                  }
+                ],
+                "controls": {
+                  "x": 0.02,
+                  "y": 0.08,
+                  "w": 0.58,
+                  "h": 0.24
+                },
+                "prose": {
+                  "hidden": true
+                },
+                "camera": {
+                  "zoom": 0.52,
+                  "x": 0.83,
+                  "y": 0.95
+                }
+              }
+            }
+          ],
+          "defaultLayout": "story"
         },
         "id": "visitor"
       },

@@ -952,7 +952,7 @@ body.sk-aurora.sk-blueprint{
 .section-arranging .section-tile-resize{display:block;right:1px;bottom:1px;width:32px;height:32px;cursor:nwse-resize;border-radius:6px 0 0 0;}
 .section-controls-resize{display:none;}
 .section-arranging .section-controls-resize{display:block;position:absolute;bottom:2px;right:38px;width:32px;height:24px;z-index:4;touch-action:none;user-select:none;cursor:ns-resize;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:5px;}
-.layout-dragging{user-select:none;}
+.layout-dragging{user-select:none;overflow-anchor:none;}
 .layout-dragging .section-layout-tile{transition:none;}
 @media print{.section-arranger,.section-tile-move,.section-tile-resize,.section-controls-resize,.layout-preview-tools{display:none !important;}}
 /* Panel library: a desktop gallery with frozen, actual widget renders. */

@@ -86,9 +86,6 @@ body .docview .layout-has-attached-controls>.diagramcol>.termbar,
 body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
   box-sizing:border-box;flex:none;height:var(--attached-controls-height);max-height:none;align-content:flex-start;
 }
-/* Keep the transport next to the actual drawing instead of stretching blank
-   board space to the bottom of an oversized tile. Large drawings still scroll. */
-.layout-has-attached-controls>.diagramcol:has(>.termbar:not([hidden]))>.board{flex:0 1 auto;}
 /* @panel-style-order:74 */
 @container diagram-section (max-width:640px){
   .section-layout-grid{display:flex;flex-direction:column;}
@@ -153,6 +150,9 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .board:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 @media screen{
   .board:not(.explore-board){max-height:70dvh;overflow:auto;box-sizing:border-box;}
+  /* Saved section geometry owns the viewport height, including the space
+     above attached controls. Only automatically sized boards use the cap. */
+  .section-layout-tile .board:not(.explore-board){max-height:none;}
   .board:not(.explore-board)>.lg{top:0;z-index:4;}
   .board:not(.explore-board) .boardcanvas{cursor:grab;touch-action:pan-x pan-y;}
   .board.board-dragging,.board.board-dragging .boardcanvas{cursor:grabbing;user-select:none;}

@@ -57,6 +57,7 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
     var choice=element('button','path-chip',row);choice.type='button';choice.title=path.label;
     element('span','path-timeline-label',choice).textContent=path.label;
     choice.setAttribute('data-dv-path',path.id);choice.style.setProperty('--path-color',path.color);
+    choice.style.width=(labelWidth-10)+'px';
     position(choice,0,lanePositions.get(path.id)-14);
     choice.disabled=!shownPaths.find(function(p){return p.id===path.id;}).indices.length;
     if(choice.disabled)choice.title='No steps from this path are shown in this view.';
@@ -77,7 +78,17 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
     var line=document.createElementNS(SVGNS,'path');line.setAttribute('d',d);line.setAttribute('fill','none');
     line.setAttribute('stroke-width','2');line.setAttribute('stroke-linecap','round');canvas.appendChild(line);
     tracks.push({element:line,pathIds:pathIds});
+    return line;
   }
+  // Each label enters its first visible stop, including a shared opening.
+  // Fixed label widths keep these anchors stable even in initially hidden tabs.
+  paths.forEach(function(path){
+    var first=graph.nodes.find(function(node){return node.occurrences.some(function(o){return o.pathId===path.id && o.visibleIndex===0;});});
+    if(!first)return;
+    var point=nodes.get(first.id),x=labelWidth-10,y=lanePositions.get(path.id),middle=(x+point.x)/2;
+    var line=stroke('M '+x+' '+y+' C '+middle+' '+y+' '+middle+' '+point.y+' '+point.x+' '+point.y,[path.id]);
+    line.setAttribute('data-path-entry',path.id);
+  });
   graph.edges.forEach(function(edge){
     var a=nodes.get(edge.from),b=nodes.get(edge.to),middle=(a.x+b.x)/2;
     stroke('M '+a.x+' '+a.y+' C '+middle+' '+a.y+' '+middle+' '+b.y+' '+b.x+' '+b.y,edge.pathIds);

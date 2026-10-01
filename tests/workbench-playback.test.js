@@ -28,7 +28,7 @@ function stepperHarness(options, reducedMotion=false, diagramSettings={}){
   let sequence=0;
   const intervals=new Map(), timeouts=new Map(), ids={}, paints=[];
   const visibilityListeners=new Set();
-  const context={CustomEvent:class {constructor(type){this.type=type;}},document:{createElement:element, getElementById:id=>ids[id] || null,
+  const context={CustomEvent:class {constructor(type){this.type=type;}},document:{createElement:element, createElementNS:element, getElementById:id=>ids[id] || null,
       addEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.add(fn); },
       removeEventListener(type,fn){ if(type==='visibilitychange') visibilityListeners.delete(fn); }},
     window:{matchMedia:()=>({matches:reducedMotion}),

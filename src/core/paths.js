@@ -115,14 +115,14 @@ function pathStepSharing(paths){
 }
 
 /* Geometry only: state and playback still fold each authored path separately.
-   Decide joins and block boundaries before filtering a named view. Prefix-only
-   identities keep separate occurrences, just like the legacy timeline rows. */
+   Decide joins and block boundaries before filtering a named view. Opening and
+   downstream shared identities use the same single-node representation. */
 function pathTimelineGraph(paths,shownPaths){
   var joined=new Set(),pathById=new Map();
   paths.forEach(function(path){pathById.set(path.id,path);});
   pathStepSharing(paths).forEach(function(step){
     var members=new Set(step.occurrences.map(function(o){return o.path.id;}));
-    if(step.downstream && members.size>1 && members.size===step.occurrences.length)joined.add(step.sourceIndex);
+    if(members.size>1 && members.size===step.occurrences.length)joined.add(step.sourceIndex);
   });
   function authoredGraph(){
     var nodes=[],byId=new Map(),sequences=new Map(),next=new Map(),previous=new Map();

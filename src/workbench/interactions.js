@@ -536,7 +536,9 @@ function createBuilderInteractions(opts){
     var svg=target.el && target.el.ownerSVGElement;
     if(!svg || !svg.createSVGPoint)return;
     var board=svg.closest('.board'),viewport=svg.closest('.section-viewport');
-    var legend=(viewport || board) && (viewport || board).querySelector('.lg');if(!legend)return;
+    // The Explore edge-key popup also uses .lg, but connection feedback belongs
+    // to the board legend (or its Explore tools host), never a closed disclosure.
+    var legend=(viewport || board) && (viewport || board).querySelector('.lg:not(.explore-edge-legend)');if(!legend)return;
     var canvas=viewport && viewport.classList.contains('workbench-diagram-canvas');
     var L=layout(diagram),source=L.pos[target.id];if(!source)return;
     var layer=document.createElementNS(SVG_NS,'g'),line=document.createElementNS(SVG_NS,'path'),arrow=document.createElementNS(SVG_NS,'path');

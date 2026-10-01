@@ -1207,6 +1207,7 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     validate:function(text){var findings=validate(normalize(JSON.parse(text)));return findings.errors.join('\n');},
+    validation:function(text){return validate(normalize(JSON.parse(text)));},
     apply:function(text,expected,proposal){
       var snapshot=session.snapshot();
       if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};

@@ -40,6 +40,10 @@
 .folder-agent-compose-actions #folder-agent-send{margin:0;padding:6px 10px;font-size:12px;}
 .folder-agent-compose-actions #folder-agent-cancel{margin:0;padding:6px;font-size:11px;}
 .folder-agent-compose-actions .folder-agent-hint{margin-left:auto;font-size:10px;}
+.folder-agent-focus-choice{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:1px 6px;margin:0 0 5px;font-size:12px;}
+.folder-agent-focus-choice[hidden]{display:none;}
+.folder-agent-focus-choice input{margin:0;}
+.folder-agent-focus-choice .folder-agent-hint{grid-column:2;margin:0;font-size:10px;}
 #editor-agent .folder-agent-activity{padding:8px 10px;margin:8px 0;font-size:12px;}
 #editor-agent .folder-agent-activity>details>summary{cursor:pointer;}
 #editor-agent .folder-agent-activity ol{max-height:none;overflow:visible;}

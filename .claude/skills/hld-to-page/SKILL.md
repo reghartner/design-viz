@@ -19,6 +19,8 @@ it is, and which code and catalog entries back it.
 Maintain the existing spec and ledger, submit both for workbench approval, and
 keep questions in the selected conversation. No separate `QUESTIONS.md`, OUT
 folder or HTML build is needed for this route.
+A registered request with `"mode": "focused-deviceapp"` follows
+[focused-panel-edit.md](references/focused-panel-edit.md) instead of this skill.
 
 **Local loopback workbench session?** If the user gave you a local session scratch
 folder (it contains `state.json` and a `README.md`), follow

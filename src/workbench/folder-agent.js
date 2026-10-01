@@ -90,7 +90,7 @@ function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
   var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null;
   var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
-  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
+  var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0,pendingRoute=null;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
   function publish(state){
     var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
@@ -120,8 +120,9 @@ function createFolderAgentClient(opts){
     if(!reviewMode && !reviewCandidate && !reviewDecision)return 'accept';
     if(reviewCandidate && reviewCandidate.signature===signature)return 'wait';
     reviewDecision=null;
-    var preview=exchange.preview(proposal);
+    var preview=exchange.preview(proposal),route=pendingRoute && pendingRoute.id===proposal.requestId?pendingRoute:null;
     reviewCandidate={signature:signature,proposal:proposal,preview:preview,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,
+      mode:route?route.mode:null,task:route?route.task:null,
       summary:String(proposal.summary || 'Your agent proposed a story update.').slice(0,1000),baseRevision:String(proposal.baseRevision || '').slice(0,160),
       revision:preview.current.revision,artifacts:files.artifacts,kind:'replacement',ok:preview.ok,merged:!!preview.merged,conflicts:preview.conflicts || []}};
     publish({status:preview.ok?'Agent updates are ready to preview. Your current story is unchanged.':'Agent update needs attention. Copy the feedback to your agent to resolve it.'});
@@ -366,13 +367,16 @@ function createFolderAgentClient(opts){
       publish({status:'Paste the connection instructions into Claude.',listening:false});
       return manifest;
     });},
-    send:function(text,context){
-      // Capture the user's focus at Send, before queued polling or disk I/O.
+    send:function(text,context,choice){
+      // Capture the user's focus and request mode at Send, before queued polling or disk I/O.
       var captured;
       try{
+        var mode=choice && choice.mode!==undefined && choice.mode!==null?choice.mode:null;
+        if(mode!==null && mode!==FOCUSED_PANEL_MODE)throw Error('Unknown request mode.');
         var focus=context || opts.snapshot();
         captured=JSON.parse(JSON.stringify({source:focus.source,project:focus.project,selection:focus.selection,
-          views:focus.views,previewCurrent:focus.previewCurrent,replySurface:focus.replySurface,delivery:focus.delivery,technicalLevel:opts.level?opts.level():'story'}));
+          views:focus.views,previewCurrent:focus.previewCurrent,replySurface:focus.replySurface,delivery:focus.delivery,technicalLevel:opts.level?opts.level():'story',
+          mode:mode,ledger:mode?focus.ledger:undefined}));
       }catch(ex){return Promise.reject(ex);}
       return serial(async function(){
       if(!connected || disposed)throw Error('Connect a folder first.');
@@ -384,14 +388,43 @@ function createFolderAgentClient(opts){
         var sent=await snapshot(token);if(!sent || !alive(token))throw Error('Project changed. Reconnect before sending.');
         if(turn!==turnEpoch)throw Error('Turn stopped before the message was sent.');
         var current=opts.snapshot();
-        if(sent.snapshot.project!==captured.project || sent.snapshot.source!==captured.source ||
-          !current.open || current.project!==captured.project || current.source!==captured.source)
+        function unchanged(value){
+          return value && value.open && value.project===captured.project && value.source===captured.source && (!captured.mode || value.ledger===captured.ledger);
+        }
+        if(!unchanged(sent.snapshot) || !unchanged(current))
           throw Error('The story changed while saving your message. Check the selection and send it again.');
         var request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
           selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel,replySurface:captured.replySurface,delivery:captured.delivery});
+        var focused=null;
+        if(captured.mode){
+          // The packet is cut from the pinned snapshot that state.json holds, then
+          // published before request.json so the request never names a missing file.
+          var validation;
+          try{validation=opts.validation?opts.validation(sent.snapshot.source):undefined;}catch(ex){validation={errors:[String(ex.message || ex)],warnings:[]};}
+          focused=focusedPanelPacket({requestId:id,sessionId:manifest.sessionId,connectionId:manifest.connectionId,project:captured.project,
+            revision:sent.snapshot.revision,source:sent.snapshot.source,ledger:sent.snapshot.ledger,selection:captured.selection,
+            open:sent.snapshot.open,previewCurrent:captured.previewCurrent,parseError:sent.snapshot.parseError,validation:validation});
+          if(!focused.ok)throw Error('Focused editing is unavailable: '+focused.reasons.map(function(item){return item.message;}).join(' ')+' Turn off focused mode to use the full-document flow.');
+          Object.assign(request,focused.request);
+        }
+        async function publishable(){
+          if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
+          if(captured.mode && !unchanged(opts.snapshot()))throw Error('The story changed while saving your message. Check the selection and send it again.');
+        }
+        // Ownership is rechecked at every request-write guard, so a takeover just
+        // before request.json publishes nothing.
+        async function owned(){
+          await publishable();
+          if(!belongs(await files.read('session.json'))){connected=false;epoch++;throw Error('Another connection owns this folder. Reconnect explicitly.');}
+          await publishable();
+        }
         exchange.pin(sent.snapshot);
-        await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
-        transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
+        if(focused){await files.write(focused.file,focused.text,publishable);await owned();}
+        await files.write('request.json',request,focused?owned:undefined);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
+        pendingRoute={id:id,mode:focused?request.mode:null,task:focused?request.focus.file:null};
+        var sentContext={selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent};
+        if(focused)sentContext.mode=request.mode;
+        transcript.push({role:'user',text:text,requestId:id,context:sentContext});
         publish({status:request.delivery==='clipboard'?'Request ready to copy. Continue in your agent.':'Message saved — waiting for Claude.',progress:''});
         await saveTranscript();return request;
       }catch(ex){

@@ -59,6 +59,7 @@
     "workbench/lifetime.js",
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
+    "workbench/focused-panel.js",
     "workbench/folder-agent.js",
     "workbench/agent-project.js",
     "workbench/agent-recovery.js",

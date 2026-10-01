@@ -17,7 +17,8 @@ def folder_agent_kit(root, runtime):
                 relative = path.relative_to(root)
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
-    for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
+    # panel_fragment.py backs folder-agent.py assemble-deviceapp in prepared folders.
+    for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js', 'tools/panel_fragment.py',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
     # Build from these sources; never depend on an existing generated file.

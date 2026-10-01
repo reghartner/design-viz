@@ -131,7 +131,25 @@ test('retired operation and dry-run envelopes never apply, including envelopes c
     assert.equal(e.request().result.status,'applied');assert.equal(h.writes.length,1);
   }
 });
-
+test('exchange rejection and conflict reasons defer repair to the request route instead of naming state.json',async()=>{
+  // These reasons reach both full and focused authors (copied feedback and result.json).
+  // preview() measures UTF-8 sizes with the browser's TextEncoder, as in the folder-agent harness.
+  const context={TextEncoder};vm.createContext(context);
+  for(const file of ['agent-merge.js','agent-session.js'])vm.runInContext(await fs.readFile(path.join(root,'src/workbench',file),'utf8'),context);
+  let source='{"title":"before"}',ledger='# Ledger\n';
+  const e=context.createWorkbenchAgentExchange({clientId:'client',requireLedger:true,snapshot:()=>({source,ledger,project:0,open:true,selection:[]}),busy:()=>false,
+    apply(text){source=text;return {ok:true,rendered:true};}});
+  const sent=e.request(),reasons=[];
+  reasons.push(e.preview({id:'lost',baseRevision:'unknown',source:'{"title":"agent"}',ledger}).conflicts[0].reason);
+  ledger='# Ledger\n\nLocal decision.\n';
+  const conflict=e.preview({id:'ledger',baseRevision:sent.snapshot.revision,source:'{"title":"agent"}',ledger:'# Ledger\n\nAgent decision.\n'});
+  assert.equal(conflict.ok,false);assert.equal(conflict.conflicts[0].path,'/ledger');reasons.push(conflict.conflicts[0].reason);
+  e.receive({proposal:{id:'stale',baseRevision:sent.snapshot.revision,source:'{"title":"agent"}',ledger}},e.request());
+  assert.equal(e.request().result.status,'rejected');reasons.push(e.request().result.message);
+  assert.match(reasons[0],/starting revision is no longer available/);assert.match(reasons[1],/Both changed the coverage ledger/);assert.match(reasons[2],/Your document changed/);
+  for(const reason of reasons){assert.match(reason,/request route in CONNECT\.md/);assert.doesNotMatch(reason,/state\.json|[Rr]eread/);}
+  assert.equal(source,'{"title":"before"}');
+});
 
 test('local helper serves only indexed lazy specs and rejects unlisted files and escaping symlinks',async t=>{
   const h=await helper(t),folder=path.join(h.root,'diagrams/doorbell');await fs.mkdir(folder,{recursive:true});

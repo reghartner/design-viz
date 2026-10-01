@@ -1,11 +1,19 @@
 /* Read-only proposed state, separate from the editor's document and history. */
+/* Repair text follows the request's route. Paths come from the session's own
+   metadata folder: custom, default .flowview-agent, or legacy root ("."). The
+   focused fragment's name is only in the agent's preparation receipt, so the
+   text points there rather than naming or deriving a file. */
 function workbenchAgentConflictFeedback(review){
-  var prefix=review.artifacts && review.artifacts.metadata==='.'?'':'.flowview-agent/';
+  var metadata=review.artifacts && typeof review.artifacts.metadata==='string'?review.artifacts.metadata:'.';
+  var prefix=metadata==='.'?'':metadata+'/';
+  var repair=review.mode==='focused-deviceapp'?
+    'This is a focused device-app request; keep following its focused route in '+prefix+'CONNECT.md. Keep your edits in the fragment file your preparation receipt named as editableFiles.fragment; do not run prepare again to reset it. Revise only the allowed presentation keys there, rerun python3 "'+prefix+'folder-agent.py" assemble-deviceapp --request '+review.requestId+' --task '+(review.task || '<request.focus.file>')+' --fragment <editableFiles.fragment>, and propose the assembled pair again. If the assembler reports that the story changed, or the fix needs anything beyond presentation, stop and ask me for a new request.':
+    'Reread '+prefix+'state.json and the accepted spec and ledger named in '+prefix+'project.json. Reconcile your intended changes with my latest edits, preserve unrelated work, reconcile the ledger with the complete story, validate it, and submit both artifacts in a new proposal with the revision you actually read. Do not just relabel the old proposal with a newer revision.';
   return ['Your proposed Flowview update could not be committed. My current diagram has been preserved.',
     'Proposal: '+review.id, 'Starting revision: '+review.baseRevision, 'Current revision: '+review.revision,'',
     'Please resolve these conflicts or validation problems:',
     (review.conflicts || []).map(function(item){return '- '+item.path+': '+item.reason;}).join('\n'),'',
-    'Reread '+prefix+'state.json and the accepted spec and ledger named in '+prefix+'project.json. Reconcile your intended changes with my latest edits, preserve unrelated work, reconcile the ledger with the complete story, validate it, and submit both artifacts in a new proposal with the revision you actually read. Do not just relabel the old proposal with a newer revision.'
+    repair
   ].join('\n');
 }
 function initWorkbenchAgentReview(opts){

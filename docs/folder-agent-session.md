@@ -75,6 +75,8 @@ your-diagram/
     ├── transcript.json   workbench messages, not native chat history
     ├── changes.json      bounded change receipts
     ├── candidate.spec.json / candidate.ledger.md
+    ├── request-scoped prepared candidates and receipts (names printed by prepare)
+    ├── focus-<request>.json   bounded packet for a focused request
     ├── folder-agent.py / CONNECT.md / authoring/
     └── …                 request/result, heartbeat and recovery data
 ```
@@ -95,24 +97,60 @@ The chosen diagram folder need not be the agent's working directory.
 
 Maintain the coverage ledger throughout authoring: worksheet, operator answers,
 evidence, coverage, decisions, illustrative assumptions, and open questions.
-Read the existing spec and ledger before changing them. A ledger is required for
-every proposed change, including a ledger-only update.
+On the full route, read the existing spec and ledger before changing them. A
+focused request instead edits only its staged fragment and never reads `state.json`,
+the spec or the ledger (see the focused section below). A ledger is required for
+every proposed change, including a ledger-only update. A focused proposal carries
+the ledger unchanged.
 
-Read `.flowview-agent/state.json` immediately before planning and retain its
-revision. Write complete candidates inside the support folder. While connected,
-the agent must not directly overwrite either accepted artifact. Validate the
-candidate spec with the bundled authoring kit, and reconcile ledger claims with
-that spec. The helper does not grant browser access or establish visual QA.
+Setup runs the requestless `prepare` once to unpack the authoring kit; it reads no
+diagram content. Before reading or editing for a registered request, the agent runs
+`prepare --request REQUEST_ID`, preferably from the diagram folder with the exact
+quoted relative helper path. The helper checks the session and connection
+identities, that the request is active and not cancelled, a connected editor
+heartbeat less than 15 seconds old, and that the request revision is the current
+revision. It then stages the request's editable files and prints a bounded receipt
+(`flowview-prepared-request-v1`) with the identity, revision, mode, input and
+staged hashes, `status`, `receiptFile`, `editableFiles` and generic
+`guidePointers`. The receipt never echoes source, ledger, fragment values or
+captions.
+
+- The full route receives `editableFiles.spec` and `editableFiles.ledger`, exact
+  copies of the current source and ledger. Its revision is the revision read
+  before planning.
+- A focused request receives only `editableFiles.fragment` (see below).
+
+Filenames are request-scoped and emitted by the helper; agents use them as printed
+and never derive them. Staging is create-only. Rerunning `prepare --request` for the
+same request returns `already-staged` for untouched files or `preserved-edits` for
+edited ones and never rewrites either. Stale, cancelled or disconnected requests,
+and files owned by another request, are refused with nothing published. On refusal
+the agent stops; it does not fall back to manual hash or time checks or discard
+earlier work. Preparation writes no accepted artifact, state, request or editor
+file and grants no approval.
+
+Edit the staged files in place. While connected, the agent must not directly
+overwrite either accepted artifact. On the full route, validate the candidate
+spec with the bundled authoring kit and reconcile ledger claims with that spec.
+On the focused route, the assembler validates the complete candidate. The helper does not
+grant browser access or establish visual QA.
 
 ```sh
-python3 /path/to/diagram/.flowview-agent/folder-agent.py prepare
-python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \
-  --request REQUEST_ID --revision REVISION_READ_BEFORE_PLANNING \
-  --file candidate.spec.json --ledger candidate.ledger.md \
+cd /path/to/diagram
+python3 ".flowview-agent/folder-agent.py" prepare          # setup: kit only
+python3 ".flowview-agent/folder-agent.py" prepare --request REQUEST_ID
+python3 ".flowview-agent/folder-agent.py" propose \
+  --request REQUEST_ID --revision RECEIPT_REVISION \
+  --file SPEC_FROM_RECEIPT --ledger LEDGER_FROM_RECEIPT \
   --summary "Describe the diagram and ledger changes"
 ```
 
-Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
+If a full-route proposal is rejected, the agent reads the latest `state.json`,
+reconciles the same staged files and proposes with the revision it actually read.
+A rejected focused proposal is revised in the same staged fragment, assembled again
+and proposed again. If the assembler reports that the story changed, or the fix
+goes beyond presentation, the agent stops and asks for a new request. Neither route
+reruns preparation to reset its files. Candidate filenames are relative to the helper's folder. Spec limit: 4 MiB;
 ledger limit: 256 KiB of nonempty UTF-8 text. The helper rejects symlinks,
 nonregular files, and filename traversal. Metadata/protocol files are bounded
 at 8 MiB; the recovery journal allows 20 MiB for escaped before/after copies of
@@ -122,18 +160,22 @@ the last saved pair.
 **Preview Agent Updates** shows the proposed rendered diagram and full ledger,
 with **Current state** and **Proposed state** controls. Neither candidate is
 accepted until **Commit update**. One Undo/Redo restores both. This saves local
-artifacts; it does not make a Git commit. The agent should reread the accepted
-pair after approval, especially after a merge, and submit a correction if the
-ledger no longer describes the accepted diagram. Commit or publish only with
+artifacts; it does not make a Git commit. On the full route, the agent should
+reread the accepted pair after approval, especially after a merge, and submit a
+correction if the ledger no longer describes the accepted diagram. A focused agent
+confirms from `result.json` and the assembler output only. Commit or publish only with
 user authorization. A missing ledger is unfinished work, not a successful delivery.
 
 Separate object fields and stable-ID items can merge against their original
 revision. Overlapping changes, deletion/edit collisions, ambiguous ordering,
 invalid combined specs, and incompatible ledger edits block approval. Ledger text
 merges conservatively as a whole document. **Copy feedback for your agent** names
-conflicts and releases the rejected proposal so the agent can revise it. Reread
-both current artifacts and submit a reconciled pair; never just put a new revision
-on an old proposal. Later edits invalidate an earlier approval.
+conflicts and releases the rejected proposal so the agent can revise it. On the
+full route, reread both current artifacts and submit a reconciled pair; never just
+put a new revision on an old proposal. Focused feedback instead points to the
+receipt's `editableFiles.fragment`. The agent keeps its edits there, reruns
+`assemble-deviceapp` and proposes again. It stops and asks for a new request when
+the story changed or the fix is out of scope. Later edits invalidate an earlier approval.
 
 Incomplete or invalid handwritten JSON stays in the browser draft and shared state;
 the artifact files retain their last valid pair until the JSON is repaired.
@@ -157,8 +199,9 @@ In **Agent → Copy & paste**, write the request in the shared message box;
 include additional URLs or file paths there if useful. **Copy request** includes
 your message, selected item identifiers and JSON paths, their evidence references,
 view/path/step context and detail level. It does not include the complete source,
-panel payloads or the contents of selected sections/documents. The agent reads
-the current spec and ledger from the shared folder before editing. A connected folder is required to copy a request.
+panel payloads or the contents of selected sections/documents. On the full route,
+the agent works from prepared copies of the current spec and ledger in the shared
+folder. A focused request reads only its prepared fragment. A connected folder is required to copy a request.
 
 With a connected folder, Copy registers a request and copies its ID with the
 message and context. Long clipboard messages use a bounded registration
@@ -198,6 +241,44 @@ and use `reply` as a completion receipt. `request.replySurface` overrides the
 workflow default for direct messages. A proposal must receive its matching result
 before another proposal or final reply. Rejected proposals can be revised while
 the request remains active. Completion releases the request.
+
+## Focused device-app presentation (experimental)
+
+When exactly one valid device-app panel is selected, the composer offers an
+opt-in **Focused device-app presentation · Experimental** checkbox. It is never
+inferred from the message. Its scope covers card order, card visibility and icons,
+the phone screen, whole-panel visibility, and the source display as one control.
+Values, copy, steps and the ledger stay locked. The choice belongs to that
+selected panel: changing the selection retires it, and a stale preview blocks
+sending rather than silently falling back to the full route. **Copy for agent**
+may say that the selection qualifies, but it never registers a focused request
+or packet.
+
+Sending writes a bounded `focus-<request>.json` packet before the request that
+names it (`request.mode` `focused-deviceapp`, with the packet filename and SHA-256).
+The copied header names that packet and the exact relative `prepare --request`
+command. The focused route then works as follows:
+
+1. `prepare --request` verifies the packet against the request, connection and
+   current story, then stages its fragment as `editableFiles.fragment`, preserving
+   every present/absent envelope. The receipt's generic pointers name the
+   declaration at `/panel/value` and the focused guide.
+2. The agent edits that fragment in place, using
+   `.claude/skills/hld-to-page/references/focused-panel-edit.md` and the existing
+   `python3 <VIZ>/tools/widget_doc.py deviceapp` schema. It does not read
+   `state.json`, the spec, the ledger or `SKILL.md`. The packet's `context` is
+   optional read-only evidence.
+3. `assemble-deviceapp --request ID --task focus-ID.json --fragment FRAGMENT_FROM_RECEIPT`
+   checks the fragment and writes the complete `candidate.spec.json` with the
+   ledger copied unchanged as `candidate.ledger.md`.
+4. The agent proposes those files with the receipt's revision. If assembly
+   refuses, the agent fixes only the listed keys or asks for the full route. It
+   never proposes after a refusal. If the proposal is rejected, the agent revises
+   the same fragment and assembles again; it does not rerun preparation to reset it.
+
+The proposal still receives the full diagram and ledger preview, explicit
+**Commit update**, conflict checks and one Undo/Redo action. Anything beyond
+presentation needs a new request with focused mode off.
 
 ## Monitor and recovery
 

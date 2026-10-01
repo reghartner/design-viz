@@ -20,7 +20,7 @@ function createWorkbenchAgentExchange(opts){
       if(!current.open)return blocked('Open the original project before reviewing this update.');
       if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))return blocked('Submit a complete updated document in source.');
       if(typeof proposal.source!=='string' || new TextEncoder().encode(proposal.source).length>4*1024*1024)return blocked('Invalid or oversized proposed source.');
-      if(!base || base.project!==current.project)return blocked('The starting revision is no longer available. Reread state.json and reconcile your proposal with the latest story.');
+      if(!base || base.project!==current.project)return blocked('The starting revision is no longer available. Reconcile your proposal with the latest story as your request route in CONNECT.md describes.');
       reviewBase={revision:proposal.baseRevision,source:base.source,ledger:base.ledger,project:base.project};
       try{outcome=mergeWorkbenchAgentSource(base.source,current.source,proposal.source);}catch(ex){return blocked('The document is too complex to merge safely. Ask for a revised proposal.');}outcome.current=current;
       if(outcome.ok && new TextEncoder().encode(outcome.source).length>4*1024*1024)return blocked('The combined story exceeds the 4 MiB size limit.');
@@ -31,7 +31,7 @@ function createWorkbenchAgentExchange(opts){
       if(outcome.ok && opts.requireLedger){
         if(typeof proposal.ledger!=='string' || !proposal.ledger.trim() || new TextEncoder().encode(proposal.ledger).length>256*1024)return blocked('Include the complete coverage ledger (up to 256 KiB) with this spec.');
         var before=base.ledger || '',local=current.ledger || '',incoming=proposal.ledger;
-        if(local!==before && incoming!==before && local!==incoming)return {ok:false,current:current,conflicts:[{path:'/ledger',reason:'Both changed the coverage ledger. Reread the accepted pair and reconcile it.'}]};
+        if(local!==before && incoming!==before && local!==incoming)return {ok:false,current:current,conflicts:[{path:'/ledger',reason:'Both changed the coverage ledger. Reconcile it with the latest accepted pair as your request route in CONNECT.md describes.'}]};
         outcome.ledger=incoming===before?local:incoming;
       }
       return outcome;
@@ -48,7 +48,7 @@ function createWorkbenchAgentExchange(opts){
       if(Object.prototype.hasOwnProperty.call(proposal,'operations') || Object.prototype.hasOwnProperty.call(proposal,'dryRun'))
         return result('rejected','Submit the complete updated document in source. Operation and dry-run proposals are no longer supported.');
       if(!current.open)return result('rejected','Open a project before applying agent changes.');
-      if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must reread state.json and revise its proposal.');
+      if(proposal.baseRevision!==current.revision)return result('rejected','Your document changed. The agent must revise its proposal against the latest story as its request route in CONNECT.md describes.');
       if(opts.busy())return 'Agent update waiting — finish editing or dragging, then click the canvas.';
       if(opts.requireLedger && (typeof proposal.ledger!=='string' || !proposal.ledger.trim() || new TextEncoder().encode(proposal.ledger).length>256*1024))return result('rejected','A complete coverage ledger is required.');
       var source=proposal.source;

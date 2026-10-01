@@ -5,6 +5,9 @@ import path from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
 import {createInterface} from 'node:readline';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+import vm from 'node:vm';
 import {source} from '../fixtures/editor-spec.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../../..');
 const origin='https://flowview-folder.test';
@@ -976,6 +979,156 @@ test('disconnected recovery actions remain reachable in a short window',async({p
       expect(await button.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return node===hit || node.contains(hit);})).toBe(true);
     }
     expect(await page.locator('.folder-agent-header').evaluate(node=>node.clientHeight)).toBeGreaterThan(100);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+/* ---------------- focused device-app presentation route ---------------- */
+function focusedStory(){return {page:{title:'Focused phone',blocks:[{heading:'Delivery',diagram:{view:'step',autoplay:false,
+  nodes:{a:{title:'Doorbell'},b:{title:'Backend'}},rows:[['a','b']],edges:[{from:'a',to:'b',kind:'https'}],
+  panels:[{id:'app',type:'deviceapp',title:'Resident phone',fields:[{id:'battery',label:'Battery',kind:'battery'},{id:'power',label:'Power'},{id:'clip',label:'Clip'}],
+    initial:{battery:{value:68,status:'ready'},power:{value:'Solar'},clip:{value:'Ready'}}}],
+  steps:[{id:'press',edge:'a->b',text:'Button pressed',panels:{app:{battery:{value:70}}}},{id:'done',nodes:['b'],text:'Recording ready',panels:{app:{phoneScreen:'app'}}}]}}]}};}
+const focusedLedger='# Coverage ledger\n\nBattery, power and clip evidence are recorded.\n';
+const sha256=text=>createHash('sha256').update(text,'utf8').digest('hex');
+/* The same pure core the workbench bundles; the packet must match it byte for byte. */
+function corePacket(request,state){
+  const {readSource}=createRequire(import.meta.url)('../../source-loader.cjs'),core=vm.createContext({});
+  for(const file of ['workbench/targets.js','workbench/focused-panel.js'])vm.runInContext(readSource(file),core);
+  return core.focusedPanelPacket({requestId:request.id,sessionId:request.sessionId,connectionId:request.connectionId,project:request.project,
+    revision:request.revision,source:state.source,ledger:state.ledger,selection:request.selection,open:true,previewCurrent:request.previewCurrent});
+}
+async function selectDeviceApp(page){
+  if(await page.locator('#workspace-window-agent').isVisible())await page.locator('#workspace-window-agent .workspace-window-close').click();
+  await page.locator('#docview [data-dv-panel="0"] .ptitle').first().click();
+  if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+}
+async function focusFiles(h){return (await readdir(h.session)).filter(name=>name.startsWith('focus-'));}
+function publishedOrder(h,from){return h.writes.slice(from).map(name=>path.basename(name)).filter(name=>name==='request.json' || name.startsWith('focus-'));}
+
+test('focused Copy registers its packet before the request, stays context-bounded, then previews, applies and undoes the full pair',async({page})=>{
+  const h=await setup(page),story=JSON.stringify(focusedStory(),null,2);
+  try{
+    await writeFile(path.join(h.folder,'payments.spec.json'),story);await writeFile(path.join(h.folder,'payments.ledger.md'),focusedLedger);
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#src')).toHaveValue(story);
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8'),common=connect.slice(0,connect.indexOf('Full route.'));
+    expect(common).toContain('connectionId');expect(common).not.toMatch(/state\.json|SKILL\.md|Open and preserve/);
+    expect(connect).toContain('"payments.spec.json"');expect(connect).toContain('assemble-deviceapp');expect(connect).toContain('Do not start Monitor');
+    expect(await readFile(path.join(h.session,'README.md'),'utf8')).toBe(connect);
+    h.run('prepare'); // the documented setup step; it unpacks the kit the assembler uses
+    await closeGuide(page);await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    await openAgent(page);const toggle=page.locator('#folder-agent-focused');await expect(toggle).toBeHidden();
+    // Selection-only Copy says focused mode exists, but creates no request or packet.
+    await selectDeviceApp(page);const quick=page.locator('#folder-agent-selection');
+    await expect(quick).toHaveText('Copy for agent · 1 selected');await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
+    let copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(copied).toContain('Selection context only');expect(copied).toContain('Only the workbench Agent composer can start that mode');
+    expect(copied).not.toMatch(/focus-[\w-]+\.json|assemble-deviceapp|candidate\.panel\.json/);
+    expect(await readdir(h.session)).not.toContain('request.json');expect(await focusFiles(h)).toEqual([]);
+    // The explicit focused choice registers a packet, then the request that names it.
+    await openAgent(page);await expect(toggle).toBeEnabled();await expect(toggle).not.toBeChecked();
+    await expect(page.locator('#folder-agent-focused-hint')).toContainText('whole-panel visibility');
+    await expect(page.locator('#folder-agent-focused-hint')).toContainText('source display as one control (source cards, badges and source selection)');
+    await expect(page.locator('#folder-agent-focused-hint')).not.toContainText(/frame|source-map/);
+    await page.locator('#folder-agent-input').fill('Move the clip card to the top.');await toggle.check();
+    const from=h.writes.length;await page.locator('#folder-agent-send').click();await expect(page.locator('#folder-agent-panel-status')).toContainText('Copied.');
+    const request=await h.read('request.json'),state=await h.read('state.json');
+    expect(request.mode).toBe('focused-deviceapp');expect(request.delivery).toBe('clipboard');
+    expect(publishedOrder(h,from)).toEqual([request.focus.file,'request.json']);
+    const packetText=await readFile(path.join(h.session,request.focus.file),'utf8'),packet=JSON.parse(packetText);
+    expect(sha256(packetText)).toBe(request.focus.sha256);expect(packet.revision).toBe(request.revision);expect(packet.revision).toBe(state.revision);
+    expect(packet.ledgerSha256).toBe(sha256(focusedLedger));expect(corePacket(request,state).text).toBe(packetText);
+    copied=await page.evaluate(()=>navigator.clipboard.readText());
+    expect(copied).toContain(request.id);expect(copied).toContain('.flowview-agent/'+request.focus.file);expect(copied).toContain(request.focus.sha256);
+    expect(copied).toContain('python3 ".flowview-agent/folder-agent.py" prepare --request '+request.id);
+    expect(copied).toContain('python3 ".flowview-agent/folder-agent.py" assemble-deviceapp --request '+request.id+' --task '+request.focus.file);
+    expect(copied).toContain('Move the clip card to the top.');
+    for(const full of ['Read its saved context and state.json','Read the current spec and ledger','hld-to-page/SKILL.md'])expect(copied).not.toContain(full);
+    expect(copied).not.toContain('"initial"');expect(copied.length).toBeLessThan(4000);
+    // Context-only Copy during the active request preserves the draft and request.
+    await page.locator('#folder-agent-input').fill('Unsent follow-up draft');await page.locator('#workspace-window-agent .workspace-window-close').click();
+    await quick.click();await expect(quick).toHaveText('Copied · 1 selected');
+    copied=await page.evaluate(()=>navigator.clipboard.readText());expect(copied).not.toContain(request.id);expect(copied).not.toContain('Unsent follow-up draft');
+    expect(await h.read('request.json')).toEqual(request);expect(await focusFiles(h)).toEqual([request.focus.file]);
+    await openAgent(page);await expect(page.locator('#folder-agent-input')).toHaveValue('Unsent follow-up draft');await expect(page.locator('#folder-agent-cancel')).toBeVisible();
+    // Documented preparation: the exact relative command from the diagram folder stages the
+    // request-scoped fragment and prints a bounded receipt naming it.
+    const prepared=h.run('prepare','--request',request.id),receipt=JSON.parse(prepared);
+    expect(receipt.format).toBe('flowview-prepared-request-v1');expect(receipt.status).toBe('created');
+    expect([receipt.requestId,receipt.sessionId,receipt.connectionId]).toEqual([request.id,request.sessionId,request.connectionId]);
+    expect(receipt.mode).toBe(request.mode);expect(receipt.revision).toBe(packet.revision);
+    expect(Object.keys(receipt.editableFiles)).toEqual(['fragment']);
+    const fragmentFile=receipt.editableFiles.fragment;
+    expect(fragmentFile).toMatch(/^[^/\\]+\.panel\.json$/);expect(fragmentFile).not.toBe('candidate.panel.json');
+    expect((await h.read(receipt.receiptFile)).requestId).toBe(request.id);
+    for(const value of ['Solar','Resident phone','Button pressed',focusedLedger.trim()])expect(prepared).not.toContain(value);
+    // The staged file is the packet's fragment; the author reads and edits that file in place.
+    const stagedText=await readFile(path.join(h.session,fragmentFile),'utf8'),fragment=JSON.parse(stagedText);
+    expect(fragment).toEqual(packet.fragment);
+    const fields=fragment.panel.value.fields;fragment.panel.value.fields=[fields[2],fields[0],fields[1]];
+    const editedText=JSON.stringify(fragment,null,2)+'\n';await writeFile(path.join(h.session,fragmentFile),editedText);
+    // A retry for the same request keeps the edited bytes and never restages them.
+    const retry=JSON.parse(h.run('prepare','--request',request.id));
+    expect(retry.status).toBe('preserved-edits');expect(retry.editableFiles).toEqual(receipt.editableFiles);
+    expect(await readFile(path.join(h.session,fragmentFile),'utf8')).toBe(editedText);
+    // The helper assembles the complete candidate from that fragment; the full pair is proposed.
+    const assembled=JSON.parse(h.run('assemble-deviceapp','--request',request.id,'--task',request.focus.file,'--fragment',fragmentFile));
+    expect(assembled.ledgerSha256).toBe(packet.ledgerSha256);expect(await readFile(path.join(h.session,'candidate.ledger.md'),'utf8')).toBe(focusedLedger);
+    h.run('propose','--request',request.id,'--revision',receipt.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Clip card first');
+    await page.locator('#agent-update-open').click();await expect(page.locator('#agent-update-commit')).toBeEnabled();
+    await expect(page.locator('#src')).toHaveValue(story);expect(await readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(story);
+    await page.locator('#agent-update-commit').click();
+    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    const expected=focusedStory(),panel=expected.page.blocks[0].diagram.panels[0];panel.fields=[panel.fields[2],panel.fields[0],panel.fields[1]];
+    await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue())).toEqual(expected);
+    const changed=await page.locator('#src').inputValue();
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(changed);
+    expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(focusedLedger);
+    h.run('reply','--request',request.id,'--text','Clip card moved first.');await expect(page.locator('#folder-agent-cancel')).toBeHidden();
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(story);
+    await expect.poll(()=>readFile(path.join(h.folder,'payments.spec.json'),'utf8')).toBe(story);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);
+    expect(await readFile(path.join(h.folder,'payments.ledger.md'),'utf8')).toBe(focusedLedger);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('Beta focused Send publishes the same core packet before a watcher-visible request; stale choices block sending',async({page})=>{
+  const h=await setup(page),story=JSON.stringify(focusedStory(),null,2);
+  try{
+    await writeFile(path.join(h.folder,'payments.spec.json'),story);await writeFile(path.join(h.folder,'payments.ledger.md'),focusedLedger);
+    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-embedded').click();
+    if(!await page.locator('#folder-agent-connect').isVisible())await page.locator('#folder-agent-open-setup').click();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    const connect=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
+    expect(connect).toContain('Start Monitor on python3');expect(connect).toContain('Renew Monitor only while editor.json is connected');
+    expect(connect.slice(0,connect.indexOf('Full route.'))).not.toMatch(/state\.json|SKILL\.md/);
+    await closeGuide(page);await h.listen();
+    await selectDeviceApp(page);await openAgent(page);
+    const toggle=page.locator('#folder-agent-focused');await expect(toggle).toBeEnabled();await toggle.check();
+    // Selecting something else retires the choice; it never silently becomes a full request.
+    await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#docview [data-dv-node="a"]').first().click();
+    if(await page.locator('#workspace-window-inspect').isVisible())await page.locator('#workspace-window-inspect .workspace-window-close').click();
+    await openAgent(page);await expect(toggle).toBeHidden();await expect(toggle).not.toBeChecked();
+    await selectDeviceApp(page);await openAgent(page);await toggle.check();
+    const text='Show the phone app screen first.',from=h.writes.length;
+    await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
+    const request=await publishedRequest(h,text),state=await h.read('state.json');
+    expect(request.mode).toBe('focused-deviceapp');expect(request.delivery).toBeUndefined();
+    expect(publishedOrder(h,from)).toEqual([request.focus.file,'request.json']);
+    const packetText=await readFile(path.join(h.session,request.focus.file),'utf8');
+    expect(sha256(packetText)).toBe(request.focus.sha256);expect(corePacket(request,state).text).toBe(packetText);
+    // The watcher saw the registered request itself; no clipboard placeholder was used.
+    await expect.poll(async()=>{try{return (await h.read('listener.json')).events.some(([kind,id])=>kind==='request' && id===request.id);}catch{return false;}}).toBe(true);
+    await expect(page.locator('#folder-agent-input')).toHaveValue('');
+    await expect(page.locator('.folder-agent-sent-context').last()).toContainText('Mode: focused device-app presentation');
+    await page.locator('#folder-agent-cancel').click();await expect(page.locator('#folder-agent-cancel')).toBeHidden();
+    expect((await h.read('cancel.json')).requestId).toBe(request.id);
+    // A cancelled request is refused before staging; no fragment is published.
+    expect(()=>h.run('prepare','--request',request.id)).toThrow();
+    expect((await readdir(h.session)).filter(name=>name.endsWith('.panel.json'))).toEqual([]);
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

@@ -58,7 +58,7 @@ function builderTargetPath(raw, target){
   if (target.kind === 'tab') return builderTabPath(raw, target.block, target.tab);
   var rec = specSectionPaths(raw)[target.section];
   if (!rec) return null;
-  if (target.kind === 'section') return rec.section;
+  if (target.kind === 'section' || target.kind === 'prose') return rec.section;
   var d = rec.diagram;
   if (target.kind === 'node') return d.concat(['nodes', target.id]);
   if (target.kind === 'group'){

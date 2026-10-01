@@ -1918,6 +1918,11 @@ function sectionProseActions(val,target){
     });
     return actions.children.length?[frowBlock('Section prose',actions)]:[];
   }
+function sectionNotesForm(val){
+    var help=document.createElement('p');help.className='fnote';
+    help.textContent='Select a paragraph or bullet to edit it. Delete Section notes removes only the text and bullets; the section, diagram and layouts stay in place. Use × on the notes window to hide it temporarily.';
+    return [help].concat(sectionProseActions(val,session.target));
+  }
 function proseControl(value,commit,options){
     options=options || {};
     var key=targetIdentity();if(proseDraft.key!==key)proseDraft={key:key,fields:Object.create(null)};
@@ -2332,6 +2337,7 @@ function renderInspector(){
         t.kind === 'panel' ? panelForm(val, ctx) :
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
+        t.kind === 'prose' ? sectionNotesForm(val) :
         t.kind === 'crow' ? crowForm(val, ctx) :
         t.kind === 'contract' ? contractForm(val,ctx) :
         t.kind === 'tab' ? tabForm(val, ctx) : sectionForm(val, ctx);
@@ -2458,7 +2464,7 @@ function renderInspector(){
         }));
       }
       if (!armedHere && t.kind !== 'document')
-        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
+        acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':t.kind==='prose'?'Delete Section notes':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       if(acts.children.length)guide.appendChild(acts);
       guide.appendChild(form);
     }

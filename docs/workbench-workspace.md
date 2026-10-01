@@ -55,6 +55,12 @@ reordering and deletion; these move or remove its whole subtree. Each addition,
 move or deletion is one Undo/Redo. Prose needs a page section; a bare diagram
 has no section prose surface.
 
+In Explore, clicking empty space inside **Section notes** selects the notes as a
+whole. **Delete Section notes** (or Delete on the selected notes surface) removes
+only `text` and `bullets`; the section, diagram and saved layouts remain. Undo
+restores the exact source. The window’s **×** hides notes temporarily without
+removing their content from Standard.
+
 Prose and step-text fields support backticks for inline code and triple-backtick
 fences for multiline code blocks. Enter real newlines in the text field; JSON
 source uses `\n`. Code remains literal, preserves indentation, and scrolls within

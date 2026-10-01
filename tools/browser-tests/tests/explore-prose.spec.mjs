@@ -112,3 +112,65 @@ test('adding prose restores temporarily hidden notes without changing saved visi
   await expect(page.locator('#guide').getByLabel('Prose text',{exact:true})).toHaveValue('New paragraph');
   const saved=JSON.parse(await source(page));expect(saved.page.sections[0].diagram).toEqual(raw.page.sections[0].diagram);
 });
+
+test('deleting the notes surface preserves the section, Standard bounds and exact Undo/Redo',async({page,server},info)=>{
+  const raw=fixture('explore'),original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await paste(page,original);await closeTools(page);
+  const geometry=()=>page.locator('.doc-sec').evaluate(sec=>{
+    const box=sec.getBoundingClientRect(),viewport=sec.querySelector('.section-viewport').getBoundingClientRect();
+    const board=sec.querySelector('.board').getBoundingClientRect(),svg=sec.querySelector('.boardcanvas>svg');
+    return {width:box.width,viewportWidth:viewport.width,viewportHeight:viewport.height,boardWidth:board.width,boardHeight:board.height,
+      contained:box.bottom>=viewport.bottom && box.right>=viewport.right,viewBox:svg.getAttribute('viewBox')};
+  });
+  await page.getByRole('button',{name:'Business',exact:true}).click();const before=await geometry();
+  await page.getByRole('button',{name:'Explore',exact:true}).click();
+  const expected=structuredClone(raw);delete expected.page.sections[0].text;delete expected.page.sections[0].bullets;
+  for(const route of ['inspector','keyboard']){
+    // Both prose padding and the remaining empty window body used to select
+    // the enclosing section, turning a text deletion into diagram deletion.
+    await closeTools(page);await notes(page).locator('.explore-window-body').click({position:{x:5,y:route==='inspector'?5:300}});
+    await expect(notes(page)).toHaveClass(/dv-sel/);await expect(page.locator('.doc-sec')).not.toHaveClass(/dv-sel/);
+    if(route==='inspector'){
+      await page.locator('#editor-tab-inspect').click();await expect(page.getByRole('button',{name:'delete section',exact:true})).toHaveCount(0);
+      await page.getByRole('button',{name:'Delete Section notes',exact:true}).click();
+    }else await page.keyboard.press('Delete');
+    await expect(notes(page)).toHaveCount(0);const removed=await source(page);expect(JSON.parse(removed)).toEqual(expected);
+    await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
+    await page.getByRole('button',{name:'Business',exact:true}).click();await closeTools(page);
+    expect(await geometry()).toEqual(before);expect(before.contained).toBe(true);expect(before.boardHeight).toBeGreaterThan(100);
+    await page.screenshot({path:info.outputPath('standard-after-notes-deletion-'+route+'.png')});
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);expect(await geometry()).toEqual(before);
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+    await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();
+  }
+});
+
+for(const value of ['The last paragraph',['The last paragraph']])test('deleting the last '+(Array.isArray(value)?'array':'string')+' paragraph leaves the diagram intact in Standard',async({page,server})=>{
+    const raw=fixture('explore');raw.page.sections[0].text=value;delete raw.page.sections[0].bullets;
+    await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+    await inspectPageElement(page,notes(page).locator('[data-dv-para="0"]'));
+    await page.getByRole('button',{name:'Delete paragraph',exact:true}).click();await expect(notes(page)).toHaveCount(0);
+    expect(JSON.parse(await source(page)).page.sections[0].diagram).toEqual(raw.page.sections[0].diagram);
+    await closeTools(page);await page.getByRole('button',{name:'Business',exact:true}).click();
+    await expect(page.locator('.doc-sec .boardcanvas>svg')).toBeVisible();await expect(page.locator('.doc-sec .sec-h')).toContainText('Delivery explained');
+    await page.locator('#undo-builder').click();await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();
+});
+
+for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprint'])test('notes remain readable in '+skin+' in the reader and workbench',async({page,server},info)=>{
+  const raw=fixture('explore');raw.page.skin=skin;
+  for(const surface of ['reader','workbench']){
+    if(surface==='reader')await page.goto(await build(server,raw,'notes-'+skin));
+    else{await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);}
+    await expect(notes(page)).toBeVisible();await page.evaluate(()=>document.fonts.ready);
+    const contrast=await notes(page).evaluate(el=>{
+      function luminance(color){const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
+      const bg=luminance(getComputedStyle(el).backgroundColor);
+      return [...el.querySelectorAll('.sec-text,.sec-bullets,.sec-text a,.sec-text code,.explore-window-grip')].map(node=>{
+        const fg=luminance(getComputedStyle(node).color);return (Math.max(bg,fg)+.05)/(Math.min(bg,fg)+.05);
+      });
+    });
+    expect(Math.min(...contrast)).toBeGreaterThanOrEqual(4.5);
+    await notes(page).screenshot({path:info.outputPath('notes-'+skin+'-'+surface+'.png')});
+  }
+});

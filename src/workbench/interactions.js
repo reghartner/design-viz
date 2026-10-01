@@ -54,6 +54,7 @@ function createBuilderInteractions(opts){
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
+    if (t.kind === 'prose') return secEl.querySelector('[data-explore-content="prose"]') || secEl.querySelector('.sec-prose');
     if (t.kind === 'step'){
       /* prefer the numbered coin; edgeless steps (or steps hidden by
          the current path/view) have no coin — fall back to their chip */
@@ -363,6 +364,11 @@ function createBuilderInteractions(opts){
     var groupEl = ev.target.closest('g.grp[data-dv-group]');
     if (groupEl && secEl.contains(groupEl))
       return {section: gi, kind: 'group', id: groupEl.getAttribute('data-dv-group'), el: groupEl};
+    // The floating notes surface is text, including its padding. Selecting it
+    // must never turn Delete into removal of the enclosing diagram section.
+    var notesEl = ev.target.closest('[data-explore-content="prose"], .sec-prose');
+    if (notesEl && secEl.contains(notesEl))
+      return {section: gi, kind: 'prose', el: findTargetEl({section:gi,kind:'prose'})};
     return {section: gi, kind: 'section', el: secEl};
   }
 

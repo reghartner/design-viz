@@ -329,6 +329,9 @@ replacement. Paragraphs support add before/after, move up/down,
 and deletion. Existing string `text` becomes an array when another paragraph
 is added. Nested bullets support siblings/subpoints, indent/outdent, reorder
 and deletion of complete subtrees. Each structural action has one Undo/Redo.
+Clicking empty space in the Explore notes window selects Section notes; deleting
+it removes only `text` and `bullets`, preserving the section and diagram. Use the
+window’s × button for temporary hiding instead of changing the authored content.
 Prose formatting buttons write the existing safe emphasis, HTTP(S) link,
 inline-code and fenced-code syntax. Bare diagrams need a page section before
 they can hold prose. Step captions and other prose fields also accept typed

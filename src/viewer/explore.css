@@ -25,6 +25,9 @@
 .section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
 .sk-aurora .section-viewport{--explore-bg:#101a2c;--explore-border:#294658;}
 .sk-pastel .section-viewport,.sk-daylight .section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
+.sk-editorial .section-viewport{--explore-bg:var(--ed-sheet);--explore-border:var(--ed-rule);}
+.sk-terminal .section-viewport{--explore-bg:var(--tm-surface);--explore-border:var(--tm-line);}
+.sk-blueprint .section-viewport{--explore-bg:#0A345D;--explore-border:#537FA1;}
 .explore-window{position:absolute;z-index:2;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);min-width:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid var(--explore-border);border-radius:12px;background:var(--explore-bg);box-shadow:0 6px 22px #1424421c;}
 .explore-window-header{height:32px;min-height:32px;display:flex;align-items:center;border-bottom:1px solid var(--explore-border);padding:0 5px 0 8px;gap:3px;}
 .explore-window-grip{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:6px 0;border:0;background:none;color:var(--dtext);font:600 10px 'IBM Plex Mono',monospace;cursor:grab;touch-action:none;}

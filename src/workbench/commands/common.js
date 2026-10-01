@@ -217,6 +217,10 @@ function builderDeletePlan(text, raw, t){
   if (t.kind === 'panel') return planDeletePanel(text, raw, t.section, t.index);
   var rec = specSectionPaths(raw)[t.section];
   if (!rec) return {error: 'no such section'};
+  if (t.kind === 'prose'){
+    if (!rec.section.length) return {error: 'A bare diagram has no section notes.'};
+    return planSetFields(text, raw, rec.section, [['text', null], ['bullets', null]]);
+  }
   if (t.kind === 'bullet'){
     var bulletPath=builderTargetPath(raw,t);
     return bulletPath?planDeleteListItem(text,raw,bulletPath.slice(0,-1),bulletPath[bulletPath.length-1]):{error:'Bullet no longer exists.'};
@@ -231,7 +235,8 @@ function builderDeletePlan(text, raw, t){
     var cp=builderTargetPath(raw,t);
     return jsonRemoveMember(text,cp.slice(0,-1),cp[cp.length-1]) || {error:'contract block not found'};
   }
-  return planDeleteSection(text, raw, t.section);
+  if (t.kind === 'section') return planDeleteSection(text, raw, t.section);
+  return {error: 'This selection cannot be deleted.'};
 }
 
 function planBulkSetField(text, targets, key, valueTextOrNull){

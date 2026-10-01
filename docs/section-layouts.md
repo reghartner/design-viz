@@ -197,7 +197,10 @@ including its previous collapsed state. The section’s `collapsed` default affe
 Standard prose only. Empty sections create no notes window. Adding the first paragraph or bullet in
 the workbench creates it immediately and keeps Explore open. Adding prose also
 restores notes hidden temporarily with the window’s Hide button; it does not
-change saved visibility defaults.
+change saved visibility defaults. Selecting empty space inside the workbench notes window
+selects only Section notes. Deleting that selection removes the section’s `text`
+and `bullets`, preserving its diagram, layouts and containing section; Undo
+restores the notes.
 
 Use **Panels · N** to choose which available panels to show. Panels hidden by
 the authored view or the current step are identified in that menu. **Hide

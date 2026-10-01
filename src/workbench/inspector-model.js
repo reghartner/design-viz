@@ -206,6 +206,11 @@ var BUILDER_GUIDES = {
       ['revealAt, hideAt', 'zero-based positions in each full path, including stops hidden in a view']
     ]
   },
+  prose: {
+    title: 'Section notes',
+    how: 'Select a paragraph or bullet to edit it. Delete Section notes removes the paragraphs and bullets while keeping the section and its diagram.',
+    fields: [['text, bullets', 'shared notes in Standard and Explore; use the window’s × button to hide notes temporarily']]
+  },
   para: {
     title: 'Paragraph — section prose',
     how: 'Edit the text and Render. section.text is one string or a list of paragraph strings.',

@@ -17,15 +17,17 @@ test('explicit Beta setup retains its bounded Monitor instructions',()=>{
   assert.match(prompt,/progress --request/);
 });
 test('both setups load the existing-edit guide first instead of the full skill and session guide',()=>{
-  const legacy={sessionId:'session',connectionId:'connection'};
+  const legacy={sessionId:'session',connectionId:'connection'},stampNote=/Commit does not itself refresh compatibility metadata;[^\n]*verify the actual accepted metadata before claiming it was stamped\./;
   for(const workflow of ['external','embedded'])for(const resume of [false,true]){
     const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow);
     assert.ok(prompt.includes('Read .flowview-agent/CONNECT.md and folder-agent.py before running anything.'),workflow);
     assert.ok(prompt.includes('Run python3 "<diagram folder>/.flowview-agent/folder-agent.py" prepare. Read .flowview-agent/authoring/docs/folder-agent-existing-edit.md first'),workflow);
     assert.doesNotMatch(prompt,/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+    assert.match(prompt,stampNote,workflow);
     const old=context.folderAgentInstructions('Doorbell','mixed',resume,legacy,workflow);
     assert.match(old,/prepare\. Read \S*authoring\/docs\/folder-agent-existing-edit\.md first/,'legacy '+workflow);
     assert.doesNotMatch(old,/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
+    assert.match(old,stampNote,'legacy '+workflow);
   }
 });
 test('the existing-edit guide escalates to the full skill and widget_doc, where the clip cue lives',()=>{

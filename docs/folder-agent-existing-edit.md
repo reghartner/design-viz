@@ -30,6 +30,12 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
 2. Verify sessionId, connectionId, request id, `editor.connected` and a heartbeat
    under 15 s. Stop if identity changes.
 3. Read `state.json` immediately before planning; keep its revision as the base.
+   If its long `source`/`ledger` lines are unreadable, read its identity and
+   revision before and after the complete pair named in `project.json`. Use the
+   pair only if both reads match each other and the active request, which Send
+   publishes only after writing that exact valid pair. Otherwise, even for an
+   invalid draft or stable newer revision, the files don't prove current state;
+   use no older candidate; follow [stale-revision recovery](folder-agent-session.md).
 4. Create the complete `candidate.spec.json` and `candidate.ledger.md` pair in
    the support folder. A whole-file rewrite is not required; use ordinary local
    file operations under your existing permissions, such as copying the current
@@ -66,6 +72,8 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
   preview and explicit **Commit update**; wait for the matching `result.json`.
 - After acceptance, reread the accepted pair and confirm they agree, including
   merged human edits; submit a corrected pair if not.
+- Commit does not itself refresh compatibility metadata; verify the accepted
+  `page.flowview` before claiming it was stamped.
 - On rejection, stale revision or conflict, reread the current pair and build a
   fresh reconciled pair; never relabel an old proposal. For any other recovery,
   load the full [folder session](folder-agent-session.md).

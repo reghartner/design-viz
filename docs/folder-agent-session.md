@@ -104,6 +104,16 @@ the agent must not directly overwrite either accepted artifact. Validate the
 candidate spec with the bundled authoring kit, and reconcile ledger claims with
 that spec. The helper does not grant browser access or establish visual QA.
 
+If the agent's file reader cannot return the long `source` or `ledger` line, it
+reads the state identity and revision, then the complete current spec and ledger
+named in `project.json`, then rereads the state identity and revision. It uses
+those files only when both reads match the active request and each other: Send
+writes that exact valid pair, including valid edits not yet committed to Git,
+before publishing the request. Otherwise the files do not prove the current
+state, even at a stable newer revision: `state.json` is written before the pair,
+and an invalid draft stays only in state. No older candidate substitutes; reread
+current state and reconcile as for a stale revision.
+
 ```sh
 python3 /path/to/diagram/.flowview-agent/folder-agent.py prepare
 python3 /path/to/diagram/.flowview-agent/folder-agent.py propose \

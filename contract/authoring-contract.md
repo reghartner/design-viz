@@ -1468,6 +1468,11 @@ perspectives" of one timeline). Types:
   proportions as content changes. Resizing a panel scales the phone, text and
   icons together; named layouts fit it to the available width and height without
   enlarging it beyond its normal size. Long app content scrolls inside the phone.
+  In the app, notifications come first, then visible fields in declaration
+  order. A card below the phone's initial scroll position can be reached by
+  scrolling but is not visible in the initial unscrolled phone view. Put a step's key evidence
+  early; hide cards or clear notifications only when the source supports it, or
+  show required clip imagery in a separate `screen`.
   `initial.phoneScreen` and step patches accept `"home"` or `"app"`; omitted
   means app, preserving existing diagrams. The screen choice carries forward.
   Home shows a wallpaper, clock, notification cards and an illustrative app dock.

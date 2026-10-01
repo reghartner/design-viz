@@ -48,6 +48,10 @@ Resize the panel tile to shrink the whole phone, including its text, icons and c
 In a named layout it fits both the tile width and height, up to its normal size.
 Changing steps or removing every card does not change the frame size; long
 content scrolls inside. The optional source explanation keeps its normal text size.
+Notifications come first, then visible cards in `fields` order. A card below the
+phone's initial scroll position is reachable but not visible in the initial
+unscrolled phone view, so declare the step's key evidence early. Hide cards or clear notifications only
+when the source supports it; show required clip imagery in a separate `screen`.
 A whole-field null reset restores default visibility and unknown data.
 
 ## A phone without the source explanation

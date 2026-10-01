@@ -56,6 +56,12 @@ The visual checks are narrow: 38 views, 0 page errors, no overflow. The Last eve
 
 ## Next
 
+The plan below is kept as written. Later, the guide was combined
+with the clip-evidence cue, and one author ran that combined route once
+through Copy for agent: see [tandem guidance trial](tandem-guidance.md). That
+run does not change the verdicts above. Reported costs for these runs are in
+[cost accounting](cost-accounting.md).
+
 Preserve the draft. The next trial is initial creation. No further substantive author will run, and the failed run will not be replaced. Initial creation will use the original brief. If widening is warranted, it will add a contemporary control and four SOL Medium item-level grades with computed totals. No caption cohort, no implementation adoption and no new API.
 
 ## Evidence

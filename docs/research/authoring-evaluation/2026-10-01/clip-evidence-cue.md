@@ -133,8 +133,10 @@ Evidence hashes (SHA-256):
   phone at both widths. In the clip-branch prepared-kit trial the home-map labels also
   overlap. These presentation limits are unscored. A matching scene being
   present at the clip opening does not fix them.
-- No registered Copy for agent, Monitor, or Beta session has been observed
-  using the cue.
+- Neither trial here was a registered Copy for agent, Monitor, or Beta
+  session. A later, separate Copy for agent run on the combined route is
+  recorded in [tandem guidance trial](tandem-guidance.md); Monitor and Beta
+  remain unobserved.
 
 ## Workbench delivery route
 
@@ -199,5 +201,9 @@ at `ccc4898`:
 - 9 widget-doc tests, 22 folder-helper tests and 13 build tests.
 - 3 selected browser checks.
 
-These show source and delivery consistency only. No author has yet run the
-combined route.
+These show source and delivery consistency only. When this record was
+written, no author had run the combined route. One author later ran it once
+through registered Copy for agent at `d1dadcf` and reached the cue through the
+full skill; see [tandem guidance trial](tandem-guidance.md). That run is
+separate from the two trials above, and its results are not pooled with
+theirs. Reported author costs are in [cost accounting](cost-accounting.md).

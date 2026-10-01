@@ -882,7 +882,7 @@ test('connected Copy preserves a large message while registering a bounded nativ
     await page.locator('#folder-agent-send').click();expect((await h.read('request.json')).id).toBe(request.id);
     h.run('reply','--request',request.id,'--text','Ready for the next request.');
     await expect.poll(async()=> (await h.read('transcript.json')).messages.at(-1).role).toBe('assistant');
-    const large=JSON.parse(await page.locator('#src').inputValue());large.page.blocks[0].text='Complete evidence. '.repeat(1000)+'SOURCE END';const largeSource=JSON.stringify(large,null,2);
+    const priorSource=await page.locator('#src').inputValue(),large=JSON.parse(priorSource);large.page.blocks[0].text='Complete evidence. '.repeat(1000)+'SOURCE END';const largeSource=JSON.stringify(large,null,2);
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill(largeSource);await page.locator('#go').click();
     await expect.poll(async()=>(await h.read('state.json')).source).toBe(largeSource);
     await page.locator('#workspace-window-json .workspace-window-close').click();await copyRequest(page,'Review the full source.');
@@ -892,6 +892,18 @@ test('connected Copy preserves a large message while registering a bounded nativ
     expect(fullCopy).not.toContain('SOURCE END');expect(fullCopy).not.toContain('Complete evidence.');
     expect(fullCopy.length).toBeLessThan(3000);
     expect((await h.read('state.json')).source).toBe(largeSource);
+    // A valid published request's named pair is exactly its Workbench pair, read between matching states.
+    const project=await h.read('project.json'),owner=await h.read('session.json'),stateBefore=await h.read('state.json');
+    expect(project).toMatchObject({version:1,spec:expect.any(String),ledger:expect.any(String)});
+    const pair={source:await readFile(path.join(h.folder,project.spec),'utf8'),ledger:await readFile(path.join(h.folder,project.ledger),'utf8')};
+    const stateAfter=await h.read('state.json'),active={sessionId:largeRequest.sessionId,connectionId:largeRequest.connectionId,revision:largeRequest.revision};
+    expect(active).toEqual({sessionId:owner.sessionId,connectionId:owner.connectionId,revision:expect.any(String)});
+    expect(largeRequest.revision).not.toBe(request.revision);
+    for(const state of [stateBefore,stateAfter]){
+      expect({sessionId:state.sessionId,connectionId:state.connectionId,revision:state.revision}).toEqual(active);
+      expect(pair).toEqual({source:state.source,ledger:state.ledger ?? ''});
+    }
+    expect(priorSource).not.toBe(largeSource);expect(pair.source).toBe(largeSource);
 
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}

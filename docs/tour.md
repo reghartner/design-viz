@@ -325,6 +325,10 @@ belong to the host. Native dialogs retain their own cancel handling before Escap
 can leave a chapter. These are host hooks, not additions to the authored tour JSON
 schema.
 
+For a company example, follow [Put your own diagram on the homepage](homepage-example.md).
+It covers a separate homepage/reader sample, the shared exercise anchors, build
+wiring, verification, and a prompt to hand to an agent.
+
 ## Known limitations
 
 - A drill-down into an EXTERNAL spec (host `loadDetail`) that was open

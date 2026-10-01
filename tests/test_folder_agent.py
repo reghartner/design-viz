@@ -17,6 +17,12 @@ HELPER = ROOT / 'tools/folder-agent.py'
 spec = importlib.util.spec_from_file_location('folder_agent', HELPER)
 helper = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(helper)
+kit_spec = importlib.util.spec_from_file_location('folder_agent_kit', ROOT / 'tools/folder_agent_kit.py')
+kit_builder = importlib.util.module_from_spec(kit_spec)
+kit_spec.loader.exec_module(kit_builder)
+doc_spec = importlib.util.spec_from_file_location('widget_doc', ROOT / 'tools/widget_doc.py')
+widget_doc = importlib.util.module_from_spec(doc_spec)
+doc_spec.loader.exec_module(widget_doc)
 
 
 class FolderAgentTests(unittest.TestCase):
@@ -125,6 +131,19 @@ class FolderAgentTests(unittest.TestCase):
         (self.folder/'authoring/docs').symlink_to(self.folder, target_is_directory=True)
         with self.assertRaisesRegex(ValueError, 'symlink'):
             helper.prepare(self.folder)
+
+    def test_prepared_real_kit_carries_clip_cue_in_skill_and_helper(self):
+        # The editor's real kit builder; the runtime bundle is irrelevant here.
+        (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, '// runtime'))
+        helper.prepare(self.folder)
+        for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py']:
+            self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
+        skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
+        self.assertIn(widget_doc.CLIP_CUE, ' '.join(skill.split()))
+        result = subprocess.run([sys.executable, str(self.folder/'authoring/tools/widget_doc.py'), 'deviceapp'],
+                                text=True, capture_output=True, timeout=10, cwd=self.folder)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count(widget_doc.CLIP_CUE), 1)
 
     def test_watcher_notifies_once_and_renewal_skips_completed_request(self):
         run = self.run_helper('watch', '--minutes', '.01', '--interval', '.1')

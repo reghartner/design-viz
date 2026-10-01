@@ -20,6 +20,17 @@ CONTRACT = Path(__file__).resolve().parent.parent / "contract" / "authoring-cont
 PANELS_HEAD = "### panels"
 CARD_HEAD = "### message-contract card"
 BULLET_RE = re.compile(r"^- `([a-z][a-z0-9-]*)` ")
+# Cross-panel rule the hld-to-page skill repeats beside "Think like the
+# presenter". Printed once before the intro when the request includes either
+# clip panel (an author who skipped `screen` still asks for `deviceapp`).
+CLIP_CUE_TYPES = ("deviceapp", "screen")
+CLIP_CUE = (
+    "For a source-required clip opening, if a source-backed matching scene is "
+    "available, include a `screen` with it and keep or make it visible at that "
+    "step; if none is, omit the screen and say so instead of showing an "
+    "unmatched scene. A retained matching still qualifies; no `Playing` label "
+    "is required. A textual `deviceapp.clip` card alone does not qualify."
+)
 
 
 def load_sections(text):
@@ -86,6 +97,9 @@ def main(argv):
         print("unknown widget type(s): %s" % " ".join(unknown), file=sys.stderr)
         print("valid: %s" % " ".join(sorted(blocks)), file=sys.stderr)
         return 2
+    if any(t in argv for t in CLIP_CUE_TYPES):
+        print(CLIP_CUE)
+        print()
     print(intro)
     for name in argv:
         print()

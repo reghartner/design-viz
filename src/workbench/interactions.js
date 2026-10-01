@@ -651,6 +651,10 @@ function createBuilderInteractions(opts){
     if (nd.el && nd.el.classList) nd.el.classList.remove('dv-dragsrc');
     if (nd.target && nd.target.classList) nd.target.classList.remove('dv-droptgt');
     dropNodeDragGhosts(nd);
+    (nd.members || []).forEach(function(member){
+      if(member.el)member.el.classList.remove('dv-dragsrc');
+      if(member.ghost)member.ghost.remove();
+    });
     (nd.edgeGhosts || []).forEach(function(pair){pair.source.classList.remove('dv-free-edge-source');pair.ghost.remove();});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
   }
@@ -696,6 +700,34 @@ function createBuilderInteractions(opts){
     var pt = svg.createSVGPoint();
     pt.x = clientX; pt.y = clientY;
     return pt.matrixTransform(inv);
+  }
+  function updateSelectedFloatGhosts(ev){
+    var nd=nodeDrag,ctm=nd.svg.getScreenCTM();if(!ctm)return;
+    var inv;try{inv=ctm.inverse();}catch(ex){return;}
+    var here=svgPointAt(nd.svg,inv,ev.clientX,ev.clientY),start=svgPointAt(nd.svg,inv,nd.x0,nd.y0);
+    var dx=here.x-start.x,dy=here.y-start.y;if(!Number.isFinite(dx) || !Number.isFinite(dy))return;
+    nd.delta={dx:dx,dy:dy};
+    var draft=builderClone(nd.diagram),ids=nd.members.map(function(member){return member.id;});
+    nd.members.forEach(function(member){
+      member.el.classList.add('dv-dragsrc');
+      if(!member.ghost){member.ghost=nodeGhostClone(member.el);member.el.parentNode.appendChild(member.ghost);}
+      member.ghost.setAttribute('transform','translate('+(member.xy.x+dx)+' '+(member.xy.y+dy)+')');
+      var f=draft.floats.find(function(item){return item.id===member.id;});
+      f.x=member.origin.cx+dx;f.y=member.origin.cy+dy;
+    });
+    var L=layout(draft);
+    if(!nd.edgeGhosts){
+      nd.edgeGhosts=[];
+      nd.svg.querySelectorAll('path.edge[data-dv-edge]').forEach(function(source){
+        var index=Number(source.getAttribute('data-dv-edge')),edge=draft.edges[index];
+        if(!edge || ids.indexOf(edge.from)<0 && ids.indexOf(edge.to)<0)return;
+        var ghost=source.cloneNode(false);ghost.removeAttribute('id');ghost.removeAttribute('data-dv-edge');
+        ghost.classList.add('dv-free-edge-preview');ghost.setAttribute('aria-hidden','true');
+        source.classList.add('dv-free-edge-source');source.parentNode.appendChild(ghost);
+        nd.edgeGhosts.push({source:source,ghost:ghost,index:index});
+      });
+    }
+    nd.edgeGhosts.forEach(function(pair){pair.ghost.setAttribute('d',edgePath(draft.edges[pair.index],L));});
   }
   function updateNodeDragGhost(ev){
     var nd = nodeDrag;
@@ -1061,7 +1093,20 @@ function createBuilderInteractions(opts){
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
         var startSnapshot=parseEditor(),startRecord=!startSnapshot.error && specSectionPaths(startSnapshot.raw)[ndGi];
         var startDiagram=startRecord && specValueAt(startSnapshot.raw,startRecord.diagram);
-        if(startDiagram && (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;})){
+        if(multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;})){
+          var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel);
+          nodeDrag.selectionError=selected.error;
+          if(!selected.error){
+            var positions=layout(startDiagram).pos;
+            nodeDrag.selection=multiSel.map(function(t){return {kind:'node',section:t.section,id:t.id};});
+            nodeDrag.members=multiSel.map(function(t){
+              var el=findTargetEl(t);return {id:t.id,el:el,xy:el && nodeTranslateXY(el),origin:positions[t.id]};
+            });
+            if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))
+              nodeDrag.selectionError='Render all selected nodes before moving them together.';
+          }
+        }
+        if(!nodeDrag.selectionError && startDiagram && (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;})){
           if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
             cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
           }
@@ -1112,8 +1157,10 @@ function createBuilderInteractions(opts){
       var ddx = ev.clientX - nodeDrag.x0, ddy = ev.clientY - nodeDrag.y0;
       if (ddx * ddx + ddy * ddy > 25) nodeDrag.moved = true; /* > 5px straight-line */
       if (!nodeDrag.moved) return;
+      if(nodeDrag.selectionError){var message=nodeDrag.selectionError;cancelNodeDrag();inspectorMessage(message);return;}
       if(nodeDrag.floating){
         if(session.text()!==nodeDrag.snapshot.text){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(nodeDrag.members){updateSelectedFloatGhosts(ev);return;}
         nodeDrag.el.classList.add('dv-dragsrc');updateNodeDragGhost(ev);return;
       }
       nodeDrag.el.classList.add('dv-dragsrc');
@@ -1171,12 +1218,16 @@ function createBuilderInteractions(opts){
       if (!nd.moved) return; /* a plain click: selection proceeds normally */
       suppressClick = true;
       life.delay(function(){ suppressClick = false; }, 0);
-      if (!nd.target && !nd.pick && !nd.position) return; /* released without a destination */
+      if (!nd.target && !nd.pick && !nd.position && !nd.delta) return; /* released without a destination */
       var ndParsed = parseEditor();
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
       if(nd.floating){
         if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(nd.selection){
+          ndPlan=planTransformFloats(session.text(),ndParsed.raw,nd.selection,{type:'move',dx:nd.delta.dx,dy:nd.delta.dy});
+          applyPlan(ndPlan,null,ndParsed);return;
+        }
         ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
       }else if (nd.target){
         ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,

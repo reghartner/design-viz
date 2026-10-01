@@ -15,7 +15,7 @@ it and then hid it at the opening. The two other confirmed repeated families
 
 ## Behavior
 
-Both the helper and the mandatory skill carry this wording:
+Both the helper and the full skill carry this wording:
 
 > For a source-required clip opening, if a source-backed matching scene is
 > available, include a `screen` with it and keep or make it visible at that
@@ -62,20 +62,22 @@ main-branch one.
 - In this one run, the other two defect families were absent. That is a
   description only; it is not scored and shows no repair.
 
-### Current main: prepared-kit author trial
+### Historical: clip-branch prepared-kit author trial
 
 Main does not have focused-v1's `--catalog`, `--guide`, or `--section` modes,
-and this draft does not port them. On main the cue comes from the mandatory
-skill and from the existing positional `widget_doc.py` output.
+and this draft does not port them. On the original clip branch, before it was
+combined with the short existing-edit guide, the cue came from the skill
+(then mandatory at setup) and from the existing positional `widget_doc.py` output.
+For the present combined route, see [Workbench delivery route](#workbench-delivery-route).
 
 One author ran the ordinary two-stage flow in a prepared folder kit built from
-this branch. The requested and observed model was `claude-opus-5-5`, the CLI
+the original clip branch. The requested and observed model was `claude-opus-5-5`, the CLI
 effort setting was `high`, and the same session was observed resuming across
 both phases. This is the prepared-kit author
 flow. It is not a live registered Copy for agent, Monitor, or Beta session.
 
-- **Cue exposure, before the first spec write.** Phase one read the mandatory
-  skill, which contained the cue once. Phase two ran the positional helper for
+- **Cue exposure, before the first spec write.** Phase one read the skill
+  (mandatory in that flow), which contained the cue once. Phase two ran the positional helper for
   `homemap deviceapp battery screen`, whose output also contained the cue
   once. The first spec write came after both. The fixed prompts contain no cue
   text. This shows exposure only, not understanding, use, or effect.
@@ -124,11 +126,11 @@ Evidence hashes (SHA-256):
 - Each trial is one unscored run. Neither is an overall presentation pass, and
   neither supports a comparative, causal, context-saving, adoption,
   quality-preservation, or cohort claim.
-- Current main: the screenshots are full-page, and the recorded DOM
+- Clip-branch prepared-kit trial: the screenshots are full-page, and the recorded DOM
   coordinates include a scroll offset that was not recorded. No claim is made
   about whether the `screen` is inside the initial viewport.
 - In both trials the device app's "Last event" value is clipped inside the
-  phone at both widths. In the current-main trial the home-map labels also
+  phone at both widths. In the clip-branch prepared-kit trial the home-map labels also
   overlap. These presentation limits are unscored. A matching scene being
   present at the clip opening does not fix them.
 - No registered Copy for agent, Monitor, or Beta session has been observed
@@ -136,18 +138,30 @@ Evidence hashes (SHA-256):
 
 ## Workbench delivery route
 
-There is no transport change. `tools/folder_agent_kit.py` already bundles the
-whole `hld-to-page` skill and `tools/widget_doc.py` into every prepared folder
-kit. `folderAgentInstructions()` in `src/workbench/agent-chat.js` tells
-registered Copy for agent (`external`) and Work with agent / Beta (`embedded`)
-to run `folder-agent.py prepare` and read the prepared `SKILL.md` before
-planning. `workbenchAgentMessage()` is unchanged. Selection-only Copy gives
+There is no transport change. `tools/folder_agent_kit.py` bundles the whole
+`hld-to-page` skill, `tools/widget_doc.py`, and the short existing-edit guide
+into every prepared folder kit. In the combined product,
+`folderAgentInstructions()` in `src/workbench/agent-chat.js` tells registered
+Copy for agent (`external`) and Work with agent / Beta (`embedded`) to run
+`folder-agent.py prepare` and read
+[`docs/folder-agent-existing-edit.md`](../../../folder-agent-existing-edit.md)
+first. Setup no longer requires reading the full `SKILL.md`. The cue reaches
+these routes in two ways:
+
+- A new story, or other work the guide escalates, loads the full `SKILL.md`,
+  which contains the cue.
+- A bounded edit that looks up panel documentation with the positional
+  `widget_doc.py` gets the cue once when it requests `deviceapp` or `screen`.
+  A bounded edit that requests neither type does not see it.
+
+`workbenchAgentMessage()` is unchanged. Selection-only Copy gives
 context only and does not start authoring.
 
 ## Verification
 
-These bounded checks were run after the skill edit was applied, and all
-passed. They check this route's delivery and existing regressions. They do not
+These bounded checks were run on the original clip branch, before it was
+combined with the short existing-edit guide, after the skill edit was applied,
+and all passed. They check this route's delivery and existing regressions. They do not
 show what an author does with the cue; the prepared-kit trial above covers
 that for one run only. These checks were not rerun for this evidence update,
 which changes no product code or guidance.
@@ -165,8 +179,9 @@ which changes no product code or guidance.
     bytes match the source, the prepared helper prints the cue, and the
     prepared skill has the same wording. This case checks only the helper and
     skill bytes and running the helper. It does not qualify the full runtime.
-  - `tests/agent-instructions.test.js` (3/3): `external` and `embedded` setup
-    both still prepare the kit and read the prepared `SKILL.md`.
+  - `tests/agent-instructions.test.js` (3/3): on that branch, `external` and
+    `embedded` setup both prepared the kit and read the prepared `SKILL.md`.
+    The combined route replaces that mandatory read (see below).
 - A fresh `python3 -B tools/build.py` passed.
 - Two existing browser tests, using the real editor and a shared folder, passed
   with no retries. One covers the embedded Beta conversation route: real files
@@ -174,3 +189,15 @@ which changes no product code or guidance.
   connected external copy/paste without Monitor. These are fixture and
   regression tests. They do not show a real Claude agent, Monitor, or Beta
   session using the cue.
+
+Combined route evidence is separate. The root reported these checks passing
+at `ccc4898`:
+
+- 4 agent-instruction tests. Both routes, new and resumed, read the short guide
+  first, including with legacy metadata. The guide escalates to the full skill
+  and links the helper.
+- 9 widget-doc tests, 22 folder-helper tests and 13 build tests.
+- 3 selected browser checks.
+
+These show source and delivery consistency only. No author has yet run the
+combined route.

@@ -1,6 +1,6 @@
 /* Section-local viewing chrome; floating defaults belong to each named view. */
 .section-viewport{position:relative;min-width:0;isolation:isolate;}
-.viewport-actions{display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;flex-wrap:wrap;}
+.viewport-actions{position:relative;display:flex;align-items:center;justify-content:flex-end;gap:6px;margin-left:auto;flex-wrap:wrap;}
 .viewport-status{font:11px/1.4 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .viewport-status:empty{display:none;}
 .section-viewport[hidden],.explore-stage[hidden],.explore-window[hidden],.explore-player[hidden],.viewport-actions [hidden]{display:none!important;}
@@ -58,6 +58,12 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
 .explore-panel-choices label{display:grid;grid-template-columns:20px 1fr;gap:3px;padding:7px 0;cursor:pointer;}
 .explore-panel-choices small{grid-column:2;color:var(--dfaint);}
 .explore-panel-choices small:empty{display:none;}
+.explore-legend-menu{font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-legend-menu>summary{cursor:pointer;border:1px solid var(--explore-border);border-radius:8px;padding:7px 10px;background:var(--explore-bg);white-space:nowrap;}
+/* Anchor to the full actions group so wrapped controls keep the key in bounds. */
+.explore-legend-menu>.explore-edge-legend{position:absolute;left:auto;right:0;top:100%;z-index:41;margin-top:5px;display:flex;flex-direction:column;align-items:stretch;gap:12px;width:280px;max-width:100%;max-height:240px;overflow:auto;overscroll-behavior:contain;box-sizing:border-box;padding:14px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
+.explore-edge-legend .li{overflow-wrap:anywhere;}
+.explore-legend-menu>summary:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 .viewport-gesturing{user-select:none;}
 .section-viewport:fullscreen{box-sizing:border-box;width:100%;height:100%;padding:12px;background:var(--explore-bg);display:flex;flex-direction:column;overflow:auto;}
 .section-viewport:fullscreen>.diagram-views{flex:none;margin:0 0 10px;}

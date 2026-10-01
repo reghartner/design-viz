@@ -567,6 +567,83 @@ test('external branch copies context without dispatch, accepts native followups 
   }finally{watcher?.kill();native?.kill();await page.close();await h.cleanup();}
 });
 
+test('copy and paste Explore review keeps comparison, ledger and commit reachable',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
+    const raw=JSON.parse(source),diagram=raw.page.blocks[0].diagram;
+    diagram.layouts.push({...structuredClone(diagram.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});
+    delete diagram.layouts[1].steps;
+    diagram.defaultLayout='explore';
+    const original=JSON.stringify(raw,null,2);
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);
+    await page.locator('#welcome-paste-form button[type=submit]').click();
+    await connectExternal(page);await copyRequest(page,'Rename Backend to Delivery service.');
+    const request=await h.read('request.json'),state=await h.read('state.json');
+    diagram.nodes.b.title='Delivery service';const proposed=JSON.stringify(raw,null,2);
+    const ledger='# Coverage ledger\n\n'+('The service name changed; the story and paths are preserved.\n'.repeat(100));
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposed);
+    await writeFile(path.join(h.session,'candidate.ledger.md'),ledger);
+    h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the service in Explore');
+    await page.locator('#agent-update-open').click();
+    const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage');
+    async function contained(){
+      await expect(stage).toBeVisible();
+      const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox();
+      expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
+      expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
+      expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
+      expect(canvas.height).toBeGreaterThan(200);
+      for(const id of ['close','current','proposed','commit','ledger-summary']){
+        await expect(page.locator('#agent-update-'+id)).toBeInViewport();
+        await page.locator('#agent-update-'+id).click({trial:true});
+      }
+    }
+    await page.screenshot({path:info.outputPath('explore-review.png')});await contained();
+    await expect(view.locator('[data-dv-node="b"]')).toContainText('Delivery service');
+    await view.locator('.explore-legend-menu>summary').click();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeVisible();
+    await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true})).toBeHidden();
+    await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+    const zoom=view.locator('.explore-zoom'),beforeZoom=await zoom.innerText();
+    await view.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(zoom).not.toHaveText(beforeZoom);
+    await view.getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await view.getByRole('button',{name:'Next step',exact:true}).click();
+    await expect(view.locator('.stepline')).toContainText('Recording ready');
+    await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');
+    await view.locator('.path-chip[data-dv-path="happy"]').click();
+    await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    const collapsed=await stage.boundingBox();
+    await page.locator('#agent-update-ledger-summary').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
+    await contained();expect((await stage.boundingBox()).height).toBeLessThan(collapsed.height);
+    await page.locator('#agent-update-current').click();await expect(view.locator('[data-dv-node="b"]')).toContainText('Backend');
+    await expect(page.locator('#agent-update-commit')).toBeDisabled();
+    await page.locator('#agent-update-proposed').click();await contained();
+    await page.locator('#agent-update-ledger-summary').click();
+    await view.getByRole('button',{name:'Business',exact:true}).click();await expect(stage).toBeHidden();
+    await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
+    await view.getByRole('button',{name:'Explore',exact:true}).click();await contained();
+    await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();
+    await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+    await page.locator('#agent-update-open').click();await contained();
+    await page.screenshot({path:info.outputPath('explore-review-ready.png')});
+    await page.setViewportSize({width:640,height:800});await contained();
+    await view.locator('.explore-legend-menu>summary').click();
+    await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeInViewport();
+    await page.screenshot({path:info.outputPath('explore-review-narrow.png')});
+    await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
+    await page.setViewportSize({width:1440,height:1000});
+    await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);
+    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(proposed);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
 test('copy and paste treats the folder as connected without Monitor and keeps conversation output out of the panel',async({page},info)=>{
   const h=await setup(page);
   try{

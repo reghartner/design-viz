@@ -94,7 +94,9 @@ test('modifier selection, ordinary dragging and zoomed connection creation coexi
   expect((await diagram(page)).floats[0].x).not.toBe(850);await clean(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#workspace-zoom-in').click();
-  await start(page);await node(page,'c').hover();await expect(arrow(page)).toHaveAttribute('d',/^M /);
+  await start(page);await expect(page.locator('.dv-connect-hint')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Cancel connection',exact:true})).toBeVisible();
+  await node(page,'c').hover();await expect(arrow(page)).toHaveAttribute('d',/^M /);
   await node(page,'c').click();expect((await diagram(page)).edges.at(-1)).toMatchObject({from:'a',to:'c'});await clean(page);
 });
 

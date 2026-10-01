@@ -171,6 +171,9 @@ full-browser presentation used by exported HTML. Move and resize its panels
 there to save their floating defaults. **Back to page** shows the contained
 Explore workspace, including while arranging. **Open Explore** returns to the
 full-browser view without changing the saved type.
+**Edge legend** beside the panel controls shows the diagram's protocol colors,
+line samples and response/ack key. It works in the editor, exported viewers and
+agent update previews. Press Escape to close it; opening it does not edit the story.
 The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph. Each supporting panel
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and

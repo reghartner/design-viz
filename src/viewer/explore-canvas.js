@@ -1,6 +1,8 @@
-/* Standalone Explore uses the entire browser (or embedding frame). Curated
-   standard views keep their document layout. Navigation never edits the spec. */
-function initViewerExploreCanvas(ctl,view){
+/* Standalone Explore uses the browser (or embedding frame). Dialog hosts supply
+   a containing surface for the canvas and its scroll lock. Curated standard
+   views keep their document layout. Navigation never edits the spec. */
+function initViewerExploreCanvas(ctl,view,opts){
+  var container=opts && opts.container || document.body;
   var active=null,detailRoot=null,detailOriginExplore=false,pageOnly=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
@@ -14,7 +16,7 @@ function initViewerExploreCanvas(ctl,view){
   function show(rec){
     var previous=active;active=rec && rec.viewport && rec.viewport.isExplore()?rec:null;
     if(previous && previous!==active){previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);}
-    document.body.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
+    container.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
     if(!active){navigation.remove();return;}
     active.sectionEl.classList.add('explore-active-section');
     active.sectionEl.querySelector('.diagram-views').prepend(navigation);

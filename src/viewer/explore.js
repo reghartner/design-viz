@@ -38,6 +38,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=true;
   var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
   var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
+  var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=true;
+  var legendSummary=document.createElement('summary');legendSummary.textContent='Edge legend';legendMenu.appendChild(legendSummary);
+  var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
   var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
@@ -332,6 +335,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
+    // Reuse the rendered samples so protocol overrides, skins and response
+    // dashes stay identical to Standard. The move anchors restore them on leave.
+    if(legend)Array.prototype.slice.call(legend.querySelectorAll('.li')).forEach(function(item){move(item,legendItems);});
+    legendMenu.hidden=!legendItems.children.length;
     board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
     if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
@@ -355,7 +362,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
-    windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;
+    windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=true;
     stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
     shell.classList.remove('viewport-explore');menu.hidden=focus.hidden=stack.hidden=true;
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
@@ -381,6 +388,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function keydown(ev){
     if(ev.key!=='Escape')return;
     if(gesture){ev.preventDefault();ev.stopPropagation();finish(true);}
+    else if(legendMenu.open){ev.preventDefault();ev.stopPropagation();legendMenu.open=false;legendSummary.focus();}
     else if(menu.open){ev.preventDefault();ev.stopPropagation();menu.open=false;summary.focus();}
     else if(expanded){ev.preventDefault();ev.stopPropagation();exitExpanded();}
   }
@@ -470,7 +478,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     snapshotReaderState:function(){
       if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
-      return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open};
+      return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open,legendOpen:legendMenu.open};
     },
     restoreReaderState:function(saved){
       if(!saved || retired)return;
@@ -489,7 +497,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         }
       }
       stage.style.height=saved.stageHeight;paint();
-      menu.open=saved.menuOpen;
+      menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
     destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}

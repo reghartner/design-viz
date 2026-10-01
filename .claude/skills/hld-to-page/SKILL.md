@@ -62,7 +62,12 @@ prerequisites before validating a page.
    its best moment. If a panel has no job, drop it. What the source says the
    customer sees (a timeline gap, a banner, an icon) goes in a panel field, not
    only in a caption. Use a camera scene only if it fits the story; if none
-   fits, omit the screen and say so.
+   fits, omit the screen and say so. For a source-required clip opening, if a
+   source-backed matching scene is available, include a `screen` with it and
+   keep or make it visible at that step; if none is, omit the screen and say
+   so instead of showing an unmatched scene. A retained matching still
+   qualifies; no `Playing` label is required. A textual `deviceapp.clip` card
+   alone does not qualify.
 3. **Every step decides every panel.** In the step x panel matrix each cell is
    either `patch: ...` or `holds: <reason>`. An empty cell is not allowed.
 4. **Time is a property of the step.** Declare `diagram.storyTime` (start,

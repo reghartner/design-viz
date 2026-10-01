@@ -16,3 +16,10 @@ test('explicit Beta setup retains its bounded Monitor instructions',()=>{
   assert.match(prompt,/Start Monitor/);assert.match(prompt,/watch --minutes 25/);assert.match(prompt,/Renew Monitor only while editor.json is connected/);
   assert.match(prompt,/progress --request/);
 });
+test('registered Copy and Beta setup both prepare the kit and read its mandatory skill',()=>{
+  // The clip-evidence cue reaches both routes only through this prepared skill/helper.
+  for(const workflow of ['external','embedded'])for(const resume of [false,true]){
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow);
+    assert.match(prompt,/Run python3 "<diagram folder>\/\.flowview-agent\/folder-agent\.py" prepare\. Read \.flowview-agent\/authoring\/\.claude\/skills\/hld-to-page\/SKILL\.md/,workflow);
+  }
+});

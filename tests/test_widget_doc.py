@@ -4,6 +4,7 @@ Guards the routing mechanism the hld-to-page skill depends on: every panel
 type documented in contract/authoring-contract.md must be individually
 extractable, and the extracted block must be the contract's own text.
 """
+import importlib.util
 import re
 import subprocess
 import sys
@@ -17,6 +18,11 @@ CONTRACT = ROOT / "contract" / "authoring-contract.md"
 # Discover authored panel modules; there is no central type allowlist.
 PANEL_TYPES = sorted(p.stem for p in (ROOT / "src/panels/types").glob("*.js"))
 assert len(PANEL_TYPES) >= 17, "panel modules not discovered"
+
+_spec = importlib.util.spec_from_file_location("widget_doc", TOOL)
+widget_doc = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(widget_doc)
+CUE = widget_doc.CLIP_CUE
 
 
 def run(*args):
@@ -75,6 +81,38 @@ class WidgetDocTest(unittest.TestCase):
         self.assertEqual(p.returncode, 0, p.stderr)
         self.assertIn("- `thermo` ", p.stdout)
         self.assertIn("- `battery` ", p.stdout)
+
+    def test_clip_cue_keeps_its_qualifiers(self):
+        # The honest fallback, the retained-still allowance and the
+        # card-is-not-enough rule are the substance; losing one changes it.
+        for text in ("source-required clip opening", "source-backed matching scene",
+                     "keep or make it visible", "omit the screen and say so",
+                     "instead of showing an unmatched scene", "retained matching still qualifies",
+                     "no `Playing` label is required",
+                     "textual `deviceapp.clip` card alone does not qualify"):
+            self.assertIn(text, CUE, text)
+
+    def test_clip_cue_once_before_intro_for_clip_types(self):
+        for args in [("deviceapp",), ("screen",), ("deviceapp", "screen"),
+                     ("thermo", "screen", "deviceapp")]:
+            p = run(*args)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertEqual(p.stderr, "", args)
+            self.assertEqual(p.stdout.count(CUE), 1, args)
+            self.assertTrue(p.stdout.startswith(CUE + "\n\n### panels"), args)
+
+    def test_clip_cue_absent_elsewhere(self):
+        def no_cue(p):
+            self.assertNotIn("clip opening", p.stdout + p.stderr)
+        for t in PANEL_TYPES:
+            if t not in ("deviceapp", "screen"):
+                no_cue(run(t))
+        for args in [("--list",), ("--contract-card",), (), ("nope",), ("deviceapp", "nope")]:
+            no_cue(run(*args))
+        # with the card, the cue still sits once between card and intro
+        with_cue = run("--contract-card", "deviceapp").stdout
+        card = run("--contract-card").stdout
+        self.assertTrue(with_cue.startswith(card + CUE + "\n\n### panels"))
 
     def test_contract_card_flag(self):
         p = run("--contract-card")

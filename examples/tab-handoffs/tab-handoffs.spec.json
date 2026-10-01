@@ -1,0 +1,158 @@
+{
+  "page": {
+    "title": "Order to delivery",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Order intake",
+            "sections": [
+              {
+                "id": "orders",
+                "heading": "Order intake",
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "start": {
+                      "title": "Request",
+                      "icon": "gear"
+                    },
+                    "middle": {
+                      "title": "Validate",
+                      "icon": "gear"
+                    },
+                    "end": {
+                      "title": "Accept",
+                      "icon": "gear"
+                    },
+                    "continue": {
+                      "title": "Delivery",
+                      "icon": "gear",
+                      "handoff": {
+                        "localSection": "delivery"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "start",
+                      "middle",
+                      "end",
+                      "continue"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "start",
+                      "to": "middle"
+                    },
+                    {
+                      "from": "middle",
+                      "to": "end"
+                    },
+                    {
+                      "from": "end",
+                      "to": "continue"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "beat1",
+                      "edge": "start->middle",
+                      "text": "Request hands off to Validate."
+                    },
+                    {
+                      "id": "beat2",
+                      "edge": "middle->end",
+                      "text": "Validate hands off to Accept."
+                    },
+                    {
+                      "id": "beat3",
+                      "edge": "end->continue",
+                      "text": "Accept hands off to Delivery."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "Delivery pipeline",
+            "sections": [
+              {
+                "id": "delivery",
+                "heading": "Delivery pipeline",
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "start": {
+                      "title": "Queue",
+                      "icon": "gear"
+                    },
+                    "middle": {
+                      "title": "Dispatch",
+                      "icon": "gear"
+                    },
+                    "end": {
+                      "title": "Confirm",
+                      "icon": "gear"
+                    },
+                    "continue": {
+                      "title": "Order intake",
+                      "icon": "gear",
+                      "handoff": {
+                        "localSection": "orders"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "start",
+                      "middle",
+                      "end",
+                      "continue"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "start",
+                      "to": "middle"
+                    },
+                    {
+                      "from": "middle",
+                      "to": "end"
+                    },
+                    {
+                      "from": "end",
+                      "to": "continue"
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "beat1",
+                      "edge": "start->middle",
+                      "text": "Queue hands off to Dispatch."
+                    },
+                    {
+                      "id": "beat2",
+                      "edge": "middle->end",
+                      "text": "Dispatch hands off to Confirm."
+                    },
+                    {
+                      "id": "beat3",
+                      "edge": "end->continue",
+                      "text": "Confirm hands off to Order intake."
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

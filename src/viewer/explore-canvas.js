@@ -29,6 +29,10 @@ function initViewerExploreCanvas(ctl,view,opts){
         // Boot-time indexing briefly visits other views. Only mark a view after
         // its frame actually opens, so those cancelled visits cannot skip Fit.
         if(active!==rec || active.viewport.viewDefinition().id!==definition.id)return;
+        // Boot may visit a view while its tab is hidden. Defer its first Fit
+        // until the canvas can be measured, so navigation gets a real camera.
+        var board=rec.sectionEl.querySelector('.board');
+        if(!board || !board.clientWidth || !board.clientHeight)return;
         seen.add(key);
         if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
       });

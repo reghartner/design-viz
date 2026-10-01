@@ -399,8 +399,13 @@ with no `title` shows its id:
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
-- `handoff` — arrow-shaped endpoint that opens another diagram document.
-  Use `{url:"https://…", spec?:"external-spec-id", revision?, section?}` or
+- `handoff` — arrow-shaped endpoint that continues to another diagram.
+  Use `{localSection:"stable-section-id"}` to switch to an ordinary diagram
+  section in this spec, including its tab. The mounted destination retains its
+  view/path/step, playback pauses, and **Back to …** returns to the source.
+  A local target cannot be `detailOnly`; do not mix `localSection` with external
+  fields. Section rename/delete edits maintain local references.
+  For another document, use `{url:"https://…", spec?:"external-spec-id", revision?, section?}` or
   a spec-only reference resolved by the host. Requires `url` or `spec`;
   `revision`/`section` require `spec`. URLs are absolute HTTP(S), without
   credentials, and include the complete route/hash. The native host may supply

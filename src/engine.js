@@ -2549,6 +2549,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
 }
 
 function renderPage(view, page, skin, backlinks, options){
+  options=Object.assign({},options,{localHandoffTarget:function(value){return localHandoffTarget(page,value);}});
   skin = resolveSkin('', skin == null ? page.skin : skin);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);
@@ -2586,6 +2587,7 @@ function renderPage(view, page, skin, backlinks, options){
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
   ctl.destroy = function(){
     ctl.destroyed = true;
+    if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.details)ctl.details.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
     ctl.sections.forEach(function(rec){
@@ -2731,6 +2733,8 @@ function renderPage(view, page, skin, backlinks, options){
   }
   if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
     ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);
+  if(records.some(function(r){return Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.handoff && n.handoff.localSection!=null;});}))
+    ctl.handoffs=wireLocalHandoffs(ctl,page);
   return ctl;
 }
 
@@ -3042,6 +3046,7 @@ function wireDeepLinks(ctl, win, preservedHash){
   function syncChangedTarget(){
     var target = ctl.activeTarget || {kind:'page'};
     if (target.kind === 'diagram'){
+      if(ctl.handoffHistoryPush)fragmentState={tabBlock:null,tab:null,diagramSection:null,cardSection:null,row:null};
       fragmentState.diagramSection = target.section;
     } else if (target.kind === 'tab'){
       fragmentState = {tabBlock:target.tabBlock, tab:target.tab,
@@ -3062,7 +3067,7 @@ function wireDeepLinks(ctl, win, preservedHash){
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
     try {
-      win.history[ctl.detailHistoryPush ? 'pushState' : 'replaceState'](null, '',
+      win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](null, '',
         withPreserved(h) || win.location.pathname + win.location.search);
       /* Fragments may contain heading slugs derived from a company document.
          Do not disclose them to an arbitrary embedder: mirroring stays off
@@ -3073,6 +3078,7 @@ function wireDeepLinks(ctl, win, preservedHash){
         mirrorSource.postMessage({type:'dv_fragment', fragment:h.replace(/^#/, '')}, mirrorOrigin);
     } catch (ex) { /* sandboxed viewers may refuse; deep links just stay off */ }
     ctl.detailHistoryPush=false;
+    ctl.handoffHistoryPush=false;
   }
   function clearRowTarget(){
     var rows = ctl.view.querySelectorAll('.ctrow.dv-hash-target');
@@ -3095,6 +3101,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     var diagramTarget = target.diagram;
     if (diagramTarget){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
+      if(ctl.handoffs && diagramSec && ctl.view.querySelector('.dv-embed-target'))
+        ctl.sections.forEach(function(rec){rec.sectionEl.classList.toggle('dv-embed-target',rec===diagramSec);});
       if(ctl.details && diagramSec)ctl.details.showSection(diagramSec.reference);
       // Restore the view before its path/step: selecting a view installs its
       // visible-stop filter. Stale IDs (and old links without v) use the default.

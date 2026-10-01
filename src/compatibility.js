@@ -10,7 +10,7 @@ var FlowviewCompatibility = (function(){
   var sharedIconIds = /* @icon-ids */ [];
 
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
-  var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
+  var extraLabels={ 'flow.local-handoff':'Same-spec diagram handoffs', 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
     'layout.step-subsets':'View-specific step stops', 'layout.path-subsets':'View-specific alternate paths', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
@@ -64,6 +64,7 @@ var FlowviewCompatibility = (function(){
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && Array.isArray(e.curvePoints) && e.curvePoints.length;}))used['layout.edge-curves']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
+      if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff && n.handoff.localSection!=null;}))used['flow.local-handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.detail;}))used['flow.drilldown']=true;
       (Array.isArray(d.panels)?d.panels:[]).forEach(function(p){
         if(!p || typeof p.type!=='string')return;

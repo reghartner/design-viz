@@ -135,7 +135,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     root.rec.sectionEl.parentNode.insertBefore(host,root.rec.sectionEl.nextSibling);
     var built;
     try{built=buildSection(host,section,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
-      function(){changed(false);},null,Object.assign({},options,{autoplay:false}));}
+      function(){changed(false);},null,Object.assign({},options,{autoplay:false,localHandoffTarget:childPage===page?options.localHandoffTarget:null}));}
     catch(error){host.remove();throw error;}
     var el=built.sectionEl;host.replaceWith(el);
     built.reference=el.id;built.number=serial;

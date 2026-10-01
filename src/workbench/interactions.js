@@ -1124,7 +1124,7 @@ function createBuilderInteractions(opts){
       return;
     }
     var nodeEl = ev.target.closest('g.node[data-dv-node]');
-    if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button')){
+    if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button, [data-dv-handoff]')){
       var ndSec = nodeEl.closest('.doc-sec');
       if (ndSec && ndSec.hasAttribute('data-dv-section')){
         var ndGi = parseInt(ndSec.getAttribute('data-dv-section'), 10);

@@ -87,7 +87,8 @@ function applyEmbedMode(ctl){
      Read once at load; composes with the other hash fields. */
   var req = embedRequest;
   if (!req) return;
-  var target = embedTargetSection(ctl, req.section);
+  var route=ctl.handoffs && parseHash(window.location.hash).d;
+  var target = embedTargetSection(ctl,route || req.section) || embedTargetSection(ctl,req.section);
   if (!target){
     if (window.console) console.warn('flowspec: #embed section "' + req.section + '" not found');
     return;

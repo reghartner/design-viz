@@ -3887,3 +3887,6 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .termbar.has-paths .path-timeline .schip[data-path-active="false"]{opacity:.16;filter:saturate(.25);}
 .termbar.has-paths .path-timeline .schip[data-path-active="false"]:hover,.termbar.has-paths .path-timeline .schip[data-path-active="false"]:focus-visible{opacity:.72;filter:none;}
 .path-timeline .schip:focus-visible{outline:2px solid var(--path-color);outline-offset:5px;}
+
+.handoff-back{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere;}
+@media print{.handoff-back{display:none !important;}}

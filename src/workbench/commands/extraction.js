@@ -28,21 +28,24 @@ function extractionChildSpec(raw, section, report){
   builderDetailRecords({page:page}).concat(records).forEach(function(record){
     taken[record.reference]=true;(record.aliases || []).forEach(function(alias){taken[alias]=true;});
   });
-  function copyTarget(detail){
-    var index=builderDetailIndex(records,detail);
+  function copyTarget(detail,key){
+    key=key || 'section';
+    var index=builderDetailIndex(records,key==='section'?detail:{section:detail[key]});
     if(index<0)return;
     var target=records[index],id=ids.get(index);
     if(!id){
       id=builderUniqueKey(taken,'dependency');taken[id]=true;ids.set(index,id);
       var copy=builderClone(specValueAt(raw,target.path));copy.id=id;copy.detailOnly=true;
       page.sections.push(copy);queue.push(copy);
-      report.notes.push('Destination includes its referenced detail: '+(copy.heading || target.reference)+'.');
+      report.notes.push('Destination includes its referenced diagram: '+(copy.heading || target.reference)+'.');
     }
-    detail.section=id;
+    detail[key]=id;
+    if(key==='localSection'){var visible=page.sections.find(function(s){return s.id===id;});if(visible)delete visible.detailOnly;}
   }
   for(var i=0;i<queue.length;i++){
     Object.values(queue[i].diagram && queue[i].diagram.nodes || {}).forEach(function(node){
       if(node.detail && !node.detail.spec && node.detail.section)copyTarget(node.detail);
+      if(node.handoff && node.handoff.localSection)copyTarget(node.handoff,'localSection');
     });
   }
   return {page:page};
@@ -77,6 +80,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options){
     if(mode==='external'){
       handoff=builderClone(options.handoff || {});
       var errors=[];validateHandoff(handoff,null,'Destination',errors);
+      if(handoff.localSection!=null)errors.push('Separate document requires an external spec ID or URL.');
       if(errors.length)return {error:errors.join('\n')};
       if(handoff.section){
         if(!/^[a-zA-Z][\w.-]*$/.test(handoff.section))return {error:'The destination section ID must begin with a letter and use letters, digits, _, . or -.'};

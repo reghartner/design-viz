@@ -1,6 +1,6 @@
 {
   "format": "authoring-experiment-status-v1",
-  "asOfUtc": "2026-10-01T00:18:35Z",
+  "asOfUtc": "2026-10-01T02:29:42.580042+00:00",
   "purpose": "Preserve decisions and distinguish promising experiments from adopted changes. This snapshot is research provenance, not a performance promise.",
   "promotionStatus": "No tested context-reduction strategy has cleared its entire predeclared promotion screen.",
   "modelPolicy": {
@@ -86,9 +86,11 @@
     "hiding source sidebar where showSources also removes badges and leaves existing copy stale"
   ],
   "queuedHypotheses": [
-    "declaration-only panel edits if unchanged per-step state dominates measured context",
-    "fresh writer handoff after storyboard with context/cost measured across all agents",
-    "bounded visual feedback pass under a separate equal-budget protocol"
+    "concise Workbench command contract, separately tested; draft PR293 contains source and agent guidance but no measured context claim",
+    "initial-authoring reading manifest: routing/order only, preserve presentation content and pointers",
+    "confirm focused guidance v1 prospectively on current main before any activation",
+    "retest composition cue separately on a non-rejected base",
+    "declaration-only edits after a representative large-spec fixture justifies them"
   ],
   "comparisonLimit": "Different main versions, rubric revisions and reviewer cohorts mean trial deltas cannot be summed. Edit-pilot scores use a different task/rubric and are not comparable to overnight initial-authoring scores.",
   "publicationBoundary": "This PR preserves review tooling, interpretation profiles, experiment decisions, and an inert source snapshot of focused guidance v1. It does not activate focused guidance v1/v2, the composition cue, or focused panel editing.",
@@ -104,6 +106,15 @@
     {
       "scope": "Further context reductions, including file-and-key payload experiments",
       "dependency": "focused panel feature, separately evaluated"
+    },
+    {
+      "scope": "Concise Workbench command contract and matching agent guidance, draft PR293",
+      "dependency": "focused panel PR292; one actual trial and prospective comparison still required"
     }
-  ]
+  ],
+  "followupAnalysis": {
+    "report": "context-followup.md",
+    "data": "context-followup.json",
+    "newAuthorOrGradeOutcomes": false
+  }
 }

@@ -60,8 +60,10 @@ test('native Backstage preserves phase overrides on shared shadows, branches, an
  await page.evaluate(raw=>window.viewer=mount(document.querySelector('#host'),raw),branched);const root=page.locator('#host');
  // Explicitly restore the full flow before checking shared-prefix shadows.
  await root.getByRole('button',{name:'Full',exact:true}).click();
- const shared=root.locator('.schip[data-step-path=failed][data-step-source="1"]');await expect(shared).toHaveCSS('background-color','rgb(2, 132, 199)');await expect(shared).toHaveCSS('opacity','0.35');
+ const failed=root.locator('[data-dv-path=failed]');await expect(failed).toHaveAttribute('aria-pressed','false');
+ const shared=root.locator('.schip[data-step-path=failed][data-step-source="1"]');await expect(shared).toHaveCSS('background-color','rgb(2, 132, 199)');await expect(shared).toHaveCSS('opacity','0.2');
  await shared.click();await expect(shared).toHaveCSS('opacity','1');await expect(shared).toHaveAttribute('aria-current','true');
+ await expect(failed).toHaveAttribute('aria-pressed','true');
  await root.locator('.schip[data-step-source="5"]').click();await colors(root,5,'rgb(249, 115, 22)');
  await root.locator('[data-dv-path=happy]').click();await root.getByRole('button',{name:'Brief',exact:true}).click();
  await expect(root.locator('.schip[data-step-path=happy]')).toHaveCount(2);await expect(chip(root,1)).toHaveText('1');await expect(chip(root,3)).toHaveText('2');await colors(root,3,'rgb(13, 148, 136)');

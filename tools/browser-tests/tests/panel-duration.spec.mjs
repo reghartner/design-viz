@@ -24,8 +24,8 @@ for(const type of ['screen','phone'])test(type+' temporary state editing preserv
  }
  await inspectPageElement(page,root.locator('.ptitle'));await expect(guide.locator('[aria-label$=" duration"]')).toHaveCount(0);
  await selectStep(1);
- await expect(patch.locator('[aria-label$=" duration"]')).toHaveCount(type==='screen'?7:1);
- for(const key of type==='screen'?['mode','scene','scenePlayback','banner','reason','audio','spotlight']:['audio'])
+ await expect(patch.locator('[aria-label$=" duration"]')).toHaveCount(type==='screen'?8:1);
+ for(const key of type==='screen'?['mode','scene','scenePlayback','banner','reason','audio','spotlight','siren']:['audio'])
   await expect(patch.getByLabel(key+' duration',{exact:true})).toHaveCount(1);
  if(type==='screen'){
   // The per-step scene override is unassigned here, so its duration has nothing to change yet.

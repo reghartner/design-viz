@@ -3597,6 +3597,12 @@ body.dv-embed .doc-sec.dv-embed-target{border:0 !important; background:transpare
 .termbar.has-paths .path-row .schip.shared-step-shadow {opacity:.35}
 .termbar.has-paths .path-row .schip.shared-step-shadow[aria-current="true"] {opacity:1}
 .termbar.has-paths .path-row .schip.shared-step-shadow:focus-visible {opacity:1 !important}
+.termbar.has-paths .path-row[data-selected="false"] .path-chip,
+.termbar.has-paths .path-row[data-selected="false"] .schip{opacity:.2;filter:saturate(.35);}
+.termbar.has-paths .path-row[data-selected="false"] .path-chip:hover,
+.termbar.has-paths .path-row[data-selected="false"] .schip:hover,
+.termbar.has-paths .path-row[data-selected="false"] :focus-visible{opacity:.72;filter:none;}
+.termbar.has-paths .path-row[data-selected="true"] .path-chip{background:color-mix(in srgb,var(--path-color) 14%,transparent);box-shadow:inset 0 0 0 1px var(--path-color),0 0 0 2px color-mix(in srgb,var(--path-color) 18%,transparent);}
 .termbar.has-paths .stepline {flex-basis:100%}
 .termbar.has-paths .tbtn:disabled {opacity:.3;cursor:default}
 @media(max-width:640px){.path-matrix{grid-template-columns:minmax(110px,max-content) repeat(var(--path-step-count),34px)}}
@@ -3869,12 +3875,15 @@ body.sk-terminal .path-timeline{--timeline-bg:#0c1411;}
 body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .path-timeline-lines{position:absolute;inset:0;z-index:1;pointer-events:none;overflow:visible;}
 .path-timeline-route .path-chip{position:absolute;z-index:3;max-width:220px;height:28px;padding-top:3px;padding-bottom:3px;box-sizing:border-box;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.path-timeline-route[data-selected="false"] .path-chip{opacity:.2;filter:saturate(.35);}
+.path-timeline-route[data-selected="false"] .path-chip:hover,.path-timeline-route[data-selected="false"] .path-chip:focus-visible{opacity:.72;filter:none;}
+.path-timeline-route[data-selected="true"] .path-chip{background:color-mix(in srgb,var(--path-color) 14%,var(--timeline-bg));box-shadow:inset 0 0 0 1px var(--path-color),0 0 0 2px color-mix(in srgb,var(--path-color) 18%,transparent);}
 .path-timeline-label{min-width:0;overflow:hidden;text-overflow:ellipsis;}
 .path-timeline-stop{position:absolute;z-index:3;width:28px;}
 .termbar.has-paths .path-timeline .schip{width:28px;height:28px;margin:0;border:1px solid color-mix(in srgb,var(--path-color) 50%,var(--dfaint));background:var(--timeline-bg);color:var(--dink);}
 .termbar.has-paths .path-timeline .schip[aria-current="true"]{border:2px solid var(--path-color);background:color-mix(in srgb,var(--path-color) 13%,var(--timeline-bg));box-shadow:0 0 0 3px var(--timeline-bg),0 0 0 5px var(--path-color);color:var(--dink);}
 .termbar.has-paths .path-timeline .schip.shared-step-shadow{opacity:.35;}
 .termbar.has-paths .path-timeline .schip.shared-step-shadow[aria-current="true"],.termbar.has-paths .path-timeline .schip.shared-step-shadow:focus-visible{opacity:1;}
+.termbar.has-paths .path-timeline .schip[data-path-active="false"]{opacity:.16;filter:saturate(.25);}
+.termbar.has-paths .path-timeline .schip[data-path-active="false"]:hover,.termbar.has-paths .path-timeline .schip[data-path-active="false"]:focus-visible{opacity:.72;filter:none;}
 .path-timeline .schip:focus-visible{outline:2px solid var(--path-color);outline-offset:5px;}
-.path-timeline-owner{position:sticky;left:0;width:max-content;max-width:100%;display:flex;align-items:center;gap:6px;font:500 10px/1.5 'IBM Plex Mono',monospace;color:var(--dtext);padding:2px 0 4px;}
-.path-timeline-owner::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--path-color);flex:none;}

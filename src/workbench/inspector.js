@@ -23,7 +23,7 @@ function createBuilderInspector(opts){
   function clipboardToolbar(){return !!(opts.clipboard.toolbar && opts.clipboard.toolbar());}
   function targetIdentity(){
     var t=session.target;
-    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId]):null;
+    return t?JSON.stringify([session.snapshot().project,t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId,t.layoutId]):null;
   }
   function multiIdentity(targets){
     return JSON.stringify([session.snapshot().project,targets.map(function(t){
@@ -2271,6 +2271,25 @@ function renderMultiInspector(multiSel){
     finishForm(previous);
   }
 
+  function stepControlsForm(val){
+    var target=Object.assign({},session.target),layout=val.exploreLayout && typeof val.exploreLayout==='object' && !Array.isArray(val.exploreLayout)?val.exploreLayout:{};
+    var current=layout.steps && layout.steps.textPosition || 'below';
+    var position=selectControl(['below','above','left','right'],current,function(value){
+      return commitCascade(function(raw){
+        var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
+        var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
+        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
+        var next=view.exploreLayout && typeof view.exploreLayout==='object' && !Array.isArray(view.exploreLayout)?JSON.parse(JSON.stringify(view.exploreLayout)):{};
+        if(value==='below')delete next.steps;else next.steps={textPosition:value};
+        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);
+      },{exploreLayout:{section:target.section,id:target.layoutId},after:refreshFormSoon});
+    });
+    position.setAttribute('aria-label','Caption position');
+    Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
+    var note=document.createElement('p');note.className='fnote';note.textContent='Resize the floating controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
+    return [frow('Caption position',position),note];
+  }
+
 function renderInspector(){
     if(disposed)return;
     cancelRefresh();
@@ -2346,6 +2365,7 @@ function renderInspector(){
         t.kind === 'node' ? nodeForm(val, ctx) :
         t.kind === 'edge' ? edgeForm(val, ctx) :
         t.kind === 'step' ? stepForm(val, ctx) :
+        t.kind === 'step-controls' ? stepControlsForm(val, ctx) :
         t.kind === 'panel' ? panelForm(val, ctx) :
         t.kind === 'bullet' ? bulletForm(val, ctx) :
         t.kind === 'para' ? paraForm(val, ctx) :
@@ -2475,7 +2495,7 @@ function renderInspector(){
             {after: function(plan){ t.index = plan.index; renderInspector(); flashPositionLine(); }});
         }));
       }
-      if (!armedHere && t.kind !== 'document')
+      if (!armedHere && t.kind !== 'document' && t.kind !== 'step-controls')
         acts.appendChild(actionButton(t.kind === 'step' && ctx.diagram && ctx.diagram.paths ? 'Delete from all paths' : t.kind==='contract'?'Delete block':t.kind==='crow'?'Delete field':t.kind==='bullet'?'Delete point':t.kind==='para'?'Delete paragraph':t.kind==='prose'?'Delete Section notes':'delete ' + t.kind, opts.selection.remove, 'bdanger' + (t.kind === 'group' ? ' groupctl' : '')));
       if(acts.children.length)guide.appendChild(acts);
       guide.appendChild(form);

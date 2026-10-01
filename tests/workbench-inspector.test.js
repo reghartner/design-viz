@@ -245,6 +245,25 @@ test('diagram routing edits the selected section or bare diagram with exact undo
   }
 });
 
+test('Explore step controls inspector edits caption placement without changing steps or sibling layout defaults',()=>{
+  const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
+    id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]},
+    exploreLayout:{overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18}}
+  }]};
+  const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
+  assert.match(h.guide.querySelector('b').textContent,/Step controls/);
+  const control=aria(h.guide,'Caption position'),before=h.text;assert.equal(control.value,'below');
+  assert.equal(h.guide.querySelectorAll('button').some(button=>button.textContent==='delete step-controls'),false);
+  control.value='right';control.fire('change');h.flush();
+  const next=JSON.parse(h.text);assert.deepEqual(next.layouts[0].exploreLayout,{
+    overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18},steps:{textPosition:'right'}
+  });
+  assert.deepEqual(next.steps,spec.steps);assert.equal(h.session.undo(),true);assert.equal(h.text,before);assert.equal(h.session.redo(),true);
+  h.session.target={kind:'step-controls',section:0,layoutId:'explore'};h.inspector.render();
+  const reset=aria(h.guide,'Caption position');reset.value='below';reset.fire('change');h.flush();
+  assert.equal(JSON.parse(h.text).layouts[0].exploreLayout.steps,undefined);
+});
+
 test('commit helper keeps blur opt-in, textarea Enter native, unchanged policy and rejected retry explicit',()=>{
   const C={};vm.runInNewContext(readSource('workbench/controls.js'),C);
   function control(tag,options){

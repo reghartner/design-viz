@@ -329,6 +329,22 @@ test('transient detail frames cannot select, drag, decorate or delete authored e
   assert.equal(JSON.stringify(h.session.target),before);assert.equal(h.text,text);assert.equal(h.renders,0);assert.equal(errors,0);assert.equal(decorations,0);assert.equal(rendered,afterArm);
 });
 
+test('Explore caption and keyboard handles select view step controls while numbered chips still select steps',()=>{
+  const spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}]};
+  const h=ui(spec),section=h.view.appendChild(h.element('section')),player=section.appendChild(h.element()),line=player.appendChild(h.element()),grip=player.appendChild(h.element('button')),chip=player.appendChild(h.element('button'));
+  section.className='doc-sec';section.setAttribute('data-dv-section','0');player.className='explore-player';player.setAttribute('data-explore-layout','explore');line.className='stepline';grip.className='explore-player-grip';chip.className='schip';chip.setAttribute('data-step-source','0');
+  let rendered=0;
+  const inspector={render(){rendered++;},retire(){},panelForCard(){return {};},panelForTarget(){return {};},error(){},transact(){}};
+  const interactions=h.C.createBuilderInteractions({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,guide:h.guide,inspector,
+    refreshLayout(){},refreshInsertion(){},syncStory(){},apply(){},selectRange(){},dismissOverlay(){return false;},ctl:()=>({sections:[]})});
+  h.view.fire('click',{target:line});
+  assert.deepEqual({...h.session.target},{section:0,kind:'step-controls',id:undefined,index:undefined,card:undefined,bulletPath:undefined,block:undefined,tab:undefined,layoutId:'explore'});
+  assert.equal(player.classList.contains('dv-sel'),true);assert.equal(rendered,1);
+  h.view.fire('click',{target:chip});assert.equal(h.session.target.kind,'step');assert.equal(h.session.target.index,0);assert.equal(rendered,2);
+  h.view.fire('click',{target:grip});assert.equal(h.session.target.kind,'step-controls');assert.equal(h.session.target.layoutId,'explore');assert.equal(rendered,3);
+  interactions.destroy();
+});
+
 function extractionFixture(){
   return {page:{title:'Keep formatting',sections:[{id:'top',heading:'Overview',text:'Prose stays byte-for-byte.',diagram:{
     nodes:{outside:{title:'Caller'},a:{title:'Validate',group:'inner',codeRefs:[{file:'orders.ts',line:4}]},b:{title:'Store',group:'inner'},end:{title:'Receiver'},idle:{title:'Observer'}},

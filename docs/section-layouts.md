@@ -423,9 +423,15 @@ Invalid optional entries warn and fall back independently.
   ],
   "prose": {"x":0.04, "y":0.12, "w":0.3, "h":0.38, "stacked":false},
   "controls": {"x":0.02, "y":0.83, "w":0.68, "h":0.14},
+  "steps": {"textPosition":"right"},
   "camera": {"zoom":1.2, "x":0.5, "y":0.45}
 }
 ```
+
+`exploreLayout.steps.textPosition` places the current-step caption `below`,
+`above`, `left` or `right` of the path controls; omission means `below`. In the
+workbench, click the Explore caption or empty step-control surface to open its
+inspector. Path tracks remain scrollable when they exceed the saved window.
 
 `exploreLayout.prose` configures the single notes window for that section.
 Optional `hidden:true` saves visibility for this named view across host profiles;

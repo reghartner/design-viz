@@ -97,6 +97,13 @@ function sectionExploreLayout(d,value,warnings,path){
       if(notes)out.prose=notes;
     }
   }
+  if(value.steps!==undefined){
+    var steps=value.steps,stepsAt=path+'.steps';
+    if(!object(steps))warn(stepsAt,'expected an object with optional textPosition');
+    else if(steps.textPosition!==undefined && ['below','above','left','right'].indexOf(steps.textPosition)<0)
+      warn(stepsAt+'.textPosition','use below, above, left or right');
+    else if(steps.textPosition!==undefined)out.steps={textPosition:steps.textPosition};
+  }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
     var c=value.camera;

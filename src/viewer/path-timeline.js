@@ -89,11 +89,10 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
     var point=nodes.get(node.id),capX=point.x+22;
     stroke('M '+point.x+' '+point.y+' H '+capX+' M '+capX+' '+(point.y-5)+' V '+(point.y+5),ending);
   });
-  var owner=element('div','path-timeline-owner',host);
   function sync(selectedId,index){
     if(retired)return;
-    var selected=pathById.get(selectedId);owner.textContent='Following '+selected.label;
-    owner.style.setProperty('--path-color',selected.color);
+    var selected=pathById.get(selectedId);
+    root.setAttribute('data-selected-path',selectedId);
     choices.forEach(function(choice){var active=choice.path.id===selectedId;choice.button.setAttribute('aria-pressed',String(active));choice.row.setAttribute('data-selected',String(active));});
     buttons.forEach(function(entry){
       var node=entry.node,occurrence=node.occurrences.find(function(o){return o.pathId===selectedId;}) || node.occurrences[0];
@@ -102,6 +101,7 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
       var current=occurrence.pathId===selectedId && occurrence.index===index;
       entry.button.textContent=String(occurrence.visibleIndex+1);
       entry.button.setAttribute('data-step-path',path.id);entry.button.setAttribute('aria-current',String(current));
+      entry.button.setAttribute('data-path-active',String(node.pathIds.indexOf(selectedId)>=0));
       entry.button.style.setProperty('--path-color',shadow?shared.owner.color:path.color);
       entry.button.classList.toggle('shared-step-shadow',!!shadow);
       var peers=node.shared?node.occurrences.map(function(o){return pathById.get(o.pathId).label+' (step '+(o.visibleIndex+1)+')';}).join(', '):'';

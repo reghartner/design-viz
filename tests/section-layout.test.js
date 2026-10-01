@@ -540,3 +540,19 @@ test('Explore prose defaults accept independent visibility and bounded geometry 
     assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'eng',input).error);
   }
 });
+
+test('Explore step captions accept view-local relative positions and reject unknown placements',()=>{
+  const d=diagram(),controls={x:.05,y:.8,w:.8,h:.15};
+  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:{controls}}];
+  for(const textPosition of ['below','above','left','right']){
+    const value={controls,steps:{textPosition}},warnings=[];
+    assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+    const text=JSON.stringify(d),plan=ctx.planSectionExploreLayout(text,d,0,'eng',value);assert.ok(!plan.error,plan.error);
+    assert.deepEqual(JSON.parse(plan.text).layouts[0].exploreLayout,value);
+  }
+  for(const steps of [null,[],true,{textPosition:'diagonal'}]){
+    const warnings=[],input={controls,steps},before=JSON.stringify(input),normalized=ctx.sectionExploreLayout(d,input,warnings);
+    assert.deepEqual(plain(normalized),{controls});assert.equal(warnings.length,1);assert.match(warnings[0],/steps/);assert.equal(JSON.stringify(input),before);
+    assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'eng',input).error);
+  }
+});

@@ -16,7 +16,11 @@ const processIndex=sourceIndex(raw,'process'),persistIndex=sourceIndex(raw,'pers
 async function choose(root,pathId,label){
  await route(root,pathId).click();
  await expect(route(root,pathId)).toHaveAttribute('aria-pressed','true');
- await expect(root.locator('.path-timeline-owner')).toHaveText('Following '+label);
+ await expect(route(root,pathId)).toHaveText(label);
+ await expect(root.locator('.path-timeline-owner')).toHaveCount(0);
+ await expect(root.locator('.path-timeline')).toHaveAttribute('data-selected-path',pathId);
+ await expect(root.locator('.path-timeline-route[data-path-row="'+pathId+'"]')).toHaveAttribute('data-selected','true');
+ await expect(root.locator('.path-timeline-route[data-selected="true"]')).toHaveCount(1);
  await expect(root.locator('.schip[aria-current="true"]')).toHaveText('1');
 }
 async function standalone(page,server,name,text){
@@ -168,7 +172,7 @@ test('middle shared operations split and rejoin with route state intact while of
   await next.click();await expect(step(root,indices.ready)).toHaveAttribute('aria-current','true');await expect(step(root,indices.ready)).toHaveText(String(state.storeNumber+3));
   await expect(readout('route')).toHaveText(state.value);await expect(readout('notice')).toHaveText(state.notice);
   await expect(log).toContainText(state.noticeLog);await expect(log).not.toContainText(state.otherNoticeLog);await expect(log).toContainText('Clip ready in event history');
-  await expect(next).toBeDisabled();await expect(root.locator('.path-timeline-owner')).toHaveText('Following '+state.label);
+  await expect(next).toBeDisabled();await expect(root.locator('.path-timeline')).toHaveAttribute('data-selected-path',state.id);
  }
  await page.screenshot({path:testInfo.outputPath('shared-middle-split-rejoin.png'),fullPage:true});
  await choose(root,'offline','Device offline');await next.click();

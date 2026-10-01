@@ -53,6 +53,18 @@ body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;d
 .explore-player .schips{grid-column:2;grid-row:1;min-width:0;min-height:0;height:100%;overflow:auto;box-sizing:border-box;flex-wrap:nowrap;align-content:start;}
 .explore-player .schips>.schip{flex-shrink:0;}
 .explore-player .stepline{grid-column:1/span 2;grid-row:2;min-width:0;height:100%;max-height:100%;overflow:auto;margin:0;}
+body .docview .explore-player[data-step-text-position="above"]>.termbar{grid-template-rows:minmax(0,1fr) minmax(34px,var(--explore-tracks-height,34px));}
+.explore-player[data-step-text-position="above"] .step-transport{grid-row:2;}
+.explore-player[data-step-text-position="above"] .schips{grid-row:2;}
+.explore-player[data-step-text-position="above"] .stepline{grid-row:1;}
+body .docview .explore-player[data-step-text-position="left"]>.termbar{grid-template-columns:max-content minmax(140px,1.5fr) minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px));}
+body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-template-columns:max-content minmax(0,1fr) minmax(140px,1.5fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px));}
+.explore-player[data-step-text-position="left"] .step-transport,
+.explore-player[data-step-text-position="right"] .step-transport{grid-column:1;grid-row:1;}
+.explore-player[data-step-text-position="left"] .stepline{grid-column:2;grid-row:1;}
+.explore-player[data-step-text-position="left"] .schips{grid-column:3;grid-row:1;}
+.explore-player[data-step-text-position="right"] .schips{grid-column:2;grid-row:1;}
+.explore-player[data-step-text-position="right"] .stepline{grid-column:3;grid-row:1;}
 .explore-player-grip{position:absolute;z-index:2;left:0;top:10px;width:18px;height:34px;padding:0;border:0;background:transparent;color:var(--dfaint);cursor:grab;touch-action:none;}
 .explore-player :focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-panel-menu{position:relative;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);z-index:40;}

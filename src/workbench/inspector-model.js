@@ -187,6 +187,13 @@ var BUILDER_GUIDES = {
       ['link', 'permalink URL — source ↗ on the caption line']
     ]
   },
+  'step-controls': {
+    title: 'Step controls — Explore layout',
+    how: 'These settings belong to this named Explore view. Individual step content and behavior remain unchanged.',
+    fields: [
+      ['Caption position', 'place the current step text below, above, left or right of the path controls']
+    ]
+  },
   panel: {
     title: 'Panel — one synchronized inspector widget',
     how: 'Edit the selected JSON, then click Render. Steps patch the panel by id; patches are sparse and folded, so jumping to any step is consistent.',

@@ -902,6 +902,7 @@ test('diagram folder opens an existing named pair without metadata and reviews l
     await writeFile(path.join(h.folder,'payments.spec.json'),source);
     await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
     await page.locator('#welcome-agent').click();
+    await page.locator('#folder-agent-start-adopt').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await expect(page.locator('#src')).toHaveValue(source);
     expect(path.basename(h.session)).toBe('.flowview-agent');

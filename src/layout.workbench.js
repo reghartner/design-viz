@@ -147,6 +147,7 @@ function initSectionLayoutEditor(opts){
     if(!drag)return;var prior=drag;drag=null;paint(prior.grid,prior.items);
     if(prior.handle.hasPointerCapture(prior.pointer))prior.handle.releasePointerCapture(prior.pointer);
     prior.grid.classList.remove('layout-dragging');
+    prior.grid.style.minHeight=prior.minHeight;
   }
   function fields(section,d){
     var rec=sectionScope(section);rec.fields.destroy();rec.fields=createWorkbenchLifetime();var fieldLife=rec.fields;controlsLife=fieldLife;
@@ -368,7 +369,10 @@ function initSectionLayoutEditor(opts){
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
     var items=currentItems(index),rect=grid.getBoundingClientRect();
-    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)/12};
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)/12,minHeight:grid.style.minHeight};
+    // Keep the scroll range while moving the bottom tile upward. Otherwise
+    // scroll clamping moves the grid origin and feeds back into the next delta.
+    grid.style.minHeight=rect.height+'px';
     handle.setPointerCapture(ev.pointerId);grid.classList.add('layout-dragging');
   },true);
   life.listen(view,'pointermove',function(ev){

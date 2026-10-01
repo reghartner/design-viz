@@ -49,8 +49,9 @@ on that handle, or set **Attached controls height** (grid rows) and choose
 **Apply controls height**. The host grows or shrinks by the same amount, keeping
 the visualization's allotted height. The combined tile is limited to 40 rows.
 Long captions scroll inside the saved controls height instead of moving the
-bar upward or shrinking the visualization. Data-flow controls follow the drawing
-directly; unused tile space stays below the combined drawing and controls.
+bar upward or shrinking the visualization. The data-flow viewport fills the
+space above attached controls. Increasing the tile height reveals more of a
+tall diagram; saved tile sizes are not limited by the automatic viewport cap.
 Optimize preserves this controls height as well as the attachment.
 If the attachment panel is hidden, the controls use their saved detached
 position so navigation remains reachable. Optimize preserves the attachment

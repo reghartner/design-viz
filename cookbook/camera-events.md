@@ -85,6 +85,34 @@ installed viewers then show an upgrade notice instead of silently showing
 STANDBY or the declared clip. Stories using only the older modes and scenes
 keep their 0.1.0 minimum.
 
+## Keep motion sensing on: detect, then record
+
+A Home map camera device can stand for the camera's motion sensor. Its cone
+and sweep show only in `scan`, `detect` and `rec`, so keep it in `scan`
+between events instead of `sleep` when the sensor never stops. Continuous
+sensing is not continuous recording or live view: the screen stays `off`
+(STANDBY) until recording actually starts.
+
+Author each event as two explicit steps. The map never triggers events from
+geometry, so a subject entering the cone changes nothing on its own. These
+step patches assume a Home panel `home` with camera `cam` and subject
+`visitor`, plus the screen `clip`:
+
+```
+detection step:  {"panels": {"home": {"cam": "detect", "visitor": {"x": 40, "y": 40}}}}
+recording step:  {"panels": {"home": {"cam": "rec"}, "clip": {"mode": "rec"}}}
+afterwards:      {"panels": {"home": {"cam": "scan"}, "clip": {"mode": "save", "banner": "CLIP SAVED"}}}
+```
+
+- **Detection step:** the subject is shown and the sensor is in `detect`. The
+  screen stays `off`. It is a local beat, with no upload edges, alerts or
+  clip battery cost.
+- **Recording step:** the next step, at the same story minute unless the
+  source gives a delay. The screen goes to `rec` and any clip battery cost
+  goes here.
+- **Afterwards:** return the sensor to `scan`, not `sleep`. When nothing is
+  being recorded, saved or played, the screen goes back to `off`.
+
 ## Timing rules
 
 - `off` is standby; `boot` shows the static pattern; `active`, `live`, `rec`,

@@ -960,6 +960,9 @@ perspectives" of one timeline). Types:
   An unknown `scene` value warns and keeps the previous clip. For one camera
   that records several events, keep one screen panel and patch `scene`:
   `{"mode":"rec","scene":"raccoon-at-night"}`, later `{"mode":"rec","scene":null}`.
+  When a Home map camera keeps sensing (`scan`), the screen still stays `off`
+  between events and on the detection step. It switches to `rec` on the next
+  step, when recording starts; do not use `live` to show sensing.
   These additions need Flowview 0.2.0. Stamping detects them in the declaration,
   `initial`, step patches and `enterOnce`, and records `minVersion:"0.2.0"` with
   `media.screen-playing`, `media.screen-scene-override` (any per-state `scene`,
@@ -1278,7 +1281,17 @@ perspectives" of one timeline). Types:
   10–180), `range` to 70 (clamped 20–160). Kinds and states: camera
   `scan` (default), `sleep`, `detect`, `rec` (sweep stays live and a red recording light blinks), `off`; entry `closed` (default),
   `open`, `alert`; sensor `ok` (default), `warn`, `alert`, `off`; hub
-  `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`. Cameras, hubs and sensors accept an `icon` from the shared
+  `idle` (default), `rx`, `tx` (loops a small outgoing-transmission wave while the state holds), `alert`.
+  The camera's sensing cone and sweep appear only in `scan`, `detect` and `rec`;
+  `sleep` and `off` remove them. If the camera's motion sensor keeps watching,
+  keep it in `scan` between events rather than `sleep`. Continuous sensing does
+  not imply continuous recording: pair it with a Camera screen in `off`
+  (STANDBY) until recording starts. Author each event explicitly as
+  `scan` → `detect` → `rec` → `scan`. The detect step shows the subject, with no
+  recording, clip or battery debit. Recording starts on the next step, with
+  `{"cam":"rec"}` and the screen in `rec`. A subject entering the cone never
+  triggers detection by itself; the geometry is presentation only.
+  Cameras, hubs and sensors accept an `icon` from the shared
   library. Omitted icons retain the defaults `camera`, `router` and `gear`,
   respectively; invalid IDs warn and use a safe fallback. The Home **Edit
   layout** inspector offers **Browse icons** beside each applicable icon field.

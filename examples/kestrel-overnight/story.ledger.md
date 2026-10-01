@@ -9,7 +9,7 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 | 2 | contract | "battery %, charging yes/no, firmware" | heartbeat payload fields | covered (battery, charging) @ panels.app.battery / .power; firmware out-of-scope: not customer-visible in this story |
 | 3 | flow | "The app's device page shows \"Battery NN% · updated <time>\"" | app shows last reported battery with report time | covered @ panels.app.fields.battery (freshness absolute, reportedAt per report) |
 | 4 | flow | "Between heartbeats the app shows the last reported value." | reported card holds between reports | covered @ panels.app (patched only at report steps or unshown scheduled reports) |
-| 5 | flow | "On PIR motion the camera wakes, records a clip (about 20 s), and uploads it" | motion → record → upload | covered @ steps raccoon, raccoon-saved, a-courier, a-upload, b-courier, b-reconnect; panels.pkgclip mode rec at raccoon (scene raccoon-at-night), a-courier, b-courier (declared package-drop) and save banners at the uploads (D22) |
+| 5 | flow | "On PIR motion the camera wakes, records a clip (about 20 s), and uploads it" | motion → record → upload | covered @ detection beats raccoon-detected, a-motion-detected, b-motion-detected (home cam detect, screen STANDBY), then recording beats raccoon, a-courier, b-courier (home cam rec) and uploads raccoon-saved, a-upload, b-reconnect (D26); panels.pkgclip mode rec at raccoon (scene raccoon-at-night), a-courier, b-courier (declared package-drop) and save banners at the uploads (D22) |
 | 6 | flow | "POST /events to event-ingest, then the clip to clip-store" | event then clip upload, both via home Wi-Fi | covered @ edges router->ingest, router->clips (story labels plain; API in bindings) |
 | 7 | flow | "event-ingest asks motion-classifier for a label" | classification request + label reply | covered @ edges ingest->classifier, classifier->ingest (ret) |
 | 8 | flow | "If the label is `person` or `package`, notify-service sends a push." | package → push | covered @ steps a-alert, b-late-alert (ingest->notify, notify->push, push->phone) |
@@ -34,7 +34,7 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 | 27 | number | "a heartbeat reports 20% → low-battery push" | 20% at the low-battery report | covered @ step lowbatt batt.charge = 20, app.battery = 20 (anchor) |
 | 28 | number | "Wi-Fi returns about 10 minutes later" | outage end ≈10 min after delivery | covered @ b-reconnect time 8:22 (delivery 8:12) |
 | 29 | number | (no source times) | all clock times | illustrative; chosen around operator times (A3); covered @ storyTime, steps[].time, section text |
-| 30 | number | amendment A3 + "Idle drain is about 1% per hour" | tension: 25% at 10:30 PM minus ~1%/h and ~1% clip reaches 20% ≈2:30 AM, not ≈4 AM | covered @ section text; batt.charge null from raccoon until lowbatt anchor; app.battery value null + detail at raccoon |
+| 30 | number | amendment A3 + "Idle drain is about 1% per hour" | tension: 25% at 10:30 PM minus ~1%/h and ~1% clip reaches 20% ≈2:30 AM, not ≈4 AM | covered @ section text; batt.charge null from raccoon-detected (the first 1:04 beat) until lowbatt anchor; app.battery value null + detail at raccoon-detected |
 | 31 | service | "Porch Cam (device)" | camera | covered @ nodes.cam, panels.home.devices.cam (not a catalog service) |
 | 32 | service | "Home router" | home Wi-Fi | covered @ nodes.router, panels.home.devices.router (not a Kestrel service) |
 | 33 | service | "event-ingest" | receives events/heartbeats | covered @ nodes.ingest.binding (component:default/event-ingest, api postEvent) |
@@ -77,9 +77,9 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 |---|----------|--------------------|------------|
 | D1 | "Thursday" = Thu, Oct 1, 2026 (today in this session); 12-hour clock, short date | A3; default not objected | diagram.storyTime |
 | D2 | Heartbeats on :00/:30 (10:30 PM, 11:00 … 8:00, 8:30 AM), illustrative | source: every 30 min; 4:00 AM alert lands on the schedule | worksheet D; reportedAt values |
-| D3 | Battery tension kept, not hidden: idle 1 %/h and 1% clip from 25% at 10:30 PM imply 20% ≈2:30 AM; operator says ≈4 AM. Both kept; charge is `null` from the raccoon step until the 4:00 AM anchor (20%); no numeric drain for the raccoon clip | skill rule 5 / story-time reference | batt patches raccoon (null), lowbatt (20); section text |
+| D3 | Battery tension kept, not hidden: idle 1 %/h and 1% clip from 25% at 10:30 PM imply 20% ≈2:30 AM; operator says ≈4 AM. Both kept; charge is `null` from the first 1:04 beat (raccoon-detected) until the 4:00 AM anchor (20%); no numeric drain for the raccoon clip | skill rule 5 / story-time reference | batt patches raccoon-detected (null), lowbatt (20); section text |
 | D4 | chargePerHour 3 (low end of "about 3–4% per hour"); the engine adds charge without subtracting idle drain while charging | source row 16; least-claim | panels.batt.chargePerHour |
-| D5 | Unshown scheduled reports update the app battery card (illustrative): 1:00 AM (level not specified), 6:30 AM (18%, physical 17.5), 8:00 AM (21%, physical 20.67) | source: fixed 30-min schedule, nothing stops it before the outage | app patches at raccoon, sunrise, a-courier, b-wifi-down |
+| D5 | Unshown scheduled reports update the app battery card (illustrative): 1:00 AM (level not specified), 6:30 AM (18%, physical 17.5), 8:00 AM (21%, physical 20.67) | source: fixed 30-min schedule, nothing stops it before the outage | app patches at raccoon-detected, sunrise, a-motion-detected, b-wifi-down (the first step at or after each report) |
 | D6 | Story-level backend = five plainly named boxes inside a "Kestrel cloud" group, one per catalog service, so each can carry its own binding and code; no service names in my text | A1 + rule 10; viewer still shows catalog/code chrome (presentation limitation) | nodes ingest, classifier, clips, shadow, notify |
 | D7 | Bindings: ingest api postEvent, clips api uploadClip, shadow api putState, notify api sendPush; kestrel-app bound without api (catalog lists none); classifier unbound (not in catalog) | catalog | nodes.*.binding |
 | D8 | Edge kinds declared as plain words: "Home Wi-Fi", "Internet", "Inside Kestrel cloud", "Phone alert" | story-level legend rule; source gives HTTPS for cam→ingest but the legend must stay plain | page.protocols |
@@ -88,7 +88,7 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 | D11 | Phone reaches the cloud directly (not via home Wi-Fi) | source does not put the phone behind the router | edges phone->clips, phone->shadow |
 | D12 | App camera cards mean "what the Kestrel app shows for the camera" (the camera status record), patched when a check-in reaches it. The app→status read edge was drafted for a-open, then removed: it crowded the row corridor (validator lint), and the cards show the same values either way | "The app reads this"; layout lint | panels.app; step a-open |
 | D18 | Device-app sources declared (camstatus → shadow node, clipstore → clips node) with the source map hidden (`showSources: false`), so the walk can tie card changes to lit edges without putting service names on screen | story level (A1); walk route check | panels.app.sources |
-| D19 | Unshown scheduled reports carry an explicit card detail naming their time ("Last report 6:30 AM · regular check-in"); the section text says their minutes are illustrative | walk CHECK guidance | sunrise, a-courier, b-wifi-down; blocks[0].text[1] |
+| D19 | Unshown scheduled reports carry an explicit card detail naming their time ("Last report 6:30 AM · regular check-in"); the section text says their minutes are illustrative | walk CHECK guidance | sunrise, a-motion-detected, b-wifi-down; blocks[0].text[1] |
 | D20 | Edge labels inside the cloud stack kept short ("low") and clip recognizer moved to the second cloud column | validator lint (label length, row-corridor crowding) | rows, edges |
 | D13 | Resident shown in bedroom from bedtime through 4 AM, hidden from sunrise (morning location not given); phone not placed on the map | honesty: no unsourced placement | panels.home subjects |
 | D14 | Courier hidden after the drop step; package stays on the porch | source says only "drops a package" | a-open, b-retry |
@@ -96,10 +96,11 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 | D16 | Single page section, primaryPanel = home map (Data flow below) | business audience; story centered on porch/phone | diagram.primaryPanel |
 | D17 | Superseded by D22 (10-01-2026). Original reasoning (no stock scene fit a night raccoon) is kept under History | — | — |
 | D21 | Superseded by D22 and D23 (10-01-2026). Original a-open-only clip decision is kept under History | — | — |
-| D22 | One persistent camera screen, panel `pkgclip` (id kept to limit churn; title "Porch Cam clips (illustrated)"), visible on every step of both paths, including the first step and direct jumps. Declared scene `package-drop`; initial mode off (STANDBY). Lifecycle: raccoon rec + scene override `raccoon-at-night`; raccoon-saved save "Animal clip saved · no alert"; lowbatt off; a-courier rec + `scene:null` (back to package-drop); a-upload save "Package clip uploaded"; a-alert off; a-open mode playing (D23); b-courier rec + `scene:null`; b-retry save "Clip on memory card · Wi-Fi down"; b-reconnect save "Package clip uploaded"; b-late-alert off. STANDBY whenever nothing is recorded, saved or played: there is no continuous live view | user request (screen present for the whole story; show the raccoon recording); rows 5, 15, 17, 50, 53; home map cam rec/scan/sleep at the same steps | panels.pkgclip; steps raccoon, raccoon-saved, lowbatt, a-courier, a-upload, a-alert, a-open, b-courier, b-retry, b-reconnect, b-late-alert |
-| D23 | a-open uses mode playing (recorded-clip playback: PLAYING chip, banner "Package clip, 8:12 AM" as the clip title), not save and not live; the camera itself is asleep at 8:13. This is distinct from `scenePlayback`, which only gates the illustrated action and is left at its default. No playback on wifi-down: the source does not say the resident opens a clip there | row 49 "Resident opens the clip."; screen renderer mode playing | step a-open (panels.pkgclip) |
+| D22 | One persistent camera screen, panel `pkgclip` (id kept to limit churn; title "Porch Cam clips (illustrated)"), visible on every step of both paths, including the first step and direct jumps. Declared scene `package-drop`; initial mode off (STANDBY). Lifecycle: detection beats raccoon-detected, a-motion-detected, b-motion-detected carry STANDBY (D26); raccoon rec + scene override `raccoon-at-night`; raccoon-saved save "Animal clip saved · no alert"; lowbatt off; a-courier rec + `scene:null` (back to package-drop); a-upload save "Package clip uploaded"; a-alert off; a-open mode playing (D23); b-courier rec + `scene:null`; b-retry save "Clip on memory card · Wi-Fi down"; b-reconnect save "Package clip uploaded"; b-late-alert off. STANDBY whenever nothing is recorded, saved or played: there is no continuous live view | user request (screen present for the whole story; show the raccoon recording); rows 5, 15, 17, 50, 53; home map cam detect/rec/scan at the same steps (D26) | panels.pkgclip; steps raccoon, raccoon-saved, lowbatt, a-courier, a-upload, a-alert, a-open, b-courier, b-retry, b-reconnect, b-late-alert |
+| D23 | a-open uses mode playing (recorded-clip playback: PLAYING chip, banner "Package clip, 8:12 AM" as the clip title), not save and not live; the camera is not recording at 8:13 (only its motion sensor is scanning, D26). This is distinct from `scenePlayback`, which only gates the illustrated action and is left at its default. No playback on wifi-down: the source does not say the resident opens a clip there | row 49 "Resident opens the clip."; screen renderer mode playing | step a-open (panels.pkgclip) |
 | D24 | The clips are illustrative animated SVG scenes (stock `raccoon-at-night`, `package-drop`), not real footage; the section text says so and that live view is out of scope. Per-state `scene` override with `null` = declared scene keeps one tile instead of two empty ones | user request; rows 49, 53 | blocks[0].text[3]; panels.pkgclip |
 | D25 | Compatibility (review fix SCREEN-01): Playing mode, per-state Screen `scene` and the `raccoon-at-night` clip are Flowview 0.2.0 capabilities. `page.flowview` is set to what stamping now produces: authoredWith/minVersion `0.2.0`; features add `panel.screen`, `media.screen-playing`, `media.screen-scene-override`, `media.scene-raccoon-at-night`. A 0.1.0 viewer reports them missing and asks for an upgrade instead of silently showing STANDBY or the package clip. Raccoon motion (review fix SCREEN-02): body and legs share one nine-second timeline; legs hold neutral for the whole 35–62% sniff stop | engineering review SCREEN-01/02 | page.flowview; screen renderer CSS |
+| D26 | Continuous motion sensing, detect before record (user request 10-01-2026). Home `cam` is the camera's independent motion sensor: initial `scan`, `detect` on each event's first beat, `rec` while recording, back to `scan` afterwards, and never `sleep`. Its cone and sweep therefore stay on every step of both paths. Three LOCAL detection beats are inserted immediately before the existing recording steps: raccoon-detected (raccoon appears at 40,40) before raccoon; a-motion-detected (courier appears) before a-courier; b-motion-detected (courier appears) before b-courier. Each keeps its event's minute (1:04 or 8:12), has only `nodes: [cam]`, and adds no edges, failures, alerts or battery debit. The screen stays STANDBY there; REC starts on the next step with the raccoon or package clip. The package appears only on the recording beat. To avoid a computed overnight charge or a stale app report at the new first beats, the existing batt `{charge:null}` and app 1:00 AM report move from raccoon to raccoon-detected, and the app 8:00 AM report moves from a-courier to a-motion-detected (same values). The single package drain stays on a-courier/b-courier. Old step IDs are kept for deep links. Continuous sensing is not continuous recording or live view | user request; row 5 "On PIR motion the camera wakes, records a clip"; D3, D5 | panels.home initial/patches; steps raccoon-detected, raccoon, lowbatt, a-motion-detected, a-courier, a-alert, b-motion-detected, b-courier, b-late-alert; paths |
 
 ## Storyboard worksheet
 
@@ -107,18 +108,18 @@ Spec: candidate.spec.json → stamped.spec.json. One section (`blocks[0]`, id `k
 
 **Audience:** Support leads and product managers at Kestrel. They know the product, not the backend.
 **Takeaway:** The Kestrel app only knows what the camera last reported. That's why the low-battery alert can come in the middle of the night (it rides a scheduled check-in), and why the package alert comes late when home Wi-Fi is down (the clip waits on the camera until Wi-Fi returns).
-**Story (60-second narration):** It's Thursday, 10:30 PM. The resident goes to bed; the Porch Cam is on battery at 25% and not charging, and it checks in with Kestrel every half hour. At 1:04 AM a raccoon crosses the porch: the camera wakes, records about 20 seconds and uploads it. Kestrel recognizes an animal, so the clip goes to the timeline and the phone stays quiet. At 4:00 AM a routine check-in reports 20%, the low-battery line, so the phone gets "Porch Cam battery low" while it's still dark. That's the answer to "why did it wake me up?": the alert fires on the first check-in at or below 20%, whatever the hour. At 6:50 AM the sun comes up and the solar panel starts charging. The app doesn't show it until the 7:00 AM check-in, when it switches to a solar charging icon. Normal morning: at 8:12 AM a courier drops a package, the clip uploads, it's recognized as a package, the phone gets "Package delivered at front door" within seconds, and at 8:13 the resident opens the clip. Wi-Fi-down morning: home Wi-Fi drops at 8:08. At 8:12 the camera records the courier to its memory card but can't send anything. It retries every 2 minutes, and the app still says Online with the 8:00 AM battery reading. At 8:22 Wi-Fi comes back, the camera uploads the clip and checks in, and only then does the package alert arrive, 10 minutes after the drop.
+**Story (60-second narration):** It's Thursday, 10:30 PM. The resident goes to bed; the Porch Cam is on battery at 25% and not charging, and it checks in with Kestrel every half hour. Its motion sensor watches the porch all night. At 1:04 AM it detects a raccoon; the camera then wakes, records about 20 seconds and uploads it. Kestrel recognizes an animal, so the clip goes to the timeline and the phone stays quiet. At 4:00 AM a routine check-in reports 20%, the low-battery line, so the phone gets "Porch Cam battery low" while it's still dark. That's the answer to "why did it wake me up?": the alert fires on the first check-in at or below 20%, whatever the hour. At 6:50 AM the sun comes up and the solar panel starts charging. The app doesn't show it until the 7:00 AM check-in, when it switches to a solar charging icon. Normal morning: at 8:12 AM the sensor detects a courier, the camera records the package drop, the clip uploads, it's recognized as a package, the phone gets "Package delivered at front door" within seconds, and at 8:13 the resident opens the clip. Wi-Fi-down morning: home Wi-Fi drops at 8:08. At 8:12 the sensor still detects the courier, and the camera records the drop to its memory card but can't send anything. It retries every 2 minutes, and the app still says Online with the 8:00 AM battery reading. At 8:22 Wi-Fi comes back, the camera uploads the clip and checks in, and only then does the package alert arrive, 10 minutes after the drop.
 
 **What would I show?**
 1. Most important moment: the 4:00 AM alert (phone notification on the app panel while the home map shows night, resident in bed) and the late 8:22 alert after the blocked Wi-Fi. Both are carried by the app panel plus the home map.
 2. Expected but source-backed: the raccoon clip *not* alerting (shown by a quiet phone and an "Animal" timeline entry later); the app saying "Online" during the outage (status card unchanged, battery "Last report 8:00 AM").
-3. Must NOT believe: that the camera was offline/broken in the app during the outage; that the resident opened the clip on the Wi-Fi-down morning; that the battery level overnight is precisely known (tension D3); that the resident was anywhere specific in the morning; that the camera screen is a live view or real footage (D22, D24).
+3. Must NOT believe: that the camera was offline/broken in the app during the outage; that the resident opened the clip on the Wi-Fi-down morning; that the battery level overnight is precisely known (tension D3); that the resident was anywhere specific in the morning; that the camera screen is a live view or real footage (D22, D24); that continuous motion sensing means continuous recording (D26).
 
 ### B. Panel plan
 
 | Panel id | Type | Physical or reported | Question it answers for this audience | Best moment (step) | Starting state (source or operator) | Must never show |
 |---|---|---|---|---|---|---|
-| home | homemap | physical | What is happening at the porch and house right now? | raccoon; b-courier (recording while Wi-Fi is down) | camera asleep, door closed, Wi-Fi up, resident in bedroom (A7, row 52) | resident placed in a morning location; Wi-Fi up during outage |
+| home | homemap | physical | What is happening at the porch and house right now? Is the motion sensor watching? | raccoon-detected → raccoon; b-motion-detected → b-courier (recording while Wi-Fi is down) | motion sensor scanning (cam scan, cone and sweep on), door closed, Wi-Fi up, resident in bedroom (A7, row 52; D26) | resident placed in a morning location; Wi-Fi up during outage; the motion sensor stopped (D26) |
 | batt | battery | physical | How much charge does the camera really have, and is it charging? | lowbatt (20%, LOW), sunrise (charging starts) | 25%, not charging, on cells (A7) | a precise number between 10:30 PM and 4:00 AM (D3) |
 | app | deviceapp | reported | What does the resident's Kestrel app show and what alerts arrived? | lowbatt notification; b-retry (still "Online", last report 8:00); b-late-alert | home screen, no alerts; Battery 25% updated 10:30 PM; On battery, not charging; Online (A7) | a value newer than the last delivered/scheduled report; "Offline" (never reached 60 min) |
 | pkgclip | screen (declared scene package-drop; override raccoon-at-night) | physical recording + saved-clip playback (illustration) | What is the camera recording, what did it save, and what does the resident see when they play the package clip? | raccoon (REC raccoon); a-open (PLAYING package clip) | visible, mode off = STANDBY (D22) | a live view; a recording camera at 8:13; playback on the wifi-down path; real footage claims (D22–D24) |
@@ -138,7 +139,7 @@ Customer-visible items → panel fields:
 
 | Path id | Label | Shared prefix (step ids) | First different step | Ending | Remaining unknowns |
 |---|---|---|---|---|---|
-| normal | Normal morning | bedtime, raccoon, raccoon-saved, lowbatt, sunrise, charging | a-courier | a-open: resident plays the package clip | exact overnight battery level (D3) |
+| normal | Normal morning | bedtime, raccoon-detected, raccoon, raccoon-saved, lowbatt, sunrise, charging | a-motion-detected | a-open: resident plays the package clip | exact overnight battery level (D3) |
 | wifi-down | Wi-Fi down at delivery | same | b-wifi-down | b-late-alert: package alert arrives 10 min late | whether/when the resident opens the clip (not in source); overnight battery level |
 
 ### D. Time table
@@ -154,17 +155,20 @@ Tension: rate implies 20% at ≈2:30 AM; operator time kept (D3) → charge `nul
 | Path | Step | `time` as written | Story time shown | Anchor, source or illus | Battery: trend, extra drain, charge | Last report (time, value) and freshness | Day/night |
 |---|---|---|---|---|---|---|---|
 | both | bedtime | 2026-10-01T22:30 | Thu 10:30 PM | anchor (A3/A7) | charge 25 (initial), trend draining | 10:30 PM, 25% (delivered) "Last report 10:30 PM" | night |
-| both | raccoon | 2026-10-02T01:04 | Fri 1:04 AM | illus (≈1 AM) | charge null (D3) | 1:00 AM, unshown, level not specified (D5) | night |
+| both | raccoon-detected | 2026-10-02T01:04 | Fri 1:04 AM | illus (≈1 AM); detection beat (D26) | charge null (D3), no debit | 1:00 AM, unshown, level not specified (D5) | night |
+| both | raccoon | 2026-10-02T01:04 | Fri 1:04 AM | same minute; recording beat | holds null (clip cost in caption only, D3) | 1:00 AM (same) | night |
 | both | raccoon-saved | +1m | 1:05 AM | illus | holds null | 1:00 AM (same) | night |
 | both | lowbatt | 2026-10-02T04:00 | 4:00 AM | anchor | charge 20 | 4:00 AM, 20% (delivered) | night |
 | both | sunrise | 2026-10-02T06:50 | 6:50 AM | anchor (≈6:50) | trend charging, source solar; drift → 17.17 (17%) | 6:30 AM unshown, 18% (physical 17.5) | dawn |
 | both | charging | 2026-10-02T07:00 | 7:00 AM | illus (next heartbeat) | charging +3/h → 17.67 (18%) | 7:00 AM, 18% (delivered), charging | day |
-| normal | a-courier | 2026-10-02T08:12 | 8:12 AM | illus ("a little after 8") | +3.6 → 21.27, drain 1 → 20.27 (20%) | 8:00 AM unshown, 21% (physical 20.67) | day |
+| normal | a-motion-detected | 2026-10-02T08:12 | 8:12 AM | illus ("a little after 8"); detection beat (D26) | +3.6 → 21.27 (21%), no debit | 8:00 AM unshown, 21% (physical 20.67) | day |
+| normal | a-courier | 2026-10-02T08:12 | 8:12 AM | same minute; recording beat | drain 1 → 20.27 (20%) | 8:00 AM (same) | day |
 | normal | a-upload | (none) | 8:12 AM | seconds | holds | 8:00 AM | day |
 | normal | a-alert | (none) | 8:12 AM | seconds | holds | 8:00 AM | day |
 | normal | a-open | 08:13 | 8:13 AM | illus | → 20.32 (20%) | 8:00 AM | day |
 | wifi-down | b-wifi-down | 2026-10-02T08:08 | 8:08 AM | illus (D15) | → 21.07 (21%) | 8:00 AM unshown, 21% | day |
-| wifi-down | b-courier | 08:12 | 8:12 AM | illus | → 21.27, drain 1 → 20.27 (20%) | 8:00 AM, ages | day |
+| wifi-down | b-motion-detected | 08:12 | 8:12 AM | illus; detection beat (D26) | → 21.27 (21%), no debit | 8:00 AM, ages | day |
+| wifi-down | b-courier | 08:12 | 8:12 AM | same minute; recording beat | drain 1 → 20.27 (20%) | 8:00 AM, ages | day |
 | wifi-down | b-retry | 08:20 | 8:20 AM | illus (2-min retries) | → 20.67 (21%) | 8:00 AM, ages | day |
 | wifi-down | b-reconnect | 08:22 | 8:22 AM | source (≈10 min) | → 20.77 (21%) | 8:22 AM, 21% (delivered) | day |
 | wifi-down | b-late-alert | (none) | 8:22 AM | seconds | holds | 8:22 AM | day |
@@ -179,10 +183,10 @@ Edges: cam->router, router->ingest, ingest->shadow
 Missing hops check: none
 Report?: report at 10:30 PM delivered: battery 25, power, status
 Focus: home
-home: patch: signals cam→router (resident already in bedroom per A7/initial)
+home: patch: signals cam→router (resident already in bedroom per A7/initial; cam scan from initial: motion sensor watching, D26)
 batt: holds: initial 25%, draining
 app: patch: battery {25, ready, reportedAt now}
-pkgclip: holds: initial mode off → STANDBY (camera asleep; no live view, D22)
+pkgclip: holds: initial mode off → STANDBY (recorder idle; no live view, D22)
 State cleared: no state change
 Icons: none: nothing changed
 Tones: none
@@ -190,22 +194,40 @@ Code/binding: ingest.heartbeat; ingest, shadow bound
 Evidence: rows 1, 3, 26, 52; A7
 ```
 ```
-### raccoon   paths: normal, wifi-down   time: Fri 1:04 AM
-Beat: A raccoon crosses the porch; the camera wakes and records about 20 s.
-Hops claimed: none (local recording)
-Edges: none (nodes: cam)
+### raccoon-detected   paths: normal, wifi-down   time: Fri 1:04 AM
+Beat: The motion sensor detects a raccoon stepping onto the porch; nothing is recorded yet.
+Hops claimed: none (local detection)
+Edges: none (nodes: cam); no failures, alerts or tones
 Missing hops check: none
 Report?: unshown scheduled report at 1:00 AM, illus: battery level not specified (D3/D5)
-Focus: home + pkgclip
-home: patch: raccoon visible on porch; cam rec
-batt: patch: charge null, note "Level not specified 10:30 PM–4:00 AM"
-app: patch: battery {value null, reportedAt 01:00, detail "Last report 1:00 AM · level not specified"}
-pkgclip: patch: mode rec, scene raccoon-at-night (illustrated raccoon crosses and sniffs the porch; REC chip, D22)
-State cleared: cam sleep → rec; pkgclip STANDBY → REC
+Focus: home
+home: patch: raccoon visible at the porch edge (40,40); cam detect (cone + sweep stay on)
+batt: patch: charge null, note "Level not specified until 4:00 AM" (moved here from raccoon so no computed overnight level shows, D26)
+app: patch: battery {value null, reportedAt 01:00, detail "Last report 1:00 AM · level not specified"} (moved here from raccoon, same values)
+pkgclip: holds: STANDBY (no REC, no clip)
+State cleared: cam scan → detect
 Icons: none
 Tones: none
 Code/binding: none
-Evidence: rows 5, 22, 30; D3, D5
+Evidence: rows 5, 30; D3, D5, D26
+```
+```
+### raccoon   paths: normal, wifi-down   time: Fri 1:04 AM
+Beat: Triggered by that detection, the camera wakes and records about 20 s of the raccoon crossing.
+Hops claimed: none (local recording)
+Edges: none (nodes: cam)
+Missing hops check: none
+Report?: no new report (1:00 AM card carried)
+Focus: home + pkgclip
+home: patch: raccoon moves across the porch (60,60); cam rec
+batt: holds: charge null (clip cost in caption only, D3)
+app: holds: 1:00 AM card
+pkgclip: patch: mode rec, scene raccoon-at-night (illustrated raccoon crosses and sniffs the porch; REC chip, D22)
+State cleared: cam detect → rec; pkgclip STANDBY → REC
+Icons: none
+Tones: none
+Code/binding: none
+Evidence: rows 5, 15, 22, 30; D3, D26
 ```
 ```
 ### raccoon-saved   paths: normal, wifi-down   time: 1:05 AM
@@ -215,7 +237,7 @@ Edges: cam->router, router->ingest, router->clips, ingest->classifier, classifie
 Missing hops check: none (no notify: D10)
 Report?: no report
 Focus: app (stays quiet) / Data flow
-home: patch: raccoon hidden; cam scan (awake, sending); signals cam→router
+home: patch: raccoon hidden; cam scan (recording over, sensor watching; uploading); signals cam→router
 batt: holds: charge unspecified (null) until 4:00 anchor
 app: holds: no notification for animal; home screen
 pkgclip: patch: mode save, banner "Animal clip saved · no alert" (same raccoon clip continues)
@@ -233,10 +255,10 @@ Edges: cam->router, router->ingest, ingest->shadow, shadow->notify, notify->push
 Missing hops check: none
 Report?: report at 4:00 AM delivered: battery 20
 Focus: app
-home: patch: cam sleep; signals cam→router
+home: patch: cam scan (sensor keeps watching, D26); signals cam→router
 batt: patch: charge 20 (anchor), note null
 app: patch: battery {20, ready, reportedAt now, detail null, icon battery-low}; notify "Porch Cam battery low"
-pkgclip: patch: mode off → STANDBY (camera asleep)
+pkgclip: patch: mode off → STANDBY (recorder idle)
 State cleared: battery normal → low (app icon battery-low; batt zone LOW computed)
 Icons: app.battery → battery-low
 Tones: none
@@ -280,22 +302,40 @@ Code/binding: ingest.heartbeat
 Evidence: rows 13, 16
 ```
 ```
-### a-courier   paths: normal   time: 8:12 AM
-Beat: A courier drops a package; the camera records.
-Hops claimed: none
-Edges: none (nodes: cam)
+### a-motion-detected   paths: normal   time: 8:12 AM
+Beat: The motion sensor detects a courier walking up to the door; nothing is recorded yet.
+Hops claimed: none (local detection)
+Edges: none (nodes: cam); no failures, alerts or tones
 Missing hops check: none
-Report?: unshown scheduled report at 8:00 AM, illus: battery 21
+Report?: unshown scheduled report at 8:00 AM, illus: battery 21 (moved here from a-courier so the card is never older than 8:00 at 8:12, D26)
 Focus: home
-home: patch: courier + package on porch; cam rec
-batt: patch: drain 1 (clip)
+home: patch: courier on porch (no package yet); cam detect
+batt: holds: drift only (no clip debit)
 app: patch: battery {21, reportedAt 08:00}
-pkgclip: patch: mode rec, scene null → declared package-drop (courier delivers; REC chip)
-State cleared: cam sleep → rec; pkgclip STANDBY → REC, raccoon clip → package clip
+pkgclip: holds: STANDBY (no REC, no clip)
+State cleared: cam scan → detect
 Icons: none
 Tones: none
 Code/binding: none
-Evidence: rows 5, 15; D5
+Evidence: rows 5; D5, D26
+```
+```
+### a-courier   paths: normal   time: 8:12 AM
+Beat: Triggered by that detection, the camera records the courier dropping the package.
+Hops claimed: none
+Edges: none (nodes: cam)
+Missing hops check: none
+Report?: no new report (8:00 AM card carried)
+Focus: home + pkgclip
+home: patch: courier + package on porch; cam rec
+batt: patch: drain 1 (clip; the only package debit on this path)
+app: holds: 8:00 AM card
+pkgclip: patch: mode rec, scene null → declared package-drop (courier delivers; REC chip)
+State cleared: cam detect → rec; pkgclip STANDBY → REC, raccoon clip → package clip
+Icons: none
+Tones: none
+Code/binding: none
+Evidence: rows 5, 15; D26
 ```
 ```
 ### a-upload   paths: normal   time: 8:12 AM
@@ -323,11 +363,11 @@ Edges: ingest->notify, notify->push, push->phone
 Missing hops check: none
 Report?: no report
 Focus: app
-home: patch: cam sleep
+home: patch: cam scan (sensor keeps watching, D26)
 batt: holds: same minute
 app: patch: notify "Package delivered at front door"
-pkgclip: patch: mode off → STANDBY (camera asleep)
-State cleared: cam back asleep; pkgclip save → STANDBY
+pkgclip: patch: mode off → STANDBY (recorder idle)
+State cleared: pkgclip save → STANDBY
 Icons: none
 Tones: none
 Code/binding: ingest.event, notify.push
@@ -370,8 +410,26 @@ Code/binding: none
 Evidence: rows 17; A6, D15
 ```
 ```
+### b-motion-detected   paths: wifi-down   time: 8:12 AM
+Beat: The motion sensor detects a courier walking up to the door, with Wi-Fi still down; nothing is recorded yet.
+Hops claimed: none (local detection; nothing is sent, so no failure is drawn here)
+Edges: none (nodes: cam); no failures, alerts or tones
+Missing hops check: none
+Report?: no report (8:00 AM card from b-wifi-down carries)
+Focus: home
+home: patch: courier on porch (no package yet); cam detect
+batt: holds: drift only (no clip debit)
+app: holds: last report 8:00 AM, still Online
+pkgclip: holds: STANDBY (no REC, no clip)
+State cleared: cam scan → detect; router still alert (true)
+Icons: none
+Tones: none (router alert carries)
+Code/binding: none
+Evidence: rows 5, 17; D26
+```
+```
 ### b-courier   paths: wifi-down   time: 8:12 AM
-Beat: Courier drops the package; camera records to its memory card; can't reach Wi-Fi.
+Beat: Triggered by that detection, the camera records the courier dropping the package to its memory card; can't reach Wi-Fi.
 Hops claimed: none sent (blocked at cam→router)
 Edges: failures cam->router blocked
 Missing hops check: none
@@ -381,7 +439,7 @@ home: patch: courier + package on porch; cam rec
 batt: patch: drain 1 (clip)
 app: holds: last report 8:00 AM, still Online, no alert
 pkgclip: patch: mode rec, scene null → declared package-drop (recording to the memory card; REC chip)
-State cleared: cam sleep → rec; router still alert (true); pkgclip STANDBY → REC, raccoon clip → package clip
+State cleared: cam detect → rec; router still alert (true); pkgclip STANDBY → REC, raccoon clip → package clip
 Icons: none
 Tones: none (router alert carries)
 Code/binding: none
@@ -395,7 +453,7 @@ Edges: failures cam->router blocked
 Missing hops check: none
 Report?: no report (8:30 heartbeat not due yet)
 Focus: app
-home: patch: cam scan (awake, retrying); courier hidden (D14)
+home: patch: cam scan (recording over, sensor watching; retrying uploads); courier hidden (D14)
 batt: holds: drift only
 app: holds: Online, Battery 21% Last report 8:00 AM (status ready: not overdue)
 pkgclip: patch: mode save, banner "Clip on memory card · Wi-Fi down" (row 50)
@@ -431,10 +489,10 @@ Edges: ingest->notify, notify->push, push->phone
 Missing hops check: none
 Report?: no report
 Focus: app
-home: patch: cam sleep
+home: patch: cam scan (sensor keeps watching, D26)
 batt: holds: same minute
 app: patch: notify "Package delivered at front door"
-pkgclip: patch: mode off → STANDBY (camera asleep; no playback on this path, D23)
+pkgclip: patch: mode off → STANDBY (recorder idle; no playback on this path, D23)
 State cleared: pkgclip save → STANDBY
 Icons: none
 Tones: none
@@ -444,21 +502,23 @@ Evidence: rows 8, 51
 
 ### F. Coverage grid
 
-| Path: normal | bedtime | raccoon | raccoon-saved | lowbatt | sunrise | charging | a-courier | a-upload | a-alert | a-open |
-|---|---|---|---|---|---|---|---|---|---|---|
-| home | P | P | P | P | P | P | P | P | P | P |
-| batt | H | P | H | P | P | H | P | H | H | H |
-| app | P | P | H | P | P | P | P | H | P | P |
-| pkgclip | H | P | P | P | H | H | P | P | P | P |
+| Path: normal | bedtime | raccoon-detected | raccoon | raccoon-saved | lowbatt | sunrise | charging | a-motion-detected | a-courier | a-upload | a-alert | a-open |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| home | P | P | P | P | P | P | P | P | P | P | P | P |
+| batt | H | P | H | H | P | P | H | H | P | H | H | H |
+| app | P | P | H | H | P | P | P | P | H | H | P | P |
+| pkgclip | H | H | P | P | P | H | H | H | P | P | P | P |
 
-| Path: wifi-down | bedtime | raccoon | raccoon-saved | lowbatt | sunrise | charging | b-wifi-down | b-courier | b-retry | b-reconnect | b-late-alert |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| home | P | P | P | P | P | P | P | P | P | P | P |
-| batt | H | P | H | P | P | H | H | P | H | H | H |
-| app | P | P | H | P | P | P | P | H | H | P | P |
-| pkgclip | H | P | P | P | H | H | H | P | P | P | P |
+| Path: wifi-down | bedtime | raccoon-detected | raccoon | raccoon-saved | lowbatt | sunrise | charging | b-wifi-down | b-motion-detected | b-courier | b-retry | b-reconnect | b-late-alert |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| home | P | P | P | P | P | P | P | P | P | P | P | P | P |
+| batt | H | P | H | H | P | P | H | H | H | P | H | H | H |
+| app | P | P | H | H | P | P | P | P | H | H | H | P | P |
+| pkgclip | H | H | P | P | P | H | H | H | H | P | P | P | P |
 
-Boring panel check: batt holds on many steps but drifts with story time on each (visible charge change); it carries the two physical beats (4 AM low, sunrise charging) and the clip costs. Kept. pkgclip is visible on every step of both paths (H = STANDBY or the previous save carried); it changes at each recording, save, sleep and the a-open playback, and never plays back on wifi-down (D22, D23). Kept.
+Sensor (home cam) on every step: normal scan, detect, rec, scan, scan, scan, scan, detect, rec, scan, scan, scan; wifi-down scan, detect, rec, scan, scan, scan, scan, scan, detect, rec, scan, scan, scan. The cone and sweep never disappear (D26).
+
+Boring panel check: batt holds on many steps but drifts with story time on each (visible charge change); it carries the two physical beats (4 AM low, sunrise charging) and the clip costs. Kept. pkgclip is visible on every step of both paths (H = STANDBY or the previous save carried, including all three detection beats); it changes at each recording, save, return to STANDBY and the a-open playback, and never plays back on wifi-down (D22, D23). Kept.
 Busy step check: lowbatt, sunrise, charging patch all three; captions name the focus (the phone alert / the battery panel / the app icon).
 
 ### G. Icon state plan
@@ -495,10 +555,11 @@ Precedence: battery card keeps battery-low while charging (low state persists un
 5. app.battery icon is battery-low at the end of both paths (never above 30%).
 6. Clock reads 8:13 AM at a-open and 8:22 AM at b-late-alert; time never goes backward.
 7. `*/raccoon: pkgclip.mode = rec` with `pkgclip.scene = raccoon-at-night`; `normal/a-courier` and `wifi-down/b-courier: pkgclip.mode = rec` with `pkgclip.scene = null` (declared package-drop); `normal/a-open: pkgclip.mode = playing` with banner "Package clip, 8:12 AM"; no step on wifi-down has mode playing; `*/bedtime`, `*/lowbatt`, `normal/a-alert`, `wifi-down/b-late-alert: pkgclip.mode = off` (STANDBY). The screen is visible on every step of both paths.
+8. `home.cam` is `scan`, `detect` or `rec` on every step of both paths (never `sleep`/`off`). `*/raccoon-detected`, `normal/a-motion-detected`, `wifi-down/b-motion-detected: home.cam = detect, pkgclip.mode = off`, each immediately followed by its recording step with `home.cam = rec, pkgclip.mode = rec`. Detection beats add no edges, failures, notifications or battery drain. Battery drain 1 appears only at a-courier and b-courier.
 
 ## Update 10-01-2026: persistent camera screen (D22–D24)
 
-Request: keep the camera screen present for the whole story, show the camera recording the raccoon, and use a real Playing mode for the resident's package playback. Changes are limited to panel `pkgclip` and its step patches, one added section text line (illustrative clips, no live view), and the stamped `page.flowview` metadata (D25). Steps, paths, times, nodes, edges, bindings, codeRefs, captions, battery/report values and notifications are unchanged. The renderer gained mode playing (PLAYING chip) and the stock scene raccoon-at-night (an illustrative animated SVG clip: a masked, ring-tailed raccoon crossing and sniffing the night porch), plus a per-state `scene` override where `null` uses the declared scene.
+Request: keep the camera screen present for the whole story, show the camera recording the raccoon, and use a real Playing mode for the resident's package playback. Changes are limited to panel `pkgclip` and its step patches, one added section text line (illustrative clips, no live view), and the stamped `page.flowview` metadata (D25). At that update, steps, paths, times, nodes, edges, bindings, codeRefs, captions, battery/report values and notifications were unchanged (the later D26 update inserts three detection beats; see below). The renderer gained mode playing (PLAYING chip) and the stock scene raccoon-at-night (an illustrative animated SVG clip: a masked, ring-tailed raccoon crossing and sniffing the night porch), plus a per-state `scene` override where `null` uses the declared scene.
 
 Screen per step (mode · scene):
 - both: bedtime off · lowbatt off · sunrise/charging STANDBY held; raccoon rec · raccoon-at-night; raccoon-saved save "Animal clip saved · no alert".
@@ -511,9 +572,22 @@ Verification: none run by the author of this update (file tools only, no shell o
 
 - SCREEN-01: the first version of this update stamped only `panel.screen` at 0.1.0, so an older viewer gave no upgrade signal. Corrected: Flowview runtime 0.2.0 registers and detects the three new Screen capabilities, and this spec's `page.flowview` now declares them with minVersion 0.2.0.
 - SCREEN-02: in the first version the raccoon's legs kept stepping during the sniff stop. Corrected: the legs follow the same nine-second timeline as the body and hold neutral from 35% to 62%.
-- Story values, lifecycle, captions and the rest of the metadata are unchanged.
+- Story values, lifecycle, captions and the rest of the metadata were unchanged by these two fixes.
 - Verification: the author ran nothing. Proposed checks: `node --test tests/compatibility.test.js tests/screen-scenes.test.js tests/kestrel-screen.test.js tests/security-video.test.js` and the extended browser smoke `tools/browser-tests/tests/screen-raccoon.spec.mjs`. The coordinator records the results.
 - Evidence note: the external `source-hashes.json` holds hashes of the ORIGINAL frozen source files. It is provenance, not a hash of these edited copies. The coordinator issues a separate, labeled receipt for the final files.
+
+## Update 10-01-2026: continuous motion sensing, detect before record (D26)
+
+Request: "i would want the motion radar active the entire time, that doesnt stop. and then id split up the motion detection the radar triggered with the next step where recording starts." The "radar" is the Home map camera's sensing cone and sweep. It is drawn only while `home.cam` is `scan`, `detect` or `rec`, so the camera now starts at `scan` and never uses `sleep`. The three former `sleep` patches (lowbatt, a-alert, b-late-alert) now read `scan`.
+
+New steps, each inserted immediately before its recording step, with old IDs kept:
+- both paths: raccoon-detected (1:04) → raccoon (1:04, REC raccoon) → raccoon-saved (1:05).
+- normal: a-motion-detected (8:12) → a-courier (8:12, REC package).
+- wifi-down: b-motion-detected (8:12) → b-courier (8:12, REC package to memory card).
+
+Detection beats are local: `nodes: [cam]` only, no edges/failures/tones/alerts/drain, screen STANDBY, subject visible, no package yet. Moved patches with unchanged values: batt `{charge:null}` and the app 1:00 AM report go to raccoon-detected; the app 8:00 AM report goes to a-motion-detected. Unchanged: the 1:05, 4:00, 6:50, 7:00, 8:08, 8:13, 8:20 and 8:22 anchors, the single package drain on a-courier/b-courier, notifications, uploads, classification, network edges, PLAYING at a-open only and no playback on wifi-down. Captions on raccoon, a-courier and b-courier now say the recording was triggered by the preceding detection; their source facts (about 20 s, about 1% per clip, memory card, no alert) are kept. The section text adds that the sensor watches all night and that continuous sensing is not continuous recording. Page metadata is unchanged: these use existing capabilities.
+
+Verification: the author ran nothing. Proposed checks: the focused browser test "continuous motion sensing" in `tools/browser-tests/tests/screen-raccoon.spec.mjs`, then `node --test tests/kestrel-screen.test.js`, the cookbook tests and spec validation. The coordinator records the results.
 
 ## History (superseded)
 

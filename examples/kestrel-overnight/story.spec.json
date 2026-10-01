@@ -29,7 +29,7 @@
           "One night with a Kestrel Porch Cam on battery: a raccoon at night, a low-battery alert before dawn, solar charging at sunrise, and a package in the morning. Use the path chips under the diagram to compare the **Normal morning** with the morning when the home **Wi-Fi is down at delivery**.",
           "Source: the Kestrel Porch Cam overnight-on-battery design (reviewed). Clock minutes are illustrative, chosen around the times the product team gave. Battery figures use the design's estimates: about 1% an hour idle, about 1% per clip, and about 3–4% an hour from morning sun (3% used here). Between the check-ins drawn as steps, the app's battery card shows the latest regular half-hourly check-in (1:00, 6:30 and 8:00 AM); their exact minutes are illustrative too.",
           "Note: at about 1% an hour, 25% at 10:30 PM would reach 20% around 2:30 AM, earlier than the 4 AM alert shown here. Both are kept, so the camera's exact battery level between 10:30 PM and 4:00 AM is left blank.",
-          "The camera screen shows illustrative animated clips, not real footage: REC while the camera records, PLAYING when the resident plays a saved clip, and STANDBY otherwise. Live view is out of scope in the design, so nothing is streamed between clips."
+          "The camera screen shows illustrative animated clips, not real footage: REC while the camera records, PLAYING when the resident plays a saved clip, and STANDBY otherwise. Live view is out of scope in the design, so nothing is streamed between clips. On the map, the camera's motion sensor watches the porch the whole night; each event is detected first, and recording starts in the next step. Continuous sensing is not continuous recording."
         ],
         "bullets": [
           "**The app only knows what the camera last told it.** The camera checks in every 30 minutes with its battery level and whether it's charging; the app shows that reading and when it arrived.",
@@ -504,7 +504,7 @@
                 }
               ],
               "initial": {
-                "cam": "sleep",
+                "cam": "scan",
                 "door": "closed",
                 "router": "idle",
                 "raccoon": null,
@@ -662,12 +662,40 @@
               ]
             },
             {
+              "id": "raccoon-detected",
+              "time": "2026-10-02T01:04",
+              "nodes": [
+                "cam"
+              ],
+              "text": "1:04 AM. A raccoon steps onto the porch. The camera's motion sensor, which watches the porch all night, detects it. Nothing is recorded yet: the screen still shows STANDBY. The exact battery level overnight is left blank (see the note above).",
+              "panels": {
+                "home": {
+                  "raccoon": {
+                    "x": 40,
+                    "y": 40
+                  },
+                  "cam": "detect"
+                },
+                "batt": {
+                  "charge": null,
+                  "note": "Level not specified until 4:00 AM"
+                },
+                "app": {
+                  "battery": {
+                    "value": null,
+                    "reportedAt": "01:00",
+                    "detail": "Last report 1:00 AM · level not specified"
+                  }
+                }
+              }
+            },
+            {
               "id": "raccoon",
               "time": "2026-10-02T01:04",
               "nodes": [
                 "cam"
               ],
-              "text": "1:04 AM. A raccoon crosses the porch. The camera's motion sensor wakes it and it records a clip of about 20 seconds, which costs about 1% of battery. The exact battery level overnight is left blank (see the note above).",
+              "text": "1:04 AM. Triggered by that motion, the camera wakes and records the raccoon crossing the porch: a clip of about 20 seconds, which costs about 1% of battery. The motion sensor keeps watching while it records.",
               "panels": {
                 "home": {
                   "raccoon": {
@@ -676,20 +704,9 @@
                   },
                   "cam": "rec"
                 },
-                "batt": {
-                  "charge": null,
-                  "note": "Level not specified until 4:00 AM"
-                },
                 "pkgclip": {
                   "mode": "rec",
                   "scene": "raccoon-at-night"
-                },
-                "app": {
-                  "battery": {
-                    "value": null,
-                    "reportedAt": "01:00",
-                    "detail": "Last report 1:00 AM · level not specified"
-                  }
                 }
               }
             },
@@ -765,7 +782,7 @@
               "text": "4:00 AM, still dark. The routine check-in reports **20%**, the low-battery line. Kestrel marks the camera low on battery and sends one alert, *Porch Cam battery low*, to the phone. It fires now because this is the first check-in at or below 20%, whatever the hour.",
               "panels": {
                 "home": {
-                  "cam": "sleep",
+                  "cam": "scan",
                   "signals": [
                     {
                       "from": "cam",
@@ -914,12 +931,36 @@
               ]
             },
             {
+              "id": "a-motion-detected",
+              "time": "2026-10-02T08:12",
+              "nodes": [
+                "cam"
+              ],
+              "text": "8:12 AM. A courier walks up to the front door and the camera's motion sensor detects them. Nothing is recorded yet: the screen still shows STANDBY. The app's battery card shows 21% from the 8:00 AM check-in.",
+              "panels": {
+                "home": {
+                  "courier": {
+                    "x": 80,
+                    "y": 118
+                  },
+                  "cam": "detect"
+                },
+                "app": {
+                  "battery": {
+                    "value": 21,
+                    "reportedAt": "08:00",
+                    "detail": "Last report 8:00 AM · regular check-in"
+                  }
+                }
+              }
+            },
+            {
               "id": "a-courier",
               "time": "2026-10-02T08:12",
               "nodes": [
                 "cam"
               ],
-              "text": "8:12 AM. A courier drops a package at the front door. The camera wakes and records the delivery, which costs about 1% of battery. The app's battery card shows 21% from the 8:00 AM check-in.",
+              "text": "8:12 AM. Triggered by that motion, the camera wakes and records the courier dropping a package at the front door, which costs about 1% of battery.",
               "panels": {
                 "home": {
                   "courier": {
@@ -938,13 +979,6 @@
                 "pkgclip": {
                   "mode": "rec",
                   "scene": null
-                },
-                "app": {
-                  "battery": {
-                    "value": 21,
-                    "reportedAt": "08:00",
-                    "detail": "Last report 8:00 AM · regular check-in"
-                  }
                 }
               }
             },
@@ -1014,7 +1048,7 @@
               "text": "8:12 AM. The phone gets *Package delivered at front door* right away.",
               "panels": {
                 "home": {
-                  "cam": "sleep"
+                  "cam": "scan"
                 },
                 "pkgclip": {
                   "mode": "off"
@@ -1131,6 +1165,23 @@
               }
             },
             {
+              "id": "b-motion-detected",
+              "time": "08:12",
+              "nodes": [
+                "cam"
+              ],
+              "text": "8:12 AM. A courier walks up to the front door. The camera's motion sensor detects them, even with the home Wi-Fi down. Nothing is recorded yet: the screen still shows STANDBY.",
+              "panels": {
+                "home": {
+                  "courier": {
+                    "x": 80,
+                    "y": 118
+                  },
+                  "cam": "detect"
+                }
+              }
+            },
+            {
               "id": "b-courier",
               "time": "08:12",
               "nodes": [
@@ -1139,7 +1190,7 @@
               "failures": {
                 "cam->router": "blocked"
               },
-              "text": "8:12 AM. A courier drops a package. The camera records it to its memory card (about 1% of battery), but it can't reach the home Wi-Fi. Nothing is sent, so **no alert** goes out.",
+              "text": "8:12 AM. Triggered by that motion, the camera records the courier dropping a package to its memory card (about 1% of battery), but it can't reach the home Wi-Fi. Nothing is sent, so **no alert** goes out.",
               "panels": {
                 "home": {
                   "courier": {
@@ -1277,7 +1328,7 @@
               "text": "8:22 AM. Only now does the phone get *Package delivered at front door*, 10 minutes after the drop. The alert was late because the clip couldn't leave the porch until Wi-Fi returned.",
               "panels": {
                 "home": {
-                  "cam": "sleep"
+                  "cam": "scan"
                 },
                 "pkgclip": {
                   "mode": "off"
@@ -1327,11 +1378,13 @@
               "label": "Normal morning",
               "steps": [
                 "bedtime",
+                "raccoon-detected",
                 "raccoon",
                 "raccoon-saved",
                 "lowbatt",
                 "sunrise",
                 "charging",
+                "a-motion-detected",
                 "a-courier",
                 "a-upload",
                 "a-alert",
@@ -1344,12 +1397,14 @@
               "color": "#fb923c",
               "steps": [
                 "bedtime",
+                "raccoon-detected",
                 "raccoon",
                 "raccoon-saved",
                 "lowbatt",
                 "sunrise",
                 "charging",
                 "b-wifi-down",
+                "b-motion-detected",
                 "b-courier",
                 "b-retry",
                 "b-reconnect",

@@ -71,6 +71,39 @@ def png(width, height):
             + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b''))
 
 
+def png_chunk(kind, data):
+    """A chunk with a correct CRC, so only the payload under test can be wrong."""
+    return len(data).to_bytes(4, 'big') + kind + data + zlib.crc32(kind + data).to_bytes(4, 'big')
+
+
+# Written independently of the tool: samples per pixel, and Adam7 passes as
+# (first column, first row, column step, row step).
+SAMPLES = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}
+TEST_ADAM7 = [(0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2)]
+
+
+def scanlines(width, height, color=6, depth=8, interlace=0, filters=(0,)):
+    """Zero-valued filtered scanlines, cycling `filters` as each row's filter type."""
+    lines = []
+    for column, row, column_step, row_step in TEST_ADAM7 if interlace else [(0, 0, 1, 1)]:
+        columns, rows = len(range(column, width, column_step)), len(range(row, height, row_step))
+        if columns and rows:
+            lines += [bytes((columns * SAMPLES[color] * depth + 7) // 8)] * rows
+    return b''.join(bytes([filters[index % len(filters)]]) + line for index, line in enumerate(lines))
+
+
+def encoded_png(width, height, color=6, depth=8, interlace=0, idat=None, before=(), after=(), split=1, header=None):
+    """A CRC-valid PNG (8-bit RGBA, as browsers capture, by default). `idat` replaces the
+    compressed pixel stream, split over `split` IDAT chunks; `before`/`after` are extra chunks."""
+    header = header or struct.pack('>IIBBBBB', width, height, depth, color, 0, 0, interlace)
+    data = zlib.compress(scanlines(width, height, color, depth, interlace)) if idat is None else idat
+    size = max(1, -(-len(data) // split))
+    parts = [data[index:index + size] for index in range(0, len(data), size)] or [b'']
+    return (b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', header) + b''.join(png_chunk(*item) for item in before)
+            + b''.join(png_chunk(b'IDAT', part) for part in parts)
+            + b''.join(png_chunk(*item) for item in after) + png_chunk(b'IEND', b''))
+
+
 PROFILE_RUBRIC = b'Profile rubric\nApply interpretations after the separator.\n'
 PROFILE_RULES = b'{"rules": [{"id": "provenance-chrome", "decision": "renderer"}]}\n'
 V3_RUBRIC = b'Profile v3 rubric\nOne deduction unit per row.\n'
@@ -1103,6 +1136,204 @@ class AuthoringJudgeTests(unittest.TestCase):
             text = text.replace(before, json.dumps(new_rules[key], ensure_ascii=False))
         # Byte for byte, v4 is v3 with only those edits.
         self.assertEqual((v4 / 'interpretations.json').read_text(), text)
+
+    def test_png_evidence_must_decode_to_its_declared_scanlines(self):
+        # The reviewed probe: framed, CRC-valid 1440x1300 RGBA whose IDAT is not compressed pixels.
+        with self.assertRaisesRegex(ValueError, 'pixel data does not decode: probe.png'):
+            judge.png_size(encoded_png(1440, 1300, idat=b'not compressed pixels'), 'probe.png')
+        self.assertEqual(judge.png_size(encoded_png(1440, 1300), 'browser.png'), (1440, 1300))
+        raw = scanlines(9, 5)
+        stream, row = zlib.compress(raw), len(raw) // 5
+        for png_bytes, message in [
+                (encoded_png(9, 5, idat=zlib.compress(raw[:-row])), 'ends before its 9x5 image'),
+                (encoded_png(9, 5, idat=zlib.compress(raw[:-1])), 'ends before its 9x5 image'),
+                (encoded_png(9, 5, idat=b''), 'ends before'),
+                (encoded_png(9, 5, idat=zlib.compress(b'')), 'ends before'),
+                (encoded_png(9, 6, idat=stream), 'ends before its 9x6 image'),
+                (encoded_png(10, 5, idat=stream), 'ends before its 10x5 image'),
+                (encoded_png(9, 5, interlace=1, idat=stream), 'ends before'),
+                (encoded_png(9, 5, idat=zlib.compress(raw + raw[:row])), 'does not match its 9x5 image'),
+                (encoded_png(9, 5, idat=zlib.compress(raw + b'\x00')), 'does not match'),
+                (encoded_png(9, 5, idat=zlib.compress(scanlines(9, 5, interlace=1))), 'does not match'),
+                (encoded_png(9, 5, idat=stream + b'\x00'), 'does not match'),
+                (encoded_png(9, 5, idat=stream[:-4]), 'does not match'),
+                (encoded_png(9, 5, idat=stream[:-1] + bytes([stream[-1] ^ 1])), 'does not decode'),
+                (encoded_png(9, 5, idat=zlib.compress(scanlines(9, 5, filters=(0, 5)))), 'undefined scanline filter')]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                judge.png_size(png_bytes, 'bad.png')
+
+        def header(**fields):
+            values = {'width': 9, 'height': 5, 'depth': 8, 'color': 6, 'compression': 0, 'filter': 0,
+                      'interlace': 0, **fields}
+            return struct.pack('>IIBBBBB', *values.values())
+        for fields in [{'color': 2, 'depth': 4}, {'color': 5}, {'color': 6, 'depth': 4}, {'color': 0, 'depth': 3},
+                       {'compression': 1}, {'filter': 1}, {'interlace': 2}, {'width': 2 ** 31}]:
+            with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, 'format is unsupported: odd.png'):
+                judge.png_size(encoded_png(9, 5, header=header(**fields)), 'odd.png')
+        # An Apple CgBI-optimized PNG carries a critical chunk that browsers cannot render.
+        with self.assertRaisesRegex(ValueError, r'unsupported: apple\.png .*critical chunks CgBI'):
+            judge.png_size(encoded_png(9, 5, before=[(b'CgBI', bytes(4))]), 'apple.png')
+        palette, text = (b'PLTE', bytes(12)), (b'tEXt', b'Software\x00test')
+        interleaved = (b'\x89PNG\r\n\x1a\n' + png_chunk(b'IHDR', header()) + png_chunk(b'IDAT', stream[:5])
+                       + png_chunk(*text) + png_chunk(b'IDAT', stream[5:]) + png_chunk(b'IEND', b''))
+        for png_bytes, message in [
+                (interleaved, 'out of order'), (encoded_png(9, 5, before=[(b'IHDR', header())]), 'out of order'),
+                (encoded_png(9, 5, color=2, after=[palette]), 'out of order'),
+                (encoded_png(9, 5, color=3, depth=2), 'invalid palette'),
+                (encoded_png(9, 5, color=0, before=[palette]), 'invalid palette'),
+                (encoded_png(9, 5, color=3, depth=1, before=[(b'PLTE', bytes(9))]), 'invalid palette'),
+                (encoded_png(9, 5, color=3, before=[(b'PLTE', bytes(4))]), 'invalid palette'),
+                (encoded_png(9, 5, color=3, before=[palette, palette]), 'invalid palette'),
+                (encoded_png(9, 5, color=2, before=[(b'PLTE', bytes(3 * 257))]), 'invalid palette')]:
+            with self.subTest(message=message), self.assertRaisesRegex(ValueError, message):
+                judge.png_size(png_bytes, 'bad.png')
+        # Valid controls: every standard format, interlaced or not, decodes at its own size.
+        formats = {0: (1, 2, 4, 8, 16), 2: (8, 16), 4: (8, 16), 6: (8, 16)}
+        for color, depths in formats.items():
+            for depth in depths:
+                for interlace in (0, 1):
+                    for width, height in [(1, 1), (3, 3), (9, 5), (17, 13)]:
+                        with self.subTest(color=color, depth=depth, interlace=interlace, size=(width, height)):
+                            self.assertEqual(judge.png_size(encoded_png(width, height, color, depth, interlace),
+                                                            'ok.png'), (width, height))
+        for depth in (1, 2, 4, 8):
+            for entries in (1, 2 ** depth):
+                with self.subTest(depth=depth, entries=entries):
+                    self.assertEqual(judge.png_size(encoded_png(9, 5, color=3, depth=depth, before=[
+                        (b'PLTE', bytes(3 * entries))]), 'indexed.png'), (9, 5))
+        for png_bytes in [encoded_png(9, 5, color=2, before=[palette]),
+                          encoded_png(9, 5, before=[text, (b'pHYs', bytes(9))], after=[text], split=4),
+                          encoded_png(9, 5, idat=zlib.compress(scanlines(9, 5, filters=(0, 1, 2, 3, 4)))),
+                          png(800, 1000)]:
+            with self.subTest(png=png_bytes[:40]):
+                self.assertIn(judge.png_size(png_bytes, 'ok.png'), [(9, 5), (800, 1000)])
+
+    def test_undecodable_or_unsupported_captures_refuse_the_evidence(self):
+        self.profile()
+        probe = self.captured_run('run-01')
+        (probe / 'visual/desktop-0.png').write_bytes(encoded_png(1440, 1300, idat=b'not compressed pixels'))
+        unsupported = self.captured_run('run-02')
+        (unsupported / 'visual/narrow-1.png').write_bytes(encoded_png(800, 2100, before=[(b'CgBI', bytes(4))]))
+        # The same views as 8-bit RGBA, the format browsers capture, are complete.
+        browser = self.captured_run('run-03')
+        for item in json.loads((browser / 'visual/manifest.json').read_text())['captures']:
+            size = (1440, 1300) if item['viewport'] == 'desktop' else (800, 2100)
+            (browser / 'visual' / item['file']).write_bytes(encoded_png(*size))
+        rows = {pathlib.Path(row['run']).name: row for row in self.prepare_profiled()['runs']}
+        for name, reason in [('run-01', 'pixel data does not decode: desktop-0.png'),
+                             ('run-02', 'format is unsupported: narrow-1.png')]:
+            with self.subTest(run=name):
+                self.assertEqual(rows[name]['status'], 'incomplete')
+                self.assertIn(reason, rows[name]['error'])
+                self.assertNotIn('visualEvidence', rows[name])
+                self.assertFalse((self.output / 'packets' / rows[name]['candidateId']).exists())
+        self.assertEqual(rows['run-03']['visualEvidence']['status'], 'complete')
+
+    def add_capture(self, run, item, size):
+        """List one more capture, with a decodable image, in a run's visual manifest."""
+        visual = run / 'visual'
+        manifest = json.loads((visual / 'manifest.json').read_text())
+        manifest['captures'].append(item)
+        (visual / item['file']).write_bytes(png(*size))
+        (visual / 'manifest.json').write_text(json.dumps(manifest))
+
+    def test_capture_inventory_must_be_exactly_the_required_views(self):
+        self.profile()
+        one_step = {'nodes': {'cam': {'title': 'Camera'}}, 'rows': [['cam']], 'edges': [], 'steps': [{'id': 'start'}]}
+        night = {**one_step, 'steps': [{'id': 'alarm'}], 'paths': [{'id': 'night', 'steps': ['alarm']}]}
+        two = {'page': {'title': 'Two', 'blocks': [{'heading': 'Day', 'diagram': one_step},
+                                                   {'heading': 'Night', 'diagram': night}]}}
+        self.assertEqual(judge.required_views(two), [('blocks[0]', 'main', 'start'), ('blocks[1]', 'night', 'alarm')])
+        desktop, narrow = (1440, 1300), (800, 2100)
+        view = {'viewport': 'desktop', 'diagram': 'sections[0]'}
+        # The reviewed probe: both required one-step views plus a listed invented path/step image.
+        self.add_capture(self.captured_run('run-01', spec=one_step),
+                         {'file': 'invented.png', **view, 'path': 'invented', 'step': 'invented'}, desktop)
+        self.add_capture(self.captured_run('run-02', spec=one_step),
+                         {'file': 'later.png', **view, 'path': 'main', 'step': 'later'}, desktop)
+        # The same semantic view under another file name.
+        self.add_capture(self.captured_run('run-03', spec=one_step),
+                         {'file': 'desktop-again.png', **view, 'path': 'main', 'step': 'start'}, desktop)
+        # A real path and step, paired with the other diagram section and viewport.
+        self.add_capture(self.captured_run('run-04', spec=two), {
+            'file': 'crossed.png', 'viewport': 'narrow', 'diagram': 'blocks[0]', 'path': 'night', 'step': 'alarm'}, narrow)
+        self.add_capture(self.captured_run('run-05', spec=one_step), {'file': 'unlabelled.png', **view}, desktop)
+        self.add_capture(self.captured_run('run-06', spec=one_step),
+                         {'file': 'listed.png', **view, 'path': ['main'], 'step': 'start'}, desktop)
+        self.add_capture(self.captured_run('run-07', spec=one_step),
+                         {'file': 'tablet.png', **view, 'viewport': 'tablet', 'path': 'main', 'step': 'start'}, desktop)
+        # A repeat is refused even when the manifest is otherwise only partial.
+        self.add_capture(self.captured_run('run-08', omit=1),
+                         {'file': 'again.png', **view, 'path': 'main', 'step': 'start'}, desktop)
+        # Valid controls: exactly the required views in any manifest order; a missing view stays partial.
+        ordered = self.captured_run('run-09', spec=two)
+        manifest = json.loads((ordered / 'visual/manifest.json').read_text())
+        manifest['captures'].reverse()
+        (ordered / 'visual/manifest.json').write_text(json.dumps(manifest))
+        self.captured_run('run-10', spec=two, omit=1)
+        rows = {pathlib.Path(row['run']).name: row for row in self.prepare_profiled()['runs']}
+        for name, reason in [('run-01', 'does not have: invented.png'), ('run-02', 'does not have: later.png'),
+                             ('run-03', 'repeat a view: desktop-again.png'), ('run-04', 'does not have: crossed.png'),
+                             ('run-05', 'does not have: unlabelled.png'), ('run-06', 'does not have: listed.png'),
+                             ('run-07', 'unknown viewport'), ('run-08', 'repeat a view: again.png')]:
+            with self.subTest(run=name):
+                self.assertEqual(rows[name]['status'], 'incomplete')
+                self.assertIn(reason, rows[name]['error'])
+                self.assertNotIn('visualEvidence', rows[name])
+                self.assertFalse((self.output / 'packets' / rows[name]['candidateId']).exists())
+        complete = rows['run-09']['visualEvidence']
+        self.assertEqual((complete['status'], complete['requiredViews'], len(complete['captures']), complete['uncovered']),
+                         ('complete', 4, 4, []))
+        partial = rows['run-10']['visualEvidence']
+        self.assertEqual((partial['status'], partial['uncovered']), ('partial', ['narrow: blocks[1] path night step alarm']))
+
+    def test_correctness_rows_reject_a_repeated_unit_within_a_criterion(self):
+        def outcome(rows, profile, **scores):
+            try:
+                return judge.parse_score(v3_reply(profiled_score(None, 0, **scores), rows), profile=profile)
+            except ValueError as error:
+                return 'rejected: ' + str(error)
+        # The reviewed probe: one authored label charged twice, with arithmetic that agrees.
+        probe = ['level | -2 | node camera | Uses MQTT.'] * 2
+        distinct = ['level | -2 | node n{} | Service name in a label.'.format(index) for index in range(5)]
+        repeated = [
+            (probe, {'level': 6}),
+            (['level | -2 | node camera | Uses MQTT.', '- `level` | −2 | Node  Camera | uses mqtt'], {'level': 6}),
+            (['| level | -2 | node camera | Uses MQTT. |', '1. level | -2 | `node camera` | Uses `MQTT`.'], {'level': 6}),
+            # The same unit at another listed amount is still one unit.
+            (['time | -2 | step s3 | Caption time differs.', 'time | -3 | step s3 | Caption time differs.'], {'time': 15}),
+            # Beyond the cap, a repeat is rejected rather than hidden by the floor.
+            (distinct + distinct[:1], {'level': 0})]
+        # Distinct units at one location, one wording at distinct locations, and one location's
+        # distinct units in separately scored criteria all remain valid.
+        accepted = [
+            (['level | -2 | caption s3 | Names MQTT.', 'level | -2 | caption s3 | Names HTTP 202.'], {'level': 6}),
+            (['level | -2 | node camera | Uses MQTT.', 'level | -2 | node hub | Uses MQTT.'], {'level': 6}),
+            (['time | -2 | step s4 | Freshness text says Updated now.',
+              'panels | -3 | step s4 | Card shows a failed heartbeat.'], {'time': 18, 'panels': 12}),
+            (distinct + ['level | -2 | node n5 | Service name in a label.'], {'level': 0})]
+        for profile in ('v3', 'v4'):
+            for rows, scores in repeated:
+                with self.subTest(profile=profile, rows=rows):
+                    self.assertRegex(outcome(rows, profile, **scores),
+                                     '^rejected: Duplicate (level|time) correctness unit')
+            for rows, scores in accepted:
+                with self.subTest(profile=profile, rows=rows):
+                    self.assertEqual(outcome(rows, profile, **scores), profiled_score(None, 0, **scores))
+        # v2 and legacy parsing do not check correctness rows, exactly as before.
+        text = v3_reply(profiled_score(None, 0, level=6), probe)
+        self.assertEqual(judge.parse_score(text, True)['level'], 6)
+        self.assertEqual(judge.parse_score(text, profile='v2')['level'], 6)
+        self.assertEqual(judge.parse_score(''.join(row + '\n' for row in probe) + final_reply()), full_score())
+        # Through judging, a repeated unit leaves the judgment invalid and the candidate without a headline.
+        self.v3_profile()
+        self.captured_run('run-01')
+        judge.prepare(self.bundle, self.runs, self.output, [], 'v3')
+        self.allow_judges(prompt=V3_RUBRIC.rstrip(b'\n') + b'\n' + judge.PROFILE_SEPARATOR + V3_RULES,
+                          reply=v3_reply(profiled_score(presentation(), 0, level=6), probe))
+        row = judge.run_judges(self.output)['runs'][0]
+        self.assertEqual((row['status'], row['validJudgments'], row['medianTotal']), ('incomplete', 0, None))
+        self.assertTrue(all('Duplicate level correctness unit' in item['error'] for item in row['judgments']))
 
 
 if __name__ == '__main__':

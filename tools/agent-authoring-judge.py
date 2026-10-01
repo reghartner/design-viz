@@ -23,6 +23,7 @@ import json
 import pathlib
 import re
 import statistics
+import struct
 import subprocess
 import sys
 import time
@@ -84,6 +85,13 @@ CAPTURE_PROCEDURE = {'viewports': [{'id': 'desktop', 'width': 1440, 'height': 10
                                    {'id': 'narrow', 'width': 800, 'height': 1000}],
                      'deviceScaleFactor': 1, 'fullPage': True}
 VISUAL_NAME = re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.png')
+PNG_SIGNATURE = b'\x89PNG\r\n\x1a\n'
+# Samples per pixel and the bit depths the PNG specification allows, per colour type.
+PNG_FORMATS = {0: (1, (1, 2, 4, 8, 16)), 2: (3, (8, 16)), 3: (1, (1, 2, 4, 8)),
+               4: (2, (8, 16)), 6: (4, (8, 16))}
+PNG_CRITICAL = (b'IHDR', b'PLTE', b'IDAT', b'IEND')
+# Adam7 passes as (first column, first row, column step, row step).
+ADAM7 = ((0, 0, 8, 8), (4, 0, 8, 8), (0, 4, 4, 8), (2, 0, 4, 4), (0, 2, 2, 4), (1, 0, 2, 2), (0, 1, 1, 2))
 SHA256 = re.compile(r'[0-9a-f]{64}')
 METRICS = {'questionsFile', 'questionCount', 'ledger', 'html', 'buildOk',
            'buildWarnings', 'diagrams', 'boundNodes', 'codeRefNodes', 'codeRefSteps',
@@ -211,30 +219,84 @@ def required_views(spec):
 
 
 def png_size(value, name):
-    """Width and height of a structurally valid PNG: IHDR first, CRCs, IDAT, IEND."""
-    if not value.startswith(b'\x89PNG\r\n\x1a\n'):
+    """Width and height of a PNG whose pixel data decodes.
+
+    Checks chunk framing and CRCs, a standard IHDR format and chunk order, then
+    inflates the IDAT stream: it must hold exactly one filtered scanline per row
+    (per Adam7 pass when interlaced), each with a defined filter type, and end
+    there. Pixel values are not unfiltered, so palette indices are not range-checked."""
+    if not value.startswith(PNG_SIGNATURE):
         raise ValueError('Visual capture is not a PNG: ' + name)
-    offset, kinds, header = 8, [], None
+    offset, chunks = 8, []
     while offset < len(value):
         if offset + 12 > len(value):
             raise ValueError('Visual capture PNG is truncated: ' + name)
         length = int.from_bytes(value[offset:offset + 4], 'big')
         kind, end = value[offset + 4:offset + 8], offset + 12 + length
         data = value[offset + 8:end - 4]
-        if end > len(value) or zlib.crc32(kind + data) != int.from_bytes(value[end - 4:end], 'big'):
+        if length >= 2 ** 31 or end > len(value) \
+                or zlib.crc32(kind + data) != int.from_bytes(value[end - 4:end], 'big'):
             raise ValueError('Visual capture PNG has a damaged chunk: ' + name)
-        if not kinds:
-            header = data
-        kinds.append(kind)
+        chunks.append((kind, data))
         offset = end
         if kind == b'IEND':
             break
-    if offset != len(value) or not kinds or kinds[0] != b'IHDR' or len(header) != 13 \
+    kinds = [kind for kind, _ in chunks]
+    if offset != len(value) or not kinds or kinds[0] != b'IHDR' or len(chunks[0][1]) != 13 \
             or kinds[-1] != b'IEND' or b'IDAT' not in kinds:
         raise ValueError('Visual capture is not a complete PNG: ' + name)
-    width, height = int.from_bytes(header[:4], 'big'), int.from_bytes(header[4:8], 'big')
+    width, height, depth, color, compression, filtering, interlace = struct.unpack('>IIBBBBB', chunks[0][1])
     if not width or not height:
         raise ValueError('Visual capture PNG has no pixels: ' + name)
+    samples, depths = PNG_FORMATS.get(color, (0, ()))
+    unknown = sorted({kind.decode('latin-1') for kind in kinds
+                      if not kind[0] & 0x20 and kind not in PNG_CRITICAL})
+    if width >= 2 ** 31 or height >= 2 ** 31 or depth not in depths or compression or filtering \
+            or interlace > 1 or unknown:
+        raise ValueError('Visual capture PNG format is unsupported: {} (colour type {}, bit depth {}, '
+                         'compression {}, filter {}, interlace {}{})'.format(
+                             name, color, depth, compression, filtering, interlace,
+                             ', critical chunks ' + ', '.join(unknown) if unknown else ''))
+    first = kinds.index(b'IDAT')
+    last = len(kinds) - 1 - kinds[::-1].index(b'IDAT')
+    palettes = [data for kind, data in chunks if kind == b'PLTE']
+    if kinds.count(b'IHDR') != 1 or set(kinds[first:last + 1]) != {b'IDAT'} \
+            or b'PLTE' in kinds[first:]:
+        raise ValueError('Visual capture PNG chunks are out of order: ' + name)
+    # Indexed colour needs one palette; greyscale forbids one; truecolour may carry a suggested one.
+    if len(palettes) > 1 or (color == 3 and not palettes) or (color in (0, 4) and palettes) or any(
+            not palette or len(palette) % 3 or len(palette) // 3 > (2 ** depth if color == 3 else 256)
+            for palette in palettes):
+        raise ValueError('Visual capture PNG has an invalid palette: ' + name)
+
+    def scanlines():
+        """Byte length of every filtered scanline, including its filter-type byte."""
+        for column, row, column_step, row_step in ADAM7 if interlace else ((0, 0, 1, 1),):
+            columns = (width - column + column_step - 1) // column_step
+            rows = (height - row + row_step - 1) // row_step
+            if columns and rows:
+                for _ in range(rows):
+                    yield 1 + (columns * samples * depth + 7) // 8
+
+    decoder = zlib.decompressobj()
+    source = b''.join(data for kind, data in chunks if kind == b'IDAT')
+    try:
+        for size in scanlines():
+            line = b''
+            while len(line) < size:
+                output = decoder.decompress(source, size - len(line))
+                source = decoder.unconsumed_tail
+                if not output and (decoder.eof or not source):
+                    raise ValueError('Visual capture PNG pixel data ends before its {}x{} image: {}'.format(
+                        width, height, name))
+                line += output
+            if line[0] > 4:
+                raise ValueError('Visual capture PNG has an undefined scanline filter: ' + name)
+        if decoder.decompress(source, 1) or not decoder.eof or decoder.unused_data:
+            raise ValueError('Visual capture PNG pixel data does not match its {}x{} image: {}'.format(
+                width, height, name))
+    except zlib.error as error:
+        raise ValueError('Visual capture PNG pixel data does not decode: ' + name) from error
     return width, height
 
 
@@ -243,8 +305,10 @@ def visual_evidence(run, spec, source_hash):
 
     Returns (packet summary, capture bytes). Captures must follow CAPTURE_PROCEDURE;
     the logical viewport is coordinator metadata, since a full-page PNG can be taller
-    (and, with overflow, wider) than its viewport. Status is `complete` only when
-    every required step view has a capture at both viewports; otherwise `partial`,
+    (and, with overflow, wider) than its viewport. Each capture must name a distinct
+    required (viewport, section, path, step) view; a manifest with an extra or repeated
+    view is refused rather than having images chosen from it. Status is `complete` only
+    when every required step view has a capture at both viewports; otherwise `partial`,
     or `missing` without a `visual/` folder. Loose files are never evidence."""
     folder = run / 'visual'
     if not folder.exists() and not folder.is_symlink():
@@ -261,13 +325,21 @@ def visual_evidence(run, spec, source_hash):
         raise ValueError('Visual evidence must use the controlled capture procedure.')
     viewports = {view['id']: view for view in CAPTURE_PROCEDURE['viewports']}
     sections = [ref.path for ref in spec_sections(spec) if ref.diagram is not None]
-    captures, files = [], {}
+    required = required_views(spec)
+    expected = {(view, *key) for key in required for view in viewports}
+    captures, files, shown = [], {}, set()
     for item in manifest.get('captures') or []:
         name = item.get('file') if isinstance(item, dict) else None
         if not isinstance(name, str) or not VISUAL_NAME.fullmatch(name) or name in files:
             raise ValueError('Visual captures need unique plain .png file names.')
         if item.get('viewport') not in viewports or item.get('diagram') not in sections:
             raise ValueError('Visual capture names an unknown viewport or diagram section: ' + name)
+        state = (item['viewport'], item['diagram'], item.get('path'), item.get('step'))
+        if not all(isinstance(part, str) for part in state) or state not in expected:
+            raise ValueError('Visual capture names a path or step its section does not have: ' + name)
+        if state in shown:
+            raise ValueError('Visual captures repeat a view: {} ({}: {} path {} step {})'.format(name, *state))
+        shown.add(state)
         path = folder / name
         if path.is_symlink() or not path.is_file():
             raise ValueError('Missing visual capture: ' + name)
@@ -278,16 +350,15 @@ def visual_evidence(run, spec, source_hash):
             raise ValueError('Visual capture is smaller than its full-page viewport: ' + name)
         files[name] = value
         captures.append({'file': 'candidate/visual/' + name, 'viewport': item['viewport'],
-                         'diagram': item['diagram'], 'path': str(item.get('path')),
-                         'step': str(item.get('step')), 'pngWidth': width, 'pngHeight': height,
+                         'diagram': item['diagram'], 'path': item['path'],
+                         'step': item['step'], 'pngWidth': width, 'pngHeight': height,
                          'sha256': digest(value)})
     if {path.name for path in folder.iterdir()} != {'manifest.json', *files}:
         raise ValueError('Visual evidence contains files its manifest does not list.')
-    required = required_views(spec)
-    shown = {(item['viewport'], item['diagram'], item['path'], item['step']) for item in captures}
     uncovered = ['{}: {} path {} step {}'.format(view, *key)
                  for key in required for view in viewports if (view, *key) not in shown]
-    return {'status': 'complete' if required and not uncovered else 'partial',
+    # Every capture is a distinct required view, so no gaps means exactly the required set.
+    return {'status': 'complete' if required and shown == expected else 'partial',
             'sourceSha256': source_hash, 'rendererSha256': renderer, 'procedure': CAPTURE_PROCEDURE,
             'requiredViews': len(required) * len(viewports), 'captures': captures,
             'uncovered': uncovered}, files
@@ -442,9 +513,11 @@ def check_correctness_rows(prose, score):
     """One row per deduction unit, each with one amount the rubric lists for its criterion;
     each criterion score is its cap minus the sum of its rows, floored at zero.
 
-    This rejects grouped totals such as `level | -6`, but it cannot prove that the prose
-    of a single `-2` row names only one semantic unit."""
-    deducted = dict.fromkeys(CAPS, 0)
+    This rejects grouped totals such as `level | -6` and a criterion's unit repeated with
+    the same location and reason (compared without case, backticks, extra whitespace or
+    a final period), at any amount. It cannot prove that the prose of a single `-2` row
+    names only one semantic unit, or that differently worded rows name different units."""
+    deducted, units = dict.fromkeys(CAPS, 0), set()
     for row in NAMED_ROW.finditer(prose):
         category = row.group(1).strip().lower()
         if category in SEPARATE_ROWS:
@@ -462,6 +535,12 @@ def check_correctness_rows(prose, score):
             raise ValueError('A ' + category + ' row must deduct exactly one of '
                              + ', '.join('-' + str(item) for item in DEDUCTIONS[category]) + ': '
                              + row.group(0).strip())
+        # Units are per criterion: one location may hold distinct units in several criteria.
+        unit = (category, *(' '.join(item.replace('`', '').split()).rstrip('.').strip().casefold()
+                            for item in fields[1:]))
+        if unit in units:
+            raise ValueError('Duplicate ' + category + ' correctness unit: ' + row.group(0).strip())
+        units.add(unit)
         deducted[category] += int(amount.group(1))
     for key, cap in CAPS.items():
         if score[key] != cap - min(cap, deducted[key]):

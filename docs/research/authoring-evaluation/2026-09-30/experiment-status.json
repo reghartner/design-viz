@@ -32,6 +32,11 @@
         "name": "focused-guidance-results.md",
         "sha256": "165659f1bccfda0b12ee5e66e691a33686bd34083d98bc86942a22bd6f11ba20",
         "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      },
+      "sourcePreservation": {
+        "receipt": "focused-guidance-v1/receipt.json",
+        "kind": "inert two-stage patches with verified reconstruction",
+        "verifiedChangedFiles": 11
       }
     },
     {
@@ -42,8 +47,8 @@
       "presentationDifference": -1.6875,
       "correctnessDifference": 1.625,
       "evidence": {
-        "name": "focused-guidance-v2-results.md",
-        "sha256": "be590ba48bacc5b9992b2ea8c803a405b4c3bffdd6ba20af25e1551381f1a09e",
+        "name": "focused-guidance-v2-2026-09-30/results.json",
+        "sha256": "60e2266e79dfe84669d8047f693e855e8c7cbff7844790f46622ba29b6be69ab",
         "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
       }
     },
@@ -86,7 +91,7 @@
     "bounded visual feedback pass under a separate equal-budget protocol"
   ],
   "comparisonLimit": "Different main versions, rubric revisions and reviewer cohorts mean trial deltas cannot be summed. Edit-pilot scores use a different task/rubric and are not comparable to overnight initial-authoring scores.",
-  "publicationBoundary": "This PR preserves review tooling and interpretation profiles only. It does not adopt focused guidance v1/v2, the composition cue, or focused panel editing.",
+  "publicationBoundary": "This PR preserves review tooling, interpretation profiles, experiment decisions, and an inert source snapshot of focused guidance v1. It does not activate focused guidance v1/v2, the composition cue, or focused panel editing.",
   "stackPlan": [
     {
       "scope": "Versioned evaluation profiles, evidence/score checks, this research snapshot",

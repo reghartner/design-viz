@@ -57,12 +57,39 @@ test('ties, free routes, sub-cent rates and repeated node links remain truthful'
   assert.equal(m.routes[0].nodes.length,1);assert.match(C.costHTML(p,{}),/Same estimated cost/);
   p.items[0].perMillion=0.004;assert.match(C.costHTML(p,{}),/USD 0.004/);
 });
+test('stacked bars share a zero baseline and scale, match node colors, and separate fixed costs', () => {
+  const chart=C.costChartModel(C.costModel(panel(),{}));
+  near(chart.max,13.4);near(chart.routes[0].pct,3.2/13.4*100);near(chart.routes[1].pct,100);
+  for(const route of chart.routes)near(route.segments.reduce((sum,s)=>sum+s.pct,0),route.pct);
+  const fixed=chart.routes[1].segments.filter(s=>s.fixed);assert.equal(fixed.length,1);near(fixed[0].cost,12);
+  const consumers=chart.routes.map(r=>r.flow.find(n=>n.label==='consumer').color);
+  assert.equal(consumers[0],consumers[1],'shared engineering nodes keep the same color');
+  assert.equal(chart.routes[0].segments.some(s=>s.label.includes('Producer')),false,'zero charges do not invent bar area');
+  const invalid=panel();delete invalid.items[1].perMillion;
+  assert.equal(C.costChartModel(C.costModel(invalid,{})).routes[0].segments.length,0,'unpriced routes have no misleading partial bar');
+  const scale=C.costChartModel(C.costModel(panel(),{messages:100000000}));
+  near(scale.routes[1].pct,152/320*100);
+  const html=C.costHTML(panel(),{});assert.match(html,/role="img" aria-label="Managed event bus/);
+  assert.match(html,/<details class="cost-details">/);assert.doesNotMatch(html,/<details class="cost-details" open/);
+});
 test('warnings name declaration, initial, step and transient source paths', () => {
   const d=diagram();d.panels[0].items[0].node='unknown';d.panels[0].initial.messages=-1;
   d.steps[0].panels.costs={activeRoute:'missing',enterOnce:{messages:'bad'}};
   const w=validate(d).warnings.join('\n');
   assert.match(w,/items\[0\].node/);assert.match(w,/initial.messages/);
   assert.match(w,/steps\[0\].panels.costs.activeRoute/);assert.match(w,/steps\[0\].panels.costs.enterOnce.messages/);
+});
+test('density is an optional declaration with safe auto fallback', () => {
+  assert.match(C.costHTML(panel(),{}),/cost-panel cost-auto/);
+  for(const density of ['auto','compact','expanded']){
+    const d=diagram();d.panels[0].density=density;
+    assert.deepEqual(validate(d),{errors:[],warnings:[]});
+    assert.match(C.costHTML(d.panels[0],{}),new RegExp('cost-panel cost-'+density));
+  }
+  const d=diagram();d.panels[0].density='hostile" onclick="bad()';
+  assert.match(validate(d).warnings.join('\n'),/density: expected/);
+  assert.match(C.costHTML(d.panels[0],{}),/cost-panel cost-auto/);
+  assert.doesNotMatch(C.costHTML(d.panels[0],{}),/onclick/);
 });
 test('alternate jumps, volume and transient overrides never leak across paths', () => {
   const d=diagram(),before=JSON.stringify(d);

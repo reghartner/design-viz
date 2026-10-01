@@ -346,6 +346,35 @@
                   }
                 ]
               }
+            },
+            {
+              "id": "compact",
+              "name": "Compact comparison",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 9,
+                    "h": 27
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 20,
+                    "w": 9,
+                    "h": 7,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "costs",
+                    "x": 9,
+                    "y": 0,
+                    "w": 3,
+                    "h": 9
+                  }
+                ]
+              }
             }
           ],
           "defaultLayout": "compare"

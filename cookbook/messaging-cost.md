@@ -6,6 +6,17 @@ follows a managed event bus and a queue with a relay. Both deliver to the same
 consumer. Choose a path, then advance from 1M to 10M and 100M monthly messages.
 It is also a built-in **Messaging cost tradeoffs** workbench template.
 
+Large stacked bars compare both totals from zero on the same scale. Each
+engineering component has a matching color in the bar and its route below;
+hatched segments are fixed infrastructure charges. The dotted gap shows the
+cost difference. Panels up to 520 px wide automatically use compact horizontal
+bars, retaining the shared scale, component colors and cost difference in about
+300 px of height. **Display density** in the panel inspector offers **Auto**,
+**Compact** and **Expanded**; set `density:"compact"` to use the small layout at
+any width, or `density:"expanded"` to keep the tall chart. This setting is saved
+in the declaration and supports Undo/Redo. Expand
+**Rates, assumptions & tradeoffs** for individual rates and exclusions.
+
 The rates are fictional, explicitly labeled, and deliberately show a crossover:
 at 1M, the bus costs USD 3.20 and the queue route USD 13.40. At 10M they cost
 USD 32 and USD 26. The queue's USD 12 fixed relay charge remains even at zero

@@ -13,6 +13,11 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
   await expect(panel.locator('.cost-total')).toHaveText(['USD 3.20','USD 13.40']);
   await expect(panel.locator('.cost-delta')).toContainText('USD 10.20 more');
   await expect(panel.locator('.cost-nodes')).toHaveText(['3 linked engineering nodes','4 linked engineering nodes']);
+  await expect(panel.locator('.cost-details')).not.toHaveAttribute('open');
+  const bars=await panel.locator('.cost-stack').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().height));
+  expect(bars[1]).toBeGreaterThan(220);
+  expect(bars[0]/bars[1]).toBeCloseTo(3.2/13.4,2);
+  await expect(panel.locator('.cost-fixed')).toHaveCount(1);
   await next.click();await expect(panel.locator('.cost-route-0')).toHaveClass(/cost-active/);
   await next.click();await next.click();
   await expect(panel.locator('.cost-total')).toHaveText(['USD 32.00','USD 26.00']);
@@ -26,14 +31,34 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
   await expect(panel.locator('.cost-delta')).toContainText('USD 168.00 less');
   await page.evaluate(()=>document.fonts.ready);
   await page.screenshot({path:testInfo.outputPath('cost-desktop.png'),fullPage:true});
+  await page.getByRole('button',{name:'Compact comparison',exact:true}).click();
+  await expect(panel.getByRole('region',{name:'Alternative: Queue + relay. Following',exact:true})).toBeVisible();
+  await expect(panel.getByRole('region',{name:'Baseline: Managed event bus',exact:true})).toBeVisible();
+  await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 320.00','USD 152.00']);
+  const consumer=await page.locator('[data-dv-node="consumer"] .card').boundingBox();
+  const transport=await page.locator('.step-transport').boundingBox();
+  expect(consumer.y+consumer.height).toBeLessThanOrEqual(transport.y);
+  await page.screenshot({path:testInfo.outputPath('cost-compact-view.png'),fullPage:true});
+  await page.getByRole('button',{name:'Architecture & cost',exact:true}).click();
   await page.setViewportSize({width:390,height:844});
   await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1);
+  await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  const compactBars=await panel.locator('.cost-stack').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().width));
+  expect(compactBars[1]/compactBars[0]).toBeCloseTo(152/320,2);
+  expect(await panel.evaluate(el=>el.getBoundingClientRect().height)).toBeLessThan(340);
   expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow.png')});
-  // Narrow arranged panels scroll internally; the conclusion must remain reachable.
-  await panel.locator('.cost-assumptions').scrollIntoViewIfNeeded();
+  // Narrow panels use compact horizontal bars and keep the conclusion in the tile.
+  await panel.locator('.cost-delta').scrollIntoViewIfNeeded();
   await expect(panel.locator('.cost-delta')).toBeInViewport();
   await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow-conclusion.png')});
+  await panel.locator('.cost-details summary').click();
+  await expect(panel.locator('.cost-details')).toHaveAttribute('open','');
+  await panel.locator('.cost-assumptions').scrollIntoViewIfNeeded();
+  await expect(panel.locator('.cost-assumptions')).toBeInViewport();
+  await expect(panel.locator('.cost-assumptions')).toContainText('Illustrative USD rates');
+  await panel.locator('.cost-details summary').click();
   await page.setViewportSize({width:1400,height:1000});await page.emulateMedia({media:'print'});
   await expect(panel.locator('.cost-total')).toHaveText(['USD 320.00','USD 152.00']);
   await expect(page.locator('.pt-cost')).toHaveCSS('background-color','rgb(255, 255, 255)');
@@ -43,6 +68,7 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
 
 test('cost editor changes starting volume and rates with exact Undo/Redo',async({page,server})=>{
   const raw=JSON.parse(await readFile(fixture,'utf8'));
+  raw.page.sections[0].diagram.panels[0].routes[0].label='Managed bus with regional routing and replay retention';
   // Omit the opening workload override to make starting-state edits visible.
   delete raw.page.sections[0].diagram.steps[0].panels.costs.messages;
   const original=JSON.stringify(raw,null,2);
@@ -63,4 +89,19 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   await expect(root.locator('.cost-total')).toHaveText(['USD 42.00','USD 26.00']);
   expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].items[1].node).toBe('bus');
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(changed);
+  await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  const density=guide.getByLabel('Display density',{exact:true});
+  await density.selectOption('compact');
+  await expect(root.locator('.cost-panel')).toHaveClass(/cost-compact/);
+  await expect(root.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  const compact=await source.inputValue();
+  expect(JSON.parse(compact).page.sections[0].diagram.panels[0].density).toBe('compact');
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(changed);
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(compact);
+  await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  await density.selectOption('expanded');
+  await page.setViewportSize({width:390,height:844});
+  await expect(root.locator('.cost-plot').first()).toHaveCSS('height','230px');
+  const baselines=await root.locator('.cost-plot').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().bottom));
+  expect(Math.abs(baselines[0]-baselines[1])).toBeLessThanOrEqual(1);
 });

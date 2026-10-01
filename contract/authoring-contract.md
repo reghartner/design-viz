@@ -892,7 +892,13 @@ perspectives" of one timeline). Types:
   limits show NO LIMIT. Only upper-bound resource usage is supported; do
   not use for lower-bound availability targets. Limits and values must come
   from the source; label fictional/illustrative examples explicitly.
-- `cost` — compare two messaging routes at the same one-way workload. Declare
+- `cost` — compare two messaging routes at the same one-way workload using
+  large stacked bars on a shared zero-based scale, with component colors matching
+  the engineering path, hatching for fixed charges and a dotted cost gap.
+  Detailed rates, assumptions and tradeoffs are in an expandable section. Declare
+  `density:"auto"` (default), `"compact"` or `"expanded"`. Auto switches to
+  compact horizontal bars at panel widths up to 520 px. Compact always uses
+  that shorter layout; Expanded retains the vertical bars at any width. Declare
   exactly two `routes:[{id,label?,tradeoff?}]` (baseline first), and 1–24
   `items:[{route,node?,label?,perMillion,fixed?}]` in delivery order. `route`
   references a route id; optional `node` references a diagram node. Each rate

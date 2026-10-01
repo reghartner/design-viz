@@ -65,9 +65,10 @@ inspector this is **Scene override**; **Use declared scene** writes `null`.
 
 `mode:"playing"` means someone is playing back a recorded clip (for example
 in a phone app). It shows the scene with a **PLAYING** chip and uses `banner`,
-when set, as the clip title:
+when set, as the clip title. For example, this step patch plays the saved
+package clip:
 
-```json
+```
 {"panels": {"clip": {"mode": "playing", "banner": "Package clip, 8:12 AM"}}}
 ```
 

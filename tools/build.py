@@ -139,7 +139,7 @@ def main() -> int:
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
     if args.runtime_only:
-        print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
+        print("built tools/canon/generated-runtime.cjs (%d bytes)" % runtime_path.stat().st_size)
         return 0
     for name, skeleton, output in [
         ('standalone', 'flowview.skel.html', ROOT / 'template/flowview.html'),
@@ -174,7 +174,7 @@ def main() -> int:
 
     print("built template/flowview.html (%d bytes) and workbench/flowspec.html (%d bytes)"
           % ((ROOT / "template/flowview.html").stat().st_size, (ROOT / "workbench/flowspec.html").stat().st_size))
-    print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
+    print("built tools/canon/generated-runtime.cjs (%d bytes)" % runtime_path.stat().st_size)
     return 0
 
 

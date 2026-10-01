@@ -892,6 +892,34 @@ perspectives" of one timeline). Types:
   limits show NO LIMIT. Only upper-bound resource usage is supported; do
   not use for lower-bound availability targets. Limits and values must come
   from the source; label fictional/illustrative examples explicitly.
+- `cost` — compare two messaging routes at the same one-way workload using
+  large stacked bars on a shared zero-based scale, with component colors matching
+  the engineering path, hatching for fixed charges and a dotted cost gap.
+  Detailed rates, assumptions and tradeoffs are in an expandable section. Declare
+  `density:"auto"` (default), `"compact"` or `"expanded"`. Auto switches to
+  compact horizontal bars at panel widths up to 520 px. Compact always uses
+  that shorter layout; Expanded retains the vertical bars at any width. Declare
+  exactly two `routes:[{id,label?,tradeoff?}]` (baseline first), and 1–24
+  `items:[{route,node?,label?,perMillion,fixed?}]` in delivery order. `route`
+  references a route id; optional `node` references a diagram node. Each rate
+  is a finite non-negative aggregate cost per million delivered messages;
+  `fixed` is a finite non-negative charge for the comparison period (default 0).
+  Include every billable operation in the aggregate rate. Explicit zero is
+  supported; missing or invalid rates make that route Unpriced and suppress
+  the difference. Every route needs at least one line. `currency` defaults to
+  `USD` and accepts a three-uppercase-letter code; `period` defaults to
+  `per month`. `assumptions` explains payload size, operations, region, pricing
+  date and exclusions. These are authored estimates, not fetched provider rates.
+  Starting and step state accept `messages` (non-negative safe integer, default
+  1,000,000), `activeRoute` (route id, null/empty for no highlight), and `note`.
+  Highlighting does not affect costs. Sparse patches and `enterOnce` follow
+  normal panel state. Each line costs `messages / 1000000 * perMillion + fixed`;
+  totals, alternative-minus-baseline difference, percentage of baseline, and
+  positive linear break-even volume are calculated. Zero traffic retains fixed
+  costs; a zero baseline omits the percentage. Overflow suppresses comparison.
+  Linked engineering node counts deduplicate node ids per route. Node removal
+  removes the reference, retaining the cost line. No tiering, currency conversion
+  or engineering labor is inferred. See [messaging costs](../cookbook/messaging-cost.md).
 - `log` — appending monospace event lines: `{"id":"log","type":"log",
   "tags":{"NET":"#38E1FF"}}`. Patched via
   `{"log":[{"tag":"NET","text":"line"}]}` — log patches APPEND. Log panels
@@ -1854,6 +1882,7 @@ contract stays the authority; a recipe shows the working subset for one task.
    | an ordered event stream (firmware log, audit trail) | `log` |
    | what a camera sees at each step | `screen` |
    | a latency / timing budget across spans | `waterfall` |
+   | messaging route costs and engineering tradeoffs at one workload | `cost` (stacked bars; Auto, Compact or Expanded density) |
    | replica or consumer positions, lag, and incomparable histories | `replicas` |
    | which regions of a frame are armed / ignored / masked | `zoneframe` |
    | line of sight / wake-on-motion (show geometry and the reported event) | `radar` with explicit `alert` |

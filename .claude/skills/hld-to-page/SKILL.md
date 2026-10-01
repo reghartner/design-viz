@@ -207,6 +207,15 @@ optional highlight labels to explain the emphasis. See
 the field reference with `python3 tools/widget_doc.py data-contract`.
 The `table` panel remains the record-snapshot view and accepts fixed column widths.
 
+For messaging architecture cost comparisons, use the `cost` panel and
+[messaging cost recipe](../../../cookbook/messaging-cost.md). Compare two routes
+at the same one-way volume, link cost lines to engineering nodes, separate fixed
+charges from per-million rates, and state pricing assumptions and exclusions.
+Its stacked bars share a zero baseline; use Auto density for responsive panels
+or Compact for a short horizontal comparison beside the diagram. The recipe
+and `python3 tools/widget_doc.py cost` cover the exact fields and starter views.
+Never present illustrative rates as current provider pricing.
+
 ## Phase 1: Inventory the source
 
 Read SOURCE fully. Build the coverage ledger as described in

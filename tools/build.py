@@ -27,6 +27,7 @@ SRC = ROOT / "src"
 # Keep metadata here, and the example itself in its existing authored location.
 WORKBENCH_TEMPLATES = [
     {"name": "Simple service flow", "desc": "A client, a service, and a store. Start with the essentials and make them yours.", "category": "engineering", "tag": "The essentials", "art": "flow", "source": "starters/minimal.json", "title": "Simple service flow"},
+    {"name": "Messaging cost tradeoffs", "desc": "Compare an event bus with a queue and relay at 1M, 10M and 100M messages, including fixed costs and engineering nodes.", "category": "engineering", "categories": ["business"], "tag": "Cost & architecture · illustrative", "art": "branch", "source": "starters/messaging-cost.json"},
     {"name": "Retries & recovery", "desc": "Follow a request through retries, deadlines, and a circuit that opens and recovers.", "category": "engineering", "tag": "Alternate outcomes", "art": "branch", "source": "starters/resilience.json"},
     {"name": "A trace, explained", "desc": "Unpack a checkout request with concurrent spans and a recorded payment error.", "category": "engineering", "tag": "Observed execution · fictional", "art": "trace", "source": "starters/honeycomb-trace.json"},
     {"name": "Doorbell domain drilldowns", "desc": "Explore connectivity and recording domains with overview maps, and follow failures into nested detail flows.", "category": "engineering", "categories": ["devices"], "tag": "Focused drilldowns", "art": "layers", "source": "starters/domain-drilldown.json"},

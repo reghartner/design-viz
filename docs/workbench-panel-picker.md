@@ -38,6 +38,16 @@ or **This step only** duration. Undo restores the edit, including removed
 fields and their highlights. **Data table** remains available for record
 snapshots; its **Columns → Width (px)** controls stabilize column widths.
 
+Choose **Software & data → Messaging cost comparison** to compare two routes
+with stacked bars and matching engineering components. In Inspect, set
+**Display density** to **Auto**, **Compact** or **Expanded**. Auto uses horizontal
+bars at panel widths up to 520 px; Compact keeps that short layout at any width.
+Set the starting **One-way messages** volume, then change it on steps to compare
+scenarios. **Following route** highlights a route without changing either cost.
+Expand **Rates, assumptions & tradeoffs** in the panel for the pricing detail.
+The [messaging cost recipe](../cookbook/messaging-cost.md) explains authored
+rates, exclusions and the **Messaging cost tradeoffs** template's two views.
+
 ## Implementation and verification
 
 Each file in `src/panels/types/` supplies its catalog entry, template and preview

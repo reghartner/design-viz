@@ -1,0 +1,385 @@
+{
+  "page": {
+    "title": "What does a million messages cost?",
+    "subtitle": "Two delivery routes \u00b7 one workload \u00b7 visible tradeoffs",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Follow the message. Compare the bill.",
+        "text": [
+          "A managed event bus keeps the path short. A queue and relay trade an extra component and a fixed monthly cost for a lower usage rate. Follow either route, then step up to 10M and 100M messages. All prices are illustrative."
+        ],
+        "diagram": {
+          "view": "step",
+          "nodes": {
+            "producer": {
+              "title": "Event producer",
+              "sub": "one-way \u00b7 1 KB payload",
+              "icon": "terminal"
+            },
+            "bus": {
+              "title": "Managed event bus",
+              "sub": "routing + delivery",
+              "icon": "cloud",
+              "tint": "data"
+            },
+            "queue": {
+              "title": "Message queue",
+              "sub": "send / receive / delete",
+              "icon": "package",
+              "tint": "data"
+            },
+            "relay": {
+              "title": "Delivery relay",
+              "sub": "host + retry policy",
+              "icon": "gear"
+            },
+            "consumer": {
+              "title": "Consumer",
+              "sub": "same processing work",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            [
+              "producer"
+            ],
+            [
+              "bus",
+              [
+                "queue",
+                "relay"
+              ]
+            ],
+            [
+              "consumer"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "producer",
+              "to": "bus",
+              "kind": "https",
+              "label": "publish"
+            },
+            {
+              "from": "bus",
+              "to": "consumer",
+              "kind": "https",
+              "label": "deliver"
+            },
+            {
+              "from": "producer",
+              "to": "queue",
+              "kind": "https",
+              "label": "enqueue"
+            },
+            {
+              "from": "queue",
+              "to": "relay",
+              "kind": "https",
+              "label": "poll"
+            },
+            {
+              "from": "relay",
+              "to": "consumer",
+              "kind": "https",
+              "label": "forward"
+            }
+          ],
+          "panels": [
+            {
+              "id": "costs",
+              "type": "cost",
+              "title": "The price of a million messages",
+              "currency": "USD",
+              "period": "per month",
+              "assumptions": "Illustrative USD rates, not vendor quotes. One-way 1 KB messages; one consumer; no retries, batching or free tier. Queue rate includes send, receive and delete; bus rate includes publish and delivery. Fixed relay infrastructure is USD 12/month. Egress, storage, taxes and engineering labor are excluded. Producer infrastructure is shared and excluded equally.",
+              "routes": [
+                {
+                  "id": "bus",
+                  "label": "Managed event bus",
+                  "tradeoff": "Managed routing and delivery. Three engineering nodes; less infrastructure to operate."
+                },
+                {
+                  "id": "queue",
+                  "label": "Queue + relay",
+                  "tradeoff": "Four engineering nodes. Own the relay, retries, dead-letter handling and monitoring; labor is not priced here."
+                }
+              ],
+              "items": [
+                {
+                  "route": "bus",
+                  "node": "producer",
+                  "label": "Producer \u00b7 shared",
+                  "perMillion": 0
+                },
+                {
+                  "route": "bus",
+                  "node": "bus",
+                  "label": "Bus \u00b7 publish + deliver",
+                  "perMillion": 2.8
+                },
+                {
+                  "route": "bus",
+                  "node": "consumer",
+                  "label": "Consumer execution",
+                  "perMillion": 0.4
+                },
+                {
+                  "route": "queue",
+                  "node": "producer",
+                  "label": "Producer \u00b7 shared",
+                  "perMillion": 0
+                },
+                {
+                  "route": "queue",
+                  "node": "queue",
+                  "label": "Queue \u00b7 send / receive / delete",
+                  "perMillion": 0.8
+                },
+                {
+                  "route": "queue",
+                  "node": "relay",
+                  "label": "Relay execution + host",
+                  "perMillion": 0.2,
+                  "fixed": 12
+                },
+                {
+                  "route": "queue",
+                  "node": "consumer",
+                  "label": "Consumer execution",
+                  "perMillion": 0.4
+                }
+              ],
+              "initial": {
+                "messages": 1000000,
+                "note": "Compare identical delivery workloads. Follow either path, then increase the monthly volume."
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "workload",
+              "nodes": [
+                "producer",
+                "bus",
+                "queue",
+                "relay",
+                "consumer"
+              ],
+              "text": "One million messages per month. Same payload, same consumer, two delivery architectures.",
+              "panels": {
+                "costs": {
+                  "messages": 1000000,
+                  "activeRoute": null
+                }
+              }
+            },
+            {
+              "id": "bus-1",
+              "edge": "producer->bus",
+              "text": "Publish to the managed bus. Its illustrative rate includes routing and delivery.",
+              "panels": {
+                "costs": {
+                  "activeRoute": "bus"
+                }
+              }
+            },
+            {
+              "id": "bus-2",
+              "edge": "bus->consumer",
+              "text": "Deliver to the consumer: USD 3.20 for one million messages, with no fixed charge in this model.",
+              "panels": {
+                "costs": {
+                  "activeRoute": "bus"
+                }
+              }
+            },
+            {
+              "id": "bus-10m",
+              "nodes": [
+                "producer",
+                "bus",
+                "consumer"
+              ],
+              "text": "At 10 million messages, the queue route is USD 26 vs USD 32: USD 6 less. The fixed relay cost is now spread over more traffic.",
+              "panels": {
+                "costs": {
+                  "messages": 10000000,
+                  "note": "At 10 million messages, the queue route is USD 26 vs USD 32: USD 6 less. The fixed relay cost is now spread over more traffic."
+                }
+              }
+            },
+            {
+              "id": "bus-100m",
+              "nodes": [
+                "producer",
+                "bus",
+                "consumer"
+              ],
+              "text": "At 100 million messages, the queue route is USD 152 vs USD 320: USD 168 less. Operational ownership still needs a separate decision.",
+              "panels": {
+                "costs": {
+                  "messages": 100000000,
+                  "note": "At 100 million messages, the queue route is USD 152 vs USD 320: USD 168 less. Operational ownership still needs a separate decision."
+                }
+              }
+            },
+            {
+              "id": "queue-1",
+              "edge": "producer->queue",
+              "text": "Enqueue the same message. The rate includes send, receive and delete operations.",
+              "panels": {
+                "costs": {
+                  "activeRoute": "queue"
+                }
+              }
+            },
+            {
+              "id": "queue-2",
+              "edge": "queue->relay",
+              "text": "The relay polls and acknowledges the queue. Its USD 12 monthly host cost applies even at zero traffic.",
+              "panels": {
+                "costs": {
+                  "activeRoute": "queue"
+                }
+              }
+            },
+            {
+              "id": "queue-3",
+              "edge": "relay->consumer",
+              "text": "Forward to the same consumer: USD 13.40 for one million messages. The relay adds an engineering component.",
+              "panels": {
+                "costs": {
+                  "activeRoute": "queue"
+                }
+              }
+            },
+            {
+              "id": "queue-10m",
+              "nodes": [
+                "producer",
+                "queue",
+                "consumer",
+                "relay"
+              ],
+              "text": "At 10 million messages, the queue route is USD 26 vs USD 32: USD 6 less. The fixed relay cost is now spread over more traffic.",
+              "panels": {
+                "costs": {
+                  "messages": 10000000,
+                  "note": "At 10 million messages, the queue route is USD 26 vs USD 32: USD 6 less. The fixed relay cost is now spread over more traffic."
+                }
+              }
+            },
+            {
+              "id": "queue-100m",
+              "nodes": [
+                "producer",
+                "queue",
+                "consumer",
+                "relay"
+              ],
+              "text": "At 100 million messages, the queue route is USD 152 vs USD 320: USD 168 less. Operational ownership still needs a separate decision.",
+              "panels": {
+                "costs": {
+                  "messages": 100000000,
+                  "note": "At 100 million messages, the queue route is USD 152 vs USD 320: USD 168 less. Operational ownership still needs a separate decision."
+                }
+              }
+            }
+          ],
+          "paths": [
+            {
+              "id": "bus",
+              "label": "Managed event bus",
+              "color": "#7371cf",
+              "steps": [
+                "workload",
+                "bus-1",
+                "bus-2",
+                "bus-10m",
+                "bus-100m"
+              ]
+            },
+            {
+              "id": "queue",
+              "label": "Queue + relay",
+              "color": "#439780",
+              "steps": [
+                "workload",
+                "queue-1",
+                "queue-2",
+                "queue-3",
+                "queue-10m",
+                "queue-100m"
+              ]
+            }
+          ],
+          "autoplay": false,
+          "layouts": [
+            {
+              "id": "compare",
+              "name": "Architecture & cost",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 5,
+                    "h": 21
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 14,
+                    "w": 5,
+                    "h": 7,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "costs",
+                    "x": 5,
+                    "y": 0,
+                    "w": 7,
+                    "h": 21
+                  }
+                ]
+              }
+            },
+            {
+              "id": "compact",
+              "name": "Compact comparison",
+              "sectionLayout": {
+                "default": [
+                  {
+                    "x": 0,
+                    "y": 0,
+                    "w": 9,
+                    "h": 27
+                  },
+                  {
+                    "controls": "steps",
+                    "x": 0,
+                    "y": 20,
+                    "w": 9,
+                    "h": 7,
+                    "attachTo": "diagram"
+                  },
+                  {
+                    "panel": "costs",
+                    "x": 9,
+                    "y": 0,
+                    "w": 3,
+                    "h": 9
+                  }
+                ]
+              }
+            }
+          ],
+          "defaultLayout": "compare"
+        }
+      }
+    ]
+  }
+}

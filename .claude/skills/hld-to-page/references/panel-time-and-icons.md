@@ -23,6 +23,7 @@ yours at every clock move.
 | `screen` | declaration `scene` (not patchable per step) | Choose a scene that matches the story and its time, for example `person-at-door-night` only for a night story. Stock scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`, `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise` (test pattern). If none fits, omit the screen. |
 | `security` | step `scene` (optional clip override), `detail`, `note` | Time can be written in `detail` or `note` text. |
 | `homemap` | none | No day/night field. Time shows through subject positions, device states and captions. |
+| `cost` | `messages`, `note` when the workload scenario changes | `period` is an authored comparison label, not a clock. Elapsed story time does not accrue usage or prorate fixed charges. Keep both routes on the same volume and billing period; see `cookbook/messaging-cost.md`. |
 | `log`, `table`, `state` | authored text | If you print timestamps, keep them consistent with the clock. |
 
 Clock rule per path: story time never goes backward. The date changes by

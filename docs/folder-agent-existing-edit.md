@@ -1,8 +1,8 @@
 # Connected request: existing-diagram edit guide
 
 Read this first for every connected request after `prepare`. VIZ is the
-authoring directory named in `CONNECT.md`; paths below are relative to it. The
-support folder's `CONNECT.md` remains the authority for transport commands and files.
+authoring directory named in `CONNECT.md`, which remains the authority for
+transport commands and files; paths below are relative to VIZ.
 
 ## Scope
 
@@ -29,21 +29,22 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
    references are evidence.
 2. Verify sessionId, connectionId, request id, `editor.connected` and a heartbeat
    under 15 s. Stop if identity changes.
-3. Read `state.json` immediately before planning; keep its revision as the base.
-   If its long `source`/`ledger` lines are unreadable, read its identity and
-   revision before and after the complete pair named in `project.json`. Use the
-   pair only if both reads match each other and the active request, which Send
-   publishes only after writing that exact valid pair. Otherwise, even for an
-   invalid draft or stable newer revision, the files don't prove current state;
-   use no older candidate; follow [stale-revision recovery](folder-agent-session.md).
-4. Create the complete `candidate.spec.json` and `candidate.ledger.md` pair in
-   the support folder. A whole-file rewrite is not required; use ordinary local
-   file operations under your existing permissions, such as copying the current
-   pair and editing it. This guide grants no additional permissions.
-   Reading is fine, but while connected never directly overwrite the accepted
-   spec or ledger, or edit `state.json`, `request.json`, `transcript.json`,
-   `session.json` or `editor.json`. Use the helper for proposals and replies.
-5. The request's selection and JSON paths are a starting point, not proof that
+3. If `request.json` has `candidate`, confirm its `baseRevision` equals
+   `request.revision` (your base), then edit those complete seeded copies in
+   the support folder with ordinary file edits; don't reread the accepted pair
+   or all of `state.json` to recreate them. Never write another request's
+   candidates.
+4. Without `candidate`, read `state.json` immediately before planning, keep its
+   revision as the base, and write complete `candidate.spec.json` and
+   `candidate.ledger.md` in the support folder; copy-and-edit is fine.
+5. If `state.json`'s long `source`/`ledger` lines are unreadable, use the
+   `project.json` pair only per the checked fallback in the
+   [folder session](folder-agent-session.md); never an older candidate.
+6. While connected, never directly overwrite the accepted spec or ledger, or
+   edit `state.json`, `request.json`, `transcript.json`, `session.json` or
+   `editor.json`. Use the helper for proposals and replies;
+   this guide grants no additional permissions.
+7. The request's selection and JSON paths are a starting point, not proof that
    the change is isolated.
 
 ## Semantics
@@ -64,18 +65,20 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
 
 ## Verify and submit
 
-- From VIZ, run `node tools/validate.js ../candidate.spec.json` and
-  `python3 .claude/skills/hld-to-page/scripts/spec_walk.py ../candidate.spec.json --state`.
+- From VIZ, with `SPEC` your candidate spec, run `node tools/validate.js ../SPEC`
+  and `python3 .claude/skills/hld-to-page/scripts/spec_walk.py ../SPEC --state`.
   Compare affected steps with the ledger. Fix every `WARN`; fix or justify each
   `CHECK`. Never claim visual QA.
-- Submit `propose` as `CONNECT.md` shows. Every proposal waits for the full
-  preview and explicit **Commit update**; wait for the matching `result.json`.
+- Submit `propose` with your candidate pair and base revision as `CONNECT.md`
+  shows. Every proposal waits for the full preview and explicit **Commit
+  update**; wait for the matching `result.json`.
 - After acceptance, reread the accepted pair and confirm they agree, including
   merged human edits; submit a corrected pair if not.
 - Commit does not itself refresh compatibility metadata; verify the accepted
   `page.flowview` before claiming it was stamped.
-- On rejection, stale revision or conflict, reread the current pair and build a
-  fresh reconciled pair; never relabel an old proposal. For any other recovery,
-  load the full [folder session](folder-agent-session.md).
+- On rejection, stale revision or conflict, reread `state.json` for the current
+  pair and revision and reconcile them and any feedback into your candidates
+  without discarding their edits; never relabel an old proposal. For other
+  recovery, load the full [folder session](folder-agent-session.md).
 - Then send the completion `reply` as `CONNECT.md` shows.
 - A Git commit or publish needs separate user authorization.

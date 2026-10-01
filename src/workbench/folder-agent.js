@@ -156,6 +156,54 @@ function createFolderAgentClient(opts){
     }
     return alive(token)?sent:null;
   }
+  function preparationError(message){var error=Error(message);error.name='RequestPreparationError';return error;}
+  // Guards each asynchronous preparation step against Stop, disconnect, lost
+  // ownership and any story/ledger/project revision change. A null turn keeps
+  // Send's existing rule that Stop during publication is reported afterwards.
+  function requestGuard(token,turn,basis,check){
+    function verify(){
+      if(check)check();
+      if(!alive(token) || turn!==null && turn!==turnEpoch)throw preparationError('This turn stopped before its request was published.');
+    }
+    return async function(){
+      verify();var owner=await files.read('session.json');verify();
+      if(!belongs(owner))throw preparationError('Folder ownership changed while preparing this request. No request was published.');
+      var current=exchange.request().snapshot;
+      if(!current.open || current.project!==project || current.revision!==basis)throw preparationError('The story changed while preparing this request. No request was published.');
+    };
+  }
+  // Copy the exact pinned pair, even an invalid draft, to request-specific
+  // names before request.json exists. The two files are written one at a time,
+  // not atomically; both must reread exactly or no request is published. Failed
+  // attempts leave their files for inspection and never reuse those names.
+  async function seedCandidates(id,pinned,guard){
+    var names={source:'candidate-'+id+'.spec.json',ledger:'candidate-'+id+'.ledger.md'},expected={source:pinned.source,ledger:pinned.ledger==null?'':pinned.ledger},keys=['source','ledger'],key;
+    if(!validId(id) || typeof files.readText!=='function' || typeof expected.source!=='string' || typeof expected.ledger!=='string')
+      throw preparationError('Candidate files need a valid request ID, story text and raw folder reads.');
+    // Without exclusive create, reread at every write phase. Only a missing
+    // file, or an empty one this write created, may be filled; committed work
+    // that appears between lookups or before close is refused and kept.
+    async function exclusive(write){
+      await guard();
+      if(!write || !write.phase)return;
+      var found=await files.readText(write.name);await guard();
+      if(write.phase==='before-open'?found!==null:!write.created || found!==null && found!=='')
+        throw preparationError(write.name+' appeared while preparing this request. No request was published and that file was not replaced.');
+    }
+    async function exact(check){
+      for(var part of keys){
+        var text=await files.readText(names[part]);await check();
+        if(text!==expected[part])throw preparationError(names[part]+' is not the exact story copy for this request. No request was published; the file was left for inspection.');
+      }
+    }
+    for(key of keys)if(await files.readText(names[key])!==null)throw preparationError(names[key]+' already exists. No request was published and that file was not changed.');
+    await guard();
+    for(key of keys){await files.write(names[key],expected[key],exclusive);await guard();}
+    await exact(guard);
+    return {candidate:{spec:names.source,ledger:names.ledger,baseRevision:pinned.revision},
+      // Each request.json phase rechecks identity and both candidate files.
+      publication:function(check){return async function(){await check();await exact(check);};}};
+  }
   async function readOptional(name){
     try{return await files.read(name);}catch(ex){
       if(ex instanceof SyntaxError || ex.name==='NotReadableError')return null;
@@ -176,16 +224,29 @@ function createFolderAgentClient(opts){
       if(!pending && belongs(incoming) && validId(incoming.id) && typeof incoming.text==='string' && incoming.text.trim() && incoming.text.length<=16000 && Number.isFinite(incoming.expiresAt) && incoming.expiresAt>now() && !nativeSeen.has(incoming.id)){
         var request=envelope({id:incoming.id,text:incoming.text,at:now(),revision:sent.snapshot.revision,selection:[],views:[],
           technicalLevel:opts.level?opts.level():'story',replySurface:'agent',delivery:'native',expiresAt:incoming.expiresAt});
-        exchange.pin(sent.snapshot);
-        try{await files.write('request.json',request,function(){
+        // Edits made after the snapshot was saved keep the existing pinned base;
+        // edits during preparation stop it.
+        var nativeGuard=requestGuard(token,turn,exchange.request().snapshot.revision,function(){
           if(!alive(token) || turn!==turnEpoch || now()>=incoming.expiresAt){var expired=Error('Native request expired before publication.');expired.name='NativeRequestExpiredError';throw expired;}
-        });}catch(ex){if(ex.name!=='NativeRequestExpiredError')throw ex;nativeSeen.add(incoming.id);if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;}
+        });
+        try{
+          var seeded=await seedCandidates(incoming.id,sent.snapshot,nativeGuard);request.candidate=seeded.candidate;
+          await files.write('request.json',request,seeded.publication(nativeGuard));
+        }catch(ex){
+          // Never retry this ID: its candidate names may hold a partial seed.
+          nativeSeen.add(incoming.id);
+          if(ex.name==='NativeRequestExpiredError'){if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;}
+          if(ex.name==='RequestPreparationError'){if(alive(token))publish({status:'Could not prepare the agent request: '+ex.message+' Ask your agent to retry.'});return;}
+          throw ex;
+        }
         if(!alive(token) || turn!==turnEpoch)return;
         if(now()>=incoming.expiresAt){
           nativeSeen.add(incoming.id);
           await files.write('cancel.json',envelope({id:uuid(),requestId:incoming.id,at:now(),reason:'Native request expired during publication. Retry this request.'}));
           if(alive(token))publish({status:'The agent request expired before acknowledgement. Ask your agent to retry.'});return;
         }
+        // Pin only an accepted publication; the base is still sent.snapshot.
+        exchange.pin(sent.snapshot);
         nativeSeen.add(incoming.id);pending=requestId=incoming.id;turn=++turnEpoch;requestAt=now();lastAgentAt=null;
         activity=[];activitySeen.clear();clearReceipt();clearReview();
         transcript.push({role:'user',text:incoming.text,requestId:incoming.id});await saveTranscript();
@@ -385,12 +446,14 @@ function createFolderAgentClient(opts){
         if(turn!==turnEpoch)throw Error('Turn stopped before the message was sent.');
         var current=opts.snapshot();
         if(sent.snapshot.project!==captured.project || sent.snapshot.source!==captured.source ||
-          !current.open || current.project!==captured.project || current.source!==captured.source)
+          !current.open || current.project!==captured.project || current.source!==captured.source || exchange.request().snapshot.revision!==sent.snapshot.revision)
           throw Error('The story changed while saving your message. Check the selection and send it again.');
         var request=envelope({id:id,text:text,at:now(),revision:sent.snapshot.revision,
           selection:captured.selection,views:captured.views,previewCurrent:captured.previewCurrent,project:captured.project,technicalLevel:captured.technicalLevel,replySurface:captured.replySurface,delivery:captured.delivery});
+        var seeded=await seedCandidates(id,sent.snapshot,requestGuard(token,turn,sent.snapshot.revision));request.candidate=seeded.candidate;
+        await files.write('request.json',request,seeded.publication(requestGuard(token,null,sent.snapshot.revision)));if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
+        // Pin only an accepted publication, before anything else can poll.
         exchange.pin(sent.snapshot);
-        await files.write('request.json',request);if(!alive(token) || turn!==turnEpoch)throw Error('Turn stopped while the message was being saved.');
         transcript.push({role:'user',text:text,requestId:id,context:{selection:request.selection,views:request.views,technicalLevel:request.technicalLevel,previewCurrent:request.previewCurrent}});
         publish({status:request.delivery==='clipboard'?'Request ready to copy. Continue in your agent.':'Message saved — waiting for Claude.',progress:''});
         await saveTranscript();return request;

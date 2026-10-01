@@ -1,8 +1,8 @@
 # Exact-v1 replication: one unscored feasibility trial
 
-One fresh Claude Opus 5.5/high author completed the questions-first, same-session authoring flow using the exact eleven-path focused-v1 snapshot on the common current scaffold. This is a feasibility check, not a contemporary quality or context comparison. No registered authors or graders have run, and no strategy is promoted.
+One fresh Claude Opus 5.5/high author completed the questions-first, same-session authoring flow using the exact eleven-path focused-v1 snapshot on the common current scaffold. This is a feasibility check, not a contemporary quality or context comparison. When it ran, no registered authors or graders had run. The registered cohort has since completed; its results are in [v1-replication-results.md](v1-replication-results.md). No strategy is promoted.
 
-The common product base is `3799dfa25e637290ea828e6acbb1b8bcbea674f4`. The prospective comparison uses historical corrected-control guidance versus historical focused-v1 guidance, with identical current runtime, wrappers, prompts and fixtures outside those eleven path states. It does not compare today's default guidance, activate v1 in production, or stack PR292/293. The two historical Workbench JavaScript paths are inert author-visible experiment inputs, not code executed by the current runtime.
+The common product base is `3799dfa25e637290ea828e6acbb1b8bcbea674f4`. The registered comparison that followed used historical corrected-control guidance versus historical focused-v1 guidance, with identical current runtime, wrappers, prompts and fixtures outside those eleven path states. It does not compare today's default guidance, activate v1 in production, or stack PR292/293. The two historical Workbench JavaScript paths are inert author-visible experiment inputs, not code executed by the current runtime.
 
 ## Mechanical evidence and deviation
 
@@ -10,9 +10,9 @@ Both phases completed with the requested model and effort, and phase two resumed
 
 The author appended `tail -5 walk-report.txt` to its final helper command. This violated the prompt's enumerated shell-command rule and was disclosed by the author. The command read only its generated local report. No outside read, input mutation, wrong kit or renderer incompatibility was observed. Zero recorded permission denials did not establish complete command compliance.
 
-The first SOL Medium flow review recommended stopping on command noncompliance. A separate retained adjudication found that this added a stricter criterion than the frozen mechanical trial gate and historical acceptance code. It recommended pass with a recorded deviation; the original report remains unchanged. Fable independently supported this interpretation conditional on capture, a check for guidance-induced shell post-processing, and verification that the command patterns are common across arms. The final SOL closure verified those conditions, and the coordinator accepted the trial with the deviation preserved. Registered author and grader launches still require their separate preparations and freezes.
+The first SOL Medium flow review recommended stopping on command noncompliance. A separate retained adjudication found that this added a stricter criterion than the frozen mechanical trial gate and historical acceptance code. It recommended pass with a recorded deviation; the original report remains unchanged. Fable independently supported this interpretation conditional on capture, a check for guidance-induced shell post-processing, and verification that the command patterns are common across arms. The final SOL closure verified those conditions, and the coordinator accepted the trial with the deviation preserved. Registered author and grader launches then required their own separate preparations and freezes.
 
-The deviation does not prove treatment attribution or its absence. Any future registered cohort must retain public command deviations from both arms. A local own-output read stays in measured context; external/sibling reads, input changes or other contamination require explicit assessment under the existing integrity and attribution rules. Neither historical thresholds nor author prompts are relaxed.
+The deviation does not prove treatment attribution or its absence. The registered cohort was required to retain public command deviations from both arms. A local own-output read stays in measured context; external/sibling reads, input changes or other contamination require explicit assessment under the existing integrity and attribution rules. Neither historical thresholds nor author prompts are relaxed.
 
 ## Descriptive measurements
 
@@ -30,11 +30,11 @@ The deviation does not prove treatment attribution or its absence. Any future re
 
 The independent public-metadata diagnostic matched all eight available core crosschecks and reported no missing fields. It reads public tools/results and numeric usage, not private reasoning. The output-minus-thinking remainder is unallocated; it is not a measure of file payload. These values are not compared with a historical mean as though it were a concurrent control.
 
-## Fable strategy and next step
+## Fable strategy and next step at the time
 
-Fable's observed model was `claude-fable-5-1`. Its corrected strategy identifies pre-write input ingestion as the strongest current lead. The previous v1 result reduced context without an observed quality loss but missed its original 20% screen. The v2 authors did read the changed presentation references, so skipped references do not explain that regression; cue timing and prominence remain hypotheses.
+Fable's observed model was `claude-fable-5-1`. Its corrected strategy identified pre-write input ingestion as the strongest lead at that time. The previous v1 result reduced context without an observed quality loss but missed its original 20% screen. The v2 authors did read the changed presentation references, so skipped references do not explain that regression; cue timing and prominence remain hypotheses.
 
-The next useful result is a fresh, balanced 4-versus-4 comparison after the single-trial inspection, using the original screen and SOL 5.6 Medium v3 reviewers. Reuse the working author path, retain failures and deviations, and avoid expanding the harness for incidental read-only behavior. No output-side or additional routing experiment is selected before that comparison.
+The next useful result was a fresh, balanced 4-versus-4 comparison after the single-trial inspection, using the original screen and SOL 5.6 Medium v3 reviewers. The plan was to reuse the working author path, retain failures and deviations, and avoid expanding the harness for incidental read-only behavior. No output-side or additional routing experiment was selected before that comparison. That comparison has now run; see [v1-replication-results.md](v1-replication-results.md).
 
 ## Evidence bindings
 

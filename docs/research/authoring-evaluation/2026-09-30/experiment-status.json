@@ -1,0 +1,104 @@
+{
+  "format": "authoring-experiment-status-v1",
+  "asOfUtc": "2026-10-01T00:18:35Z",
+  "purpose": "Preserve decisions and distinguish promising experiments from adopted changes. This snapshot is research provenance, not a performance promise.",
+  "promotionStatus": "No tested context-reduction strategy has cleared its entire predeclared promotion screen.",
+  "modelPolicy": {
+    "implementationAndAuthors": "Claude Opus 5.5 high",
+    "independentReviews": "GPT-5.6 SOL Medium"
+  },
+  "trials": [
+    {
+      "name": "corrected rebaseline",
+      "kind": "initial authoring, full files",
+      "status": "complete",
+      "freshCorrectness": 90.125,
+      "freshPresentation": 19.3125,
+      "contextMeanPeak": 204662.25,
+      "evidence": {
+        "name": "rebaseline-v2-results.md",
+        "sha256": "3fb3f5bd394b50fc6840e800b06bc05a9b1e670f3d5f7d4ee63562515aa1ace7",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "focused guidance v1",
+      "kind": "initial authoring, full files",
+      "status": "screen missed; useful routing retained experimentally",
+      "peakReductionFraction": 0.1449,
+      "presentationDifference": 0.625,
+      "correctnessDifference": 1.3125,
+      "evidence": {
+        "name": "focused-guidance-results.md",
+        "sha256": "165659f1bccfda0b12ee5e66e691a33686bd34083d98bc86942a22bd6f11ba20",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "focused guidance v2",
+      "kind": "initial authoring, full files",
+      "status": "do not promote; presentation regression and context screen missed",
+      "peakReductionFraction": 0.056112,
+      "presentationDifference": -1.6875,
+      "correctnessDifference": 1.625,
+      "evidence": {
+        "name": "focused-guidance-v2-results.md",
+        "sha256": "be590ba48bacc5b9992b2ea8c803a405b4c3bffdd6ba20af25e1551381f1a09e",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "composition cue",
+      "kind": "initial authoring, full files",
+      "status": "strict comparison incomplete; sensitivity also misses presentation target",
+      "peakReductionFraction": 0.01940418412264222,
+      "presentationDifferenceSensitivityOnly": 0.875,
+      "correctnessDifferenceSensitivityOnly": -2.1875,
+      "evidence": {
+        "name": "composition-cue-results.md",
+        "sha256": "e8b51d48037031d0f8a298e71187513ea5b3332552c0b581bd8ab7c451e8f2cb",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    },
+    {
+      "name": "focused panel file",
+      "kind": "existing deviceapp presentation edit through registered workbench",
+      "status": "first campaign aborted because harness permissions blocked required commands; one approved output retained, another run interrupted; no quality or context comparison",
+      "authorPlan": 8,
+      "reviewerPlan": 8,
+      "freezeSha256": "b9f390d587285984fddf60bc1f4ffbce9681380e5a2403349d27b54636006d52",
+      "evidence": {
+        "name": "edit-benchmark-protocol.md",
+        "sha256": "98a69bcef69a2c07b3f71b61309e1e820ac163665be173568ebb98df52113abf",
+        "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
+      }
+    }
+  ],
+  "rejectedBeforeTrial": [
+    "splitting append-heavy ledger without repeated-read evidence",
+    "splitting one-use batched widget reports into more calls",
+    "label edits outside the v1 locked-field contract",
+    "hiding source sidebar where showSources also removes badges and leaves existing copy stale"
+  ],
+  "queuedHypotheses": [
+    "declaration-only panel edits if unchanged per-step state dominates measured context",
+    "fresh writer handoff after storyboard with context/cost measured across all agents",
+    "bounded visual feedback pass under a separate equal-budget protocol"
+  ],
+  "comparisonLimit": "Different main versions, rubric revisions and reviewer cohorts mean trial deltas cannot be summed. Edit-pilot scores use a different task/rubric and are not comparable to overnight initial-authoring scores.",
+  "publicationBoundary": "This PR preserves review tooling and interpretation profiles only. It does not adopt focused guidance v1/v2, the composition cue, or focused panel editing.",
+  "stackPlan": [
+    {
+      "scope": "Versioned evaluation profiles, evidence/score checks, this research snapshot",
+      "dependency": "main"
+    },
+    {
+      "scope": "Opt-in focused panel editing and subsequent workflow fixes",
+      "dependency": "main unless a concrete code dependency appears; keep draft pending fresh benchmark"
+    },
+    {
+      "scope": "Further context reductions, including file-and-key payload experiments",
+      "dependency": "focused panel feature, separately evaluated"
+    }
+  ]
+}

@@ -92,6 +92,23 @@ test('View options duplicates and renames a sibling without changing its source 
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
+test('arranged views filter whole paths before their step subset without copying story content',async({page,server})=>{
+  const raw=fixture(),original=await open(page,server,raw),sec=section(page);
+  await sec.getByRole('button',{name:'Arrange section',exact:true}).click();
+  const pathSummary=page.getByText('Paths shown in this view · All 2',{exact:true});
+  const stepSummary=page.getByText('Steps shown in this view · All 3',{exact:true});
+  await expect(pathSummary).toBeVisible();await expect(stepSummary).toBeVisible();
+  expect(await pathSummary.evaluate((paths,steps)=>Boolean(paths.compareDocumentPosition(steps)&Node.DOCUMENT_POSITION_FOLLOWING),await stepSummary.elementHandle())).toBe(true);
+  await pathSummary.click();
+  await page.getByRole('checkbox',{name:'Show path Failure in Resident story',exact:true}).uncheck();
+  const saved=JSON.parse(await text(page)),diagram=saved.page.blocks[0].diagram;
+  expect(diagram.layouts[0].paths).toEqual(['happy']);expect(diagram.paths).toEqual(raw.page.blocks[0].diagram.paths);expect(diagram.steps).toEqual(raw.page.blocks[0].diagram.steps);
+  await expect(page.getByText('Paths shown in this view · 1 selected',{exact:true})).toBeVisible();
+  await expect(sec.locator('[data-dv-path="failed"], [data-path-row="failed"]')).toHaveCount(0);
+  await expect(sec.locator('.printsteps > li')).toHaveCount(2);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
 test('a pending view-name draft does not consume a physical Duplicate view click',async({page,server})=>{
   const raw=fixture(),original=await open(page,server,raw);await options(page);
   await settings(page).getByRole('textbox',{name:'View name',exact:true}).fill('Uncommitted name');

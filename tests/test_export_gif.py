@@ -23,11 +23,10 @@ class ExportGifPureTests(unittest.TestCase):
     def test_explicit_view_captures_visible_stops_on_their_actual_paths_once(self):
         spec = self.named_spec()
         target = export_gif.choose_target(spec, view="home-story")
-        self.assertEqual(target.step_refs, ("quiet", "notify", "inside", "offline", "leave"))
-        self.assertEqual(target.source_indices, (0, 3, 4, 5, 6))
+        self.assertEqual(target.step_refs, ("quiet", "notify", "inside"))
+        self.assertEqual(target.source_indices, (0, 3, 4))
         self.assertTrue(all("&v=home-story&" in f for f in target.fragments))
-        self.assertTrue(all("&p=happy&" in f for f in target.fragments[:3]))
-        self.assertTrue(all("&p=offline&" in f for f in target.fragments[3:]))
+        self.assertTrue(all("&p=happy&" in f for f in target.fragments))
         self.assertEqual(target.view.canonical_id, "home-story")
         # No flag retains the historical registry capture and has no v/p.
         default = export_gif.choose_target(spec)
@@ -94,7 +93,17 @@ class ExportGifPureTests(unittest.TestCase):
         d = spec["page"]["sections"][0]["diagram"]
         for step_filter in ([], ["not-a-step"]):
             d["layouts"][0]["steps"] = step_filter
-            self.assertEqual(len(export_gif.choose_target(spec, view="home-story").fragments), 7)
+            self.assertEqual(len(export_gif.choose_target(spec, view="home-story").fragments), 5)
+
+    def test_view_path_filter_excludes_whole_outcomes_before_step_filtering(self):
+        spec = self.named_spec()
+        diagram = spec["page"]["sections"][0]["diagram"]
+        diagram["layouts"][0].pop("steps")
+        target = export_gif.choose_target(spec, view="home-story")
+        self.assertEqual(target.step_refs, ("quiet", "detect", "upload", "notify", "inside"))
+        self.assertTrue(all("&p=happy&" in fragment for fragment in target.fragments))
+        diagram["layouts"][0]["paths"] = ["missing"]
+        self.assertEqual(len(export_gif.choose_target(spec, view="home-story").fragments), 7)
 
     def test_view_verification_embeds_json_safely_and_checks_old_html_capability(self):
         expression = export_gif.view_expression('a"b', export_gif.ViewTarget("home", "home"), 2)
@@ -338,7 +347,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                         process.kill()
                         process.wait(timeout=3)
 
-    def test_cli_named_view_captures_hidden_step_subset_and_distinct_alternate_steps(self):
+    def test_cli_named_view_captures_only_the_selected_path_and_steps(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp:
             temp_path = pathlib.Path(temp)
             page, gif = temp_path / "views.html", temp_path / "views.gif"
@@ -357,10 +366,10 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                  "--out", str(gif), "--chrome", CHROME],
                 capture_output=True, text=True, timeout=90)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("5 frames", result.stdout)
+            self.assertIn("3 frames", result.stdout)
             self.assertIn("view home-story", result.stdout)
             self.assertIn("d=front-door", result.stdout)
-            self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 5)
+            self.assertEqual(export_gif.gif_frame_count(gif.read_bytes()), 3)
 
     def test_view_capture_rejects_old_html_even_when_its_default_matches(self):
         # A page built before view-aware links never stamps data-view-id.

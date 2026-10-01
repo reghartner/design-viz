@@ -73,7 +73,7 @@ The caller supplies the current/default path ID when no explicit path was given.
 
 `pathIndex` is a zero-based position within that path. `sourceIndex` is a zero-based
 index in the authored `diagram.steps` registry. Neither is a position in a named
-view's filtered playback stops. The lookup does not apply view filters or change
+view's filtered paths or playback stops. The lookup does not apply view filters or change
 the selected path, and it does not mutate the diagram.
 
 For an exact host jump, pass the returned source index and path ID directly to

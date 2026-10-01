@@ -88,8 +88,12 @@ function planAddStep(text, raw, sectionIdx, pathId){
           index: (got.d.steps || []).length};
 }
 function builderViewStepsError(d){
-  var view=(d.layouts || []).find(function(v){return Array.isArray(v.steps) && !sectionViewStepsReachable(d,v.steps);});
-  return view?{error:'Choose another step in view "'+view.name+'" before removing its last reachable step or path.'}:null;
+  var pathIds=diagramPathList(d).map(function(path){return path.id;});
+  var view=(d.layouts || []).find(function(v){return (Array.isArray(v.paths) && v.paths.some(function(id){return pathIds.indexOf(id)<0;})) || (Array.isArray(v.steps) && !sectionViewStepsReachable(d,v.steps,v.paths));});
+  if(!view)return null;
+  return Array.isArray(view.paths)
+    ?{error:'Choose another path or step in view "'+view.name+'" before removing its last reachable path or step.'}
+    :{error:'Choose another step in view "'+view.name+'" before removing its last reachable step or path.'};
 }
 /* Finalize a cloned diagram edit once. The mutator returns its existing error
    shape and writes explicit selection metadata: index is a raw registry slot,

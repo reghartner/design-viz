@@ -1,5 +1,17 @@
 # Changelog
 
+## View-specific alternate paths (2026-10-01)
+
+- Named views can declare `layouts[].paths` to show only the outcomes intended
+  for that audience while reusing the diagram, panels and shared step registry.
+  Hidden paths disappear from playback, path controls, print output and GIF
+  frames; exact editor and detail navigation can still preview them without
+  changing the saved view.
+- **Arrange section → Paths shown in this view** edits the filter before the
+  existing step filter. Validation and story edits keep every view reachable,
+  duplication preserves both filters, and compatibility metadata tells older
+  viewers that view-specific path support is required.
+
 ## Device-app freshness from story time (2026-09-27)
 
 - A Device app field can record when its value was reported: `reportedAt`

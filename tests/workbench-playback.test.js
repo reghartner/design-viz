@@ -376,6 +376,19 @@ test('filtered alternates play only their own selected stops and empty paths can
   assert.equal(s.selectPath('failed'),true);assert.equal(s.current().id,'start');h.term.btnNext.fire('click');assert.equal(s.current().id,'failed');assert.equal(s.sourceIndex(),3);
   s.setVisibleSteps(['done']);assert.equal(s.path(),'happy');assert.equal(s.current().id,'done');assert.equal(s.selectPath('failed'),false);
 });
+test('view path filters remove whole outcomes and exact authoring jumps preview them temporarily',()=>{
+  const h=stepperHarness({autoplay:false},false,{steps:[{id:'start',text:'Start'},{id:'done',text:'Done'},{id:'failed',text:'Failed'}],paths:[{id:'happy',steps:['start','done']},{id:'failed',steps:['failed']}]});
+  const s=h.stepper;s.enterStep(false);s.selectPath('failed');assert.equal(s.path(),'failed');
+  s.setViewFilter(['happy'],null);assert.deepEqual(s.paths().map(path=>path.id),['happy']);assert.equal(s.path(),'happy');assert.equal(s.selectPath('failed'),false);
+  assert.equal(s.jumpSource(2,'failed'),true);assert.equal(s.path(),'failed');assert.equal(s.current().id,'failed');assert.match(h.term.playbackStatus.textContent,/Previewing a hidden path/);
+  const descendants=node=>node.children.flatMap(child=>[child,...descendants(child)]);
+  const visibleChip=descendants(h.term.chips).find(node=>node.getAttribute && node.getAttribute('data-step-path')==='happy');
+  visibleChip.fire('click');assert.equal(s.path(),'happy');assert.deepEqual(s.paths().map(path=>path.id),['happy']);assert.doesNotMatch(h.term.playbackStatus.textContent,/Previewing/);
+  s.jumpSource(2,'failed');
+  h.term.btnNext.fire('click');assert.equal(s.path(),'happy','ordinary playback leaves the temporary hidden-path preview');
+  s.setViewFilter(['failed'],['done']);assert.deepEqual(s.paths().map(path=>path.id),['failed'],'an unreachable step filter falls back without discarding the path filter');
+  assert.equal(s.current().id,'failed');
+});
 test('inspecting a hidden step previews the exact source without changing the view filter',()=>{
   const h=stepperHarness({autoplay:false}),s=h.stepper;s.enterStep(false);s.setVisibleSteps(['first','third']);
   s.jumpSource(1);assert.equal(s.sourceIndex(),1);assert.match(h.term.playbackStatus.textContent,/Previewing a hidden step/);

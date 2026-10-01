@@ -1257,6 +1257,9 @@ perspectives" of one timeline). Types:
   fall back to Standard; legacy single arrangements remain Standard.
   Named views are the complete button set; there is no extra automatic Data flow
   view. All views share step definitions, paths and live widget state. Optional
+  `layouts[].paths:[path IDs]` chooses a nonempty subset of alternate paths;
+  omitted paths remain authored but cannot be selected or played in that view.
+  Omit the field to show every path. Optional
   `layouts[].steps:[step IDs]` chooses a nonempty subset of playback stops; omitted
   steps still contribute state on the active path, and story order is preserved.
   A `controls:"steps"` tile may use `attachTo:"diagram"` or `attachTo:"panel:<homemap ID>"`

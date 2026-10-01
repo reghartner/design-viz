@@ -152,7 +152,9 @@ See `docs/section-layouts.md` for the contract and an example.
 Duplicate view and Swap places
 can replace Home with the diagram while retaining supporting panels and controls.
 Use explicit tile `hidden:true` for per-view visibility; all views share one set
-of steps and paths. The workbench's **Visible elements** checklist names the
+of steps and paths. Optional `layouts[].paths:[IDs]` limits a view to selected
+outcomes without duplicating the diagram, panels, or step registry. Omit it for
+all paths. The workbench's **Visible elements** checklist names the
 selected layout and provides a separate checkbox for Data flow and each panel.
 **Optimize layout** preserves hidden tiles and arranges only visible elements
 in the selected view/host profile. Add `attachTo:"diagram"` or

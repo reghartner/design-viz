@@ -159,6 +159,16 @@ test('Explore named views advertise their capability without requiring it for St
   assert.match(result.messages.join(' '),/Explore view presentation/);
 });
 
+test('view-specific paths advertise their capability independently of step subsets',()=>{
+  const raw=spec(),view=raw.page.blocks[0].tabs[0].sections[0].diagram.layouts[0];
+  assert.ok(!C.detect(raw).includes('layout.path-subsets'));
+  view.paths=['happy'];assert.ok(C.detect(raw).includes('layout.path-subsets'));
+  const available={...C.features};delete available['layout.path-subsets'];
+  const result=C.check(C.stamp(raw),{version:C.version,contract:'1',features:available});
+  assert.deepEqual(plain(result.missingFeatures),['layout.path-subsets']);
+  assert.match(result.messages.join(' '),/View-specific alternate paths/);
+});
+
 test('floating prose declares a capability for content or saved per-view defaults, including tab sections',()=>{
   const raw=spec(),section=raw.page.blocks[0].tabs[0].sections[0],view=section.diagram.layouts[0];
   section.text=['Explanation'];assert.ok(!C.detect(raw).includes('layout.explore-prose'));

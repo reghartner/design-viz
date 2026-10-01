@@ -58,7 +58,7 @@ test('advanced reader tour validates before committing and compatibility remains
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await page.locator('#editor-tab-outline').click();await page.locator('#outline-document-settings').click();
   await page.locator('#guide summary').filter({hasText:'Advanced: reader tour and compatibility'}).click();
   const field=page.getByLabel('Reader tour JSON',{exact:true}),before=await source(page);
-  await expect(page.locator('.document-advanced')).toContainText('Runtime 0.1.0');await expect(page.locator('.document-advanced')).toContainText('Required features: layout.named');
+  await expect(page.locator('.document-advanced')).toContainText('Runtime 0.2.0');await expect(page.locator('.document-advanced')).toContainText('Required features: layout.named');
   await field.fill('{');await field.press('Tab');await expect(page.locator('#guide .ierr')).toContainText('not valid JSON');expect(await source(page)).toBe(before);await expect(field).toHaveValue('{');
   await field.fill('{"version":2,"steps":[]}');await field.press('Tab');await expect(page.locator('#guide .ierr')).toContainText('unknown version');expect(await source(page)).toBe(before);
   const tour={version:1,steps:[{id:'end',kind:'done',copy:{heading:'Done',body:'That is the story.'}}]};await field.fill(JSON.stringify(tour));await field.press('Tab');

@@ -65,7 +65,7 @@ test('stamping infers feature requirements, preserves future declarations and ne
   assert.equal(C.stamp({nodes:{a:{}},rows:[['a']]}).page.contract,'1');
 });
 test('new feature release requirements are inferred rather than stamping every spec with the current editor version',()=>{
-  const source=readSource('compatibility.js').replace("version = '0.1.0'","version = '2.0.0'");
+  const source=readSource('compatibility.js').replace(/\bversion = '[^']*'/,"version = '2.0.0'");
   const newer={};vm.runInNewContext(source,newer);const N=newer.FlowviewCompatibility;
   N.features['panel.deviceapp'].since='1.2.0';
   const stamped=N.stamp(spec());
@@ -168,4 +168,82 @@ test('floating prose declares a capability for content or saved per-view default
   delete section.text;assert.ok(!C.detect(raw).includes('layout.explore-prose'));
   section.bullets=['A point'];assert.ok(C.detect(raw).includes('layout.explore-prose'));delete section.bullets;
   view.exploreLayout={prose:{hidden:true}};assert.ok(C.detect(raw).includes('layout.explore-prose'));
+});
+
+const SCREEN_FEATURES=['media.scene-raccoon-at-night','media.screen-playing','media.screen-scene-override'];
+const screenUse=raw=>plain(C.detect(raw)).filter(id=>SCREEN_FEATURES.includes(id));
+const withoutScreenFeatures=()=>{const older={...C.features};SCREEN_FEATURES.forEach(id=>delete older[id]);return older;};
+
+test('Screen Playing, per-step scene overrides and the raccoon clip are 0.2.0 capabilities; the baseline stays 0.1.0',()=>{
+  assert.equal(C.version,'0.2.0');
+  for(const id of SCREEN_FEATURES)assert.equal(C.features[id].since,'0.2.0',id);
+  for(const id of ['panel.screen','panel.security','media.audio','media.spotlight','flow.panel-visibility','flow.alternates'])
+    assert.equal(C.features[id].since,'0.1.0',id);
+  // A Screen story using only older scenes and modes keeps the baseline minimum.
+  const legacy={nodes:{a:{}},rows:[['a']],panels:[{id:'cam',type:'screen',scene:'package-drop',initial:{mode:'off',scenePlayback:'waiting'}}],
+    steps:[{panels:{cam:{mode:'rec'}}},{panels:{cam:{mode:'save',banner:'Saved',enterOnce:{mode:'live'}}}}]};
+  assert.deepEqual(screenUse(legacy),[]);
+  const stamped=C.stamp(legacy);
+  assert.equal(stamped.page.flowview.minVersion,'0.1.0');assert.equal(stamped.page.flowview.authoredWith,'0.2.0');
+  assert.equal(C.check(stamped).status,'compatible');
+});
+
+test('Screen capabilities are detected from declarations, initial, panels/legacy patch steps and enterOnce, including tabs',()=>{
+  const raw=spec(),d=raw.page.blocks[0].tabs[0].sections[0].diagram,cam={id:'cam',type:'screen',scene:'kitchen-fire'};
+  d.panels.push(cam);
+  const at=(setup,expected)=>{delete cam.initial;d.steps=[{id:'start'},{id:'done'},{id:'lost'}];cam.scene='kitchen-fire';setup();
+    assert.deepEqual(screenUse(raw),expected,JSON.stringify({cam,steps:d.steps}));};
+  at(()=>{},[]);
+  at(()=>cam.scene='raccoon-at-night',['media.scene-raccoon-at-night']);
+  at(()=>cam.initial={mode:'playing'},['media.screen-playing']);
+  at(()=>d.steps[1].panels={cam:{mode:'playing',banner:'Clip'}},['media.screen-playing']);
+  at(()=>d.steps[1].patch={cam:{mode:'playing'}},['media.screen-playing']);
+  at(()=>d.steps[1].panels={cam:{enterOnce:{mode:'playing'}}},['media.screen-playing']);
+  // Any per-state scene, including an older clip or the null reset, needs the override.
+  at(()=>d.steps[1].panels={cam:{scene:null}},['media.screen-scene-override']);
+  at(()=>d.steps[1].panels={cam:{mode:'rec',scene:'kitchen-fire'}},['media.screen-scene-override']);
+  at(()=>cam.initial={scene:'package-drop'},['media.screen-scene-override']);
+  at(()=>d.steps[2].patch={cam:{enterOnce:{scene:'raccoon-at-night'}}},['media.scene-raccoon-at-night','media.screen-scene-override']);
+  // Modes and banners from earlier releases, or a patch for another panel, need nothing new.
+  at(()=>{d.steps[1].panels={cam:{mode:'rec',scenePlayback:'playing'},home:{mode:'playing',scene:null}};},[]);
+});
+
+test('shared Security monitoring requires only the raccoon clip, never Screen-only semantics',()=>{
+  const d={nodes:{a:{}},rows:[['a']],panels:[{id:'monitor',type:'security',scene:'person-through-door'}],steps:[]},p=d.panels[0];
+  assert.deepEqual(screenUse(d),[]);
+  p.initial={video:'reviewing',scene:'kitchen-fire',mode:'playing'};assert.deepEqual(screenUse(d),[],'older state scene is supported');
+  delete p.initial;p.scene='raccoon-at-night';assert.deepEqual(screenUse(d),['media.scene-raccoon-at-night']);
+  p.scene='person-through-door';
+  for(const step of [{panels:{monitor:{scene:'raccoon-at-night'}}},{patch:{monitor:{enterOnce:{scene:'raccoon-at-night'}}}}]){
+    d.steps=[step];assert.deepEqual(screenUse(d),['media.scene-raccoon-at-night']);
+  }
+  d.steps=[{panels:{monitor:{scene:null}}}];assert.deepEqual(screenUse(d),[]);
+  // Unrelated panel types with similarly named fields never require Screen capabilities.
+  const other={nodes:{a:{}},rows:[['a']],panels:[{id:'s',type:'state',scene:'raccoon-at-night',initial:{mode:'playing',scene:null}},
+    {id:'phone',type:'phone',initial:{mode:'playing',scene:'raccoon-at-night'}},
+    {id:'home',type:'homemap',devices:[{id:'cam'}],initial:{cam:{mode:'playing',scene:'raccoon-at-night'}}}],
+    steps:[{panels:{s:{mode:'playing'},phone:{enterOnce:{scene:null}},home:{cam:{scene:'raccoon-at-night'}}}}]};
+  assert.deepEqual(screenUse(other),[]);
+});
+
+test('the stamped Kestrel overnight story declares 0.2.0 Screen capabilities that an older viewer reports missing',()=>{
+  const raw=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/kestrel-overnight/story.spec.json'),'utf8'));
+  const declared=raw.page.flowview,stamped=C.stamp(raw).page.flowview;
+  assert.deepEqual(plain(stamped),plain(declared),'committed metadata matches a fresh stamp');
+  assert.equal(declared.authoredWith,'0.2.0');assert.equal(declared.minVersion,'0.2.0');
+  for(const id of SCREEN_FEATURES)assert.ok(declared.features.includes(id),id);
+  assert.ok(!declared.features.includes('flow.panel-visibility'));
+  const current=C.check(raw);
+  assert.equal(current.status,'compatible');assert.deepEqual(plain(current.missingFeatures),[]);
+  // The 0.1.0 viewer knew panel.screen but none of the new Screen semantics.
+  const old=C.check(raw,{version:'0.1.0',contract:'1',features:withoutScreenFeatures()});
+  assert.equal(old.status,'partial');
+  assert.deepEqual(plain(old.missingFeatures),SCREEN_FEATURES);
+  assert.equal(old.minVersion,'0.2.0');
+  const text=old.messages.join(' ');
+  assert.match(text,/requires Flowview 0\.2\.0 or newer\. This viewer uses 0\.1\.0/);
+  assert.match(text,/Camera screen Playing mode/);assert.match(text,/Camera screen scene changes per step/);assert.match(text,/Raccoon-at-night camera clip/);
+  // Without the metadata, content detection still reports the same gaps.
+  delete raw.page.flowview;
+  assert.deepEqual(plain(C.check(raw,{version:'0.1.0',contract:'1',features:withoutScreenFeatures()}).missingFeatures),SCREEN_FEATURES);
 });

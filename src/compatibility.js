@@ -4,7 +4,7 @@
    claim about which historical release introduced the existing features. */
 var FlowviewCompatibility = (function(){
   'use strict';
-  var version = '0.1.0', contract = '1', baseline = '0.1.0';
+  var version = '0.2.0', contract = '1', baseline = '0.1.0';
   var features = Object.create(null);
   var panelFeatures = /* @panel-features */ {};
   var sharedIconIds = /* @icon-ids */ [];
@@ -15,6 +15,13 @@ var FlowviewCompatibility = (function(){
     'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
+  // Capabilities added after the baseline, with their first release.
+  var released={
+    'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
+    'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
+    'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0']
+  };
+  Object.keys(released).forEach(function(id){features[id]={label:released[id][0],since:released[id][1]};});
   // Panel capabilities come from their definitions at build time.
   // Non-panel capabilities and the release version remain owned here.
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
@@ -73,10 +80,19 @@ var FlowviewCompatibility = (function(){
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && notify(patches[p.id]);}))used['content.deviceapp']=true;
         }
         if(['homemap','screen','security','phone'].indexOf(p.type)<0)return;
+        var camera=p.type==='screen' || p.type==='security';
+        if(camera && p.scene==='raccoon-at-night')used['media.scene-raccoon-at-night']=true;
         function endpoint(value){
           if(!object(value))return;
           if(object(value.audio) && Object.keys(value.audio).length)used['media.audio']=true;
           if(value.spotlight && value.spotlight!=='off')used['media.spotlight']=true;
+          if(!camera)return;
+          // Security already carried state scenes; only the new clip is new there.
+          if(value.scene==='raccoon-at-night')used['media.scene-raccoon-at-night']=true;
+          if(p.type!=='screen')return;
+          if(value.mode==='playing')used['media.screen-playing']=true;
+          if(Object.prototype.hasOwnProperty.call(value,'scene') && (value.scene===null || typeof value.scene==='string'))
+            used['media.screen-scene-override']=true;
         }
         function patch(value){
           if(!object(value))return;

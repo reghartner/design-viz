@@ -55,6 +55,21 @@ test('monitoring uses the Camera Screen stock library and renderer for every cli
   assert.doesNotMatch(source,/var SCENES|@keyframes (?:walkin|entrycross|doorbellaway|firebreathe)/);
 });
 
+test('monitoring shares the raccoon clip and scene list but never claims Screen playback', () => {
+  const p = panel();
+  assert.ok(C.SCENE_NAMES.includes('raccoon-at-night'));
+  const rendered = html(p,{video:'reviewing',scene:'raccoon-at-night',scenePlayback:'playing'});
+  assert.ok(rendered.includes(C.SCENES['raccoon-at-night']));
+  assert.match(rendered,/Raccoon on the porch at night/);
+  assert.match(rendered,/screenbox m-active"/);
+  assert.doesNotMatch(rendered,/playchip|PLAYING/);
+  const waiting = html(p,{video:'reviewing',scene:'raccoon-at-night',scenePlayback:'waiting'});
+  assert.match(waiting,/screenbox m-active scene-waiting/);
+  // Security keeps its own scene resolution: the monitor state scene wins over the declaration.
+  assert.ok(html({...p,scene:'kitchen-fire'},{video:'reviewing',scene:'raccoon-at-night'}).includes(C.SCENES['raccoon-at-night']));
+  assert.deepEqual(plain(C.panelPatchFields(p).find(f=>f[0]==='scene')),['scene','enum',plain(C.SCENE_NAMES)]);
+});
+
 test('video review has explicit states and never infers viewing or verification from status', () => {
   const p = panel();
   for (const status of ['unknown','armed','alarm','reviewing','verified','cleared','offline']) {

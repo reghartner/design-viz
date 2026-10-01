@@ -59,8 +59,9 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   await title.fill('Walkthrough draft');await title.press('Enter');
   const edited=await page.locator('#src').inputValue();
   await page.locator('#workbench-home').click();await page.locator('#welcome-agent').click();
+  const setup=page.locator('#folder-agent-guide');await expect(setup).toBeVisible();
   const before=await page.evaluate(()=>({url:location.href,length:history.length,draft:localStorage.getItem('dv-workbench-draft')}));
-  const entry=page.locator('#welcome-build-screen [data-open-human-guide]');
+  const entry=setup.locator('[data-open-human-guide]');
   await entry.click();
   await expect(page.locator('#hg-agent')).toBeFocused();
   await expect(guide(page).getByRole('heading',{name:'Your agent talks. The workbench shows the result.'})).toBeInViewport();
@@ -77,8 +78,7 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();await expect(entry).toBeFocused();
   expect(await page.evaluate(()=>({url:location.href,length:history.length,draft:localStorage.getItem('dv-workbench-draft')}))).toEqual(before);
   // Opening help from an existing modal must not dismiss or reset that modal.
-  await page.locator('#welcome-build-external').click();
-  const setup=page.locator('#folder-agent-guide'),help=setup.locator('[data-open-human-guide]');
+  const help=entry;
   await page.locator('#folder-agent-start-resume').click();
   await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
   await guide(page).getByRole('link',{name:'05 · Alternate outcomes'}).click();

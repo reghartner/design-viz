@@ -4,6 +4,7 @@ No function-body slicing and no production test globals. Other Chrome fixtures
 exercise the committed workbench unchanged; this one checks owner teardown.
 """
 import importlib.util
+import json
 from pathlib import Path
 import sys
 
@@ -34,6 +35,7 @@ html=build.fill(build.read('workbench.skel.html'),{
     'JS':entry['source']+'\n'+facade,
     'WORKBENCH_TEMPLATES':build.workbench_templates(),
     'WORKBENCH_CANON':build.workbench_canon(),
+    'WORKBENCH_ONBOARDING':json.dumps(json.loads(build.read('starters/onboarding.json'))).replace('<', '\\u003c'),
     'HUMAN_GUIDE':build.read('workbench/human-guide.html'),
     'FOLDER_AGENT_KIT':build.folder_agent_kit(root,build.canon_runtime()),
 })

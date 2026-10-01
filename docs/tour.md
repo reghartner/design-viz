@@ -297,6 +297,38 @@ controls; workbench actions such as Arrange section do not belong here.
   keystroke away; Skip and Esc instead return focus to wherever the reader
   was. Page-authored configs should name their real chips/paths here.
 
+## Workbench onboarding
+
+The workbench homepage uses the same renderer and `TOUR_DEFAULT_CONFIG` for its
+diagram introduction, including persona choice and feature applicability. Its
+**Take the tour** entry continues into agent and manual-editing chapters using
+`wireTour`. Returning readers skip the introduction after explicitly completing
+or skipping it. Closing the host alone does not mark the introduction complete;
+the chapter bar always permits replay. Only actually shown reader topics enter
+the existing browser-local feature history.
+
+Workbench practice lives in an opaque-origin `sandbox="allow-scripts"` iframe,
+created from a pristine shipped-document snapshot captured before draft or agent
+recovery. A restrictive CSP blocks network requests. Practice draft persistence
+uses a private in-memory store; the simulated agent transport reuses the actual
+setup, review, apply and paired spec/ledger Undo code. Native clipboard events
+are blocked, and agent copy actions write only to practice memory. Destroying
+the iframe discards the practice session. The parent accepts only known progress
+events from that exact iframe window and blocks editor shortcuts in tour chrome.
+
+`src/starters/onboarding.json` owns the fictional sample. Replace this authored
+spec to change the homepage example and reader introduction; the portable viewer
+tour discovers applicable features. Agent/manual exercises in
+`src/workbench/onboarding.js` also reference sample node and step identities and
+must be updated with a different exercise story. Fullscreen and chapter switching
+belong to the host. Native dialogs retain their own cancel handling before Escape
+can leave a chapter. These are host hooks, not additions to the authored tour JSON
+schema.
+
+For a company example, follow [Put your own diagram on the homepage](homepage-example.md).
+It covers a separate homepage/reader sample, the shared exercise anchors, build
+wiring, verification, and a prompt to hand to an agent.
+
 ## Known limitations
 
 - A drill-down into an EXTERNAL spec (host `loadDetail`) that was open

@@ -235,6 +235,20 @@ the surrounding document. Browser fullscreen remains a separate explicit action.
 
 ## Setup and review tools
 
+**Build with my agent** on the homepage opens the same setup as **Agent → New
+Connection**. Copy/paste to the user's own coding agent is selected by default;
+**Inside workbench · Beta** explicitly selects Claude Monitor. Existing drafts
+remain available for adoption or resumption. **Start new project → Build with my
+agent** explicitly creates a new diagram and preserves the previous draft.
+
+**Take the tour** starts with the existing reader tour when it has not been
+completed or skipped, then demonstrates the agent and manual workflows in an
+isolated practice workbench. The header and agent setup also offer **Take the
+workbench tour**. Practice includes Add to Diagram, the real panel and service
+pickers, preview/commit/Undo, selection and Copy for agent, row placement, float
+alignment, catalog bindings, step membership and panel patches, alternate paths,
+and diagram-only nesting. Closing practice restores the original workspace.
+
 **File → Workspace preferences → Arrange editor for** chooses a starting set of
 editor windows: Story with an agent, Engineering review, or Canvas only. It does
 not change the diagram’s authored views or source. The left **Agent** tool owns

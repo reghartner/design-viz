@@ -101,7 +101,12 @@ function wireTour(ctl, view, win, config, options){
                (sec && sec.sectionEl ? sec.sectionEl : null);
     if (!root || !target || typeof target.selector !== 'string') return null;
     try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
-      return matches.find(isRendered) || matches[0] || null; }
+      var found=matches.find(isRendered) || matches[0] || null;
+      var modal=options.overlayHost && options.overlayHost();
+      // Trying a highlighted control can open a native modal. Keep that new
+      // surface usable, including its focusable controls, until the next lesson.
+      if(found && modal && modal.tagName==='DIALOG' && modal.open && !modal.contains(found))return modal;
+      return found; }
     catch (ex) { return null; }
   }
   function isRendered(el){
@@ -267,6 +272,7 @@ function wireTour(ctl, view, win, config, options){
     catch (ex){
       if (win.console) console.warn('flowspec: tour error — ' + (ex && ex.message) + ' — tour dismissed');
       teardown();
+      if(options.onError)options.onError(ex);
     }
   }
   function teardown(){
@@ -275,7 +281,7 @@ function wireTour(ctl, view, win, config, options){
     stopDemo();
     closeDemoClick();
     detach();
-    restoreReader();
+    if(options.restore!==false)restoreReader();
     active = false;
     if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
   }
@@ -846,6 +852,8 @@ function wireTour(ctl, view, win, config, options){
     if (focusOnShow && !parts.ui.classList.contains('dv-tour-ui-pending')) focusNext();
   }
   function recordTopic(){
+    if(options.onShow && active && !parts.ui.hidden && !parts.ui.classList.contains('dv-tour-ui-pending'))
+      options.onShow(list[at]);
     if(progress && active && !parts.ui.hidden && !parts.ui.classList.contains('dv-tour-ui-pending'))
       progress.seen(list[at]);
   }
@@ -976,6 +984,7 @@ function wireTour(ctl, view, win, config, options){
     go(next);
   }
   function go(index){
+    if(options.beforeAdvance && index===at+1 && list[at] && options.beforeAdvance(list[at])===false)return;
     stopDemo();
     closeDemoClick();
     var myGen = ++gen; /* a newer entry invalidates every pending timer */
@@ -991,6 +1000,15 @@ function wireTour(ctl, view, win, config, options){
       if (index >= list.length){ finish(true); return; }
       if (index < 0){ index = from; dir = 1; } /* nothing enterable behind: stay */
       step = list[index];
+      // Workbench lessons stage real controls before resolving the spotlight.
+      // Reader tours have no host and keep their existing lifecycle.
+      if(options.prepareStep){
+        if(overlay)doc.body.appendChild(overlay);
+        options.prepareStep(step);
+        if(options.controller)ctl=options.controller();
+        ctl.suppressFragmentWrites=true;
+        fullscreenChanged();
+      }
       if ((step.kind || 'spot') !== 'spot') break;
       sec = sectionFor(step);
       if (step.diagramState && step.diagramState.section != null && !sec){
@@ -1139,6 +1157,8 @@ function wireTour(ctl, view, win, config, options){
   function keydown(ev){
     if (!active) return;
     if (ev.key === 'Escape'){
+      if(ev.repeat)return;
+      if(options.escape && options.escape(ev))return;
       if (doc.querySelector('.node-link-menu:not([hidden])')) return;
       stopDemo(); guarded(finish);
       ev.preventDefault(); ev.stopImmediatePropagation(); return;
@@ -1185,12 +1205,17 @@ function wireTour(ctl, view, win, config, options){
   function pageMove(ev){if(overlay && !overlay.contains(ev.target))schedule();}
   function fullscreenChanged(){
     if(overlay){
-      var host=doc.fullscreenElement || doc.body;
+      var host=(options.overlayHost && options.overlayHost()) || doc.fullscreenElement || doc.body;
       if(overlay.parentNode!==host)host.appendChild(overlay);
     }
     schedule();
   }
+  var modalObserver=null;
   function attach(){
+    if(options.overlayHost && win.MutationObserver){
+      modalObserver=new win.MutationObserver(fullscreenChanged);
+      modalObserver.observe(doc.body,{subtree:true,attributes:true,attributeFilter:['open']});
+    }
     doc.addEventListener('keydown', keydown, true);
     doc.addEventListener('pointerdown', pagePointer, true);
     doc.addEventListener('pointermove', pageMove, true);
@@ -1201,6 +1226,7 @@ function wireTour(ctl, view, win, config, options){
     doc.addEventListener('fullscreenchange', fullscreenChanged);
   }
   function detach(){
+    if(modalObserver){modalObserver.disconnect();modalObserver=null;}
     unwatch();
     doc.removeEventListener('keydown', keydown, true);
     doc.removeEventListener('pointerdown', pagePointer, true);
@@ -1238,9 +1264,9 @@ function wireTour(ctl, view, win, config, options){
     settling = false;
     stopDemo();
     closeDemoClick();
-    markDone();
+    if(options.recordCompletion!==false)markDone();
     detach();
-    restoreReader().then(function(){if(!destroyed)updateDiscovery();});
+    if(options.restore!==false)restoreReader().then(function(){if(!destroyed)updateDiscovery();});
     if (overlay){overlay.hidden=true;doc.body.appendChild(overlay);}
     /* Done hands over control: the recap invites pressing ▶, so focus the
        transport of the section the tour ran in (a step arrow under reduced
@@ -1254,6 +1280,7 @@ function wireTour(ctl, view, win, config, options){
     }
     else if (restoreFocus && restoreFocus.isConnected && restoreFocus.focus) restoreFocus.focus();
     else if (replay && replay.isConnected) replay.focus();
+    if(options.onFinish)options.onFinish(!!done);
   }
 
   /* ---- replay affordance + autostart ---- */
@@ -1266,6 +1293,7 @@ function wireTour(ctl, view, win, config, options){
   var present = view.querySelector('.presentbtn');
   if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
   else view.insertBefore(replay, view.firstChild);
+  if(options.replay===false)replay.hidden=true;
 
   function updateDiscovery(){
     if(!discovery || destroyed || active || request==='suppress' || options.deepLink)return;
@@ -1314,5 +1342,6 @@ function wireTour(ctl, view, win, config, options){
     else if(progress)guarded(offerDiscovery);
   }
 
-  return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy};
+  return {start: function(){ guarded(start); }, active: function(){ return active; }, destroy: destroy,
+    refresh:function(){if(active)guarded(function(){if(options.controller)ctl=options.controller();renderStep(list[at],true);schedule();});}};
 }

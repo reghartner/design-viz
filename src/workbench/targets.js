@@ -58,8 +58,13 @@ function builderTargetPath(raw, target){
   if (target.kind === 'tab') return builderTabPath(raw, target.block, target.tab);
   var rec = specSectionPaths(raw)[target.section];
   if (!rec) return null;
-  if (target.kind === 'section' || target.kind === 'prose') return rec.section;
   var d = rec.diagram;
+  if (target.kind === 'section' || target.kind === 'prose') return rec.section;
+  if (target.kind === 'step-controls'){
+    var diagram=specValueAt(raw,d),layouts=diagram && diagram.layouts;
+    var layoutIndex=Array.isArray(layouts)?layouts.findIndex(function(view){return view && view.id===target.layoutId;}):-1;
+    return layoutIndex>=0?d.concat(['layouts',layoutIndex]):null;
+  }
   if (target.kind === 'node') return d.concat(['nodes', target.id]);
   if (target.kind === 'group'){
     var groups = specValueAt(raw, d.concat(['groups']));

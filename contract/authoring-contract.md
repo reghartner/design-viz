@@ -1225,6 +1225,9 @@ perspectives" of one timeline). Types:
   viewport coordinates. The **Panels & controls** zoom saves this value
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
+  `layouts[].exploreLayout.steps.textPosition` optionally places the current-step
+  caption `below`, `above`, `left` or `right` of the path controls. Omission means
+  `below`; overflowing path tracks remain scrollable.
   Arrange section keeps Explore visible and exposes a saved Section notes
   visibility checkbox. Duplicate view preserves it. Invalid values warn and
   fall back to Standard; legacy single arrangements remain Standard.

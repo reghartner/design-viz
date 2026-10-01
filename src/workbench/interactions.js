@@ -55,6 +55,7 @@ function createBuilderInteractions(opts){
     if (!secEl) return null;
     if (t.kind === 'section') return secEl;
     if (t.kind === 'prose') return secEl.querySelector('[data-explore-content="prose"]') || secEl.querySelector('.sec-prose');
+    if (t.kind === 'step-controls') return secEl.querySelector('.explore-player[data-explore-layout="' + cssQuote(t.layoutId) + '"]');
     if (t.kind === 'step'){
       /* prefer the numbered coin; edgeless steps (or steps hidden by
          the current path/view) have no coin — fall back to their chip */
@@ -316,12 +317,29 @@ function createBuilderInteractions(opts){
       return {section: parseInt(chipSec.getAttribute('data-dv-section'), 10),
               kind: 'step', index: chipIdx, el: chip};
     }
+    /* The move/resize handles are the keyboard-focusable entry points for the
+       Explore controls surface. Let their generated click select the controls
+       before the generic interactive-element guard below. */
+    var controlsHandle=ev.target.closest && ev.target.closest('.explore-player-grip, .explore-window-resize');
+    var controlsPlayer=controlsHandle && controlsHandle.closest('.explore-player[data-explore-layout]');
+    if(controlsPlayer){
+      var controlsSec=controlsPlayer.closest('.doc-sec');
+      if(controlsSec && controlsSec.hasAttribute('data-dv-section'))return {
+        section:parseInt(controlsSec.getAttribute('data-dv-section'),10),kind:'step-controls',
+        layoutId:controlsPlayer.getAttribute('data-explore-layout'),el:controlsPlayer
+      };
+    }
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
-    /* the caption line selects the CURRENT step (links and the copy
-       chip inside it were already skipped above) */
+    /* In Explore, the caption is part of the authorable controls surface.
+       Standard view keeps the legacy shortcut to the current step. */
     var line = ev.target.closest && ev.target.closest('.stepline');
     if (line){
       var lineSec = line.closest('.doc-sec');
+      var explorePlayer=line.closest('.explore-player');
+      if(explorePlayer && lineSec && lineSec.hasAttribute('data-dv-section'))return {
+        section:parseInt(lineSec.getAttribute('data-dv-section'),10),kind:'step-controls',
+        layoutId:explorePlayer.getAttribute('data-explore-layout'),el:explorePlayer
+      };
       var chipsBox = lineSec && lineSec.querySelector('.schips');
       if (!lineSec || !chipsBox || !lineSec.hasAttribute('data-dv-section')) return null;
       var cur = -1, currentChip = null;
@@ -338,6 +356,8 @@ function createBuilderInteractions(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
+    var stepControls=ev.target.closest && ev.target.closest('.explore-player[data-explore-layout]');
+    if(stepControls && secEl.contains(stepControls))return {section:gi,kind:'step-controls',layoutId:stepControls.getAttribute('data-explore-layout'),el:stepControls};
     var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-bullet-path], [data-dv-para], [data-dv-crow], [data-dv-contract]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))
@@ -380,7 +400,7 @@ function createBuilderInteractions(opts){
     setSelected(target.el);
     session.target = {section: target.section, kind: target.kind,
                      id: target.id, index: target.index, card:target.card, bulletPath:target.bulletPath,
-                     block: target.block, tab: target.tab};
+                     block: target.block, tab: target.tab, layoutId:target.layoutId};
     if (target.kind !== 'tab' && target.kind !== 'document') session.insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
@@ -413,7 +433,8 @@ function createBuilderInteractions(opts){
   });
   life.listen(view,'dv:pathchange',function(ev){
     if(inDetailPreview(ev.target))return;
-    var followStep = session.target && session.target.kind === 'step';
+    var previousTarget=session.target,followStep = previousTarget && previousTarget.kind === 'step';
+    var followControls=previousTarget && previousTarget.kind==='step-controls';
     session.target=null;clearMultiSelect();if(guide) guide.hidden=true;
     if(addToStep) cancelAddToStep(null);if(connect) cancelConnect(null);
     applyRowGrabs();clearStepMarkers();opts.syncStory();
@@ -422,6 +443,7 @@ function createBuilderInteractions(opts){
       var ordinal = Number(section.getAttribute('data-dv-section')), player = stepperFor(ordinal);
       if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false, true);
     }
+    else if(followControls && section)selectTarget({section:previousTarget.section,kind:'step-controls',layoutId:previousTarget.layoutId,el:findTargetEl(previousTarget)},false,true);
   });
 
   /* ---- ADD TO STEP mode: board clicks toggle step membership ---- */

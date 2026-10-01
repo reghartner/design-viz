@@ -293,10 +293,14 @@ test('one rejoined circle keeps the active path state and its number through fil
   const d=fixture();
   d.paths[0].steps=['one','four','five'];d.paths[1].steps=['two','three','drop','five'];
   const h=harness(d),shared=circle(h,4);
+  assert.equal(descendants(h.term.chips).some(e=>e.className==='path-timeline-owner'),false,'the timeline adds no Following label below its scroll content');
+  assert.equal(circle(h,0).getAttribute('data-path-active'),'true');
+  assert.equal(circle(h,1).getAttribute('data-path-active'),'false','exclusive stops on other paths are visibly inactive');
   assert.equal(descendants(h.term.chips).filter(e=>e.getAttribute('data-step-source')==='4').length,1);
   assert.equal(shared.textContent,'3');assert.match(shared.title,/Dropped signal \(step 4\)/);
   shared.fire('click');assert.equal(h.navigation.length,0,'same-route step selection does not cancel authoring modes');
   pathChoice(h,'dropped').fire('click');assert.equal(h.sp.current().n,0);
+  assert.equal(circle(h,0).getAttribute('data-path-active'),'false');assert.equal(circle(h,1).getAttribute('data-path-active'),'true');
   assert.equal(h.navigation.length,1,'path chips announce explicit reader navigation');
   assert.equal(shared.textContent,'4');shared.fire('click');
   assert.equal(h.navigation.length,1,'shared stop retains its current route');

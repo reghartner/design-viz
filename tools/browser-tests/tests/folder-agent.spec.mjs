@@ -159,7 +159,7 @@ test('editor conversation uses real local files and helper; changes render with 
 test('new-story entry, picker cancellation and unsupported browser have useful states',async({page})=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await expect(page.locator('#editor-agent')).toBeVisible();
     await page.evaluate(()=>window.cancelPicker=true);await chooseFolder(page);
     await expect(page.locator('#folder-agent-status')).toHaveText('Folder selection cancelled.');
@@ -172,7 +172,7 @@ test('one Build click guides visible copying and folder recovery, then the liste
   const h=await setup(page);let watcher;
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await expect(page.getByRole('dialog',{name:'How are you starting?'})).toBeVisible();
     expect(await page.evaluate(()=>window.pickerCalls)).toBe(0);
     await page.screenshot({path:info.outputPath('claude-centered-start.png')});
@@ -206,7 +206,7 @@ test('one Build click guides visible copying and folder recovery, then the liste
 test('Claude activity streams before the final answer and remains visible without duplicate or executable text',async({page},info)=>{
   const h=await setup(page);let watcher;
   try{
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:'ignore'});
     await expect(page.locator('#folder-agent-connection')).toHaveText('Claude listener active');
@@ -240,7 +240,7 @@ test('Claude activity streams before the final answer and remains visible withou
 test('refused folder Resume preserves the draft and instructions; successful Resume restores saved story and conversation',async({page})=>{
   const h=await setup(page);
   try{
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await chooseFolder(page);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Monitor/);
     const before=await h.read('session.json'),instructions=await readFile(path.join(h.session,'CONNECT.md'),'utf8');
@@ -338,7 +338,7 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
   test.setTimeout(90000);
   const h=await setup(page);let watcher;
   try{
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();await page.locator('#welcome-build-embedded').click();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     const events=new Map(),waiting=new Map();
     watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:['ignore','pipe','pipe']});
@@ -514,9 +514,9 @@ test('external branch copies context without dispatch, accepts native followups 
   const h=await setup(page);let watcher,native;
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
-    await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-screen')).toBeVisible();
+    await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();
     await page.screenshot({path:info.outputPath('build-workflows.png')});
-    await page.locator('#welcome-build-external').click();await expect(page.locator('#editor-agent')).toBeVisible();
+    await expect(page.locator('#editor-agent')).toBeVisible();
     await expect(page.locator('.folder-agent-prerequisites')).toContainText('Copy/paste does not start Monitor or a background watcher.');
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     expect((await h.read('session.json')).workflow).toBe('external');
@@ -868,7 +868,7 @@ test('connected Copy preserves a large message while registering a bounded nativ
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#welcome-agent').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-copy').click();
     await openAgent(page);
     const long='Read this complete pasted context. '+('Reference detail. '.repeat(1400))+' END OF MESSAGE';
@@ -901,7 +901,7 @@ test('diagram folder opens an existing named pair without metadata and reviews l
   try{
     await writeFile(path.join(h.folder,'payments.spec.json'),source);
     await writeFile(path.join(h.folder,'payments.ledger.md'),beforeLedger);
-    await page.locator('#welcome-agent').click();await page.locator('#welcome-build-external').click();
+    await page.locator('#welcome-agent').click();
     await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await expect(page.locator('#src')).toHaveValue(source);
     expect(path.basename(h.session)).toBe('.flowview-agent');
@@ -999,8 +999,8 @@ test('Start new clears a connected story, preserves it, and refuses to reopen it
   try{
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();
-    await expect(page.locator('#welcome-build-continue-title')).toContainText('Browser contract');
-    await page.locator('#welcome-build-external').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#src')).toHaveValue(source);
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     const oldSession=h.session,oldSpec=await readFile(path.join(h.folder,'story.spec.json'),'utf8');
     // Return to setup, then choose the explicit new-diagram path.
     await page.getByRole('button',{name:'Change folder',exact:true}).click();await page.locator('#folder-agent-start-new').click();await expect(page.locator('#folder-agent-start-description')).toContainText('Choose where Flowview should create');
@@ -1024,19 +1024,19 @@ test('home explicitly starts new from a saved draft and Continue still restores 
   const h=await setup(page);
   try{
     await page.evaluate(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:Date.now()})),source);
-    await page.reload();await page.locator('#welcome-agent').click();await expect(page.locator('#welcome-build-continue-title')).toContainText('Browser contract');
+    await page.reload();await page.locator('#welcome-agent').click();await expect(page.locator('#src')).toHaveValue(source);
     await page.screenshot({path:info.outputPath('agent-starting-point.png')});
-    await page.locator('#welcome-build-new').check();await page.locator('#welcome-build-external').click();
+    await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();await page.locator('#welcome-new-agent').click();
     await expect(page.locator('#folder-agent-start-description')).toContainText('Choose where Flowview should create');
     expect(JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].diagram.nodes).toEqual({});
     expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts')).map(d=>d.text))).toContain(source);
     // Cancelling New and explicitly choosing Continue also clears the new-folder
     // restriction when the current draft itself has not changed.
-    await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#welcome-build-continue').check();await page.locator('#welcome-build-external').click();
+    await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();
     await expect(page.locator('#folder-agent-start-description')).toContainText('Choose the folder containing its existing');
     await closeGuide(page);await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
-    await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).click();
-    await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#welcome-build-continue').check();await page.locator('#welcome-build-external').click();
+    await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract/}).first().click();
+    await page.locator('#workspace-home').click();await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();
     await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#folder-agent-start-description')).toContainText('Choose the folder containing its existing');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}

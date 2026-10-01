@@ -47,6 +47,7 @@ function folderAgentInstructions(folderName,level,resume,identity,workflow){
 
 function initWorkbenchAgentChat(opts){
   var doc=opts.document,root=doc.getElementById('editor-agent');
+  function writeClipboard(text){return opts.practice?opts.practice.copy(text):navigator.clipboard.writeText(text);}
   if(!root)return {destroy:function(){}};
   var life=createWorkbenchLifetime(),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
   var workflow='external',composeMode='external',setupIntent='adopt',freshProject=null,pendingFileChoice=null,copying=false,preparedCopy=null,composed=null,composeEpoch=0;
@@ -92,7 +93,7 @@ function initWorkbenchAgentChat(opts){
   detailSettings.id='folder-agent-detail-settings';detailSummary.id='folder-agent-detail-summary';
   detailBody.append(levelLabel,levelControl,element('p','folder-agent-hint','Applies to your next message. A message already sent keeps its original detail.'));
   detailSettings.append(detailSummary,detailBody);
-  var setupDetail=element('div','folder-agent-setup-detail'),setupLabel=element('label','','How much detail should Claude include?'),setupLevel=levelControl.cloneNode(true);
+  var setupDetail=element('div','folder-agent-setup-detail'),setupLabel=element('label','','What is the focus of your visualization?'),setupLevel=levelControl.cloneNode(true);
   setupLevel.id='folder-agent-setup-level';setupLabel.htmlFor=setupLevel.id;
   setupDetail.append(setupLabel,setupLevel,element('p','folder-agent-hint','Start with the story. You can add engineering detail later.'));get('new-session').prepend(setupDetail);
   var form=get('form'),composeActions=element('div','folder-agent-compose-actions'),cancelButton=button('cancel','Stop accepting this turn');cancelButton.hidden=true;
@@ -179,7 +180,7 @@ function initWorkbenchAgentChat(opts){
         text=preparedCopy.text;
       }
       if(!current())return;
-      try{await navigator.clipboard.writeText(text);if(current())status('Copied. Paste into your agent. This copied request is not sent to a monitor.');}
+      try{await writeClipboard(text);if(current())status('Copied. Paste into your agent. This copied request is not sent to a monitor.');}
       catch(ex){if(current()){showCopyFallback(text,false);status('Press ⌘C / Ctrl+C to copy the prepared request, then paste it into your agent.');}}
     }catch(ex){if(current())status('Could not prepare the request: '+ex.message);}
     finally{if(copying===operation)copying=false;if(life.alive())paintCompose();}
@@ -196,7 +197,7 @@ function initWorkbenchAgentChat(opts){
     var token=generation,key=selectionKey(focus),operation={selection:true};
     function current(){var next=composeSnapshot();return life.alive() && token===generation && next.open && next.project===focus.project && next.source===focus.source && next.previewCurrent!==false && selectionKey(next)===key;}
     copying=operation;selectionFeedback=null;paintCompose();
-    try{await navigator.clipboard.writeText(text);if(current())selectionNotice(focus,'Copied');}
+    try{await writeClipboard(text);if(current())selectionNotice(focus,'Copied');}
     catch(ex){if(current()){
       if(opts.show)opts.show();showCopyFallback(text,true);
       status('Press ⌘C / Ctrl+C to copy the selected context, then paste it into your agent.');selectionNotice(focus,'Copy manually in Agent');
@@ -331,7 +332,7 @@ function initWorkbenchAgentChat(opts){
       ? 'Use desktop Chrome or Edge over HTTPS and an agent with access to your selected local folder, Python 3, and Node. Copy/paste does not start Monitor or a background watcher. A web chat without local file access cannot update the shared diagram.'
       : 'Use desktop Chrome or Edge over HTTPS, Claude Code running in your selected local folder, Python 3, Node, and Claude’s Monitor tool. The helper reports runtime readiness; it does not install tools or change permissions.';
     guide.querySelector('.folder-agent-guide-header>span').textContent=workflow==='external'?'✧ Your agent · Your conversation':'✧ Your Claude · Your account';
-    setupLabel.textContent=workflow==='external'?'How much detail should your agent include?':'How much detail should Claude include?';
+    setupLabel.textContent='What is the focus of your visualization?';
     setText('launch-command',"claude --no-chrome --strict-mcp-config --mcp-config '{\"mcpServers\":{}}' --tools 'Bash,Read,Write,Edit,Glob,Grep"+(workflow==='embedded'?',Monitor':'')+"'");
     setText('launch-help',workflow==='external'?'Use your own account and normal permission prompts. Copy and paste does not start Monitor or a background watcher. Review the complete instructions before pasting.':'Use your own account and normal permission prompts. The Beta conversation uses Claude Monitor. Review the complete instructions before pasting.');
     guideStage=name;
@@ -547,6 +548,12 @@ function initWorkbenchAgentChat(opts){
   }
   async function connect(resume,useRemembered){
     if(connecting || state.connected)return;
+    if(opts.practice){
+      client=opts.practice.connect(opts,paint);activeFolder={name:'tour-story'};
+      get('instructions').value=opts.practice.instructions;
+      setText('folder','tour-story · Practice folder');stage('review');
+      paint({connected:true,listening:false});status('Practice only. No folder was opened.');return;
+    }
     if(typeof window.showDirectoryPicker!=='function' || !window.isSecureContext){
       status('Use this workbench in a desktop Chrome or Edge tab over HTTPS to connect a folder.');return;
     }
@@ -639,7 +646,7 @@ function initWorkbenchAgentChat(opts){
   life.listen(get('selection'),'click',copySelection);
   life.listen(get('copy'),'click',async function(){
     var token=generation;
-    try{await navigator.clipboard.writeText(get('instructions').value);if(!life.alive() || token!==generation)return;if(workflow==='external'){closeGuide();status('Setup copied. Paste into your agent, then continue your conversation there.');return;}if(state.listening)return;stage('waiting');get('show-copy').focus();status('Copied. Paste into the Claude session working in the folder you selected.');}
+    try{await writeClipboard(get('instructions').value);if(!life.alive() || token!==generation)return;if(workflow==='external'){closeGuide();status(opts.practice?'Practice instructions copied inside this tour. Your clipboard is unchanged.':'Setup copied. Paste into your agent, then continue your conversation there.');return;}if(state.listening)return;stage('waiting');get('show-copy').focus();status('Copied. Paste into the Claude session working in the folder you selected.');}
     catch(ex){if(!life.alive() || token!==generation || state.listening)return;get('instructions').focus();get('instructions').select();status('Press ⌘C or Ctrl+C to copy the selected instructions.');}
   });
   async function send(event){
@@ -675,6 +682,7 @@ function initWorkbenchAgentChat(opts){
   recovery.handle().then(function(saved){if(life.alive())rememberedHandle=saved;});
   contextTick();stage('folder');setComposeMode('external');
   return {destroy:life.destroy,openSetup:openSetup,
+    practice:opts.practice?{connect:connect,propose:function(){if(client)client.propose();}}:null,
     readLedger:function(){return client && state.connected?client.readLedger():Promise.resolve(null);},
     recoveryInfo:function(){restoreRecoveryForProject(opts.snapshot());return {connected:state.connected,listening:state.listening,folderName:activeFolder?activeFolder.name:cacheReady && remembered?remembered.folderName:null,sessionId:client && client.manifest()?client.manifest().sessionId:null,changes:state.changes.slice(-100)};}};
 }

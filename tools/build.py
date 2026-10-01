@@ -161,6 +161,7 @@ def main() -> int:
         else:
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
             mapping['WORKBENCH_CANON'] = workbench_canon()
+            mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
             mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.parent.mkdir(parents=True, exist_ok=True)

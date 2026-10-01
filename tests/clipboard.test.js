@@ -88,7 +88,7 @@ test('pasting into a bare diagram preserves it inside a page and carries custom 
   assert.equal(bare.page,undefined);
 });
 
-function harness(clipboard){
+function harness(clipboard,localOnly=false){
   const events={},elements={};let selectedText=false,active=true;
   const document={activeElement:null,defaultView:{navigator:{clipboard},getSelection:()=>({isCollapsed:!selectedText})},
     addEventListener(type,fn){(events[type] ||= []).push(fn);},getElementById(id){return elements[id];},
@@ -100,7 +100,7 @@ function harness(clipboard){
   function fire(map,type,target,extra){const ev={target,preventDefault(){this.prevented=true;},stopPropagation(){},...extra};for(const fn of map[type] || [])fn(ev);return ev;}
   for(const id of ['object-clipboard','object-clipboard-text','object-clipboard-feedback','object-clipboard-status','object-clipboard-destination','object-copy','object-duplicate','object-paste','object-clipboard-cancel','object-clipboard-apply','object-clipboard-read'])elements[id]=element(id);
   let raw=fixture(),text=JSON.stringify(raw),targets=[homeTarget('devices')],dest={section:1,index:0},blocked=false;const undo=[];
-  const c=context({},true),ctl=c.initBuilderClipboard(document,{isActive:()=>active,text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
+  const c=context({},true),ctl=c.initBuilderClipboard(document,{localOnly,isActive:()=>active,text:()=>text,selection:()=>targets,destination:()=>({...dest}),destinationLabel:()=> 'Destination Home',blocked:()=>blocked,
     apply(plan){undo.push(text);text=plan.text;return true;}});
   return {elements,document,ctl,undo,set active(v){active=v;},event:(type,extra={})=>fire(events,type,elements['object-copy'],extra),get text(){return text;},set text(v){text=v;},set targets(v){targets=v;},set blocked(v){blocked=v;},selectedText(v){selectedText=v;}};
 }
@@ -110,6 +110,17 @@ test('native object copy/paste works without Clipboard API and makes exactly one
   const pasted=h.event('paste',{clipboardData:{getData:()=>clipboard}});assert.equal(pasted.prevented,true);assert.equal(h.undo.length,1);
   assert.equal(diagram(JSON.parse(h.text),1).panels[0].devices[1].id,'cam-copy-3');
   h.text=h.undo.pop();assert.equal(diagram(JSON.parse(h.text),1).panels[0].devices.length,1);
+});
+test('practice copy and read use only the local object clipboard',()=>{
+  let calls=0;const h=harness({writeText(){calls++;},readText(){calls++;}},true);
+  h.document.execCommand=()=>{calls++;return true;};
+  h.elements['object-copy'].fire('click');
+  assert.equal(h.elements['object-clipboard'].open,false);
+  h.elements['object-paste'].fire('click');
+  h.elements['object-clipboard-read'].fire('click');
+  assert.equal(JSON.parse(h.elements['object-clipboard-text'].value).format,'flowview-clipboard');
+  h.elements['object-clipboard-apply'].fire('click');assert.equal(h.undo.length,1);
+  assert.equal(calls,0);
 });
 test('clipboard button capabilities follow selection, source and blocked actions while targetless Paste stays available',()=>{
   const h=harness(),copy=h.elements['object-copy'],duplicate=h.elements['object-duplicate'],paste=h.elements['object-paste'];

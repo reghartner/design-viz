@@ -38,6 +38,7 @@ function initBuilderClipboard(document, options){
   function close(focus){request++;dialog.close();if(focus!==false && opener && opener.isConnected)opener.focus();opener=null;}
   function write(data){
     memory=data;var text=JSON.stringify(data,null,2), sequence=++request;
+    if(options.localOnly){say('Copied '+builderClipboardLabel(data)+' inside this practice project. Your system clipboard is unchanged.');return;}
     say('Copied '+builderClipboardLabel(data)+'.');
     function fallback(){
       if(sequence!==request || (options.isActive && !options.isActive()))return;
@@ -74,6 +75,7 @@ function initBuilderClipboard(document, options){
   });
   life.listen(document.getElementById('object-clipboard-read'),'click',async function(){
     var sequence=++request;
+    if(options.localOnly){input.value=memory?JSON.stringify(memory,null,2):'';feedback.textContent='Practice clipboard loaded. Your system clipboard is unchanged.';return;}
     try{
       if(!win.navigator.clipboard || !win.navigator.clipboard.readText)throw new Error();
       var text=await win.navigator.clipboard.readText();if(sequence!==request || !dialog.open)return;

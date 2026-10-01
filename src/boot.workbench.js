@@ -258,6 +258,12 @@ var CONTRACT = [
 ].join('\n');
 
 /* ---------------- wire up ---------------- */
+// Capture only the pristine shipped document, before loading a user's draft,
+// catalog, agent recovery data or hash handoff into any form or DOM node.
+var workbenchPractice=!!document.documentElement.dataset.flowviewPractice;
+var workbenchPristine=workbenchPractice?null:'<!doctype html>'+document.documentElement.outerHTML;
+var workbenchPracticeAgent=workbenchPractice?createWorkbenchPracticeAgent(WORKBENCH_ONBOARDING):null;
+if(!workbenchPractice)installWorkbenchTourKeyGuard(window);
 var view = document.getElementById('docview');
 var src = document.getElementById('src');
 var msgs = document.getElementById('msgs');
@@ -384,7 +390,8 @@ var workspace = initWorkbenchWorkspace();
 workspace.canvas.bind(workbenchPreview.controller,workbenchPreview.page);
 var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
-  catalog:function(){return canonContext && canonContext.catalog;},
+  practice:workbenchPracticeAgent,
+  catalog:function(){return workbenchPractice?workbenchTourCatalog():canonContext && canonContext.catalog;},
   importCatalog:function(raw){if(canonContext)canonContext.importCatalog(raw);},
   deferInitialSave:true,
   isActive:function(){return !document.getElementById('workbench-workspace').hidden;},
@@ -398,7 +405,11 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   },
   renderedText:workbenchPreview.renderedText,
   ctl:workbenchPreview.controller});
-var welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
+var welcome;
+if(workbenchPractice){
+  initWorkbenchPractice({builder:workbenchBuilder,workspace:workspace,controller:workbenchPreview.controller,agent:workbenchPracticeAgent});
+}else{
+welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
 canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
   loadingCanon=true;
@@ -407,3 +418,5 @@ canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location
 }});
 
 initWorkbenchHumanGuide();
+initWorkbenchOnboarding({source:workbenchPristine,welcome:welcome});
+}

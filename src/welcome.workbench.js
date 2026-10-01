@@ -150,7 +150,7 @@ function initWorkbenchWelcome(opts){
   var editor = document.getElementById('workbench-workspace');
   if (!root || !editor) return {show:function(){}, enterEditor:function(){}, openWorkspace:function(){},localProjectOpened:function(){},canonicalLoaded:function(){}};
   var builder = opts.builder, templates = opts.templates || [];
-  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', build:'welcome-build-screen', agent:'welcome-agent-screen', library:'welcome-library-screen', reader:'welcome-reader-screen'};
+  var screens = {home:'welcome-home', paste:'welcome-paste-screen', new:'welcome-new-screen', agent:'welcome-agent-screen', library:'welcome-library-screen', reader:'welcome-reader-screen'};
   var screen = 'home', operation = 0, manifestStarted = false, activeReader=null, navigation, library;
   function retireRead(){
     operation++;
@@ -177,8 +177,6 @@ function initWorkbenchWelcome(opts){
     resume.hidden = !current && !draft;
     headerResume.hidden = !current || root.hidden;
     el('welcome-resume-title').textContent = current ? 'Continue ' + projectTitle() : 'Resume ' + (draft ? draft.title : 'your draft');
-    el('welcome-build-continue-title').textContent=current?'Continue '+projectTitle():draft?'Continue '+draft.title:'Open an existing diagram';
-    el('welcome-build-continue-detail').textContent=current || draft?'Use this draft, or choose an existing diagram folder.':'Choose its diagram folder to pick up where you left off.';
     var date = draft && new Date(draft.savedAt);
     el('welcome-resume-detail').textContent = current ? 'Your current project is still here, including its undo history.' :
       'Saved in this browser' + (date && Number.isFinite(date.getTime()) ? ' · ' + date.toLocaleString() : '') + '.';
@@ -223,6 +221,7 @@ function initWorkbenchWelcome(opts){
   }
   function display(screen,focus){
     if(library)library.hide();
+    if(screen==='build'){buildWithAgent('external',false,true);return;}
     if(screen==='editor'){
       if(builder.isProjectOpen() || (opts.skipWelcome && !navigation.retired()))displayEditor(focus);
       else if(builder.restoreDraft()){navigation.localProject();displayEditor(focus);}
@@ -249,17 +248,17 @@ function initWorkbenchWelcome(opts){
   ['welcome-catalog','welcome-new-catalog'].forEach(function(id){
     el(id).addEventListener('click',function(){builder.openCatalog({newProject:true,onCreated:enterEditor});});
   });
-  ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('build');});});
-  el('welcome-build-brief').addEventListener('click',function(){navigation.go('agent');});
-  function buildWithClaude(mode,fresh){
-    if(fresh===undefined)fresh=el('welcome-build-new').checked;
+  ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('agent');});});
+  function buildWithAgent(mode,fresh,replace){
+    if(fresh===undefined)fresh=false;
     if(fresh || !builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
-    enterEditor();builder.startAgent(mode,{newProject:fresh});
+    if(replace)navigation.replace('editor',false);else enterEditor();
+    builder.startAgent(mode,{newProject:fresh});
   }
-  document.addEventListener('dv:agentnew',function(event){buildWithClaude(event.detail && event.detail.workflow==='embedded'?'embedded':'external',true);});
-  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){el('welcome-build-new').checked=id==='welcome-new-agent';el('welcome-build-continue').checked=id!=='welcome-new-agent';navigation.go('build');});});
-  el('welcome-build-external').addEventListener('click',function(){buildWithClaude('external');});
-  el('welcome-build-embedded').addEventListener('click',function(){buildWithClaude('embedded');});
+  document.addEventListener('dv:agentnew',function(event){buildWithAgent(event.detail && event.detail.workflow==='embedded'?'embedded':'external',true);});
+  ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){
+    buildWithAgent('external',id!=='welcome-agent' || !builder.isProjectOpen() && !builder.draftInfo());
+  });});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
@@ -394,7 +393,7 @@ function initWorkbenchWelcome(opts){
   }});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});
-  return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor,
+  return {show:show, enterEditor:enterEditor, openWorkspace:enterEditor, buildWithAgent:function(){buildWithAgent('external',true);},
     localProjectOpened:navigation.localProject,
     canonicalLoaded:function(){if(navigation.screen()==='editor')displayEditor(false);else updateResume();}};
 }

@@ -463,7 +463,7 @@ function initWorkbenchBuilder(opts){
 
   var session=createBuilderSession({
     source:{read:function(){return src.value;},write:function(text){src.value=text;}},
-    persistence:createBuilderPersistence({storage:function(){return localStorage;},
+    persistence:createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
       schedule:function(fn,ms){return life.delay(fn,ms);},
       cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
       status:function(state){
@@ -741,7 +741,7 @@ function initWorkbenchBuilder(opts){
   }
   life.listen(src,'input',refreshClipboardActions);
   var objectClipboard = typeof initBuilderClipboard === 'function' ? initBuilderClipboard(document,{
-    isActive:opts.isActive,
+    isActive:opts.isActive,localOnly:!!opts.practice,
     text:function(){return session.text();},selection:clipboardSelection,destination:clipboardDestination,
     blocked:function(){return !!(interactions.busy() || inspector.busy(view));},
     destinationLabel:function(dest){
@@ -1172,7 +1172,7 @@ function initWorkbenchBuilder(opts){
     if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
-  var agentOptions={document:document,
+  var agentOptions={document:document,practice:opts.practice,
     setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
@@ -1302,6 +1302,12 @@ function initWorkbenchBuilder(opts){
   return {
     loadSpec:function(raw,origin){var ok=life.alive() && loadText(JSON.stringify(raw,null,2));if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
     startAgent:function(mode,options){if(agentChat)agentChat.openSetup(mode || 'external',options);},
+    practice:opts.practice?{select:function(target,extend){
+      target=Object.assign({},target,{el:findTargetEl(target)});
+      if(extend)interactions.toggleMultiSelect(target);
+      else{clearMultiSelect();selectTarget(target,false);}
+    },selected:function(){return session.target?Object.assign({},session.target):null;},
+    edit:function(raw){return agentOptions.apply(JSON.stringify(raw,null,2),agentOptions.snapshot());},agent:agentChat.practice}:null,
     preserveDraft:life.guard(session.preserveDraft),
     earlierDrafts:session.earlierDrafts,
     restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),

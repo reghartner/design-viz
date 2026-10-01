@@ -26,7 +26,7 @@ test('named links select host profile, view, alternate and visible step; copying
  await sec.getByRole('button',{name:'Copy link to this diagram step',exact:true}).click();
  const copy=await page.evaluate(()=>__copied.at(-1));expect(new URL(copy).search).toBe('?layout=confluence');expect(new URL(copy).hash).toContain('v=service-flow');expect(new URL(copy).hash).toContain('p=offline&s=offline');
  await sec.getByRole('button',{name:'Home story',exact:true}).click();expect(viewOf(page)).toBe('home-story');
- await expect(sec.locator('.board')).toBeHidden();await expect(sec.locator('.stepline')).toContainText('Internet service is down');
+ await expect(sec.locator('.board')).toBeHidden();await expect(sec.locator('.stepline')).toContainText('A quiet home');await expect(sec.locator('.stepline')).not.toContainText('Internet service is down');
  await sec.locator('.embedcopy').click();const embed=await page.evaluate(()=>__copied.at(-1));expect(new URL(embed).hash).toBe('#embed=front-door&v=home-story');
  await page.reload();await expect(selected(page)).toHaveAttribute('data-layout-id','home-story');
  await page.goto(embed);await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveAttribute('data-view-id','home-story');

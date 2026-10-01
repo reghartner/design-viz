@@ -1,6 +1,6 @@
 {
   "format": "authoring-experiment-status-v1",
-  "asOfUtc": "2026-10-01T02:29:42.580042+00:00",
+  "asOfUtc": "2026-10-01T03:39:13.702015+00:00",
   "purpose": "Preserve decisions and distinguish promising experiments from adopted changes. This snapshot is research provenance, not a performance promise.",
   "promotionStatus": "No tested context-reduction strategy has cleared its entire predeclared promotion screen.",
   "modelPolicy": {
@@ -77,6 +77,30 @@
         "sha256": "98a69bcef69a2c07b3f71b61309e1e820ac163665be173568ebb98df52113abf",
         "retention": "Full reports and raw artifacts retained in local experiment archive; not included in this PR."
       }
+    },
+    {
+      "name": "prepared focused-panel edit pipeline",
+      "kind": "registered Workbench deviceapp presentation edit",
+      "status": "stopped inconclusive at final allowed repair cycle; no scored cohort launched",
+      "repairCycles": 2,
+      "scoredAuthors": 0,
+      "scoredJudgments": 0,
+      "finalTrial": {
+        "setup": "passed",
+        "task": "successful compound prepare command not recognized by frozen observer",
+        "candidate": "exact field-order-only delta; identical field objects and byte-identical ledger",
+        "approved": false,
+        "scored": false,
+        "independentAuthorEscapeEstablished": false,
+        "reviewModel": "gpt-5.6-sol medium"
+      },
+      "freezeSha256": "4ff3bf5d983abf39592ce036074fcb26bd8c795f469cf8e3953140b3010b6acd",
+      "evidence": {
+        "reviewJsonSha256": "76532a57aa859ed35bdc747f6345c4cfe26ec472dd19197a50a9fa623c2386a2",
+        "resultSha256": "8f13fe60b9cfa5b9b83165b515f2221812aed558445e57cec82681e1e72585fb",
+        "report": "edit-pipeline-closure.md",
+        "retention": "Raw logs, frozen inputs, public diagnostic reviews and unapproved render retained locally; original trial outcomes unchanged."
+      }
     }
   ],
   "rejectedBeforeTrial": [
@@ -86,9 +110,9 @@
     "hiding source sidebar where showSources also removes badges and leaves existing copy stale"
   ],
   "queuedHypotheses": [
-    "concise Workbench command contract, separately tested; draft PR293 contains source and agent guidance but no measured context claim",
+    "concise Workbench command contract: draft PR293 preserved with agent guidance, measurement deferred because it shares the stopped edit harness",
     "initial-authoring reading manifest: routing/order only, preserve presentation content and pointers",
-    "confirm focused guidance v1 prospectively on current main before any activation",
+    "exact preserved focused-v1 versus preserved historical control under one contemporary runtime; one inspected initial-authoring trial before a fresh concurrent cohort; no current-default or adoption claim",
     "retest composition cue separately on a non-rejected base",
     "declaration-only edits after a representative large-spec fixture justifies them"
   ],
@@ -101,7 +125,7 @@
     },
     {
       "scope": "Opt-in focused panel editing and subsequent workflow fixes",
-      "dependency": "main unless a concrete code dependency appears; keep draft pending fresh benchmark"
+      "dependency": "main; draft PR292 preserved unmeasured after edit measurement pipeline stopped inconclusive"
     },
     {
       "scope": "Further context reductions, including file-and-key payload experiments",
@@ -109,12 +133,21 @@
     },
     {
       "scope": "Concise Workbench command contract and matching agent guidance, draft PR293",
-      "dependency": "focused panel PR292; one actual trial and prospective comparison still required"
+      "dependency": "focused panel PR292; measurement deferred, no promotion"
     }
   ],
   "followupAnalysis": {
     "report": "context-followup.md",
     "data": "context-followup.json",
     "newAuthorOrGradeOutcomes": false
+  },
+  "strategyConsult": {
+    "model": "claude-fable-5-1",
+    "adviceSha256": "e2d3592b790fc190aa8f7407af4be24b74f1872b790680ab9587e4de77466576",
+    "decision": "Stop edit repairs at the agreed bound. Defer the dependent command-contract measurement. Confirm the exact historical v1 contrast in independent initial authoring before selecting a further routing intervention.",
+    "withdrawnHypotheses": [
+      "v2 authors skipped presentation references",
+      "file-payload output allocation inferred from output minus thinking"
+    ]
   }
 }

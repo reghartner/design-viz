@@ -97,7 +97,8 @@ The chosen diagram folder need not be the agent's working directory.
 
 Maintain the coverage ledger throughout authoring: worksheet, operator answers,
 evidence, coverage, decisions, illustrative assumptions, and open questions.
-On the full route, read the existing spec and ledger before changing them. A
+On the full route, read the prepared copies of the existing spec and ledger (below)
+before changing them. A
 focused request instead edits only its staged fragment and never reads `state.json`,
 the spec or the ledger (see the focused section below). A ledger is required for
 every proposed change, including a ledger-only update. A focused proposal carries
@@ -254,8 +255,9 @@ sending rather than silently falling back to the full route. **Copy for agent**
 may say that the selection qualifies, but it never registers a focused request
 or packet.
 
-Sending writes a bounded `focus-<request>.json` packet before the request that
-names it (`request.mode` `focused-deviceapp`, with the packet filename and SHA-256).
+Sending writes a bounded task packet before the request that names it
+(`request.mode` `focused-deviceapp`, with the packet filename in `request.focus.file`
+and its SHA-256).
 The copied header names that packet and the exact relative `prepare --request`
 command. The focused route then works as follows:
 
@@ -268,9 +270,11 @@ command. The focused route then works as follows:
    `python3 <VIZ>/tools/widget_doc.py deviceapp` schema. It does not read
    `state.json`, the spec, the ledger or `SKILL.md`. The packet's `context` is
    optional read-only evidence.
-3. `assemble-deviceapp --request ID --task focus-ID.json --fragment FRAGMENT_FROM_RECEIPT`
+3. `assemble-deviceapp --request ID --task REQUEST_FOCUS_FILE --fragment FRAGMENT_FROM_RECEIPT`
    checks the fragment and writes the complete `candidate.spec.json` with the
-   ledger copied unchanged as `candidate.ledger.md`.
+   ledger copied unchanged as `candidate.ledger.md`. `REQUEST_FOCUS_FILE` is the
+   exact `request.focus.file` value, which the copied request also names; never
+   derive it from the request ID.
 4. The agent proposes those files with the receipt's revision. If assembly
    refuses, the agent fixes only the listed keys or asks for the full route. It
    never proposes after a refusal. If the proposal is rejected, the agent revises

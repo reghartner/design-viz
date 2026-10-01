@@ -411,25 +411,35 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   build or **New Connection** to choose a method and folder. Copy and send controls
   appear only after connection; Beta sending also requires a live listener.
   Copied requests include selected item identifiers, JSON paths, evidence
-  references and view context, not the complete source. Read the current spec and
-  ledger from the shared folder before planning. Without a shared folder, ask for
-  any required source files; do not treat the copied context as a complete diagram.
+  references and view context, not the complete source; do not treat the copied
+  context as a complete diagram. For a registered request, follow `CONNECT.md`:
+  run `prepare --request <request id>` before reading or editing, and use only
+  the files its receipt names, exactly as printed. On the full route the
+  receipt's `editableFiles.spec` and `editableFiles.ledger` are staged copies of
+  the current spec and ledger, and its `revision` is the revision you read; plan
+  from and edit those two files in place. A rerun reports `already-staged` or
+  `preserved-edits` and never resets your edits. If `prepare` refuses, stop and
+  report its reason.
   The bottom-left **Copy for agent** action copies selection context without
   registering or replacing a request. Wait for the user's accompanying instruction;
   use an existing active request or the normal native `begin` flow as appropriate.
   The project is the spec and coverage ledger at the folder root; `project.json`
-  names them. Existing artifacts must be preserved and read before planning.
+  names them. Preserve existing artifacts and unrelated work.
   Connection identity is temporary and can change without changing the project.
   Maintain the worksheet, answers, coverage, evidence, decisions and open work
-  in a complete candidate ledger alongside the candidate spec. Submit both with
-  `propose --file candidate.spec.json --ledger candidate.ledger.md`; never write
-  accepted artifacts directly while connected. Even ledger-only changes require
-  a paired proposal. Every update waits for preview and explicit approval; one
-  Undo restores both. Reconcile conflicts against the current spec and ledger,
-  never merely relabel an old proposal with a new revision. After acceptance,
-  reread both artifacts and reconcile the ledger with any merged human edits
-  before claiming they are ready to commit. Keep `.flowview-agent/` metadata,
-  candidates and workbench conversation history out of the repository commit.
+  in the complete staged ledger alongside the staged spec. Submit both with
+  `propose --request <request id> --revision <receipt revision> --file <editableFiles.spec> --ledger <editableFiles.ledger>`;
+  never write accepted artifacts directly while connected. Even ledger-only
+  changes require a paired proposal. Every update waits for preview and explicit
+  approval; one Undo restores both. If a proposal is rejected or conflicts,
+  reconcile the current pair and feedback into the same staged files as
+  `CONNECT.md` directs and propose with the revision you actually read; never
+  merely relabel an old proposal with a new revision, and do not rerun `prepare`
+  to reset the files. Confirm acceptance from the matching helper or editor
+  result, and follow the current request and connection instructions for any
+  later reconciliation before claiming the artifacts are ready to commit. Keep
+  `.flowview-agent/` metadata, preparation receipts, staged and candidate files
+  and workbench conversation history out of the repository commit.
   Commit or publish the reviewed artifacts only when authorized by the user.
   Use `session.workflow` and `request.replySurface` to route conversation:
   **external/agent** keeps questions and interrupts in the native agent app;

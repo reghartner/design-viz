@@ -97,8 +97,10 @@ Do not add fields, steps or panels.
 
 ```sh
 python3 <helper>/folder-agent.py assemble-deviceapp \
-  --request <request id> --task focus-<request id>.json --fragment <editableFiles.fragment>
+  --request <request id> --task <request.focus.file> --fragment <editableFiles.fragment>
 ```
+
+Pass `--task` the exact `focus.file` value from `request.json`; the copied request names the same file. Never derive it from the request id.
 
 On success it prints JSON with `written`, `changedSteps` and `next`. `next` is the exact `propose` command for this helper folder, with the receipt's revision. Run it with a short `--summary`, and the editor shows the complete preview for approval as usual.
 

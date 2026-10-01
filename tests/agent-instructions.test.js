@@ -1,4 +1,4 @@
-const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
 const {readSource}=require('../tools/source-loader.cjs');
 const context=vm.createContext({});for(const file of ['workbench/focused-panel.js','workbench/agent-chat.js'])vm.runInContext(readSource(file),context);
 const identity={sessionId:'session',connectionId:'connection',artifacts:{spec:'story.spec.json',ledger:'story.ledger.md',metadata:'.flowview-agent'}};
@@ -132,4 +132,26 @@ test('copied request headers give the exact relative prepare command and name on
   assert.doesNotMatch(full,/focus-|assemble-deviceapp|state\.json/);
   assert.ok(context.folderAgentRequestHeader('Doorbell','.',focused).includes('python3 "folder-agent.py" prepare --request req-1'));
   assert.ok(context.folderAgentRequestHeader('Doorbell','.',focused).includes('python3 "folder-agent.py" assemble-deviceapp'));
+});
+const guide=file=>fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+test('the skill\'s shared-folder section defers file access to CONNECT.md and the preparation receipt',()=>{
+  const skill=guide('.claude/skills/hld-to-page/SKILL.md'),start=skill.indexOf('- **Shared diagram folder.**'),end=skill.indexOf('\n- **',start+1);
+  assert.ok(start>0 && end>start,'the shared-folder special situation is present');
+  const section=skill.slice(start,end);
+  assert.match(section,/CONNECT\.md/);assert.match(section,/prepare --request <request id>/);
+  assert.match(section,/editableFiles\.spec/);assert.match(section,/editableFiles\.ledger/);
+  assert.match(section,/preserved-edits/);assert.match(section,/do not rerun `prepare`\s+to reset the files/);
+  assert.ok(section.includes('--revision <receipt revision> --file <editableFiles.spec> --ledger <editableFiles.ledger>'));
+  assert.match(section,/paired proposal/);assert.match(section,/one Undo restores both/);assert.match(section,/only when authorized by the user/);
+  assert.doesNotMatch(section,/Read the current spec and\s+ledger|read before planning|candidate\.spec\.json|candidate\.ledger\.md|reread both/,'no direct durable read, fixed candidate or unconditional reread');
+  // The focused redirect near the top is unchanged.
+  assert.match(skill,/"mode": "focused-deviceapp"` follows\n\[focused-panel-edit\.md\]\(references\/focused-panel-edit\.md\) instead of this skill/);
+});
+test('focused examples pass the authoritative request.focus.file to --task',()=>{
+  for(const file of ['.claude/skills/hld-to-page/references/focused-panel-edit.md','docs/folder-agent-session.md']){
+    const text=guide(file);
+    assert.match(text,/assemble-deviceapp[\s\\]+--request [^\n]*\n?\s*--task (?:<request\.focus\.file>|REQUEST_FOCUS_FILE) --fragment/,file);
+    assert.match(text,/`request\.focus\.file`|`focus\.file`/,file);
+    assert.doesNotMatch(text,/focus-ID|focus-<request id>|--task focus-/,file+' derives no packet filename');
+  }
 });

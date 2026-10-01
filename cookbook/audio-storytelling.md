@@ -80,6 +80,18 @@ For full-duplex conversation, both microphone capturing and speaker speech can
 be active. For alternating talk/listen, show one direction at each stop. Which
 behavior a real product supports must come from its source documentation.
 
+## Desk and camera effects together
+
+The [console effects example](../examples/console-effects/story.spec.json) pairs
+a specialist desk with a camera screen through two-way talk, spotlight, an
+alarm sounding alongside conversation, and explicit clearing. Both panel
+inspectors expose **Alarm siren** (`siren:"off"|"on"`) in starting and step
+state. The desk depicts the remote siren in its monitor; its headset audio
+remains independent. Set `enterOnce.siren` for an alarm lasting one stop.
+This is a confirmed sounding state; use endpoint `audio.output:"siren"` with
+`playback` when narrating a queued, suppressed or failed playback request.
+Do not author both representations for the same sounder.
+
 ## Deterrence and alternatives
 
 - Set `spotlight:"on"` or `"flash"` on a Home camera's device patch, a Screen

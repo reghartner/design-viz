@@ -269,7 +269,7 @@ test('per-state scene override carries, resets to the declaration with null and 
   const fields = C.panelPatchFields(panel);
   assert.deepEqual(plain(fields.slice(0, 2).map(f => f.slice(0, 3))), [['mode','enum',plain(fields[0][2])],['scene','enum',names]]);
   assert.equal(fields[1][3].nullLabel, 'Use declared scene');
-  assert.deepEqual(plain(C.PANEL_PATCH_FIELDS.screen.map(f => f[0])), ['mode','scenePlayback','banner','reason','audio','spotlight'],
+  assert.deepEqual(plain(C.PANEL_PATCH_FIELDS.screen.map(f => f[0])), ['mode','scenePlayback','banner','reason','audio','spotlight','siren'],
     'legacy static field list is unchanged');
   assert.ok(C.PanelRegistry.get('screen').authoring.transientFields.includes('scene'));
   const before = JSON.stringify(d), reset = C.planStepSetPanelPatch(before, d, 0, 3, 'cam', JSON.stringify({mode:'rec',scene:null}));

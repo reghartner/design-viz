@@ -628,7 +628,7 @@ listed (gRPC, Kafka, NATS...), declare it in `page.protocols`, e.g.
 `"grpc": {"label": "gRPC", "color": "#7BD88F"}`, then use `"kind": "grpc"`
 on edges. Undeclared kinds fall back to `int` with a warning.
 
-### Shared audio and spotlight state
+### Shared audio, spotlight and alarm state
 
 Camera Screen, Security monitoring and Phone accept optional `initial.audio`
 and step `panels.<id>.audio`. Home map accepts `audio` inside each device or
@@ -653,11 +653,16 @@ subfield without making notifications transient. Home preserves its own device
 and subject semantics. `spotlight` (`off|on|flash`) is independently available
 on Home camera device patches, Screen and Security; Security illuminates its
 embedded camera view. Existing recording and scenePlayback behavior is unchanged.
+`siren` (`off|on`) on Screen and Security shows an independent remote alarm
+sounder. It carries through sparse steps, supports `enterOnce.siren`, and is
+cleared with `off`. Invalid values warn and preserve the previous state. It
+does not replace conversation audio, imply the operator hears the alarm, or
+change sensor alarms, assessment, spotlight or video. Omitted siren is silent.
 The `speaker` icon is available for ordinary nodes and generic Home sensors.
 
 Read [the audio recipe](../cookbook/audio-storytelling.md) for endpoint direction,
 workbench editing, failure examples and the complete teaching seed. New exports
-advertise `media.audio` / `media.spotlight` so older installed renderers can warn
+advertise `media.audio` / `media.spotlight` / `media.camera-siren` so older installed renderers can warn
 about unsupported capabilities.
 
 ### Whole-panel visibility

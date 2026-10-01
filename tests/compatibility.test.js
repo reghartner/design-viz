@@ -257,3 +257,14 @@ test('the stamped Kestrel overnight story declares 0.2.0 Screen capabilities tha
   delete raw.page.flowview;
   assert.deepEqual(plain(C.check(raw,{version:'0.1.0',contract:'1',features:withoutScreenFeatures()}).missingFeatures),SCREEN_FEATURES);
 });
+
+test('independent camera sirens advertise compatibility in initial and transient states',()=>{
+  for(const type of ['screen','security']){
+    const raw={nodes:{n:{}},rows:[['n']],edges:[],panels:[{id:'cam',type,initial:{siren:'on'}}],steps:[]};
+    assert.ok(C.detect(raw).includes('media.camera-siren'));
+    raw.panels[0].initial={};raw.steps=[{panels:{cam:{enterOnce:{siren:'off'}}}}];
+    assert.ok(C.detect(raw).includes('media.camera-siren'));
+    delete raw.steps[0].panels.cam.enterOnce.siren;
+    assert.ok(!C.detect(raw).includes('media.camera-siren'));
+  }
+});

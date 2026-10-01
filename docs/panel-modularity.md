@@ -273,7 +273,7 @@ transaction/lifetime and the renderer's existing notification object contract.
 `authoring.transientFields` lists top-level fields whose runtime supports
 `enterOnce`. The shared step inspector exposes duration only for these fields;
 Starting state is unchanged. Camera declares mode, scenePlayback, banner, reason,
-audio and spotlight; Phone declares audio only. Object fields are complete
+audio, spotlight and siren; Phone declares audio only. Object fields are complete
 snapshots. When both locations are authored, editing the temporary value leaves
 the carried value intact; an explicit duration choice collapses the pair to the
 current temporary value. The planner preserves unknown siblings and refuses

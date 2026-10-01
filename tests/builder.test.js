@@ -299,7 +299,7 @@ test('PANEL_PATCH_FIELDS covers all 20 panel types with supported kinds and none
     }
   }
   const expected = {
-    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
+    state: ['state'], leds: [], gauge: ['value'], log: ['log'], screen: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight', 'siren'],
     waterfall: ['reveal', 'highlight', 'total'], orbit: ['state', 'via'],
     zoneframe: ['zones', 'subject', 'verdict'], xray: ['layers', 'hop'],
     queue: ['state', 'label', 'from', 'to', 'reason'],

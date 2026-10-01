@@ -6,7 +6,7 @@
   var alarms = ['unknown', 'clear', 'triggered', 'acknowledged'];
   var kinds = ['door', 'motion', 'camera', 'smoke', 'water', 'lock', 'sensor'];
   var videoStates = ['closed', 'opening', 'reviewing', 'unavailable'];
-  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', spotlight:SCREEN_SPOTLIGHTS, audio:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
+  var fields = {video:videoStates, scene:SCENE_NAMES, scenePlayback:['waiting','playing'], videoReason:'text', spotlight:SCREEN_SPOTLIGHTS, siren:SCREEN_SIRENS, audio:'text', status:statuses, operator:'text', incident:'text', assessment:assessments, detail:'text', note:'text'};
   var sensorFields = {health:health, alarm:alarms, detail:'text'};
   var labels = {unknown:'Status unknown', disarmed:'Disarmed', armed:'Monitoring', alarm:'Alarm received',
     reviewing:'Operator reviewing', verified:'Incident verified', cleared:'All clear', offline:'Monitoring offline'};
@@ -40,7 +40,7 @@
     if (SCENE_NAMES.indexOf(scene) < 0) scene = 'static-noise';
     var modes = {closed:'off', opening:'boot', reviewing:'active', unavailable:'unavailable'};
     return {video:video, panel:{scene:scene}, state:{mode:modes[video], scenePlayback:state.scenePlayback,
-      spotlight:state.spotlight, reason:state.videoReason || 'The operator cannot reach this camera.'}};
+      spotlight:state.spotlight, siren:state.siren, reason:state.videoReason || 'The operator cannot reach this camera.'}};
   }
   function audioClass(audio) {
     var model = FlowAudio.model(audio);
@@ -216,11 +216,11 @@
       initialFields:true,
       fieldMeta:{
         site:{label:'Site'},scene:{label:'Camera scene'},videoLabel:{label:'Video label'},sensors:{label:'Sensors'},
-        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},
+        video:{label:'Video state',group:'Video'},scenePlayback:{label:'Scene playback',group:'Video'},videoReason:{label:'Video reason',group:'Video'},audio:{label:'Operator audio',group:'Video'},spotlight:{label:'Spotlight',group:'Video'},siren:{label:'Alarm siren',group:'Video'},
         status:{label:'Monitoring status',group:'Monitoring'},operator:{label:'Operator',group:'Monitoring'},incident:{label:'Incident',group:'Monitoring'},assessment:{label:'Assessment',group:'Monitoring'},detail:{label:'Summary',group:'Monitoring'},note:{label:'Internal note',group:'Monitoring'}
       },
       setupFields:[['site','text'],['scene','scene'],['videoLabel','text'],['sensors','rows',{cols:[{k:'id',req:true},{k:'label'},{k:'kind',kind:'enum',options:kinds},{k:'zone'}],max:12}],['initial','json']],
-      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
+      patchFields:[['video','enum',videoStates],['scene','enum',SCENE_NAMES],['scenePlayback','enum',['waiting','playing']],['videoReason','text'],['audio','objf',FlowAudio.fields],['spotlight','enum',SCREEN_SPOTLIGHTS],['siren','enum',SCREEN_SIRENS],['status','enum',statuses],['operator','text'],['incident','text'],['assessment','enum',assessments],['detail','text'],['note','text']],
       expandPatchFields:function (panel) {
         return PanelRegistry.get('security').authoring.patchFields.concat(items(panel).map(function (sensor) {
           return [sensor.id,'objf',[['health','enum',health],['alarm','enum',alarms],['detail','text']],{label:sensor.label||sensor.id,group:'Sensors'}];
@@ -230,9 +230,9 @@
         return panelSanitizedOrigin(key, context, function (raw) { return clean(panel, raw, '', null, false); });
       },
       picker:{order:26,name:'Security monitoring',category:'Devices & interfaces',tagline:'From sensor signal to verified incident',
-        description:'An operator reviews animated camera clips, speaks into a headset and hears remote audio. Author video, audio, spotlight, assessment and sensor facts independently.'},
+        description:'An operator reviews animated camera clips, speaks into a headset and hears remote audio. Author video, two-way audio, spotlight, remote alarm siren, assessment and sensor facts independently.'},
       example:function (sample) {
-        sample.state = {video:'reviewing',scenePlayback:'playing',status:'reviewing',operator:'Alex · monitoring specialist',incident:'Front door opened while armed',assessment:'reviewing',detail:'Reviewing doorbell footage before escalation.',
+        sample.state = {audio:{connection:'connected',microphone:'capturing',output:'speech'},spotlight:'on',siren:'on',video:'reviewing',scenePlayback:'playing',status:'reviewing',operator:'Alex · monitoring specialist',incident:'Front door opened while armed',assessment:'reviewing',detail:'Reviewing doorbell footage before escalation.',
           frontDoor:{health:'online',alarm:'triggered',detail:'Contact opened · entry zone'},doorbell:{health:'online',alarm:'clear',detail:'Evidence available'},hall:{health:'online',alarm:'clear'}};
         sample.panel.initial = JSON.parse(JSON.stringify(sample.state));
         return sample;

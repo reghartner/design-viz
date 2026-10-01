@@ -142,3 +142,47 @@ test('console effects have reduced-motion and print fallbacks and absent audio a
   assert.match(css,/@media print\{\.secmon\{[\s\S]*?\.secmon \*\{animation:none!important/);
   for(const type of ['screen','security']) assert.doesNotMatch(html(panel(type),{}),/class="fva-audio|class="secmon-audio"|screen-camera-device/);
 });
+
+test('an independent alarm coexists with two-way talk and light on both consoles', () => {
+  for (const type of ['screen','security']) {
+    const p=panel(type), d=fixture(p), audio={connection:'connected',microphone:'capturing',output:'speech'};
+    p.initial={audio,spotlight:'on',siren:'off',[type==='screen'?'mode':'video']:type==='screen'?'live':'reviewing'};
+    d.steps=[{id:'sound',panels:{[type]:{siren:'on'}}},{id:'carry'},
+      {id:'bad',panels:{[type]:{siren:'invalid'}}},{id:'stop',panels:{[type]:{siren:'off'}}},
+      {id:'pulse',panels:{[type]:{enterOnce:{siren:'on'}}}},{id:'after'}];
+    const original=JSON.stringify(d), states=C.foldPanelStates(d)[type];
+    assert.deepEqual(plain(states.map(s=>s.siren)),['on','on','on','off','on','off']);
+    for(const state of states){
+      assert.deepEqual(plain(state.audio),audio);assert.equal(state.spotlight,'on');
+      const markup=html(p,state);
+      assert.match(markup,/Spotlight on/);
+      assert.match(markup,type==='screen'?/Camera speaker and microphone active/:/Speaking and hearing remote audio/);
+      if(state.siren==='on'){
+        assert.match(markup,/screen-siren"/);assert.match(markup,/Alarm sounding/);assert.match(markup,/fva-sound-siren/);
+      }else assert.doesNotMatch(markup,/screen-siren"|Alarm sounding|fva-sound-siren/);
+    }
+    assert.ok(C.validate(C.normalize(d)).warnings.some(w=>w.includes('.siren:')));
+    assert.equal(JSON.stringify(d),original);
+    d.paths=[{id:'alarm',steps:['sound','carry']},{id:'quiet',steps:['stop','after']}];
+    assert.equal(C.foldPanelStates(C.diagramForPath(d,'quiet'))[type].at(-1).siren,'off');
+    assert.equal(C.foldPanelStates(C.diagramForPath(d,'alarm'))[type].at(-1).siren,'on');
+    const fields=C.panelPatchFields(p);
+    assert.deepEqual(plain(fields.find(f=>f[0]==='siren').slice(0,3)),['siren','enum',['off','on']]);
+    const plan=C.planStepSetPanelPatch(JSON.stringify(d),d,0,0,type,JSON.stringify({siren:'on'}));
+    assert.ok(!plan.error,plan.error);
+  }
+});
+
+test('alarm is explicit, survives unavailable video and never marks the operator as hearing', () => {
+  for(const type of ['screen','security']){
+    const p=panel(type);
+    const idle=html(p,{status:'alarm',frontDoor:{alarm:'triggered'}});
+    assert.doesNotMatch(idle,/screen-siren"|Alarm sounding/);
+    const active=html(p,{mode:'unavailable',video:'unavailable',siren:'on'});
+    assert.match(active,/Alarm sounding/);
+    assert.doesNotMatch(active,/secmon-audio-listening|class="secmon-audio"/);
+  }
+  const p=panel('screen'), h=screenHost();
+  for(const siren of ['off','on','off','on'])C.renderPanelBody(h,p,{mode:'live',siren},'pastel',null,null,false);
+  assert.equal(h.writes,1,'alarm changes preserve the running scene');
+});

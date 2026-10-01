@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'layout.edge-curves':['Editable smooth arrow curves','0.2.0'],
+    'media.camera-siren':['Independent camera alarm siren','0.2.0'],
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
     'media.screen-scene-override':['Camera screen scene changes per step','0.2.0'],
     'media.scene-raccoon-at-night':['Raccoon-at-night camera clip','0.2.0']
@@ -89,6 +90,7 @@ var FlowviewCompatibility = (function(){
           if(object(value.audio) && Object.keys(value.audio).length)used['media.audio']=true;
           if(value.spotlight && value.spotlight!=='off')used['media.spotlight']=true;
           if(!camera)return;
+          if(value.siren==='on' || value.siren==='off')used['media.camera-siren']=true;
           // Security already carried state scenes; only the new clip is new there.
           if(value.scene==='raccoon-at-night')used['media.scene-raccoon-at-night']=true;
           if(p.type!=='screen')return;

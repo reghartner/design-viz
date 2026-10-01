@@ -166,7 +166,8 @@ var BUILDER_GUIDES = {
       ['kind', 'protocol: https | int | mqtt, or a key declared in page.protocols'],
       ['ret', 'true = response/ack, drawn as a fine dash'],
       ['label', 'short verb or topic on the arrow (POST /x, PUBLISH a/b/c)'],
-      ['bend, labelDx, labelDy', 'manual geometry nudges for crowded corridors'],
+      ['curvePoints', 'Drag an arrow or handle to shape it; Reset curve restores automatic routing'],
+      ['bend, labelDx, labelDy', 'legacy bend and manual label nudges'],
       ['revealAt, hideAt', 'zero-based step indexes — draw the edge only inside that interval']
     ]
   },

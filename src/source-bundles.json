@@ -77,6 +77,7 @@
     "workbench/io-model.js",
     "workbench/io-browser.js",
     "workbench/io.js",
+    "workbench/edge-curves.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
     "workbench/catalog-picker.js",

@@ -579,7 +579,21 @@ Directed arrows between placed nodes:
 - `label` — optional short text on the edge. Protocol verbs and topics read
   best: `POST /commands`, `PUBLISH cmd/site-4/pump-7`, `verify JWT`. Keep
   under ~28 characters.
-- `bend` (number, px), `labelDx`, `labelDy` (numbers, px) — optional manual
+- `curvePoints` — optional ordered array of up to 32 `{t,dx,dy}` through-points
+  for a manually shaped smooth arrow. `t` is 0–1; the point is the interpolation
+  between source and destination node centers at `t`, plus diagram-unit `dx/dy`
+  offsets (finite, within ±100000). Array order is traversal order; `t` values
+  need not increase. Example: `[{"t":0.5,"dx":0,"dy":-100}]` bows through a point
+  100 units above the midpoint. Multiple points allow S-curves. Moving endpoints
+  carries the points proportionally; translating both translates the whole
+  curve. Explicit entry/exit ports stay attached. Nonempty points override
+  `bend`, lanes and automatic avoidance for that edge; they do not guarantee
+  obstacle clearance. Omitting the field or `[]` restores ordinary routing.
+  In the editor, drag an arrow to add a point; drag its handles to reshape;
+  double-click or Delete a focused handle to remove it. Reset curve also removes
+  the legacy bend value. Each gesture is one Undo action. Requires the
+  `layout.edge-curves` capability.
+- `bend` (number, px; legacy), `labelDx`, `labelDy` (numbers, px) — optional manual
   overrides. The engine de-crowds automatically: edges sharing a node side fan
   their attach points apart, a forward/return pair between the same two nodes
   bows apart, same-row edges that skip over a node arc above the row, and

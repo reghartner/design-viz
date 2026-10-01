@@ -1,0 +1,25 @@
+{
+  "page": {
+    "title": "Shape the connection",
+    "skin": "pastel",
+    "blocks": [{
+      "heading": "Curves around a shared service",
+      "text": ["Select a connection and drag a round handle. Pull another part of the arrow to add a point, or choose Reset curve to start over."],
+      "diagram": {
+        "nodes": {
+          "client": {"title": "Client", "icon": "phone"},
+          "shared": {"title": "Shared service", "icon": "server"},
+          "store": {"title": "Storage", "icon": "db"}
+        },
+        "rows": [[]],
+        "floats": [{"id":"client","x":150,"y":240},{"id":"shared","x":590,"y":240},{"id":"store","x":1030,"y":240}],
+        "edges": [
+          {"from":"client","to":"store","label":"Upload","fromPort":{"side":"right"},"toPort":{"side":"left"},"curvePoints":[{"t":0.35,"dx":0,"dy":-110},{"t":0.65,"dx":0,"dy":-110}]},
+          {"from":"store","to":"client","label":"Acknowledged","ret":true,"fromPort":{"side":"bottom"},"toPort":{"side":"bottom"},"curvePoints":[{"t":0.3,"dx":0,"dy":130},{"t":0.7,"dx":0,"dy":130}]}
+        ],
+        "steps": [{"edge":"client->store","text":"Send the upload around the shared service."},{"edge":"store->client","text":"Return the acknowledgement on its own curve."}],
+        "autoplay": false
+      }
+    }]
+  }
+}

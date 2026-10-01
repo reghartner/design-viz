@@ -10,6 +10,49 @@ var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 function floatCoordinate(value){return Number.isFinite(value) && Math.abs(value)<=100000;}
 function positionedFloat(f){return !!f && floatCoordinate(f.x) && floatCoordinate(f.y);}
 var EDGE_PORT_SIDES=['top','right','bottom','left'];
+/* Manual through-points are relative to the endpoint centers. Moving both
+   endpoints translates the whole curve; moving one carries its share. */
+function validCurvePoints(points){
+  return Array.isArray(points) && points.length<=32 && points.every(function(p){
+    return p && Number.isFinite(p.t) && p.t>=0 && p.t<=1 && floatCoordinate(p.dx) && floatCoordinate(p.dy);
+  });
+}
+function hasEdgeCurve(e){return validCurvePoints(e.curvePoints) && e.curvePoints.length>0;}
+function edgeCurveAnchors(e,L){
+  var a=L.pos[e.from],b=L.pos[e.to];
+  if(!a || !b || !hasEdgeCurve(e))return [];
+  return e.curvePoints.map(function(p){return {x:a.cx+(b.cx-a.cx)*p.t+p.dx,y:a.cy+(b.cy-a.cy)*p.t+p.dy};});
+}
+function edgeCurvePoint(e,L,p,t){
+  var a=L.pos[e.from],b=L.pos[e.to];
+  return {t:t,dx:Math.round((p.x-a.cx-(b.cx-a.cx)*t)*10)/10,dy:Math.round((p.y-a.cy-(b.cy-a.cy)*t)*10)/10};
+}
+function edgeCurveSegments(e,L){
+  var anchors=edgeCurveAnchors(e,L);if(!anchors.length)return [];
+  var a=L.pos[e.from],b=L.pos[e.to];
+  var first=anchors[0],last=anchors[anchors.length-1];
+  var start=edgePortPoint(a,{cx:first.x,cy:first.y},e.fromPort),end=edgePortPoint(b,{cx:last.x,cy:last.y},e.toPort);
+  var points=[start].concat(anchors,[end]),tangents=[];
+  points.forEach(function(p,i){
+    if(i===0){tangents.push({x:start.nx,y:start.ny});return;}
+    if(i===points.length-1){tangents.push({x:-end.nx,y:-end.ny});return;}
+    var prev=points[i-1],next=points[i+1],u=Math.hypot(p.x-prev.x,p.y-prev.y),v=Math.hypot(next.x-p.x,next.y-p.y);
+    var x=(p.x-prev.x)/(u || 1)+(next.x-p.x)/(v || 1),y=(p.y-prev.y)/(u || 1)+(next.y-p.y)/(v || 1),len=Math.hypot(x,y);
+    tangents.push({x:x/(len || 1),y:y/(len || 1)});
+  });
+  return points.slice(1).map(function(q,i){
+    var p=points[i],length=Math.hypot(q.x-p.x,q.y-p.y)/3;
+    var before=i?Math.hypot(p.x-points[i-1].x,p.y-points[i-1].y)/3:length;
+    var after=i+2<points.length?Math.hypot(points[i+2].x-q.x,points[i+2].y-q.y)/3:length;
+    var out=Math.min(length,before),into=Math.min(length,after);
+    return [p,{x:p.x+tangents[i].x*out,y:p.y+tangents[i].y*out},
+      {x:q.x-tangents[i+1].x*into,y:q.y-tangents[i+1].y*into},q];
+  });
+}
+function edgeCurvePath(e,L){
+  return edgeCurveSegments(e,L).map(function(p,i){return (i?'':'M '+p[0].x+' '+p[0].y+' ')+
+    'C '+p[1].x+' '+p[1].y+' '+p[2].x+' '+p[2].y+' '+p[3].x+' '+p[3].y;}).join(' ');
+}
 function validEdgePort(port){
   return !!port && typeof port==='object' && !Array.isArray(port) && EDGE_PORT_SIDES.indexOf(port.side)>=0 &&
     (port.offset==null || Number.isFinite(port.offset) && port.offset>=0 && port.offset<=1);
@@ -432,15 +475,18 @@ function cubicAxisBounds(v){
 function expandPlacedEdgeBounds(edges,L,adjust){
   var vb=L.vb,left=vb.x,top=vb.y,right=vb.x+vb.w,bottom=vb.y+vb.h;
   edges.forEach(function(e,i){
-    if(!L.pos[e.from] || !L.pos[e.to] || !edgeHasPlacement(e,L))return;
-    var points=placedEdgePoints(e,L,adjust[i] || {});
+    if(!L.pos[e.from] || !L.pos[e.to] || !hasEdgeCurve(e) && !edgeHasPlacement(e,L))return;
+    var segments=hasEdgeCurve(e)?edgeCurveSegments(e,L):[placedEdgePoints(e,L,adjust[i] || {})];
+    segments.forEach(function(points){
     var x=cubicAxisBounds(points.map(function(p){return p.x;})),y=cubicAxisBounds(points.map(function(p){return p.y;}));
     left=Math.min(left,x.min-24);top=Math.min(top,y.min-24);right=Math.max(right,x.max+24);bottom=Math.max(bottom,y.max+24);
+    });
   });
   L.vb={x:left,y:top,w:right-left,h:bottom-top};L.H=Math.max(L.H,bottom);
 }
 
 function edgePath(e, L, adj){
+  if(hasEdgeCurve(e))return edgeCurvePath(e,L);
   if(edgeHasPlacement(e,L))return placedEdgePath(e,L,adj || {});
   if (adj && adj.path) return adj.path;
   var a = L.pos[e.from], b = L.pos[e.to];
@@ -572,6 +618,7 @@ var AVOID_MX = [-44, 44, -78, 78, -112, 112, -146, 146];
 var AVOID_MY = [-30, 30, -54, 54, -78, 78];
 function resolveEdgeAvoidance(edges, L, adj){
   edges.forEach(function(e, ei){
+    if(hasEdgeCurve(e))return; /* A user's through-points are authoritative. */
     var a = L.pos[e.from], b = L.pos[e.to];
     if (!a || !b) return;
     var rects = [];

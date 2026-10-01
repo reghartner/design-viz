@@ -380,6 +380,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
     deltaWarnings(e, EP, warnings);
+    if(e && e.curvePoints!=null && !validCurvePoints(e.curvePoints))
+      errors.push(EP+'.curvePoints: expected up to 32 {t: 0..1, dx, dy} points with finite offsets between -100000 and 100000');
     ['fromPort','toPort'].forEach(function(key){
       if(e && e[key]!=null && !validEdgePort(e[key]))errors.push(EP+'.'+key+': expected {side: top|right|bottom|left, offset?: 0..1}');
     });

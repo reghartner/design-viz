@@ -950,7 +950,21 @@ perspectives" of one timeline). Types:
   state shows the label and the reason line.
 - `screen` — a camera viewfinder: `{"id":"cam","type":"screen",
   "scene":"person-at-door-night","initial":{"mode":"off"}}`. Patched via
-  `{"mode":"off|boot|active|live|rec|save|unavailable", "banner":"<save-banner text>"}`.
+  `{"mode":"off|boot|active|live|rec|save|playing|unavailable", "banner":"<save-banner text>"}`.
+  `playing` is recorded-clip playback (someone plays a saved clip, for example
+  in an app): it shows the scene with a **PLAYING** chip and, when `banner` is
+  set, that text as the clip title. It is not live view and is unrelated to
+  `scenePlayback:"playing"`, which only starts the illustrated action.
+  Optional per-state `scene` overrides the declared clip from that step and
+  carries like other fields; `scene:null` returns to the declared `scene`.
+  An unknown `scene` value warns and keeps the previous clip. For one camera
+  that records several events, keep one screen panel and patch `scene`:
+  `{"mode":"rec","scene":"raccoon-at-night"}`, later `{"mode":"rec","scene":null}`.
+  These additions need Flowview 0.2.0. Stamping detects them in the declaration,
+  `initial`, step patches and `enterOnce`, and records `minVersion:"0.2.0"` with
+  `media.screen-playing`, `media.screen-scene-override` (any per-state `scene`,
+  including `null` or an older clip) and `media.scene-raccoon-at-night` (also
+  for Security monitoring). A 0.1.0 viewer shows an upgrade notice listing them.
   `unavailable` hides the scene and shows a crossed-camera symbol with
   “Camera unavailable” and the authored `reason` text. For example:
   `{"mode":"unavailable","reason":"Protective shutdown · too hot"}`.
@@ -962,8 +976,9 @@ perspectives" of one timeline). Types:
   badge or recording dot: the camera is on, but is not livestreaming or recording.
   Use `live` for livestreaming and `rec` for recording. Stock
   scenes: `person-at-door-night`, `person-through-door`, `doorbell-run-away`,
-  `doorbell-runners`, `package-drop`, `kitchen-fire`, `static-noise`. `rec` shows
-  a blinking REC dot; `save` shows the banner. All stock scenes use full-color
+  `doorbell-runners`, `package-drop`, `kitchen-fire`, `raccoon-at-night`,
+  `static-noise`. `rec` shows a blinking REC dot; `save` shows the banner;
+  `playing` shows PLAYING. All stock scenes use full-color
   artwork under every skin; `static-noise` uses a color test pattern with
   interference during boot. Existing scene names work without a new field;
   rebuild older exported HTML with the current template to update its artwork. Scenes
@@ -979,10 +994,13 @@ perspectives" of one timeline). Types:
   lasting about eight seconds; the porch stays empty afterward. Reduced motion
   and print show a mid-run still. The Screen scene picker previews both clips.
   `kitchen-fire` loops layered flames, rising smoke, embers, and reflected
-  light around a stove. These are simulated SVG clips, with no video assets
+  light around a stove. `raccoon-at-night` is a nine-second one-shot clip: a
+  masked, ring-tailed raccoon crosses the night porch, stops to sniff the mat,
+  and leaves. These are simulated SVG clips, with no video assets
   or external requests. Reduced motion and print hold a readable still of
-  the entry or fire. ACTIVE → LIVE → REC → SAVE preserves the same clip's animation;
-  returning from OFF/BOOT restarts it. A different scene replaces the clip.
+  the entry, fire or sniffing raccoon. ACTIVE → LIVE → REC → SAVE → PLAYING
+  preserves the same clip's animation; returning from OFF/BOOT restarts it.
+  A different scene (declared or per-state) replaces the clip.
   Scene timing is independent of recording: patch `scenePlayback:"waiting"`
   to show the quiet setting before an event (empty doorway or porch, no delivered
   package, or a kitchen without fire/smoke). Set `mode:"rec"` in that same
@@ -1002,9 +1020,12 @@ perspectives" of one timeline). Types:
   In the workbench, select a screen panel and choose **Screen scene**. The
   inline preview and **Replay clip** work even when the story camera is OFF;
   replay affects only that preview. In the step's screen patch editor, use
-  **Scene event → Before event / Play event** independently of **mode**.
+  **Scene event → Before event / Play event** independently of **mode**
+  (whose `playing` option reads “playing (recorded clip playback)”). **Scene
+  override** picks a clip for this step; **Use declared scene** writes `null`.
   **Inherit** removes only this step's override. Try **starters… → screen clips**
-  for a recording that starts at step 3 and captures the event at step 4.
+  for a recording that starts at step 3 and captures the event at step 4, and
+  a raccoon clip recorded, then played back in `playing` mode.
 - `trace` — observed service internals and wall-time coverage:
   `{"id":"inside","type":"trace","title":"Inside the service",
   "spans":[{"id":"request","service":"api","name":"handle request",

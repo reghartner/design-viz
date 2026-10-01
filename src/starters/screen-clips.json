@@ -486,6 +486,139 @@
             }
           ]
         }
+      },
+      {
+        "heading": "A raccoon at night, recorded then played back",
+        "text": [
+          "An illustrative animated clip, not real footage. Step 2 records the empty night porch; step 3 starts the raccoon while REC continues. After standby, step 6 uses mode playing: the saved clip is played back with a PLAYING label. Scene event (Before event / Play event) is a separate control that only starts or holds the action."
+        ],
+        "diagram": {
+          "primaryPanel": "camera-view",
+          "view": "step",
+          "nodes": {
+            "camera": {
+              "title": "Porch camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "detector": {
+              "title": "Animal detector",
+              "icon": "chip",
+              "tint": "mqtt"
+            },
+            "phone": {
+              "title": "Phone",
+              "icon": "phone",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "detector",
+              "phone"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "detector",
+              "kind": "int",
+              "label": "frames"
+            },
+            {
+              "from": "detector",
+              "to": "phone",
+              "kind": "https",
+              "label": "event"
+            }
+          ],
+          "panels": [
+            {
+              "id": "camera-view",
+              "type": "screen",
+              "title": "Porch camera",
+              "scene": "raccoon-at-night",
+              "initial": {
+                "mode": "off",
+                "scenePlayback": "waiting"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "standby",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Camera in standby at night. Nothing has happened yet.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off",
+                  "scenePlayback": "waiting"
+                }
+              }
+            },
+            {
+              "id": "record",
+              "nodes": [
+                "camera"
+              ],
+              "text": "Motion wakes the camera. Recording begins on the quiet porch.",
+              "panels": {
+                "camera-view": {
+                  "mode": "rec"
+                }
+              }
+            },
+            {
+              "id": "event",
+              "edge": "camera->detector",
+              "text": "A raccoon crosses the porch, stops to sniff the mat and moves on while the camera keeps recording.",
+              "panels": {
+                "camera-view": {
+                  "scenePlayback": "playing"
+                }
+              }
+            },
+            {
+              "id": "save",
+              "edge": "detector->phone",
+              "text": "The clip is saved to the timeline.",
+              "panels": {
+                "camera-view": {
+                  "mode": "save",
+                  "banner": "ANIMAL CLIP SAVED"
+                }
+              }
+            },
+            {
+              "id": "idle",
+              "nodes": [
+                "camera"
+              ],
+              "text": "The camera returns to standby. There is no live view between clips.",
+              "panels": {
+                "camera-view": {
+                  "mode": "off"
+                }
+              }
+            },
+            {
+              "id": "playback",
+              "nodes": [
+                "phone"
+              ],
+              "text": "Later, the saved clip is played back on the phone. PLAYING marks recorded playback, not a live camera.",
+              "panels": {
+                "camera-view": {
+                  "mode": "playing",
+                  "banner": "Raccoon clip"
+                }
+              }
+            }
+          ]
+        }
       }
     ]
   }

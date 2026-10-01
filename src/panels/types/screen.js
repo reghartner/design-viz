@@ -6,15 +6,24 @@ var SCENE_NAMES = [
   'doorbell-runners',
   'package-drop',
   'kitchen-fire',
+  'raccoon-at-night',
   'static-noise',
 ];
-var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'unavailable'];
+/* `playing` is recorded-clip playback (a PLAYING chip). It is unrelated to
+   `scenePlayback:"playing"`, which only gates the illustrated event. */
+var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'playing', 'unavailable'];
+var SCREEN_SCENE_MODES = ['active', 'live', 'rec', 'save', 'playing'];
 var SCREEN_SPOTLIGHTS = ['off', 'on', 'flash'];
+/* A state `scene` overrides the declared clip; null restores the declaration. */
+function screenSceneOverride(value) {
+  return value === null || SCENE_NAMES.indexOf(value) >= 0;
+}
 /* Preserve the legacy screen snapshot contract while sanitizing the independent
-   audio/light channels before they enter carried state. */
+   audio/light channels and scene override before they enter carried state. */
 function screenCleanState(raw, once) {
   if (!panelObject(raw)) return {};
   var out = Object.assign({}, raw);
+  if (panelOwn(raw, 'scene') && !screenSceneOverride(raw.scene)) delete out.scene;
   if (panelOwn(raw, 'audio')) {
     var audio = FlowAudio.clean(raw.audio);
     if (audio === undefined) delete out.audio;
@@ -31,6 +40,8 @@ function screenPatchWarnings(state, path, warnings) {
   if (!state || typeof state !== 'object' || Array.isArray(state)) return;
   if (state.mode != null && SCREEN_MODES.indexOf(state.mode) < 0)
     warnings.push(path + '.mode: unknown camera mode — using off');
+  if (panelOwn(state, 'scene') && !screenSceneOverride(state.scene))
+    warnings.push(path + '.scene: unknown scene — keeping the previous clip (null uses the declared scene)');
   if (state.reason != null && typeof state.reason !== 'string')
     warnings.push(path + '.reason: expected text or null — using the default explanation');
   if (panelOwn(state, 'audio')) FlowAudio.clean(state.audio, path + '.audio', warnings);
@@ -176,6 +187,32 @@ function doorbellRunScene(pair) {
     '</svg>'
   );
 }
+function raccoonNightScene() {
+  /* A masked, ring-tailed raccoon crosses the night porch right to left,
+     stops at the mat to sniff, then leaves. Feet sit at the local origin;
+     the tail rings are a dashed stroke over the fur. No SVG IDs. */
+  var tail = 'M18-15Q33-13 37-26Q40-34 47-36';
+  return (
+    '<svg viewBox="0 0 320 180" class="scene scene-raccoon" aria-hidden="true">' +
+    porchSceneBackdrop(true) +
+    '<g class="raccoon"><ellipse cx="0" cy="1" rx="27" ry="3.5" fill="#0D1729" opacity=".4"/>' +
+    '<g stroke-linecap="round"><path class="raccoon-leg raccoon-leg-back" d="M-12-7V0M15-7V0" stroke="#1E2128" stroke-width="5"/>' +
+    '<g class="raccoon-tail" fill="none" stroke-width="9"><path d="' + tail + '" stroke="#A2A6AF"/>' +
+    '<path d="' + tail + '" stroke="#24272E" stroke-dasharray="5 5" stroke-dashoffset="-3" stroke-linecap="butt"/></g>' +
+    '<ellipse cx="2" cy="-15" rx="22" ry="11" fill="#8F939D"/>' +
+    '<path d="M-13-23Q3-30 19-22" fill="none" stroke="#6B6F79" stroke-width="3" opacity=".8"/>' +
+    '<path class="raccoon-leg" d="M-9-7V0M11-7V0" stroke="#2B2E36" stroke-width="5"/>' +
+    '<g class="raccoon-head"><path d="M-28-27L-26-36L-20-29ZM-18-29L-14-36L-12-26Z" fill="#6B6F79" stroke="#E6E8EC" stroke-width="1"/>' +
+    '<ellipse cx="-21" cy="-21" rx="11" ry="9" fill="#A6AAB3"/>' +
+    '<path d="M-29-22Q-37-20-39-15Q-33-12-25-15Z" fill="#E8EAEE"/>' +
+    '<path d="M-31-25Q-23-31-13-25" fill="none" stroke="#F2F3F6" stroke-width="2.5"/>' +
+    '<path d="M-33-21Q-27-26-21-23Q-16-26-11-21Q-15-16-21-19Q-27-16-33-21Z" fill="#17191E"/>' +
+    '<circle cx="-26" cy="-21" r="1.4" fill="#F4EFA0"/><circle cx="-16" cy="-21" r="1.2" fill="#F4EFA0"/>' +
+    '<circle cx="-39" cy="-16" r="1.8" fill="#121419"/></g></g></g>' +
+    '<text x="293" y="176" text-anchor="end" fill="#DCE6F7" opacity=".8" font-family="monospace" font-size="5" letter-spacing="1">PORCH · NIGHT · DEMO</text>' +
+    '</svg>'
+  );
+}
 var SCENE_LABELS = {
   'person-at-door-night': 'Visitor at night',
   'person-through-door': 'Person walking through a door',
@@ -183,11 +220,13 @@ var SCENE_LABELS = {
   'doorbell-runners': 'Doorbell: two people running away',
   'package-drop': 'Package delivery',
   'kitchen-fire': 'Kitchen fire',
+  'raccoon-at-night': 'Raccoon on the porch at night',
   'static-noise': 'Static noise',
 };
 var SCENES = {
   'doorbell-run-away': doorbellRunScene(false),
   'doorbell-runners': doorbellRunScene(true),
+  'raccoon-at-night': raccoonNightScene(),
   'person-at-door-night':
     '<svg viewBox="0 0 320 180" class="scene" aria-hidden="true">' +
     porchSceneBackdrop(true) +
@@ -342,11 +381,13 @@ function screenFramePresentation(host, panel, state) {
   var h = '';
   var mode = String(state.mode || 'off');
   if (SCREEN_MODES.indexOf(mode) < 0) mode = 'off';
-  var sceneName = SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
+  var sceneName =
+    SCENE_NAMES.indexOf(state.scene) >= 0 ? state.scene :
+    SCENE_NAMES.indexOf(panel.scene) >= 0 ? panel.scene : 'static-noise';
   var scrClass =
     'screenbox m-' +
     mode +
-    (state.scenePlayback === 'waiting' && ['active', 'live', 'rec', 'save'].indexOf(mode) >= 0
+    (state.scenePlayback === 'waiting' && SCREEN_SCENE_MODES.indexOf(mode) >= 0
       ? ' scene-waiting'
       : '');
   /* overlays are built separately from the scene so a mode change between
@@ -359,6 +400,12 @@ function screenFramePresentation(host, panel, state) {
   if (mode === 'rec') scrOvl += '<span class="ovl recchip"><span class="recdot"></span>REC</span>';
   if (mode === 'save')
     scrOvl += '<span class="ovl banner">' + esc(state.banner || 'SAVING CLIP') + '</span>';
+  if (mode === 'playing') {
+    scrOvl += '<span class="ovl playchip"><span class="playglyph" aria-hidden="true"></span>PLAYING</span>';
+    /* In playback the banner, when authored, titles the recorded clip. */
+    if (typeof state.banner === 'string' && state.banner.trim())
+      scrOvl += '<span class="ovl cliptitle">' + esc(state.banner) + '</span>';
+  }
   if (mode === 'off') scrOvl += '<span class="ovl offlabel">STANDBY</span>';
   if (mode === 'unavailable')
     scrOvl +=
@@ -377,19 +424,18 @@ function screenFramePresentation(host, panel, state) {
     scrOvl += '<span class="ovl screen-light-label">Spotlight ' + (state.spotlight === 'flash' ? 'flashing' : 'on') + '</span>';
   h += '<div class="' + scrClass + '">';
   if (mode === 'boot') h += SCENES['static-noise'];
-  else if (mode === 'active' || mode === 'live' || mode === 'rec' || mode === 'save')
-    h += SCENES[sceneName];
+  else if (SCREEN_SCENE_MODES.indexOf(mode) >= 0) h += SCENES[sceneName];
   h += scrOvl + '</div><div class="screen-audio-slot">' + audioHTML + '</div>';
   return {
     html: h,
     patch: function () {
       /* screen surgical path: consecutive modes that both show the SAME scene
-     (active / live / rec / save) swap only the mode class and the overlay chips,
-     keeping the scene subtree — the walker's animation state survives.
+     (active / live / rec / save / playing) swap only the mode class and the
+     overlay chips, keeping the scene subtree — the walker's animation state survives.
      A stable off/boot/unavailable frame can patch audio too; entering or
      leaving one of those modes rebuilds its video content. */
       var surgical = false;
-      var SCENE_SHOWING = { active: true, live: true, rec: true, save: true };
+      var SCENE_SHOWING = { active: true, live: true, rec: true, save: true, playing: true };
       if (
         host._lastHTML != null &&
         sceneName === host._scrScene &&
@@ -450,18 +496,18 @@ PanelRegistry.extend('screen', {
       order: 478,
       css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
 .screenbox .scene{display:block; width:100%; height:100%;}
-.screenbox.m-active .walker, .screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker{animation:walkin 3.2s ease-out forwards;}
+.screenbox.m-active .walker, .screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker, .screenbox.m-playing .walker{animation:walkin 3.2s ease-out forwards;}
 @keyframes walkin{from{transform:translateX(40px);} to{transform:translateX(160px);}}
 .screenbox .walker{transform:translateX(160px);}`,
     },
     {
       order: 484,
       css: String.raw`.screenbox .courier{transform:translateX(-40px);}
-.screenbox.m-active .courier, .screenbox.m-live .courier, .screenbox.m-rec .courier, .screenbox.m-save .courier{animation:courierrun 5s ease-in-out forwards;}
+.screenbox.m-active .courier, .screenbox.m-live .courier, .screenbox.m-rec .courier, .screenbox.m-save .courier, .screenbox.m-playing .courier{animation:courierrun 5s ease-in-out forwards;}
 @keyframes courierrun{0%{transform:translateX(-30px);} 42%{transform:translateX(238px);} 58%{transform:translateX(238px);} 100%{transform:translateX(-40px);}}
-.screenbox.m-active .courier .carried, .screenbox.m-live .courier .carried, .screenbox.m-rec .courier .carried, .screenbox.m-save .courier .carried{animation:carrydrop 5s step-end forwards;}
+.screenbox.m-active .courier .carried, .screenbox.m-live .courier .carried, .screenbox.m-rec .courier .carried, .screenbox.m-save .courier .carried, .screenbox.m-playing .courier .carried{animation:carrydrop 5s step-end forwards;}
 @keyframes carrydrop{0%{opacity:1;} 50%{opacity:0;} 100%{opacity:0;}}
-.screenbox.m-active .pkg, .screenbox.m-live .pkg, .screenbox.m-rec .pkg, .screenbox.m-save .pkg{animation:pkgdrop 5s ease-out forwards;}
+.screenbox.m-active .pkg, .screenbox.m-live .pkg, .screenbox.m-rec .pkg, .screenbox.m-save .pkg, .screenbox.m-playing .pkg{animation:pkgdrop 5s ease-out forwards;}
 @keyframes pkgdrop{0%,49%{opacity:0; transform:translateY(-6px);} 56%{opacity:1; transform:translateY(0);} 100%{opacity:1;}}`,
     },
     {
@@ -470,13 +516,13 @@ PanelRegistry.extend('screen', {
 .screenbox .entry-door{transform-origin:174px 28px;transform:skewY(-12deg) scaleX(.24);}
 .screenbox .entry-leg{transform-origin:0 127px;}
 .screenbox .entry-arm{transform-origin:0 106px;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-person{animation:entrycross 6.8s linear forwards;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-door{animation:entryopen 6.8s ease-in-out forwards;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-light{animation:entrylight 6.8s ease-in-out forwards;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg,
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm{animation:entrystride .68s ease-in-out 8 alternate;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-leg-back,
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .entry-arm:not(.entry-arm-back){animation-direction:alternate-reverse;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-person{animation:entrycross 6.8s linear forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-door{animation:entryopen 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-light{animation:entrylight 6.8s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-leg,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-arm{animation:entrystride .68s ease-in-out 8 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .entry-arm:not(.entry-arm-back){animation-direction:alternate-reverse;}
 @keyframes entrycross{
   0%{transform:translate(22px,0) scale(1);opacity:1;}
   38%{transform:translate(185px,0) scale(1);opacity:1;}
@@ -499,13 +545,13 @@ PanelRegistry.extend('screen', {
 .screenbox .doorbell-leg-back{transform:rotate(12deg);}
 .screenbox .doorbell-arm{transform-origin:8px -46px;transform:rotate(-18deg);}
 .screenbox .doorbell-arm-back{transform-origin:-8px -46px;transform:rotate(18deg);}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-runner-second{animation-name:doorbellawaysecond;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-leg-back,
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-runner{animation:doorbellaway 7.2s linear var(--runner-delay) both;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-runner-second{animation-name:doorbellawaysecond;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-bounce{animation:doorbellbounce .32s ease-in-out var(--runner-delay) 23;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-leg{animation:doorbellstride .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-arm{animation:doorbellarms .16s ease-in-out var(--runner-delay) 46 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-leg-back,
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .doorbell-arm:not(.doorbell-arm-back){animation-direction:alternate-reverse;}
 @keyframes doorbellaway{
   0%{transform:translate(105px,180px) scale(1.35);}
   16%{transform:translate(130px,146px) scale(.98);}
@@ -533,31 +579,63 @@ PanelRegistry.extend('screen', {
       css: String.raw`.screenbox .fire-flame{transform-origin:239px 105px;}
 .screenbox .fire-glow{filter:blur(10px);}
 .screenbox .fire-smoke{transform-origin:233px 72px;filter:blur(3px);}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-flame{animation:firebreathe 1.1s ease-in-out infinite alternate;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-middle{animation-duration:.83s;animation-delay:-.4s;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-core{animation-duration:.67s;animation-delay:-.2s;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-glow{animation:fireglow 2.2s ease-in-out infinite alternate;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke{animation:firerise 3.8s ease-out infinite;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-smoke-late{animation-delay:-1.9s;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember{animation:fireember 2.6s ease-out infinite;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-ember-late{animation-delay:-1.3s;}
-.screenbox:is(.m-active,.m-live,.m-rec,.m-save) .fire-alarm{animation:fireglow 1.5s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-flame{animation:firebreathe 1.1s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-middle{animation-duration:.83s;animation-delay:-.4s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-core{animation-duration:.67s;animation-delay:-.2s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-glow{animation:fireglow 2.2s ease-in-out infinite alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-smoke{animation:firerise 3.8s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-smoke-late{animation-delay:-1.9s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-ember{animation:fireember 2.6s ease-out infinite;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-ember-late{animation-delay:-1.3s;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .fire-alarm{animation:fireglow 1.5s ease-in-out infinite alternate;}
 @keyframes firebreathe{from{transform:scale(.96,.87) skewX(-3deg);}to{transform:scale(1.04,1.05) skewX(3deg);}}
 @keyframes fireglow{from{opacity:.55;}to{opacity:1;}}
 @keyframes firerise{0%{transform:translate(0,0) scale(.7);opacity:0;}20%{opacity:.9;}100%{transform:translate(-28px,-57px) scale(1.9);opacity:0;}}
 @keyframes fireember{0%{transform:translate(0,0);opacity:0;}15%{opacity:.8;}100%{transform:translate(-12px,-45px);opacity:0;}}`,
     },
     {
+      order: 530,
+      /* Default transform is the reduced-motion/print still: sniffing at the mat. */
+      css: String.raw`.screenbox .raccoon{transform-origin:0 0;transform:translate(176px,163px) scale(1.3);}
+.screenbox .raccoon-leg{transform-origin:0 -7px;}
+.screenbox .raccoon-head{transform-origin:-14px -20px;}
+.screenbox .raccoon-tail{transform-origin:18px -15px;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .raccoon{animation:raccooncross 9s linear forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .raccoon-leg{animation:raccoongait 9s ease-in-out forwards;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .raccoon-leg-back{animation-name:raccoongaitback;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .raccoon-head{animation:raccoonsniff .39s ease-in-out 3.2s 6 alternate;}
+.screenbox:is(.m-active,.m-live,.m-rec,.m-save,.m-playing) .raccoon-tail{animation:raccoontail .9s ease-in-out 10 alternate;}
+/* Body and legs share one nine-second timeline: walk, stand still to sniff
+   from 35% to 62% (legs neutral, head sniffs), then walk off. */
+@keyframes raccooncross{
+  0%{transform:translate(352px,163px) scale(1.3);}
+  35%,62%{transform:translate(176px,163px) scale(1.3);}
+  100%{transform:translate(-56px,163px) scale(1.3);}
+}
+@keyframes raccoongait{
+  0%,7%,14%,21%,28%,65.5%,72.5%,79.5%,86.5%,93.5%{transform:skewX(-22deg);}
+  3.5%,10.5%,17.5%,24.5%,31.5%,69%,76%,83%,90%,97%{transform:skewX(22deg);}
+  35%,62%,100%{transform:skewX(0);}
+}
+@keyframes raccoongaitback{
+  0%,7%,14%,21%,28%,65.5%,72.5%,79.5%,86.5%,93.5%{transform:skewX(22deg);}
+  3.5%,10.5%,17.5%,24.5%,31.5%,69%,76%,83%,90%,97%{transform:skewX(-22deg);}
+  35%,62%,100%{transform:skewX(0);}
+}
+@keyframes raccoonsniff{from{transform:rotate(0);}to{transform:rotate(-14deg);}}
+@keyframes raccoontail{from{transform:rotate(-6deg);}to{transform:rotate(8deg);}}`,
+    },
+    {
       order: 541,
       css: String.raw`.screenbox.scene-waiting .scene *{animation:none !important;}
-.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.doorbell-runner,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm){visibility:hidden;}
+.screenbox.scene-waiting :is(.walker,.courier,.pkg,.entry-person,.doorbell-runner,.fire-flame,.fire-glow,.fire-smoke,.fire-ember,.fire-alarm,.raccoon){visibility:hidden;}
 .screenbox.scene-waiting .entry-door{transform:none;}
 .screenbox.scene-waiting .entry-light{opacity:0;}
 @media(prefers-reduced-motion:reduce){
-  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire,.scene-raccoon) *{animation:none !important;}
 }
 @media print{
-  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire) *{animation:none !important;}
+  .screenbox :is(.scene-entry,.scene-doorbell,.scene-fire,.scene-raccoon) *{animation:none !important;}
 }
 @media print{
   .screenbox{print-color-adjust:exact;}
@@ -571,7 +649,10 @@ PanelRegistry.extend('screen', {
 .recchip{top:8px; left:8px; color:#FFB0A6; background:rgba(8,20,35,.8); padding:3px 6px; border-radius:5px; display:flex; align-items:center; gap:5px;}
 .recdot{width:8px; height:8px; border-radius:50%; background:#FF3B30; animation:recblink 1s steps(1) infinite;}
 @keyframes recblink{50%{opacity:.15;}}
-.banner{left:0; right:0; bottom:0; text-align:center; padding:5px 0; color:#0B1220; background:#FFB454;}`,
+.banner{left:0; right:0; bottom:0; text-align:center; padding:5px 0; color:#0B1220; background:#FFB454;}
+.playchip{top:8px; left:8px; color:#D6EEFF; background:rgba(8,20,35,.8); padding:3px 6px; border-radius:5px; display:flex; align-items:center; gap:5px;}
+.playglyph{width:0; height:0; border-left:7px solid #7CC8FF; border-top:4.5px solid transparent; border-bottom:4.5px solid transparent;}
+.cliptitle{left:0; right:0; bottom:0; padding:5px 8px; text-align:center; color:#E6F1FA; background:rgba(8,20,35,.78); font-weight:500; letter-spacing:.03em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}`,
     },
     {
       order: 1201,
@@ -699,7 +780,7 @@ PanelRegistry.extend('screen', {
     branding: true,
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
     initialFields: true,
-    transientFields: ['mode', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
+    transientFields: ['mode', 'scene', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
     setupFields: [
       ['scene', 'scene'],
       ['initial', 'json'],
@@ -712,6 +793,15 @@ PanelRegistry.extend('screen', {
       ['audio', 'objf', FlowAudio.fields],
       ['spotlight', 'enum', SCREEN_SPOTLIGHTS],
     ],
+    /* The per-state scene override joins the inspector beside mode; the
+       legacy static field list stays unchanged for existing tooling. */
+    expandPatchFields: function () {
+      var fields = PanelRegistry.get('screen').authoring.patchFields;
+      return fields.slice(0, 1).concat(
+        [['scene', 'enum', SCENE_NAMES, { label: 'Scene override', nullLabel: 'Use declared scene' }]],
+        fields.slice(1)
+      );
+    },
     origin: function (panel, key, snapshot, context) {
       return panelSanitizedOrigin(key, context, function (raw) { return screenCleanState(raw, false); });
     },
@@ -759,6 +849,12 @@ PanelRegistry.extend('screen', {
           return context.controls.block(key, scenes);
         },
         patchField: function (f, input, options) {
+          if (f[0] === 'mode') {
+            Array.prototype.forEach.call(input.options, function (option) {
+              if (option.value === 'playing') option.textContent = 'playing (recorded clip playback)';
+            });
+            return;
+          }
           if (f[0] !== 'scenePlayback') return;
           input.setAttribute('aria-label', 'Scene event');
           Array.prototype.forEach.call(input.options, function (option) {
@@ -771,7 +867,7 @@ PanelRegistry.extend('screen', {
           var sceneNote = document.createElement('p');
           sceneNote.className = 'home-note';
           sceneNote.textContent =
-            'Active means on without livestreaming or recording. Audio and spotlight carry independently of video. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
+            'Active means on without livestreaming or recording. Mode playing shows a recorded clip being played back (PLAYING chip; banner titles the clip); Scene event only starts or holds the illustrated action. Scene override switches the clip from this step; Use declared scene returns to the panel scene. Audio and spotlight carry independently of video. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
           body.appendChild(sceneNote);
         },
         patchLabel: function (key) {

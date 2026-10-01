@@ -140,7 +140,7 @@ To build that from an existing arrangement:
    buttons above the section.
 
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
-copies its View type, step selection and all profiles independently;
+copies its View type, path and step selections, and all profiles independently;
 swapping, moving, sizing and visibility edit
 only the selected host profile in the active layout. Repeat a swap in other
 explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
@@ -288,6 +288,23 @@ rather than capturing its default silently. See [GIF options](../README.md#expor
 These link selectors require a newly generated standalone HTML page. They do
 not change the Backstage plugin's public navigation API.
 
+## Paths shown in each view
+
+Under **Arrange section**, expand **Paths shown in this view** and check the
+outcomes its audience needs. **Show all paths** clears the filter and includes
+future paths automatically. A selected path keeps its full authored sequence;
+combine this with **Steps shown in this view** when the audience also needs fewer
+playback stops. At least one path must remain selected, and a view-specific step
+selection must include a step reachable through one of its selected paths.
+
+Hidden paths remain in `diagram.paths`, share the same step registry, and retain
+their state definitions. They are absent from the view's path controls, playback,
+print step list, deep-link fallback and GIF frames. A path-only link to a hidden path falls back
+to an available path. Exact workbench and detail-step navigation may temporarily
+preview a hidden path without changing the saved filter. Switching views retains
+the selected path when it remains available; otherwise it opens the first
+available selected path.
+
 ## Steps shown in each view
 
 Under **Arrange section**, expand **Steps shown in this view** and check the
@@ -305,7 +322,8 @@ If the entire path is excluded, it selects the first available path. Step links
 and editor references retain the original step identity.
 
 The editor's Steps inspector can temporarily preview a hidden step for editing;
-the playback status says **Previewing a hidden step**. Arrows, Play or clicking
+the playback status says **Previewing a hidden step**. Exact navigation can also
+preview a path excluded from the view. Arrows, Play or clicking
 the view button return to its saved selection. This does not change the spec.
 
 Named views are the complete set of view buttons; there is no additional automatic
@@ -375,7 +393,7 @@ Confluence or Backstage. Check the installed host after deployment.
 ```json
 "defaultLayout": "home-story",
 "layouts": [
-  {"id":"home-story", "name":"Home story", "presentation":"standard", "sectionLayout":{"default":[
+  {"id":"home-story", "name":"Home story", "presentation":"standard", "paths":["happy"], "sectionLayout":{"default":[
     {"panel":"home","x":0,"y":0,"w":8,"h":12},
     {"x":0,"y":18,"w":8,"h":12,"hidden":true},
     {"controls":"steps","x":0,"y":12,"w":8,"h":6},
@@ -458,13 +476,19 @@ Named layouts require the updated viewer bundle: re-export standalone HTML or
 update the Backstage/Forge app. Backstage's native renderer is rebuilt with the
 plugin; its host uses the normal bundled-script and embedded-asset policy.
 
+Optional `layouts[].paths` is a nonempty list of unique existing path IDs. Omit
+it for all paths; list order does not reorder path controls. The selection belongs
+to the view across all host profiles. The workbench prevents an edit from leaving
+a view without a reachable selected path and step.
+
 Optional `layouts[].steps` is a nonempty list of unique existing step IDs. Omit
 it for all steps; list order does not reorder the story. The selection belongs
 to the view across all host profiles. For example:
 
 ```json
 {"id":"resident", "name":"Resident story",
- "steps":["quiet","notify","inside","offline","leave"],
+ "paths":["happy"],
+ "steps":["quiet","notify","inside"],
  "sectionLayout":{"default":[
    {"panel":"home","x":0,"y":0,"w":8,"h":18},
    {"controls":"steps","attachTo":"panel:home","x":0,"y":18,"w":8,"h":6},
@@ -473,5 +497,5 @@ to the view across all host profiles. For example:
 ```
 
 Deleting a selected step updates all view selections; the editor prevents deleting
-the only selected step in a view until another is selected. Panel rename updates
+the only selected step or path in a view until another is selected. Panel rename updates
 attachments across profiles; deleting a Home map detaches its controls.

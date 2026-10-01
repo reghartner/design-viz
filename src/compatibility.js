@@ -12,7 +12,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(panelFeatures).forEach(function(id){features[id]=panelFeatures[id];});
   var extraLabels={ 'flow.handoff':'Cross-document diagram handoffs', 'flow.drilldown':'Domain drill-downs', 'flow.alternates':'Alternate paths', 'flow.failures':'Failed communications', 'flow.step-colors':'Authored step-circle colors',
     'content.deviceapp':'Device app notifications and optional sources', 'content.deviceapp-navigation':'Device app phone screens and card visibility', 'content.contracts':'Multiple sized contract blocks', 'layout.arranged':'Custom panel layouts', 'layout.named':'Named views',
-    'layout.step-subsets':'View-specific step stops', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
+    'layout.step-subsets':'View-specific step stops', 'layout.path-subsets':'View-specific alternate paths', 'layout.explore':'Explore view presentation', 'layout.explore-defaults':'Saved Explore positions and camera', 'layout.explore-scale':'Independent Explore panel and control scale', 'layout.explore-prose':'Floating Explore section notes', 'layout.free-nodes':'Free node placement', 'layout.edge-ports':'Explicit edge entry and exit', 'media.audio':'Audio conversations and device sounds',
     'media.spotlight':'Authored camera spotlights', 'flow.panel-visibility':'Step-specific panel visibility', 'media.shared-icons':'Shared colored state icons', 'media.branding':'Shared company logos and branding', 'flow.story-time':'Story time, step clocks and battery drain', 'content.deviceapp-freshness':'Device app report times and freshness from story time' };
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Panel capabilities come from their definitions at build time.
@@ -104,6 +104,7 @@ var FlowviewCompatibility = (function(){
       if(Array.isArray(d.layouts) && d.layouts.length){
         used['layout.named']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
+        if(d.layouts.some(function(v){return v && Array.isArray(v.paths);}))used['layout.path-subsets']=true;
         if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;

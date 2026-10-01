@@ -912,6 +912,12 @@ function initWorkbenchBuilder(opts){
       if(!ok)session.target=prior;else{clearMultiSelect();clearStepMarkers();if(guide)guide.hidden=true;}
       return ok;
     },
+    paths:function(section,id,pathIds){
+      var prior=session.target;session.target=null;
+      var ok=commitCascade(function(raw){return planSectionViewPaths(session.text(),raw,section,id,pathIds);});
+      if(!ok)session.target=prior;else{clearMultiSelect();clearStepMarkers();if(guide)guide.hidden=true;}
+      return ok;
+    },
     duplicate:function(section,id){
       var nextId,ok=commitCascade(function(raw){var plan=planDuplicateSectionLayout(session.text(),raw,section,id);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },

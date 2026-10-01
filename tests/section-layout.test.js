@@ -288,6 +288,20 @@ test('named view conversion and step selection preserve story definitions, gener
   const removed=ctx.planDeleteStep(selection.text,selected,0,0);assert.deepEqual(JSON.parse(removed.text).layouts[0].steps,['third']);
   assert.ok(ctx.planDeleteStep(removed.text,JSON.parse(removed.text),0,1).error);
 });
+test('named views select whole paths without copying story content and keep path and step filters reachable',()=>{
+  const d=diagram();d.steps.push({id:'failed',text:'Failed'});d.paths.push({id:'failure',label:'Failure',steps:['failed']});
+  d.layouts=[{id:'resident',name:'Resident',sectionLayout:{default:[board]}}];
+  const text=JSON.stringify(d),selected=ctx.planSectionViewPaths(text,d,0,'resident',['happy']);assert.ok(!selected.error,selected.error);
+  const next=JSON.parse(selected.text);assert.deepEqual(next.layouts[0].paths,['happy']);assert.deepEqual(next.paths,d.paths);assert.deepEqual(next.steps,d.steps);
+  const stops=ctx.planSectionViewSteps(selected.text,next,0,'resident',[0]);assert.ok(!stops.error,stops.error);
+  const filtered=JSON.parse(stops.text);assert.deepEqual(filtered.layouts[0].steps,['one']);
+  assert.ok(ctx.planSectionViewPaths(stops.text,filtered,0,'resident',['failure']).error,'selected paths must retain a selected stop');
+  const duplicate=ctx.planDuplicateSectionLayout(stops.text,filtered,0,'resident'),copy=JSON.parse(duplicate.text).layouts[1];
+  assert.deepEqual(copy.paths,['happy']);assert.deepEqual(copy.steps,['one']);
+  const all=ctx.planSectionViewPaths(stops.text,filtered,0,'resident',null);assert.equal(JSON.parse(all.text).layouts[0].paths,undefined);
+  assert.ok(ctx.planSectionViewPaths(stops.text,filtered,0,'resident',[]).error);
+  const warnings=[];ctx.sectionLayoutWarnings({...d,layouts:[{...d.layouts[0],paths:['missing']}]},'diagram',warnings);assert.ok(warnings.some(w=>w.includes('.paths:')));
+});
 test('attachments follow panel renames and detach on deletion across view profiles',()=>{
   const d=diagram();d.layouts=[{id:'home',name:'Home',sectionLayout:{default:plain(ctx.sectionLayoutAttach(d,ctx.sectionLayoutPreset(d,'default'),'panel:home'))}}];
   const rename=ctx.planRenamePanel(JSON.stringify(d),d,0,0,'house'),next=JSON.parse(rename.text);

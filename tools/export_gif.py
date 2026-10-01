@@ -92,6 +92,7 @@ class ViewTarget:
     canonical_id: str
     layout_id: str | None = None
     step_ids: tuple[Any, ...] | None = None
+    path_ids: tuple[Any, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -326,8 +327,10 @@ def _choose_view(diagram: dict[str, Any], reference: str) -> ViewTarget:
     if named:
         if reference in named:
             steps = named[reference].get("steps")
+            paths = named[reference].get("paths")
             return ViewTarget(reference, reference, reference,
-                              tuple(steps) if isinstance(steps, list) else None)
+                              tuple(steps) if isinstance(steps, list) else None,
+                              tuple(paths) if isinstance(paths, list) else None)
         available = list(named)
     else:
         # The capture URL has no host-profile query: a legacy composition is
@@ -363,6 +366,10 @@ def _diagram_paths(diagram: dict[str, Any]) -> list[tuple[str, list[int]]]:
 def _target_in_view(target: StepTarget, diagram: dict[str, Any], reference: str) -> StepTarget:
     view = _choose_view(diagram, reference)
     paths = _diagram_paths(diagram)
+    if view.path_ids is not None:
+        selected_paths = [path for path in paths if path[0] in view.path_ids]
+        if selected_paths:
+            paths = selected_paths
     allowed = view.step_ids
     # The renderer drops an empty/unreachable filter rather than leaving every
     # path without a stop. Compare values instead of hashing malformed JSON IDs.

@@ -357,6 +357,9 @@
               "id": "home-story",
               "name": "Home story",
               "presentation": "standard",
+              "paths": [
+                "happy"
+              ],
               "sectionLayout": {
                 "default": [
                   {
@@ -438,9 +441,7 @@
               "steps": [
                 "quiet",
                 "notify",
-                "inside",
-                "offline",
-                "leave"
+                "inside"
               ]
             },
             {

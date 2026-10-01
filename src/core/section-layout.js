@@ -112,7 +112,8 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,steps:Array.isArray(v.steps)?v.steps:undefined});
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
+      paths:Array.isArray(v.paths)?v.paths:undefined,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;
   return d.sectionLayout && typeof d.sectionLayout==='object' && !Array.isArray(d.sectionLayout) ?
@@ -122,8 +123,8 @@ function sectionLayoutDefinition(d, id){
   var views=diagramLayoutViews(d);
   return views.find(function(v){return v.id===id;}) || views.find(function(v){return v.id===d.defaultLayout;}) || views[0];
 }
-function sectionViewStepsReachable(d,ids){
-  return diagramPathList(d).some(function(p){return p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
+function sectionViewStepsReachable(d,ids,pathIds){
+  return diagramPathList(d).some(function(p){return (!Array.isArray(pathIds) || pathIds.indexOf(p.id)>=0) && p.indices.some(function(i){return ids.indexOf(d.steps[i].id)>=0;});});
 }
 function sectionLayoutItems(d, target, id){
   var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);

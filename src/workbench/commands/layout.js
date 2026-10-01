@@ -426,7 +426,8 @@ function planSectionViewSteps(text,raw,section,layoutId,indices){
   var index=(got.d.layouts || []).findIndex(function(v){return v.id===layoutId;});
   if(index<0)return {error:'Select a named view before choosing its steps.'};
   if(indices!==null && (!Array.isArray(indices) || !indices.length || indices.some(function(i,n){return !Number.isInteger(i) || !got.d.steps[i] || indices.indexOf(i)!==n;})))return {error:'Choose at least one step for this view.'};
-  if(indices && !diagramPathList(got.d).some(function(p){return p.indices.some(function(i){return indices.indexOf(i)>=0;});}))return {error:'Choose at least one step that belongs to a story path.'};
+  var view=got.d.layouts[index];
+  if(indices && !diagramPathList(got.d).some(function(p){return (!Array.isArray(view.paths) || view.paths.indexOf(p.id)>=0) && p.indices.some(function(i){return indices.indexOf(i)>=0;});}))return {error:'Choose at least one step that belongs to a path shown in this view.'};
   return builderRewrite(text,raw,got.path,function(d){
     if(indices===null){delete d.layouts[index].steps;return;}
     var taken=new Set((d.steps || []).map(function(st){return st.id;}));
@@ -436,6 +437,18 @@ function planSectionViewSteps(text,raw,section,layoutId,indices){
     });
     d.layouts[index].steps=indices.map(function(i){return d.steps[i].id;});
     if(d.layouts[index].steps.some(function(id){return d.steps.filter(function(st){return st.id===id;}).length!==1;}))return {error:'Selected steps need unique IDs. Fix duplicate step IDs first.'};
+  });
+}
+function planSectionViewPaths(text,raw,section,layoutId,pathIds){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var index=(got.d.layouts || []).findIndex(function(v){return v.id===layoutId;});
+  if(index<0)return {error:'Select a named view before choosing its paths.'};
+  var available=Array.isArray(got.d.paths)?diagramPathList(got.d).map(function(p){return p.id;}):[];
+  if(pathIds!==null && (!Array.isArray(pathIds) || !pathIds.length || pathIds.some(function(id,n){return typeof id!=='string' || available.indexOf(id)<0 || pathIds.indexOf(id)!==n;})))return {error:'Choose at least one existing path for this view.'};
+  var view=got.d.layouts[index];
+  if(pathIds && Array.isArray(view.steps) && !sectionViewStepsReachable(got.d,view.steps,pathIds))return {error:'Choose a path containing at least one step shown in this view.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    if(pathIds===null)delete d.layouts[index].paths;else d.layouts[index].paths=pathIds.slice();
   });
 }
 function planDuplicateSectionLayout(text,raw,section,layoutId){
@@ -459,7 +472,7 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   Object.keys(profiles).forEach(function(target){
     profiles[target]=sectionLayoutItems(Object.assign({},d,{layouts:undefined,defaultLayout:undefined,sectionLayout:profiles}),target);
   });
-  var copy={id:id,name:name,sectionLayout:profiles};if(source.steps)copy.steps=builderClone(source.steps);
+  var copy={id:id,name:name,sectionLayout:profiles};if(source.paths)copy.paths=builderClone(source.paths);if(source.steps)copy.steps=builderClone(source.steps);
   var original=d.layouts.find(function(v){return v.id===source.id;});
   if(original && original.presentation!==undefined)copy.presentation=original.presentation;
   if(original && original.exploreLayout!==undefined)copy.exploreLayout=builderClone(original.exploreLayout);

@@ -30,7 +30,7 @@ function initSectionLayoutEditor(opts){
   function sectionScope(section){
     var rec=sections.get(section);if(!rec){rec={life:createWorkbenchLifetime(),fields:createWorkbenchLifetime(),viewFields:createWorkbenchLifetime(),optionsOpen:false};sections.set(section,rec);}return rec;
   }
-  var view=opts.view,editing=null,drag=null,selected='diagram',stepsOpen=false,widths={backstage:1080,confluence:760};
+  var view=opts.view,editing=null,drag=null,selected='diagram',pathsOpen=false,stepsOpen=false,widths={backstage:1080,confluence:760};
   function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;}
   function button(label,fn){var b=el('button','bbtn',label);b.type='button';controlsLife.listen(b,'click',fn);return b;}
   var toolbar=el('div','layout-preview-tools'),label=el('label',null,'Preview '),target=el('select');
@@ -205,6 +205,25 @@ function initSectionLayoutEditor(opts){
       if(controls && controls.attachTo && !dock)row.appendChild(el('span','fnote','Attachment panel is hidden; controls are shown separately.'));
       }
       if(definition && !definition.legacy){
+        if(Array.isArray(d.paths) && d.paths.length>1){
+          var pathDetail=el('details','layout-step-selection');pathDetail.open=pathsOpen;
+          var pathCount=definition.paths?definition.paths.length:d.paths.length;
+          pathDetail.appendChild(el('summary',null,'Paths shown in this view · '+(definition.paths?pathCount+' selected':'All '+pathCount)));
+          fieldLife.listen(pathDetail,'toggle',function(){if(pathDetail.isConnected)pathsOpen=pathDetail.open;});
+          pathDetail.appendChild(el('p','fnote','Hidden paths stay in the shared story, but readers cannot select or play them in this view.'));
+          pathDetail.appendChild(button('Show all paths',function(){if(ready() && activeLayout(index)===id)opts.paths(index,id,null);}));
+          var pathList=el('div','layout-step-options');
+          d.paths.forEach(function(path){
+            var label=el('label'),input=el('input');input.type='checkbox';input.checked=!definition.paths || definition.paths.indexOf(path.id)>=0;
+            input.disabled=input.checked && pathCount===1;input.setAttribute('data-view-path',path.id);input.setAttribute('aria-label','Show path '+(path.label || path.id)+' in '+definition.name);
+            label.appendChild(input);label.appendChild(el('span',null,path.label || path.id));
+            fieldLife.listen(input,'change',function(){
+              if(!ready() || activeLayout(index)!==id)return;
+              var ids=Array.prototype.filter.call(pathList.querySelectorAll('input'),function(box){return box.checked;}).map(function(box){return box.getAttribute('data-view-path');});
+              if(!opts.paths(index,id,ids))fields(section,d);
+            });pathList.appendChild(label);
+          });pathDetail.appendChild(pathList);row.appendChild(pathDetail);
+        }
         var detail=el('details','layout-step-selection');detail.open=stepsOpen;
         var count=definition.steps?definition.steps.length:(d.steps || []).length;
         detail.appendChild(el('summary',null,'Steps shown in this view · '+(definition.steps?count+' selected':'All '+count)));

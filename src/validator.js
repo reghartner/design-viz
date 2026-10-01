@@ -196,10 +196,15 @@ function sectionLayoutWarnings(d, path, warnings){
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
         sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
+        var pathIds=Array.isArray(d.paths)?diagramPathList(d).map(function(path){return path.id;}):[],validPaths=true;
+        if(v.paths!=null){
+          validPaths=Array.isArray(v.paths) && v.paths.length && !v.paths.some(function(id,j){return typeof id!=='string' || pathIds.indexOf(id)<0 || v.paths.indexOf(id)!==j;});
+          if(!validPaths)warnings.push(p+'.paths: use a nonempty list of unique existing path IDs; omit for all paths');
+        }
         if(v.steps!=null){
           var ids=(d.steps || []).map(function(st){return st && st.id;});
           if(!Array.isArray(v.steps) || !v.steps.length || v.steps.some(function(id,i){return typeof id!=='string' || ids.filter(function(s){return s===id;}).length!==1 || v.steps.indexOf(id)!==i;}))warnings.push(p+'.steps: use a nonempty list of unique existing step IDs; omit for all steps');
-          else if(!sectionViewStepsReachable(d,v.steps))warnings.push(p+'.steps: select at least one step used by a story path');
+          else if(validPaths && !sectionViewStepsReachable(d,v.steps,v.paths))warnings.push(p+'.steps: select at least one step used by a path shown in this view');
         }
       });
     }

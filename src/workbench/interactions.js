@@ -531,13 +531,13 @@ function createBuilderInteractions(opts){
     var mode = addToStep;
     var plan = null;
     if (target.kind === 'node'){
-      plan = planStepToggleNode(session.text(), parsed.raw, mode.section, mode.step, target.id);
+      plan = planStepToggleNode(session.text(), session.resolve?session.resolve(parsed.raw):parsed.raw, mode.section, mode.step, target.id);
     } else if (target.kind === 'edge'){
       var rec = specSectionPaths(parsed.raw)[mode.section];
-      var edges = rec ? (specValueAt(parsed.raw, rec.diagram) || {}).edges : null;
+      var edges = rec ? (specValueAt(session.resolve?session.resolve(parsed.raw):parsed.raw, rec.diagram) || {}).edges : null;
       var e = Array.isArray(edges) ? edges[target.index] : null;
       if (!e){ formError('edge not found — the render and the editor may be out of sync'); return; }
-      plan = planStepToggleHop(session.text(), parsed.raw, mode.section, mode.step, builderEdgeKey(e));
+      plan = planStepToggleHop(session.text(), session.resolve?session.resolve(parsed.raw):parsed.raw, mode.section, mode.step, builderEdgeKey(e));
     } else {
       var rec2 = specSectionPaths(parsed.raw)[mode.section];
       var panels = rec2 ? (specValueAt(parsed.raw, rec2.diagram) || {}).panels : null;
@@ -670,7 +670,7 @@ function createBuilderInteractions(opts){
     }
     var fromId = connect.fromId,quick=connect.quick;
     session.insertSection = target.section;
-    var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id);
+    var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id,session.resolve?session.resolve(parsed.raw):null);
     if (plan.error){ cancelConnect(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     cancelConnect(null);
@@ -1133,7 +1133,23 @@ function createBuilderInteractions(opts){
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
         var startSnapshot=parseEditor(),startRecord=!startSnapshot.error && specSectionPaths(startSnapshot.raw)[ndGi];
         var startDiagram=startRecord && specValueAt(startSnapshot.raw,startRecord.diagram);
-        if(multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;})){
+        if(startDiagram && session.resolve && typeof FlowTopology!=='undefined'){
+          var resolvedDiagram;
+          try{resolvedDiagram=specValueAt(session.resolve(startSnapshot.raw),startRecord.diagram);}catch(ex){cancelNodeDrag();inspectorMessage(ex.message);return;}
+          var imported=FlowTopology.origin(resolvedDiagram,'nodes',nodeDrag.id);
+          if(imported){
+            if(!imported.position || !Array.isArray(startDiagram.topologyImports) || !startDiagram.topologyImports.some(function(imp){return imp.as===imported.as;})){
+              cancelNodeDrag();inspectorMessage('Open the authored consumer from Canon to move its imported block.');return;
+            }
+            startDiagram=resolvedDiagram;nodeDrag.topologyImport=imported;
+            var importPositions=layout(startDiagram).pos;
+            nodeDrag.members=imported.nodes.map(function(id){
+              var el=findTargetEl({kind:'node',section:ndGi,id:id});return {id:id,el:el,xy:el && nodeTranslateXY(el),origin:importPositions[id]};
+            });
+            if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))nodeDrag.selectionError='Render all imported nodes before moving the block.';
+          }
+        }
+        if(!nodeDrag.topologyImport && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;})){
           var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel);
           nodeDrag.selectionError=selected.error;
           if(!selected.error){
@@ -1264,11 +1280,13 @@ function createBuilderInteractions(opts){
       var ndPlan;
       if(nd.floating){
         if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
-        if(nd.selection){
+        if(nd.topologyImport){
+          ndPlan=planPlaceTopologyImport(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,
+            nd.topologyImport.position.x+nd.delta.dx,nd.topologyImport.position.y+nd.delta.dy);
+        }else if(nd.selection){
           ndPlan=planTransformFloats(session.text(),ndParsed.raw,nd.selection,{type:'move',dx:nd.delta.dx,dy:nd.delta.dy});
           applyPlan(ndPlan,null,ndParsed);return;
-        }
-        ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
+        }else ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
       }else if (nd.target){
         ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,
                                  nd.target.getAttribute('data-dv-node'));

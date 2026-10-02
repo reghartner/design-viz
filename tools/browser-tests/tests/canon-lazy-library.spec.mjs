@@ -1,8 +1,10 @@
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,pagePreview} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import path from 'node:path';
 import {publishLibrary} from '../../canon/library.mjs';
+import {prepareCanonSnapshot} from '../../canon/entity-diagrams.mjs';
+import {digest} from '../../canon/drift.mjs';
 
 async function publish(server){
   const root=path.join(server.root,'company'),workbench=path.join(root,'workbench');
@@ -19,14 +21,125 @@ async function publish(server){
   const registryPath=path.join(root,'canon.json'),output=path.join(workbench,'diagrams.json');
   await writeFile(registryPath,JSON.stringify({version:1,diagrams:Object.keys(specs).map(id=>({folder:'diagrams/'+id,owner:'group:default/home'}))}));
   const index=await publishLibrary({registryPath,output});
-  return {root,specs,index,url:server.origin+'/company/workbench/flowspec.html',specURL:id=>server.origin+'/company/diagrams/'+id+'/'+id+'.spec.json'};
+  return {root,specs,index,url:server.origin+'/company/workbench/flowspec.html',specURL:id=>new URL(index.diagrams.find(entry=>entry.id===id).specUrl,server.origin+'/company/workbench/diagrams.json').href};
 }
 test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recursive:true,force:true});});
+
+test('the backend workspace handoff drags a whole floating import with authored placement and one Undo',async({page,server},testInfo)=>{
+  const fixture=await publish(server),sources=[];
+  for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
+  const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('checkout'),workspace=snapshot.loadWorkspace('checkout');
+  await page.route('**/api/canon/context?*',route=>route.fulfill({json:{spec,...workspace,catalog:{version:1,services:[]}}}));
+  const handoff={version:1,id:'checkout',revision:digest(spec),action:'edit'};
+  await page.goto(fixture.url+'?canon=checkout#fv='+encodeURIComponent(JSON.stringify(handoff)));
+  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
+  await pagePreview(page);await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
+  expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
+  expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
+  const before=await page.locator('#src').inputValue(),root=page.locator('#docview');
+  const node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+  const center=async id=>node(id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};});
+  const original=await Promise.all(['client','platform::api','platform::store'].map(center));
+  async function drag(){
+    const box=await node('platform::api').locator('.card').boundingBox(),scale=await node('platform::api').evaluate(n=>n.ownerSVGElement.getScreenCTM().a);
+    const x=box.x+box.width/2,y=box.y+box.height/2;
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+90*scale,y+70*scale,{steps:12});
+  }
+  await drag();await expect(root.locator('.dv-ghost')).toHaveCount(2);
+  await expect(root.locator('.dv-free-edge-preview')).toHaveCount(2);await page.mouse.up();
+  const after=await page.locator('#src').inputValue(),moved=JSON.parse(after),d=moved.page.sections[0].diagram;
+  const origin=spec.page.sections[0].diagram.topologyProvenance.imports[0].position;
+  expect(d.topologyImports[0].position.x).toBeCloseTo(origin.x+90,0);
+  expect(d.topologyImports[0].position.y).toBeCloseTo(origin.y+70,0);
+  const expected=JSON.parse(before);expected.page.sections[0].diagram.topologyImports[0].position=d.topologyImports[0].position;
+  expect(moved).toEqual(expected);expect(d.floats).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();
+  const placed=await Promise.all(['client','platform::api','platform::store'].map(center));
+  expect(placed[0]).toEqual(original[0]);
+  for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(90,0);expect(placed[i].y-original[i].y).toBeCloseTo(70,0);}
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+  await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+  await drag();await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(after);
+  await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await drag();const stale=after+'\n';
+  await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value;src.dispatchEvent(new Event('input',{bubbles:true}));},stale);
+  await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);
+  await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await pagePreview(page);
+  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  expect(saved.page.sections[0].diagram).toEqual(d);
+  await page.reload();await pagePreview(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
+  expect(await Promise.all(['client','platform::api','platform::store'].map(center))).toEqual(placed);
+  await testInfo.attach('floating-import',{body:await root.screenshot(),contentType:'image/png'});
+});
+
+test('a published topology consumer renders and its imported node inspector is read only',async({page,server})=>{
+  const fixture=await publish(server);
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  for(const [id,example] of [['first','platform'],['second','checkout']]){
+    const spec=JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+example+'.json',import.meta.url),'utf8'));
+    if(id==='second')spec.page.sections[0].diagram.topologyImports[0].spec='first';
+    await writeFile(path.join(fixture.root,'diagrams',id,id+'.spec.json'),JSON.stringify(spec));
+  }
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  expect(requests).toEqual([fixture.specURL('second'),fixture.specURL('first')]);
+  await expect(page.locator('#canon-reader [data-dv-node="platform::api"]')).toBeVisible();
+  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await expect(page.locator('#workspace-provenance')).toContainText('Referenced topology (frozen session)');
+  await page.locator('#docview [data-dv-node="platform::api"]').click();
+  await page.locator('#editor-tab-inspect').click();
+  await expect(page.locator('#guide')).toContainText('Read-only topology from first / core');
+  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveCount(0);
+  const source=JSON.parse(await page.locator('#src').inputValue());
+  expect(source.page.sections[0].diagram.steps[1].edge).toBe('platform::api->platform::store');
+  expect(source.page.sections[0].diagram.topologyImports[0].spec).toBe('first');
+  expect(source.page.sections[0].diagram.topologyProvenance).toBeUndefined();
+  expect(source.page.sections[0].diagram.nodes['platform::api']).toBeUndefined();
+  const changed=JSON.parse(await readFile(path.join(fixture.root,'diagrams/first/first.spec.json'),'utf8'));
+  changed.page.sections[0].diagram.nodes.api.title='PROVIDER CHANGED';
+  await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(changed));
+  source.page.sections[0].diagram.steps[1].text='Local narrative change';
+  await page.locator('#editor-tab-json').click();
+  await page.locator('#src').fill(JSON.stringify(source,null,2));
+  await page.locator('#go').click();
+  await pagePreview(page);
+  await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
+  await expect(page.locator('#docview')).not.toContainText('PROVIDER CHANGED');
+  await page.locator('#editor-tab-steps').click();
+  await page.locator('#steps-list [data-step-index="1"]').click();await pagePreview(page);
+  await expect(page.locator('#docview .step-text')).toContainText('Local narrative change');
+  await expect(page.locator('#docview .stepid')).toHaveText('persist');
+  expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(source);
+  await page.locator('#editor-tab-file').click();
+  const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  expect(saved.page.sections[0].diagram).toEqual(source.page.sections[0].diagram);
+  expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text)).toBe(JSON.stringify(source,null,2));
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+  expect(recovered.topologyContext.specs.find(s=>s.page.canon.id==='first').page.sections[0].diagram.nodes.api.title).toBe('API');
+  expect(requests).toHaveLength(2);
+  await page.reload();await pagePreview(page);
+  await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
+  await expect(page.locator('#docview')).not.toContainText('PROVIDER CHANGED');
+  expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(source.page.sections[0].diagram);
+  expect(requests).toHaveLength(2);
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await expect(page.locator('#canon-reader')).toContainText('PROVIDER CHANGED');
+  const beforeFailure=await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'));
+  await page.route(fixture.specURL('first'),route=>route.fulfill({json:{page:{canon:{id:'first'}}}}));
+  await page.reload();await expect(page.locator('#canon-reader-edit')).toBeDisabled();
+  await expect(page.locator('#canon-reader-error')).toContainText('revision mismatch for first');
+  expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(beforeFailure);
+});
 
 test('the real metadata index fetches only the opened spec and imports the same canonical content',async({page,server})=>{
   const fixture=await publish(server),requests=[];
   page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
-  expect(fixture.index.version).toBe(2);expect(JSON.stringify(fixture.index)).not.toContain('rows');
+  expect(fixture.index.version).toBe(3);expect(JSON.stringify(fixture.index)).not.toContain('rows');
   await page.goto(fixture.url);await page.locator('#welcome-library').click();
   await expect(page.locator('.canon-library-card')).toHaveCount(2);expect(requests).toEqual([]);
   await expect(page.locator('.canon-library-card').first()).toContainText('nodes');
@@ -35,7 +148,7 @@ test('the real metadata index fetches only the opened spec and imports the same 
   await page.goBack();await page.getByRole('link',{name:/Second story/}).click();await expect(page.locator('#canon-reader-title')).toHaveText('Second story');
   expect(requests).toEqual([fixture.specURL('first'),fixture.specURL('second')]);
   await page.goBack();await page.getByRole('link',{name:/First story/}).click();await expect(page.locator('#canon-reader-edit')).toBeEnabled();
-  expect(requests).toHaveLength(2);await page.locator('#canon-reader-edit').click();
+  expect(requests).toHaveLength(3);await page.locator('#canon-reader-edit').click();
   const expected=structuredClone(fixture.specs.first);expected.page.canon=fixture.index.diagrams[0].canon;
   await expect(page.locator('#src')).toHaveValue(JSON.stringify(expected,null,2));await expect(page.locator('#undo-builder')).toBeDisabled();
   expect(JSON.parse(await readFile(path.join(fixture.root,'diagrams/first/first.spec.json'),'utf8'))).toEqual(fixture.specs.first);
@@ -54,7 +167,7 @@ test('a direct link beneath a deployment prefix loads one spec, reloads and pres
 test('a late spec response cannot replace another reader or an edited draft',async({page,server})=>{
   const fixture=await publish(server);let release,started;
   const held=new Promise(resolve=>release=resolve),requested=new Promise(resolve=>started=resolve);
-  await page.route('**/first.spec.json',async route=>{started();await held;await route.fulfill({json:fixture.specs.first});});
+  await page.route(fixture.specURL('first'),async route=>{started();await held;await route.fulfill({json:fixture.specs.first});});
   await page.goto(fixture.url);await page.locator('#welcome-library').click();await page.getByRole('link',{name:/First story/}).click();await requested;
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await page.goBack();await page.getByRole('link',{name:/Second story/}).click();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
@@ -65,8 +178,8 @@ test('a late spec response cannot replace another reader or an edited draft',asy
 
 test('invalid lazy specs show an error and retry fetches repaired content',async({page,server})=>{
   const fixture=await publish(server);let data={page:{title:'Broken',sections:[{diagram:{nodes:{a:{}},rows:[['a']],edges:[{from:'missing',to:'a'}]}}]}};
-  await page.route('**/first.spec.json',route=>route.fulfill({json:data}));
-  await page.goto(fixture.url+'?diagram=first');await expect(page.locator('#canon-reader-error')).toContainText('Invalid diagram');
+  await page.route(fixture.specURL('first'),route=>route.fulfill({json:data}));
+  await page.goto(fixture.url+'?diagram=first');await expect(page.locator('#canon-reader-error')).toContainText('revision');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await expect(page.locator('#canon-reader')).toBeEmpty();
   data=fixture.specs.first;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('First story');
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();

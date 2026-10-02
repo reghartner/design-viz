@@ -57,7 +57,8 @@ function initCanonWorkbench(opts){
     if(!attached)return;
     save.disabled=true;
     try{
-      var raw=JSON.parse(opts.src.value), errors=FlowCanon.validate(raw).concat(validate(normalize(raw)).errors);
+      var raw=JSON.parse(opts.src.value), resolved=typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,context.topologyContext);
+      var errors=FlowCanon.validate(raw).concat(validate(normalize(resolved)).errors);
       if(errors.length) throw new Error(errors.join('\n'));
       if(typeof FlowviewCompatibility !== 'undefined')raw=FlowviewCompatibility.stamp(raw);
       var response=await fetch('/api/canon/proposals',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,review:review,spec:raw,baseRevision:context.revision})});
@@ -68,7 +69,7 @@ function initCanonWorkbench(opts){
   });save.disabled=true;
   fetch('/api/canon/context?id='+encodeURIComponent(id)+(review?'&review='+encodeURIComponent(review):''))
     .then(function(r){if(!r.ok)throw new Error('Company repository unavailable. Use the local portal or import a catalog snapshot.');return r.json();})
-    .then(function(data){if(!attached)return;acceptCatalog(data.catalog,1,'company context');context.revision=data.revision;opts.loadSpec(data.spec);status.textContent=(data.simulated?'SIMULATED · ':'')+id+' · changes are submitted for review.';save.disabled=false;})
+    .then(function(data){if(!attached)return;acceptCatalog(data.catalog,1,'company context');context.revision=data.revision;context.topologyContext=data.topologyContext;opts.loadSpec(data.source || data.spec,data.topologyContext);status.textContent=(data.simulated?'SIMULATED · ':'')+id+' · changes are submitted for review.';save.disabled=false;})
     .catch(function(e){if(!attached)return;status.textContent=e.message;details.open=true;});
   return context;
 }

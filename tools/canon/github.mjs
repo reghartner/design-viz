@@ -39,6 +39,9 @@ async function run(){
   if(base!==checkedOut)throw new Error('Default branch moved. Rerun against its latest revision.');
   report.baseRevision=base;report.registry=env.FLOWVIEW_REGISTRY;
   const reg=await registry(env.FLOWVIEW_REGISTRY),statePath='.flowview/drift-state.json',state=await stateFile(statePath);
+  // Keep baseline writes on authored topology providers/consumers. Never
+  // replace source declarations with their generated structural snapshots.
+  reg.specs=reg.entries.map(entry=>entry.spec);
   if(!reg.specs.length)throw new Error('The registry contains no diagrams.');
   report.diagrams=reg.specs.length;report.references=reg.specs.reduce((n,s)=>n+C.references(s).length,0);
   let source;

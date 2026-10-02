@@ -203,6 +203,9 @@ function createWorkbenchPreviewController(opts){
         opts.findings({errors:['JSON parse: '+ex.message],warnings:[]});
         return finish({ok:false,replaced:false,text:text,reason:'parse',origin:request.origin});
       }
+      try{if(opts.resolve)raw=opts.resolve(raw);}catch(ex){
+        opts.findings({errors:[ex.message],warnings:[]});return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});
+      }
       var next=normalize(raw),verdict=validate(next),lint=verdict.errors.length?[]:lintPage(next);
       opts.findings({errors:verdict.errors,warnings:verdict.warnings.concat(lint)});
       if(verdict.errors.length)return finish({ok:false,replaced:false,text:text,reason:'validation',origin:request.origin});

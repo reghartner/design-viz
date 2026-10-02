@@ -21,7 +21,7 @@ function createBuilderPersistence(options){
     try {
       var storage=options.storage();
       storage.setItem(baselineKey,JSON.stringify({text:baseline,draftText:text}));
-      storage.setItem(draftKey,JSON.stringify(Object.assign({text:text,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{})));
+      storage.setItem(draftKey,JSON.stringify(Object.assign({text:text,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{})));
       if(options.status)options.status('saved');
     } catch(ex){if(options.status)options.status('unavailable'); /* unavailable storage does not prevent editing */ }
   }
@@ -42,8 +42,8 @@ function createBuilderPersistence(options){
       try{
         var storage=options.storage(),entries=JSON.parse(storage.getItem(archiveKey) || '[]');
         if(!Array.isArray(entries))throw Error('Invalid earlier drafts');
-        if(!entries.some(function(entry){return entry && entry.text===text && entry.baseline===baseline && entry.ledger===(artifacts && artifacts.ledger!==undefined?artifacts.ledger:undefined);})){
-          entries.unshift(Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{}));
+        if(!entries.some(function(entry){return entry && entry.text===text && entry.baseline===baseline && entry.ledger===(artifacts && artifacts.ledger!==undefined?artifacts.ledger:undefined) && JSON.stringify(entry.topologyContext)===JSON.stringify(artifacts && artifacts.topologyContext);})){
+          entries.unshift(Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{}));
           storage.setItem(archiveKey,JSON.stringify(entries));
         }
       }catch(ex){throw Error('Your earlier draft could not be saved. Save it to a file or free browser storage, then try again.');}

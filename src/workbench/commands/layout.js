@@ -145,6 +145,19 @@ function planPlaceFloat(text,raw,sectionIdx,id,x,y){
   });
 }
 
+/* Only import placement belongs to the consumer; no derived nodes are written. */
+function planPlaceTopologyImport(text,raw,sectionIdx,namespace,x,y){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Block position requires finite X/Y coordinates between -100000 and 100000.'};
+  var imports=got.d.topologyImports;
+  if(!Array.isArray(imports))return {error:'Authored topology import not found.'};
+  var indexes=[];imports.forEach(function(imp,index){if(imp && imp.as===namespace)indexes.push(index);});
+  if(indexes.length!==1)return {error:'Choose one uniquely named topology import.'};
+  return planSetFields(text,raw,got.path.concat(['topologyImports',indexes[0]]),[
+    ['position',JSON.stringify({x:Math.round(x*10)/10,y:Math.round(y*10)/10})]
+  ]);
+}
+
 /* Selection order defines the alignment anchor. Automatic floats are resolved
    together before pinning, so moving one cannot move another's starting point. */
 function builderSelectedFloats(text,raw,targets){

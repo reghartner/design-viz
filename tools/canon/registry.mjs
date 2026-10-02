@@ -4,6 +4,14 @@ import {initialState} from './drift.mjs';
 import library from './manifest.cjs';
 import C from './core.cjs';
 export async function json(file){return JSON.parse(await readFile(file,'utf8'));}
+export function materializeEntries(entries){
+  for(const entry of entries)if(C.sections(entry.spec).some(s=>s.diagram.topologyProvenance))throw new Error('Publish authored references, not generated topologyProvenance: '+entry.id);
+  // Legacy callers keep their diagnostics; topology snapshots validate as a
+  // batch before any consumer can be indexed, digested, or published.
+  if(!entries.some(entry=>C.sections(entry.spec).some(s=>s.diagram.topologyProvenance || Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports'))))return entries;
+  const specs=C.materializeTopology(entries.map(entry=>entry.spec));
+  return entries.map((entry,i)=>({...entry,resolvedSpec:specs[i]}));
+}
 export async function canonLibrary(file='canon.json'){
   const root=await realpath(path.dirname(path.resolve(file))),manifest=await json(file),entries=[];
   for(const entry of library.entries(manifest)){
@@ -12,11 +20,15 @@ export async function canonLibrary(file='canon.json'){
     const folder=path.join(root,entry.folder)+path.sep;
     if(!filename.startsWith(folder))throw new Error('Canon specs must remain inside their diagram folder.');
     const spec=library.spec(await json(filename),entry);
-    const errors=C.validate(spec).concat(C.validateSpec(spec).errors);
-    if(errors.length)throw new Error(entry.path+': '+errors.join('\n'));
     entries.push({...entry,filename,spec});
   }
-  return {root,entries,specs:entries.map(entry=>entry.spec)};
+  const resolved=materializeEntries(entries);
+  for(const entry of resolved){
+    const rendered=entry.resolvedSpec || entry.spec;
+    const errors=C.validate(rendered).concat(C.validateSpec(rendered).errors);
+    if(errors.length)throw new Error(entry.path+': '+errors.join('\n'));
+  }
+  return {root,entries:resolved,specs:resolved.map(entry=>entry.spec)};
 }
 export async function registry(file){
   if(path.basename(file)==='canon.json')return canonLibrary(file);
@@ -30,7 +42,8 @@ export async function registry(file){
     if(spec.page?.canon?.id!==entry.id)throw new Error('Registry and spec IDs differ: '+entry.id);
     entries.push({...entry,filename,spec});
   }
-  return {root,entries,specs:entries.map(e=>e.spec)};
+  const resolved=materializeEntries(entries);
+  return {root,entries:resolved,specs:resolved.map(e=>e.spec)};
 }
 export async function stateFile(file){try{return await json(file);}catch(e){if(e.code==='ENOENT')return initialState();throw e;}}
 export async function atomicJSON(file,value){await mkdir(path.dirname(path.resolve(file)),{recursive:true});const temp=file+'.tmp-'+process.pid;await writeFile(temp,JSON.stringify(value,null,2)+'\n');await rename(temp,file);}

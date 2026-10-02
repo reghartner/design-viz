@@ -1,0 +1,24 @@
+{
+  "page": {
+    "title": "Checkout over shared platform",
+    "canon": {"version":1,"id":"checkout","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id": "checkout", "heading": "Checkout narrative",
+      "diagram": {
+        "topologyImports": [{"spec":"platform", "export":"core", "as":"platform"}],
+        "nodes": {"client":{"title":"Checkout client"}},
+        "rows": [["client"]],
+        "edges": [{"from":"client", "to":"platform::api", "kind":"https"}],
+        "steps": [
+          {"id":"request", "edge":"client->platform::api", "text":"Submit checkout"},
+          {"id":"persist", "edge":"platform::api->platform::store", "text":"Persist the order"},
+          {"id":"unavailable", "failures":{"platform::api->platform::store":"blocked"}, "text":"Storage unavailable"}
+        ],
+        "paths": [
+          {"id":"success", "label":"Success", "steps":["request","persist"]},
+          {"id":"failure", "label":"Storage failure", "steps":["request","unavailable"]}
+        ]
+      }
+    }]
+  }
+}

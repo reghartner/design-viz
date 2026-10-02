@@ -310,6 +310,8 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   var d = sec.diagram;
   if (!d) return;
   var DP = P + '.diagram';
+  if(Object.prototype.hasOwnProperty.call(d,'topologyImports') || Object.prototype.hasOwnProperty.call(d,'topologyExports'))
+    errors.push(DP+': unresolved topology declarations — resolve the approved authored provider snapshot in memory before rendering or validating this spec');
   validatePaths(d, DP, errors);
   storyTimeWarnings(d, DP, warnings);
   sectionLayoutWarnings(d, DP, warnings);

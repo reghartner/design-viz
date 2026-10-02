@@ -189,28 +189,50 @@ The company GitHub source adapter reads that manifest and its listed JSON specs
 at the **same approved Git SHA**. Use the pure `/backend` helpers:
 
 ```ts
-import {parseCanonManifest, materializeCanonSpec, buildEntityDiagramIndex}
+import {parseCanonManifest, materializeCanonSpec, prepareCanonSnapshot}
   from '@flowview/backstage-plugin/backend';
 
 const entries = parseCanonManifest(manifestJson);
 // Read entry.path at the pinned SHA through your authenticated GitHub adapter.
-// Authorize each entry for this requesting viewer.
-const specs = authorizedEntries.map(entry =>
-  materializeCanonSpec(specJsonByPath[entry.path], entry));
-const index = buildEntityDiagramIndex(specs, {diagramUrls});
+// Resolve ALL entries at that SHA in memory at request/load time. A consumer
+// is readable only if the viewer is authorized for its entire provider closure.
+const snapshot = prepareCanonSnapshot(entries.map(entry =>
+  materializeCanonSpec(specJsonByPath[entry.path], entry)), {
+  authorize: spec => authorizedIds.has((spec as any).page.canon.id), diagramUrls,
+});
+const index = snapshot.index;
+const viewerValue = snapshot.loadSpec(id); // derived, with the indexed digest
+const workspace = snapshot.loadWorkspace(id); // authored source + frozen context
 ```
 
 `entry.html` remains as deprecated compatibility metadata for adapters that
 publish optional standalone exports. Canon membership and readers require only
 `entry.path`; new adapters should not fetch or validate the HTML path.
 
-The example's `authorizedEntries`, `specJsonByPath` and `diagramUrls` come from
-your company adapter. Return the same materialized spec from `loadSpec`, with
-its indexed digest; keep raw authored JSON unchanged. Existing node bindings
+The example's `authorizedIds`, `specJsonByPath` and `diagramUrls` come from
+your company adapter. Serve `viewerValue` from the spec endpoint and expose
+`{spec: viewerValue, ...workspace}` from the legacy `/api/canon/context` endpoint
+for a reference-preserving Workbench handoff. Unauthorized IDs return null;
+translate that to your ordinary not-found/denied response. Keep authored JSON
+unchanged; do not generate flattened files. Existing node bindings
 still determine which service/API entity lists the diagram. Refresh manifest
 membership along with specs so removed entries disappear. Missing or invalid
 listed files must fail the snapshot, rather than publishing a partial list.
 These helpers do not fetch files or grant authorization.
+
+`materializeCanonSpec` derives membership for one source; the plural
+`materializeCanonSpecs` resolves the complete batch in memory. For simple fully
+authorized snapshots, `buildEntityDiagramIndex` also accepts authored imports.
+Prefer `prepareCanonSnapshot` to keep viewer/index/workspace parity and provider
+authorization together. Cache by approved revision and authorization scope only;
+never combine revisions. Open viewers/editors freeze the closure until explicit
+reload/reopen; provider edits never live-update an open consumer. A removed exported node or
+edge still used by a consumer fails the snapshot. See the
+[shared topology contract](../../docs/shared-topology.md) and executable example.
+
+`prepareCanonSnapshot` is synchronous: await external authorization checks first
+and pass a boolean-returning policy (Promise results fail closed). The filesystem
+`loadCanonDiagrams` wrapper also accepts an asynchronous entry authorization hook.
 
 For a local checkout, `tools/canon/library.mjs` also exports
 `loadCanonDiagrams(file, {authorize, ...indexOptions})`. The standard nginx build

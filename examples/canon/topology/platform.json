@@ -1,0 +1,19 @@
+{
+  "page": {
+    "title": "Shared platform topology",
+    "canon": {"version":1,"id":"platform","kind":"canonical","owner":"group:default/platform"},
+    "sections": [{
+      "id": "services", "heading": "Platform services",
+      "diagram": {
+        "nodes": {
+          "api": {"title":"API", "group":"backend", "binding":{"entityRef":"component:default/api"}},
+          "store": {"title":"Store", "group":"backend"}
+        },
+        "groups": {"backend":{"label":"Platform"}},
+        "rows": [["api", "store"]],
+        "edges": [{"from":"api", "to":"store", "kind":"https", "label":"Persist"}],
+        "topologyExports": {"core":{"nodes":["api","store"], "edges":["api->store"]}}
+      }
+    }]
+  }
+}

@@ -3,35 +3,42 @@
 import {readdir,readFile,realpath,stat} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
-import {registry,atomicJSON,canonLibrary} from './registry.mjs';
+import {registry,atomicJSON,canonLibrary,materializeEntries} from './registry.mjs';
+import {digest} from './drift.mjs';
 import C from './core.cjs';
-import {buildEntityDiagramIndex} from './entity-diagrams.mjs';
+import {prepareCanonSnapshot} from './entity-diagrams.mjs';
 
 export async function loadCanonDiagrams(file='canon.json',{authorize=()=>true,...options}={}){
   const library=await canonLibrary(file),specs=[];
   for(const entry of library.entries)if(await authorize(entry))specs.push(entry.spec);
-  return {specs,index:buildEntityDiagramIndex(specs,options)};
+  return prepareCanonSnapshot(library.specs,{...options,authorize:spec=>specs.some(s=>s.page.canon.id===spec.page.canon.id)});
 }
 
 async function libraryFromEntries(entries,output){
   const ids=new Map();
-  return {version:2,diagrams:await Promise.all(entries.map(async entry=>{
+  for(const entry of entries){
     const label=entry.filename || entry.id;
     if(typeof entry.id!=='string' || !entry.id.trim() || entry.id.length>200)throw new Error(label+': every library diagram needs an ID of 1–200 characters.');
     if(ids.has(entry.id))throw new Error('Duplicate canon ID '+entry.id+': '+ids.get(entry.id)+' and '+label);
     ids.set(entry.id,label);
     if((await stat(entry.filename)).size>30*1024*1024)throw new Error(label+': diagram exceeds 30 MB.');
-    const errors=C.validate(entry.spec).concat(C.validateSpec(entry.spec).errors);
+  }
+  entries=materializeEntries(entries);
+  return {version:3,diagrams:await Promise.all(entries.map(async entry=>{
+    const label=entry.filename || entry.id;
+    const rendered=entry.resolvedSpec || entry.spec;
+    const errors=C.validate(rendered).concat(C.validateSpec(rendered).errors);
     if(errors.length)throw new Error('Invalid diagram '+label+': '+errors.join('; '));
     const counts={nodes:0,steps:0,panels:0};
-    for(const section of C.sections(entry.spec)){
+    for(const section of C.sections(rendered)){
       counts.nodes+=Object.keys(section.diagram.nodes || {}).length;
       counts.steps+=(section.diagram.steps || []).length;
       counts.panels+=(section.diagram.panels || []).length;
     }
-    const specUrl=path.relative(path.dirname(path.resolve(output)),(await realpath(entry.filename))).split(path.sep).map(encodeURIComponent).join('/');
+    const specUrl=path.relative(path.dirname(path.resolve(output)),await realpath(entry.filename)).split(path.sep).map(encodeURIComponent).join('/');
+    if(Buffer.byteLength(JSON.stringify(rendered))>30*1024*1024)throw new Error(label+': resolved diagram exceeds 30 MB.');
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
-      canon:entry.spec.page.canon,counts,specUrl};
+      canon:entry.spec.page.canon,counts,specUrl,revision:digest(entry.spec)};
   }))};
 }
 export async function buildLibrary(registryPath,output='workbench/diagrams.json'){return libraryFromEntries((await registry(registryPath)).entries,await physicalPath(output));}

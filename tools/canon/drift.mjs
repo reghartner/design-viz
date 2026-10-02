@@ -111,8 +111,11 @@ export function decide(specs,state,id,{disposition,reason,ticket,actor='local re
 export function propose(specs,state,{id,spec,baseRevision,review:resolves},now=new Date().toISOString()){
   const current=effectiveSpecs(specs,state).find(s=>s.page.canon.id===id);
   if(!current || digest(current)!==baseRevision)throw new Error('Spec changed; reload the current revision before proposing.');
-  const errors=C.validateSpec(spec).errors;if(errors.length)throw new Error(errors.join('\n'));
   if(spec.page?.canon?.id!==id)throw new Error('A proposal cannot change the diagram identity.');
+  const candidate=effectiveSpecs(specs,state).map(s=>s.page.canon.id===id?spec:s);
+  const topology=candidate.some(s=>C.sections(s).some(section=>section.diagram.topologyImports || section.diagram.topologyExports));
+  const rendered=topology?C.materializeTopology(candidate).find(s=>s.page.canon.id===id):spec;
+  const errors=C.validateSpec(rendered).errors;if(errors.length)throw new Error(errors.join('\n'));
   const prior=state.reviews[resolves];let supersedes;
   if(prior?.type==='spec'){
     if(prior.diagramId!==id || prior.baseRevision!==baseRevision || prior.status!=='open')throw new Error('Proposal is stale or belongs to a different diagram.');

@@ -50,12 +50,15 @@ test('nginx image publishes central canon membership and replaces a stale librar
     catch(error){if(attempt===19)throw error;await new Promise(resolve=>setTimeout(resolve,100));}
   }
   assert.equal(response.status,200);assert.match(response.headers['cache-control'],/no-cache/);
-  const library=JSON.parse(response.body);assert.equal(library.version,2);
+  const library=JSON.parse(response.body);assert.equal(library.version,3);
   const expected=structuredClone(spec);expected.page.canon.id='feature';expected.page.canon.kind='canonical';
   assert.equal(library.diagrams[0].spec,undefined);
   assert.deepEqual(library.diagrams[0].canon,expected.page.canon);
   const specResponse=await probeHttp(new URL(library.diagrams[0].specUrl,url).href,2000);
   assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
+  // The lazy library serves authored JSON. Membership is applied in memory.
+  const sourceResponse=await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.spec.json',2000);
+  assert.equal(sourceResponse.status,200);assert.deepEqual(JSON.parse(sourceResponse.body),spec);
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
   const licenseResponse=await probeHttp('http://127.0.0.1:'+port+'/LICENSE',2000);

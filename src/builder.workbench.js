@@ -472,6 +472,7 @@ function initWorkbenchBuilder(opts){
         status.dataset.state=state;
       }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
+    editError:function(message){inspectorMessage(message);},
     historyChanged:function(undo,redo){
       if(undoBtn)undoBtn.disabled=!undo;
       if(redoBtn)redoBtn.disabled=!redo;
@@ -1027,7 +1028,7 @@ function initWorkbenchBuilder(opts){
       if (interactions.adding() || interactions.connecting()) return {error:'Finish ' + (interactions.adding() ? 'ADD TO STEP' : 'connecting nodes') + ' first (Done or Esc).'};
       var parsed = parseEditor();
       if (parsed.error) return {error:parsed.error + ' — fix it before inserting'};
-      var findings = validate(normalize(parsed.raw));
+      var findings = session.validate(parsed.raw);
       if (findings.errors.length) return {error:'Fix the diagram’s validation errors before adding a panel.'};
       var rec = specSectionPaths(parsed.raw)[session.insertSection];
       if (!rec || !specValueAt(parsed.raw,rec.diagram)) return {error:'Choose a section with a diagram before adding a panel.'};
@@ -1046,10 +1047,10 @@ function initWorkbenchBuilder(opts){
         if(!selected || selected.kind!=='panel' || selected.section!==section || selected.index!==index)return {error:'Select this panel again before replacing its type.'};
         var path=builderTargetPath(parsed.raw,{kind:'panel',section:section,index:index}),panel=path && specValueAt(parsed.raw,path);
         if(!panel)return {error:'The panel no longer exists.'};
-        if(validate(normalize(parsed.raw)).errors.length)return {error:'Fix the diagram’s validation errors before replacing a panel.'};
+        if(session.validate(parsed.raw).errors.length)return {error:'Fix the diagram’s validation errors before replacing a panel.'};
         return Object.assign({},parsed,{section:section,targetKey:JSON.stringify([section,index,panel.id]),panelType:panel.type,label:panel.title || panel.id});
       },
-      review:function(type,snapshot){return planReplacePanel(snapshot.text,snapshot.raw,section,index,type);},
+      review:function(type,snapshot){return planReplacePanel(snapshot.text,snapshot.raw,section,index,type,session.validate);},
       apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
         clearMultiSelect();var next={kind:'panel',section:section,index:index};
         selectTarget(Object.assign({},next,{el:findTargetEl(next)}),false);
@@ -1061,7 +1062,7 @@ function initWorkbenchBuilder(opts){
   function additionContext(){
       var parsed=parseEditor(),locked=!!interactions.adding() || !!interactions.connecting();
       var error=locked ? 'Finish adding to the step or connecting nodes first (Done or Esc).' : parsed.error;
-      if(!error){var findings=validate(normalize(parsed.raw));if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
+      if(!error){var findings=session.validate(parsed.raw);if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
       var sections=parsed.error ? [] : specSectionPaths(parsed.raw).map(function(rec,index){
         return {section:index,label:builderInsertTargetText(parsed.raw,index).replace(/^into /,'')};
       });
@@ -1145,15 +1146,15 @@ function initWorkbenchBuilder(opts){
     },
     afterSave:function(){if(stepList)stepList.sync();}
   };}
-  function replaceProject(text, baseline){var ok=session.replaceProject(text,baseline,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}
-  function loadText(text){
+  function replaceProject(text, baseline,topologyContext){var ok=session.replaceProject(text,baseline,Object.assign(projectHooks(),{topologyContext:topologyContext}));if(ok){sourceOrigin=null;refreshProvenance();}return ok;}
+  function loadText(text,topologyContext){
     if(!life.alive())return false;
     var raw;
     try { raw = JSON.parse(text); }
     catch (ex){ throw new Error('JSON parse: ' + ex.message); }
-    var findings = validate(normalize(raw));
+    var findings = validate(normalize(session.resolve(raw,topologyContext || null)));
     if (findings.errors.length) throw new Error(findings.errors.join('\n'));
-    return replaceProject(text);
+    return replaceProject(text,undefined,topologyContext);
   }
   function restoreDraft(){
     var restored=session.restoreDraft(projectHooks());
@@ -1196,6 +1197,10 @@ function initWorkbenchBuilder(opts){
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
     if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
+    var raw=session.snapshot().raw,imports=[];
+    try{raw=session.resolve(raw);}catch(ex){}
+    (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
+    if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen Canon to load a later deployment; this session never refreshes automatically.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,
@@ -1232,12 +1237,12 @@ function initWorkbenchBuilder(opts){
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
-    validate:function(text){var findings=validate(normalize(JSON.parse(text)));return findings.errors.join('\n');},
+    validate:function(text){var findings=session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal){
       var snapshot=session.snapshot();
       if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
       var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
-      var findings=validate(normalize(raw));
+      var findings=session.validate(raw);
       if(findings.errors.length)return {ok:false,error:findings.errors.join('\n')};
       var ledgerEpoch=agentLedgerEpoch,outcome,paired=proposal && typeof proposal.ledger==='string',history;
       if(paired){
@@ -1284,7 +1289,7 @@ function initWorkbenchBuilder(opts){
   var agentChat=typeof initWorkbenchAgentChat==='function'?initWorkbenchAgentChat(agentOptions):null;
   var handoffRequests=new Set();life.own(function(){handoffRequests.forEach(function(request){request.abort();});});
   async function handoffHtml(source){
-    var findings=validate(normalize(JSON.parse(source)));if(findings.errors.length)throw Error('Repair the story before preparing a viewable handoff: '+findings.errors.join('\n'));
+    var findings=session.validate(JSON.parse(source));if(findings.errors.length)throw Error('Repair the story before preparing a viewable handoff: '+findings.errors.join('\n'));
     var request=new AbortController();handoffRequests.add(request);
     try{
       var paths=['../template/flowview.html','template/flowview.html','flowview.html'];
@@ -1293,7 +1298,7 @@ function initWorkbenchBuilder(opts){
         try{
           var response=await fetch(paths[i],{cache:'no-store',signal:request.signal});if(!response.ok)continue;
           var template=await response.text();if(exportTemplateOpeners(template)!==1)continue;
-          var built=buildExportHtml(template,source.replace(/</g,'\\u003c'));if(built.error)throw Error(built.error);return built.html;
+          var built=buildExportHtml(template,source.replace(/</g,'\\u003c'),session.topologyContext());if(built.error)throw Error(built.error);return built.html;
         }catch(error){if(request.signal.aborted)throw error;}
       }
       throw Error('The viewer template is unavailable. Open the hosted workbench, or serve it alongside template/flowview.html, then prepare review again.');
@@ -1326,7 +1331,8 @@ function initWorkbenchBuilder(opts){
   life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
   function destroy(){life.destroy();}
   return {
-    loadSpec:function(raw,origin){var ok=life.alive() && loadText(JSON.stringify(raw,null,2));if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
+    resolve:session.resolve,
+    loadSpec:function(raw,origin,topologyContext){var ok=life.alive() && loadText(JSON.stringify(raw,null,2),topologyContext);if(ok){sourceOrigin=origin || null;refreshProvenance();}return ok;},
     startAgent:function(mode,options){if(agentChat)agentChat.openSetup(mode || 'external',options);},
     practice:opts.practice?{select:function(target,extend){
       target=Object.assign({},target,{el:findTargetEl(target)});

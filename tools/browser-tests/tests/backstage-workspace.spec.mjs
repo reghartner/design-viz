@@ -107,7 +107,7 @@ test('a changed published story fails the handoff without replacing the existing
     const response=await route.fetch(),data=await response.json();data.page.title='Changed publication';await route.fulfill({json:data});
   });
   await page.goto(url);
-  await expect(page.locator('#canon-reader-error')).toContainText('changed since you opened');
+  await expect(page.locator('#canon-reader-error')).toContainText('revision mismatch');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(before);
 });

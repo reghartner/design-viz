@@ -274,6 +274,7 @@ var msgs = document.getElementById('msgs');
 var activeSkin = null; /* null = follow the host/spec default */
 var previewDocumentSkin = false; /* explicit document-default preview bypasses the host cookie */
 var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSkin,findings:showMsgs,
+  resolve:function(raw){return workbenchBuilder?workbenchBuilder.resolve(raw):raw;},
   present:function(skin){setSkinButtons(skin);applySkinClasses(document.body,view,skin);},
   beforeReplace:function(request){if(workspace)workspace.canvas.capture();if(workbenchBuilder)workbenchBuilder.beforePreviewReplace(request);},
   completed:function(outcome){if(workspace)workspace.canvas.rendered(outcome);if(workbenchBuilder)workbenchBuilder.previewRendered(outcome);}
@@ -416,9 +417,9 @@ if(workbenchPractice){
 }else{
 welcome=initWorkbenchWelcome({src:src,builder:workbenchBuilder,templates:WORKBENCH_TEMPLATES,canon:WORKBENCH_CANON,
   workspace:workspace,skipWelcome:new URLSearchParams(location.search).has('canon')});
-canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw){
+canonContext=initCanonWorkbench({src:src,handoff:!!readWorkspaceHandoff(location.hash),catalogChanged:function(){workbenchBuilder.refreshCatalog();},loadSpec:function(raw,topologyContext){
   loadingCanon=true;
-  try{var result=workbenchBuilder.loadSpec(raw);welcome.canonicalLoaded();return result;}
+  try{var result=workbenchBuilder.loadSpec(raw,null,topologyContext);if(result)welcome.canonicalLoaded();return result;}
   finally{loadingCanon=false;}
 }});
 

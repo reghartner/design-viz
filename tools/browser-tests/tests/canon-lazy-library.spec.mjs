@@ -96,12 +96,22 @@ test('reference picker cancels stale async work and leaves source/history untouc
   expect(fixture.requests).toHaveLength(2);
 });
 
-for(const failure of ['revision','malformed'])test('reference picker fails closed on '+failure+' provider response',async({page,server})=>{
+for(const failure of ['revision','malformed'])test('reference picker fails closed then retries repaired '+failure+' provider response in the same session',async({page,server})=>{
   const fixture=await pickerFixture(page,server),changed=structuredClone(fixture.provider);changed.page.title='Changed deployment';
   await page.route(fixture.specURL('first'),route=>route.fulfill(failure==='revision'?{json:changed}:{body:'not json',contentType:'application/json'}));
   await openTopology(page);await expect(page.locator('#topology-status')).not.toContainText('Loading approved');
   await expect(page.locator('#topology-add')).toBeDisabled();if(failure==='revision')await expect(page.locator('#topology-status')).toContainText('revision mismatch');
   await page.locator('#topology-cancel').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.unroute(fixture.specURL('first'));
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-add').click();await pagePreview(page);
+  await expect(page.locator('#docview [data-dv-node="first::dispatch"]')).toBeVisible();
+  expect(fixture.requests.filter(url=>url===fixture.specURL('first'))).toHaveLength(2);
+  const after=await page.locator('#src').inputValue();
+  await page.route(fixture.specURL('first'),route=>route.fulfill({json:changed}));
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-cancel').click();
+  await expect(page.locator('#src')).toHaveValue(after);
+  expect(fixture.requests.filter(url=>url===fixture.specURL('first'))).toHaveLength(2);
 });
 
 test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{

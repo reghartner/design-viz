@@ -84,3 +84,30 @@ test('catalog acquisition loads nested dependencies once, fails transport safely
   assert.throws(()=>harness({location:{href:'file:///tmp/workbench.html'}}).createTopologyCatalogLoader(context),/unavailable/);
   assert.throws(()=>c.createTopologyCatalogLoader({...context,catalogURL:'https://elsewhere.invalid/diagrams.json'}),/origin/);
 });
+
+for(const failure of ['network','403','malformed JSON','revision mismatch'])test('catalog retries '+failure+' without evicting successful frozen dependencies',async()=>{
+  const {digest}=await import('../tools/canon/drift.mjs');const specs=fixtures(),nested=clone(specs[1]);
+  nested.page.canon.id='nested';diagram(nested).topologyImports=[reference];specs.push(nested);
+  const context={version:1,id:'consumer',specs:[specs[1]],catalogURL:'https://test.invalid/workbench/diagrams.json',catalog:{version:3,diagrams:specs.map(spec=>({id:spec.page.canon.id,canon:spec.page.canon,counts:{nodes:0,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))}};
+  let repaired=false;const hits=[];
+  const c=harness({fetch:async url=>{
+    const id=String(url).split('/').pop().replace('.json','');hits.push(id);
+    if(id==='provider' && !repaired){
+      if(failure==='network')throw Error('Network offline');
+      if(failure==='403')return new Response('',{status:403});
+      if(failure==='malformed JSON')return new Response('not JSON');
+      const changed=clone(specs[0]);changed.page.title='Wrong revision';return new Response(JSON.stringify(changed));
+    }
+    return new Response(JSON.stringify(specs.find(spec=>spec.page.canon.id===id)));
+  }});
+  const client=c.createTopologyCatalogLoader(context);
+  const failed=await Promise.allSettled([client.load('nested'),client.load('nested')]);
+  assert.ok(failed.every(result=>result.status==='rejected'));
+  assert.deepEqual(hits,['nested','provider']);assert.equal(context.specs.length,1);
+  repaired=true;const retried=await client.load('nested');assert.equal(retried.context.specs.length,3);
+  assert.deepEqual(hits,['nested','provider','provider'],'only the rejected request is reacquired');
+  diagram(specs[0]).nodes.a.title='Later deployment';nested.page.title='Later nested deployment';
+  const frozen=await client.load('nested',retried.context);
+  assert.equal(diagram(frozen.resolved).nodes['child::a'].title,'A');assert.notEqual(frozen.source.page.title,'Later nested deployment');
+  assert.deepEqual(hits,['nested','provider','provider'],'successful provider snapshots stay cached');
+});

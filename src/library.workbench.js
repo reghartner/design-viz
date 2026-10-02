@@ -54,13 +54,21 @@ function createTopologyCatalogLoader(context){
   var requests=new Map();
   (context.specs || []).forEach(function(source){requests.set(source.page.canon.id,Promise.resolve(source));});
   function source(entry){
-    if(!requests.has(entry.id))requests.set(entry.id,(async function(){
-      var response=await fetch(canonLibrarySpecURL(entry.specUrl,base),{cache:'no-cache',redirect:'error'});
-      var raw=canonLibrarySpec(await readCanonLibraryJSON(response,'Provider '+entry.id),entry);
-      try{await verifyWorkspaceHandoff(raw,{id:entry.id,revision:entry.revision},window.crypto);}
-      catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen Canon after deployment; your draft has not changed.');}
-      return raw;
-    })());
+    if(!requests.has(entry.id)){
+      var request=(async function(){
+        var response=await fetch(canonLibrarySpecURL(entry.specUrl,base),{cache:'no-cache',redirect:'error'});
+        var raw=canonLibrarySpec(await readCanonLibraryJSON(response,'Provider '+entry.id),entry);
+        try{await verifyWorkspaceHandoff(raw,{id:entry.id,revision:entry.revision},window.crypto);}
+        catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen Canon after deployment; your draft has not changed.');}
+        return raw;
+      })().catch(function(ex){
+        // Share in-flight work, but cache only verified successful sources.
+        // A retry still checks the original revision lock; it is not a refresh.
+        if(requests.get(entry.id)===request)requests.delete(entry.id);
+        throw ex;
+      });
+      requests.set(entry.id,request);
+    }
     return requests.get(entry.id);
   }
   return {entries:entries,load:async function(id,currentContext){

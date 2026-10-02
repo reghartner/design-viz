@@ -14,6 +14,7 @@ var SCENE_NAMES = [
 var SCREEN_MODES = ['off', 'boot', 'active', 'live', 'rec', 'save', 'playing', 'unavailable'];
 var SCREEN_SCENE_MODES = ['active', 'live', 'rec', 'save', 'playing'];
 var SCREEN_SPOTLIGHTS = ['off', 'on', 'flash'];
+var SCREEN_SIRENS = ['off', 'on'];
 /* A state `scene` overrides the declared clip; null restores the declaration. */
 function screenSceneOverride(value) {
   return value === null || SCENE_NAMES.indexOf(value) >= 0;
@@ -30,6 +31,7 @@ function screenCleanState(raw, once) {
     else out.audio = audio;
   }
   if (panelOwn(raw, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(raw.spotlight) < 0) delete out.spotlight;
+  if (panelOwn(raw, 'siren') && SCREEN_SIRENS.indexOf(raw.siren) < 0) delete out.siren;
   if (panelOwn(raw, 'enterOnce')) {
     if (once && panelObject(raw.enterOnce)) out.enterOnce = screenCleanState(raw.enterOnce, false);
     else delete out.enterOnce;
@@ -47,6 +49,8 @@ function screenPatchWarnings(state, path, warnings) {
   if (panelOwn(state, 'audio')) FlowAudio.clean(state.audio, path + '.audio', warnings);
   if (panelOwn(state, 'spotlight') && SCREEN_SPOTLIGHTS.indexOf(state.spotlight) < 0)
     warnings.push(path + '.spotlight: expected off|on|flash — ignored');
+  if (panelOwn(state, 'siren') && SCREEN_SIRENS.indexOf(state.siren) < 0)
+    warnings.push(path + '.siren: expected off|on — ignored');
   if (
     Object.prototype.hasOwnProperty.call(state, 'scenePlayback') &&
     ['waiting', 'playing'].indexOf(state.scenePlayback) < 0
@@ -352,17 +356,20 @@ var SCENES = {
 
 /* Shared by embedded monitoring consoles. The caller still owns its panel
    lifecycle; this factory owns camera artwork, overlays and clip-preserving patches. */
-function screenDeviceOverlay(audio, spotlight) {
+function screenDeviceOverlay(audio, spotlight, siren) {
   var light = SCREEN_SPOTLIGHTS.indexOf(spotlight) >= 0 && spotlight !== 'off';
   var sound = FlowAudio.render(audio);
-  if (!sound && !light) return '';
+  if (!sound && !light && siren !== 'on') return '';
   return '<svg class="ovl screen-devices" viewBox="0 0 320 180" aria-hidden="true">' +
     (light ? '<g class="screen-spotlight screen-spotlight-' + spotlight + '"><path d="M263 55L101 180H320V122Z" fill="#FFE5A3" opacity=".24"/><path d="M263 55L203 180H320V126Z" fill="#FFF6D6" opacity=".14"/><ellipse cx="250" cy="170" rx="67" ry="12" fill="#FFE5A3" opacity=".2"/></g>' : '') +
     '<g class="screen-camera-device" transform="translate(260 40)"><rect x="-17" y="-12" width="34" height="25" rx="9" fill="#163046" stroke="#A3CCD6" stroke-width="1.2"/>' +
     '<circle cx="-5" cy="-1" r="6" fill="#081927" stroke="#65B8C5" stroke-width="2"/><circle cx="-6" cy="-2" r="2" fill="#92D9E2"/>' +
     '<path d="M6-5H11M6-1H11M6 3H11" stroke="#C7E4DF" stroke-width="1.6" stroke-linecap="round"/>' +
     (light ? '<rect x="-8" y="12" width="16" height="3" rx="1.5" fill="#FFE5A3"/>' : '') +
-    FlowAudio.effect(audio) + '</g></svg>';
+    FlowAudio.effect(audio) + '</g>' +
+    (siren === 'on' ? '<g class="screen-siren" transform="translate(58 45)">' +
+      '<g transform="translate(-12 -12)">' + FlowIcons.glyph('alarm', {tone:'alert'}) + '</g>' +
+      FlowAudio.effect({output:'siren'}) + '</g>' : '') + '</svg>';
 }
 function screenAudioHTML(audio) {
   var strip = FlowAudio.render(audio, {label:'Camera audio'});
@@ -418,10 +425,13 @@ function screenFramePresentation(host, panel, state) {
           : 'Video is temporarily unavailable.'
       ) +
       '</span></div>';
-  scrOvl += screenDeviceOverlay(state.audio, state.spotlight);
+  scrOvl += screenDeviceOverlay(state.audio, state.spotlight, state.siren);
   var audioHTML = screenAudioHTML(state.audio);
+  var effects = '';
+  if (state.siren === 'on') effects += '<span class="screen-siren-label">Alarm sounding</span>';
   if (SCREEN_SPOTLIGHTS.indexOf(state.spotlight) >= 0 && state.spotlight !== 'off')
-    scrOvl += '<span class="ovl screen-light-label">Spotlight ' + (state.spotlight === 'flash' ? 'flashing' : 'on') + '</span>';
+    effects += '<span class="screen-light-label">Spotlight ' + (state.spotlight === 'flash' ? 'flashing' : 'on') + '</span>';
+  if (effects) scrOvl += '<div class="ovl screen-effects">' + effects + '</div>';
   h += '<div class="' + scrClass + '">';
   if (mode === 'boot') h += SCENES['static-noise'];
   else if (SCREEN_SCENE_MODES.indexOf(mode) >= 0) h += SCENES[sceneName];
@@ -483,10 +493,14 @@ PanelRegistry.extend('screen', {
       order: 490,
       css: String.raw`.screen-devices{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible;}
 .screen-camera-device{color:#B9FFF0;filter:drop-shadow(0 2px 4px #09192788);}
+.screen-siren{color:#FFB4A6;filter:drop-shadow(0 2px 4px #09192788);}
+.screen-effects{left:6px;right:6px;bottom:8px;display:flex;flex-wrap:wrap;justify-content:space-between;gap:3px;pointer-events:none;}
+.screen-effects>span{padding:3px 5px;border:1px solid;border-radius:5px;font:600 9px/1.4 'IBM Plex Sans',sans-serif;letter-spacing:0;}
+.screen-effects .screen-siren-label{border-color:#FFB4A655;background:#401E25E8;color:#FFE2D9;}
 .screen-spotlight-flash{animation:screen-spotlight-flash 2.6s ease-in-out infinite;}
 .screen-audio-slot:empty{display:none;}.screen-audio-slot{margin-top:7px;min-width:0;}
 .screen-audio-direction{margin:0 2px 5px;color:var(--dtext);font:500 10px/1.4 'IBM Plex Sans',sans-serif;}
-.screen-light-label{position:absolute;right:8px;bottom:8px;padding:3px 6px;border:1px solid #FFE5A355;border-radius:5px;background:#183046D9;color:#FFF0CA;font:500 9px/1.4 'IBM Plex Sans',sans-serif;}
+.screen-effects .screen-light-label{margin-left:auto;border-color:#FFE5A355;background:#183046D9;color:#FFF0CA;}
 @keyframes screen-spotlight-flash{0%,34%,100%{opacity:1;}50%,82%{opacity:.16;}}
 @media(prefers-reduced-motion:reduce){.screen-devices *{animation:none!important;}.screen-spotlight-flash{opacity:.8;}}
 @media print{.screen-devices *{animation:none!important;}.screen-audio-slot{break-inside:avoid;}.screen-devices{print-color-adjust:exact;}}
@@ -780,7 +794,7 @@ PanelRegistry.extend('screen', {
     branding: true,
     template: { title: 'Camera', scene: 'static-noise', initial: { mode: 'off' } },
     initialFields: true,
-    transientFields: ['mode', 'scene', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight'],
+    transientFields: ['mode', 'scene', 'scenePlayback', 'banner', 'reason', 'audio', 'spotlight', 'siren'],
     setupFields: [
       ['scene', 'scene'],
       ['initial', 'json'],
@@ -792,6 +806,7 @@ PanelRegistry.extend('screen', {
       ['reason', 'text'],
       ['audio', 'objf', FlowAudio.fields],
       ['spotlight', 'enum', SCREEN_SPOTLIGHTS],
+      ['siren', 'enum', SCREEN_SIRENS, {label:'Alarm siren'}],
     ],
     /* The per-state scene override joins the inspector beside mode; the
        legacy static field list stays unchanged for existing tooling. */
@@ -811,7 +826,7 @@ PanelRegistry.extend('screen', {
       category: 'Places & sensing',
       tagline: 'What the camera sees',
       description:
-        'Show camera video, two-way talk, recorded warnings, sound detection and an independent spotlight.',
+        'Show camera video, two-way talk, recorded warnings, sound detection and independent spotlight and alarm siren states.',
     },
     example: function (sample, context) {
       var panel = sample.panel,
@@ -819,7 +834,7 @@ PanelRegistry.extend('screen', {
         states = sample.states,
         step = sample.step;
       panel.scene = 'person-through-door';
-      state = { mode: 'live' };
+      state = { mode: 'live', audio: {connection:'connected', microphone:'capturing', output:'speech'}, spotlight:'on', siren:'on' };
       panel.initial = builderClone(state);
 
       return { panel: panel, state: state, states: states, step: step };
@@ -867,7 +882,7 @@ PanelRegistry.extend('screen', {
           var sceneNote = document.createElement('p');
           sceneNote.className = 'home-note';
           sceneNote.textContent =
-            'Active means on without livestreaming or recording. Mode playing shows a recorded clip being played back (PLAYING chip; banner titles the clip); Scene event only starts or holds the illustrated action. Scene override switches the clip from this step; Use declared scene returns to the panel scene. Audio and spotlight carry independently of video. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
+            'Active means on without livestreaming or recording. Mode playing shows a recorded clip being played back (PLAYING chip; banner titles the clip); Scene event only starts or holds the illustrated action. Scene override switches the clip from this step; Use declared scene returns to the panel scene. Audio, spotlight and alarm siren carry independently of video. Siren on shows the remote alarm sounding; off clears it without changing the conversation. Camera output is heard by the visitor; microphone capturing means the camera hears the visitor. Each audio object replaces the prior audio state; null clears it. Audio is visual only. Unavailable hides video and shows its reason.';
           body.appendChild(sceneNote);
         },
         patchLabel: function (key) {

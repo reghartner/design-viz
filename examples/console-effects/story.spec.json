@@ -1,0 +1,140 @@
+{
+  "page": {
+    "title": "Specialist desk and camera effects",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Visual conversation and deterrence",
+        "diagram": {
+          "view": "step",
+          "autoplay": false,
+          "nodes": {
+            "camera": {
+              "label": "Porch camera"
+            },
+            "desk": {
+              "label": "Specialist"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "desk"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "desk",
+              "label": "Two-way audio"
+            }
+          ],
+          "panels": [
+            {
+              "id": "desk",
+              "type": "security",
+              "title": "Specialist desk",
+              "scene": "person-at-door-night",
+              "initial": {
+                "video": "reviewing",
+                "status": "reviewing",
+                "assessment": "unverified",
+                "operator": "Alex",
+                "siren": "off",
+                "spotlight": "off"
+              },
+              "sensors": [
+                {
+                  "id": "door",
+                  "label": "Front door",
+                  "kind": "door"
+                }
+              ]
+            },
+            {
+              "id": "camera",
+              "type": "screen",
+              "title": "Porch camera",
+              "scene": "person-at-door-night",
+              "initial": {
+                "mode": "live",
+                "siren": "off",
+                "spotlight": "off"
+              }
+            }
+          ],
+          "steps": [
+            {
+              "id": "ready",
+              "text": "The specialist opens the camera.",
+              "nodes": [
+                "camera",
+                "desk"
+              ]
+            },
+            {
+              "id": "talk",
+              "text": "Specialist and visitor speak over two-way audio.",
+              "panels": {
+                "desk": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing",
+                    "output": "speech"
+                  }
+                },
+                "camera": {
+                  "audio": {
+                    "connection": "connected",
+                    "microphone": "capturing",
+                    "output": "speech"
+                  }
+                }
+              }
+            },
+            {
+              "id": "light",
+              "text": "The camera spotlight turns on; the conversation continues.",
+              "panels": {
+                "desk": {
+                  "spotlight": "on"
+                },
+                "camera": {
+                  "spotlight": "on"
+                }
+              }
+            },
+            {
+              "id": "alarm",
+              "text": "The remote alarm sounds alongside the conversation and spotlight.",
+              "panels": {
+                "desk": {
+                  "siren": "on"
+                },
+                "camera": {
+                  "siren": "on"
+                }
+              }
+            },
+            {
+              "id": "clear",
+              "text": "Alarm, spotlight and conversation are explicitly cleared.",
+              "panels": {
+                "desk": {
+                  "siren": "off",
+                  "spotlight": "off",
+                  "audio": null
+                },
+                "camera": {
+                  "siren": "off",
+                  "spotlight": "off",
+                  "audio": null
+                }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

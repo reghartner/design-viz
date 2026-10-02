@@ -7,6 +7,14 @@ const fixture=require('./fixtures/auto-arrange-grouped.json');
 const Viz=require('../src/workbench/vendor/viz-3.31.0.js'),cola=require('../src/workbench/vendor/webcola-3.4.0.js');
 let viz;test.before(async()=>{viz=await Viz.instance();});
 function simple(){return {nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'a'}]};}
+function minimumCardGap(result){
+  let closest=Infinity;
+  result.positions.forEach((a,i)=>result.positions.slice(i+1).forEach(b=>{
+    const dx=Math.max(0,Math.abs(a.x-b.x)-150),dy=Math.max(0,Math.abs(a.y-b.y)-44);
+    closest=Math.min(closest,Math.hypot(dx,dy));
+  }));
+  return closest;
+}
 
 test('approved 20-node grouped fixture retains groups and native routes with clear final viewer paths',()=>{
   const d=fixture.page.blocks[0].diagram,result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result);
@@ -14,8 +22,23 @@ test('approved 20-node grouped fixture retains groups and native routes with cle
   assert.deepEqual(plain(out.groups),d.groups);assert.deepEqual(plain(out.nodes),d.nodes);
   assert.deepEqual(plain(out.edges.map(e=>[e.from,e.to,e.label])),plain(d.edges.map(e=>[e.from,e.to,e.label])));
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.ok(result.score.crossings<=10,JSON.stringify(result.score));
+  assert.ok(minimumCardGap(result)>=48,minimumCardGap(result));
   assert.ok(out.edges.find(e=>e.label==='retry').labelDx!==undefined);
   assert.deepEqual(plain(C.autoArrangeCandidates(d,viz,cola)),plain(result));
+});
+
+test('layered and force-directed candidates keep visibly separated card rectangles',()=>{
+  const d=simple();
+  for(const direction of ['TB','LR']){
+    const result=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,direction),{engine:'dot'}));
+    assert.ok(minimumCardGap(result)>=48,direction+' '+minimumCardGap(result));
+  }
+  for(const seed of [1,91]){
+    const positions=C.autoArrangeColaPositions(d,cola,seed);
+    const result=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR',positions),{engine:'nop2'}));
+    assert.ok(minimumCardGap(result)>=48,'cola '+seed+' '+minimumCardGap(result));
+  }
+  assert.ok(minimumCardGap(C.autoArrangeCandidates(d,viz,cola))>=48);
 });
 
 test('cyclic, disconnected, nested, self and parallel connections preserve identity and route every edge',()=>{

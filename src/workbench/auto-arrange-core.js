@@ -1,6 +1,7 @@
 /* Bounded deterministic layout search. Runs in a worker; this pure module is
    also exercised against the final viewer geometry in Node tests. */
 var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
+var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
 function autoArrangeInput(d){
   var ids=Object.keys(d.nodes || {}),edges=d.edges || [];
   if(!ids.length)throw new Error('Add a node before arranging this diagram.');
@@ -34,7 +35,7 @@ function autoArrangeDot(d,direction,positions){
   function group(g){return 'subgraph cluster_'+gids.indexOf(g)+' {label='+quote(groups[g].title || g)+';margin=24;'+
     gids.filter(function(c){return parents[c]===g;}).map(group).join('')+
     ids.filter(function(id){return d.nodes[id].group===g;}).map(node).join('')+'}';}
-  var source='digraph G {graph [rankdir='+direction+',compound=true,newrank=true,splines=true,overlap=true,notranslate=true,nodesep=.35,ranksep=.6];'+
+  var source='digraph G {graph [rankdir='+direction+',compound=true,newrank=true,splines=true,overlap=true,notranslate=true,nodesep='+(AUTO_ARRANGE_CARD_GAP/72)+',ranksep='+(AUTO_ARRANGE_RANK_GAP/72)+'];'+
     'node [shape=box,fixedsize=true,width='+150/72+',height='+44/72+'];edge [dir=none,fontsize=11,fontname="Arial"];';
   if(positions)source+=ids.map(node).join('');
   else source+=gids.filter(function(g){return !parents[g];}).map(group).join('')+ids.filter(function(id){return !d.nodes[id].group;}).map(node).join('');
@@ -102,6 +103,14 @@ function autoArrangeScore(d,result){
   });});
   return {overlaps:overlaps,hits:hits,crossings:crossings,length:length,area:L.vb.w*L.vb.h};
 }
+function autoArrangeColaPositions(d,cola,seed){
+  var ids=autoArrangeInput(d),state=seed;
+  function random(){state=(1664525*state+1013904223)>>>0;return state/4294967296;}
+  var nodes=ids.map(function(id){return {id:id,width:150+AUTO_ARRANGE_CARD_GAP,height:44+AUTO_ARRANGE_CARD_GAP,x:random()*900,y:random()*700};});
+  var links=(d.edges || []).filter(function(e){return e.from!==e.to;}).map(function(e){return {source:ids.indexOf(e.from),target:ids.indexOf(e.to)};});
+  new cola.Layout().nodes(nodes).links(links).size([1200,900]).linkDistance(AUTO_ARRANGE_LINK_DISTANCE).avoidOverlaps(true).start(60,100,250,0,false);
+  var positions=Object.create(null);nodes.forEach(function(n){positions[n.id]={x:n.x,y:n.y};});return positions;
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[];
   function attempt(direction,positions){
@@ -112,11 +121,7 @@ function autoArrangeCandidates(d,viz,cola){
   attempt('TB');attempt('LR');
   if(!ids.some(function(id){return d.nodes[id].group;}) && ids.length>1 && cola){
     [1,91].forEach(function(seed){
-      try{var state=seed;function random(){state=(1664525*state+1013904223)>>>0;return state/4294967296;}
-        var nodes=ids.map(function(id){return {id:id,width:174,height:68,x:random()*900,y:random()*700};});
-        var links=(d.edges || []).filter(function(e){return e.from!==e.to;}).map(function(e){return {source:ids.indexOf(e.from),target:ids.indexOf(e.to)};});
-        new cola.Layout().nodes(nodes).links(links).size([1200,900]).linkDistance(230).avoidOverlaps(true).start(60,100,250,0,false);
-        var positions=Object.create(null);nodes.forEach(function(n){positions[n.id]={x:n.x,y:n.y};});attempt('LR',positions);
+      try{attempt('LR',autoArrangeColaPositions(d,cola,seed));
       }catch(ex){/* Layered alternatives remain available. */}
     });
   }

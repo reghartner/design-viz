@@ -8,6 +8,14 @@ const ROOT=path.join(__dirname,'..');
 const {probeHttp}=require('./helpers/http-probe.js');
 const dockerAvailable=spawnSync('docker',['info','--format','{{.ServerVersion}}'],{encoding:'utf8',timeout:10000}).status===0;
 
+test('production and prebuilt images recursively copy the diagram tree',()=>{
+  for(const dockerfile of ['Dockerfile','Dockerfile.prebuilt']){
+    const text=fs.readFileSync(path.join(ROOT,'deploy/workbench',dockerfile),'utf8');
+    assert.match(text,/COPY diagrams\/ diagrams\//);
+    assert.match(text,/COPY (?:--from=build \/build\/)?diagrams\/ \/usr\/share\/nginx\/html\/diagrams\//);
+  }
+});
+
 test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{
   assert.ok(dockerAvailable,'Docker must be available in CI for the workbench image contract.');
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-'));
@@ -31,9 +39,9 @@ test('nginx image publishes central canon membership and replaces a stale librar
   const spec=JSON.parse(fs.readFileSync(path.join(ROOT,'examples/canon/specs/doorbell.json')));
   spec.page.canon.id='old-spec-id';
   spec.page.canon.kind='design';
-  const source=path.join(directory,'diagrams/feature/feature.spec.json');
+  const source=path.join(directory,'diagrams/product-area/feature/feature.spec.json');
   fs.mkdirSync(path.dirname(source),{recursive:true});fs.writeFileSync(source,JSON.stringify(spec));
-  const manifest={version:1,diagrams:[{folder:'diagrams/feature',owner:spec.page.canon.owner}]};
+  const manifest={version:1,diagrams:[{folder:'diagrams/product-area/feature',owner:spec.page.canon.owner}]};
   fs.writeFileSync(path.join(directory,'canon.json'),JSON.stringify(manifest));
   fs.mkdirSync(path.join(directory,'diagrams/unlisted'));
   fs.writeFileSync(path.join(directory,'diagrams/unlisted/unlisted.spec.json'),JSON.stringify(spec));
@@ -53,11 +61,12 @@ test('nginx image publishes central canon membership and replaces a stale librar
   const library=JSON.parse(response.body);assert.equal(library.version,3);
   const expected=structuredClone(spec);expected.page.canon.id='feature';expected.page.canon.kind='canonical';
   assert.equal(library.diagrams[0].spec,undefined);
+  assert.equal(library.diagrams[0].specUrl,'../diagrams/product-area/feature/feature.spec.json');
   assert.deepEqual(library.diagrams[0].canon,expected.page.canon);
   const specResponse=await probeHttp(new URL(library.diagrams[0].specUrl,url).href,2000);
   assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
   // The lazy library serves authored JSON. Membership is applied in memory.
-  const sourceResponse=await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.spec.json',2000);
+  const sourceResponse=await probeHttp('http://127.0.0.1:'+port+'/diagrams/product-area/feature/feature.spec.json',2000);
   assert.equal(sourceResponse.status,200);assert.deepEqual(JSON.parse(sourceResponse.body),spec);
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);

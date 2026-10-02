@@ -1,17 +1,19 @@
 # Diagrams
 
 This is the home for maintained diagrams. Keep each diagram in its own
-descriptively named, kebab-case folder. The authored JSON spec is required;
-generated standalone HTML is an optional portable export:
+descriptively named, kebab-case folder. Optional kebab-case namespace folders
+can group diagrams without changing their IDs. The authored JSON spec is
+required; generated standalone HTML is an optional portable export:
 
 ```text
 diagrams/
-  service-checkout/
-    service-checkout.spec.json
-    service-checkout.html
-    manifest.json
-    service-checkout.ledger.md  # optional source/coverage notes
-    assets/                    # optional supporting files
+  payments/
+    service-checkout/
+      service-checkout.spec.json
+      service-checkout.html
+      manifest.json
+      service-checkout.ledger.md  # optional source/coverage notes
+      assets/                    # optional supporting files
 ```
 
 One folder represents one diagram page; that page can contain multiple related
@@ -22,7 +24,7 @@ build command. Demos and test fixtures belong in `examples/`.
 From the repository root, build a diagram beside its source:
 
 ```sh
-python3 tools/page_build.py diagrams/service-checkout/service-checkout.spec.json
+python3 tools/page_build.py diagrams/payments/service-checkout/service-checkout.spec.json
 ```
 
 Replace `service-checkout` with the actual folder and spec name. The command
@@ -55,18 +57,20 @@ For example, after creating the files above:
   "version": 1,
   "diagrams": [
     {
-      "folder": "diagrams/service-checkout",
+      "folder": "diagrams/payments/service-checkout",
       "owner": "group:default/checkout-team"
     }
   ]
 }
 ```
 
-Use the actual owning entity reference. Each entry references one immediate
-subfolder of `diagrams/`. The folder name supplies the stable diagram ID and
-required filename: `<folder-name>.spec.json`. Keep IDs stable once diagrams have
-links or reviewed evidence. A matching `<folder-name>.html` may be committed when
-a portable standalone export is useful, but canon publication reads the spec.
+Use the actual owning entity reference. Each entry references a diagram folder
+below `diagrams/`; every path segment must be kebab-case. The leaf folder name
+supplies the stable diagram ID and required filename: `<leaf-name>.spec.json`.
+Namespace folders are organization only, so leaf IDs must be globally unique
+across the entire manifest. Keep IDs stable once diagrams have links or reviewed
+evidence. A matching `<leaf-name>.html` may be committed when a portable
+standalone export is useful, but canon publication reads the spec.
 
 Review changes to `canon.json` alongside the diagram's story and evidence.
 The JSON spec remains the source of diagram content; `canon.json` owns membership

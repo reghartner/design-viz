@@ -15,10 +15,10 @@ describe('central canon membership for GitHub adapters',()=>{
     expect(prepareCanonSnapshot(source,{authorize:(s:any)=>s.page.canon.id==='checkout'}).loadWorkspace('checkout')).toBeNull();
   });
   it('uses manifest identity and ownership before indexing service bindings',()=>{
-    const entries=parseCanonManifest({version:1,diagrams:[{folder:'diagrams/checkout',owner:'group:default/team'}]});
+    const entries=parseCanonManifest({version:1,diagrams:[{folder:'diagrams/payments/checkout',owner:'group:default/team'}]});
     expect(entries).toEqual([{
-      id:'checkout',folder:'diagrams/checkout',owner:'group:default/team',path:'diagrams/checkout/checkout.spec.json',
-      html:'diagrams/checkout/checkout.html',
+      id:'checkout',folder:'diagrams/payments/checkout',owner:'group:default/team',path:'diagrams/payments/checkout/checkout.spec.json',
+      html:'diagrams/payments/checkout/checkout.html',
     }]);
     const source={page:{title:'Checkout',canon:{id:'old',kind:'design'},sections:[{heading:'Flow',diagram:{
       nodes:{service:{title:'Service',binding:{entityRef:'component:default/checkout'}}},rows:[['service']],edges:[],steps:[],
@@ -31,8 +31,15 @@ describe('central canon membership for GitHub adapters',()=>{
     expect(found).toHaveLength(1);expect(found[0]).toMatchObject({id:'checkout',owner:'group:default/team',kind:'canonical'});
     expect(source.page.canon.kind).toBe('design');
     expect(parseCanonManifest({version:1,diagrams:[]})).toEqual([]);
+    expect(parseCanonManifest({version:1,diagrams:[{folder:'diagrams/flat-diagram',owner:'group:default/team'}]})[0].id).toBe('flat-diagram');
   });
-  it('rejects a manifest path outside the diagram folders',()=>{
-    expect(()=>parseCanonManifest({version:1,diagrams:[{folder:'diagrams/../secret',owner:'group:default/team'}]})).toThrow();
+  it('rejects unsafe paths and duplicate leaf IDs across namespaces',()=>{
+    for(const folder of ['../secret','/diagrams/secret','diagrams/../secret','diagrams/','diagrams//a','diagrams/a/','diagrams/a//b','diagrams/a/.','diagrams/a/..','https://evil.test/a','diagrams/a%2fb','diagrams/a%2Fb','diagrams/a\\b']){
+      expect(()=>parseCanonManifest({version:1,diagrams:[{folder,owner:'group:default/team'}]})).toThrow();
+    }
+    expect(()=>parseCanonManifest({version:1,diagrams:[
+      {folder:'diagrams/payments/checkout',owner:'group:default/team'},
+      {folder:'diagrams/archive/checkout',owner:'group:default/team'},
+    ]})).toThrow(/Duplicate canon ID: checkout/);
   });
 });

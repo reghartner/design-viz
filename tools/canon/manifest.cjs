@@ -3,13 +3,15 @@ var FlowCanonLibrary = (function(){
   'use strict';
   function entries(raw){
     if(!raw || raw.version!==1 || !Array.isArray(raw.diagrams))throw new Error('canon.json requires version 1 and a diagrams array.');
-    var seen=new Set();
+    var folders=new Set(),ids=new Set();
     return raw.diagrams.map(function(entry){
-      if(!entry || typeof entry.folder!=='string' || !/^diagrams\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(entry.folder))throw new Error('Canon folder must be diagrams/<kebab-case-name>.');
-      if(seen.has(entry.folder))throw new Error('Duplicate canon folder: '+entry.folder);
-      seen.add(entry.folder);
+      if(!entry || typeof entry.folder!=='string' || !/^diagrams\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(entry.folder))throw new Error('Canon folder must be diagrams/<kebab-case-segment>[/<kebab-case-segment>...].');
+      if(folders.has(entry.folder))throw new Error('Duplicate canon folder: '+entry.folder);
+      folders.add(entry.folder);
       if(typeof entry.owner!=='string' || !/^[a-z][a-z0-9-]*:[a-z0-9_.-]+\/[a-z0-9_.-]+$/i.test(entry.owner))throw new Error('Canon entry requires an owner entity reference: '+entry.folder);
-      var id=entry.folder.slice('diagrams/'.length);
+      var id=entry.folder.slice(entry.folder.lastIndexOf('/')+1);
+      if(ids.has(id))throw new Error('Duplicate canon ID: '+id);
+      ids.add(id);
       return {id:id,folder:entry.folder,owner:entry.owner,path:entry.folder+'/'+id+'.spec.json',html:entry.folder+'/'+id+'.html'};
     });
   }

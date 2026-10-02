@@ -181,8 +181,11 @@ users can discover how to associate a service.
 ### Central canon membership
 
 Root `canon.json` in the company diagrams repository is the shared authority for
-Backstage and the nginx workbench. Its `diagrams` entries reference folders such
-as `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
+Backstage and the nginx workbench. Its `diagrams` entries reference flat or
+namespaced folders such as
+`{"folder":"diagrams/home/doorbell","owner":"group:default/home-team"}`.
+Every segment below `diagrams/` is kebab-case. The leaf folder supplies the ID
+and required spec filename; leaf IDs must be globally unique across namespaces.
 A spec's own `page.canon` cannot enroll it or override the central ID/owner.
 
 The company GitHub source adapter reads that manifest and its listed JSON specs

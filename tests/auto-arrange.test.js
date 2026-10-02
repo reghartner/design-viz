@@ -40,8 +40,10 @@ test('refuses malformed, oversized and deeply nested graphs without publication'
  for(const d of [{nodes:{},rows:[[]]}, {nodes:{a:{}},rows:[['a']],edges:[{from:'a',to:'missing'}]}, {nodes:{a:{}},rows:null}, {nodes:Object.fromEntries(Array.from({length:151},(_,i)=>['n'+i,{}])),rows:[[]]}]){
   const before=JSON.stringify(d);assert.ok(B.planAutoArrangeNodes(before,d,0).error);assert.equal(JSON.stringify(d),before);
  }
- const d={nodes:{a:{group:'g0'}},groups:{},rows:[['a']]};for(let i=0;i<23;i++)d.groups['g'+i]=i<22?{parent:'g'+(i+1)}:{};
- assert.match(B.planAutoArrangeNodes(JSON.stringify(d),d,0).error,/nesting/);
+ function nested(depth){const d={nodes:{a:{group:'g0'}},groups:{},rows:[['a']]};for(let i=0;i<depth;i++)d.groups['g'+i]=i<depth-1?{parent:'g'+(i+1)}:{};return d;}
+ const allowed=nested(20),next=arrange(allowed);assert.deepEqual(next.groups,allowed.groups);assert.equal(next.floats.length,1);noOverlap(next);
+ const excessive=nested(21),before=JSON.stringify(excessive);
+ assert.match(B.planAutoArrangeNodes(before,excessive,0).error,/nesting/);assert.equal(JSON.stringify(excessive),before);
 });
 test('the dependency is editor-only, with no network or source-map sidecar',()=>{
  assert.ok(readSource('builder.workbench.js').includes('var dagre='));

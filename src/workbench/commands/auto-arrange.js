@@ -27,8 +27,8 @@ function planAutoArrangeNodes(text,raw,sectionIdx){
       owner.children.push(node);
     });
     function arrange(unit,depth){
-      if(depth>20)throw new Error('Group nesting exceeds 20 levels.');
       if(unit.node!==undefined)return;
+      if(depth>20)throw new Error('Group nesting exceeds 20 levels.');
       var graph=new dagre.graphlib.Graph({multigraph:true});
       graph.setGraph({rankdir:'TB',nodesep:54,ranksep:100,edgesep:24,marginx:0,marginy:0});
       graph.setDefaultEdgeLabel(function(){return {};});

@@ -113,7 +113,7 @@ and legacy version 2 snapshot URLs remain readable, including the offline demo.
 
 An empty `canon.json` list creates a valid empty index.
 Missing files, malformed metadata, duplicate folders, invalid specs, escaping
-paths, incompatible topology imports, a source/materialized spec over 30 MB, or
+paths, incompatible topology imports, a source or in-memory resolved spec over 30 MB, or
 an index over 30 MB fail publication and preserve the prior index. Only the index
 is written, atomically after validation; authored sources are never overwritten.
 Output cannot overwrite the source manifest or anything under `diagrams/`.

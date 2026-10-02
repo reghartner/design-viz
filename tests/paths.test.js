@@ -20,6 +20,24 @@ function fixture(){return {view:'step',nodes:{api:{},device:{}},rows:[['api','de
     {id:'drop',text:'Dropped signal',nodes:['api'],tone:{device:'warn'},panels:{state:{state:'lost'},log:{log:[{text:'lost'}]}}}
   ],paths:[{id:'happy',label:'Happy path',color:'#38bdf8',steps:['one','two','three','four','five']},
     {id:'dropped',label:'Dropped signal',color:'#fb923c',steps:['one','two','three','drop']}]};}
+function edgePathFixture(shared){
+  const steps=[
+    {id:'happy-first',text:'Start happy route',edge:'a->b'},
+    {id:'happy-middle',text:'Continue happy route',edge:'b->c'},
+    {id:'happy-last',text:'Finish happy route',edge:'c->d'},
+    {id:'alternate-first',text:'Start alternate route',edge:'a->e'},
+    {id:'alternate-last',text:'Finish alternate route',edge:'e->d'}
+  ];
+  if(shared)steps.unshift({id:'shared-first',text:'Start either route',edge:'a->b'});
+  return {view:'step',nodes:{a:{},b:{},c:{},d:{},e:{}},rows:[['a','b','c','d','e']],
+    edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'d'},{from:'a',to:'e'},{from:'e',to:'d'}],steps,
+    panels:[{id:'state',type:'state',states:['pending'],initial:{state:'pending'}}],
+    paths:shared?
+      [{id:'happy',label:'Happy path',steps:['shared-first','happy-middle','happy-last']},
+        {id:'alternate',label:'Alternate path',steps:['shared-first','alternate-first','alternate-last']}]:
+      [{id:'happy',label:'Happy path',steps:['happy-first','happy-middle','happy-last']},
+        {id:'alternate',label:'Alternate path',steps:['alternate-first','alternate-last']}]};
+}
 
 test('path rows align their fork and end positions without changing the registry',()=>{
   const c=load(),d=fixture(),before=JSON.stringify(d),paths=c.diagramPathList(d);
@@ -92,7 +110,7 @@ test('story and effective-state inspection use source indices with selected-path
 });
 
 function harness(d=fixture()){
-  const intervals=new Map(),paints=[],rendered=[],navigation=[];let seq=0,folded;
+  const intervals=new Map(),paints=[],rendered=[],navigation=[],ids={};let seq=0,folded,currentBoard;
   function el(){
     const attrs={},events={},classes=new Set();
     const e={children:[],style:{setProperty(k,v){this[k]=v;}},
@@ -100,23 +118,36 @@ function harness(d=fixture()){
       appendChild(n){this.children.push(n);n.parentNode=this;return n;},removeChild(n){this.children.splice(this.children.indexOf(n),1);},
       setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,
       addEventListener(k,fn){(events[k]??=[]).push(fn);},fire(k){(events[k]||[]).forEach(fn=>fn({stopPropagation(){}}));},
-      dispatchEvent(event){if(event.type==='dv:pathchange')navigation.push(event.type);},querySelectorAll(){return [];},getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
+      dispatchEvent(event){if(event.type==='dv:pathchange')navigation.push(event.type);},
+      querySelectorAll(selector){return descendants(this).filter(n=>selector[0]==='.' && n.classList.contains(selector.slice(1)));},
+      getBoundingClientRect(){return {left:0,top:0,width:100,height:20};},cloneNode:()=>el()};
     Object.defineProperty(e,'firstChild',{get(){return this.children[0];}});return e;
   }
-  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,createElementNS:el,getElementById:()=>null},window:{matchMedia:()=>({matches:true}),
+  const c=load({CustomEvent:function(type){this.type=type;},document:{createElement:el,createElementNS:el,getElementById:id=>ids[id]||null},window:{matchMedia:()=>({matches:true}),
     setInterval(fn){intervals.set(++seq,fn);return seq;},clearInterval:id=>intervals.delete(id)},
     setTimeout:()=>1,clearTimeout(){}});
   // Enable timer logic but keep geometry/animation irrelevant to the test.
   c.RM=false;
-  const board=()=>({svg:el(),nodeEls:{},edgeIds:{}}),term={};
+  function board(diagram=d){
+    const svg=el(),edgeIds={};
+    (diagram.edges||[]).forEach(function(edge,index){
+      const pathEl=svg.appendChild(el()),labelEl=svg.appendChild(el()),domId='test-e'+index;
+      pathEl.classList.add('edge');labelEl.classList.add('elabel');ids[domId]=pathEl;
+      edgeIds[edge.from+'->'+edge.to]={domId,e:edge,idx:index,pathEl,labelEl};
+    });
+    currentBoard={svg,nodeEls:{},edgeIds};return currentBoard;
+  }
+  const term={};
   ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus','sharedStatus'].forEach(k=>term[k]=el());
   term.bar.appendChild(el()).appendChild(term.stepN);
   folded=c.foldPanelStates(c.diagramForPath(d));
-  const sp=c.attachStepper(el(),el(),term,d,'test',board(),{},
+  const sp=c.attachStepper(el(),el(),term,d,'test',board(d),{},
     {setDiagram(d){folded=c.foldPanelStates(d);},setStep(i){paints.push(plain(folded.state[i]));}},null,
-    {autoplay:false,renderPath(d){rendered.push(d.steps.map(s=>s.id));return board();}});
+    {autoplay:false,renderPath(d){rendered.push(d.steps.map(s=>s.id));return board(d);}});
   sp.enterStep(false);
-  return {c,sp,term,paints,rendered,intervals,navigation,tick(){[...intervals.values()].forEach(fn=>fn());}};
+  return {c,sp,term,paints,rendered,intervals,navigation,
+    litEdges(){return Object.keys(currentBoard.edgeIds).filter(key=>currentBoard.edgeIds[key].pathEl.classList.contains('lit'));},
+    tick(){[...intervals.values()].forEach(fn=>fn());}};
 }
 test('switching paths pauses, rebuilds the chosen sequence, and stops at its own terminal step',()=>{
   const h=harness();h.term.btnPlay.fire('click');h.tick();assert.equal(h.sp.current().n,1);
@@ -136,6 +167,31 @@ test('pathless diagrams keep unlabeled legacy navigation; a single explicit path
   const d=fixture();delete d.paths;const h=harness(d);
   assert.ok(h.term.chips.children.every(b=>b.className.startsWith('schip')));h.sp.jump(-1);assert.equal(h.sp.current().id,'drop');
   const one=fixture();one.paths.pop();assert.ok(harness(one).term.chips.children.every(b=>b.className.startsWith('schip')));
+});
+test('matrix path chips light every authored route edge, including hidden steps, until arrow navigation resumes',()=>{
+  const h=harness(edgePathFixture(false));
+  assert.equal(h.term.chips.children[0].className,'path-matrix');
+  h.sp.setVisibleSteps(['happy-first','happy-last','alternate-first','alternate-last']);
+  pathChoice(h,'happy').fire('click');
+  assert.deepEqual(h.litEdges(),['a->b','b->c','c->d'],'the overview includes the filtered-out middle step');
+  assert.equal(h.sp.current().id,'happy-first');
+  h.term.btnNext.fire('click');
+  assert.deepEqual(h.litEdges(),['c->d'],'the next arrow restores current-step edge paint');
+  pathChoice(h,'alternate').fire('click');
+  assert.deepEqual(h.litEdges(),['a->e','e->d'],'switching chips cannot retain edges from the previous route');
+});
+test('shared-timeline path chips light their full route and step selection restores one-step paint',()=>{
+  const h=harness(edgePathFixture(true));
+  assert.equal(h.term.chips.children[0].className,'path-timeline');
+  pathChoice(h,'happy').fire('click');
+  assert.deepEqual(h.litEdges(),['a->b','b->c','c->d']);
+  assert.equal(h.sp.current().id,'shared-first');
+  circle(h,2).fire('click');
+  assert.deepEqual(h.litEdges(),['b->c'],'a timeline circle restores current-step edge paint');
+  pathChoice(h,'alternate').fire('click');
+  assert.deepEqual(h.litEdges(),['a->b','a->e','e->d']);
+  h.sp.selectPath('happy',0);
+  assert.deepEqual(h.litEdges(),['a->b'],'programmatic path selection remains step-scoped');
 });
 test('selecting the existing path keeps the board, and a one-step path never starts an autoplay timer',()=>{
   const h=harness();h.sp.selectPath('happy',2);assert.equal(h.rendered.length,0);assert.equal(h.sp.current().id,'three');

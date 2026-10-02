@@ -861,12 +861,25 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
     expect(await preview.inputValue()).not.toContain(source);expect(await preview.inputValue()).not.toContain('"rows"');
-    await page.setViewportSize({width:640,height:360});await preview.focus();
-    await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback.png')});
-    expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
-    await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
-    expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
+    for(const width of [768,640,390])for(let cycle=0;cycle<2;cycle++){
+      await page.setViewportSize({width,height:360});
+      await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-working')).toHaveAccessibleName(/Open Agent/);
+      for(const selector of ['#workbench-home','#workspace-home','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#file-save']){
+        const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};});
+        expect(control,selector+' while Agent is active at '+width+'px').toEqual({inside:true,reachable:true});
+      }
+      if(!await preview.isVisible())await page.locator('#folder-agent-send').click();
+      await expect(preview).toBeVisible();await preview.focus();
+      await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback-'+width+'-'+cycle+'.png')});
+      expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
+      const windowRect=await page.locator('#workspace-window-agent').boundingBox();
+      await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
+      await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
+      expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
+      for(const id of ['#folder-agent-input','#workspace-canvas-tools>summary'])expect(await page.locator(id).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' remains reachable alongside Copy request').toBe(true);
+      expect(await page.locator('#workspace-window-agent').boundingBox()).toEqual(windowRect);
+      await page.screenshot({path:info.outputPath('unified-agent-short-return-draft-'+width+'-'+cycle+'.png')});
+    }
     await page.setViewportSize({width:1280,height:900});
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{');
     await page.locator('#workspace-window-json .workspace-window-close').click();await openAgent(page);

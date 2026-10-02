@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,expectCompanyBrand} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {readFile} from 'node:fs/promises';
 
@@ -28,7 +28,7 @@ test('homepage fits the authored default view and supports Explore through expan
   const section=example.locator('#section-visitor'),grid=section.locator('.section-layout-grid');
   await expect(stage.locator(':scope > .doc-heading')).toHaveCount(1);
   await expect(stage.locator(':scope > .doc-heading')).toBeHidden();
-  await expect(stage.locator('.doc-company-brand')).toContainText('YOUR COMPANY');
+  await expectCompanyBrand(stage.locator('.doc-company-brand'));
   await expect(section.getByRole('button',{name:'Story',exact:true})).toHaveAttribute('aria-pressed','true');
   const diagram=grid.locator('[data-layout-key="diagram"]'),app=grid.locator('[data-layout-key="panel:app"]');
   await expect(diagram).toHaveCSS('grid-row','1 / span 9');
@@ -306,7 +306,7 @@ test('company config owns landing and reader while editing exercises remain fict
   await expect(card.locator('#welcome-example-stage')).toHaveClass(/sk-pastel/);
   await expect(card.locator('#welcome-example-stage > .doc-heading')).toHaveCount(1);
   await expect(card.locator('#welcome-example-stage > .doc-heading')).toBeHidden();
-  await expect(card.locator('.doc-company-brand')).toContainText('YOUR COMPANY');
+  await expectCompanyBrand(card.locator('.doc-company-brand'));
   await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
   await expect(section).toBeVisible();
   await expect(card.locator('#section-company-processing')).toBeHidden();

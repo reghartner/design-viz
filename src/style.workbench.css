@@ -1275,7 +1275,8 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-views>*{pointer-events:auto;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-view-choice,.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions{background:var(--card);padding:7px;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation{background:var(--card);border-color:var(--line);}
-.workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation .diagram-view-choice{padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+.workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation .diagram-view-choice{order:initial;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+.workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation-chapters .workbench-views-label{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-view-choice:empty{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions{margin-left:0;}
 .section-view-settings{display:flex;order:-1;align-items:center;flex-wrap:wrap;gap:6px;padding:7px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;font:12px 'IBM Plex Sans',sans-serif;max-width:100%;box-sizing:border-box;}

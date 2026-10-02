@@ -8,7 +8,10 @@ test('floating tools leave the diagram full-window and global actions available'
   const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
   await open(page,server,JSON.stringify(raw,null,2));
   const size=page.viewportSize();
-  expect(await page.locator('.explore-board').boundingBox()).toEqual({x:0,y:0,width:size.width,height:size.height});
+  const shell=await page.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
+  const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox();
+  expect(shell).toEqual({x:84,y:104,width:size.width-96,height:size.height-116});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(board).toEqual(stage);
   await expect(page.locator('#workspace-columns')).toBeHidden();
   for(const name of ['inspect','steps','outline','json','file']){
     await page.locator('#editor-tab-'+name).click();await expect(page.locator('#editor-'+name)).toBeVisible();

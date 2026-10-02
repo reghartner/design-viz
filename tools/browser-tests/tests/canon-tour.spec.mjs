@@ -119,7 +119,10 @@ test('Canon Explore fills the browser and retires its canvas before editing the 
   await publish(page,data);await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-home').click();await openReader(page);
   const size=page.viewportSize();await expect(page.locator('#canon-reader .viewer-diagram-canvas')).toBeVisible();
-  expect(await page.locator('#canon-reader .explore-board').boundingBox()).toEqual({x:0,y:0,width:size.width,height:size.height});
+  const shell=await page.locator('#canon-reader .viewer-diagram-canvas').boundingBox(),nav=await page.locator('#canon-reader .explore-navigation').boundingBox();
+  const stage=await page.locator('#canon-reader .explore-stage').boundingBox(),board=await page.locator('#canon-reader .explore-board').boundingBox();
+  expect(shell).toEqual({x:0,y:0,width:size.width,height:size.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(board).toEqual(stage);
   await page.getByRole('button',{name:'Back to page',exact:true}).click();await page.locator('#canon-reader-edit').click();
   await expect(page.locator('#workspace-canvas .explore-board')).toBeVisible();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
 });

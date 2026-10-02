@@ -34,7 +34,10 @@ test('Explore floats only prose, keeps live formatting/reveals and restores the 
   await expect(notes(page).locator('strong')).toHaveText('Why this matters.');await expect(notes(page).locator('code')).toHaveText('recording_id');
   await expect(notes(page).locator('[data-dv-bullet-path="0.0"]')).toHaveText('Keep a copy until acknowledged');
   await expect(notes(page).locator('[data-dv-bullet-path="1"]')).toHaveClass(/dv-fragment-hidden/);await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(notes(page).locator('[data-dv-bullet-path="1"]')).not.toHaveClass(/dv-fragment-hidden/);
-  const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox();expect(board).toEqual(stage);expect(stage.width).toBe(page.viewportSize().width);
+  const shell=await page.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
+  const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox(),prose=await notes(page).boundingBox(),viewport=page.viewportSize();
+  expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(board).toEqual(stage);expect(prose.x).toBeGreaterThanOrEqual(stage.x);expect(prose.y).toBeGreaterThanOrEqual(stage.y);expect(prose.x+prose.width).toBeLessThanOrEqual(stage.x+stage.width);expect(prose.y+prose.height).toBeLessThanOrEqual(stage.y+stage.height);
   const original=await notes(page).boundingBox();await notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowLeft');expect((await notes(page).boundingBox()).x).toBeCloseTo(original.x-8,0);
   await notes(page).getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(notes(page)).toBeHidden();await page.locator('.explore-panel-menu summary').click();await page.getByRole('checkbox',{name:'Section notes',exact:true}).check();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Compact',exact:true}).click();await expect(notes(page)).toBeHidden();await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();

@@ -3,7 +3,10 @@
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var pageButton=document.getElementById('workspace-page'),pageOverride=false,selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
-  var savedSelection=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null;
+  var savedSelection=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null;
+  var fitObserver=new ResizeObserver(function(entries){
+    if(!fitPending && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))fitPending=requestAnimationFrame(autoFit);
+  });
   function records(){var ctl=getController();return ctl && ctl.sections || [];}
   // Child copies have transient DOM IDs. Keep their geometry by the source
   // sections along the local node chain, and re-resolve every link on restore.
@@ -62,6 +65,10 @@ function initWorkbenchCanvas(){
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
     return JSON.stringify([section,snapshot && snapshot.frames.map(function(f){return f.node;}),explicitView(rec)?definition.id:p && p.viewId?p.viewId():'flow',exploreView(rec)]);
   }
+  function fitIdentity(rec){
+    var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot(),definition=rec && rec.viewport && rec.viewport.viewDefinition();
+    return JSON.stringify([rec && rec.reference,snapshot && snapshot.section,snapshot && snapshot.frames.map(function(f){return f.node;}),definition && definition.id]);
+  }
   function selectedByEvent(ev){
     if(selecting)return;
     var element=ev.target.closest('.doc-sec'),rec=records().find(function(r){return r.sectionEl===element;});
@@ -79,6 +86,13 @@ function initWorkbenchCanvas(){
     view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:index}));
     select(index);
   });
+  view.addEventListener('diagram-tab-change',function(ev){
+    var target=ev.detail,matching=target && records().filter(function(r){return !r.detailOnly && r.tabBlock===target.tabBlock && r.tab===target.tab;}) || [];
+    var rec=matching.find(function(r){return r.viewport;}) || matching[0];
+    if(!rec)return;
+    view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:rec.number-1}));
+    select(rec.number-1);
+  });
   function paintZoom(){
     var vp=viewport(),value=vp && vp.canvasZoom(),scale=vp?vp.overlayScale():1;
     document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';
@@ -95,9 +109,17 @@ function initWorkbenchCanvas(){
     if(innerWidth-left-right<350){left=84;right=24;}
     vp.fitCanvas({left:left,right:right,top:top,bottom:bottom});paintZoom();
   }
-  function autoFit(){if(!diagramMode())return;var rec=current(),vp=viewport(),definition=vp && vp.viewDefinition();if(rec)rec.canvasVisited=true;if(!(definition && definition.exploreLayout && definition.exploreLayout.camera))fit();}
+  function cancelFit(){cancelAnimationFrame(fitPending);fitPending=0;fitObserver.disconnect();}
+  function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(autoFit);}
+  function autoFit(){
+    fitPending=0;if(!diagramMode())return;
+    var rec=current(),vp=viewport(),definition=vp && vp.viewDefinition(),target=board();
+    if(!target || !target.clientWidth || !target.clientHeight){if(target)fitObserver.observe(target);return;}
+    fitObserver.disconnect();fitRequests.delete(fitIdentity(rec));if(rec)rec.canvasVisited=true;
+    if(!(definition && definition.exploreLayout && definition.exploreLayout.camera))fit();
+  }
   function select(index){
-    if(selecting)return;selecting=true;cancelAnimationFrame(fitPending);
+    if(selecting)return;selecting=true;cancelFit();
     var changedSection=section!==index;finish(true);saveDetail();section=index;
     var ctl=getController(),base=records().find(function(r){return r.number===section+1;}),details=ctl && ctl.details,snapshot=details && details.snapshot();
     if(snapshot && base && snapshot.section!==base.reference)details.close(true);
@@ -117,7 +139,7 @@ function initWorkbenchCanvas(){
       });
       rec.inheritedExplore=inherited;all=all.concat(rec);
     }
-    var key=identity(rec);if(key!==selectionKey)pageOverride=false;selectionKey=key;
+    var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));if(key!==selectionKey)pageOverride=false;selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
     all.forEach(function(r){
@@ -126,7 +148,7 @@ function initWorkbenchCanvas(){
       r.sectionEl.classList.toggle('workspace-active-section',on);
       r.sectionEl.classList.toggle('workspace-empty-section',on && !r.viewport);
       if(r.viewport){r.viewport.setWorkbenchCanvas(on);
-        if(on && !r.canvasVisited)fitPending=requestAnimationFrame(autoFit);}
+        if(on && (!r.canvasVisited || requestedFit))scheduleFit();}
     });
     if(rec && rec.tabBlock){var ctl=getController(),tabs=ctl.tabBlocks[rec.tabBlock-1];if(tabs && tabs.active()!==rec.tab)tabs.select(rec.tab,false,false);}
     document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;});
@@ -135,6 +157,7 @@ function initWorkbenchCanvas(){
     if(changedSection && rec && !diagramMode())rec.sectionEl.scrollIntoView({block:'start'});
   }
   function capture(){
+    cancelFit();
     if(skipCapture){skipCapture=false;saved=null;savedDetail=null;return;}
     saveDetail();
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
@@ -222,7 +245,7 @@ function initWorkbenchCanvas(){
       return current && current.viewport && current.viewport.restoreCanvasPanelGeometry(change.view,value)?true:'expired';
     }});
   });
-  surface.addEventListener('workbench-canvas-view',function(){cancelAnimationFrame(fitPending);fitPending=requestAnimationFrame(autoFit);});
+  surface.addEventListener('workbench-canvas-view',function(){var rec=current();if(rec)fitRequests.add(fitIdentity(rec));});
   view.addEventListener('diagram-view-change',selectedByEvent);
   view.addEventListener('explore-overlay-scale',paintZoom);
   view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus],[data-view-layout],.section-view-settings'))selectedByEvent(ev);},true);
@@ -242,5 +265,5 @@ function initWorkbenchCanvas(){
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,
     showPage:function(){pageOverride=true;select(section);},
-    reset:function(){skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;pageOverride=false;},fit:fit};
+    reset:function(){cancelFit();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;pageOverride=false;},fit:fit};
 }

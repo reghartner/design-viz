@@ -4,6 +4,9 @@
 function initViewerExploreCanvas(ctl,view,opts){
   var container=opts && opts.container || document.body;
   var active=null,detailRoot=null,detailOriginExplore=false,pageOnly=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
+  var fitObserver=new ResizeObserver(function(entries){
+    if(!frame && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))frame=requestAnimationFrame(firstFit);
+  }),fitRecord=null,fitDefinition=null,fitKey=null;
   var navigation=document.createElement('div');navigation.className='explore-reader-navigation';
   var label=document.createElement('label');label.textContent='Story ';
   var sections=document.createElement('select');sections.setAttribute('aria-label','Explore story');label.appendChild(sections);navigation.appendChild(label);
@@ -13,7 +16,17 @@ function initViewerExploreCanvas(ctl,view,opts){
   });
   label.hidden=sections.options.length<2;
   var back=document.createElement('button');back.type='button';back.className='mbtn';back.textContent='Back to page';navigation.appendChild(back);
+  function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
+  function firstFit(){
+    frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;
+    if(!rec || active!==rec || active.viewport.viewDefinition().id!==definition.id){cancelFirstFit();return;}
+    var board=rec.sectionEl.querySelector('.board');
+    if(!board || !board.clientWidth || !board.clientHeight){if(board)fitObserver.observe(board);return;}
+    cancelFirstFit();seen.add(key);
+    if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
+  }
   function show(rec){
+    cancelFirstFit();
     var previous=active;active=rec && rec.viewport && rec.viewport.isExplore()?rec:null;
     if(previous && previous!==active){previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);}
     container.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
@@ -25,16 +38,10 @@ function initViewerExploreCanvas(ctl,view,opts){
     active.viewport.setReaderCanvas(true);
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
     if(!seen.has(key)){
-      cancelAnimationFrame(frame);frame=requestAnimationFrame(function(){
+      fitRecord=rec;fitDefinition=definition;fitKey=key;frame=requestAnimationFrame(function(){
         // Boot-time indexing briefly visits other views. Only mark a view after
         // its frame actually opens, so those cancelled visits cannot skip Fit.
-        if(active!==rec || active.viewport.viewDefinition().id!==definition.id)return;
-        // Boot may visit a view while its tab is hidden. Defer its first Fit
-        // until the canvas can be measured, so navigation gets a real camera.
-        var board=rec.sectionEl.querySelector('.board');
-        if(!board || !board.clientWidth || !board.clientHeight)return;
-        seen.add(key);
-        if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:260,top:108,bottom:180});
+        firstFit();
       });
     }
   }
@@ -76,6 +83,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
     pageOnly=false;detailRoot=null;
     var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
+    if(!rec && target && target.kind==='tab')rec=ctl.sections.find(function(r){return !r.detailOnly && r.tabBlock===target.tabBlock && r.tab===target.tab && r.viewport && r.viewport.viewDefinition().presentation==='explore';});
     if(rec!==active)show(rec);
   }
   var priorChange=ctl.onChange;
@@ -85,5 +93,5 @@ function initViewerExploreCanvas(ctl,view,opts){
   var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
   if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
-  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelAnimationFrame(frame);show(null);}};
+  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();show(null);}};
 }

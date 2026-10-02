@@ -2685,7 +2685,10 @@ function renderPage(view, page, skin, backlinks, options){
         p._steppers.forEach(function(s){ i === idx ? (wasHidden && s.onShow()) : s.onHide(); });
       });
       if (focus) buttons[idx].focus();
-      if (activate !== false) changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});
+      if (activate !== false){
+        changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});
+        view.dispatchEvent(new CustomEvent('diagram-tab-change',{detail:{tabBlock:tabBlockIndex,tab:idx}}));
+      }
     }
     buttons.forEach(function(b, i){
       b.addEventListener('click', function(){ select(i, false); });

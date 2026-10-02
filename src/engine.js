@@ -1877,6 +1877,81 @@ function sectionLayoutWithoutFlow(items,controlsRows){
   kept.forEach(function(it){it.y-=empty.filter(function(row){return row<it.y;}).length;});
   return kept;
 }
+function setExploreIndicator(control,visible,description){
+  var badge=control && control.querySelector(':scope > .explore-indicator-badge');
+  if(!visible){
+    if(badge)badge.remove();
+    control.classList.remove('has-explore-indicator');control.removeAttribute('data-explore-view');
+    control.removeAttribute('aria-description');control.removeAttribute('title');return;
+  }
+  if(!badge){badge=document.createElement('span');badge.className='explore-indicator-badge';badge.setAttribute('aria-hidden','true');control.appendChild(badge);}
+  control.classList.add('has-explore-indicator');control.setAttribute('data-explore-view','true');
+  control.setAttribute('aria-description',description);control.title=description;
+}
+/* Explore keeps the document's real tab and chapter controls in reach. Move
+   them instead of cloning them so selection, keyboard behavior, routes and
+   authored labels keep one owner. Anchors put every control back when the
+   reader returns to the page or a workbench preview is replaced. */
+function createExploreNavigation(ctl,options){
+  options=options || {};
+  var doc=ctl.view.ownerDocument,nav=doc.createElement('nav'),tabs=doc.createElement('div'),diagrams=doc.createElement('div'),chapters=doc.createElement('div'),actions=doc.createElement('div');
+  nav.className='explore-navigation';nav.setAttribute('aria-label','Diagram navigation');
+  tabs.className='explore-navigation-group explore-navigation-tabs';
+  diagrams.className='explore-navigation-group explore-navigation-diagrams';
+  chapters.className='explore-navigation-group explore-navigation-chapters';
+  actions.className='explore-navigation-actions';
+  function title(text){var label=doc.createElement('span');label.className='explore-navigation-label';label.textContent=text;return label;}
+  tabs.appendChild(title('Tabs'));diagrams.appendChild(title('Diagrams'));chapters.appendChild(title('Chapters'));
+  nav.appendChild(tabs);nav.appendChild(diagrams);nav.appendChild(chapters);nav.appendChild(actions);
+  var moved=[],current=null;
+  function activeElement(){var focused=doc.activeElement;while(focused && focused.shadowRoot && focused.shadowRoot.activeElement)focused=focused.shadowRoot.activeElement;return focused;}
+  function containsFocus(node,focused){return !!(node && focused && (node===focused || node.contains && node.contains(focused)));}
+  function move(node,host){
+    if(!node)return false;
+    var anchor=null;if(node.parentNode){anchor=doc.createComment('explore navigation position');node.parentNode.insertBefore(anchor,node);}
+    moved.push({node:node,anchor:anchor});host.appendChild(node);return true;
+  }
+  function restore(refocus){
+    var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});
+    moved.reverse().forEach(function(entry){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();if(entry.anchor)entry.anchor.remove();});
+    moved=[];current=null;nav.remove();tabs.hidden=diagrams.hidden=chapters.hidden=false;
+    if(refocus!==false && owned && focused.isConnected)focused.focus({preventScroll:true});
+  }
+  function diagramRecords(){
+    var embedded=ctl.sections.find(function(rec){return rec.sectionEl.classList.contains('dv-embed-target');});
+    return ctl.sections.filter(function(rec){
+      if(!rec.hasDiagram || rec.detailOnly || embedded && rec!==embedded)return false;
+      if(!rec.tabBlock)return true;
+      return ctl.sections.find(function(candidate){return !candidate.detailOnly && candidate.hasDiagram && candidate.viewport && candidate.tabBlock===rec.tabBlock && candidate.tab===rec.tab;})!==rec;
+    });
+  }
+  var navigable=diagramRecords();if(!ctl.tabBlocks.length && navigable.length<2)navigable=[];
+  var sectionButtons=navigable.map(function(rec){
+    var button=doc.createElement('button');button.type='button';button.className='tabbtn explore-diagram-button';
+    button.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent.trim() || rec.reference || 'Diagram '+rec.number;
+    button.addEventListener('click',function(){if(options.selectSection)options.selectSection(rec);});
+    diagrams.appendChild(button);return {rec:rec,button:button};
+  });
+  function mount(rec){
+    if(!rec || !rec.sectionEl)return false;
+    if(current===rec && nav.isConnected)return true;
+    var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false);
+    var host=rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice'),flow=host && host.querySelector(':scope > .layout-flow-toggle');
+    if(!host)return false;
+    host.prepend(nav);current=rec;
+    var movedTabs=false,embedded=ctl.view.querySelector('.dv-embed-target');
+    if(!embedded)ctl.tabBlocks.forEach(function(tabBlock){movedTabs=move(tabBlock.bar,tabs) || movedTabs;});
+    tabs.hidden=!movedTabs;
+    var selected=rec,detail=ctl.details && ctl.details.snapshot && ctl.details.snapshot();
+    if(detail && detail.section)selected=ctl.sections.find(function(candidate){return candidate.reference===detail.section;}) || selected;
+    sectionButtons.forEach(function(entry){entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
+    diagrams.hidden=!sectionButtons.length;chapters.hidden=!move(choices,chapters);
+    var movedAction=move(options.action,actions),movedFlow=move(flow,actions);actions.hidden=!movedAction && !movedFlow;
+    if((owned || moved.some(function(entry){return containsFocus(entry.node,focused);})) && focused.isConnected)focused.focus({preventScroll:true});
+    return true;
+  }
+  return {element:nav,mount:mount,restore:restore,destroy:restore};
+}
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
   var items=sectionLayoutItems(d,target || 'default',layoutId);
@@ -1890,10 +1965,12 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     group=document.createElement('div');group.className='diagram-view-choice';
     toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
   }
+  group.setAttribute('role','group');group.setAttribute('aria-label','Chapters');
   var buttons=Object.create(null);
   views.forEach(function(v){
     var button=document.createElement('button');button.type='button';button.className='mbtn';button.textContent=v.name;
     button.setAttribute('data-view-layout','');button.setAttribute('data-layout-id',v.id);
+    setExploreIndicator(button,v.presentation==='explore','Explore viewing mode: opens a canvas you can pan and zoom.');
     button.addEventListener('click',function(){setLayout(v.id);});buttons[v.id]=button;group.appendChild(button);
   });
   /* Keep authored choices before the standard Data flow button. */
@@ -2587,6 +2664,7 @@ function renderPage(view, page, skin, backlinks, options){
              onChange:null, activeTarget:{kind:'page'}, rendering:true};
   ctl.destroy = function(){
     ctl.destroyed = true;
+    view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.details)ctl.details.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
@@ -2601,6 +2679,15 @@ function renderPage(view, page, skin, backlinks, options){
     if (ctl.rendering || ctl.destroyed) return;
     ctl.activeTarget = target;
     if (ctl.onChange) ctl.onChange();
+  }
+  function paintTabExploreIndicators(){
+    ctl.tabBlocks.forEach(function(tb){
+      tb.buttons.forEach(function(button,index){
+        var primary=ctl.sections.find(function(rec){return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===tb.index && rec.tab===index;});
+        var definition=primary && primary.viewport.viewDefinition();
+        setExploreIndicator(button,!!(definition && definition.presentation==='explore'),'This tab’s primary diagram chapter uses Explore viewing mode: its canvas can be panned and zoomed.');
+      });
+    });
   }
   function addSection(container){
     var record = records[gi], sec = record.section;
@@ -2635,7 +2722,7 @@ function renderPage(view, page, skin, backlinks, options){
     var tabBlockIndex = ctl.tabBlocks.length + 1;
     var bar = document.createElement('div');
     bar.className = 'tabbar';
-    bar.setAttribute('role', 'tablist');
+    bar.setAttribute('role', 'tablist');bar.setAttribute('aria-label','Document tabs'+(tabBlockIndex>1?' '+tabBlockIndex:''));
     view.appendChild(bar);
     var panels = [], buttons = [], copyButtons = [], slugs = [];
     var activeIdx = 0;
@@ -2684,11 +2771,13 @@ function renderPage(view, page, skin, backlinks, options){
         p.hidden = i !== idx;
         p._steppers.forEach(function(s){ i === idx ? (wasHidden && s.onShow()) : s.onHide(); });
       });
-      if (focus) buttons[idx].focus();
       if (activate !== false){
         changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});
         view.dispatchEvent(new CustomEvent('diagram-tab-change',{detail:{tabBlock:tabBlockIndex,tab:idx}}));
       }
+      /* Explore temporarily reparents the tablist into the active panel. Focus
+         only after navigation has made the destination panel and bar visible. */
+      if (focus) buttons[idx].focus({preventScroll:true});
     }
     buttons.forEach(function(b, i){
       b.addEventListener('click', function(){ select(i, false); });
@@ -2710,6 +2799,8 @@ function renderPage(view, page, skin, backlinks, options){
     deferredHides.push(function(){ select(0, false, false); });
   });
   deferredHides.forEach(function(f){ f(); });
+  view.addEventListener('diagram-view-change',paintTabExploreIndicators);
+  paintTabExploreIndicators();
   ctl.rendering = false;
   ctl.manifest = {
     tabBlocks:ctl.tabBlocks.map(function(tb){

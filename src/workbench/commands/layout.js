@@ -424,7 +424,7 @@ function builderPromoteSectionViews(d,layoutId){
 }
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
-  if(Array.isArray(got.d.layouts))return {error:'This diagram already has named views.'};
+  if(Array.isArray(got.d.layouts))return {error:'This diagram already has Chapters.'};
   return builderRewrite(text,raw,got.path,function(d){
     builderEnsureSectionView(d);
     if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));

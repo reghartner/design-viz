@@ -12,7 +12,7 @@ test('Presentation is a per-view undoable edit and survives host preview changes
   await expect(page.locator('#welcome-paste-error')).toBeEmpty();
   await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await pagePreview(page);
   await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
-  const presentation=()=>section(page).getByRole('combobox',{name:'View type',exact:true});
+  const presentation=()=>section(page).getByRole('combobox',{name:'Viewing mode',exact:true});
   await expect(presentation()).toHaveValue('explore');
   const before=await page.locator('#src').inputValue();
   await presentation().selectOption('standard');
@@ -24,7 +24,7 @@ test('Presentation is a per-view undoable edit and survives host preview changes
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
   await section(page).getByRole('button',{name:'Arrange section',exact:true}).click();
   await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
-  await section(page).getByRole('button',{name:'Duplicate view',exact:true}).click();
+  await section(page).getByRole('button',{name:'Duplicate chapter',exact:true}).click();
   const diagram=(await raw(page)).page.sections[0].diagram,copy=diagram.layouts.at(-1);
   expect(copy.presentation).toBe('explore');expect(diagram.defaultLayout).toBe('home-story');
   expect(diagram.layouts[0]).toEqual(named.page.sections[0].diagram.layouts[0]);

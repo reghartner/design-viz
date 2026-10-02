@@ -21,51 +21,51 @@ function mountNativeSpec(environment, spec, options){
     link.setAttribute('target','_blank');link.setAttribute('rel','noopener noreferrer');
   }
   var navigating=false;
-  var canvas=false,canvasSection=null,canvasFrame=0,canvasSeen=new Set(),canvasNav=null,canvasSelect=null;
+  var canvas=false,canvasSection=null,canvasFrame=0,canvasSeen=new Set(),canvasNavigation=null;
   function createCanvasNavigation(){
-    canvasNav=document.createElement('label');canvasNav.className='native-canvas-story';canvasNav.textContent='Story ';
-    canvasSelect=document.createElement('select');canvasSelect.setAttribute('aria-label','Explore story');canvasNav.appendChild(canvasSelect);
-    controller.sections.filter(function(rec){return rec.viewport && !rec.detailOnly;}).forEach(function(rec){
-      var option=document.createElement('option');option.value=rec.reference;option.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent.trim() || rec.reference;canvasSelect.appendChild(option);
-    });
-    canvasNav.hidden=canvasSelect.options.length<2;
-    canvasSelect.addEventListener('change',function(){
-      var rec=controller.sections.find(function(r){return r.reference===canvasSelect.value;});if(!rec)return;
+    canvasNavigation=createExploreNavigation(controller,{selectSection:function(rec){
       if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
       if(controller.details)controller.details.showSection(rec.reference);
       controller.activeTarget={kind:'diagram',section:rec.number};canvasSync();changed();
+    }});
+  }
+  function tabPrimary(target){
+    return target && controller.sections.find(function(rec){
+      return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===target.tabBlock && rec.tab===target.tab;
     });
   }
   function canvasSync(){
     if(!canvas && !canvasSection)return;
-    if(!canvasNav)createCanvasNavigation();
+    if(!canvasNavigation)createCanvasNavigation();
     var target=controller.activeTarget || {};
     var detail=controller.details && controller.details.activeSection && controller.details.activeSection();
-    var next=canvas && (detail || controller.sections.find(function(rec){return rec.viewport &&
-      (rec.number===target.section || target.kind==='tab' && rec.tabBlock===target.tabBlock && rec.tab===target.tab);}) || canvasSection || controller.sections.find(function(rec){return rec.viewport && !rec.detailOnly;}));
+    var selected=target.kind==='tab'?tabPrimary(target):controller.sections.find(function(rec){return rec.viewport && rec.number===target.section;});
+    var next=canvas && (detail || selected || canvasSection || controller.sections.find(function(rec){return rec.viewport && !rec.detailOnly;}));
     if(canvasSection && canvasSection!==next){
+      canvasNavigation.restore();
       canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
       canvasSection.sectionEl.classList.remove('explore-active-section');
     }
     canvasSection=next || null;view.classList.toggle('explore-full-window',!!canvasSection);
     environment.body.classList.toggle('native-canvas',!!canvasSection);
-    if(!canvasSection){canvasNav.remove();return;}
+    if(!canvasSection){canvasNavigation.restore();return;}
     if(canvasSection.tabBlock!=null)controller.tabBlocks[canvasSection.tabBlock-1].select(canvasSection.tab,false,false);
     if(!detail)controller.activeTarget={kind:'diagram',section:canvasSection.number};
     canvasSection.sectionEl.classList.add('explore-active-section');
     // Reuse the transient diagram canvas: opening it never changes the authored
     // presentation, including a curated Home view's saved primary panel.
     canvasSection.viewport.setWorkbenchCanvas(true);canvasSection.viewport.setReaderCanvas(true);
-    canvasSection.sectionEl.querySelector('.diagram-views').prepend(canvasNav);canvasSelect.value=detail?controller.details.snapshot().section:canvasSection.reference;
-    var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+definition.id;
+    canvasNavigation.mount(canvasSection);
+    canvasSection.viewport.restoreInitialCamera();
+    var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+(definition && definition.id || 'flow');
     if(!canvasSeen.has(key)){
       canvasSeen.add(key);cancelAnimationFrame(canvasFrame);var rec=canvasSection;
-      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:165,bottom:190});});
+      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:20,bottom:190});});
     }
   }
   function snapshot(){
     var active=controller.activeTarget || {}, section=(controller.sections || []).find(function(s){return s.number===active.section;});
-    if(!section && active.kind==='tab')section=controller.sections.find(function(s){return s.tabBlock===active.tabBlock && s.tab===active.tab && s.hasDiagram;});
+    if(!section && active.kind==='tab')section=tabPrimary(active);
     if(!section)return null;
     var target={section:section.reference}, presentation=section.presentation, sp=section.stepper;
     if(presentation && presentation.viewId)target.view=presentation.viewId();
@@ -119,6 +119,6 @@ function mountNativeSpec(environment, spec, options){
       }finally{navigating=false;changed();}
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
-    destroy:function(){if(environment.disposed)return;if(canvasFrame)cancelAnimationFrame(canvasFrame);try{controller.destroy();}finally{environment.destroy();}}
+    destroy:function(){if(environment.disposed)return;if(canvasFrame)cancelAnimationFrame(canvasFrame);if(canvasNavigation)canvasNavigation.destroy();try{controller.destroy();}finally{environment.destroy();}}
   };
 }

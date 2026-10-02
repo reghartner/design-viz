@@ -362,7 +362,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // the regular camera suspended until the destination layout is mounted.
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);
-    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
@@ -449,6 +449,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,.15,4);sizeGraph(true);},
     overlayScale:overlayScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
+    restoreInitialCamera:function(force){
+      if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
+      sizeGraph(false);positionCamera(memory.layout.camera);return true;
+    },
     setView:function(view,tiles,sourceGrid){leave(true);definition=view;items=tiles || [];panelSource=sourceGrid || grid;var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
@@ -466,7 +470,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,
     snapshotCanvasState:function(){
-      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera(lastWidth,lastHeight)};memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);
     },
     restoreCanvasState:function(saved){

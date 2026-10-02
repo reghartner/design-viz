@@ -22,8 +22,6 @@ export async function nativeViewerSource(){
     'flowview-root.native-canvas{display:block;position:relative;height:100dvh;overflow:hidden;}'+
     '.native-canvas .docview.explore-full-window{padding:0;}'+
     '.native-canvas .viewer-diagram-canvas{position:absolute;inset:0;}'+
-    '.native-canvas .viewer-diagram-canvas>.diagram-views{top:64px;}'+
-    '.native-canvas .viewer-diagram-canvas .explore-tools{top:126px;}'+
     '.native-canvas-story{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;font:12px sans-serif;}'+
     '.native-canvas-story select{font:inherit;max-width:200px;}';
   const assets={css,fonts,icons:shared.icons};

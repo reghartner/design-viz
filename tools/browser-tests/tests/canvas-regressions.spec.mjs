@@ -27,7 +27,7 @@ test('legacy Data flow and saved layout remain curated until their View type cha
   await expect(section.locator('.board')).toBeVisible();await expect(section.locator('.explore-stage')).toBeHidden();
   await section.getByRole('button',{name:'Layout',exact:true}).click();
   await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);
-  await section.getByRole('combobox',{name:'View type',exact:true}).selectOption('explore');
+  await section.getByRole('combobox',{name:'Viewing mode',exact:true}).selectOption('explore');
   await expect(section.locator('.explore-board')).toBeVisible();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
 });
 
@@ -42,7 +42,7 @@ test('keyboard focus raises an overlapping tool window',async({page,server})=>{
   })).toBe(true);
 });
 
-test('reader canvas follows same-view hash navigation and writes the story dropdown target',async({page,server})=>{
+test('reader canvas follows same-view hash navigation and diagram button target',async({page,server})=>{
   const spec=await named(),first=spec.page.sections[0];first.id='story0';first.heading='Story 0';
   first.diagram.defaultLayout='service-flow';first.diagram.autoplay=false;
   const second=structuredClone(first);second.id='story1';second.heading='Story 1';spec.page.sections=[first,second];
@@ -52,7 +52,7 @@ test('reader canvas follows same-view hash navigation and writes the story dropd
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 0');
   await page.evaluate(()=>{location.hash='d=story1&v=service-flow';});
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 1');
-  await page.getByRole('combobox',{name:'Explore story',exact:true}).selectOption('1');
+  await page.getByRole('button',{name:'Story 0',exact:true}).click();
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 0');
   await expect.poll(()=>new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('story0');
   await page.getByRole('button',{name:'Back to page',exact:true}).click();
@@ -70,5 +70,8 @@ test('a later default Explore story opens full-window without a step or deep lin
   await page.goto(server.origin+'/implicit-canvas.html#tour=0');
   await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
   await expect(page.locator('#section-front-door')).toHaveClass(/explore-active-section/);
-  const box=await page.locator('#section-front-door .explore-board').boundingBox();expect(box.width).toBe(page.viewportSize().width);expect(box.height).toBe(page.viewportSize().height);
+  const shell=await page.locator('#section-front-door .viewer-diagram-canvas').boundingBox(),box=await page.locator('#section-front-door .explore-board').boundingBox(),nav=await page.locator('#section-front-door .explore-navigation').boundingBox();
+  expect(shell).toEqual({x:0,y:0,width:page.viewportSize().width,height:page.viewportSize().height});
+  expect(box.x).toBeGreaterThanOrEqual(shell.x);expect(box.x+box.width).toBeLessThanOrEqual(shell.x+shell.width);
+  expect(box.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(box.y+box.height).toBeLessThanOrEqual(shell.y+shell.height);expect(box.height).toBeGreaterThan(300);
 });

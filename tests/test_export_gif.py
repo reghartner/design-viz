@@ -538,8 +538,9 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                     left:r.left+scrollX,right:r.right+scrollX,height:r.height};
                 }
                 var grid=sec.querySelector('.section-layout-grid'),
-                    stage=sec.querySelector('.explore-stage');
-                var state={clip:%s,valid:%s,stage:rect(stage),
+                    stage=sec.querySelector('.explore-stage'),
+                    canvas=sec.querySelector('.viewer-diagram-canvas');
+                var state={clip:%s,valid:%s,canvas:rect(canvas),stage:rect(stage),
                   graph:rect(sec.querySelector('.explore-canvas')),
                   bar:rect(sec.querySelector('.termbar')),grid:rect(grid),
                   heading:rect(sec.querySelector('.sec-h')),
@@ -563,7 +564,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
             clip = state["clip"]
             self.assertIsNotNone(clip)
-            for part in [state["stage"], state["graph"], state["bar"], state["notes"],
+            for part in [state["canvas"], state["stage"], state["graph"], state["bar"], state["notes"],
                          *(panel["rect"] for panel in state["panels"])]:
                 self.assertGreater(part["height"], 0)
                 self.assertLessEqual(clip["x"], part["left"])
@@ -574,7 +575,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual(clip["x"], 0)
             self.assertEqual(clip["y"], 0)
             self.assertLessEqual(clip["y"], state["toolbar"]["top"])
-            self.assertLessEqual(clip["height"], state["stage"]["height"] + 33)
+            self.assertLessEqual(clip["height"], state["canvas"]["height"] + 33)
             # Exercise the production frame path too: view verification must
             # accept a hidden authored grid, and capture more than the step bar.
             frames = export_gif.capture_frames(

@@ -1269,11 +1269,13 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec.workspace-active-section{display:block;position:fixed;inset:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;outline:0;}
 .workspace-diagram:not(.welcome-active) .workspace-active-section>:not(.section-viewport){display:none;}
-.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{position:absolute;inset:0;}
-.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.explore-stage{position:absolute;inset:0;width:100%;height:100%!important;border:0;border-radius:0;}
-.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{position:absolute;top:80px;left:84px;right:190px;z-index:45;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;background:none;border:0;}
+.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{position:absolute;top:104px;left:84px;right:12px;bottom:12px;display:flex;flex-direction:column;gap:8px;}
+.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.explore-stage{position:relative;inset:auto;flex:1 1 auto;min-height:0;width:100%;height:auto!important;border:0;border-radius:0;}
+.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{position:relative;inset:auto;z-index:135;display:flex;flex:none;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;background:none;border:0;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-views>*{pointer-events:auto;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-view-choice,.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions{background:var(--card);padding:7px;border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;}
+.workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation{background:var(--card);border-color:var(--line);}
+.workspace-diagram:not(.welcome-active) :where(#docview) .explore-navigation .diagram-view-choice{padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .diagram-view-choice:empty{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions{margin-left:0;}
 .section-view-settings{display:flex;order:-1;align-items:center;flex-wrap:wrap;gap:6px;padding:7px;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 18px #14244212;font:12px 'IBM Plex Sans',sans-serif;max-width:100%;box-sizing:border-box;}
@@ -1289,7 +1291,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .section-view-options-body .fnote{margin:10px 0 0;line-height:1.5;}
 @media(max-width:700px){.section-view-settings{position:relative;}.section-view-options{position:static;}.section-view-options-body{max-width:100%;}}
 .workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="Expand"],.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="expanded"],.workspace-diagram:not(.welcome-active) :where(#docview) .layout-flow-toggle{display:none;}
-.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{left:auto;right:12px;top:118px;bottom:auto;padding:0;background:none;border:0;box-shadow:none;}
+.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{left:auto;right:12px;top:10px;bottom:auto;padding:0;background:none;border:0;box-shadow:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools>.mbtn,.workspace-diagram:not(.welcome-active) :where(#docview) .explore-zoom,.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools .board-size{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools>.explore-zoom-group{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools .lg{padding:6px 10px;background:var(--card);border:1px solid var(--line);border-radius:8px;}
@@ -1298,7 +1300,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) .workspace-empty-section{inset:150px 84px auto;padding:24px;}
 .workspace-diagram:not(.welcome-active) .workspace-empty-section>*{display:revert;}
 @media(max-width:1050px){.workspace-canvas .workspace-create .editor-add-destination{display:flex;max-width:220px;}.workspace-canvas .editor-add-destination select{min-width:0;max-width:150px;}}
-@media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:124px;right:12px;}.workspace-canvas .workspace-create .editor-add-destination{position:fixed;top:82px;left:84px;max-width:calc(100vw - 280px);}.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{display:none;}}
+@media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{top:122px;}.workspace-canvas .workspace-create .editor-add-destination{position:fixed;top:82px;left:84px;max-width:calc(100vw - 280px);}.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{display:none;}}
 
 .workspace-diagram:not(.welcome-active) .workspace-active-section::before,.workspace-diagram:not(.welcome-active) .workspace-active-section::after{display:none;}
 .workspace-diagram:not(.welcome-active) .layout-preview-tools{display:none!important;}
@@ -1320,13 +1322,12 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-provenance{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px 'IBM Plex Sans',sans-serif;color:var(--sub);}
 .workspace-preset{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:12px 0 8px;font:12px 'IBM Plex Sans',sans-serif;}
 .workspace-preset select{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px;font:inherit;max-width:100%;}
-.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:104px;z-index:135;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{z-index:135;}
 
 .workspace-change-dialog{width:min(650px,calc(100vw - 40px));max-height:75dvh;overflow:auto;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:22px;}
 .workspace-change-dialog p{white-space:pre-wrap;overflow-wrap:anywhere;}
 @media(max-width:1100px){.workspace-provenance{display:none;}}
-@media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:122px;}}
+@media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{top:122px;}}
 
 @media(max-height:520px){.workspace-canvas #workspace-window-agent{top:116px!important;height:calc(100dvh - 118px)!important;max-height:none;z-index:150!important;}.workspace-canvas #workspace-window-agent .workspace-window-header{min-height:26px;padding:2px 8px;}.workspace-canvas #workspace-window-agent #editor-agent[data-connected="true"] .folder-agent-header{max-height:26px;overflow:auto;}.workspace-canvas #workspace-window-agent .folder-agent-composer label[for="folder-agent-level"]{display:none;}.workspace-canvas #workspace-window-agent .folder-agent-compose-actions{flex-wrap:nowrap;}.workspace-canvas #workspace-window-agent .folder-agent-composer{padding:3px 8px;}}
 
@@ -1338,7 +1339,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas:not(.welcome-active) .workbench-brand>span,.workspace-canvas #workspace-home{display:none;}
   .workspace-canvas .workspace-create .editor-add-destination{position:fixed;top:82px;left:84px;max-width:calc(100vw - 280px);}
   .workspace-canvas .workspace-appearance{top:82px;}
-  .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas>.diagram-views{top:126px;}
+  .workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{top:126px;}
 }
 @media(max-width:700px){
   .workspace-canvas .workspace-tools .editor-add-button{gap:4px;}

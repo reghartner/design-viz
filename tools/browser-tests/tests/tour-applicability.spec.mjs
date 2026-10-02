@@ -54,13 +54,20 @@ function expectContiguous(lessons){
 }
 async function startBoth(page){await page.locator('.dv-tour-replay').click();await page.getByRole('button',{name:/Show me both/}).click();}
 
-test('the built-in tour finds later-tab capabilities and numbers only the lessons it can show',async({page,server})=>{
+test('the built-in tour finds later-tab capabilities and numbers only the lessons it can show',async({page,server},info)=>{
   const warnings=tourWarnings(page),url=await build(server,spec());await page.goto(url);
   await expect(activeTab(page)).toHaveText('Overview');await startBoth(page);
-  const detailTopics=['Choose your reading view','Flows can split','And they come back together',
+  const detailTopics=['Choose a chapter','Flows can split','And they come back together',
     'The panels tell the story','Make room to explore','Bring a panel back'];
   const lessons=await walk(page,async title=>{
     if(detailTopics.includes(title))await expect(activeTab(page)).toHaveText('Details');
+    if(title==='Choose a chapter'){
+      const body=page.locator('.dv-tour-ui .dv-tour-body').first();
+      await expect(body).toContainText('marked Explore');
+      await expect(body).toContainText('pan and zoom');
+      const screenshot=info.outputPath('tour-explore-marker.png');await page.screenshot({path:screenshot});
+      await info.attach('tour-explore-marker',{path:screenshot,contentType:'image/png'});
+    }
     if(title==='Make room to explore'){
       await expect(activeView(page)).toHaveText('Engineering view');
       await expect(page.locator('[data-explore-panel]:visible')).toHaveCount(2);
@@ -116,7 +123,7 @@ test('planning and completing the built-in tour preserve the reader view, path, 
     const after=await geometry();for(const key of Object.keys(before))expect(after[key],key+' restored').toBeCloseTo(before[key],0);
     expect(new URL(page.url()).hash).toBe(hash);
   }
-  await startBoth(page);await expect(heading(page)).toHaveText('Choose your reading view');
+  await startBoth(page);await expect(heading(page)).toHaveText('Choose a chapter');
   await page.locator('.dv-tour-exit').click();await expect(page.locator('.dv-tour')).toBeHidden();await restored();
   await startBoth(page);await walk(page);await restored();
 });

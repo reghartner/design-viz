@@ -31,8 +31,8 @@ var TOUR_DEFAULT_CONFIG = {
       id: 'views',
       target: {selector: '.diagram-view-choice', within: 'section'},
       copy: {
-        heading: 'Choose your reading view',
-        body: 'Use these buttons to choose a view of this story. Each view can emphasize a different part of the same flow. Your steps and their effects stay connected as you switch.'
+        heading: 'Choose a chapter',
+        body: 'Tabs organize the document; Chapters choose a saved perspective inside the current tab. A chapter marked Explore opens a canvas you can pan and zoom. The same marker on a tab means its primary diagram’s selected chapter uses Explore viewing mode.'
       }
     },
     {

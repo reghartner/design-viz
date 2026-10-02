@@ -26,6 +26,9 @@ test('homepage fits the authored default view and supports Explore through expan
   await page.goto(server.origin+'/workbench.html');
   const example=page.locator('#welcome-example-view'),stage=example.locator('#welcome-example-stage');
   const section=example.locator('#section-visitor'),grid=section.locator('.section-layout-grid');
+  await expect(stage.locator(':scope > .doc-heading')).toHaveCount(1);
+  await expect(stage.locator(':scope > .doc-heading')).toBeHidden();
+  await expect(stage.locator('.doc-company-brand')).toContainText('YOUR COMPANY');
   await expect(section.getByRole('button',{name:'Story',exact:true})).toHaveAttribute('aria-pressed','true');
   const diagram=grid.locator('[data-layout-key="diagram"]'),app=grid.locator('[data-layout-key="panel:app"]');
   await expect(diagram).toHaveCSS('grid-row','1 / span 9');
@@ -66,7 +69,7 @@ test('homepage opens an authored Explore default without exposing the Standard g
   sample.page.sections[0].diagram.defaultLayout='explore';
   await page.route(server.origin+'/workbench.html',async route=>{
     const response=await route.fetch(),html=await response.text();
-    const body=html.replace(/var WORKBENCH_ONBOARDING = [^\n]*;\n/,'var WORKBENCH_ONBOARDING = '+JSON.stringify(sample).replace(/</g,'\\u003c')+';\n');
+    const body=html.replace(/var WORKBENCH_LANDING = [^\n]*;\n/,'var WORKBENCH_LANDING = '+JSON.stringify({spec:sample,title:'Example',label:'',footer:''}).replace(/</g,'\\u003c')+';\n');
     expect(body).not.toBe(html);
     await route.fulfill({response,body});
   });
@@ -291,4 +294,59 @@ test('Next commits the practice proposal even after comparing Current state',asy
   await expect(frame.locator('#undo-builder')).toBeEnabled();
   expect(JSON.parse(await frame.locator('#src').inputValue()).page.sections[0].diagram.nodes.cloud.sub).toContain('Validate event');
   await expect(frame.locator('#agent-update-banner')).toBeHidden();
+});
+
+test('company config owns landing and reader while editing exercises remain fictional',async({page,server},info)=>{
+  test.setTimeout(90000);
+  await page.goto(server.origin+'/company.html');
+  const card=page.locator('#welcome-example-view'),section=card.locator('#section-company-overview');
+  await expect(page.locator('#welcome-example-title')).toHaveText('Company <architecture>');
+  await expect(page.locator('#welcome-example-label')).toHaveText(' · Internal </script> example');
+  await expect(page.locator('#welcome-example-footer')).toHaveText('Company story & details');
+  await expect(card.locator('#welcome-example-stage')).toHaveClass(/sk-pastel/);
+  await expect(card.locator('#welcome-example-stage > .doc-heading')).toHaveCount(1);
+  await expect(card.locator('#welcome-example-stage > .doc-heading')).toBeHidden();
+  await expect(card.locator('.doc-company-brand')).toContainText('YOUR COMPANY');
+  await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
+  await expect(section).toBeVisible();
+  await expect(card.locator('#section-company-processing')).toBeHidden();
+  await expect(card.getByText('Company introduction before the featured diagram.')).toBeHidden();
+  await expect(section.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(section.locator('.section-layout-grid')).toBeHidden();
+  const fits=async()=>{await expect.poll(async()=>{
+    const outer=await card.boundingBox(),inner=await card.locator('#welcome-example-stage').boundingBox();
+    return Math.abs(outer.height-inner.height)+Math.abs(outer.width-inner.width);
+  }).toBeLessThan(2);};
+  await fits();await page.screenshot({path:info.outputPath('company-desktop.png')});
+  await page.setViewportSize({width:390,height:844});await fits();
+  await page.locator('.welcome-example').screenshot({path:info.outputPath('company-narrow.png')});
+  await page.setViewportSize({width:1800,height:1200});
+  await section.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();
+  const caption=await section.locator('.stepline').textContent();
+  await page.locator('#welcome-example-expand').click();
+  const expanded=practice(page).locator('#section-company-overview');
+  await expect(page.locator('.workbench-tour-header>b')).toHaveText('Company <architecture> · Internal </script> example');
+  await expect(practice(page).locator('#docview')).toHaveClass(/sk-blueprint/);
+  await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
+  await expect(expanded.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect.poll(()=>expanded.locator('.stepline').textContent()).toBe(caption);
+  await expect(expanded.getByText('Company ingestion',{exact:true})).toBeVisible();
+  await page.screenshot({path:info.outputPath('company-expanded.png')});
+  await expanded.locator('[data-dv-detail="company-service"]').click();
+  await expect(practice(page).locator('[data-dv-detail-preview]:visible')).toHaveCount(1);
+  await practice(page).locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();
+  await expect(expanded).toBeVisible();
+  await page.getByRole('button',{name:'1. Explore a diagram',exact:true}).click();
+  await expect(practice(page).locator('#section-company-overview')).toBeVisible();
+  await expect(practice(page).getByRole('button',{name:/Show me both/})).toBeVisible();
+  await page.getByRole('button',{name:'3. Edit in workbench',exact:true}).click();
+  await expect(heading(practice(page))).toHaveText('Start with Add to Diagram');
+  const manual=JSON.parse(await practice(page).locator('#src').inputValue());
+  expect(manual.page.sections[0].id).toBe('visitor');
+  expect(manual.page.sections[0].diagram.nodes.cloud).toBeTruthy();
+  await page.getByRole('button',{name:'2. Work with my agent',exact:true}).click();
+  for(let i=0;i<7;i++)await next(practice(page));
+  const agent=JSON.parse(await practice(page).locator('#src').inputValue());
+  expect(agent.page.sections[0].id).toBe('visitor');
+  expect(agent.page.sections[0].diagram.nodes.cloud.sub).toContain('Validate event');
 });

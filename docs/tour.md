@@ -320,18 +320,19 @@ are blocked, and agent copy actions write only to practice memory. Destroying
 the iframe discards the practice session. The parent accepts only known progress
 events from that exact iframe window and blocks editor shortcuts in tour chrome.
 
-`src/starters/onboarding.json` owns the fictional sample. Replace this authored
-spec to change the homepage example and reader introduction; the portable viewer
-tour discovers applicable features. Agent/manual exercises in
-`src/workbench/onboarding.js` also reference sample node and step identities and
-must be updated with a different exercise story. Fullscreen and chapter switching
-belong to the host. Native dialogs retain their own cancel handling before Escape
-can leave a chapter. These are host hooks, not additions to the authored tour JSON
-schema.
+`src/starters/onboarding.json` owns the fixed fictional agent/manual exercise
+sample. Company-owned `workbench/site.json` (or `build.py --config PATH`) selects
+a separate homepage, expanded example and reader introduction spec. Without a
+config, those surfaces use the same fictional sample. The portable viewer tour
+discovers the configured diagram's applicable features. Agent/manual exercises
+in `src/workbench/onboarding.js` retain their sample node and step identities.
+Fullscreen and chapter switching belong to the host. Native dialogs retain their
+own cancel handling before Escape can leave a chapter. These are host hooks,
+not additions to the authored tour JSON schema.
 
-For a company example, follow [Put your own diagram on the homepage](homepage-example.md).
-It covers a separate homepage/reader sample, the shared exercise anchors, build
-wiring, verification, and a prompt to hand to an agent.
+Follow [Put your own diagram on the homepage](homepage-example.md) for the config
+schema, update ownership, migration from injection patches, verification and an
+agent prompt.
 
 ## Known limitations
 

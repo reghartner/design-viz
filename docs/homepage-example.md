@@ -1,87 +1,100 @@
 # Put your own diagram on the homepage
 
-Use an exported Flowview **JSON spec** as the source. The homepage renders it with the real viewer; it is not a screenshot or an embedded link to a published diagram.
+Own the landing page in **company config and an exported Flowview JSON spec**. `python3 tools/build.py` embeds them in the portable workbench HTML. Rebuilding after an upstream update reapplies the company example without patches to upstream source or generated HTML.
 
-**The current example is shared with the tour.** Replacing `src/starters/onboarding.json` changes the homepage, expanded example, reader introduction, and agent/manual practice story. The editing exercises refer to particular nodes, steps, and panels. An unrelated diagram is therefore not a safe one-file replacement today.
+The company example appears on the homepage, in its expanded view, and in the reader introduction. Agent and manual editing exercises always use the fictional `src/starters/onboarding.json` sample. The existing copy/paste-first agent setup and tour history are shared across both.
 
-For an existing company diagram, the recommended change is to give the homepage and reader introduction their own spec while keeping the editing exercises on the fictional sample. The wiring below is a small implementation task; a separate `WORKBENCH_LANDING` input does not exist yet.
+## Company fork: automatic configuration
 
-## Prepare the company example
-
-1. Open the diagram in the workbench and download its JSON. Choose a concise section that works at card size; keep a clear first state and a few meaningful steps. An alternate path and local child diagram give the reader tour more features to demonstrate.
-2. Put the featured diagram first, with any local detail sections after it. A simple `page.sections` wrapper is easiest; a tabbed document needs its card visibility and expansion behavior checked separately.
-3. Save the desired opening Chapter using **Make opening chapter** in the workbench. The homepage preserves that Chapter's arrangement and Standard or Explore viewing mode. Include the panels you want visible together; Home map, App screens, and Device app are the current selection, not a requirement of the renderer.
-4. Embed screen images and any other media as data URLs. The expanded example and reader tour block network requests, so remote media URLs and remote child-diagram dependencies will not work there. Use local sections for drill-downs.
-
-The JSON and embedded images ship inside the downloadable workbench HTML, so choose an example suitable for the audience that receives that file.
-
-## Recommended: company example on the homepage and reader tour
-
-Keep `src/starters/onboarding.json` for the agent/manual practice chapters. Add your exported JSON at `src/starters/landing-example.json` and make these changes:
-
-| File | Change |
-| --- | --- |
-| `tools/build.py` | Beside `WORKBENCH_ONBOARDING`, add a `WORKBENCH_LANDING` mapping that reads the new file, parses it as JSON, serializes it with `json.dumps`, and escapes `<` exactly as the existing mapping does. |
-| `src/workbench.skel.html` | Beside the existing sample constant, add `var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};`. Update the example card's title, example label, and footer to describe your diagram. |
-| `tools/browser-tests/fixtures/build-editor.py` | Supply the same new mapping to `build.fill`. The lifecycle fixture also builds this skeleton. |
-| `src/workbench/onboarding.js` | In `initWorkbenchOnboarding`, clone `WORKBENCH_LANDING` instead of `WORKBENCH_ONBOARDING` for the homepage. In `initWorkbenchPractice`, use the new spec for the `viewer` and `example` chapters only, as shown below. |
-| `src/workbench/onboarding.css` | Check the hidden-section selectors against the new diagram. The current CSS hides `#section-event-detail`; replace that selector if your local detail section has a different ID. The card height follows the rendered view automatically. |
-
-In `initWorkbenchPractice`, choose the source before cloning it:
-
-```js
-var exampleSpec = chapter === 'viewer' || chapter === 'example'
-  ? WORKBENCH_LANDING
-  : WORKBENCH_ONBOARDING;
-var sample = JSON.parse(JSON.stringify(exampleSpec)), workspace = opts.workspace;
-```
-
-Leave `createWorkbenchPracticeAgent(WORKBENCH_ONBOARDING)` in boot unchanged: its proposed update belongs to the editing exercise. Keep the existing tour engine, history keys, chapter transitions, and practice isolation.
-
-The homepage and expanded example use the spec's own layout. Edit the view in the workbench and export its JSON; no separate homepage grid needs to be maintained. Named views remain selectable, including Explore with its live graph, floating panels, zoom, and step controls. Expansion retains the selected view, path, and step. Both read-only render calls currently select `pastel`; change those explicit skin arguments if your example needs another skin.
-
-The compact stage renders at a logical width of 1100 pixels and scales proportionally to the card. Its height is measured from the actual view, including changes between Standard and Explore; it is not cropped into a fixed aspect ratio. Change `#welcome-example-stage` in CSS if another logical width suits your diagram better. Check that all controls remain visible and extra sections do not spill into the card.
-
-## Alternative: use your story throughout every chapter
-
-Replace `src/starters/onboarding.json` directly, then reconcile the exercises in `src/workbench/onboarding.js`. A content refresh can preserve the existing IDs while changing labels, images, captions, and state. A different topology needs the code and tests updated to match.
-
-These are the current anchors, not requirements for all Flowview diagrams:
-
-| Current identity | Where it matters |
-| --- | --- |
-| First section `visitor` | Homepage expansion, practice navigation, and all manual selections use section index 0. |
-| Nodes `camera`, `hub`, `cloud`, `phone` | Row/alignment exercises, selected agent context, sample proposal, and story edges. `cloud` also demonstrates service binding and nesting. |
-| Panels `home`, `app`, `device` | The sample's saved Story and Explore layouts. The panel-edit lesson opens the `app` controls. |
-| Steps `detect`, `offline`; paths `happy`, `offline` | Selected-step and alternate-path exercises. The default selected step also assumes raw index 1. |
-| Local child section `event-detail` | The node's detail link and the homepage's hidden-detail CSS selector. |
-| Sample service/API bindings | `workbenchTourCatalog()` supplies the matching fictional catalog for the Company service/API dropdowns. |
-
-Also update the example card copy, lesson narration, illustrative agent conversation, simulated proposal/ledger, and fixture-specific test assertions. Keep the catalog demonstration fictional or explicitly authored for practice; it must not fetch your live catalog. Nesting stays a diagram feature.
-
-## Build and verify
-
-Run from the repository root (use `onboarding.json` in the validation command if replacing the shared sample):
+From your company fork root:
 
 ```sh
-node tools/validate.js src/starters/landing-example.json
+mkdir -p diagrams/company
+# Save your exported JSON as diagrams/company/story.spec.json first.
+cp workbench/site.example.json workbench/site.json
 python3 tools/build.py
-node --test tests/*.test.js
 ```
 
-After installing the pinned browser dependencies described in `tools/browser-tests/README.md`:
+Edit `workbench/site.json` to describe the example:
+
+```json
+{
+  "version": 1,
+  "landing": {
+    "spec": "../diagrams/company/story.spec.json",
+    "title": "Our architecture",
+    "label": "Company example",
+    "footer": "Explore the story, then expand for a closer look."
+  }
+}
+```
+
+Commit `workbench/site.json` and your spec in the company repository. Upstream tracks only `workbench/site.example.json`; it does not ship or rewrite your `site.json`. Ordinary builds automatically discover `workbench/site.json` relative to the Flowview source root, regardless of the current working directory. The existing `deploy/workbench/Dockerfile` copies `workbench/` and `diagrams/`, so this placement also works for its normal image build without modifying the Dockerfile.
+
+`version` must be the integer `1`. `landing.spec` is required and resolves relative to the config file, including for external config files. Optional `title`, `label`, and `footer` are plain text, never HTML; they default to “Company diagram”, “Company example”, and an empty footer. An empty label or footer is hidden. Unknown fields, unsupported versions, missing files, malformed JSON, and spec validation errors fail the build before it overwrites HTML. A missing *automatic* config keeps the built-in example; an explicitly supplied missing config is an error.
+
+The builder only reads config and spec. It never injects changes into either source file. Generated `workbench/flowspec.html` and `template/flowview.html` remain ignored outputs; don't edit or commit them.
+
+## Vendored source or a mirror that deletes files
+
+Keep config and spec **outside the directory replaced by your sync**. A vendor copy or `rsync --delete` can remove company files inside that directory even when upstream doesn't track them. For this structure:
+
+```text
+company-repo/
+  flowview-site/site.json
+  flowview-site/story.spec.json
+  vendor/flowview/tools/build.py
+```
+
+Use `"spec": "story.spec.json"` in `flowview-site/site.json`. From `company-repo/`, run:
 
 ```sh
+python3 vendor/flowview/tools/build.py --config flowview-site/site.json
+```
+
+Add that exact configured build step to your company update/deploy script after replacing `vendor/flowview/`. Commit the external config, spec, and build script. The generated workbench is `vendor/flowview/workbench/flowspec.html`. Absolute `--config` paths work from any directory; relative CLI paths resolve from the invoking directory, while `landing.spec` always resolves from its config directory.
+
+The stock Dockerfile's build context covers its source tree. External config outside that context needs your company packaging step to copy config/spec into the image build context, or a company Dockerfile that includes those inputs and runs `build.py --config` at their container paths. For the stock image, use the in-tree placement above.
+
+## Author the example
+
+- Use a bare diagram, a page object, or a `page` wrapper with sections/blocks. The first diagram section that is not `detailOnly` is featured on the compact card. Other sections remain available to local drill-downs and the expanded reader, without spilling into the card. For a tabbed document, the featured diagram's tab is selected on the compact card and on expansion.
+- Save the desired opening Chapter with **Make opening chapter** in the workbench. The spec owns its layout, Standard or Explore mode, panels, and default Chapter. The expanded example and reader introduction honor its authored skin; the compact homepage card keeps the stock pastel presentation. The landing config adds no duplicate layout settings and the builder does not rewrite the spec.
+- Expansion preserves the selected Chapter, path, and step. The compact stage renders at a logical width of 1100 pixels, then scales to fit the card; its height follows the authored view instead of cropping it to a fixed ratio.
+- Embed images and media as data URLs. The expanded example and reader introduction run in an opaque-origin sandbox that blocks network requests; remote media and external child diagrams are unavailable there. Use local detail sections.
+
+The complete spec and embedded media ship inside the downloadable HTML. Choose a company story appropriate for everyone receiving that file.
+
+## Migrate an existing manual injection
+
+1. Save the company landing JSON as a company-owned spec file. If it only exists in an old generated page, recover that JSON before rebuilding.
+2. Create the config above and move your card title, label and footer into it.
+3. Retire the company patches to `tools/build.py`, the skeleton, onboarding code/CSS, and `src/starters/onboarding.json`; use the current upstream versions. Keep the fictional exercise sample intact.
+4. Run your configured build after each upstream update. Deploy its output instead of applying another injection patch. Compare the saved config and spec in Git to confirm the build left them unchanged.
+
+## Verify
+
+After building with your config, serve the source root:
+
+```sh
+python3 -m http.server 8765 --bind 127.0.0.1
+```
+
+Open `http://127.0.0.1:8765/workbench/flowspec.html`. Check desktop and phone widths, the saved default Chapter, and local child details. The compact card uses pastel; expansion and the reader introduction use the authored skin. Select another Chapter/path/step and expand. Replay **1. Explore a diagram**, then switch to agent/manual practice and confirm it uses the fictional story.
+
+For upstream development, `python3 tools/build.py --no-config` deliberately ignores company config. Default build tests and browser fixtures use this mode; browser contracts also build a separate temporary company configuration. These tests can leave the default sample in the generated output. **Run your configured production build again after testing**, then deploy that result.
+
+Focused checks from the Flowview root:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_site_config.py' -v
+python3 -m unittest discover -s tests -p 'test_build.py' -v
+node --test tests/workbench-onboarding.test.js
+# Install the pinned browser dependencies per tools/browser-tests/README.md first.
 cd tools/browser-tests
 npx playwright test --config playwright.editor.config.mjs tests/workbench-onboarding.spec.mjs tests/welcome-navigation.spec.mjs
 ```
 
-Extend the spec-validation test to cover the new file. Update assertions tied to the old example, such as its diagram count, panel labels, or alternate-step caption. Preserve the tests for expanded-state continuity, viewer history, real-draft/clipboard isolation, selected-step editing, and Commit/Undo.
-
-Serve the repository with `python3 -m http.server 8765 --bind 127.0.0.1`, then open `http://127.0.0.1:8765/workbench/flowspec.html`. Check the compact card at laptop and phone widths. Confirm it opens the saved default view, switch between Standard and Explore views, and expand after selecting another view/step/path. Replay **1. Explore a diagram** and continue through the agent/manual chapters to confirm the practice sample still works.
-
-Commit the JSON, source, and test changes. `workbench/flowspec.html` and `template/flowview.html` are generated outputs; do not edit or commit them.
-
 ## Prompt to give an agent
 
-> Put the Flowview JSON at **[path to my exported diagram]** on the homepage and in its expanded example/reader introduction. Read `docs/homepage-example.md` first. Create the separate landing-example input described there, preserving the fictional agent/manual practice sample and the single canonical copy/paste-first agent setup. Preserve my saved default view and its layout, including Explore when authored; adapt section visibility and card copy to my diagram. Keep the expanded example on the same selected view/step/path and retain the existing tour history and sandbox protections. Embed the required images; use local drill-down sections. Update both production and browser-fixture build mappings, add validation for the new spec, adjust only fixture-specific expectations, and run the listed checks. Show me the compact and expanded result. Do not change the app's tour engine or replace the editing exercises merely to make the new homepage example fit.
+> Configure our Flowview landing page using the JSON at **[path to my exported diagram]**. Read `docs/homepage-example.md`. Determine which directory our upstream sync replaces. Keep a version-1 config and the company spec in company-owned paths that survive that sync; use `workbench/site.json` for a normal fork or an external `--config` path for a replaced vendor tree. Set our title, label, and footer in config. Add the configured build to our update/deploy process. Preserve the spec's opening Chapter, layout, Explore support, and local detail sections. Keep the compact card pastel and honor the authored skin in the expanded reader. Keep agent/manual exercises fictional and the canonical copy/paste-first setup intact. Migrate any old injection patches to config. Build, verify compact and expanded state continuity plus reader/practice separation, and show desktop and narrow screenshots. Commit company inputs and build wiring, not generated HTML. After any upstream tests, rebuild with our config before deployment.

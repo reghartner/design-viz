@@ -148,6 +148,14 @@ npm run verify --prefix apps/confluence
 npm test --prefix tools/browser-tests
 ```
 
+The normal HTML build reads company-owned `workbench/site.json` when present.
+Use `--config PATH` for config outside a replaced vendor tree; spec paths resolve
+from that config's directory. `--no-config` intentionally builds the upstream
+sample. Config errors fail before HTML is overwritten; `--runtime-only` does not
+read site config. See [homepage configuration](homepage-example.md) for schema,
+input ownership and deployment. Reapply the configured build after running
+upstream tests, which build their default fixtures with `--no-config`.
+
 `build:viewer` emits native artifacts only; `build:runtime` emits native and backend
 artifacts. `check:viewer` now deletes the known generated outputs and compares two
 fresh builds byte for byte, including declarations, licenses, HTML and the backend.

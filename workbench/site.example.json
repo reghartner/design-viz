@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "landing": {
+    "spec": "../diagrams/company/story.spec.json",
+    "title": "Our architecture",
+    "label": "Company example",
+    "footer": "Explore the story, then expand for a closer look."
+  }
+}

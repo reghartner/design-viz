@@ -26,6 +26,10 @@ With Python 3.10+ and Node 24 installed, run:
 python3 tools/build.py
 ```
 
+To keep a company landing page across upstream updates, commit company-owned
+config and its JSON spec, then rebuild. See [homepage configuration](docs/homepage-example.md)
+for automatic `workbench/site.json` and external `--config` workflows.
+
 Open `workbench/flowspec.html` locally, or serve the checkout with
 `python3 -m http.server 8765` and visit `/workbench/flowspec.html`. The build also
 creates `template/flowview.html`. Both HTML entrypoints are ignored build outputs;

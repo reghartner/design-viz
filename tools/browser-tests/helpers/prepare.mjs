@@ -1,3 +1,4 @@
+import {prepareLanding} from './prepare-landing.mjs';
 import {chromium} from '@playwright/test';
 import {cp,readFile,writeFile,mkdir,mkdtemp,rm} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -13,12 +14,13 @@ export default async function prepare(){
   try{browser=await chromium.launch();console.log('Required Chromium: '+browser.version());}
   catch(error){throw new Error('Required Chromium could not launch. Run npm run install:browser --prefix tools/browser-tests (CI: playwright install --with-deps chromium).',{cause:error});}
   finally{if(browser)await browser.close();}
-  execFileSync('python3',[path.join(repo,'tools/build.py')],{stdio:'inherit'});
+  execFileSync('python3',[path.join(repo,'tools/build.py'),'--no-config'],{stdio:'inherit'});
   execFileSync(process.execPath,[path.join(repo,'apps/backstage/build-viewer.mjs')],{stdio:'inherit'});
   const output=await mkdtemp(path.join(tmpdir(),'flowview-browser-'));
   process.env.FLOWVIEW_BROWSER_ROOT=output;
   try {
     await cp(path.join(repo,'workbench/flowspec.html'),path.join(output,'workbench.html'));
+    await prepareLanding(repo,output);
     execFileSync('python3',[fixture('build-editor.py'),repo,path.join(output,'lifetime')],{stdio:'inherit'});
     for(const directory of [output,path.join(output,'lifetime')]){
       await cp(path.join(repo,'workbench/catalog.json'),path.join(directory,'catalog.json'));

@@ -134,11 +134,28 @@ for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Stand
   await page.keyboard.down('Control');await page.mouse.wheel(0,-180);await page.keyboard.up('Control');
   await expect.poll(()=>width(board)).toBeGreaterThan(fitted*1.5);expect(await pageY()).toBe(before);
   expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(100);
-  await board.evaluate(el=>{el.scrollTop=0;});p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,80);
+  await board.evaluate(el=>{el.scrollTop=0;});p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(4,80);
   await expect.poll(()=>board.evaluate(el=>el.scrollTop)).toBeGreaterThan(20);expect(await pageY()).toBe(before);
   await board.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  const contained=board.locator('[data-wheel-contained]');
+  await board.evaluate(el=>{const scroller=document.createElement('div'),content=document.createElement('div');scroller.dataset.wheelContained='';Object.assign(scroller.style,{position:'absolute',left:el.scrollLeft+40+'px',top:el.scrollTop+80+'px',width:'140px',height:'80px',overflow:'auto',overscrollBehaviorY:'contain',zIndex:'20',background:'#fff'});content.style.height='240px';content.textContent='Contained wheel target';scroller.append(content);el.querySelector('.boardcanvas').append(scroller);scroller.scrollTop=scroller.scrollHeight;});
+  await expect(contained).toBeVisible();await expect(contained).toHaveCSS('overscroll-behavior-y','contain');
+  expect(await contained.evaluate(el=>el.scrollTop+el.clientHeight>=el.scrollHeight-1)).toBe(true);
+  const containedBox=await contained.boundingBox(),containedBoard=await scroll(board);
+  await page.mouse.move(containedBox.x+containedBox.width/2,containedBox.y+containedBox.height/2);for(let i=0;i<4;i++)await page.mouse.wheel(4,50);
+  expect(await pageY()).toBe(before);expect(await scroll(board)).toEqual(containedBoard);await contained.evaluate(el=>el.remove());
+  for(let i=0;i<12;i++)await page.mouse.wheel(4,50);
+  await expect.poll(pageY).toBeGreaterThan(before+200);await expect(panel).toBeInViewport();
+  expect(await pageY()).toBeLessThanOrEqual(before+600);
+  before=await pageY();await board.evaluate(el=>{el.scrollLeft=el.scrollWidth;});
+  for(let i=0;i<12;i++)await page.mouse.wheel(50,4);
+  expect(await pageY()).toBeLessThanOrEqual(before+60);
+  await board.evaluate(el=>{const spacer=document.createElement('div');spacer.dataset.wheelTopSpacer='';spacer.style.height='500px';el.closest('.doc-sec').before(spacer);el.scrollTop=0;el.scrollIntoView({block:'center'});});
+  before=await pageY();expect(before).toBeGreaterThan(200);p=await point();await page.mouse.move(p.x,p.y);
+  for(let i=0;i<6;i++)await page.mouse.wheel(4,-50);
+  await expect.poll(pageY).toBeLessThan(before-200);expect(await pageY()).toBeGreaterThanOrEqual(before-300);
+  await board.evaluate(el=>{document.querySelector('[data-wheel-top-spacer]').remove();el.scrollLeft=0;el.scrollTop=el.scrollHeight;});
   const camera={width:await width(board),scroll:await scroll(board)};
-  await page.mouse.wheel(0,600);await expect.poll(pageY).toBeGreaterThan(before+200);await expect(panel).toBeInViewport();
   await resetPage();await reader.getByRole('button',{name:'Explore',exact:true}).click();
   await expect(board).toHaveClass(/explore-board/);
   await expect(board).toHaveCSS('overscroll-behavior-y','contain');
@@ -147,4 +164,38 @@ for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Stand
   await expect(reader.locator('body')).not.toHaveClass(/viewer-exploring/);
   await resetPage();p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,600);
   await expect.poll(pageY).toBeGreaterThan(200);await expect(panel).toBeInViewport();
+  if(embedded){
+    await reader.locator('body').evaluate(()=>scrollTo(0,document.scrollingElement.scrollHeight));
+    await page.locator('iframe').evaluate(el=>{for(const text of ['Host before','Host after']){const spacer=document.createElement('div');spacer.textContent=text;spacer.style.height='700px';el[text==='Host before'?'before':'after'](spacer);}});
+    await page.evaluate(()=>scrollTo(0,650));const hostBefore=await page.evaluate(()=>scrollY),frameBox=await page.locator('iframe').boundingBox();
+    await page.mouse.move(frameBox.x+frameBox.width/2,frameBox.y+frameBox.height/2);await page.mouse.wheel(0,600);
+    await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(hostBefore+200);
+  }
+});
+
+test('workbench Standard board routes vertical-dominant wheel at its boundary to the workspace',async({page,server})=>{
+  const raw=spec(),section=raw.page.sections[0],d=section.diagram;
+  section.id='services';
+  d.panels=[{id:'below',type:'state',title:'Below-fold panel',states:['Ready'],initial:{state:'Ready'}}];
+  d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[
+    {x:0,y:0,w:12,h:16},{panel:'below',x:0,y:22,w:12,h:20}
+  ]}}];d.defaultLayout='standard';
+  await page.setViewportSize({width:1280,height:800});
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);await closeTools(page);
+  const board=page.locator('.board'),workspace=page.locator('.workmain'),panel=page.locator('[data-dv-panel="0"]');
+  const workspaceY=()=>workspace.evaluate(el=>el.scrollTop);
+  await expect(panel).not.toBeInViewport();
+  for(let i=0;i<4;i++)await board.getByRole('button',{name:'Zoom in',exact:true}).click();
+  expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(100);
+  await board.evaluate(el=>{el.scrollTop=0;});
+  let p=await background(board);await page.mouse.move(p.x,p.y);await page.mouse.wheel(4,80);
+  await expect.poll(()=>board.evaluate(el=>el.scrollTop)).toBeGreaterThan(20);expect(await workspaceY()).toBe(0);
+  await board.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  for(let i=0;i<12;i++)await page.mouse.wheel(4,50);
+  await expect.poll(workspaceY).toBeGreaterThan(200);await expect(panel).toBeInViewport();
+  expect(await workspaceY()).toBeLessThanOrEqual(600);
+  await board.evaluate(el=>{const spacer=document.createElement('div');spacer.dataset.wheelTopSpacer='';spacer.style.height='500px';el.closest('.doc-sec').before(spacer);el.scrollTop=0;el.scrollIntoView({block:'center'});});
+  const before=await workspaceY();expect(before).toBeGreaterThan(200);p=await background(board);await page.mouse.move(p.x,p.y);
+  for(let i=0;i<6;i++)await page.mouse.wheel(4,-50);
+  await expect.poll(workspaceY).toBeLessThan(before-200);expect(await workspaceY()).toBeGreaterThanOrEqual(before-300);
 });

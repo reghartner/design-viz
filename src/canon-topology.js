@@ -109,7 +109,6 @@ var FlowTopology = (function(){
             placements.set(f.id,placements.get(f.id)+1);var copy=clone(f);copy.id=prefix+copy.id;return copy;
           });
           placements.forEach(function(count,key){if(count!==1)fail(where,'exported node '+key+' needs exactly one row/float placement (found '+count+')');});
-          if(!rows.length)fail(where,'export requires at least one row-placed node');
           d.rows.push.apply(d.rows,rows);
           if(floats.length){if(d.floats==null)d.floats=[];if(!Array.isArray(d.floats))fail(where,'consumer floats must be an array');d.floats.push.apply(d.floats,floats);}
           Object.keys(groups).forEach(function(key){

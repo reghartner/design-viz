@@ -20,6 +20,24 @@ test('removed exported node referenced by consumer edge fails with consumer/impo
   const specs=source(),d=diagram(specs[0]);delete d.nodes.api;d.rows=[['store']];d.edges=[];d.topologyExports.core={nodes:['store'],edges:[]};
   assert.throws(()=>resolve(specs),/checkout.*import platform.*platform export core.*missing node platform::api/);
 });
+test('float-only exported fragments preserve coordinates without importing the provider row anchor',()=>{
+  const specs=source(),provider=diagram(specs[0]);
+  provider.nodes.anchor={title:'Provider anchor'};provider.rows=[['anchor']];
+  provider.floats=[{id:'api',x:100,y:100},{id:'store',x:300,y:100}];
+  const before=structuredClone(specs),out=resolve(specs),consumer=diagram(out[1]);
+  assert.deepEqual(specs,before);assert.deepEqual(consumer.rows,[['client']]);
+  assert.deepEqual(consumer.floats,[{id:'platform::api',x:100,y:100},{id:'platform::store',x:300,y:100}]);
+  assert.equal(consumer.nodes['platform::anchor'],undefined);
+  assert.deepEqual(consumer.edges[1],{from:'platform::api',to:'platform::store',kind:'https',label:'Persist'});
+  assert.deepEqual(C.validateSpec(out[1]).errors,[]);assert.deepEqual(resolve(out),out);
+});
+test('float-only imports do not bypass ordinary materialized consumer row validation',()=>{
+  const specs=source(),provider=diagram(specs[0]);
+  provider.nodes.anchor={title:'Provider anchor'};provider.rows=[['anchor']];
+  provider.floats=[{id:'api',x:100,y:100},{id:'store',x:300,y:100}];
+  delete diagram(specs[1]).rows;
+  assert.throws(()=>resolve(specs),/Topology checkout: invalid materialized spec:.*rows: required/);
+});
 test('removed exported edge used by consumer step or failure fails despite ordinary validator warnings',()=>{
   for(const failureOnly of [false,true]){
     const specs=source(),d=diagram(specs[0]);d.edges=[];d.topologyExports.core.edges=[];

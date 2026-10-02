@@ -16,7 +16,8 @@ edge identities (Flowview edges are keyed by `from->to`, not a separate edge ID)
 
 Export names are unique across all diagrams/sections of that provider spec.
 An edge export must include both endpoints. Every exported node must have exactly
-one base `rows` or `floats` placement; at least one must be row-placed. A consumer
+one base `rows` or `floats` placement. An export may consist entirely of floats;
+the complete materialized consumer must still have valid `rows`. A consumer
 imports by the provider's canon ID and export name:
 
 ```json

@@ -2,12 +2,12 @@
    read models remain shared leaves; source/history publication belongs to session. */
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
-  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null;
+  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
-  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -27,7 +27,7 @@ function createBuilderInspector(opts){
   }
   function multiIdentity(targets){
     return JSON.stringify([session.snapshot().project,targets.map(function(t){
-      return JSON.stringify([t.kind,t.section,t.id,t.index,t.bulletPath,t.card,t.block,t.tab,t.pathId]);
+      return JSON.stringify([t.kind,t.section,t.id,t.index,t.key,t.bulletPath,t.card,t.block,t.tab,t.pathId]);
     }).sort()]);
   }
   function beginForm(identity){
@@ -2184,13 +2184,60 @@ function renderExtractionPreview(multiSel){
     updatePreview();finishForm(previous);title.focus({preventScroll:true});
   }
 
+  function topologyExportForm(multiSel){
+    var snapshot=parseEditor(),context=session.topologyContext(),identity=multiIdentity(multiSel),lifetime=formLife;
+    var targets=multiSel.map(function(t){return {kind:t.kind,section:t.section,id:t.id,index:t.index,key:t.key};});
+    var box=document.createElement('fieldset');box.className='topology-export-form';
+    var legend=document.createElement('legend');legend.textContent='Shared topology export';box.appendChild(legend);
+    var summary=document.createElement('p');summary.className='fnote';box.appendChild(summary);
+    var selected=snapshot.error?{error:snapshot.error}:topologyExportSelection(snapshot.text,snapshot.raw,targets,context);
+    summary.textContent='Nodes: '+targets.filter(function(t){return t.kind==='node';}).map(function(t){return t.id;}).join(', ')+
+      ' · Connections: '+(targets.filter(function(t){return t.kind==='edge';}).map(function(t){return t.key || 'connection '+(t.index+1);}).join(', ') || 'none');
+    var status=document.createElement('p');status.className='fnote';status.setAttribute('role','status');status.setAttribute('aria-live','polite');
+    if(selected.error){status.textContent=selected.error;box.appendChild(status);return box;}
+    var choose=document.createElement('select');choose.className='fctl';choose.setAttribute('aria-label','Topology export');
+    var fresh=document.createElement('option');fresh.value='';fresh.textContent='Create new export';choose.appendChild(fresh);
+    var declarations=selected.diagram.topologyExports || {};
+    Object.keys(declarations).forEach(function(key){var option=document.createElement('option');option.value=key;option.textContent=key;choose.appendChild(option);});
+    var name=document.createElement('input');name.className='fctl';name.type='text';name.setAttribute('aria-label','Export name');name.placeholder='e.g. notification-channels';name.autocomplete='off';
+    var existing=document.createElement('p');existing.className='fnote';
+    box.appendChild(frow('Export',choose));box.appendChild(frow('Name',name));box.appendChild(existing);
+    var actions=actionGroup('Topology export actions','inspector-actions');
+    var save=actionButton('Create export',function(){commit(false);});
+    var remove=actionButton('Remove export',function(){commit(true);},'bdanger');
+    actions.appendChild(save);actions.appendChild(remove);box.appendChild(actions);box.appendChild(status);
+    function current(){
+      var now=parseEditor(),live=opts.selection.current?opts.selection.current():multiSel;
+      return lifetime.alive() && now.text===snapshot.text && now.project===snapshot.project &&
+        multiIdentity(live)===identity && JSON.stringify(session.topologyContext())===JSON.stringify(context);
+    }
+    function plan(removing){
+      if(!current())return {error:'Source, project, or selection changed. Reselect the topology.'};
+      if(snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return {error:'Render the current source before exporting selected topology.'};
+      return planTopologyExport(snapshot.text,snapshot.raw,targets,{action:removing?'remove':choose.value?'update':'create',existingName:choose.value,name:name.value},context);
+    }
+    function refresh(){
+      var draft=plan(false);save.disabled=!!draft.error;remove.disabled=!choose.value || !!plan(true).error;
+      status.textContent=draft.error || (choose.value?'Update replaces this export’s membership with the selection; changing the name renames it.':'Creates a reusable declaration from this selection.');
+    }
+    function commit(removing){var draft=plan(removing);if(draft.error){status.textContent=draft.error;refresh();return;}applyPlan(draft,null,snapshot);}
+    listen(name,'input',refresh);
+    listen(choose,'change',function(){
+      name.value=choose.value;save.textContent=choose.value?'Update export':'Create export';remove.hidden=!choose.value;
+      var exp=declarations[choose.value];existing.textContent=exp?'Existing membership — Nodes: '+exp.nodes.join(', ')+' · Connections: '+(exp.edges.join(', ') || 'none')+'. Removing deletes only this declaration.':'';refresh();
+    });
+    // The source input invalidates held controls immediately, even before render.
+    invalidateTopologyExport=refresh;
+    remove.hidden=true;refresh();return box;
+  }
+
 function renderMultiInspector(multiSel){
     if(disposed)return;
     cancelRefresh();
     function applyBulkField(key,value){return applyPlan(planBulkSetField(session.text(),multiSel,key,value));}
     if (!guide || multiSel.length < 2) return;
     var previous=beginForm(multiIdentity(multiSel));
-    var kind = multiSel[0].kind;
+    var homogeneous=multiSel.every(function(t){return t.kind===multiSel[0].kind;}),kind=homogeneous?multiSel[0].kind:'topology item';
     var head = document.createElement('b');
     head.textContent = multiSel.length + ' ' + kind + 's selected';
     guide.appendChild(head);
@@ -2201,6 +2248,8 @@ function renderMultiInspector(multiSel){
     var err = document.createElement('div');
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
+    var exportForm=multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})?topologyExportForm(multiSel):null;
+    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);finishForm(previous);return;}
     var form = document.createElement('div');
     form.className = 'iform';
     /* every control writes the SAME value to every selected element;
@@ -2290,6 +2339,7 @@ function renderMultiInspector(multiSel){
       opts.selection.removeMany, 'bdanger'));
     guide.appendChild(acts);
     if (form.childNodes.length) guide.appendChild(form);
+    if(exportForm)guide.appendChild(exportForm);
     finishForm(previous);
   }
 
@@ -2576,7 +2626,7 @@ function renderInspector(){
 
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
-    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},

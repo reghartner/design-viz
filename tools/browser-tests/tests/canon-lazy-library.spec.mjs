@@ -42,6 +42,24 @@ async function pickerFixture(page,server){
 }
 async function openTopology(page){await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await expect(page.getByRole('dialog',{name:'Referenced topology',exact:true})).toBeVisible();}
 
+test('multi-select Inspector re-exports namespaced topology without materializing source',async({page,server})=>{
+  await pickerFixture(page,server);await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await pagePreview(page);
+  const before=await page.locator('#src').inputValue(),node=id=>page.locator('#docview g.node[data-dv-node="notify::'+id+'"] .t1');
+  await node('dispatch').click();await node('push').click({modifiers:['Shift']});
+  // Connection identities are rendered indices; find the matching geometry via
+  // its source-order index (the consumer owns one edge before the imported three).
+  await page.locator('#docview path.edge[data-dv-edge="1"]').dispatchEvent('click',{ctrlKey:true});
+  if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
+  const form=page.locator('#guide .topology-export-form');await expect(form).toContainText('notify::dispatch->notify::push');
+  await form.getByLabel('Export name',{exact:true}).fill('nested');await form.getByRole('button',{name:'Create export',exact:true}).click();
+  const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
+  expect(d.topologyExports).toEqual({nested:{nodes:['notify::dispatch','notify::push'],edges:['notify::dispatch->notify::push']}});
+  delete d.topologyExports;expect(raw).toEqual(JSON.parse(before));expect(after).not.toContain('topologyProvenance');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+  await page.reload();await pagePreview(page);await expect(page.locator('#src')).toHaveValue(after);await expect(node('push')).toBeVisible();
+});
+
 test('reference picker browses bounded exports, inserts a closed subset, and preserves history/source/frozen recovery',async({page,server},testInfo)=>{
   const fixture=await pickerFixture(page,server);
   expect(fixture.requests).toEqual([fixture.specURL('second')]);await openTopology(page);

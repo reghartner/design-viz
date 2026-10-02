@@ -95,6 +95,20 @@ for supported capabilities, CI checks and the company fork release workflow.
 
 ### Shared topology references
 
+To declare a provider export in Workbench, modifier-click (Shift, Ctrl, or Cmd)
+at least two nodes/connections in one diagram section, then use **Inspector →
+Shared topology export**. Single selections never offer this action. Include at
+least one node and both endpoints of every selected connection; node-only exports
+are valid. Names start with a letter/digit and contain only letters, digits, dots,
+dashes, or underscores, unique across all sections in the provider spec. Choose
+an existing export explicitly to replace its membership, rename, or remove it.
+Each save/removal edits only `diagram.topologyExports` in one Undo transaction.
+Mixed node/edge selections do not offer generic bulk edits or deletion.
+Local exports work offline without a Canon catalog. Nested/imported exports need
+the frozen authored provider context and validate the complete candidate in memory;
+never materialize imported rows/nodes/edges into source. Agents use these same
+rules and the pure `planTopologyExport` planner in `src/workbench/commands/topology.js`.
+
 Diagram source may declare `topologyExports: {name: {nodes: [nodeId], edges:
 ["from->to"]}}` or `topologyImports: [{spec: canonId, export: name, as:
 namespace}]`. Imported node IDs are `namespace::nodeId`; consumer steps and

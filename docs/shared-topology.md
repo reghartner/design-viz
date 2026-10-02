@@ -146,6 +146,38 @@ Build tooling and evidence baselines preserve imports/exports in source files.
 
 ## Authoring in Workbench
 
+To publish a selection as a provider export, Shift/Ctrl/Cmd-click at least two
+nodes and/or connections in one diagram section. The **multi-select Inspector →
+Shared topology export** summarizes node IDs and connection keys. Enter a name
+and **Create export**. It requires at least one node and both endpoint nodes for
+each selected connection; node-only exports are valid. A single node never offers
+export creation. Export names follow the token rule above and must be unique
+across every section of the provider spec.
+
+The export selector lists declarations in the selected section. Choose one to
+inspect its existing membership, then **Update export** replaces that membership
+with the canvas selection. Editing the name also renames the declaration in that
+same transaction. **Remove export** removes only the chosen declaration. Create,
+update/rename and remove each produce one exact Undo/Redo action and never change
+nodes, connections, placements, imports, or narrative. Mixed selections offer
+only export authoring; homogeneous selections retain their usual bulk controls.
+Source/project/selection changes invalidate held export controls.
+
+Local authored exports work in ordinary/offline Workbench without a deployed
+catalog. Re-exporting imported identities uses the session's frozen topology
+context; without it the editor asks you to open the authored spec from Canon.
+The full candidate is resolved and validated in memory, including dependent
+imports already in that context. An incompatible rename/removal fails atomically.
+
+Agents use `planTopologyExport(text, raw, targets, options, context)` in
+`src/workbench/commands/topology.js`. Targets are `{section, kind:'node', id}` or
+`{section, kind:'edge', key:'from->to'}`; a supplied edge `index` must still match
+that key in the resolved diagram. Options are `{action:'create', name}`, or
+`{action:'update', existingName, name}`, or `{action:'remove', existingName}`.
+The planner requires the same multi-selection and changes only topologyExports.
+Pass the frozen authored context for imported topology; omit it for local exports.
+Callers must reject stale source/project/selection before accepting the plan.
+
 In a deployed Canon v3 editor, choose **Add to diagram → Referenced topology**.
 Search by provider name, ID or owner, then choose its page section and named
 export. Only that export's nodes and connections are offered. All start selected;

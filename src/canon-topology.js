@@ -233,7 +233,23 @@ var FlowTopology = (function(){
     });return Array.from(ids);
   }
   function resolveSource(raw,context){
-    if(!context){if(declarations(raw))fail('editor','open this authored spec from Canon to load its providers');return raw;}
+    if(!context){
+      if(raw && raw.nodes && raw.rows && !raw.page && !raw.blocks && !raw.sections){
+        if(!own(raw,'topologyExports') && !own(raw,'topologyImports'))return raw;
+        return resolveSource({page:{sections:[{diagram:raw}]}},null).page.sections[0].diagram;
+      }
+      if(!declarations(raw))return raw;
+      if(sections(raw).some(function(sec){return (sec.diagram.topologyImports || []).length;}))
+        fail('editor','open this authored spec from Canon to load its providers');
+      // Local exports need no catalog. Validate through the same resolver, with
+      // temporary identity metadata that is never published into authored JSON.
+      var local=clone(raw),wrapped=!!local.page,page=wrapped?local.page:local;
+      var canon=page.canon;
+      if(!canon)page.canon={version:1,id:'local-export',kind:'design',owner:'group:default/local'};
+      var result=materialize([wrapped?local:{page:local}])[0];
+      if(!canon)delete result.page.canon;
+      return wrapped?result:result.page;
+    }
     if(context.version!==1 || !Array.isArray(context.specs) || typeof context.id!=='string')fail('editor','invalid authored provider snapshot');
     var candidate=clone(raw);if(!object(candidate.page))fail('editor','expected a page spec');
     var original=context.specs.find(function(spec){return spec.page && spec.page.canon && spec.page.canon.id===context.id;});

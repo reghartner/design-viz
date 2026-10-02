@@ -240,6 +240,7 @@ function builderDeletePlan(text, raw, t){
 }
 
 function planBulkSetField(text, targets, key, valueTextOrNull){
+  if(targets.length && targets.some(function(t){return t.kind!==targets[0].kind;}))return {error:'Mixed topology selections support export authoring only. Select one kind to edit fields.'};
   var cur = text;
   for (var i = 0; i < targets.length; i++){
     var raw;
@@ -255,6 +256,7 @@ function planBulkSetField(text, targets, key, valueTextOrNull){
 }
 
 function planBulkDelete(text, targets){
+  if(targets.length && targets.some(function(t){return t.kind!==targets[0].kind;}))return {error:'Mixed topology selections support export authoring only. Select one kind to delete.'};
   if(targets.some(function(t){return t.kind==='bullet' && !builderBulletIndices(t);}))return {error:'Invalid bullet selection.'};
   var list = targets.filter(function(t,i){
     if(t.kind!=='bullet')return true;

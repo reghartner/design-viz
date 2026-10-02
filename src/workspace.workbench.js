@@ -22,6 +22,65 @@ function workspacePanelRect(rect,width,height){
   return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
     y:Math.max(top,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
+
+/* A reader preview is a second renderer, not an authoring canvas with its
+   controls hidden. Detach the authoring tree while it is open: both renderers
+   use stable fragment IDs, and global SVG lookups must see only one tree. */
+function initWorkbenchReaderPreview(opts){
+  var open=document.getElementById('workbench-reader-open'),back=document.getElementById('workbench-reader-back');
+  var surface=document.getElementById('workbench-reader-preview'),view=document.getElementById('workbench-reader');
+  var workspace=document.getElementById('workbench-workspace'),authorView=document.getElementById('docview'),header=document.querySelector('.workbench-header');
+  if(!open || !back || !surface || !view || !workspace || !authorView || !header)return null;
+  var ctl=null,state=null;
+  function active(){return !!state;}
+  function suspend(authoring){
+    return (authoring.steppers || []).map(function(rec){
+      var stepper=rec.stepper,playing=!!(stepper && stepper.playing && stepper.playing());
+      if(stepper && stepper.pause)stepper.pause();
+      return {stepper:stepper,playing:playing};
+    });
+  }
+  function restoreAuthoring(restore){
+    if(restore.anchor.parentNode)restore.anchor.replaceWith(authorView);
+    workspace.hidden=restore.workspaceHidden;
+    restore.playback.forEach(function(saved){
+      if(saved.playing && saved.stepper && saved.stepper.playing && !saved.stepper.playing())saved.stepper.toggleAuto();
+    });
+  }
+  function show(){
+    if(state)return;
+    var page=opts.page(),authoring=opts.controller();
+    if(!page || !authoring)return;
+    var canvas=document.getElementById('workspace-canvas'),focused=document.activeElement;
+    var anchor=document.createComment('workbench author view position');
+    state={focused:focused,windowX:window.scrollX,windowY:window.scrollY,anchor:anchor,canvas:canvas,
+      canvasX:canvas?canvas.scrollLeft:0,canvasY:canvas?canvas.scrollTop:0,
+      headerHidden:header.hidden,workspaceHidden:workspace.hidden,playback:suspend(authoring)};
+    var skin=opts.skin(page);
+    authorView.parentNode.insertBefore(anchor,authorView);authorView.remove();workspace.hidden=true;
+    header.hidden=true;surface.hidden=false;
+    document.body.classList.add('workbench-reader-preview-active');
+    try{
+      ctl=opts.render(view,page,skin,authoring);
+    }catch(ex){
+      var restore=state;state=null;view.replaceChildren();surface.hidden=true;header.hidden=restore.headerHidden;
+      document.body.classList.remove('workbench-reader-preview-active');restoreAuthoring(restore);throw ex;
+    }
+    window.scrollTo(0,0);back.focus({preventScroll:true});
+  }
+  function hide(){
+    if(!state)return;
+    var restore=state,canvas=restore.canvas;state=null;
+    if(ctl)ctl.destroy();ctl=null;view.replaceChildren();surface.hidden=true;
+    header.hidden=restore.headerHidden;restoreAuthoring(restore);
+    document.body.classList.remove('workbench-reader-preview-active');
+    if(canvas){canvas.scrollLeft=restore.canvasX;canvas.scrollTop=restore.canvasY;}
+    window.scrollTo(restore.windowX,restore.windowY);
+    if(restore.focused && restore.focused.isConnected)restore.focused.focus({preventScroll:true});
+  }
+  open.addEventListener('click',show);back.addEventListener('click',hide);
+  return {active:active,show:show,hide:hide};
+}
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;

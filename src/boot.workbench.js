@@ -409,6 +409,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
   },
   renderedText:workbenchPreview.renderedText,
   ctl:workbenchPreview.controller});
+var workbenchReaderPreview=initWorkbenchReaderPreview({page:workbenchPreview.page,controller:workbenchPreview.controller,skin:currentSkin,render:renderWorkbenchReaderPreview});
 var welcome;
 if(workbenchPractice){
   initWorkbenchPractice({builder:workbenchBuilder,workspace:workspace,controller:workbenchPreview.controller,agent:workbenchPracticeAgent});

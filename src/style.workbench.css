@@ -352,6 +352,12 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 #workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media(min-width:800px){body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,60px));overflow:auto;}}
 @media(max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{gap:8px;}body:not(.welcome-active) .workbench-header{padding:10px 12px;gap:12px;}.workspace-tools .editor-add-destination{max-width:180px;}}
+/* Expanded action labels need about 1500px before Add's destination retains a
+   useful hit target. Compact through that boundary, not merely at phone sizes. */
+@media(max-width:1500px){.workspace-canvas .workbench-reader-open-label{font-size:0;}.workspace-canvas .workbench-reader-open-label::after{content:'Preview';font-size:12px;}.workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}.workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}}
+/* Keep the secondary guide action out until the destination selector has room
+   for a useful target across browser/font metrics (about 120px at 1281px). */
+@media(max-width:1280px){.workspace-canvas .workspace-save>[data-open-human-guide]{display:none;}}
 @media(max-width:1100px){body:not(.welcome-active) .workbench-header{flex-wrap:wrap;}body:not(.welcome-active) .workbench-brand{font-size:17px;}.workspace-tools{flex-wrap:wrap;}.workspace-create{flex-basis:50%;}.workspace-tools .editor-add-destination{max-width:none;}}
 @media(max-width:799px){
   .workwrap{grid-template-columns:56px minmax(0,1fr);padding:0 8px;}
@@ -1172,6 +1178,16 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-heading{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
 
+/* Reader preview is deliberately outside #docview and the editable workspace:
+   only the ordinary page renderer and its own controls live on this surface. */
+body.workbench-reader-preview-active{margin:0!important;overflow:auto!important;background:var(--bg);}
+body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-preview-active>#agent-update-banner{display:none!important;}
+.workbench-reader-preview{min-height:100dvh;box-sizing:border-box;padding:76px clamp(12px,3vw,36px) 48px;}
+.workbench-reader-preview>.docview{width:min(1500px,100%);max-width:none;box-sizing:border-box;margin:0 auto;}
+.workbench-reader-back{position:fixed;left:12px;top:12px;z-index:1000;padding:10px 14px;border:2px solid #fff;border-radius:9px;background:#111827;color:#fff;box-shadow:0 4px 18px #0006;font:700 13px/1.2 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;}
+.workbench-reader-back:hover{background:#312e81;}.workbench-reader-back:focus-visible{outline:3px solid #fbbf24;outline-offset:3px;}
+@media(max-width:560px){.workbench-reader-preview{padding:68px 8px 28px;}.workbench-reader-preview>.docview{padding:15px 10px 22px;border-radius:10px;}.workbench-reader-back{left:8px;top:8px;max-width:calc(100vw - 16px);}}
+
 
 .notification-composer{min-width:0;display:grid;gap:10px;}
 .notification-editor{min-width:0;margin:0;padding:10px;border:1px solid var(--wline,#d5ddef);border-radius:10px;}
@@ -1351,14 +1367,24 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 }
 .folder-agent-guide #folder-agent-file-picker{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
 @media(max-width:540px){
-  /* Reserve Add's real width beside Auto arrange. Shorten the tour label just
-     as we shorten Add below, keeping all header actions visible in one row. */
+  /* Reserve Add's real width beside Auto arrange and compact the remaining
+     dense labels, keeping every header action visible in one row. */
   .workspace-canvas .workspace-create{flex:none;}
-  .workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}
-  .workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
-  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas #auto-arrange{font-size:0;}
+  .workspace-canvas #auto-arrange::after{content:'Arrange';font-size:11px;}
+  .workspace-canvas #workbench-reader-open{max-width:92px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas .workbench-reader-open-label::after{font-size:11px;}
+  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:0;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas #file-save::after{content:'JSON';font-size:11px;}
+}
+@media(max-width:420px){
+  /* Keep all five labeled actions in the header without clipping: reclaim
+     horizontal chrome before reducing any label or hit target. */
+  .workspace-canvas:not(.welcome-active) .workbench-header{left:8px;right:8px;padding-left:8px;padding-right:8px;gap:5px;}
+  .workspace-canvas .workspace-tools{gap:4px;}
+  .workspace-canvas .workspace-save{gap:3px;}
 }
 
 /* In compact windows, editor panels overlap canvas chrome. Keep editor

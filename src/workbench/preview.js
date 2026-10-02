@@ -118,6 +118,17 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   return ctl;
 }
 
+/* The full-page preview is a real reader controller. It borrows only the
+   author's current reading position; no authoring option or listeners cross
+   into the new surface. */
+function renderWorkbenchReaderPreview(view,page,skin,authoringCtl){
+  var tabs=activeTabReferences(authoringCtl),snapshot=workbenchPreviewSnapshot(page,authoringCtl);
+  var ctl=renderPage(view,page,skin,null,{autoplay:false});
+  try{restoreActiveTabs(ctl,tabs);restoreWorkbenchPreview(page,ctl,snapshot);}
+  catch(ex){ctl.destroy();throw ex;}
+  return ctl;
+}
+
 /* One owner for preview identity and controlled replacement outcomes. The host
    supplies presentation callbacks; callers never infer a render from DOM mutation. */
 function createWorkbenchPreviewController(opts){

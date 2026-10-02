@@ -1191,11 +1191,11 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
    only the ordinary page renderer and its own controls live on this surface. */
 body.workbench-reader-preview-active{margin:0!important;overflow:auto!important;background:var(--bg);}
 body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-preview-active>#agent-update-banner{display:none!important;}
-.workbench-reader-preview{min-height:100dvh;box-sizing:border-box;padding:76px clamp(12px,3vw,36px) 48px;}
-.workbench-reader-preview>.docview{width:min(1500px,100%);max-width:none;box-sizing:border-box;margin:0 auto;}
+.workbench-reader-preview{min-height:100dvh;box-sizing:border-box;padding:76px 0 48px;}
+.workbench-reader-preview>#workbench-reader{width:100%;max-width:none;box-sizing:border-box;margin:0;border:0;border-radius:0;}
 .workbench-reader-back{position:fixed;left:12px;top:12px;z-index:1000;padding:10px 14px;border:2px solid #fff;border-radius:9px;background:#111827;color:#fff;box-shadow:0 4px 18px #0006;font:700 13px/1.2 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;}
 .workbench-reader-back:hover{background:#312e81;}.workbench-reader-back:focus-visible{outline:3px solid #fbbf24;outline-offset:3px;}
-@media(max-width:560px){.workbench-reader-preview{padding:68px 8px 28px;}.workbench-reader-preview>.docview{padding:15px 10px 22px;border-radius:10px;}.workbench-reader-back{left:8px;top:8px;max-width:calc(100vw - 16px);}}
+@media(max-width:560px){.workbench-reader-preview{padding:68px 0 28px;}.workbench-reader-preview>#workbench-reader{padding:15px 10px 22px;}.workbench-reader-back{left:8px;top:8px;max-width:calc(100vw - 16px);}}
 
 
 .notification-composer{min-width:0;display:grid;gap:10px;}

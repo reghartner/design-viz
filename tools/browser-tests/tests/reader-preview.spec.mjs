@@ -31,7 +31,9 @@ test('read-only page preview is a separate interactive reader and returns withou
   await canvas.evaluate(element=>{element.scrollTop=240;});
   const canvasScroll=await canvas.evaluate(element=>element.scrollTop);
 
+  await page.setViewportSize({width:1800,height:900});
   await page.locator('#workbench-reader-open').click();
+  const surface=page.locator('#workbench-reader-preview');
   const reader=page.locator('#workbench-reader'),back=page.locator('#workbench-reader-back');
   await expect(page.locator('#workbench-workspace')).toBeHidden();
   expect(await workspaceHandle.evaluate(element=>element.isConnected)).toBe(true);
@@ -41,6 +43,11 @@ test('read-only page preview is a separate interactive reader and returns withou
   await expect(page.locator('.workbench-header')).toBeHidden();
   await expect(reader).toBeVisible();await expect(reader).toHaveClass(/sk-terminal/);
   await expect(back).toBeFocused();
+  const desktopBox=await reader.boundingBox();
+  expect(desktopBox.x).toBe(0);expect(desktopBox.width).toBe(1800);
+  await expect(surface).toHaveCSS('padding-left','0px');
+  await expect(reader).toHaveCSS('max-width','none');
+  await expect(reader).toHaveCSS('border-left-width','0px');
   await expect(reader.locator('.path-chip[data-dv-path="happy"]').first()).toHaveAttribute('aria-pressed','true');
   await expect(reader.locator('.stepline').first()).toContainText('Button pressed');
   await expect(reader.locator('.node[data-dv-node="a"]').first()).toHaveClass(/\blit\b/);

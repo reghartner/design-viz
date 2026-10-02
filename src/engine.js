@@ -2644,9 +2644,20 @@ function renderPage(view, page, skin, backlinks, options){
     }
   }
   if (page.title){
+    var heading = document.createElement('div');
+    heading.className = 'doc-heading';
     var h = document.createElement('h2');
     h.className = 'doc-title'; h.textContent = page.title;
-    view.appendChild(h);
+    heading.appendChild(h);
+    var headerBrand = FlowBrand.resolve(FlowBrand.global(), page.brand);
+    var headerBrandHTML = FlowBrand.render(headerBrand, {className:'doc-company-brand-lockup'});
+    if (headerBrandHTML){
+      var brand = document.createElement('div');
+      brand.className = 'doc-company-brand';
+      brand.innerHTML = headerBrandHTML;
+      heading.appendChild(brand);
+    }
+    view.appendChild(heading);
   }
   var provenance = generatedFromHTML(page.generatedFrom);
   if (provenance) view.insertAdjacentHTML('beforeend', provenance);

@@ -74,9 +74,10 @@ resolve safely. Decorative icons need no label; meaningful standalone icons
 need accessible text. Geometry, charts and scene artwork remain panel-owned.
 See [shared icons](shared-icons.md) for IDs, palettes and the full panel review.
 
-`src/icons/brand.js` resolves `diagram.brand` and `panel.brand`; supported panels
-opt in with `authoring.branding: true`. Panel rendering receives the resolved
-brand, including a local `false` suppression. Use `FlowBrand.render` for a
+`src/company-brand.config.js` defines the immutable global fallback.
+`src/icons/brand.js` resolves global → `diagram.brand` → `panel.brand`; supported
+panels opt in with `authoring.branding: true`. Panel rendering receives the
+resolved brand, including diagram and panel `false` suppression. Use `FlowBrand.render` for a
 shared name/mark or `{compact:true}` for a mark-only watermark. Existing Phone
 monograms remain supported. `src/panels/media.js` validates embedded PNG, JPEG
 and WebP assets for images, app screens and company logos; reuse it instead of

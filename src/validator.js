@@ -520,6 +520,7 @@ function validate(page){
   }
   if (page.skin && SKIN_NAMES.indexOf(page.skin) < 0)
     warnings.push('page.skin: unknown skin "' + page.skin + '" — using "' + DEFAULT_SKIN + '" (valid: ' + SKIN_NAMES.join(', ') + ')');
+  FlowBrand.warnings(page.brand, 'page.brand', warnings);
   if (Object.prototype.hasOwnProperty.call(page, 'generatedFrom')){
     var gf = page.generatedFrom;
     if (!gf || typeof gf !== 'object' || Array.isArray(gf)){

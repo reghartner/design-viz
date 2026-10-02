@@ -173,3 +173,18 @@ test('branded phone surfaces, camera watermark and monitoring desk accept the sh
   const p={...app(),brand},h=C.deviceAppPanelHTML(p,{phoneScreen:'home'},false);
   assert.match(h,/da-launcher-icon[^]*?data-icon="house"/);
 });
+
+test('the global fallback renders on all four company-brand surfaces', () => {
+  const brand=C.FlowBrand.effective();
+  assert.deepEqual(plain(brand),{app:'YOUR COMPANY',logo:'YC',accent:'#6750A4',bg:'#6750A4',fg:'#FFFFFF'});
+  const surfaces={
+    deviceapp:render('deviceapp',{brand},{}),
+    phone:render('phone',{brand},{}),
+    screen:render('screen',{brand},{mode:'live'}),
+    security:render('security',{brand},{})
+  };
+  assert.match(surfaces.deviceapp,/fv-brand[^]*?YOUR COMPANY/);
+  assert.match(surfaces.phone,/phonebrand[^]*?YC[^]*?YOUR COMPANY/);
+  assert.match(surfaces.screen,/screen-brand[^]*?YC/);
+  assert.match(surfaces.security,/secmon-desk-brand[^]*?YOUR COMPANY/);
+});

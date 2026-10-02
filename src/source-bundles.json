@@ -15,6 +15,7 @@
     "core/handoffs.js",
     "core/tour-model.js",
     "panels/media.js",
+    "company-brand.config.js",
     "icons/brand.js",
     "panels/shared.js",
     "panels/notifications.js",

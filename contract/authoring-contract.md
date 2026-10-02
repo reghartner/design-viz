@@ -357,8 +357,13 @@ see [the complete library and recipe](../docs/shared-icons.md) for names and
 examples. Existing icon IDs remain valid. Icon choices convey authored meaning;
 they do not create alarm, temperature, charging or availability state.
 
-`diagram.brand` is an optional shared brand object for `phone`, `deviceapp`,
-`screen` and `security` panels:
+Every build has a global company brand from `src/company-brand.config.js`; that
+single source-controlled object supplies the document-header lockup and the
+default for `phone`, `deviceapp`, `screen` and `security` panels. Replace its
+placeholder company name, monogram or embedded raster logo, primary color and
+secondary color to rebrand all outputs. `page.brand` optionally overrides the
+header lockup or hides it with `false`. `diagram.brand` optionally overrides the
+panel default:
 
 ```json
 {"app":"Northstar Home","icon":"house","accent":"#318585"}
@@ -371,13 +376,17 @@ through the workbench also checks a maximum of 4096 × 4096 pixels. Remote URLs
 and authored SVG logos are unsupported. Mark precedence within an object is
 `logoImage`, then `icon`, then `logo`.
 
-Omit `panel.brand` to inherit. `panel.brand:false` suppresses the brand on that
-panel. A partial object overrides shared fields; a valid local mark replaces
-the shared mark even when its format differs. Brand configuration belongs to
-the panel/diagram declaration, not step patches. Select a supported panel and
-open **Inspect → Company branding** to choose **Shared across this diagram**,
+Precedence for panels is global → `diagram.brand` → `panel.brand`.
+`diagram.brand:false` opts the whole diagram out of the global fallback; a
+panel object may still opt a specific panel back in. Omit `panel.brand` to
+inherit. `panel.brand:false` suppresses the brand on that panel. A partial
+object overrides shared fields; a valid local mark replaces the inherited mark
+even when its format differs. Brand configuration belongs to the panel/diagram
+declaration, not step patches. Select a supported panel and open **Inspect →
+Company branding** to choose **Diagram / global brand**,
 **Override for this panel**, or **No brand on this panel**. The shared scope
-edits the diagram's name and mark for all inheriting panels. Camera screens
+previews inherited values without writing them into the spec; editing a field
+saves only that override. Camera screens
 show a compact mark-only watermark; the other supported surfaces can show the
 company name. Existing Phone monograms retain their presentation.
 

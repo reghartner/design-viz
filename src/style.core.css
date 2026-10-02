@@ -3570,7 +3570,7 @@ body.sk-blueprint .sk-daylight .stepmode .node.lit.tone-dim .card{
    every skin's section-box treatment. */
 body.dv-embed{margin:0 !important;}
 body.dv-embed header, body.dv-embed footer,
-body.dv-embed .doc-title, body.dv-embed .doc-sub,
+body.dv-embed .doc-heading, body.dv-embed .doc-sub,
 body.dv-embed .generated-from, body.dv-embed .presentbtn,
 body.dv-embed .tabbar,
 body.dv-embed .doc-sec:not(.dv-embed-target),

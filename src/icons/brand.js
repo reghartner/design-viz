@@ -28,6 +28,26 @@ var FlowBrand = (function () {
     }
     return Object.keys(value).length ? value : null;
   }
+  function fromCompanyConfig(raw) {
+    if (!object(raw)) return null;
+    var logo = raw.logo, embedded = embeddedImageSource(logo);
+    return resolve(null, {
+      app: raw.companyName,
+      logoImage: embedded || undefined,
+      logo: embedded ? undefined : logo,
+      accent: raw.primaryColor,
+      bg: raw.primaryColor,
+      fg: raw.secondaryColor
+    });
+  }
+  var globalBrand = fromCompanyConfig(
+    typeof FLOWVIEW_COMPANY_BRAND_CONFIG === 'undefined' ? null : FLOWVIEW_COMPANY_BRAND_CONFIG
+  );
+  if (globalBrand) Object.freeze(globalBrand);
+  function global() { return globalBrand; }
+  function effective(diagram, panel) {
+    return resolve(resolve(globalBrand, diagram), panel);
+  }
   function warnings(raw, path, out) {
     if (raw == null || raw === false) return;
     if (!object(raw)) { out.push(path + ': expected a brand object or false — ignored'); return; }
@@ -50,5 +70,6 @@ var FlowBrand = (function () {
     return '<span class="fv-brand' + (o.className ? ' ' + esc(o.className) : '') + '"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') + '>' + mark +
       (!o.compact && b.app ? '<span class="fv-brand-name">' + esc(b.app) + '</span>' : '') + '</span>';
   }
-  return Object.freeze({isObject:object,clean:clean, resolve:resolve, warnings:warnings, render:render});
+  return Object.freeze({isObject:object,clean:clean,resolve:resolve,effective:effective,global:global,
+    warnings:warnings,render:render});
 })();

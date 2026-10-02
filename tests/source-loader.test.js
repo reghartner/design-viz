@@ -39,6 +39,10 @@ test('actual entrypoints have unique ordered declarations and deliberate exports
   for(const name of ['standalone','workbench','backend','native','forge','compatibility']){
     const entry=loader.entrypoint(name),files=entry.records.map(record=>record.file);
     assert.equal(new Set(files).size,files.length,name);assert.equal(files.filter(file=>file==='compatibility.js').length,1);
+    if(files.includes('icons/brand.js')){
+      assert.equal(files.filter(file=>file==='company-brand.config.js').length,1,name);
+      assert.ok(files.indexOf('company-brand.config.js')<files.indexOf('icons/brand.js'),name);
+    }
     assert.equal(entry.source.includes('/* @panel-features */'),false,name);
     assert.equal(Object.keys(entry.exports).includes('wireBuilderCommit'),false);
   }

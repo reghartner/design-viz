@@ -1867,6 +1867,43 @@ function documentForm(){
     return rows;
   }
 
+function autoArrangeNodesControl(target){
+    var button=actionButton('Auto arrange nodes',function(){
+      var snapshot=parseEditor(),identity=targetIdentity(),version=session.historyVersion();
+      if(snapshot.error){formError(snapshot.error);return;}
+      if(snapshot.renderedText!==snapshot.text){formError('Render the current source before arranging nodes.');return;}
+      var dialog=document.createElement('dialog');dialog.className='auto-arrange-dialog';
+      var heading=document.createElement('h2');heading.id=prefix+'-arrange-title';heading.textContent='Auto arrange nodes?';
+      var warning=document.createElement('p');warning.id=prefix+'-arrange-warning';
+      warning.textContent='Replace all node positions and manual arrow shapes, bends, pinned ports, label positions and lane routing in this diagram, across every view. Content, connection styles and story steps stay intact. Undo restores the previous settings.';
+      var detail=document.createElement('p');detail.textContent='Creates a top-to-bottom data-flow arrangement with smooth arrows. Section tiles and Home-map placement stay intact. Then drag nodes and shape arrows to refine it. Fewer crossings are the goal; crossings and arrows passing through nodes can still occur.';
+      dialog.setAttribute('aria-labelledby',heading.id);dialog.setAttribute('aria-describedby',warning.id);
+      var life=createWorkbenchLifetime(),release;
+      function close(focus){
+        life.destroy();if(release)release();if(dialog.open)dialog.close();dialog.remove();
+        if(focus && button.isConnected)button.focus({preventScroll:true});
+      }
+      var cancel=document.createElement('button');cancel.className='bbtn';cancel.type='button';cancel.textContent='Cancel';
+      var accept=document.createElement('button');accept.className='bbtn primary';accept.type='button';accept.textContent='Auto arrange';
+      var actions=document.createElement('div');actions.className='iacts';actions.append(cancel,accept);
+      dialog.append(heading,warning,detail,actions);guide.appendChild(dialog);
+      release=formLife.own(function(){close(false);});
+      life.listen(cancel,'click',function(){close(true);});
+      life.listen(dialog,'cancel',function(ev){ev.preventDefault();close(true);});
+      life.listen(accept,'click',function(){
+        var now=parseEditor();
+        if(now.text!==snapshot.text || now.project!==snapshot.project || identity!==targetIdentity() || version!==session.historyVersion()){
+          close(true);formError('The source or selection changed. Open Auto arrange nodes again.');return;
+        }
+        var plan=planAutoArrangeNodes(snapshot.text,snapshot.raw,target.section);
+        close(true);if(plan.error){formError(plan.error);return;}
+        applyPlan(plan,{after:refreshFormSoon},snapshot);
+      });
+      dialog.showModal();cancel.focus();
+    });
+    return button;
+  }
+
 function sectionForm(val, ctx){
     ensureAccentDatalist();
     var target=session.target;
@@ -1888,6 +1925,7 @@ function sectionForm(val, ctx){
       help.textContent='Lanes reserve tracks for connections between rows. Requires 1–5 unstacked nodes per row, no floats or self-loops. Applies to every view of this diagram; story lane labels are separate.';
       help.textContent+=' Unsupported layouts use curves.';
       routingRows.push(frow('Edge routing',routing),help);
+      routingRows.push(autoArrangeNodesControl(target));
       routingRows.push(storyTimeGroup(ctx.diagram,target));
     }
     if(builderTargetPath(parseEditor().raw,target).length===0)return routingRows;

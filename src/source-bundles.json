@@ -51,6 +51,8 @@
     "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",
     "workbench/commands/layout.js",
+    "vendor/dagre/dagre.min.js",
+    "workbench/commands/auto-arrange.js",
     "workbench/persistence.js",
     "workbench/session.js",
     "workbench/field-values.js",

@@ -72,3 +72,14 @@ bottom row."
 `side: "below"` floats sit under the last row; `dy: -60` raises the float
 60 px into the inter-row gap. Validate; the float-overlap spacing is
 recomputed automatically (`dx` shifts sideways the same way).
+
+### Start with Auto arrange nodes
+
+Select the diagram’s section heading, then **Inspect → Auto arrange nodes**.
+The confirmation resets node placement, manual curves/bends, pinned ports, label
+positions and lane routing across every view of that diagram. Cancel preserves
+the source; one Undo restores it exactly. The layout keeps groups together and
+uses positioned floats with smooth arrows. Use it first, then drag nodes and
+shape arrows; it reduces crossings heuristically and does not guarantee clear
+paths. It never runs automatically on load or after edits. The bounded editor
+action supports at most 150 nodes, 150 groups, 500 connections and 20 group levels.

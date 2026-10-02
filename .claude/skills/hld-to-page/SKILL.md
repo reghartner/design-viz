@@ -327,6 +327,11 @@ Confluence, named views, free placement). For manually shaped arrows, use
 `edges[].curvePoints` from the authoring contract and `cookbook/adjustments.md`:
 these are smooth through-points that override automatic routing. The workbench
 can author them by dragging the arrow; check the rendered curve for collisions.
+The section inspector also offers **Auto arrange nodes**: a warned, one-shot
+top-to-bottom starting layout. It replaces positions and manual edge geometry
+across that diagram’s views, preserving content and steps; one Undo restores the
+prior source. Refine its ordinary free-placement nodes and smooth arrows
+afterward; crossings and edge/node intersections are still possible.
 
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths

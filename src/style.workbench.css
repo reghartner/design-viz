@@ -1375,3 +1375,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 
 .panel-collection-item{padding:10px;border:1px solid var(--line);border-radius:8px;margin:8px 0;min-width:0;}
 .panel-collection-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;}
+.auto-arrange-dialog{box-sizing:border-box;width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);font:14px/1.6 system-ui,sans-serif;}
+.auto-arrange-dialog::backdrop{background:#07111c99;}
+.auto-arrange-dialog h2{margin:0 0 12px;font-size:21px;}
+.auto-arrange-dialog .iacts{justify-content:flex-end;margin-top:20px;gap:10px;}

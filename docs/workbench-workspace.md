@@ -117,8 +117,14 @@ In the contained view, panning and zooming also save the opening camera.
 **Arrange section** exposes the page arrangement and saved view settings;
 **Canvas appearance** offers host-width previews.
 
-**Add to diagram**, **Undo**, **Redo**, **User guide**, and **Save** share the
-project toolbar above the workspace. The
+**Add to diagram**, **Undo**, **Redo**, **Preview read-only page**, **User guide**,
+and **Download JSON** share the project toolbar above the workspace. **Preview
+read-only page** opens the current usable document in a separate reader surface,
+using the active skin and keeping the selected tab, Chapter, path, view, and step
+where possible. Editor tools and layout-authoring handles are unavailable there;
+reader navigation and playback remain interactive without changing the JSON.
+The fixed **← Back to workbench** button stays visible while the page scrolls and
+returns to the same workbench draft, focus, and canvas position. The
 **Section** selector names the destination section, including its tab when applicable.
 Selecting a section in the preview updates this selector; choosing a destination
 here opens its tab and selects that section without switching editor tools.

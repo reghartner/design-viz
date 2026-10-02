@@ -1172,6 +1172,16 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-heading{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
 
+/* Reader preview is deliberately outside #docview and the editable workspace:
+   only the ordinary page renderer and its own controls live on this surface. */
+body.workbench-reader-preview-active{margin:0!important;overflow:auto!important;background:var(--bg);}
+body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-preview-active>#agent-update-banner{display:none!important;}
+.workbench-reader-preview{min-height:100dvh;box-sizing:border-box;padding:76px clamp(12px,3vw,36px) 48px;}
+.workbench-reader-preview>.docview{width:min(1500px,100%);max-width:none;box-sizing:border-box;margin:0 auto;}
+.workbench-reader-back{position:fixed;left:12px;top:12px;z-index:1000;padding:10px 14px;border:2px solid #fff;border-radius:9px;background:#111827;color:#fff;box-shadow:0 4px 18px #0006;font:700 13px/1.2 'IBM Plex Sans',system-ui,sans-serif;cursor:pointer;}
+.workbench-reader-back:hover{background:#312e81;}.workbench-reader-back:focus-visible{outline:3px solid #fbbf24;outline-offset:3px;}
+@media(max-width:560px){.workbench-reader-preview{padding:68px 8px 28px;}.workbench-reader-preview>.docview{padding:15px 10px 22px;border-radius:10px;}.workbench-reader-back{left:8px;top:8px;max-width:calc(100vw - 16px);}}
+
 
 .notification-composer{min-width:0;display:grid;gap:10px;}
 .notification-editor{min-width:0;margin:0;padding:10px;border:1px solid var(--wline,#d5ddef);border-radius:10px;}
@@ -1358,6 +1368,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
+  .workspace-canvas #workbench-reader-open{max-width:92px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
   .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
 }
 

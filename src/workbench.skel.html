@@ -23,7 +23,7 @@
     </div>
     <button type="button" class="bbtn" id="auto-arrange" aria-haspopup="dialog">Auto arrange</button>
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Download JSON</button></div>
+    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button class="bbtn" type="button" id="workbench-reader-open">Preview read-only page</button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" title="Download the current story as an editable JSON file">Download JSON</button></div>
   </div>
 </header>
 <section id="agent-update-banner" class="agent-update-banner" role="status" hidden><div><strong id="agent-update-banner-title">Agent updates are ready</strong><p id="agent-update-banner-summary"></p></div><button type="button" class="rbtn" id="agent-update-open">Preview Agent Updates</button></section>
@@ -443,6 +443,11 @@
   </div>
 
   </div>
+
+  <section id="workbench-reader-preview" class="workbench-reader-preview" aria-label="Read-only page preview" hidden>
+    <button type="button" id="workbench-reader-back" class="workbench-reader-back">← Back to workbench</button>
+    <div id="workbench-reader" class="docview" aria-label="Read-only rendered documentation page"></div>
+  </section>
 </main>
 
 

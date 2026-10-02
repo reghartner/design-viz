@@ -22,6 +22,49 @@ function workspacePanelRect(rect,width,height){
   return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
     y:Math.max(top,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
+
+/* A reader preview is a second renderer, not an authoring canvas with its
+   controls hidden. Keeping the editable workspace hidden also makes every
+   document-level authoring shortcut respect the builder's isActive guard. */
+function initWorkbenchReaderPreview(opts){
+  var open=document.getElementById('workbench-reader-open'),back=document.getElementById('workbench-reader-back');
+  var surface=document.getElementById('workbench-reader-preview'),view=document.getElementById('workbench-reader');
+  var workspace=document.getElementById('workbench-workspace'),header=document.querySelector('.workbench-header');
+  if(!open || !back || !surface || !view || !workspace || !header)return null;
+  var ctl=null,state=null;
+  function active(){return !!state;}
+  function show(){
+    if(state)return;
+    var page=opts.page(),authoring=opts.controller();
+    if(!page || !authoring)return;
+    var canvas=document.getElementById('workspace-canvas'),focused=document.activeElement;
+    state={focused:focused,windowX:window.scrollX,windowY:window.scrollY,
+      canvasX:canvas?canvas.scrollLeft:0,canvasY:canvas?canvas.scrollTop:0,
+      headerHidden:header.hidden,workspaceHidden:workspace.hidden};
+    var skin=opts.skin(page);
+    header.hidden=true;workspace.hidden=true;surface.hidden=false;
+    document.body.classList.add('workbench-reader-preview-active');
+    try{
+      ctl=opts.render(view,page,skin,authoring);
+    }catch(ex){
+      surface.hidden=true;header.hidden=state.headerHidden;workspace.hidden=state.workspaceHidden;
+      document.body.classList.remove('workbench-reader-preview-active');state=null;view.replaceChildren();throw ex;
+    }
+    window.scrollTo(0,0);back.focus({preventScroll:true});
+  }
+  function hide(){
+    if(!state)return;
+    var restore=state,canvas=document.getElementById('workspace-canvas');state=null;
+    if(ctl)ctl.destroy();ctl=null;view.replaceChildren();surface.hidden=true;
+    header.hidden=restore.headerHidden;workspace.hidden=restore.workspaceHidden;
+    document.body.classList.remove('workbench-reader-preview-active');
+    if(canvas){canvas.scrollLeft=restore.canvasX;canvas.scrollTop=restore.canvasY;}
+    window.scrollTo(restore.windowX,restore.windowY);
+    if(restore.focused && restore.focused.isConnected)restore.focused.focus({preventScroll:true});
+  }
+  open.addEventListener('click',show);back.addEventListener('click',hide);
+  return {active:active,show:show,hide:hide};
+}
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;

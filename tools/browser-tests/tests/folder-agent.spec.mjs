@@ -596,20 +596,33 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the service in Explore');
     await page.locator('#agent-update-open').click();
     const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage');
-    async function contained(){
+    async function contained(supporting=true){
       await expect(stage).toBeVisible();
       const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox();
       expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
       expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
       expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
       expect(canvas.height).toBeGreaterThan(200);
-      for(const id of ['close','current','proposed','commit','ledger-summary']){
+      for(const id of ['close','current','proposed','commit'].concat(supporting?['ledger-summary']:[])){
         await expect(page.locator('#agent-update-'+id)).toBeInViewport();
         await page.locator('#agent-update-'+id).click({trial:true});
       }
     }
     await page.screenshot({path:info.outputPath('explore-review.png')});await contained();
     await expect(view.locator('[data-dv-node="b"]')).toContainText('Delivery service');
+    await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
+    await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
+    await expect(page.locator('#agent-update-highlights')).toHaveAttribute('aria-pressed','true');
+    await page.locator('#agent-update-highlights').click();await expect(view).not.toHaveAttribute('data-agent-highlights','');
+    await expect(view.locator('[data-dv-node="b"]')).not.toHaveAttribute('data-agent-change');
+    await page.locator('#agent-update-highlights').click();await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
+    const standardStage=await stage.boundingBox();await page.locator('#agent-update-immersive').click();
+    await expect(page.locator('#agent-update-dialog')).toHaveClass(/agent-update-immersive/);
+    const fullDialog=await page.locator('#agent-update-dialog').boundingBox(),viewport=page.viewportSize();
+    expect(fullDialog).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});await expect(page.locator('#agent-update-note')).toBeHidden();
+    await expect.poll(async()=> (await stage.boundingBox()).height).toBeGreaterThan(standardStage.height);
+    for(const id of ['close','current','proposed','highlights','immersive','discard','commit'])await expect(page.locator('#agent-update-'+id)).toBeInViewport();
+    await contained(false);await page.locator('#agent-update-immersive').click();await expect(page.locator('#agent-update-dialog')).not.toHaveClass(/agent-update-immersive/);
     await view.locator('.explore-legend-menu>summary').click();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeVisible();
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
@@ -628,6 +641,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await page.locator('#agent-update-ledger-summary').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
     await contained();expect((await stage.boundingBox()).height).toBeLessThan(collapsed.height);
     await page.locator('#agent-update-current').click();await expect(view.locator('[data-dv-node="b"]')).toContainText('Backend');
+    await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
     await expect(page.locator('#agent-update-commit')).toBeDisabled();
     await page.locator('#agent-update-proposed').click();await contained();
     await page.locator('#agent-update-ledger-summary').click();

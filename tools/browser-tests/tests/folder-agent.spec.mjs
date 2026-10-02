@@ -73,6 +73,13 @@ async function openAgent(page){
   if(!await page.locator('#editor-agent').isVisible())await page.locator('#editor-tab-agent').click();
   await closeGuide(page);
 }
+async function expectWorkbenchCanvas(page){
+  const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
+  const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
+  const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
+  expect(shell).toEqual({x:84,y:104,width:viewport.width-96,height:viewport.height-116});
+  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
+}
 async function copyRequest(page,text){
   await openAgent(page);
   await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();
@@ -408,7 +415,7 @@ test('diagram itself fills the browser and pans and zooms without editing source
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
     const canvas=page.locator('.workspace-active-section .explore-board');
-    expect(await canvas.boundingBox()).toEqual({x:0,y:0,...page.viewportSize()});
+    await expectWorkbenchCanvas(page);
     await expect(page.locator('#docview .doc-title')).toBeHidden();
     const position=()=>canvas.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
     const before=await position(),node=page.locator('[data-dv-node="a"]').first(),n=await node.boundingBox();
@@ -458,8 +465,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
     await page.locator('#workspace-fit').click();
     await page.locator('#diagram-add-target').selectOption('1');
-    const other=page.locator('.workspace-active-section .explore-board');
-    expect(await other.boundingBox()).toEqual({x:0,y:0,...page.viewportSize()});
+    await expectWorkbenchCanvas(page);
     await expect(page.locator('[data-dv-node="customer"]')).toBeInViewport();
     await expect(page.locator('[data-dv-node="a"]')).toBeHidden();
     await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();

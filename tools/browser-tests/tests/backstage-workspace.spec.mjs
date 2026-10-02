@@ -11,8 +11,9 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Explore alpha',exact:true});
   await expect(dialog).toBeVisible();
-  const box=await dialog.locator('.explore-board').boundingBox();
-  expect(box.x).toBe(0);expect(box.y).toBe(0);expect(box.width).toBe(1600);expect(box.height).toBe(1000);
+  const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),nav=await dialog.locator('.explore-navigation').boundingBox();
+  const stage=await dialog.locator('.explore-stage').boundingBox(),board=await dialog.locator('.explore-board').boundingBox();
+  expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
   expect(await dialog.locator('[data-flowview-native]').evaluate((node,previous)=>node===previous,original)).toBe(true);
   await expect(dialog.locator('.preadout')).toHaveText('Success');
   await expect(dialog.locator('[data-view-id]')).toHaveAttribute('data-view-id','brief');

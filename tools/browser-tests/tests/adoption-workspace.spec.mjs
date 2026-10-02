@@ -55,16 +55,23 @@ test('invalid authored graphs cannot be packaged as a successful viewable handof
   await expect(page.locator('.story-brief-status')).toContainText('Repair the story');await expect(page.locator('.story-brief-status')).toContainText('missing');expect(downloads).toHaveLength(0);
 });
 
-test('compact chrome keeps Add, appearance and workspace controls independently reachable',async({page,server})=>{
+test('compact chrome keeps Add, Auto arrange, appearance and workspace controls independently reachable',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
-  for(const width of [1050,850,720,640,390]){
-    await page.setViewportSize({width,height:800});
-    const controls=await page.evaluate(()=>['diagram-add','file-save','editor-tab-agent'].map(id=>{
-      const node=document.getElementById(id),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
-      return {id,inside:r.left>=0 && r.right<=innerWidth,reachable:hit===node || node.contains(hit)};
+  for(const [width,height] of [[1800,800],[1050,800],[850,800],[720,800],[640,800],[390,800],[390,360]]){
+    await page.setViewportSize({width,height});
+    const controls=await page.evaluate(()=>['#diagram-add','#auto-arrange','#file-save','.workspace-save>[data-workbench-tour]','#undo-builder','#redo-builder','#diagram-add-target','#workspace-appearance>summary','#editor-tab-agent'].map(selector=>{
+      const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+      return {selector,inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};
     }));
-    for(const control of controls)expect(control,JSON.stringify(control)+' at '+width+'px').toMatchObject({inside:true,reachable:true});
+    for(const control of controls)expect(control,JSON.stringify(control)+' at '+width+'×'+height+'px').toMatchObject({inside:true,reachable:true});
+    await expect(page.locator('.workspace-save>[data-workbench-tour]')).toHaveAccessibleName('Take the workbench tour');
     await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeVisible();await page.keyboard.press('Escape');
+    if(width===390){
+      const before=await page.locator('#src').inputValue();
+      await page.locator('#auto-arrange').click();await expect(page.locator('#auto-arrange-dialog')).toBeVisible();
+      await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();
+      await expect(page.locator('#src')).toHaveValue(before);
+    }
     await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#sk-pastel')).toBeVisible();
     await page.locator('#workspace-appearance>summary').click();await arrangeEditor(page,'present');
   }

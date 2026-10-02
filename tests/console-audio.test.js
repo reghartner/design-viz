@@ -79,7 +79,7 @@ test('transient and branch-local audio facts do not leak across paths or overwri
 
 test('screen shows actual emission, capture, detection and spotlight independently of working video', () => {
   const p=panel('screen');
-  for (const output of ['speech','recorded','chime','siren']) {
+  for (const output of ['speech','recorded','chime']) {
     const h=html(p,{mode:'live',audio:{output,text:'Please use the other door'},spotlight:'flash'});
     assert.ok(h.includes(C.SCENES[p.scene]));
     assert.match(h,new RegExp('fva-sound-'+output));
@@ -98,6 +98,26 @@ test('screen shows actual emission, capture, detection and spotlight independent
   assert.doesNotMatch(heard,/fva-emission/);
   const hostile=html(p,{mode:'live',audio:{output:'speech',text:'<img src=x>',source:'<script>',reason:'<b>'}});
   assert.match(hostile,/&lt;img/);assert.doesNotMatch(hostile,/<img|<script>|<b>/);
+});
+
+test('screen hides below-camera audio text for alarms while preserving visual effects and ordinary conversation', () => {
+  const p=panel('screen'), alarmText=/screen-audio-direction|class="fva-audio|Camera audio|Emergency audio/;
+  const conversation=html(p,{mode:'live',audio:{output:'speech',microphone:'capturing',text:'Use the side door'}});
+  assert.match(conversation,/Camera speaker and microphone active/);
+  assert.match(conversation,/Use the side door/);
+  for(const audio of [
+    {output:'siren',playback:'playing',text:'Emergency audio'},
+    {output:'siren',playback:'queued',text:'Emergency audio'},
+    {output:'siren',playback:'suppressed',text:'Emergency audio'},
+    {output:'siren',playback:'failed',text:'Emergency audio'},
+    {output:'siren',playback:'stopped',text:'Emergency audio'},
+    {microphone:'capturing',detection:'smoke-alarm',text:'Emergency audio'},
+    {microphone:'capturing',detection:'co-alarm',text:'Emergency audio'}
+  ]) assert.doesNotMatch(html(p,{mode:'live',audio}),alarmText);
+  const independent=html(p,{mode:'live',audio:{output:'speech',microphone:'capturing',text:'Emergency audio'},spotlight:'flash',siren:'on'});
+  assert.doesNotMatch(independent,alarmText);
+  assert.match(independent,/screen-siren"/);assert.match(independent,/Alarm sounding/);assert.match(independent,/fva-sound-siren/);
+  assert.match(independent,/screen-camera-device/);assert.match(independent,/screen-spotlight-flash/);assert.match(independent,/fva-sound-speech/);
 });
 
 test('security maps capture to operator speech and output to listening without changing the camera endpoint', () => {
@@ -156,10 +176,14 @@ test('an independent alarm coexists with two-way talk and light on both consoles
       assert.deepEqual(plain(state.audio),audio);assert.equal(state.spotlight,'on');
       const markup=html(p,state);
       assert.match(markup,/Spotlight on/);
-      assert.match(markup,type==='screen'?/Camera speaker and microphone active/:/Speaking and hearing remote audio/);
       if(state.siren==='on'){
         assert.match(markup,/screen-siren"/);assert.match(markup,/Alarm sounding/);assert.match(markup,/fva-sound-siren/);
-      }else assert.doesNotMatch(markup,/screen-siren"|Alarm sounding|fva-sound-siren/);
+        if(type==='screen')assert.doesNotMatch(markup,/Camera speaker and microphone active|class="fva-audio/);
+        else assert.match(markup,/Speaking and hearing remote audio/);
+      }else{
+        assert.doesNotMatch(markup,/screen-siren"|Alarm sounding|fva-sound-siren/);
+        assert.match(markup,type==='screen'?/Camera speaker and microphone active/:/Speaking and hearing remote audio/);
+      }
     }
     assert.ok(C.validate(C.normalize(d)).warnings.some(w=>w.includes('.siren:')));
     assert.equal(JSON.stringify(d),original);

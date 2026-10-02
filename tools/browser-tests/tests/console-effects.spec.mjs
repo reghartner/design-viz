@@ -18,7 +18,7 @@ for(const motion of ['no-preference','reduce'])test('console effects coexist and
   await expect(page.locator('.screen-siren-label')).toHaveCount(2);
   await expect(page.locator('.screen-light-label')).toHaveCount(2);
   await expect(page.locator('.secmon-audio-speaking.secmon-audio-listening')).toHaveCount(1);
-  await expect(page.locator('.pt-screen .screen-audio-direction')).toHaveText('Camera speaker and microphone active');
+  await expect(page.locator('.screen-audio-direction, .screen-audio-slot .fva-audio')).toHaveCount(0);
   for(const label of await page.locator('.screen-siren-label, .screen-light-label').all())await expect(label).toBeVisible();
   for(const box of await screens.all()){
     await expect(box.locator('.scene')).toHaveAttribute('data-preserved','yes');
@@ -37,4 +37,9 @@ for(const motion of ['no-preference','reduce'])test('console effects coexist and
   await jump('talk');
   await expect(page.locator('.screen-siren-label, .screen-light-label')).toHaveCount(0);
   await expect(page.locator('.secmon-audio-speaking.secmon-audio-listening')).toHaveCount(1);
+  await expect(page.locator('.pt-screen .screen-audio-direction')).toHaveText('Camera speaker and microphone active');
+  for(const box of await screens.all())await expect(box.locator('.scene')).toHaveAttribute('data-preserved','yes');
+  await jump('alarm');
+  await expect(page.locator('.screen-audio-direction, .screen-audio-slot .fva-audio')).toHaveCount(0);
+  for(const box of await screens.all())await expect(box.locator('.scene')).toHaveAttribute('data-preserved','yes');
 });

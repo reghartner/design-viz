@@ -54,6 +54,11 @@ labels distinguish states without relying on color. Queued, suppressed, failed a
 assessment and dispatch remain independently authored. Static/reduced-motion
 and print retain the state without animated pulses.
 
+Camera screens omit the audio text strip below the video while their alarm siren
+is on, their audio output is a siren, or they classify a smoke or CO alarm. The
+in-screen sound, siren and spotlight effects remain visible. Ordinary speech and
+other sound captions return when the alarm state clears.
+
 ## A complete conversation beat
 
 The fragment below is a per-step patch, not a complete spec. The phone microphone

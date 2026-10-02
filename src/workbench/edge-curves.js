@@ -47,7 +47,7 @@ function createEdgeCurveEditor(opts){
   function consumeClick(){suppress=true;life.delay(function(){suppress=false;},0);}
   function save(c,points,focus){
     if(!fresh(c)){opts.message('The source changed. Curve edit cancelled.');return;}
-    var plan=planEdgeCurve(c.snapshot.text,c.snapshot.raw,c.section,c.index,points);
+    var plan=planEdgeCurve(c.snapshot.text,c.snapshot.raw,c.section,c.index,points,hasCubicCurve(c.edge));
     if(plan.error){opts.message(plan.error);return;}
     opts.commit(plan,c.snapshot,c.section,c.index);
     if(focus!=null && chrome){
@@ -56,12 +56,13 @@ function createEdgeCurveEditor(opts){
     }
   }
   function insertAt(c,p){
-    var points=hasEdgeCurve(c.edge)?builderClone(c.edge.curvePoints):[],segments=edgeCurveSegments(c.edge,c.L);
+    var points=hasEdgeCurve(c.edge)?builderClone(edgeCurveData(c.edge)):[],segments=edgeCurveSegments(c.edge,c.L);
     var paths=segments.length?segments.map(function(s){return 'M '+s[0].x+' '+s[0].y+' C '+s[1].x+' '+s[1].y+' '+s[2].x+' '+s[2].y+' '+s[3].x+' '+s[3].y;}):[c.el.getAttribute('d')];
     var best=Infinity,index=0,fraction=.5;
     paths.forEach(function(d,i){var samples=samplePathD(d);samples.forEach(function(q,j){
       var distance=Math.hypot(q.x-p.x,q.y-p.y);if(distance<best){best=distance;index=i;fraction=j/(samples.length-1);}
     });});
+    if(hasCubicCurve(c.edge))return splitEdgeCubic(c.edge,c.L,index,fraction);
     var left=index?points[index-1].t:0,right=index<points.length?points[index].t:1;
     var t=left+(right-left)*fraction;
     points.splice(index,0,edgeCurvePoint(c.edge,c.L,p,t));return {points:points,index:index};
@@ -94,8 +95,8 @@ function createEdgeCurveEditor(opts){
     if(selected!==el)opts.select(el,c.section,c.index);
     opts.pause();
     if(handle!=null && target.focus)target.focus({preventScroll:true});
-    var edit=handle!=null && handle>=0?{points:builderClone(c.edge.curvePoints),index:handle}:insertAt(c,p);
-    if(edit.points.length>32){opts.message('This arrow already has 32 curve points. Move or remove an existing point.');return;}
+    var edit=handle!=null && handle>=0?{points:builderClone(edgeCurveData(c.edge)),index:handle}:insertAt(c,p);
+    if(edit.points.length>(hasCubicCurve(c.edge)?95:32)){opts.message('This arrow has reached its curve point limit. Move or remove an existing point.');return;}
     gesture={c:c,points:edit.points,index:edit.index,start:p,x:ev.clientX,y:ev.clientY,moved:false,
       pointerId:ev.pointerId,capture:handle!=null?target:c.svg};
     // Existing handles remain mounted; a first selection uses the stable SVG.
@@ -106,12 +107,13 @@ function createEdgeCurveEditor(opts){
     if(!fresh(g.c)){cancel();opts.message('The source changed. Curve edit cancelled.');return;}
     if(Math.hypot(ev.clientX-g.x,ev.clientY-g.y)>3)g.moved=true;
     if(!g.moved)return;var p=pointer(g.c,ev);if(!p)return;
-    g.points[g.index]=edgeCurvePoint(g.c.edge,g.c.L,p,g.points[g.index].t);
-    if(!validCurvePoints(g.points)){cancel();opts.message('Curve point is outside the supported canvas.');return;}
+    moveEdgeCurvePoint(g.c.edge,g.points,g.index,edgeCurvePoint(g.c.edge,g.c.L,p,g.points[g.index].t));
+    if(!(hasCubicCurve(g.c.edge)?validCurveControls(g.points):validCurvePoints(g.points))){cancel();opts.message('Curve point is outside the supported canvas.');return;}
     if(!g.ghost){g.ghost=g.c.el.cloneNode(false);g.ghost.removeAttribute('id');g.ghost.removeAttribute('data-dv-edge');
       g.ghost.setAttribute('class','edge dv-free-edge-preview');g.c.svg.appendChild(g.ghost);g.c.el.classList.add('dv-free-edge-source');}
     if(chrome)chrome.setAttribute('visibility','hidden');
-    g.ghost.setAttribute('d',edgePath(Object.assign({},g.c.edge,{curvePoints:g.points}),g.c.L));
+    var shaped=Object.assign({},g.c.edge);shaped[hasCubicCurve(shaped)?'curveControls':'curvePoints']=g.points;
+    g.ghost.setAttribute('d',edgePath(shaped,g.c.L));
     ev.preventDefault();
   });
   life.listen(window,'pointerup',function(ev){
@@ -124,21 +126,21 @@ function createEdgeCurveEditor(opts){
   life.listen(view,'keydown',function(ev){
     var handle=ev.target.closest && ev.target.closest('[data-curve-point]');if(!handle)return;
     var c=context(selected);if(!c || opts.disabled())return;
-    var index=Number(handle.getAttribute('data-curve-point')),points=hasEdgeCurve(c.edge)?builderClone(c.edge.curvePoints):[];
+    var index=Number(handle.getAttribute('data-curve-point')),points=hasEdgeCurve(c.edge)?builderClone(edgeCurveData(c.edge)):[];
     var arrows={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]};
     if(ev.key==='Delete' || ev.key==='Backspace'){
-      ev.preventDefault();ev.stopImmediatePropagation();if(index<0)return;points.splice(index,1);save(c,points,Math.min(index,points.length-1));return;
+      ev.preventDefault();ev.stopImmediatePropagation();if(index<0)return;points=removeEdgeCurvePoint(c.edge,points,index);save(c,points,Math.min(index,points.length-1));return;
     }
     if(!arrows[ev.key])return;
     ev.preventDefault();ev.stopImmediatePropagation();
     if(index<0){var mid=c.el.getPointAtLength(c.el.getTotalLength()/2);points=[edgeCurvePoint(c.edge,c.L,mid,.5)];index=0;}
-    var delta=arrows[ev.key],step=ev.shiftKey?1:10;points[index].dx+=delta[0]*step;points[index].dy+=delta[1]*step;
+    var delta=arrows[ev.key],step=ev.shiftKey?1:10;moveEdgeCurvePoint(c.edge,points,index,Object.assign({},points[index],{dx:points[index].dx+delta[0]*step,dy:points[index].dy+delta[1]*step}));
     save(c,points,index);
   },true);
   life.listen(view,'dblclick',function(ev){
     var handle=ev.target.closest && ev.target.closest('[data-curve-point]');if(!handle || opts.disabled())return;
     var c=context(selected),index=Number(handle.getAttribute('data-curve-point'));if(!c || index<0)return;
-    ev.preventDefault();ev.stopImmediatePropagation();var points=builderClone(c.edge.curvePoints);points.splice(index,1);save(c,points);
+    ev.preventDefault();ev.stopImmediatePropagation();var points=builderClone(edgeCurveData(c.edge));points=removeEdgeCurvePoint(c.edge,points,index);save(c,points);
   },true);
   life.listen(window,'keydown',function(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopImmediatePropagation();cancel();}},true);
   life.listen(window,'blur',cancel);life.listen(window,'pointercancel',cancel);

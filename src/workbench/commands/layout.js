@@ -1,12 +1,13 @@
 /* Pure authored placement, layout and named-view commands. Measured boxes
    are inputs; DOM measurements and pointer lifetimes belong to controllers. */
 
-function planEdgeCurve(text,raw,sectionIdx,index,points){
+function planEdgeCurve(text,raw,sectionIdx,index,points,cubic){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   if(!got.d.edges || !got.d.edges[index])return {error:'Connection not found.'};
-  if(!validCurvePoints(points))return {error:'Use up to 32 curve points with finite coordinates.'};
+  if(!(cubic && Array.isArray(points) && points.length?validCurveControls(points):validCurvePoints(points)))return {error:'Use up to 32 curve points with finite coordinates.'};
   return planSetFields(text,raw,got.path.concat(['edges',index]),[
-    ['curvePoints',points.length?JSON.stringify(points):null],['bend',null]
+    ['curvePoints',!cubic && points.length?JSON.stringify(points):null],
+    ['curveControls',cubic && points.length?JSON.stringify(points):null],['bend',null]
   ]);
 }
 
@@ -582,4 +583,22 @@ function sectionLayoutDetachSteps(d,items){
   diagram.h=Math.max(3,diagram.h-height);
   next.push({controls:'steps',x:diagram.x,y:diagram.y+diagram.h,w:diagram.w,h:height});
   return sectionLayoutPack(next,'steps');
+}
+
+function planAutoArrange(text,raw,section,result){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  try{
+    var ids=autoArrangeInput(got.d);
+    if(!result || !Array.isArray(result.positions) || result.positions.length!==ids.length ||
+      !Array.isArray(result.edges) || result.edges.length!==(got.d.edges || []).length ||
+      new Set(result.positions.map(function(p){return p.id;})).size!==ids.length ||
+      result.positions.some(function(p){return ids.indexOf(p.id)<0 || !floatCoordinate(p.x) || !floatCoordinate(p.y);}) ||
+      result.edges.some(function(e){return !e || !validCurveControls(e.curveControls) || !validEdgePort(e.fromPort) || !validEdgePort(e.toPort) ||
+        ['labelDx','labelDy'].some(function(k){return e[k]!=null && !floatCoordinate(e[k]);});}))
+      return {error:'The layout returned invalid geometry. The source is unchanged.'};
+    // Only a fixed geometry allowlist crosses the worker/transaction boundary.
+    var clean={positions:result.positions,edges:result.edges.map(function(e){var out={};
+      ['curveControls','fromPort','toPort','labelDx','labelDy'].forEach(function(k){if(e[k]!=null)out[k]=e[k];});return out;})};
+    return planReplaceValue(text,raw,got.path,JSON.stringify(autoArrangeDiagram(got.d,clean),null,2));
+  }catch(error){return {error:error.message};}
 }

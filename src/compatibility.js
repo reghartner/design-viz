@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'layout.cubic-curves':['Editable native cubic arrow routes','0.2.0'],
     'layout.edge-curves':['Editable smooth arrow curves','0.2.0'],
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
     'media.screen-playing':['Camera screen Playing mode for recorded-clip playback','0.2.0'],
@@ -63,6 +64,7 @@ var FlowviewCompatibility = (function(){
       icons(d,false);
       if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
+      if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && Array.isArray(e.curveControls) && e.curveControls.length;}))used['layout.cubic-curves']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && Array.isArray(e.curvePoints) && e.curvePoints.length;}))used['layout.edge-curves']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff;}))used['flow.handoff']=true;
       if(Object.values(d.nodes || {}).some(function(n){return n && n.handoff && n.handoff.localSection!=null;}))used['flow.local-handoff']=true;

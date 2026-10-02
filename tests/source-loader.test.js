@@ -22,7 +22,7 @@ test('logical expansion, named composition and CLI share order, physical feature
   assert.equal(context.FEATURES['panel.probe'].label,'Probe panel');assert.equal(context.first,1);assert.equal(context.second,2);
   assert.equal(entry.source.includes('/* @panel-features */'),false);
   const real=loader.entrypoint('workbench');
-  const cli=JSON.parse(execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),'--entrypoint','workbench'],{encoding:'utf8',maxBuffer:8*1024*1024}));
+  const cli=JSON.parse(execFileSync(process.execPath,[path.join(root,'tools/source-loader.cjs'),'--entrypoint','workbench'],{encoding:'utf8',maxBuffer:32*1024*1024}));
   assert.deepEqual(cli,real);assert.ok(real.body.includes('function createBuilderInteractions('));
   assert.equal(real.records.at(-1).file,'boot.workbench.js');
 });

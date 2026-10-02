@@ -22,6 +22,12 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     if (seen.has(file)) throw new Error('Duplicate physical source: ' + file);
     seen.add(file);
     let source = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
+    if (file === 'workbench/auto-arrange.js' && substitute) {
+      const files = manifest(root).assets.autoArrangeWorker;
+      const notices = manifest(root).assets.autoArrangeNotices.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n\n');
+      const worker = '/*\n' + notices.replace(/\*\//g, '* /') + '\n*/\n' + files.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
+      source = source.replace('/* @auto-arrange-worker */ ""', () => JSON.stringify(worker).replace(/</g, '\\u003c'));
+    }
     if (file === 'compatibility.js' && substitute) {
       const marker = '/* @panel-features */ {}';
       if (!source.includes(marker)) throw new Error('Missing panel feature marker: ' + file);

@@ -17,11 +17,19 @@ function validCurvePoints(points){
     return p && Number.isFinite(p.t) && p.t>=0 && p.t<=1 && floatCoordinate(p.dx) && floatCoordinate(p.dy);
   });
 }
-function hasEdgeCurve(e){return validCurvePoints(e.curvePoints) && e.curvePoints.length>0;}
+/* Native cubic routes store control/control/join, control/control/join, ...,
+   control/control. Endpoints always come from the card ports. */
+function validCurveControls(points){
+  return Array.isArray(points) && points.length>=2 && points.length<=95 && points.length%3===2 &&
+    points.every(function(p){return p && Number.isFinite(p.t) && p.t>=0 && p.t<=1 && floatCoordinate(p.dx) && floatCoordinate(p.dy);});
+}
+function hasCubicCurve(e){return validCurveControls(e.curveControls);}
+function edgeCurveData(e){return hasCubicCurve(e)?e.curveControls:e.curvePoints || [];}
+function hasEdgeCurve(e){return hasCubicCurve(e) || validCurvePoints(e.curvePoints) && e.curvePoints.length>0;}
 function edgeCurveAnchors(e,L){
   var a=L.pos[e.from],b=L.pos[e.to];
   if(!a || !b || !hasEdgeCurve(e))return [];
-  return e.curvePoints.map(function(p){return {x:a.cx+(b.cx-a.cx)*p.t+p.dx,y:a.cy+(b.cy-a.cy)*p.t+p.dy};});
+  return edgeCurveData(e).map(function(p){return {x:a.cx+(b.cx-a.cx)*p.t+p.dx,y:a.cy+(b.cy-a.cy)*p.t+p.dy};});
 }
 function edgeCurvePoint(e,L,p,t){
   var a=L.pos[e.from],b=L.pos[e.to];
@@ -32,6 +40,11 @@ function edgeCurveSegments(e,L){
   var a=L.pos[e.from],b=L.pos[e.to];
   var first=anchors[0],last=anchors[anchors.length-1];
   var start=edgePortPoint(a,{cx:first.x,cy:first.y},e.fromPort),end=edgePortPoint(b,{cx:last.x,cy:last.y},e.toPort);
+  if(hasCubicCurve(e)){
+    var nativePoints=[start].concat(anchors,[end]),segments=[];
+    for(var ci=0;ci+3<nativePoints.length;ci+=3)segments.push(nativePoints.slice(ci,ci+4));
+    return segments;
+  }
   var points=[start].concat(anchors,[end]),tangents=[];
   points.forEach(function(p,i){
     if(i===0){tangents.push({x:start.nx,y:start.ny});return;}
@@ -48,6 +61,37 @@ function edgeCurveSegments(e,L){
     return [p,{x:p.x+tangents[i].x*out,y:p.y+tangents[i].y*out},
       {x:q.x-tangents[i+1].x*into,y:q.y-tangents[i+1].y*into},q];
   });
+}
+/* Split exactly with de Casteljau; adding a handle preserves the entire path. */
+function splitEdgeCubic(e,L,index,fraction){
+  var points=edgeCurveData(e).map(function(p){return Object.assign({},p);}),segment=edgeCurveSegments(e,L)[index];
+  var f=Math.max(.02,Math.min(.98,fraction));
+  function mix(a,b){return {x:a.x+(b.x-a.x)*f,y:a.y+(b.y-a.y)*f};}
+  var a=mix(segment[0],segment[1]),b=mix(segment[1],segment[2]),c=mix(segment[2],segment[3]);
+  var d=mix(a,b),q=mix(b,c),join=mix(d,q);
+  var left=index?points[index*3-1].t:0,right=index*3+2<points.length?points[index*3+2].t:1;
+  var ts=[left+(right-left)*f/3,left+(right-left)*f*2/3,left+(right-left)*f,
+    left+(right-left)*(f+(1-f)/3),left+(right-left)*(f+(1-f)*2/3)];
+  var converted=[a,d,join,q,c].map(function(p,i){
+    var from=L.pos[e.from],to=L.pos[e.to],t=ts[i];
+    return {t:t,dx:p.x-from.cx-(to.cx-from.cx)*t,dy:p.y-from.cy-(to.cy-from.cy)*t};
+  });
+  points.splice.apply(points,[index*3,2].concat(converted));
+  return {points:points,index:index*3+2};
+}
+function removeEdgeCurvePoint(e,points,index){
+  if(!hasCubicCurve(e)){points.splice(index,1);return points;}
+  if(points.length===2)return [];
+  // Remove one join and its two adjacent controls, leaving other spans intact.
+  var join=Math.min(points.length-3,Math.max(2,Math.floor(index/3)*3+2));
+  points.splice(join-1,3);return points;
+}
+function moveEdgeCurvePoint(e,points,index,next){
+  var old=points[index];
+  if(hasCubicCurve(e) && index%3===2){
+    [index-1,index+1].forEach(function(i){points[i].dx+=next.dx-old.dx;points[i].dy+=next.dy-old.dy;});
+  }
+  points[index]=next;return points;
 }
 function edgeCurvePath(e,L){
   return edgeCurveSegments(e,L).map(function(p,i){return (i?'':'M '+p[0].x+' '+p[0].y+' ')+

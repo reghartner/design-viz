@@ -599,6 +599,29 @@ Directed arrows between placed nodes:
   double-click or Delete a focused handle to remove it. Reset curve also removes
   the legacy bend value. Each gesture is one Undo action. Requires the
   `layout.edge-curves` capability.
+- `curveControls` — optional native cubic route, used by workbench **Auto arrange**.
+  It is an ordered array of 2..95 endpoint-relative `{t,dx,dy}` points, with
+  length `3n-1`: control, control, join, control, control, join, …, control,
+  control. Each `t` is in 0..1 and offsets are finite within ±100000. The start
+  and finish are the card's `fromPort` and `toPort`; intermediate coordinates
+  use the same endpoint-center interpolation as `curvePoints`. Use only one
+  of these two curve representations on an edge. Cubics take precedence over
+  automatic routing and legacy bend settings. Their shape persists in JSON,
+  viewers and exports without running a layout engine. Drag a control to shape
+  its segment, or drag a join to move its neighboring controls together. Adding
+  a point splits a cubic without changing its shape; removing one joins the
+  neighboring spans. Reset curve clears either representation. Moving cards
+  carries their share of the route and keeps the ends attached. Example:
+
+  ```json
+  {"from":"client","to":"service",
+   "fromPort":{"side":"right","offset":0.5},
+   "toPort":{"side":"left","offset":0.5},
+   "curveControls":[{"t":0.333333,"dx":0,"dy":-80},
+                    {"t":0.666667,"dx":0,"dy":80}]}
+  ```
+  Required compatibility capability: `layout.cubic-curves`.
+
 - `bend` (number, px; legacy), `labelDx`, `labelDy` (numbers, px) — optional manual
   overrides. The engine de-crowds automatically: edges sharing a node side fan
   their attach points apart, a forward/return pair between the same two nodes

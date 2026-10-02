@@ -1,7 +1,7 @@
 /* Independent extraction is a graph edit, not a timeline split. The parent
    keeps its story and panel ownership; the destination starts without steps. */
 function extractionClearRoute(edge, windows){
-  ['bend','curvePoints','labelDx','labelDy','labelAt','fromDx','fromDy','toDx','toDy'].forEach(function(key){delete edge[key];});
+  ['bend','curvePoints','curveControls','labelDx','labelDy','labelAt','fromDx','fromDy','toDx','toDy'].forEach(function(key){delete edge[key];});
   if(windows){delete edge.revealAt;delete edge.hideAt;}
   return edge;
 }

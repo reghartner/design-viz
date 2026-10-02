@@ -1,0 +1,17 @@
+Auto arrange third-party software
+
+Viz.js 3.31.0 (MIT), copyright Michael Daines.
+https://github.com/mdaines/viz-js/tree/c8ce050d28eb0dc1ed1629ea32ab7f3dc117db0f
+This unmodified browser bundle contains Graphviz 16.1.0 (EPL-2.0) and
+Expat 2.8.5 (MIT). Corresponding source is available at:
+https://gitlab.com/api/v4/projects/4207231/packages/generic/graphviz-releases/16.1.0/graphviz-16.1.0.tar.gz
+https://github.com/libexpat/libexpat/releases/download/R_2_8_5/expat-2.8.5.tar.gz
+Build recipe for the embedded object code:
+https://github.com/mdaines/viz-js/blob/c8ce050d28eb0dc1ed1629ea32ab7f3dc117db0f/packages/viz/backend/Dockerfile
+
+WebCola 3.4.0 (MIT), copyright Tim Dwyer and contributors.
+https://github.com/tgdwyer/WebCola
+
+The following license texts apply to these components. They are embedded in
+all distributed workbenches with the worker payload. No layout engines are
+included in standalone viewers, native viewers or the backend runtime.

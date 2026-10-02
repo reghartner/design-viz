@@ -9,10 +9,50 @@ zoom into a domain. Use `link` for ordinary source evidence.
 Give the destination diagram section a stable `id`, then select the source node
 → **Diagram handoff → Handoff destination → This spec**. Choose **Destination
 section** and **Apply handoff**. The picker includes the destination tab label.
-The equivalent node declaration is:
+This complete example hands off from the Orders tab to the Delivery tab:
 
 ```json
-{"title":"Delivery", "handoff":{"localSection":"delivery"}}
+{
+  "page": {
+    "title": "Order to delivery",
+    "blocks": [{
+      "tabs": [
+        {
+          "label": "Orders",
+          "sections": [{
+            "id": "orders",
+            "heading": "Order intake",
+            "diagram": {
+              "nodes": {
+                "order": {"title": "Order accepted"},
+                "next": {"title": "Delivery", "handoff": {"localSection": "delivery"}}
+              },
+              "rows": [["order", "next"]],
+              "edges": [{"from": "order", "to": "next"}],
+              "steps": [{"edge": "order->next", "text": "Continue to delivery."}]
+            }
+          }]
+        },
+        {
+          "label": "Delivery",
+          "sections": [{
+            "id": "delivery",
+            "heading": "Delivery pipeline",
+            "diagram": {
+              "nodes": {
+                "queue": {"title": "Queue"},
+                "dispatch": {"title": "Dispatch"}
+              },
+              "rows": [["queue", "dispatch"]],
+              "edges": [{"from": "queue", "to": "dispatch"}],
+              "steps": [{"edge": "queue->dispatch", "text": "Dispatch the queued order."}]
+            }
+          }]
+        }
+      ]
+    }]
+  }
+}
 ```
 
 Clicking **Continue →** switches to the destination section’s tab in the current

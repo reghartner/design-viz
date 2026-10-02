@@ -395,7 +395,7 @@ var workspace = initWorkbenchWorkspace();
 workspace.canvas.bind(workbenchPreview.controller,workbenchPreview.page);
 var canonContext, loadingCanon=false;
 var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: function(request){return go(true,request);}, workspace:workspace,
-  practice:workbenchPracticeAgent,
+  practice:workbenchPracticeAgent,previewSkin:currentSkin,
   catalog:function(){return workbenchPractice?workbenchTourCatalog():canonContext && canonContext.catalog;},
   importCatalog:function(raw){if(canonContext)canonContext.importCatalog(raw);},
   deferInitialSave:true,

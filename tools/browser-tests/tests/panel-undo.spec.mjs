@@ -1,4 +1,6 @@
-import {test,expect,paste,closeTools,pagePreview} from '../helpers/test.mjs';
+import {chapterOptions} from '../helpers/test.mjs';
+import {arrangeChapter} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,prepareEditorSurface} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 
 function exploreSpec(){const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');return raw;}
@@ -122,9 +124,9 @@ test('layout edits cannot strand an earlier geometry history entry for an inacti
   const sec=page.locator('#docview .doc-sec').first(),panel=sec.locator('[data-explore-panel=home]'),before=await geometry(panel);
   await panel.locator('.explore-window-grip').focus();await page.keyboard.press('Shift+ArrowLeft');const moved=await geometry(panel);
   const movedSource=await page.locator('#src').inputValue();expect(movedSource).not.toBe(source);
-  await sec.getByRole('button',{name:'Engineering',exact:true}).click();await pagePreview(page);
-  await sec.getByRole('button',{name:'Arrange section',exact:true}).click();
-  await sec.getByRole('button',{name:'Duplicate chapter',exact:true}).click();const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);
+  await sec.getByRole('button',{name:'Engineering',exact:true}).click();await prepareEditorSurface(page);
+  await arrangeChapter(page,sec);
+  await chapterOptions(page,sec);await sec.getByRole('button',{name:'Duplicate chapter',exact:true}).click();const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);

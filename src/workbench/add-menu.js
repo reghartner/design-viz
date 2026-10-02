@@ -19,7 +19,7 @@ function initDiagramAddMenu(opts){
     life.listen(choice,'click',function(){confirm(function(){opts.addNode(item);});});
   });
   function showError(message){error.textContent=message || '';error.hidden=!message;}
-  function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section;}
+  function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section && current.chapter===snapshot.chapter;}
   function paint(current){
     choices.concat(presetButtons).forEach(function(action){
       var prose=action.hasAttribute('data-add-prose');
@@ -38,7 +38,7 @@ function initDiagramAddMenu(opts){
     var key=JSON.stringify(entries.map(function(entry){return [entry.section,entry.label];}));
     if(key!==optionsKey){
       optionsKey=key;target.replaceChildren();
-      entries.forEach(function(entry){var option=doc.createElement('option');option.value=String(entry.section);option.textContent=entry.label;target.appendChild(option);});
+      var groups=new Map();entries.forEach(function(entry){var label=entry.group || 'Document',host=groups.get(label);if(!host){host=doc.createElement('optgroup');host.label=label;groups.set(label,host);target.appendChild(host);}var option=doc.createElement('option');option.value=String(entry.section);option.textContent=entry.label;host.appendChild(option);});
     }
     target.value=String(current.section);target.disabled=!!current.error || !entries.length;
     button.disabled=!!current.locked;
@@ -56,6 +56,7 @@ function initDiagramAddMenu(opts){
     snapshot=current;invalid=false;choosingNode=false;
     doc.getElementById('diagram-add-destination').textContent=current.label || 'Page';
     dialog.querySelector('.diagram-add-structure').open=false;
+    dialog.querySelector('.diagram-add-destination-picker').open=false;
     paint(current);dialog.showModal();button.setAttribute('aria-expanded','true');
     focusChoice();
   }
@@ -70,7 +71,10 @@ function initDiagramAddMenu(opts){
   life.listen(button,'click',open);
   life.listen(target,'change',function(){
     var current=opts.context(),index=Number(target.value);
+    if(invalid || !same(current)){invalid=true;paint(current);return;}
     if(!current.error && (current.sections || []).some(function(entry){return entry.section===index;}))opts.chooseSection(index);
+    snapshot=opts.context();invalid=false;
+    doc.getElementById('diagram-add-destination').textContent=snapshot.label || 'Page';
     refresh();
   });
   life.listen(doc.getElementById('add-node'),'click',function(){

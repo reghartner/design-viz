@@ -1,7 +1,7 @@
 import {writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {chooseAddDestination,test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function diagram(prefix,count,camera,presentation='explore'){
@@ -71,7 +71,7 @@ test('workbench first entry into a hidden Explore tab frames its diagram',async(
  const source=JSON.stringify(fixture(),null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
  const board=page.locator('#section-large .board');await board.evaluate(el=>el.style.display='none');
- await page.locator('#diagram-add-target').selectOption('1');
+ await chooseAddDestination(page,'1');
  await expect(page.locator('#tab-0-1')).toHaveAttribute('aria-selected','true');
  await afterTwoFrames(page);await expect.poll(()=>board.evaluate(el=>el.clientWidth)).toBe(0);
  await board.evaluate(el=>el.style.removeProperty('display'));
@@ -102,7 +102,7 @@ test('workbench entering Explore through an ordinary document tab frames its dia
  await page.mouse.move(box.x+box.width/2-70,box.y+box.height/2-45,{steps:6});await page.mouse.up();
  await page.locator('#workspace-pan').click();
  const camera=await board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop})),zoom=await page.locator('#workspace-zoom').textContent();
- await page.locator('#workspace-page').click();await page.locator('#tab-0-0').click();
+ await page.locator('#tab-0-0').click();
  await page.locator('#tab-0-0').press('ArrowRight');
  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
  await expect(page.locator('#workspace-zoom')).toHaveText(zoom);
@@ -169,7 +169,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await expect(exploreTab).toHaveAttribute('aria-description',/pan.*zoom/);
  await exploreTab.click();
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
- await expect(navigation.locator('.explore-navigation-group:not([hidden]) .explore-navigation-label')).toHaveText(['Tabs','Chapters']);
+ await expect(navigation.locator('.explore-navigation-group:not([hidden]) .explore-navigation-label')).toHaveText(['Tabs','Sections','Chapters']);
  await expect(navigation.getByRole('tab')).toHaveText(['Standard story','Explore story']);
  const destinationViews=page.locator('#section-explore .diagram-view-choice [data-view-layout]');
  await expect(destinationViews).toHaveCount(3);
@@ -210,6 +210,7 @@ test('Explore top bar keeps every tab block and untabbed or secondary diagram re
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();
  await navigation.getByRole('button',{name:'Loose diagram',exact:true}).click();
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();
+ await navigation.getByRole('tab',{name:'Second',exact:true}).click();
  await navigation.getByRole('button',{name:'Secondary diagram',exact:true}).click();
  await expect(page.locator('#section-secondary [data-dv-node="s0"]')).toBeInViewport();
 });
@@ -219,12 +220,13 @@ test('workbench diagram buttons update editing context without changing source o
  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
  const navigation=page.locator('.explore-navigation');await navigation.getByRole('button',{name:'Loose diagram',exact:true}).click();
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();await expect(page.locator('#diagram-add-target')).toHaveValue('3');
+ await navigation.getByRole('tab',{name:'Second',exact:true}).click();
  await navigation.getByRole('button',{name:'Secondary diagram',exact:true}).click();
  await expect(page.locator('#section-secondary [data-dv-node="s0"]')).toBeInViewport();await expect(page.locator('#diagram-add-target')).toHaveValue('2');
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
-test('native setCanvas reuses tabs and Chapters, then restores and isolates their DOM',async({page,server})=>{
+test('native setCanvas reuses tabs and Chapters, then restores and isolates their DOM',async({page,server},info)=>{
  await writeFile(path.join(server.root,'chapter-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'chapter-native.html'),'<style>#one{position:fixed;inset:0}#two{display:none}</style><div id="one"></div><div id="two"></div><script type="module">import {mountNativeViewer} from "./chapter-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/chapter-native.html');await page.waitForFunction(()=>!!window.mount);
@@ -235,6 +237,7 @@ test('native setCanvas reuses tabs and Chapters, then restores and isolates thei
  await one.getByRole('tab',{name:'Explore story',exact:true}).click();
  await expect(one.locator('#section-explore [data-dv-node="x0"]')).toBeInViewport();
  await expect(one.getByRole('button',{name:'Fresh view',exact:true})).toBeVisible();
+ await expect(one.getByRole('tab',{name:'Explore story',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await expect(one.getByRole('button',{name:'Explore',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await info.attach('native-monitor-icons',{body:await page.screenshot(),contentType:'image/png'});
  await expect(two.locator('.explore-navigation')).toHaveCount(0);await expect(two.locator('.docview > .tabbar')).toHaveCount(1);
  await page.evaluate(()=>one.setCanvas(false));
  await expect(one.locator('.explore-navigation')).toHaveCount(0);await expect(one.locator('.docview > .tabbar')).toHaveCount(1);

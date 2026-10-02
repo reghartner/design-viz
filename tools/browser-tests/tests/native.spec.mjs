@@ -17,12 +17,12 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   const leftPanel=alpha.locator('[data-explore-panel="state"]'),rightPanel=beta.locator('[data-explore-panel="state"]');
   const originalRight=await rightPanel.boundingBox();
   const leftBefore=await leftPanel.boundingBox(),graphBefore=await alpha.locator('.explore-board .boardcanvas>svg').boundingBox();
-  await alpha.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
+  await alpha.locator('.explore-panel-menu summary').click();await alpha.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
   await expect(alpha.locator('.explore-overlay-value')).toHaveText('90%');
   expect((await leftPanel.boundingBox()).width).toBeCloseTo(leftBefore.width*.9,0);
   expect(await rightPanel.boundingBox()).toEqual(originalRight);
   expect(await alpha.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graphBefore);
-  await alpha.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();
+  await alpha.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();await page.keyboard.press('Escape');
   await leftPanel.getByRole('button',{name:'Move state; use arrow keys',exact:true}).press('ArrowLeft');
   await expect(leftPanel).not.toHaveClass(/explore-stacked/);await expect(rightPanel).toHaveClass(/explore-stacked/);
   await leftPanel.getByRole('button',{name:'Resize state; use arrow keys',exact:true}).press('ArrowLeft');

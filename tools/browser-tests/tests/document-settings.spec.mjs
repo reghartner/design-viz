@@ -1,4 +1,4 @@
-import {test,expect,openInspectorGroup,paste,pagePreview,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -13,7 +13,7 @@ const diagram={nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a','b']],e
 
 test('saved document metadata and initial prose collapse survive Save/export, Undo, preview overrides and navigation',async({page,server,context},info)=>{
   const raw={page:{title:'Before',skin:'aurora',blocks:[{heading:'Flow',text:['This explains the flow.'],diagram}]}};
-  const original=JSON.stringify(raw,null,'\t');await page.goto(server.origin+'/workbench.html');await paste(page,original);await pagePreview(page);
+  const original=JSON.stringify(raw,null,'\t');await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);
   const section=page.locator('#docview .doc-sec').first();await section.getByRole('button',{name:'Second',exact:true}).click();
   await settings(page);await edit(page,'Document title','Design notes');
   await expect(page.locator('#docview .doc-title')).toHaveText('Design notes');await expect(section).toHaveAttribute('data-view-id','second');

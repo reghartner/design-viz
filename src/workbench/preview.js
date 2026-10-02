@@ -109,8 +109,7 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   var saved = previousPage ? workbenchPreviewSnapshot(previousPage, previousCtl) : null;
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
-  var target = typeof document !== 'undefined' && document.getElementById ? document.getElementById('layout-preview-target') : null;
-  var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:target ? target.value : (typeof window !== 'undefined' && window.location ? new URLSearchParams(window.location.search).get('layout') : 'default')});
+  var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
   try{
     restoreActiveTabs(ctl, tabs);
     restoreWorkbenchPreview(page, ctl, saved);
@@ -121,11 +120,20 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
 /* The full-page preview is a real reader controller. It borrows only the
    author's current reading position; no authoring option or listeners cross
    into the new surface. */
-function renderWorkbenchReaderPreview(view,page,skin,authoringCtl){
-  var tabs=activeTabReferences(authoringCtl),snapshot=workbenchPreviewSnapshot(page,authoringCtl);
-  var ctl=renderPage(view,page,skin,null,{autoplay:false});
-  try{restoreActiveTabs(ctl,tabs);restoreWorkbenchPreview(page,ctl,snapshot);}
-  catch(ex){ctl.destroy();throw ex;}
+function workbenchReaderPreviewSnapshot(page,ctl){
+  return {tabs:activeTabReferences(ctl),sections:workbenchPreviewSnapshot(page,ctl),
+    target:ctl.activeTarget && Object.assign({},ctl.activeTarget),details:ctl.details && ctl.details.snapshot()};
+}
+function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
+  options=options || {};
+  var saved=options.snapshot || workbenchReaderPreviewSnapshot(page,authoringCtl);
+  var ctl=renderPage(view,page,skin,null,{autoplay:false,layoutTarget:options.layoutTarget});
+  ctl.suppressFragmentWrites=true;
+  try{
+    restoreActiveTabs(ctl,saved.tabs);restoreWorkbenchPreview(page,ctl,saved.sections);
+    if(saved.target)ctl.activeTarget=saved.target;
+    if(saved.details && ctl.details)ctl.details.restore(saved.details);
+  }catch(ex){ctl.destroy();throw ex;}
   return ctl;
 }
 

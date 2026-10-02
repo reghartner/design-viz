@@ -19,7 +19,7 @@ const source=page=>page.locator('#src').inputValue();
 async function open(page,server,raw){
   await page.setViewportSize({width:1440,height:1000});
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
-  await expect(page.locator('#workspace-page')).toHaveText('Back to page');
+  await expect(page.locator('#workspace-page')).toHaveCount(0);await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await expect(section(page)).toHaveAttribute('data-view-id','explore');await expect(panel(page)).toBeVisible();
 }
 async function drag(page,handle,dx,dy){

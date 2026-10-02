@@ -115,7 +115,8 @@ test('Build with my agent from the standalone brief preserves the current draft 
 });
 
 test('every viewer, agent and manual lesson resolves against a real visible control',async({page,server},info)=>{
-  test.setTimeout(120000);
+  // This walks all three chapters; keep each action bounded while allowing the complete journey.
+  test.setTimeout(180000);
   const missing=[];page.on('console',m=>{if(m.type()==='warning' && /tour step|tour.*fail/i.test(m.text()))missing.push(m.text());});
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   let frame=await start(page,server);
@@ -155,7 +156,7 @@ test('practice commit and Undo keep the real draft and storage untouched',async(
   await page.goto(server.origin+'/workbench.html');
   const original=JSON.stringify(editorSpec(),null,2);await paste(page,original);
   await page.locator('#editor-tab-agent').click();
-  await page.getByRole('button',{name:'Take the workbench tour',exact:true}).filter({visible:true}).click();
+  await page.locator('.workspace-help>summary').click();await page.getByRole('button',{name:'Take the workbench tour',exact:true}).filter({visible:true}).click();
   const frame=practice(page);
   await expect(heading(frame)).toHaveText('Start with your own agent');
   const saved=await page.evaluate(()=>Object.fromEntries(Object.entries(localStorage).filter(([k])=>!k.startsWith('dv_tour'))));
@@ -233,7 +234,7 @@ test('parent tour chrome blocks edit shortcuts and entering fullscreen works',as
   await page.locator('#docview .node').first().click();
   await page.locator('#object-duplicate').click();
   const before=await page.locator('#src').inputValue();
-  await page.getByRole('button',{name:'Take the workbench tour',exact:true}).filter({visible:true}).click();
+  await page.locator('.workspace-help>summary').click();await page.getByRole('button',{name:'Take the workbench tour',exact:true}).filter({visible:true}).click();
   await expect(heading(practice(page))).toHaveText('Start with your own agent');
   await page.locator('.workbench-tour-header>b').click();
   const pan=await page.locator('#workspace-pan').getAttribute('aria-pressed');

@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
+import {chooseAddDestination,test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFileSync} from 'node:fs';
 import {paste as pasteDiagram} from '../helpers/test.mjs';
 const add=async(page,kind)=>{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();};
@@ -48,7 +48,7 @@ test('blank starter creates, edits, orders and removes prose through the UI with
 test('prose-only tab sections support first additions and stale Add dialogs do not publish',async({page,server})=>{
  const raw={page:{blocks:[{heading:'Keep',text:['Untouched']},{tabs:[{label:'Notes',sections:[{heading:'Blank notes'}]}]}]}},original=JSON.stringify(raw,null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,original);
- await page.locator('#diagram-add-target').selectOption('1');await page.locator('#diagram-add').click();
+ await chooseAddDestination(page,'1');await page.locator('#diagram-add').click();
  await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeFocused();
  await page.keyboard.press('Enter');await expect(page.locator('#guide').getByLabel('Prose text',{exact:true})).toHaveValue('New paragraph');
  let next=JSON.parse(await page.locator('#src').inputValue());expect(next.page.blocks[0]).toEqual(raw.page.blocks[0]);expect(next.page.blocks[1].tabs[0].sections[0].text).toEqual(['New paragraph']);

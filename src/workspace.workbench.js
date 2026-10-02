@@ -13,25 +13,26 @@ function workspacePrefs(raw){
   });
   return prefs;
 }
-function workspacePanelRect(rect,width,height){
-  // Compact chrome uses a second row for destination and appearance controls.
-  var top=width<=1050?126:72,availableH=Math.max(1,height-top-12);
+function workspacePanelRect(rect,width,height,chromeTop,chromeBottom){
+  // The measured navigation edge reserves space for every wrapped lane.
+  var top=Number.isFinite(chromeTop)?chromeTop:72,bottom=Number.isFinite(chromeBottom)?chromeBottom:12,availableH=Math.max(1,height-top-bottom);
   var minW=Math.min(300,Math.max(1,width-24)),minH=Math.min(240,availableH);
   var w=Math.max(minW,Math.min(width-24,Number.isFinite(rect.w)?rect.w:380));
   var h=Math.max(minH,Math.min(availableH,Number.isFinite(rect.h)?rect.h:640));
   return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
-    y:Math.max(top,Math.min(height-h-12,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
+    y:Math.max(top,Math.min(height-h-bottom,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
 
 /* A reader preview is a second renderer, not an authoring canvas with its
    controls hidden. Detach the authoring tree while it is open: both renderers
    use stable fragment IDs, and global SVG lookups must see only one tree. */
 function initWorkbenchReaderPreview(opts){
-  var open=document.getElementById('workbench-reader-open'),back=document.getElementById('workbench-reader-back');
-  var surface=document.getElementById('workbench-reader-preview'),view=document.getElementById('workbench-reader');
+  var open=document.getElementById('open-page-preview'),back=document.getElementById('close-page-preview');
+  var dialog=document.getElementById('page-preview'),surface=document.getElementById('page-preview-surface'),view=document.getElementById('page-preview-view');
   var workspace=document.getElementById('workbench-workspace'),authorView=document.getElementById('docview'),header=document.querySelector('.workbench-header');
-  if(!open || !back || !surface || !view || !workspace || !authorView || !header)return null;
-  var ctl=null,state=null;
+  var menu=document.getElementById('workspace-appearance'),settings=menu.querySelector('.layout-preview-tools');
+  if(!open || !back || !dialog || !surface || !view || !workspace || !authorView || !header || !settings)return null;
+  var life=createWorkbenchLifetime(),ctl=null,canvas=null,state=null;
   function active(){return !!state;}
   function suspend(authoring){
     return (authoring.steppers || []).map(function(rec){
@@ -40,47 +41,63 @@ function initWorkbenchReaderPreview(opts){
       return {stepper:stepper,playing:playing};
     });
   }
+  function destroyReader(){
+    if(canvas)canvas.destroy();canvas=null;
+    if(ctl)ctl.destroy();ctl=null;view.replaceChildren();
+  }
   function restoreAuthoring(restore){
     if(restore.anchor.parentNode)restore.anchor.replaceWith(authorView);
-    workspace.hidden=restore.workspaceHidden;
+    if(restore.settingsAnchor.parentNode)restore.settingsAnchor.replaceWith(settings);
+    workspace.hidden=restore.workspaceHidden;header.hidden=restore.headerHidden;
+    document.body.classList.remove('workbench-reader-preview-active');
+    restore.popovers.forEach(function(body){if(body.isConnected && !body.matches(':popover-open'))body.showPopover();});
     restore.playback.forEach(function(saved){
       if(saved.playing && saved.stepper && saved.stepper.playing && !saved.stepper.playing())saved.stepper.toggleAuto();
     });
+    restore.scroll.forEach(function(saved){saved.element.scrollLeft=saved.x;saved.element.scrollTop=saved.y;});
+    if(restore.canvas){restore.canvas.scrollLeft=restore.canvasX;restore.canvas.scrollTop=restore.canvasY;}
+    window.scrollTo(restore.windowX,restore.windowY);
+  }
+  function hide(refocus){
+    if(!state)return;
+    var restore=state;state=null;destroyReader();if(dialog.open)dialog.close();restoreAuthoring(restore);
+    if(refocus!==false && restore.focused && restore.focused.isConnected){menu.open=true;syncNavigationPopover(menu);restore.focused.focus({preventScroll:true});}
+  }
+  function renderReader(){
+    var reading=ctl?workbenchReaderPreviewSnapshot(state.page,ctl):state.reading;
+    destroyReader();
+    var target=settings.querySelector('select').value,width=settings.querySelector('input').value;
+    surface.style.width=target==='default'?'100%':width+'px';
+    try{
+      ctl=opts.render(view,state.page,state.skin,null,{layoutTarget:target,snapshot:reading});
+      canvas=initViewerExploreCanvas(ctl,view,{container:surface});
+    }catch(ex){hide();throw ex;}
   }
   function show(){
     if(state)return;
-    var page=opts.page(),authoring=opts.controller();
-    if(!page || !authoring)return;
-    var canvas=document.getElementById('workspace-canvas'),focused=document.activeElement;
-    var anchor=document.createComment('workbench author view position');
-    state={focused:focused,windowX:window.scrollX,windowY:window.scrollY,anchor:anchor,canvas:canvas,
-      canvasX:canvas?canvas.scrollLeft:0,canvasY:canvas?canvas.scrollTop:0,
-      headerHidden:header.hidden,workspaceHidden:workspace.hidden,playback:suspend(authoring)};
-    var skin=opts.skin(page);
-    authorView.parentNode.insertBefore(anchor,authorView);authorView.remove();workspace.hidden=true;
-    header.hidden=true;surface.hidden=false;
+    var page=opts.page(),authoring=opts.controller();if(!page || !authoring)return;
+    var authorCanvas=document.getElementById('workspace-canvas'),focused=document.activeElement;
+    var anchor=document.createComment('workbench author view position'),settingsAnchor=document.createComment('preview settings position');
+    state={page:page,skin:opts.skin(page),reading:workbenchReaderPreviewSnapshot(page,authoring),focused:focused,
+      windowX:window.scrollX,windowY:window.scrollY,anchor:anchor,settingsAnchor:settingsAnchor,canvas:authorCanvas,
+      canvasX:authorCanvas?authorCanvas.scrollLeft:0,canvasY:authorCanvas?authorCanvas.scrollTop:0,
+      headerHidden:header.hidden,workspaceHidden:workspace.hidden,playback:suspend(authoring),
+      scroll:Array.from(authorView.querySelectorAll('*')).filter(function(el){return el.scrollLeft || el.scrollTop;}).map(function(el){return {element:el,x:el.scrollLeft,y:el.scrollTop};}),
+      popovers:Array.from(authorView.querySelectorAll(':popover-open'))};
+    state.popovers.forEach(function(body){body.hidePopover();});
+    menu.open=false;syncNavigationPopover(menu);
+    settings.before(settingsAnchor);dialog.querySelector('header').appendChild(settings);
     document.body.classList.add('workbench-reader-preview-active');
-    try{
-      ctl=opts.render(view,page,skin,authoring);
-    }catch(ex){
-      var restore=state;state=null;view.replaceChildren();surface.hidden=true;header.hidden=restore.headerHidden;
-      document.body.classList.remove('workbench-reader-preview-active');restoreAuthoring(restore);throw ex;
-    }
-    window.scrollTo(0,0);back.focus({preventScroll:true});
+    authorView.before(anchor);authorView.remove();workspace.hidden=true;header.hidden=true;
+    dialog.showModal();renderReader();back.focus({preventScroll:true});
   }
-  function hide(){
-    if(!state)return;
-    var restore=state,canvas=restore.canvas;state=null;
-    if(ctl)ctl.destroy();ctl=null;view.replaceChildren();surface.hidden=true;
-    header.hidden=restore.headerHidden;restoreAuthoring(restore);
-    document.body.classList.remove('workbench-reader-preview-active');
-    if(canvas){canvas.scrollLeft=restore.canvasX;canvas.scrollTop=restore.canvasY;}
-    window.scrollTo(restore.windowX,restore.windowY);
-    if(restore.focused && restore.focused.isConnected)restore.focused.focus({preventScroll:true});
-  }
-  open.addEventListener('click',show);back.addEventListener('click',hide);
-  return {active:active,show:show,hide:hide};
+  life.listen(open,'click',show);life.listen(back,'click',hide);
+  life.listen(dialog,'cancel',function(ev){ev.preventDefault();hide();});
+  life.listen(dialog,'keydown',function(ev){ev.stopPropagation();});
+  life.listen(settings,'change',function(){if(state)renderReader();});
+  return {active:active,show:show,hide:hide,destroy:function(){hide(false);life.destroy();}};
 }
+
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;
@@ -89,11 +106,23 @@ function initWorkbenchWorkspace(){
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
   var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0;
   document.body.classList.add('workspace-canvas');
+  document.querySelector('.workbench-header').addEventListener('keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){var detail=ev.target.closest('details[open]');if(detail){ev.preventDefault();detail.open=false;detail.querySelector('summary').focus();}}});
+  document.addEventListener('toggle',function(ev){
+    var selector='.workbench-header details,#workspace-canvas-tools,#docview .explore-navigation details';
+    if(!ev.target.matches(selector))return;
+    if(ev.target.open)document.querySelectorAll(selector).forEach(function(other){if(other!==ev.target && other.open){other.open=false;syncNavigationPopover(other);}});
+    syncNavigationPopover(ev.target);
+  },true);
   var rail=document.querySelector('.workspace-rail');rail.setAttribute('role','toolbar');
   rail.removeAttribute('aria-orientation');
   function persist(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(ex){}}
   function defaults(name){return {x:name==='agent'?84:Math.max(84,innerWidth-408),y:154,w:name==='json'?500:380,h:Math.min(700,innerHeight-226),open:false};}
-  function rect(name){return workspacePanelRect(prefs.windows[name],innerWidth,innerHeight);}
+  function boundRect(value){
+    var tools=document.getElementById('workspace-canvas-controls'),r=tools && tools.getBoundingClientRect();
+    var bottom=r && r.height?innerHeight-r.top+12:12;
+    return workspacePanelRect(value,innerWidth,innerHeight,parseFloat(getComputedStyle(document.body).getPropertyValue('--workspace-content-top')) || 72,bottom);
+  }
+  function rect(name){return boundRect(prefs.windows[name]);}
   function paint(name){
     var win=windows[name],r=rect(name),open=prefs.windows[name].open;
     win.style.left=r.x+'px';win.style.top=r.y+'px';win.style.width=r.w+'px';win.style.height=r.h+'px';
@@ -103,6 +132,7 @@ function initWorkbenchWorkspace(){
     tabs[name].tabIndex=name===prefs.tool?0:-1;
   }
   function paintAll(){names.forEach(paint);}
+  document.addEventListener('workbench-chrome-resize',paintAll);
   function front(name){prefs.tool=name;windows[name].style.zIndex=++z;names.forEach(function(n){tabs[n].tabIndex=n===name?0:-1;});}
   function focusTab(name){tabs[name].focus({preventScroll:true});tabs[name].scrollIntoView({block:'nearest',inline:'nearest'});}
   function showTool(name,options){
@@ -117,7 +147,7 @@ function initWorkbenchWorkspace(){
   function close(name){prefs.windows[name].open=false;paint(name);persist();focusTab(name);}
   function geometry(name){var value=prefs.windows[name],out={};['x','y','w','h'].forEach(function(k){out[k]=value[k];});return out;}
   function remember(name,before){
-    if(!history || JSON.stringify(workspacePanelRect(before,innerWidth,innerHeight))===JSON.stringify(rect(name)))return;
+    if(!history || JSON.stringify(boundRect(before))===JSON.stringify(rect(name)))return;
     history({before:before,after:geometry(name),restore:function(value){
       finish(true);Object.assign(prefs.windows[name],value);paint(name);persist();return true;
     }});
@@ -140,14 +170,14 @@ function initWorkbenchWorkspace(){
     if(!gesture || ev.pointerId!==gesture.id)return;
     var g=gesture,r=Object.assign({},g.rect),dx=ev.clientX-g.x,dy=ev.clientY-g.y;
     if(g.kind==='move'){r.x+=dx;r.y+=dy;}else{r.w+=dx;r.h+=dy;}
-    Object.assign(prefs.windows[g.name],workspacePanelRect(r,innerWidth,innerHeight));paint(g.name);
+    Object.assign(prefs.windows[g.name],boundRect(r));paint(g.name);
   }
   function keyMove(ev,name,kind){
     if(ev.altKey || ev.ctrlKey || ev.metaKey || !/^Arrow(Left|Right|Up|Down)$/.test(ev.key))return;
     ev.preventDefault();ev.stopPropagation();var before=geometry(name),r=rect(name),amount=ev.shiftKey?50:10;
     var axis=/Left|Right/.test(ev.key)?(kind==='move'?'x':'w'):(kind==='move'?'y':'h');
     r[axis]+=/Left|Up/.test(ev.key)?-amount:amount;
-    Object.assign(prefs.windows[name],workspacePanelRect(r,innerWidth,innerHeight));paint(name);persist();remember(name,before);
+    Object.assign(prefs.windows[name],boundRect(r));paint(name);persist();remember(name,before);
   }
   names.forEach(function(name,index){
     var pane=panes[name]=document.getElementById('editor-'+name),tab=tabs[name]=document.getElementById('editor-tab-'+name);
@@ -191,6 +221,8 @@ function initWorkbenchWorkspace(){
   if(!hasSaved)prefs.windows[prefs.tool].open=true;
   front(prefs.tool);paintAll();
   var canvas=initWorkbenchCanvas();
+  var controls=document.getElementById('workspace-canvas-controls');
+  if(controls && typeof ResizeObserver!=='undefined'){var controlsObserver=new ResizeObserver(paintAll);controlsObserver.observe(controls);}
   var preset=document.getElementById('workspace-preset');
   function applyPreset(value){
     if(!['story','engineering','present'].includes(value))return;

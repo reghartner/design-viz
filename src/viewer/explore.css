@@ -130,11 +130,11 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 
 @media screen and (max-width:640px){
  .explore-full-window .viewer-diagram-canvas{padding:8px;}
- .explore-navigation{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:5px 8px;padding:6px;}
+ .explore-navigation{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:5px 8px;padding:6px;}
  .native-canvas .explore-navigation{margin-left:0;margin-top:var(--flowview-host-actions-block-offset,0px);}
  .explore-navigation-tabs{grid-column:1 / -1;grid-row:1;}
- .explore-navigation-chapters{grid-column:1;grid-row:2;}
- .explore-navigation-actions{grid-column:2;grid-row:2;}
+ .explore-navigation-chapters{grid-column:1 / -1;grid-row:2;}
+ .explore-navigation-actions{grid-column:1 / -1;grid-row:4;flex-wrap:wrap;justify-content:flex-end;max-width:100%;}
  .explore-navigation-diagrams{grid-column:1 / -1;grid-row:3;}
  .explore-navigation-label{font-size:9px;}
  .explore-navigation .tabbtn,.explore-navigation .diagram-view-choice .mbtn{min-height:34px;padding:5px 8px;}
@@ -146,8 +146,45 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 @media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}
 
 @media screen{
- .explore-full-window .explore-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:108px;left:12px;z-index:90;max-width:calc(100vw - 24px);padding:8px 12px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
+ .explore-full-window .explore-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:var(--flowview-navigation-bottom,8px);left:12px;z-index:90;max-width:calc(100vw - 24px);padding:8px 12px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
  .explore-full-window .explore-active-section>.detail-head>:not(.detail-head-intro),.explore-full-window .explore-active-section>.detail-head .detail-head-intro>:not(.detail-breadcrumb):not(.sec-heading-row){display:none;}
  .explore-full-window .explore-active-section>.detail-head .sec-h{font-size:14px;margin:4px 0 0;}
  .explore-full-window .explore-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:12px;bottom:12px;z-index:95;max-width:calc(100vw - 24px);padding:10px 14px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;}
 }
+
+/* Playback mode stays available when Ambient collapses the step timeline. */
+.playback-mode-rail{display:flex;align-items:center;gap:6px;padding:5px 8px;}
+.playback-mode-rail .mtoggle{margin:0;}
+.explore-player>.playback-mode-rail{padding:4px 24px 4px 8px;}
+.explore-player.player-ambient{height:auto!important;min-height:38px;}
+.explore-panel-menu>.mbtn,.explore-panel-menu>.explore-overlay-zoom{display:none;}
+.explore-panel-menu[open]>.mbtn,.explore-panel-menu[open]>.explore-overlay-zoom{display:flex;}
+.explore-panel-menu[open]{background:var(--explore-bg);}
+.explore-navigation .viewport-actions{padding:0;border:0;box-shadow:none;background:none;}
+.explore-navigation{border-radius:0;box-shadow:none;}
+.explore-panel-body{position:absolute;right:0;top:calc(100% + 6px);width:260px;max-width:calc(100vw - 24px);max-height:65vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
+.explore-panel-body .explore-panel-choices{position:static;width:auto;min-width:0;max-width:none;padding:0;margin:0;border:0;box-shadow:none;}
+.explore-panel-body .explore-overlay-zoom{flex-wrap:wrap;}
+.explore-panel-body [hidden]{display:none!important;}
+.explore-navigation .explore-edge-legend>.lg{display:flex;flex-wrap:wrap;background:none;}
+.explore-navigation .diagram-view-choice{order:initial;}
+.explore-player{display:flex;flex-direction:column;container-type:inline-size;}
+.explore-player>.playback-mode-rail{flex:none;}
+body .docview .explore-player>.termbar{flex:1;min-height:0;height:auto;}
+@container(max-width:560px){
+ body .docview .explore-player>.termbar{display:flex;flex-direction:column;gap:6px;padding:6px 10px;overflow:auto;}
+ .explore-player .step-transport{flex-wrap:wrap;flex:none;}
+ .explore-player .schips{flex:none;width:100%;min-height:34px;max-height:110px;}
+ .explore-player .stepline{flex:1;min-height:34px;width:100%;}
+}
+[popover]:not(:popover-open){display:none;}
+.explore-panel-body:popover-open,.explore-edge-legend:popover-open{color:var(--dtext);box-sizing:border-box;overflow:auto;}
+@container(max-width:560px){
+ body .docview .explore-player>.termbar{flex-wrap:nowrap;}
+ body .docview .explore-player .schips{flex:0 0 auto;height:auto;max-height:84px;}
+ body .docview .explore-player .stepline{flex:1 0 34px;height:auto;max-height:none;}
+}
+/* Detached Standard controls share their authored tile with the mode switch. */
+.section-layout-tile[data-layout-key="steps"]{display:flex;flex-direction:column;}
+.section-layout-tile[data-layout-key="steps"]>.playback-mode-rail{flex:none;}
+body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-height:0;height:auto;}

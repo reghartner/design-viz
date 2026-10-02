@@ -1,4 +1,4 @@
-import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,pastePage,closeTools,canvasTools} from '../helpers/test.mjs';
 
 const initial=()=>({page:{title:'Quick connections',blocks:[{id:'main',heading:'Doorbell services',diagram:{
   nodes:{a:{title:'Doorbell'},b:{title:'Gateway'},c:{title:'Recording'},f:{title:'Analytics'}},
@@ -13,7 +13,7 @@ const start=(page,id='a')=>node(page,id).click({modifiers:['Alt']});
 const arrow=page=>page.locator('.dv-connect-line');
 
 test('Alt-click connects row and free nodes with a live preview, exact Undo and the edge inspector',async({page,server},testInfo)=>{
-  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial(),null,2);await paste(page,original);
+  await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(initial(),null,2);await paste(page,original);await closeTools(page);
   await start(page);await expect(page.locator('.dv-connect-hint')).toBeVisible();await expect(page.locator('.dv-connect-hint')).toContainText('Connect from Doorbell');
   await expect(node(page,'a')).toHaveClass(/dv-connect-source/);await expect(node(page,'b')).not.toHaveClass(/dv-connect-candidate/);
   await expect(node(page,'c')).toHaveClass(/dv-connect-candidate/);await expect(node(page,'f')).toHaveClass(/dv-connect-candidate/);
@@ -27,7 +27,7 @@ test('Alt-click connects row and free nodes with a live preview, exact Undo and 
   await expect(page.locator('#guide')).toContainText('Edge — one hop between nodes');await expect(page.locator('#guide').getByRole('combobox',{name:'Exit side',exact:true})).toBeVisible();
   const after=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
-  await start(page,'f');await node(page,'b').click();expect((await diagram(page)).edges.at(-1).from).toBe('f');
+  await closeTools(page);await start(page,'f');await node(page,'b').click();expect((await diagram(page)).edges.at(-1).from).toBe('f');
 });
 
 test('visible Connect action and the Add menu share cancellation and invalid-target protection',async({page,server})=>{
@@ -74,13 +74,13 @@ test('source changes, blur, remount and stale inspector actions cannot publish p
   await page.locator('#editor-tab-json').click();await page.locator('#src').focus();
   await page.evaluate(value=>{const s=document.querySelector('#src');s.value=value;s.dispatchEvent(new Event('input',{bubbles:true}));},changed);
   await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-pressed','true');await expect(page.locator('#src')).toBeFocused();
-  await clean(page);await node(page,'c').click();await expect(page.locator('#src')).toHaveValue(changed);
+  await clean(page);await closeTools(page);await node(page,'c').click();await expect(page.locator('#src')).toHaveValue(changed);
   await start(page);await clean(page);await expect(page.locator('#guide')).toContainText('Render it before connecting');
   await page.evaluate(()=>__editorTest.builder.loadSpec(JSON.parse(document.querySelector('#src').value)));
   await node(page,'a').click();await page.evaluate(()=>window.oldConnect=document.querySelector('.node-connect-button'));
   const baseline=await source(page);await start(page);await page.evaluate(()=>__editorTest.builder.destroy());await clean(page);
   await page.evaluate(()=>{__editorTest.remount();oldConnect.click();});await clean(page);await expect(page.locator('#src')).toHaveValue(baseline);
-  await start(page);await page.evaluate(()=>{document.querySelector('#src').value+=' ';});await node(page,'c').click();await clean(page);
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));await closeTools(page);await start(page);await page.evaluate(()=>{document.querySelector('#src').value+=' ';});const candidate=await node(page,'c').boundingBox();await page.mouse.move(candidate.x+candidate.width/2,candidate.y+candidate.height/2);await clean(page);
   await expect(page.locator('#src')).toHaveValue(baseline+' ');
 });
 
@@ -103,8 +103,8 @@ test('modifier selection, ordinary dragging and zoomed connection creation coexi
 for(const width of [680,390])test('step-free canvas keeps connection feedback and cancel visible at '+width+'px',async({page,server})=>{
   await page.setViewportSize({width,height:900});const raw=initial();delete raw.page.blocks[0].diagram.steps;
   await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw);await paste(page,original);
-  await page.getByRole('button',{name:'Hide tools',exact:true}).click();await start(page);
+  await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();await start(page);
   const hint=page.locator('.dv-connect-hint');await expect(hint).toBeVisible();
-  const box=await hint.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
+  const box=await hint.boundingBox(),navigation=await page.locator('.explore-navigation').boundingBox();expect(box.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);
   await page.getByRole('button',{name:'Cancel connection',exact:true}).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);
 });

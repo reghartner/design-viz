@@ -88,9 +88,9 @@ export async function pointerTo(page,from,to,{release=true}={}){
 }
 export async function resources(page){return page.evaluate(()=>__resourceCounts());}
 
-// Layout/prose contracts explicitly exercise the exported-page surface.
-export async function pagePreview(page){
-  if(await page.locator('body').evaluate(el=>el.classList.contains('workspace-diagram')))await page.locator('#workspace-page').click();
+// Editor contracts keep the selected chapter mode and dismiss authoring windows.
+export async function prepareEditorSurface(page){
+  // The selected Chapter owns its surface; closing tools never overrides it.
   await closeTools(page);
 }
 export async function closeTools(page){
@@ -105,9 +105,41 @@ export async function inspectPageElement(page,element){
   if(!await page.locator('#workspace-window-inspect').isVisible())await page.locator('#editor-tab-inspect').click();
 }
 
-// Curated widget/prose contracts explicitly choose Page preview; canvas tests
-// continue using paste() and the product's default Diagram canvas.
+// Widget/prose authoring contracts open Inspect on the selected chapter surface.
 export async function pastePage(page,text){
-  await paste(page,text);await pagePreview(page);
+  await paste(page,text);await prepareEditorSurface(page);
   await page.locator('#editor-tab-inspect').click();
+}
+
+export async function chooseAddDestination(page,index){
+  await page.locator('#diagram-add').click();
+  await page.locator('.diagram-add-destination-picker summary').click();
+  await page.locator('#diagram-add-target').selectOption(String(index));
+  await page.locator('#diagram-add-close').click();
+}
+export async function chapterOptions(page,section){
+  const options=(section || page.locator('#docview .explore-navigation')).locator('.section-view-options');
+  if(await options.getAttribute('open')===null)await options.locator('summary').click();
+  return options;
+}
+export async function arrangeChapter(page,section){
+  await chapterOptions(page,section);
+  await (section || page.locator('#docview .explore-navigation')).getByRole('button',{name:'Arrange chapter and saved visibility…',exact:true}).click();
+}
+
+export async function openAutoArrange(page){
+ await chapterOptions(page);
+ await page.locator('#docview .explore-navigation').getByRole('button',{name:'Auto arrange',exact:true}).click();
+}
+
+export async function panelsOptions(page,root){
+ const menu=(root || page.locator('#docview .explore-navigation')).locator('.explore-panel-menu');
+ if(await menu.getAttribute('open')===null)await menu.locator('summary').click();
+ return menu;
+}
+
+export async function canvasTools(page){
+ const menu=page.locator('#workspace-canvas-tools');
+ if(await menu.getAttribute('open')===null)await menu.locator('summary').click();
+ return menu;
 }

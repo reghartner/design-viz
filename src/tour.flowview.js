@@ -206,7 +206,7 @@ function wireTour(ctl, view, win, config, options){
   }
   function restoreSnapshot(){
     if (!snapshot) return;
-    openedDetails.forEach(function(d){ if (d && d.isConnected) d.open = false; });
+    openedDetails.forEach(function(d){ if (d && d.isConnected){d.open = false;if(typeof syncNavigationPopover==='function')syncNavigationPopover(d);} });
     openedDetails = [];
     snapshot.tabs.forEach(function(saved){
       for (var i = 0; i < ctl.tabBlocks.length; i++)
@@ -225,12 +225,12 @@ function wireTour(ctl, view, win, config, options){
       if(savedPage.drill)restoration=ctl.details.restore(savedPage.drill);
     }
     ctl.detailHistoryPush=false;
-    ctl.activeTarget=savedPage.activeTarget;
+    ctl.activeTarget=savedPage.activeTarget;if(ctl.onChange)ctl.onChange();
     win.scrollTo(savedPage.scrollX,savedPage.scrollY);
     return Promise.resolve(restoration).then(function(){
       if(destroyed)return;
       ctl.detailHistoryPush=false;
-      ctl.activeTarget=savedPage.activeTarget;
+      ctl.activeTarget=savedPage.activeTarget;if(ctl.onChange)ctl.onChange();
       win.scrollTo(savedPage.scrollX,savedPage.scrollY);
     });
   }
@@ -869,7 +869,7 @@ function wireTour(ctl, view, win, config, options){
   var plannedConfig=config;
   function disclose(node){
     for(var anc=node;anc && anc!==doc.body;anc=anc.parentElement || (anc.getRootNode && anc.getRootNode().host))
-      if(anc.tagName==='DETAILS' && !anc.open){anc.open=true;openedDetails.push(anc);}
+      if(anc.tagName==='DETAILS' && !anc.open){anc.open=true;openedDetails.push(anc);if(typeof syncNavigationPopover==='function')syncNavigationPopover(anc);}
   }
   function stateTokenMiss(sec,ds){
     var sp=sec && sec.stepper;
@@ -945,10 +945,10 @@ function wireTour(ctl, view, win, config, options){
               if(valid && sec.stepper && (ds.path!=null || step.demo && step.demo.advance!=null))state.path=sec.stepper.path();
             }
           }finally{
-            openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected)d.open=false;});
+            openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected){d.open=false;if(typeof syncNavigationPopover==='function')syncNavigationPopover(d);}});
             restoreSection(sec,saved,false);
             ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
-            ctl.activeTarget=targetState;win.scrollTo(scroll.x,scroll.y);
+            ctl.activeTarget=targetState;if(ctl.onChange)ctl.onChange();win.scrollTo(scroll.x,scroll.y);
           }
           if(valid){
             preferred={sec:sec,view:choices[j]};

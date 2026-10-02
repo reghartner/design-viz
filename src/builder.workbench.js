@@ -496,7 +496,6 @@ function initWorkbenchBuilder(opts){
       var section=el.closest('.doc-sec'),rec=records.find(function(r){return r.sectionEl===section;});
       if(rec && rec.viewport && rec.viewport.revealProse)rec.viewport.revealProse();
     }
-    if((!floating || floating.hidden) && opts.workspace && opts.workspace.canvas)opts.workspace.canvas.showPage();
     if(el)el.scrollIntoView({block:'nearest'});
   }
   var inspector=createBuilderInspector({
@@ -892,7 +891,7 @@ function initWorkbenchBuilder(opts){
     session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();
   });
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
-    view:view,src:src,ctl:opts.ctl,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
+    view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
@@ -933,7 +932,7 @@ function initWorkbenchBuilder(opts){
     if(catalogPicker)catalogPicker.invalidate();
     if(topologyPicker)topologyPicker.invalidate();
     interactions.beforeReplace(request);
-    if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace();
+    if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace(request);
     hideDiff();
   }
   function previewRendered(outcome){
@@ -1062,13 +1061,17 @@ function initWorkbenchBuilder(opts){
   if (panelBtn) life.listen(panelBtn,'click',function(){confirmAddition(function(){if(panelPicker)panelPicker.open();});});
   function additionContext(){
       var parsed=parseEditor(),locked=!!interactions.adding() || !!interactions.connecting();
+      var ctl=opts.ctl && opts.ctl(),detail=ctl && ctl.details && ctl.details.snapshot();
       var error=locked ? 'Finish adding to the step or connecting nodes first (Done or Esc).' : parsed.error;
+      if(!error && detail && detail.frames && detail.frames.length)error='Return to the source diagram using its breadcrumb before adding. Detail previews are read-only insertion contexts.';
       if(!error){var findings=session.validate(parsed.raw);if(findings.errors.length)error='Fix the diagram’s validation errors before adding.';}
       var sections=parsed.error ? [] : specSectionPaths(parsed.raw).map(function(rec,index){
-        return {section:index,label:builderInsertTargetText(parsed.raw,index).replace(/^into /,'')};
+        var ti=rec.section.indexOf('tabs'),tab=ti>=0?specValueAt(parsed.raw,rec.section.slice(0,ti+2)):null;
+        return {section:index,group:tab?'Tab · '+(tab.label || 'Untitled'):'Document',label:builderInsertTargetText(parsed.raw,index).replace(/^into /,'')};
       });
       var rec=parsed.error ? null : specSectionPaths(parsed.raw)[session.insertSection];
-      return {text:session.text(),raw:parsed.raw,project:parsed.project,section:session.insertSection,sections:sections,
+      var selected=ctl && ctl.sections.find(function(section){return section.number===session.insertSection+1;});
+      return {text:session.text(),raw:parsed.raw,project:parsed.project,section:session.insertSection,chapter:selected && selected.viewport && (selected.viewport.viewDefinition() || {}).id,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
         diagram:rec && specValueAt(parsed.raw,rec.diagram),prose:!!(rec && rec.section.length),error:error,locked:locked};
   }

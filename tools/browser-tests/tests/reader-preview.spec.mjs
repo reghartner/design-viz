@@ -1,4 +1,5 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {readFile} from 'node:fs/promises';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 
 function longReaderSpec(){
@@ -14,7 +15,7 @@ test('read-only page preview is a separate interactive reader and returns withou
   await page.emulateMedia({reducedMotion:'no-preference'});
   await page.goto(server.origin+'/workbench.html');await paste(page,source);
 
-  await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-terminal').click();
+  await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-terminal').click();await page.locator('#workspace-appearance>summary').click();
   await page.locator('#docview .path-chip[data-dv-path="happy"]').first().click();
   await expect(page.locator('#docview .stepline').first()).toContainText('Button pressed');
   const workspaceHandle=await page.locator('#workbench-workspace').elementHandle();
@@ -31,8 +32,8 @@ test('read-only page preview is a separate interactive reader and returns withou
   await canvas.evaluate(element=>{element.scrollTop=240;});
   const canvasScroll=await canvas.evaluate(element=>element.scrollTop);
 
-  await page.locator('#workbench-reader-open').click();
-  const reader=page.locator('#workbench-reader'),back=page.locator('#workbench-reader-back');
+  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
+  const reader=page.locator('#page-preview-view'),back=page.locator('#close-page-preview');
   await expect(page.locator('#workbench-workspace')).toBeHidden();
   expect(await workspaceHandle.evaluate(element=>element.isConnected)).toBe(true);
   await expect(page.locator('#docview')).toHaveCount(0);
@@ -66,13 +67,13 @@ test('read-only page preview is a separate interactive reader and returns withou
   for(const handle of [authorNode,authorEdge,authorCoin])expect(await handle.evaluate(element=>element.classList.contains('lit'))).toBe(true);
 
   await page.setViewportSize({width:520,height:640});
-  await page.evaluate(()=>window.scrollTo(0,document.body.scrollHeight));
-  expect(await back.evaluate(element=>getComputedStyle(element).position)).toBe('fixed');
-  const backBox=await back.boundingBox();expect(backBox.y).toBeLessThanOrEqual(12);
+  const backBefore=await back.boundingBox();
+  await page.locator('#page-preview-surface').evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  const backBox=await back.boundingBox();expect(backBox).toEqual(backBefore);await expect(back).toBeInViewport();
   await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),{message:'Reader preview fits the narrow viewport'}).toBe(true);
 
   await back.click();
-  await expect(page.locator('#workbench-reader-preview')).toBeHidden();
+  await expect(page.locator('#page-preview')).toBeHidden();
   await expect(page.locator('#workbench-workspace')).toBeVisible();
   expect(await workspaceHandle.evaluate(element=>element.isConnected)).toBe(true);
   expect(await authorViewHandle.evaluate(element=>element.isConnected)).toBe(true);
@@ -80,8 +81,8 @@ test('read-only page preview is a separate interactive reader and returns withou
   await expect(page.locator('#docview .playback-status').first()).toContainText('Playing');
   await page.locator('#docview .playback-button').first().evaluate(element=>element.click());
   await expect(page.locator('#docview .playback-status').first()).toContainText('Paused');
-  await expect(page.locator('#workbench-reader-open')).toBeFocused();
-  await expect(page.locator('#workbench-reader-open')).toBeInViewport();
+  await expect(page.locator('#open-page-preview')).toBeFocused();
+  await expect(page.locator('#open-page-preview')).toBeInViewport();
   await expect(page.locator('#src')).toHaveValue(source);
   expect(await canvas.evaluate(element=>element.scrollTop)).toBe(canvasScroll);
   await expect(page.locator('#docview .path-chip[data-dv-path="happy"]').first()).toHaveAttribute('aria-pressed','true');
@@ -90,4 +91,60 @@ test('read-only page preview is a separate interactive reader and returns withou
     expect(await handle.evaluate(element=>element.isConnected)).toBe(true);
     expect(await handle.evaluate(element=>element.classList.contains('lit'))).toBe(true);
   }
+});
+
+
+test('invalid drafts retain the last usable Explore reader across host and width changes without fragment or author mutations',async({page,server})=>{
+  const raw=editorSpec(),diagram=raw.page.blocks[0].diagram;
+  diagram.layouts[0].presentation='explore';delete diagram.layouts[0].steps;
+  const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
+  await page.locator('#docview .path-chip[data-dv-path="happy"]').first().click();
+  const author=await page.locator('#docview').elementHandle(),node=await page.locator('#docview .node[data-dv-node="a"]').first().elementHandle();
+  await page.locator('#editor-tab-json').click();const invalid=source+' invalid draft';
+  await page.locator('#src').fill(invalid);await page.locator('#go').click();await closeTools(page);
+  await page.evaluate(()=>history.replaceState(null,'','#unchanged-preview-fragment'));const hash=await page.evaluate(()=>location.hash);
+  await expect.poll(()=>page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')).text)).toBe(invalid);
+  const draft=await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'));
+  const camera=()=>page.locator('#docview .explore-board').evaluate(el=>{const pixels=parseFloat(el.style.getPropertyValue('--explore-width')),ratio=el.querySelector('svg').viewBox.baseVal.height/el.querySelector('svg').viewBox.baseVal.width;return {x:(el.scrollLeft+el.clientWidth/2-parseFloat(el.style.getPropertyValue('--explore-margin-x')))/pixels,y:(el.scrollTop+el.clientHeight/2-parseFloat(el.style.getPropertyValue('--explore-margin-y')))/(pixels*ratio)};});
+  const beforeCamera=await camera();
+  await page.locator('#workspace-appearance>summary').click();await page.locator('#layout-preview-target').selectOption('backstage');await page.locator('#open-page-preview').click();
+  await expect(page.locator('#page-preview-surface')).toHaveClass(/viewer-exploring/);
+  await expect(page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true})).toHaveAttribute('aria-pressed','true');
+  for(const host of ['confluence','backstage','default']){
+    await page.locator('#layout-preview-target').selectOption(host);
+    if(host!=='default'){await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).fill('720');await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).dispatchEvent('change');expect(await page.locator('#page-preview-surface').evaluate(el=>el.clientWidth)).toBe(720);}
+    expect(await author.evaluate(el=>el.isConnected)).toBe(false);expect(await node.evaluate(el=>el.isConnected)).toBe(false);
+    await expect(page.locator('#page-preview-view .path-chip[data-dv-path="happy"]').first()).toHaveAttribute('aria-pressed','true');
+    expect(await page.evaluate(()=>location.hash)).toBe(hash);
+  }
+  await page.locator('#page-preview-view').getByRole('button',{name:'Next step',exact:true}).first().click();
+  expect(await page.evaluate(()=>location.hash)).toBe(hash);await page.setViewportSize({width:390,height:900});
+  const chapter=page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true});await expect(chapter).toBeInViewport();expect(await chapter.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===hit || el.contains(hit);})).toBe(true);await expect(chapter.locator('.explore-indicator-badge svg')).toBeInViewport();
+  await page.setViewportSize({width:1024,height:760});await page.keyboard.press('Escape');
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const afterCamera=await camera();expect(afterCamera.x).toBeCloseTo(beforeCamera.x,2);expect(afterCamera.y).toBeCloseTo(beforeCamera.y,2);
+  expect(await author.evaluate(el=>el.isConnected)).toBe(true);expect(await node.evaluate(el=>el.isConnected)).toBe(true);
+  await expect(page.locator('#src')).toHaveValue(invalid);expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(draft);
+  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#open-page-preview')).toBeFocused();
+  await expect(page.locator('#docview .stepline').first()).toContainText('Button pressed');
+  expect(await page.evaluate(()=>location.hash)).toBe(hash);
+});
+
+
+test('reader owner unwinds renderer errors and repeated destroy before reconnecting author DOM',async({page})=>{
+  await page.setContent('<header class="workbench-header"><details id="workspace-appearance"><summary>Preview</summary><div><button id="open-page-preview">Open page preview</button><div class="layout-preview-tools"><select><option value="default">Responsive</option></select><input value="760"></div></div></details></header><main id="workbench-workspace"><div id="workspace-canvas"><div id="docview"><div id="author-node">Author</div></div></div></main><dialog id="page-preview"><header><button id="close-page-preview">Close preview</button></header><div id="page-preview-surface"><div id="page-preview-view"></div></div></dialog>');
+  await page.addScriptTag({content:await readFile(new URL('../../../src/workbench/lifetime.js',import.meta.url),'utf8')});
+  await page.addScriptTag({content:await readFile(new URL('../../../src/workspace.workbench.js',import.meta.url),'utf8')});
+  const result=await page.evaluate(()=>{
+    const author=document.getElementById('docview'),settings=document.querySelector('.layout-preview-tools'),parent=settings.parentNode,events=[];let playing=true;
+    window.syncNavigationPopover=()=>{};window.workbenchReaderPreviewSnapshot=()=>({});
+    window.initViewerExploreCanvas=()=>({destroy(){events.push('canvas:'+author.isConnected);}});
+    const opts={page:()=>({}),skin:()=> 'pastel',controller:()=>({steppers:[{stepper:{playing:()=>playing,pause(){playing=false;},toggleAuto(){playing=!playing;}}}]})};
+    const owner=initWorkbenchReaderPreview({...opts,render(view){view.innerHTML='<span id="reader-node">Reader</span>';return {destroy(){events.push('reader:'+author.isConnected);}};}});
+    owner.show();const detached=!author.isConnected && !playing;owner.destroy();owner.destroy();
+    const restored=author.isConnected && settings.parentNode===parent && playing && !document.getElementById('page-preview').open && !document.getElementById('reader-node');
+    const failure=initWorkbenchReaderPreview({...opts,render(){throw Error('intentional render failure');}});let message;try{failure.show();}catch(error){message=error.message;}
+    const unwound=!failure.active() && author.isConnected && settings.parentNode===parent && playing && !document.getElementById('page-preview').open;failure.destroy();
+    return {events,detached,restored,unwound,message,authors:document.querySelectorAll('#docview').length,settings:document.querySelectorAll('.layout-preview-tools').length};
+  });
+  expect(result).toEqual({events:['canvas:false','reader:false'],detached:true,restored:true,unwound:true,message:'intentional render failure',authors:1,settings:1});
 });

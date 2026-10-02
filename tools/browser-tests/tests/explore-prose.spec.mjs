@@ -1,4 +1,6 @@
-import {test,expect,paste,closeTools,pagePreview,inspectPageElement} from '../helpers/test.mjs';
+import {panelsOptions} from '../helpers/test.mjs';
+import {arrangeChapter} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -56,10 +58,10 @@ test('editor notes move/resize/visibility and zoom author one view, keep Explore
   const resized=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);await closeTools(page);
   const beforeDrag=await notes(page).boundingBox(),handle=await grip.boundingBox();await page.mouse.move(handle.x+28,handle.y+12);await page.mouse.down();await page.mouse.move(handle.x-72,handle.y+36,{steps:8});await page.mouse.up();expect((await notes(page).boundingBox()).x).toBeCloseTo(beforeDrag.x-100,0);
   const dragged=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(dragged);await closeTools(page);
-  const graph=await page.locator('.explore-board .boardcanvas>svg').boundingBox(),width=(await notes(page).boundingBox()).width;await page.locator('#workspace-overlay-out').click();expect((await notes(page).boundingBox()).width).toBeCloseTo(width*.9,0);expect(await page.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graph);
-  await pagePreview(page);await page.getByRole('button',{name:'Arrange section',exact:true}).click();const visible=page.getByRole('checkbox',{name:'Show Section notes in Explore',exact:true});const beforeHide=await source(page);await visible.uncheck();await expect(notes(page)).toBeHidden();expect(JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.prose.hidden).toBe(true);
+  const graph=await page.locator('.explore-board .boardcanvas>svg').boundingBox(),width=(await notes(page).boundingBox()).width;await panelsOptions(page);await page.locator('#docview .explore-navigation').getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect((await notes(page).boundingBox()).width).toBeCloseTo(width*.9,0);expect(await page.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graph);
+  await prepareEditorSurface(page);await arrangeChapter(page);const visible=page.getByRole('checkbox',{name:'Show Section notes in Explore',exact:true});const beforeHide=await source(page);await visible.uncheck();await expect(notes(page)).toBeHidden();expect(JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.prose.hidden).toBe(true);
   const hidden=await source(page);await page.getByRole('button',{name:'Optimize layout',exact:true}).click();await expect(notes(page)).toBeHidden();expect(JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.prose).toEqual({hidden:true});await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeHide);await expect(notes(page)).toBeVisible();await page.getByRole('button',{name:'Done arranging',exact:true}).click();await page.locator('#workspace-page').click();await closeTools(page);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeHide);await expect(notes(page)).toBeVisible();await page.getByRole('button',{name:'Done arranging',exact:true}).click();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await closeTools(page);
   await inspectPageElement(page,notes(page).locator('[data-dv-para="0"]'));const text=page.locator('#guide .prose-editor textarea');await text.fill('**Updated explanation.** The recording stays local until delivery.');await text.press('Tab');await expect(notes(page).locator('strong')).toHaveText('Updated explanation.');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await closeTools(page);await verifySeparation(page);
   const saved=JSON.parse(await source(page));expect(saved.page.sections[0].diagram.layouts[0]).toEqual(fixture().page.sections[0].diagram.layouts[0]);expect(saved.page.sections[0].diagram.layouts[2]).toEqual(fixture().page.sections[0].diagram.layouts[2]);
   await page.screenshot({path:info.outputPath('explore-notes-editor.png')});
@@ -91,8 +93,8 @@ test('first prose from Add or section inspector creates visible notes and keeps 
   for(const [route,kind] of [['add','paragraph'],['section','paragraph'],['add','bullet'],['section','bullet']]){
     await closeTools(page);await expect(notes(page)).toHaveCount(0);await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
     if(route==='section'){
-      await pagePreview(page);await inspectPageElement(page,page.locator('#docview .sec-h'));
-      await page.locator('#workspace-page').click();
+      await prepareEditorSurface(page);await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Delivery explained');await page.locator('#outline-results .outline-item').filter({hasText:'section · Delivery explained'}).click();await page.locator('#outline-inspect').click();
+      await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
       await page.locator('#guide').getByRole('button',{name:kind==='paragraph'?'Add an introduction':'Add first point',exact:true}).click();
     }else{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();}
     await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await verifySeparation(page);

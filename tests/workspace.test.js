@@ -9,12 +9,18 @@ test('floating preferences migrate the selected tool, reject invalid values, and
 test('offscreen or oversized saved panels stay reachable after a smaller viewport',()=>{
   const r=context.workspacePanelRect({x:1600,y:1000,w:700,h:900},800,600);
   assert.ok(r.x>=12);assert.ok(r.y>=72);assert.ok(r.x+r.w<=788);assert.ok(r.y+r.h<=588);
-  const narrow=context.workspacePanelRect({x:-1000,y:-1000,w:-20,h:-30},375,700);
-  assert.equal(narrow.x,12);assert.equal(narrow.y,126);assert.equal(narrow.w,300);assert.equal(narrow.h,240);
+  const narrow=context.workspacePanelRect({x:-1000,y:-1000,w:-20,h:-30},375,700,224);
+  assert.equal(narrow.x,12);assert.equal(narrow.y,224);assert.equal(narrow.w,300);assert.equal(narrow.h,240);
 });
 test('missing and nonfinite geometry uses usable defaults without rewriting source data',()=>{
   const original={x:Infinity,y:NaN,w:NaN,h:Infinity};
   const r=context.workspacePanelRect(original,1400,1000);
   assert.equal(r.w,380);assert.equal(r.h,640);assert.equal(r.x,84);assert.equal(r.y,84);
   assert.equal(original.x,Infinity);assert.ok(Number.isNaN(original.y));
+});
+
+test('measured bottom tools reserve a reachable panel viewport in short windows',()=>{
+  const r=context.workspacePanelRect({x:900,y:900,w:380,h:640},640,360,112,68);
+  assert.equal(r.y,112);assert.equal(r.h,180);assert.equal(r.y+r.h,292);
+  assert.ok(r.x+r.w<=628);
 });

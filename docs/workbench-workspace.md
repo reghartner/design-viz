@@ -44,9 +44,10 @@ remain available. The Steps Path selector can inspect an alternate even when the
 current named view hides every step on that route. Editing and rerendering keep
 that exact authored step without changing the view's selected subset.
 
-Choose a destination in **Section**, then **Add to diagram → Paragraph** or **Bullet point**
-to create section prose. These actions append and select the new item, including
-in sections without diagrams, and reveal page preview when Explore hides it.
+Use **Add → Paragraph** or **Bullet point** in the selected editing context
+to create section prose. **Change destination** chooses another section. These
+actions append and select the new item, including in sections without diagrams,
+and reveal it on the selected chapter surface: Notes in Explore or prose in Standard.
 Empty section inspectors also offer **Add an introduction** and **Add first point**.
 New paragraphs and points focus their text field with the placeholder selected.
 Select a paragraph for **Add paragraph before/after**, **Move paragraph up/down**,
@@ -70,13 +71,12 @@ its block. Node/edge labels and panel values remain plain text. See
 Each named **Chapter** has one saved **Viewing mode**: **Standard** shows the curated
 page arrangement, while **Explore** fills the browser with the diagram and
 floating panels. The editor displays the selected type just as the exported
-HTML does. Select a **Section** in the top toolbar and use its Chapter buttons to
-switch between the saved perspectives.
+HTML does. Use the shared **Tabs**, **Chapters**, and optional **Diagrams** buttons to select the visible context. A small screen icon marks Explore on chapter and tab chips.
 
 In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
 Moving or resizing a data panel or the step controls saves that Chapter's floating
 defaults in the source, so the placement survives HTML export. Standard keeps
-its panels in the authored page arrangement; use **Arrange section** to edit
+its panels in the authored page arrangement; use **Chapter → Arrange chapter and saved visibility…** to edit
 that arrangement.
 
 Explore panel edits and editor-tool moves/resizes join the same **Undo**/**Redo**
@@ -93,12 +93,11 @@ start fresh. Local drill-down panels keep their own geometry through preview
 refreshes; undoing a closed detail’s geometry does not reopen it. Each named Chapter
 retains its own camera for the session.
 Canvas panning, zooming and **Fit diagram** remain temporary navigation and do
-not add Undo entries or change the saved opening camera. Use **Back to page**
-to author the camera in the contained Explore view.
+not add Undo entries or change the saved opening camera. Use **Chapter → Use current camera as opening view** to save the current framing explicitly, or **Reset opening camera** to restore automatic fitting. Each is one Undo operation.
 
-Choose a named Chapter above the graph to work on it. The adjacent **Viewing mode**
+Choose a named Chapter above the graph to work on it. The **Chapter → Viewing mode**
 control saves **Standard** or **Explore** for that Chapter. Keep
-both modes in one story: open **Chapter options → Duplicate chapter**, give the copy
+both modes in one story: open **Chapter → Duplicate chapter**, give the copy
 a **Chapter name**, save it with **Rename chapter** or Enter, and choose its
 mode independently. Changing a legacy or automatic chapter to Explore
 creates its named Chapter in one Undo operation.
@@ -108,26 +107,9 @@ published page; it then reads **Opening chapter**. Merely selecting another Chap
 does not edit the source or change that default. Viewing mode, name, duplication
 and default changes use the normal source Undo/Redo history.
 
-**Back to page** reveals prose, contract cards and the contained Explore view.
-**Open Explore** returns to its full-browser view. This navigation does not
-change the saved Viewing mode. Selecting another Chapter or section follows that Chapter's
-mode again. There is no separate editor presentation dropdown.
-Explore panel and step-control placement can be saved from either surface.
-In the contained view, panning and zooming also save the opening camera.
-**Arrange section** exposes the page arrangement and saved view settings;
-**Canvas appearance** offers host-width previews.
+The selected Chapter owns its Standard or Explore surface. **Chapter → Arrange chapter and saved visibility…** opens the detailed arranger for placement, saved visibility, paths and steps. Its **Arrangement profile** selector edits Responsive, Backstage, or Confluence arrangements independently; moving, resizing, hiding, optimizing, or resetting Standard tiles changes only that profile. **Panels** owns temporary Hide/Restore, Stack at edge and panel/control scale; **Legend** owns protocol keys. These popovers overlay the canvas. **Preview → Open page preview** renders a separate reader. It opens the last usable document with the current skin, tab, Chapter, path and step. Host and width choices apply there. The editor tree is suspended while reader controls remain interactive; Close preview or Escape restores the same source (including an invalid draft), history, editing selection, playback and camera.
 
-**Add to diagram**, **Undo**, **Redo**, **Preview read-only page**, **User guide**,
-and **Download JSON** share the project toolbar above the workspace. **Preview
-read-only page** opens the current usable document in a separate reader surface,
-using the active skin and keeping the selected tab, Chapter, path, view, and step
-where possible. Editor tools and layout-authoring handles are unavailable there;
-reader navigation and playback remain interactive without changing the JSON.
-The fixed **← Back to workbench** button stays visible while the page scrolls and
-returns to the same workbench draft, focus, and canvas position. The
-**Section** selector names the destination section, including its tab when applicable.
-Selecting a section in the preview updates this selector; choosing a destination
-here opens its tab and selects that section without switching editor tools.
+**File**, **Add**, **Undo/Redo**, **Preview**, **Help**, and download share one project band. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
 
 Each card in **Add to diagram** opens its next step immediately. **Node** opens
 presets; click a preset to add it and customize it in the inspector. **All additions**
@@ -238,8 +220,7 @@ Contract blocks have their own width and editing controls: see
 
 Published standalone pages open an Explore view across the full browser or iframe,
 with floating data panels, playback and view choices. Switching to a curated
-standard/Home view restores its authored page layout. **Back to page** reveals
-the surrounding document. Browser fullscreen remains a separate explicit action.
+standard/Home view restores its authored page layout. Use Tabs and Chapters to navigate the surrounding document. Browser fullscreen remains a separate explicit action.
 
 ## Setup and review tools
 

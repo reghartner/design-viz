@@ -282,7 +282,8 @@ test('switching live focus moves one board, panel and transport without repainti
   const layout=c.createBoardGrid(section,true,panel), aside=element(), map=element();
   layout.primaryHost.appendChild(map);layout.grid.appendChild(aside);
   layout.diagramHost.appendChild(h.boardDiv);layout.controlsHost.appendChild(h.term.bar);
-  const focus=c.createDiagramFocusControl(layout,panel,aside,h.term.bar,'panel',host=>h.stepper.scrollTargetEl=host);
+  const rail=element();layout.controlsHost.appendChild(rail);
+  const focus=c.createDiagramFocusControl(layout,panel,aside,h.term.bar,'panel',host=>h.stepper.scrollTargetEl=host,rail);
   h.stepper.enterStep(false);h.stepper.jumpSource(1);h.term.btnPlay.fire('click');
   const paints=h.paints.length,timers=[...h.intervals.keys()],pending=[...h.timeouts.keys()];
   layout.flowDisclosure.open=true;
@@ -290,7 +291,7 @@ test('switching live focus moves one board, panel and transport without repainti
   flowButton.fire('click');
   assert.equal(focus.mode(),'flow');assert.equal(flowButton.attrs['aria-pressed'],'true');
   assert.deepEqual(layout.grid.children,[layout.diagramCol,layout.primaryHost]);
-  assert.deepEqual(layout.diagramCol.children,[h.boardDiv,h.term.bar]);
+  assert.deepEqual(layout.diagramCol.children,[h.boardDiv,rail,h.term.bar]);
   assert.deepEqual(layout.primaryHost.children,[map,aside]);
   assert.equal(layout.flowDisclosure.hidden,true);
   assert.equal(h.stepper.scrollTargetEl,layout.diagramCol);
@@ -298,7 +299,7 @@ test('switching live focus moves one board, panel and transport without repainti
   assert.equal(h.paints.length,paints);assert.deepEqual([...h.intervals.keys()],timers);assert.deepEqual([...h.timeouts.keys()],pending);
   homeButton.fire('click');
   assert.deepEqual(layout.grid.children,[layout.primaryHost,aside]);
-  assert.deepEqual(layout.primaryHost.children,[map,h.term.bar]);
+  assert.deepEqual(layout.primaryHost.children,[map,rail,h.term.bar]);
   assert.equal(layout.diagramCol.parentNode,layout.flowDisclosure);
   assert.equal(layout.flowDisclosure.open,true,'the optional disclosure remembers its state');
   assert.equal(layout.flowDisclosure.hidden,false);assert.equal(h.stepper.scrollTargetEl,layout.primaryHost);

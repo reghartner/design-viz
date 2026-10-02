@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises';
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,canvasTools} from '../helpers/test.mjs';
 
 const spec={page:{title:'Independent domains',sections:[{id:'overview',heading:'Overview',diagram:{
   nodes:{outside:{title:'Caller'},a:{title:'Validate'},b:{title:'Store'},end:{title:'Receiver'}},
@@ -76,7 +76,7 @@ test('an extracted child opens empty and later plays its own steps independently
   authored.page.sections[1].diagram.view='step';
   authored.page.sections[1].diagram.steps=[{id:'own-first',text:'Child first beat',nodes:['a']},{id:'own-last',text:'Child second beat',nodes:['b']}];
   const text=JSON.stringify(authored,null,2);
-  await page.locator('#editor-tab-json').click();await src.fill(text);await page.locator('#go').click();await page.getByRole('button',{name:'Hide tools',exact:true}).click();
+  await page.locator('#editor-tab-json').click();await src.fill(text);await page.locator('#go').click();await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   await parent.getByRole('button',{name:'STEP',exact:true}).click();
   await parent.locator('[data-dv-path="alternate"]').click();
   await parent.locator('.schip[data-step-path="alternate"][data-step-source="2"]').click();

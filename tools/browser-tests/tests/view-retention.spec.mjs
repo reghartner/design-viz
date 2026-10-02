@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 
 function fixture(kind){
   const diagram={primaryPanel:'home',view:'step',autoplay:false,nodes:{camera:{title:'Camera'},service:{title:'Service'}},rows:[['camera','service']],edges:[{from:'camera',to:'service'}],
@@ -20,7 +20,7 @@ async function renderJSON(page,edit){
   await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();
 }
 for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view survives node, section and page edits, Undo and host preview`,async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(kind),null,2));await pagePreview(page);
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(kind),null,2));await prepareEditorSurface(page);
   const flow=kind==='named'?'service-flow':'flow';
   await section(page).getByRole('button',{name:'Data flow',exact:true}).click();
   await expect(section(page)).toHaveAttribute('data-view-id',flow);
@@ -40,12 +40,12 @@ for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view 
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');await expect(section(page)).toHaveAttribute('data-view-id',flow);
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('default');await expect(section(page)).toHaveAttribute('data-view-id',flow);
   await page.locator('#workspace-appearance>summary').click();
-  await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture(kind),null,2));await pagePreview(page);
+  await page.locator('#workspace-home').click();await paste(page,JSON.stringify(fixture(kind),null,2));await prepareEditorSurface(page);
   await expect(section(page)).toHaveAttribute('data-view-id',kind==='named'?'home-story':kind==='single layout'?'layout':'home');
 });
 
 test('removing the selected view uses the remaining authored default',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture('named'),null,2));await pagePreview(page);
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture('named'),null,2));await prepareEditorSurface(page);
   await section(page).getByRole('button',{name:'Data flow',exact:true}).click();
   await renderJSON(page,raw=>{raw.page.blocks[0].diagram.layouts.pop();});
   await expect(section(page)).toHaveAttribute('data-view-id','home-story');

@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -31,7 +31,7 @@ async function expectFullWidth(board){
 for(const skin of ['pastel','aurora'])for(const routing of ['curves','lanes']){
   test(`${skin} ${routing} rows fill Auto and Fit width in workbench and standalone`,async({page,server},testInfo)=>{
     const source=JSON.stringify(widthSpec(skin,routing));
-    await page.goto(server.origin+'/workbench.html');await paste(page,source);await pagePreview(page);
+    await page.goto(server.origin+'/workbench.html');await paste(page,source);await prepareEditorSurface(page);
     const board=page.locator('.board');
     await expectFullWidth(board);
     await board.getByRole('button',{name:'Fit width',exact:true}).click();await expectFullWidth(board);

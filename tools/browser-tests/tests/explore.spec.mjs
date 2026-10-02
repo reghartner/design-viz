@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 async function build(server,{unstacked=false,oversized=false}={}){
@@ -9,7 +9,7 @@ async function build(server,{unstacked=false,oversized=false}={}){
  delete d.layouts[1].exploreLayout;d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.panels.push({id:'queue',type:'queue',title:'Upload queue',initial:{depth:3}});
  if(unstacked)d.layouts[1].exploreLayout={
-  panels:d.panels.map((panel,index)=>({panel:panel.id,x:.02+index*.2,y:.12,w:.18,h:oversized && panel.id==='outcome' ? .95 : .22,stacked:false})),
+  panels:d.panels.map((panel,index)=>({panel:panel.id,x:.02+index*.2,y:.12,w:.18,h:oversized && panel.id==='outcome' ? 1 : .22,stacked:false})),
   prose:{x:.02,y:.52,w:.22,h:.26,stacked:false}
  };
  d.steps[1].panelVisibility={queue:false};d.steps[1].text='A deliberately long engineering caption. '.repeat(60);
@@ -56,7 +56,7 @@ test('right and top-right remain free placement; Stack at edge preserves size an
  expect(placed.x).toBeCloseTo(target.x,0);expect(placed.y).toBeCloseTo(target.y,0);
  await expect(grip).toHaveAttribute('title','Drag to move; arrow keys to move');
  const freeSizes=await Promise.all(cards.map(async card=>{const r=await rect(card);return {width:r.width,height:r.height};}));
- await page.getByRole('button',{name:'Stack at edge',exact:true}).click();
+ await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await page.keyboard.press('Escape');
  for(const card of cards)await expect(card).toHaveClass(/explore-stacked/);
  const stacked=await Promise.all(cards.map(rect));
  stacked.forEach((r,index)=>{expect(r.width).toBeCloseTo(freeSizes[index].width,0);expect(r.height).toBeCloseTo(freeSizes[index].height,0);});
@@ -66,21 +66,27 @@ test('right and top-right remain free placement; Stack at edge preserves size an
  const columns=[];stacked.forEach(r=>{const right=r.x+r.width;let column=columns.find(c=>Math.abs(c.right-right)<2);if(!column){column={right,rects:[]};columns.push(column);}column.rects.push(r);});
  expect(columns.length).toBeGreaterThan(1);
  for(const column of columns){
-  column.rects.sort((a,b)=>a.y-b.y);expect(column.rects[0].y).toBeCloseTo(stage.y+96,0);
+  column.rects.sort((a,b)=>a.y-b.y);expect(column.rects[0].y).toBeCloseTo(stage.y+12,0);
   column.rects.forEach((r,index)=>{expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);if(index)expect(r.y-column.rects[index-1].y-column.rects[index-1].height).toBeCloseTo(8,0);});
  }
 });
-test('an oversized stacked panel remains full-size and sends the following panel left',async({page,server})=>{
- const url=await build(server,{unstacked:true,oversized:true});await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and sends the following panel left',async({page,server})=>{
+ const url=await build(server,{unstacked:true,oversized:true});
+ if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
  const stage=await rect(page.locator('.explore-stage')),oversized=page.locator('[data-explore-panel=outcome]'),following=page.locator('[data-explore-panel=clip]');
- const beforeOversized=await rect(oversized),beforeFollowing=await rect(following),laneHeight=stage.height-96-12;
- expect(beforeOversized.height).toBeGreaterThan(laneHeight);
- await page.getByRole('button',{name:'Stack at edge',exact:true}).click();
+ const beforeOversized=await rect(oversized),beforeFollowing=await rect(following);
+ const tools=surface==='workbench'?await rect(page.locator('#workspace-canvas-controls')):null;
+ const insetBottom=tools?Math.max(68,stage.y+stage.height-tools.y+12):12,laneHeight=stage.height-12-insetBottom;
+ if(surface==='workbench')expect(beforeOversized.height).toBeGreaterThan(laneHeight);
+ else expect(beforeOversized.height).toBeCloseTo(laneHeight,0);
+ await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await page.keyboard.press('Escape');
  const afterOversized=await rect(oversized),afterFollowing=await rect(following);
  expect(afterOversized.width).toBeCloseTo(beforeOversized.width,0);expect(afterOversized.height).toBeCloseTo(beforeOversized.height,0);
  expect(afterFollowing.width).toBeCloseTo(beforeFollowing.width,0);expect(afterFollowing.height).toBeCloseTo(beforeFollowing.height,0);
- expect(afterOversized.y).toBeCloseTo(stage.y+96,0);expect(afterFollowing.y).toBeCloseTo(stage.y+96,0);
- expect(afterOversized.y+afterOversized.height).toBeGreaterThan(stage.y+stage.height-12);
+ expect(afterOversized.y).toBeCloseTo(stage.y+12,0);expect(afterFollowing.y).toBeCloseTo(stage.y+12,0);
+ if(surface==='workbench')expect(afterOversized.y+afterOversized.height).toBeGreaterThan(stage.y+stage.height-insetBottom);
+ else expect(afterOversized.y+afterOversized.height).toBeCloseTo(stage.y+stage.height-12,0);
  expect(afterFollowing.x+afterFollowing.width).toBeCloseTo(afterOversized.x-8,0);
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
@@ -94,7 +100,7 @@ test('panels resize inward below 210px, detach, cancel, hide and restore indepen
  await home.getByRole('button',{name:/^Hide /}).click();await expect(home).toBeHidden();
  await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-choices label').filter({hasText:'Home'}).getByRole('checkbox').check();await page.keyboard.press('Escape');
  await expect(home).toBeVisible();expect((await rect(home)).width).toBeCloseTo(narrow.width,0);
- await page.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(floats(page)).toHaveCount(0);
+ await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(floats(page)).toHaveCount(0);
  await page.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(floats(page)).toHaveCount(5);
  await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await expect(home).toHaveClass(/explore-stacked/);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Service flow',exact:true}).click();expect((await rect(home)).width).toBeCloseTo(narrow.width,0);
@@ -106,6 +112,7 @@ test('fullscreen is explicit and refusal keeps an exit-able in-page view',async(
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
  await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('Host policy'));});
  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.viewport-status')).toContainText('unavailable');
+ await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Hide panels',exact:true}).focus();await page.keyboard.press('Escape');await expect(page.locator('.explore-panel-menu')).not.toHaveAttribute('open','');await expect(page.locator('.explore-panel-menu summary')).toBeFocused();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).press('Escape');await expect(page.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);await expect(page.locator('.explore-stage')).toBeHidden();
 });
@@ -128,7 +135,7 @@ test('Explore height is scroll-independent, controls share the top row and canva
  for(let n=0;n<2;n++){await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));await page.reload();await expect(stage).toBeVisible();expect((await stage.boundingBox()).height).toBeCloseTo(initial,0);}
  const transport=await page.locator('.explore-player .step-transport').boundingBox(),chips=await page.locator('.explore-player .schips').boundingBox(),caption=await page.locator('.explore-player .stepline').boundingBox();
  expect(chips.y).toBeCloseTo(transport.y,0);expect(chips.x).toBeGreaterThan(transport.x+transport.width);expect(caption.y).toBeGreaterThan(transport.y+transport.height);
- expect((await page.locator('.explore-player').boundingBox()).height).toBeLessThan(190);
+ const dock=await page.locator('.explore-player').boundingBox(),mode=await page.locator('.explore-player .playback-mode-rail').boundingBox();expect(dock.height-mode.height).toBeLessThan(190);expect(mode.y+mode.height).toBeLessThanOrEqual(transport.y);expect(caption.y+caption.height).toBeLessThanOrEqual(dock.y+dock.height);
  const margins=await board.evaluate(el=>{
   const svg=el.querySelector('.boardcanvas>svg');el.scrollLeft=0;el.scrollTop=0;const start=svg.getBoundingClientRect(),b=el.getBoundingClientRect();
   el.scrollLeft=el.scrollWidth;el.scrollTop=el.scrollHeight;const end=svg.getBoundingClientRect();

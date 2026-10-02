@@ -57,10 +57,10 @@ test('invalid authored graphs cannot be packaged as a successful viewable handof
 
 test('compact chrome keeps Add, Auto arrange, appearance and workspace controls independently reachable',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
-  for(const [width,height] of [[1800,800],[1501,800],[1500,800],[1499,800],[1240,800],[1200,800],[1190,800],[1181,800],[1180,800],[1150,800],[1050,800],[1024,800],[850,800],[820,800],[720,800],[640,800],[390,800],[390,360]]){
+  for(const [width,height] of [[1800,800],[1501,800],[1500,800],[1499,800],[1281,800],[1280,800],[1279,800],[1240,800],[1200,800],[1190,800],[1181,800],[1180,800],[1150,800],[1050,800],[1024,800],[850,800],[820,800],[720,800],[640,800],[390,800],[390,360]]){
     await page.setViewportSize({width,height});
     const controls=await page.evaluate(width=>['#workbench-home','#diagram-add','#auto-arrange','#workbench-reader-open','#file-save','.workspace-save>[data-workbench-tour]','#undo-builder','#redo-builder','#diagram-add-target','#workspace-appearance>summary','#editor-tab-agent']
-      .concat(width>1050?['#workspace-home']:[],width>1180?['.workspace-save>[data-open-human-guide]']:[]).map(selector=>{
+      .concat(width>1050?['#workspace-home']:[],width>1280?['.workspace-save>[data-open-human-guide]']:[]).map(selector=>{
       const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
       return {selector,inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};
     }),width);
@@ -70,6 +70,8 @@ test('compact chrome keeps Add, Auto arrange, appearance and workspace controls 
     await expect(page.locator('#auto-arrange')).toHaveAccessibleName('Auto arrange');
     await expect(page.locator('#file-save')).toHaveAccessibleName('Download JSON');
     await expect(page.locator('.workspace-save>[data-workbench-tour]')).toHaveAccessibleName('Take the workbench tour');
+    if(width>1280)await expect(page.locator('.workspace-save>[data-open-human-guide]')).toBeVisible();
+    else await expect(page.locator('.workspace-save>[data-open-human-guide]')).toBeHidden();
     await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeVisible();await page.keyboard.press('Escape');
     if(width===390){
       const before=await page.locator('#src').inputValue();

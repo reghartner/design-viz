@@ -11,10 +11,12 @@ distinct outcomes. Shared steps follow the selected path's color and numbering.
 Selecting the path chip pauses at step 1, including the shared lead-in; clicking
 a shared number keeps that path selected. Clicking the selected path chip also
 returns to step 1. A path-chip selection illuminates every delivered hop used by
-that path, including steps hidden by a view filter, while the caption, focused
-nodes, failures and panel state remain at step 1. Clicking a step number or using
-the previous/next controls returns illumination to that step's hops. The step
-count, playback ending, node tones and panel state all follow the selected path.
+that path and both endpoints of those hops, including hops in steps hidden by a
+view filter. Unrelated nodes and node-only step references stay dim, while the
+caption, semantic node tones, failures and panel state remain at step 1.
+Clicking a step number or using the previous/next controls returns illumination
+to that step's hops and focused nodes. The step count, playback ending, node
+tones and panel state all follow the selected path.
 Chips retain their order when switching.
 
 A path ends at its last referenced step. Next is disabled there; Play replays

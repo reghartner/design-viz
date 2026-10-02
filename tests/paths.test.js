@@ -26,16 +26,17 @@ function edgePathFixture(shared){
     {id:'happy-middle',text:'Continue happy route',edge:'b->c'},
     {id:'happy-last',text:'Finish happy route',edge:'c->d'},
     {id:'alternate-first',text:'Start alternate route',edge:'a->e'},
-    {id:'alternate-last',text:'Finish alternate route',edge:'e->d'}
+    {id:'alternate-last',text:'Finish alternate route',edge:'e->d'},
+    {id:'happy-note',text:'Narrate without a hop',nodes:['narrator']}
   ];
   if(shared)steps.unshift({id:'shared-first',text:'Start either route',edge:'a->b'});
-  return {view:'step',nodes:{a:{},b:{},c:{},d:{},e:{}},rows:[['a','b','c','d','e']],
+  return {view:'step',nodes:{a:{},b:{},c:{},d:{},e:{},narrator:{},orphan:{}},rows:[['a','b','c','d','e','narrator','orphan']],
     edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'d'},{from:'a',to:'e'},{from:'e',to:'d'}],steps,
     panels:[{id:'state',type:'state',states:['pending'],initial:{state:'pending'}}],
     paths:shared?
-      [{id:'happy',label:'Happy path',steps:['shared-first','happy-middle','happy-last']},
+      [{id:'happy',label:'Happy path',steps:['shared-first','happy-middle','happy-note','happy-last']},
         {id:'alternate',label:'Alternate path',steps:['shared-first','alternate-first','alternate-last']}]:
-      [{id:'happy',label:'Happy path',steps:['happy-first','happy-middle','happy-last']},
+      [{id:'happy',label:'Happy path',steps:['happy-note','happy-first','happy-middle','happy-last']},
         {id:'alternate',label:'Alternate path',steps:['alternate-first','alternate-last']}]};
 }
 
@@ -129,13 +130,14 @@ function harness(d=fixture()){
   // Enable timer logic but keep geometry/animation irrelevant to the test.
   c.RM=false;
   function board(diagram=d){
-    const svg=el(),edgeIds={};
+    const svg=el(),edgeIds={},nodeEls={};
+    Object.keys(diagram.nodes||{}).forEach(id=>{nodeEls[id]=svg.appendChild(el());});
     (diagram.edges||[]).forEach(function(edge,index){
       const pathEl=svg.appendChild(el()),labelEl=svg.appendChild(el()),domId='test-e'+index;
       pathEl.classList.add('edge');labelEl.classList.add('elabel');ids[domId]=pathEl;
       edgeIds[edge.from+'->'+edge.to]={domId,e:edge,idx:index,pathEl,labelEl};
     });
-    currentBoard={svg,nodeEls:{},edgeIds};return currentBoard;
+    currentBoard={svg,nodeEls,edgeIds};return currentBoard;
   }
   const term={};
   ['bar','chips','stepN','stepText','srcA','lanePill','stepIdEl','btnPrev','btnPlay','btnNext','btnAmb','btnStep','playbackStatus','sharedStatus'].forEach(k=>term[k]=el());
@@ -147,6 +149,7 @@ function harness(d=fixture()){
   sp.enterStep(false);
   return {c,sp,term,paints,rendered,intervals,navigation,
     litEdges(){return Object.keys(currentBoard.edgeIds).filter(key=>currentBoard.edgeIds[key].pathEl.classList.contains('lit'));},
+    litNodes(){return Object.keys(currentBoard.nodeEls).filter(id=>currentBoard.nodeEls[id].classList.contains('lit'));},
     tick(){[...intervals.values()].forEach(fn=>fn());}};
 }
 test('switching paths pauses, rebuilds the chosen sequence, and stops at its own terminal step',()=>{
@@ -168,30 +171,40 @@ test('pathless diagrams keep unlabeled legacy navigation; a single explicit path
   assert.ok(h.term.chips.children.every(b=>b.className.startsWith('schip')));h.sp.jump(-1);assert.equal(h.sp.current().id,'drop');
   const one=fixture();one.paths.pop();assert.ok(harness(one).term.chips.children.every(b=>b.className.startsWith('schip')));
 });
-test('matrix path chips light every authored route edge, including hidden steps, until arrow navigation resumes',()=>{
+test('matrix path chips light every route edge and endpoint, including hidden steps, until arrow navigation resumes',()=>{
   const h=harness(edgePathFixture(false));
   assert.equal(h.term.chips.children[0].className,'path-matrix');
+  pathChoice(h,'happy').fire('click');
+  assert.equal(h.sp.current().id,'happy-note');
+  assert.deepEqual(h.litNodes(),['a','b','c','d'],'the current node-only step does not widen route endpoint focus');
   h.sp.setVisibleSteps(['happy-first','happy-last','alternate-first','alternate-last']);
   pathChoice(h,'happy').fire('click');
   assert.deepEqual(h.litEdges(),['a->b','b->c','c->d'],'the overview includes the filtered-out middle step');
+  assert.deepEqual(h.litNodes(),['a','b','c','d'],'only endpoints of delivered route edges are focused');
   assert.equal(h.sp.current().id,'happy-first');
   h.term.btnNext.fire('click');
   assert.deepEqual(h.litEdges(),['c->d'],'the next arrow restores current-step edge paint');
+  assert.deepEqual(h.litNodes(),['c','d'],'the next arrow restores current-step node focus');
   pathChoice(h,'alternate').fire('click');
   assert.deepEqual(h.litEdges(),['a->e','e->d'],'switching chips cannot retain edges from the previous route');
+  assert.deepEqual(h.litNodes(),['a','d','e'],'switching chips clears old endpoints and excludes unrelated and node-only references');
 });
-test('shared-timeline path chips light their full route and step selection restores one-step paint',()=>{
+test('shared-timeline path chips light their full route endpoints and step selection restores one-step paint',()=>{
   const h=harness(edgePathFixture(true));
   assert.equal(h.term.chips.children[0].className,'path-timeline');
   pathChoice(h,'happy').fire('click');
   assert.deepEqual(h.litEdges(),['a->b','b->c','c->d']);
+  assert.deepEqual(h.litNodes(),['a','b','c','d']);
   assert.equal(h.sp.current().id,'shared-first');
   circle(h,2).fire('click');
   assert.deepEqual(h.litEdges(),['b->c'],'a timeline circle restores current-step edge paint');
+  assert.deepEqual(h.litNodes(),['b','c'],'a timeline circle restores current-step node focus');
   pathChoice(h,'alternate').fire('click');
   assert.deepEqual(h.litEdges(),['a->b','a->e','e->d']);
+  assert.deepEqual(h.litNodes(),['a','b','d','e']);
   h.sp.selectPath('happy',0);
   assert.deepEqual(h.litEdges(),['a->b'],'programmatic path selection remains step-scoped');
+  assert.deepEqual(h.litNodes(),['a','b'],'programmatic path selection restores step-scoped node focus');
 });
 test('selecting the existing path keeps the board, and a one-step path never starts an autoplay timer',()=>{
   const h=harness();h.sp.selectPath('happy',2);assert.equal(h.rendered.length,0);assert.equal(h.sp.current().id,'three');

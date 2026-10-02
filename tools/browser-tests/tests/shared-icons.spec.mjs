@@ -86,6 +86,16 @@ test('raster, monogram and icon company marks stay contained in narrow Screen ca
  expect(monogramBox.width).toBeCloseTo(12,0);expect(monogramBox.height).toBeCloseTo(12,0);
  expect(textBox.x).toBeGreaterThanOrEqual(monogramBox.x-.5);expect(textBox.x+textBox.width).toBeLessThanOrEqual(monogramBox.x+monogramBox.width+.5);
  expect(textBox.y).toBeGreaterThanOrEqual(monogramBox.y-.5);expect(textBox.y+textBox.height).toBeLessThanOrEqual(monogramBox.y+monogramBox.height+.5);
+ for(const logo of ['WW','WWW','漢漢','漢漢漢']){
+   d.brand={app:'Cedar',logo};
+   await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+   const wideScreen=root.locator('.pt-screen .screenbox');await wideScreen.evaluate(el=>el.style.width='160px');
+   const wideMark=wideScreen.locator('.fv-brand-monogram'),wideText=wideMark.locator('.fv-brand-monogram-text');
+   await expect(wideText).toHaveText(logo);
+   const wideMarkBox=await wideMark.boundingBox(),wideTextBox=await wideText.boundingBox();
+   expect(wideTextBox.x,logo).toBeGreaterThanOrEqual(wideMarkBox.x-.5);expect(wideTextBox.x+wideTextBox.width,logo).toBeLessThanOrEqual(wideMarkBox.x+wideMarkBox.width+.5);
+   expect(wideTextBox.y,logo).toBeGreaterThanOrEqual(wideMarkBox.y-.5);expect(wideTextBox.y+wideTextBox.height,logo).toBeLessThanOrEqual(wideMarkBox.y+wideMarkBox.height+.5);
+ }
  d.brand={app:'Cedar',logo:'C'};
  await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
  const singleScreen=root.locator('.pt-screen .screenbox');await singleScreen.evaluate(el=>el.style.width='160px');

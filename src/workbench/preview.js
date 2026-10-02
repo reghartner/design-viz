@@ -110,7 +110,11 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
-  var links=typeof wireDeepLinks==='function' && typeof window!=='undefined'?wireDeepLinks(ctl,window,null,{history:false}):null,destroy=ctl.destroy;
+  /* An unpublished draft has no public document ID. Its controls deliberately
+     use this Workbench document as a local/recovery base; Canon supplies its
+     stable published route in library.workbench.js. */
+  var linkBase=typeof window!=='undefined'?String(window.location.href).split('#')[0]:null;
+  var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
   ctl.destroy=function(){if(links)links.destroy();destroy();};
   try{
     restoreActiveTabs(ctl, tabs);
@@ -139,7 +143,8 @@ function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
   options=options || {};
   var saved=options.snapshot || workbenchReaderPreviewSnapshot(page,authoringCtl);
   var ctl=renderPage(view,page,skin,null,{autoplay:false,layoutTarget:options.layoutTarget});
-  var links=typeof wireDeepLinks==='function' && typeof window!=='undefined'?wireDeepLinks(ctl,window,null,{history:false}):null,destroy=ctl.destroy;
+  var linkBase=typeof window!=='undefined'?String(window.location.href).split('#')[0]:null;
+  var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
   ctl.destroy=function(){if(links)links.destroy();destroy();};
   ctl.suppressFragmentWrites=true;
   try{

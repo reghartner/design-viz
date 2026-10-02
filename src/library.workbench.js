@@ -214,7 +214,7 @@ function initWorkbenchLibrary(opts){
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
       ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
-      deepLinks=wireDeepLinks(ctl,window,null,{history:false});
+      deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
       exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});

@@ -242,7 +242,10 @@ function initWorkbenchWelcome(opts){
   /* Keep a real, rename-safe navigation target for open-in-new-tab and for
      the no-script fallback. Ordinary clicks retain the in-app history. */
   homeLink.href=window.location.pathname;
-  homeLink.addEventListener('click', function(ev){ev.preventDefault();show();});
+  homeLink.addEventListener('click', function(ev){
+    if(ev.button!==0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey)return;
+    ev.preventDefault();show();
+  });
   el('workspace-home').addEventListener('click', show);
   headerResume.addEventListener('click', resumeProject);
   resume.addEventListener('click', resumeProject);

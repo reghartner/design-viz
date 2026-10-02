@@ -38,8 +38,12 @@ opens the latest published version; renaming the folder or removing its canon
 entry makes an old link unavailable.
 Unknown IDs or a missing published snapshot show an error with Retry.
 
-**Copy link** shares the document at its initial view/step, not the current
-playback position. Use a hosted standalone export for step/view/embed links.
+The toolbar **Copy link** shares the document at its authored opening state.
+The chain-link controls beside tabs, chapters, steps, and contract cards keep
+the same `?diagram=…` document route and add the current composed reader state;
+those links open directly at that target and survive reloads. A chapter link in
+the hosted reader is a normal chapter target. Use a hosted standalone export
+when you specifically need its chrome-free `#embed=…` mode.
 The bundled fictional demo remains available from the library when no snapshot
 exists, but has no public Copy link. Direct `?diagram=…` links never substitute
 that demo for missing published content. `?diagram=…` is the read-only route;

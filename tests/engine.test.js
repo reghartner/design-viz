@@ -1773,8 +1773,9 @@ test('prose collapse controls have print expansion and explicit six-skin styling
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\{[\s\S]*?\.prosechev\{transition:none !important;\}/);
 });
 
-function deepLinkHarness(activeTarget, options){
-  const pageBase = 'https://pages.example.test/page.html?mode=view';
+function deepLinkHarness(activeTarget, options, sharedWin, pageURL){
+  const pageBase = pageURL || 'https://pages.example.test/page.html?mode=view';
+  const parsedPage = new URL(pageBase);
   const historyWrites = [], historyCalls = [], posts = [], copied = [], windowListeners = {};
   const button = {
     innerHTML: '', parentNode: null, listeners: {},
@@ -1784,11 +1785,12 @@ function deepLinkHarness(activeTarget, options){
   const location = {
     href: pageBase,
     hash: '',
-    pathname: '/page.html',
-    search: '?mode=view',
-    origin: 'https://pages.example.test'
+    pathname: parsedPage.pathname,
+    search: parsedPage.search,
+    origin: parsedPage.origin,
+    protocol: parsedPage.protocol
   };
-  const win = {
+  const win = sharedWin || {
     location,
     history: {replaceState(state, title, value){
       historyCalls.push([state, title, value]);
@@ -1971,7 +1973,7 @@ test('host link-base composition joins fragments with # or & and leaves an empty
 
 test('invalid link bases are ignored by both inbound paths', () => {
   const h = deepLinkHarness();
-  ['javascript:alert(1)', 'data:text/html,hello', 'relative/page.html',
+  ['javascript:alert(1)', 'data:text/html,hello', 'file:///tmp/workbench.html', 'relative/page.html',
    '"https://example.test/"', 'https://example.test/a b',
    ' https://example.test/path', 'https://example.test/path\n', 42].forEach(base => {
     assert.strictEqual(C.isValidLinkBase(base), false);
@@ -2100,16 +2102,54 @@ test('standalone history writes retain every replaceState argument', () => {
 });
 
 test('host-owned deep links bind current-state copies without changing host routing', () => {
-  const h = deepLinkHarness(undefined, {history:false});
+  const h = deepLinkHarness(undefined, {history:false,linkBase:'https://host.example.test/workbench'});
   assert.deepStrictEqual(h.historyCalls, []);
   assert.strictEqual(h.windowListeners.hashchange, undefined);
   h.ctl.onChange();
   assert.deepStrictEqual(h.historyCalls, []);
   h.button.listeners.click();
   assert.strictEqual(h.copied[0],
-    'https://pages.example.test/page.html?mode=view#t=overview');
+    'https://host.example.test/workbench#t=overview');
   h.channel.destroy();
   assert.strictEqual(h.win.dvSetLinkBase, undefined);
+});
+
+test('a downloaded host may use its own trusted file URL without widening external setters', () => {
+  const base='file:///tmp/Flowview%20Workbench/workbench.html?diagram=demo';
+  const h=deepLinkHarness(undefined,{history:false,linkBase:base},null,'file:///tmp/Flowview%20Workbench/workbench.html');
+  h.button.listeners.click();
+  assert.strictEqual(h.copied[0],base+'#t=overview');
+  assert.strictEqual(h.win.dvSetLinkBase,undefined);
+  h.channel.destroy();
+});
+
+test('host-owned deep links restore an initial target without writing host history', () => {
+  const seed=deepLinkHarness(undefined,{history:false});seed.channel.destroy();
+  seed.win.location.hash='#t=overview';seed.win.location.href='https://pages.example.test/page.html?mode=view#t=overview';
+  seed.historyCalls.length=0;
+  const h=deepLinkHarness({kind:'page'},{history:false,linkBase:'https://host.example.test/view'},seed.win);
+  assert.deepStrictEqual(plain(h.ctl.activeTarget),{kind:'tab',tabBlock:1,tab:0});
+  assert.deepStrictEqual(seed.historyCalls,[]);
+  h.channel.destroy();
+});
+
+test('overlapping deep-link setters retire safely in either order', () => {
+  function pair(){
+    const a=deepLinkHarness(undefined,{history:false}),b=deepLinkHarness(undefined,{history:false},a.win);
+    return {a,b,win:a.win,copied:a.copied};
+  }
+  let h=pair();
+  h.a.channel.destroy();
+  assert.strictEqual(h.win.dvSetLinkBase('https://second.example/view'),true);
+  h.b.button.listeners.click();
+  assert.strictEqual(h.copied.at(-1),'https://second.example/view#t=overview');
+  h.b.channel.destroy();assert.strictEqual(h.win.dvSetLinkBase,undefined);
+
+  h=pair();h.b.channel.destroy();
+  assert.strictEqual(h.win.dvSetLinkBase('https://first.example/view'),true);
+  h.a.button.listeners.click();
+  assert.strictEqual(h.copied.at(-1),'https://first.example/view#t=overview');
+  h.a.channel.destroy();assert.strictEqual(h.win.dvSetLinkBase,undefined);
 });
 
 test('section references are heading-slug primary, unique, and positional only without headings', () => {

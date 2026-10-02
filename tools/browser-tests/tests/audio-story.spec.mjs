@@ -58,7 +58,8 @@ test('operator voice, siren confirmation and heard-alarm evidence stay independe
  await expect(clip).toBeVisible();await expect(host.locator('.pt-homemap [data-sound]')).toHaveCount(0);
  await expect(host.locator('.secmon')).toContainText('Voice downlink interrupted');
  await mount(page,2);await navigate(page,2,'recognized','classified');
- await expect(host.locator('.pt-screen')).toContainText('Smoke alarm heard');
+ await expect(host.locator('.pt-screen')).not.toContainText('Smoke alarm heard');
+ await expect(host.locator('.pt-screen .screen-audio-direction, .pt-screen .screen-audio-slot .fva-audio')).toHaveCount(0);
  await expect(host.locator('.pt-phone')).toContainText('Smoke alarm sound heard');
  await navigate(page,2,'uncertain','unclassified');
  await expect(host.locator('.pt-phone')).not.toContainText('Smoke alarm sound heard');

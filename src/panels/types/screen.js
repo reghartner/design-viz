@@ -371,10 +371,17 @@ function screenDeviceOverlay(audio, spotlight, siren) {
       '<g transform="translate(-12 -12)">' + FlowIcons.glyph('alarm', {tone:'alert'}) + '</g>' +
       FlowAudio.effect({output:'siren'}) + '</g>' : '') + '</svg>';
 }
-function screenAudioHTML(audio) {
+function screenAudioHTML(audio, siren) {
+  var model = FlowAudio.model(audio);
+  if (
+    siren === 'on' ||
+    model.output === 'siren' ||
+    model.detection === 'smoke-alarm' ||
+    model.detection === 'co-alarm'
+  ) return '';
   var strip = FlowAudio.render(audio, {label:'Camera audio'});
   if (!strip) return '';
-  var speaking = FlowAudio.isEmitting(audio), hearing = FlowAudio.isCapturing(audio), model = FlowAudio.model(audio);
+  var speaking = FlowAudio.isEmitting(audio), hearing = FlowAudio.isCapturing(audio);
   var action = speaking && hearing ? 'Camera speaker and microphone active' :
     speaking ? {speech:'Camera speaking to visitor',recorded:'Camera playing recorded message',chime:'Camera sounding a chime',siren:'Camera sounding a siren'}[model.output] :
     hearing ? 'Camera hearing visitor or nearby sound' :
@@ -426,7 +433,7 @@ function screenFramePresentation(host, panel, state) {
       ) +
       '</span></div>';
   scrOvl += screenDeviceOverlay(state.audio, state.spotlight, state.siren);
-  var audioHTML = screenAudioHTML(state.audio);
+  var audioHTML = screenAudioHTML(state.audio, state.siren);
   var effects = '';
   if (state.siren === 'on') effects += '<span class="screen-siren-label">Alarm sounding</span>';
   if (SCREEN_SPOTLIGHTS.indexOf(state.spotlight) >= 0 && state.spotlight !== 'off')

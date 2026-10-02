@@ -42,3 +42,20 @@ test('the practice transport stages review and invokes real apply only when acce
   client.propose();assert.equal(client.reviewSnapshot(),null,'moving to another lesson must not recreate an accepted proposal');
   assert.equal(updates.at(-1).review,null);
 });
+
+test('landing selects the first non-detail diagram using canonical section records',()=>{
+  const c=harness();
+  for(const raw of [
+    {nodes:{a:{}},rows:[['a']]},
+    {page:{sections:[{heading:'Intro'},{id:'child',detailOnly:true,diagram:{nodes:{a:{}},rows:[['a']]}},{id:'company',diagram:{nodes:{b:{}},rows:[['b']]}}]}},
+    {blocks:[{tabs:[{label:'Intro',sections:[{heading:'Intro'}]},{label:'Story',sections:[{id:'company',diagram:{nodes:{b:{}},rows:[['b']]}}]}]}]}
+  ]){
+    const records=c.sectionRecords(c.normalize(raw));
+    const ctl={sections:records.map(r=>({...r,hasDiagram:!!r.section.diagram,detailOnly:!!r.section.detailOnly}))};
+    const selected=c.workbenchLandingSection(ctl);
+    assert.equal(selected.reference,records.length===1?records[0].reference:'company');
+    let activated=null;ctl.tabBlocks=[{index:1,select:(tab,focus,activate)=>activated={tab,focus,activate}}];
+    c.workbenchLandingActivate(ctl,selected);
+    assert.deepEqual(activated,selected.tabBlock?{tab:1,focus:false,activate:false}:null);
+  }
+});

@@ -33,7 +33,7 @@ def entrypoint(name):
 class BuildTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        r = subprocess.run([sys.executable, str(BUILD)], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(BUILD), "--no-config"], capture_output=True, text=True)
         assert r.returncode == 0, r.stderr
         cls.texts = {p.name: p.read_text() for p in PAGES}
 
@@ -178,7 +178,7 @@ class BuildTests(unittest.TestCase):
 
     def test_build_is_deterministic(self):
         before = {p: p.read_text() for p in OUTPUTS}
-        r = subprocess.run([sys.executable, str(BUILD)], capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(BUILD), "--no-config"], capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr)
         for p in OUTPUTS:
             self.assertEqual(before[p], p.read_text(), f"{p} changed on rebuild")

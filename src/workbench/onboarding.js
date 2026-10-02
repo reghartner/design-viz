@@ -72,9 +72,23 @@ function installWorkbenchTourKeyGuard(win){
     if((ev.metaKey || ev.ctrlKey) && /^[zdycvx]$/i.test(ev.key) || ev.key==='Delete' || ev.key==='Backspace')ev.preventDefault();
   },true);
 }
+// Render records use the same canonical identity for wrappers, tabs and bare diagrams.
+function workbenchLandingSection(ctl){
+  return ctl.sections.find(function(section){return section.hasDiagram && !section.detailOnly;});
+}
+function workbenchLandingActivate(ctl,section){
+  if(section && section.tabBlock){
+    var tabs=ctl.tabBlocks.find(function(tabs){return tabs.index===section.tabBlock;});
+    if(tabs)tabs.select(section.tab,false,false);
+  }
+}
 function initWorkbenchOnboarding(opts){
-  var doc=document,example=doc.getElementById('welcome-example-view'),sample=JSON.parse(JSON.stringify(WORKBENCH_ONBOARDING));
+  var doc=document,example=doc.getElementById('welcome-example-view'),sample=JSON.parse(JSON.stringify(WORKBENCH_LANDING.spec));
   var ctl=null,home=doc.getElementById('welcome-home'),welcomeRoot=doc.getElementById('workbench-welcome');
+  doc.getElementById('welcome-example-title').textContent=WORKBENCH_LANDING.title;
+  doc.getElementById('welcome-example-label').textContent=WORKBENCH_LANDING.label?' · '+WORKBENCH_LANDING.label:'';
+  doc.getElementById('welcome-example-footer').textContent=WORKBENCH_LANDING.footer;
+  doc.getElementById('welcome-example-footer').hidden=!WORKBENCH_LANDING.footer;
   var stage=doc.createElement('div');stage.id='welcome-example-stage';
   function sizeExample(){
     if(!ctl || home.hidden || welcomeRoot.hidden || !example.clientWidth)return;
@@ -84,7 +98,13 @@ function initWorkbenchOnboarding(opts){
   }
   function paintExample(){
     if(home.hidden || welcomeRoot.hidden){if(ctl){ctl.destroy();ctl=null;example.replaceChildren();}return;}
-    if(!ctl){example.appendChild(stage);ctl=renderPage(stage,normalize(sample),'pastel',null,{autoplay:false});ctl.suppressFragmentWrites=true;sizeExample();}
+    if(!ctl){
+      // Keep the compact card on its stock presentation; the expanded reader owns the authored skin.
+      example.appendChild(stage);ctl=renderPage(stage,normalize(sample),'pastel',null,{autoplay:false});ctl.suppressFragmentWrites=true;
+      var featured=workbenchLandingSection(ctl);workbenchLandingActivate(ctl,featured);
+      ctl.sections.forEach(function(section){section.sectionEl.classList.toggle('welcome-example-secondary',section!==featured);});
+      sizeExample();
+    }
   }
   var sizeFrame=null;
   var exampleSize=new ResizeObserver(function(){
@@ -117,11 +137,12 @@ function initWorkbenchOnboarding(opts){
   function load(next){
     if(frame && chapter==='viewer' && next!=='viewer')viewerDismissed();
     note.textContent=practiceNotice;
+    title.textContent=next==='viewer' || next==='example'?[WORKBENCH_LANDING.title,WORKBENCH_LANDING.label].filter(Boolean).join(' · ') || 'Flowview · Example':'Flowview · Practice project';
     if(frame)frame.remove();chapter=next;
     Object.keys(buttons).forEach(function(key){buttons[key].setAttribute('aria-pressed',String(key===next));});
     frame=doc.createElement('iframe');frame.title='Interactive Flowview practice';frame.setAttribute('sandbox','allow-scripts');
-    var section=next==='example' && ctl && ctl.sections[0],sp=section && section.stepper;
-    var state=section?{view:section.presentation && section.presentation.viewId(),mode:sp && sp.mode(),path:sp && sp.path(),step:sp && sp.sourceIndex()}:null;
+    var section=next==='example' && ctl && workbenchLandingSection(ctl),sp=section && section.stepper;
+    var state=section?{section:section.reference,view:section.presentation && section.presentation.viewId(),mode:sp && sp.mode(),path:sp && sp.path(),step:sp && sp.sourceIndex()}:null;
     frame.addEventListener('load',function(){if(frame && dialog.open)frame.focus();});
     frame.srcdoc=workbenchPracticeSource(opts.source,next,state);dialog.appendChild(frame);
   }
@@ -202,7 +223,7 @@ function workbenchPracticeLessons(chapter){
 }
 function initWorkbenchPractice(opts){
   var doc=document,chapter=doc.documentElement.dataset.flowviewPractice,builder=opts.builder,tour=null;
-  var sample=JSON.parse(JSON.stringify(WORKBENCH_ONBOARDING)),workspace=opts.workspace;
+  var sample=JSON.parse(JSON.stringify(chapter==='viewer' || chapter==='example'?WORKBENCH_LANDING.spec:WORKBENCH_ONBOARDING)),workspace=opts.workspace;
   doc.body.classList.add('workbench-practice');doc.body.classList.remove('welcome-active');
   doc.getElementById('workbench-welcome').hidden=true;doc.getElementById('workbench-workspace').hidden=false;
   builder.loadSpec(chapter==='agent'?welcomeBlankSpec('My visitor story'):sample);workspace.showTool('inspect');
@@ -210,10 +231,11 @@ function initWorkbenchPractice(opts){
   if(chapter==='viewer' || chapter==='example'){
     builder.destroy();
     var readerView=doc.getElementById('docview');readerView.replaceChildren();
-    reader=renderPage(readerView,normalize(sample),'pastel',null,{autoplay:false});reader.suppressFragmentWrites=true;
+    reader=renderPage(readerView,normalize(sample),null,null,{autoplay:false});reader.suppressFragmentWrites=true;
     if(chapter==='example'){
       var initial=JSON.parse(decodeURIComponent(doc.documentElement.dataset.flowviewView || 'null'));
-      var section=reader.sections[0],player=section && section.stepper;
+      var section=initial && reader.sections.find(function(section){return section.reference===initial.section;}) || workbenchLandingSection(reader),player=section && section.stepper;
+      workbenchLandingActivate(reader,section);
       if(initial && initial.view && section && section.presentation)section.presentation.setView(initial.view);
       if(initial && player){player.jumpSource(initial.step,initial.path);if(initial.mode==='ambient')player.enterAmbient();}
     }

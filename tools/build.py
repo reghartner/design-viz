@@ -73,6 +73,52 @@ def workbench_canon() -> str:
     return json.dumps(manifest, ensure_ascii=True).replace('<', '\\u003c')
 
 
+def embedded_json(value) -> str:
+    """JSON safe inside an inline script and skeleton substitution, including closing tags."""
+    return json.dumps(value, ensure_ascii=True).replace('<', '\\u003c').replace('{{', '\\u007b\\u007b')
+
+
+def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
+    """Read company-owned inputs without changing them. Paths belong to config."""
+    path = pathlib.Path(config).resolve() if config is not None else ROOT / 'workbench/site.json'
+    if no_config or (config is None and not path.exists()):
+        return embedded_json({'spec': json.loads(read('starters/onboarding.json')),
+                              'title': 'A visitor at the door', 'label': 'Fictional example',
+                              'footer': 'One story. System flow, Home map, App screens, and Device app—moving together.'})
+    try:
+        data = json.loads(path.read_text())
+        if not isinstance(data, dict) or set(data) != {'version', 'landing'}:
+            raise ValueError('expected only version and landing fields')
+        if type(data['version']) is not int or data['version'] != 1:
+            raise ValueError('version must be 1')
+        landing = data['landing']
+        if not isinstance(landing, dict) or set(landing) - {'spec', 'title', 'label', 'footer'}:
+            raise ValueError('landing allows only spec, title, label and footer')
+        if not isinstance(landing.get('spec'), str) or not landing['spec'].strip():
+            raise ValueError('landing.spec must be a non-empty path')
+        for key in ('title', 'label', 'footer'):
+            if key in landing and not isinstance(landing[key], str):
+                raise ValueError('landing.' + key + ' must be plain text')
+        spec_path = (path.parent / landing['spec']).resolve()
+        raw = json.loads(spec_path.read_text())
+        # Execute the freshly assembled validator, never a stale generated runtime.
+        check = (runtime if runtime is not None else canon_runtime()) + '\n' + (
+            'const raw = ' + embedded_json(raw) + ';\n'
+            'const result = module.exports.validateSpec(raw);\n'
+            'if (!result.errors.length && !module.exports.viewerRouting().sectionRecords('
+            'module.exports.viewerRouting().normalize(raw)).some(r => r.section.diagram && !r.section.detailOnly))'
+            'result.errors.push("Landing needs a non-detail diagram section");\n'
+            'process.stdout.write(JSON.stringify(result.errors));\n')
+        errors = json.loads(subprocess.check_output(['node'], input=check, text=True))
+        if errors:
+            raise ValueError(str(spec_path) + ': ' + '; '.join(errors))
+        return embedded_json({'spec': raw, 'title': landing.get('title', 'Company diagram'),
+                              'label': landing.get('label', 'Company example'),
+                              'footer': landing.get('footer', '')})
+    except (OSError, ValueError) as error:
+        raise SystemExit(f'Invalid site config {path}: {error}') from error
+
+
 def read(name: str) -> str:
     return (SRC / name).read_text()
 
@@ -134,8 +180,14 @@ def fill(skel: str, mapping: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--runtime-only", action="store_true", help="build the static Node runtime without HTML")
+    config = parser.add_mutually_exclusive_group()
+    config.add_argument('--config', type=pathlib.Path, help='company site JSON; spec paths resolve relative to this file')
+    config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json')
     args = parser.parse_args()
+    if args.runtime_only and args.config is not None:
+        parser.error('--config requires an HTML build')
     runtime = canon_runtime()
+    landing = None if args.runtime_only else workbench_landing(args.config, no_config=args.no_config, runtime=runtime)
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
@@ -162,6 +214,7 @@ def main() -> int:
             mapping['WORKBENCH_TEMPLATES'] = workbench_templates()
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
+            mapping['WORKBENCH_LANDING'] = landing
             mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.parent.mkdir(parents=True, exist_ok=True)

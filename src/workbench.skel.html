@@ -44,9 +44,9 @@
           <p class="welcome-note">Copy instructions to your own coding agent. Preview its changes here, then commit when you’re ready.</p>
         </div>
         <section class="welcome-example" aria-label="Interactive example diagram">
-          <header><span><b>A visitor at the door</b> · Fictional example</span><button type="button" class="bbtn" id="welcome-example-expand">Expand ↗</button></header>
-          <div id="welcome-example-view" class="dv-skin-pastel"></div>
-          <footer>One story. System flow, Home map, App screens, and Device app—moving together.</footer>
+          <header><span><b id="welcome-example-title">A visitor at the door</b><span id="welcome-example-label"> · Fictional example</span></span><button type="button" class="bbtn" id="welcome-example-expand">Expand ↗</button></header>
+          <div id="welcome-example-view"></div>
+          <footer id="welcome-example-footer">One story. System flow, Home map, App screens, and Device app—moving together.</footer>
         </section>
       </div>
       <div class="welcome-actions" aria-label="Choose how to begin">
@@ -614,6 +614,7 @@
 var WORKBENCH_TEMPLATES = {{WORKBENCH_TEMPLATES}};
 var WORKBENCH_CANON = {{WORKBENCH_CANON}};
 var WORKBENCH_ONBOARDING = {{WORKBENCH_ONBOARDING}};
+var WORKBENCH_LANDING = {{WORKBENCH_LANDING}};
 {{JS}}
 })();
 </script>

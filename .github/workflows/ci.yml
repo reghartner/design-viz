@@ -7,8 +7,8 @@ on:
 jobs:
   browser-contracts:
     runs-on: ubuntu-latest
-    # The required single-worker suite plus packaged fixtures exceeds 14 minutes.
-    timeout-minutes: 35
+    # The single-worker browser suite takes about 34 minutes; allow setup and reporting headroom.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

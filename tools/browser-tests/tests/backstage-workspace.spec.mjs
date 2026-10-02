@@ -3,12 +3,12 @@ import {test,expect,resources,trackResources} from '../helpers/test.mjs';
 const overlaps=(a,b)=>!(a.x+a.width<=b.x||a.x>=b.x+b.width||a.y+a.height<=b.y||a.y>=b.y+b.height);
 async function expandedGeometry(dialog){
   const actions=await dialog.getByRole('toolbar',{name:'Diagram actions'}).boundingBox();
-  const nav=await dialog.locator('.explore-navigation').boundingBox(),stage=await dialog.locator('.explore-stage').boundingBox();
+  const nav=await dialog.locator('.explore-navigation').boundingBox(),stage=await dialog.locator('.explore-stage').boundingBox(),row=await dialog.getByRole('group',{name:'Explore sizing and zoom',exact:true}).boundingBox();
   const controls=[];
   for(const control of await dialog.locator('.explore-navigation button,.viewport-actions button,.explore-tools button').all()){
     const box=await control.boundingBox();if(box)controls.push(box);
   }
-  return {actions,nav,stage,controls};
+  return {actions,nav,stage,row,controls};
 }
 async function canvasCamera(dialog){
   return dialog.locator('.explore-board').evaluate(el=>{
@@ -33,6 +33,8 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
   const board=await dialog.locator('.explore-board').boundingBox();
   expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
+  expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
+  await expect(dialog.getByRole('link',{name:'Edit in workbench',exact:true})).toBeInViewport();
   expect(desktop.actions.y).toBe(desktop.nav.y);expect(overlaps(desktop.actions,desktop.nav)).toBe(false);
   expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
   const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
@@ -46,7 +48,8 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   expect(await page.evaluate(()=>__host.requests.length)).toBe(2);
   await page.setViewportSize({width:480,height:800});const narrow=await expandedGeometry(dialog);
   expect(narrow.nav.y).toBeGreaterThanOrEqual(narrow.actions.y+narrow.actions.height);
-  expect(narrow.stage.y).toBeGreaterThanOrEqual(narrow.nav.y+narrow.nav.height);
+  expect(narrow.row.y).toBe(narrow.nav.y+narrow.nav.height);expect(narrow.stage.y).toBe(narrow.row.y+narrow.row.height);
+  await expect(dialog.getByRole('link',{name:'Edit in workbench',exact:true})).toBeInViewport();
   expect(narrow.controls.every(control=>!overlaps(narrow.actions,control))).toBe(true);
   await expect(dialog.getByRole('img',{name:'flow diagram'})).toBeVisible();
   await info.attach('backstage-expanded-narrow',{body:await page.screenshot(),contentType:'image/png'});
@@ -156,4 +159,27 @@ test('an unavailable Build target fails visibly before replacing the saved draft
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(before);
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBeNull();
+});
+
+test('visible host Edit opens the exact Explore chapter and step in the Canon reader then Workbench',async({page,server},info)=>{
+  await page.goto(server.origin+'/backstage/index.html');await page.getByRole('button',{name:'Service flow',exact:true}).click();
+  await page.getByRole('button',{name:'Explore canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:/^Explore /});
+  await dialog.getByRole('button',{name:'Next step',exact:true}).click();
+  const source=await page.evaluate(()=>__backstage.spec);
+  for(const width of [1440,768,390]){
+    await page.setViewportSize({width,height:1000});const edit=dialog.getByRole('link',{name:'Edit in workbench',exact:true});
+    await expect(edit).toBeInViewport();await expect(dialog.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
+    await expect.poll(()=>dialog.locator('.explore-navigation-actions').evaluate(el=>Array.from(el.querySelectorAll('button,summary')).filter(control=>control.checkVisibility()).map(control=>{const r=control.getBoundingClientRect();return {name:control.textContent,left:r.left,right:r.right};}).filter(r=>r.left<0 || r.right>innerWidth))).toEqual([]);
+    const geometry=await expandedGeometry(dialog);expect(geometry.controls.every(control=>!overlaps(geometry.actions,control))).toBe(true);
+    expect(geometry.row.y).toBe(geometry.nav.y+geometry.nav.height);expect(geometry.stage.y).toBe(geometry.row.y+geometry.row.height);
+    const url=new URL(await edit.getAttribute('href')),address=new URLSearchParams(url.hash.slice(1)),handoff=JSON.parse(address.get('fv'));
+    expect(address.get('v')).toBe('service-flow');expect(address.get('s')).not.toBe('quiet');expect(handoff.action).toBe('edit');expect(handoff.entity).toBe('component:default/recording');
+    await info.attach('host-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
+    const popupPromise=page.waitForEvent('popup');await edit.click();const reader=await popupPromise;
+    await expect(reader.locator('#canon-reader .explore-navigation #canon-reader-edit')).toBeVisible();
+    await reader.locator('#canon-reader-edit').click();await expect(reader.locator('#workbench-workspace')).toBeVisible();
+    expect(JSON.parse(await reader.locator('#src').inputValue())).toEqual(source);
+    await expect(reader.locator('#docview [data-view-id]')).toHaveAttribute('data-view-id','service-flow');await expect(reader.locator('#docview .stepid')).toHaveText(address.get('s'));
+    await expect(reader.locator('#undo-builder')).toBeDisabled();await reader.close();
+  }
 });

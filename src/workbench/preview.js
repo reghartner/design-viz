@@ -121,8 +121,17 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
    author's current reading position; no authoring option or listeners cross
    into the new surface. */
 function workbenchReaderPreviewSnapshot(page,ctl){
+  /* activeTarget is address-bar/navigation state and can lag the canvas that is
+     actually being presented after an authoring rerender. The visible Explore
+     section is authoritative when handing the reader its opening surface. */
+  var activeExplore=(ctl.sections || []).find(function(rec){
+    return rec.sectionEl && rec.sectionEl.classList.contains('explore-active-section') &&
+      rec.viewport && rec.viewport.isExplore && rec.viewport.isExplore();
+  });
+  var target=activeExplore?{kind:'diagram',section:activeExplore.number}:
+    ctl.activeTarget && Object.assign({},ctl.activeTarget);
   return {tabs:activeTabReferences(ctl),sections:workbenchPreviewSnapshot(page,ctl),
-    target:ctl.activeTarget && Object.assign({},ctl.activeTarget),details:ctl.details && ctl.details.snapshot()};
+    target:target,details:ctl.details && ctl.details.snapshot()};
 }
 function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
   options=options || {};

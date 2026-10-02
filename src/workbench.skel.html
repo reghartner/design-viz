@@ -16,14 +16,13 @@
   </button>
   <div class="workbench-header-links"><button type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button type="button" id="welcome-header-resume" hidden>Back to project <span aria-hidden="true">↗</span></button><a id="welcome-repo-link" href="https://github.com/reghartner/design-viz" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
   <div class="workspace-tools" aria-label="Project actions">
-    <button class="bbtn" id="workspace-home" type="button">← New / open</button>
+    <button class="bbtn" id="workspace-home" type="button">File</button>
     <div class="workspace-create">
-        <button type="button" id="diagram-add" class="editor-add-button" aria-label="Add to diagram" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> <span class="editor-add-label">Add to diagram</span><span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
-        <label class="editor-add-destination" for="diagram-add-target">Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label>
+        <button type="button" id="diagram-add" class="editor-add-button" aria-label="Add to diagram" aria-haspopup="dialog" aria-controls="diagram-add-menu" aria-expanded="false"><span aria-hidden="true">＋</span> <span class="editor-add-label">Add</span><span class="editor-add-chevron" aria-hidden="true">⌄</span></button>
     </div>
-    <button type="button" class="bbtn" id="auto-arrange" aria-label="Auto arrange" aria-haspopup="dialog">Auto arrange</button>
+
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><button class="bbtn" type="button" id="workbench-reader-open" aria-label="Preview read-only page"><span class="workbench-reader-open-label" aria-hidden="true">Preview read-only page</span></button><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button><button class="rbtn" id="file-save" aria-label="Download JSON" title="Download the current story as an editable JSON file">Download JSON</button></div>
+    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><button class="rbtn" id="file-save" aria-label="Download JSON" title="Download the current story as an editable JSON file">Download JSON</button></div>
   </div>
 </header>
 <section id="agent-update-banner" class="agent-update-banner" role="status" hidden><div><strong id="agent-update-banner-title">Agent updates are ready</strong><p id="agent-update-banner-summary"></p></div><button type="button" class="rbtn" id="agent-update-open">Preview Agent Updates</button></section>
@@ -163,6 +162,7 @@
       <div class="draftbar" id="draftbar" hidden></div>
         <div class="buildrow editor-add-status"><span class="btarget" id="btarget"></span><button type="button" class="bexit" id="addmode-exit" hidden>&#10005; exit add-to-step (Esc)</button></div>
       <div class="editor-pane" id="editor-inspect" role="tabpanel" aria-labelledby="editor-tab-inspect">
+      <button type="button" class="bbtn" id="auto-arrange" aria-haspopup="dialog" hidden>Auto arrange</button>
       <div class="document-settings-entry"><button class="bbtn" id="document-settings" type="button">Document settings</button></div>
       <p class="editor-empty" id="editor-empty">Select an element in the preview, or choose a step in the Steps tab to edit it here.</p>
       <details class="ssec" id="sec-inspect" open hidden>
@@ -301,7 +301,7 @@
       <ul class="msgs" id="msgs" aria-live="polite"></ul>
     </section>
     <div class="workspace-divider" id="workspace-columns" role="separator" tabindex="0" aria-label="Editor width" aria-orientation="vertical" aria-controls="spec-editor" title="Drag to resize editor. Left/right arrows adjust; Home/End set limits; double-click balances the split."><span aria-hidden="true">⋮</span></div>
-    <details id="workspace-appearance" class="workspace-appearance"><summary>Canvas appearance</summary><div id="workspace-appearance-body">
+    <details id="workspace-appearance" class="workspace-appearance"><summary>Preview</summary><div id="workspace-appearance-body">
       <p class="fnote">Preview only — these buttons do not change the saved document.</p>
       <div class="toolrow">
         <span class="lab">PREVIEW SKIN</span>
@@ -310,6 +310,7 @@
       <p class="fnote" id="preview-skin-status" role="status"></p>
       <button type="button" class="bbtn" id="preview-skin-default">Use document default</button>
       <button type="button" class="bbtn" id="preview-skin-settings">Edit saved default…</button>
+      <button type="button" class="bbtn" id="open-page-preview">Open page preview</button>
 
     </div></details>
     <div class="workmain" id="workspace-canvas" aria-label="Story view" tabindex="-1">
@@ -318,27 +319,21 @@
       </div></div>
     </div>
     <button type="button" id="folder-agent-selection" class="workspace-selection" hidden aria-live="polite" aria-atomic="true" disabled>Copy for agent · No selection</button>
-    <div class="workspace-canvas-controls" role="toolbar" aria-label="Canvas navigation">
-      <button type="button" id="workspace-page" class="bbtn" hidden>Back to page</button>
+    <div id="workspace-canvas-controls" class="workspace-canvas-controls" role="toolbar" aria-label="Canvas navigation">
       <button type="button" id="workspace-pan" class="bbtn" aria-pressed="false" title="Drag the canvas; hold Space for temporary pan">Pan</button>
       <span class="workspace-zoom-label">Diagram</span>
       <button type="button" id="workspace-zoom-out" class="bbtn" aria-label="Zoom canvas out">−</button>
       <button type="button" id="workspace-zoom" class="bbtn" title="Reset canvas to 100%">100%</button>
       <button type="button" id="workspace-zoom-in" class="bbtn" aria-label="Zoom canvas in">+</button>
       <button type="button" id="workspace-fit" class="bbtn">Fit diagram</button>
-      <div id="workspace-overlay-tools" class="workspace-overlay-tools" role="group" aria-label="Panels and controls size" hidden>
-        <span class="workspace-zoom-label">Panels &amp; controls</span>
-        <button type="button" id="workspace-overlay-out" class="bbtn" aria-label="Shrink panels and controls">−</button>
-        <button type="button" id="workspace-overlay-size" class="bbtn" aria-label="Reset panels and controls size" title="Reset panels and controls to 100%">100%</button>
-        <button type="button" id="workspace-overlay-in" class="bbtn" aria-label="Enlarge panels and controls">+</button>
-      </div>
-      <button type="button" id="workspace-panels" class="bbtn" aria-pressed="false">Hide tools</button>
+      <details id="workspace-canvas-tools"><summary>Canvas</summary><div class="workspace-canvas-tools-body"><button type="button" id="workspace-panels" class="bbtn" aria-pressed="false">Hide tools</button></div></details>
     </div>
 
   </div>
 
   <dialog id="diagram-add-menu" class="diagram-add-menu" aria-labelledby="diagram-add-title" aria-describedby="diagram-add-destination">
     <div class="diagram-add-header"><div><h2 id="diagram-add-title">Add to diagram</h2><p id="diagram-add-destination"></p></div><button type="button" class="bbtn" id="diagram-add-close" aria-label="Close add to diagram">✕</button></div>
+    <details class="diagram-add-destination-picker"><summary>Change destination</summary><label>Section <select id="diagram-add-target" aria-label="Add to diagram destination"></select></label></details>
     <div class="diagram-add-choices" role="group" aria-label="What to add">
       <button type="button" id="add-node" data-add-kind="node"><span class="diagram-add-symbol" aria-hidden="true">▣</span><span><b>Node</b><small>Choose a service, device or actor</small></span></button>
       <button type="button" id="add-edge" data-add-kind="edge"><span class="diagram-add-symbol" aria-hidden="true">→</span><span><b>Connection</b><small>Click a source, then its target</small></span></button>
@@ -394,7 +389,7 @@
       <tr><td>diagram.routing</td><td><code>"curves" | "lanes"</code></td><td>Optional lane routing reserves tracks and ports around cards. Supports 1–5 unstacked cards per row, no floats or self-loops; otherwise warns and uses curves. New diagrams, catalog seeds, trace imports and built-in template projects default to no lanes. Select the section heading, then Inspect → Edge routing to switch. Readable size enlarges the board for horizontal scrolling.</td></tr>
       <tr><td>diagram.floats</td><td><code>[{id, side:"above", x?, y?}]</code></td><td>Nodes outside the rows. Without coordinates, above/below placement is automatic. Both <code>x</code> and <code>y</code> pin the center in diagram units. Drag any float to pin it; use inspector Float X/Y for precision or choose Auto above/below to release it. Row nodes keep their row/slot gestures.</td></tr>
       <tr><td>diagram.edges</td><td><code>{from, to, kind?, ret?, label?, fromPort?, toPort?, bend?, labelDx?, labelDy?, revealAt?, hideAt?}</code></td><td><code>kind</code> is the <b>protocol</b> (default <code>int</code>). Optional ports are <code>{side:"top|right|bottom|left",offset:0.5}</code>, with offset 0–1 along the side. Inspector Exit/Entry side and position (%) pin endpoints; Auto restores routing. Pinned edges use curves even in lane layouts. Zero-based reveal indices draw the edge only for the selected step interval; bend/label offsets tune geometry.</td></tr>
-      <tr><td>diagram.layouts</td><td><code>[{id,name,presentation?,sectionLayout,steps?,exploreLayout?}]</code></td><td>Named Chapters of one story. <code>presentation:"standard"</code> (default) uses the saved arrangement; <code>"explore"</code> uses a full-height graph, independent floating panels and pinned steps. Section paragraphs and bullets become one movable, resizable Section notes window; the graph remains the full canvas. <code>exploreLayout.prose</code> accepts <code>x/y/w/h</code> fractions together and optional <code>stacked</code>/<code>hidden</code>; <code>{hidden:true}</code> can stand alone. Standard restores the original prose and collapse state. Explore stays visible while editing. <code>exploreLayout</code> saves floating rectangles as viewport fractions (panel dimensions and control height at 100% content size; control width keeps its span), <code>overlayScale</code> (0.5–1.25, default 1) for independent panel and control zoom, and <code>camera:{zoom,x,y}</code> as scale and SVG-relative center; workbench gestures update these defaults with Undo. Presentation belongs to the Chapter across host profiles. The Viewing mode dropdown beside the Chapter buttons edits it in one Undo/Redo operation and switches both editor and export. <code>defaultLayout</code> picks the opening Chapter ID. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
+      <tr><td>diagram.layouts</td><td><code>[{id,name,presentation?,sectionLayout,steps?,exploreLayout?}]</code></td><td>Named Chapters of one story. <code>presentation:"standard"</code> (default) uses the saved arrangement; <code>"explore"</code> uses a full-height graph, independent floating panels and pinned steps. Section paragraphs and bullets become one movable, resizable Section notes window; the graph remains the full canvas. <code>exploreLayout.prose</code> accepts <code>x/y/w/h</code> fractions together and optional <code>stacked</code>/<code>hidden</code>; <code>{hidden:true}</code> can stand alone. Standard restores the original prose and collapse state. Explore stays visible while editing. <code>exploreLayout</code> saves floating rectangles as viewport fractions (panel dimensions and control height at 100% content size; control width keeps its span), <code>overlayScale</code> (0.5–1.25, default 1) for independent panel and control zoom, and <code>camera:{zoom,x,y}</code> as scale and SVG-relative center; panel gestures update these defaults with Undo; Chapter commands explicitly save or reset the opening camera. Presentation belongs to the Chapter across host profiles. The Viewing mode dropdown inside the Chapter popover edits it in one Undo/Redo operation and switches both editor and export. <code>defaultLayout</code> picks the opening Chapter ID. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
       <tr><td>diagram.sectionLayout</td><td><code>{default:[{x:0,y:0,w:8,h:12},{panel:"home",x:8,y:0,w:4,h:12}]}</code></td><td>Saved twelve-column tile layouts: default, backstage, confluence. Use <code>controls:"steps"</code> for a movable playback/path/caption tile. Arrange section to drag/resize; Preview selects the target and Optimize layout supplies a starting arrangement. Coordinates are zero-based, height 3–40 rows. Unspecified tiles stay visible; narrow views stack. <a href="../docs/section-layouts.md">Layout guide</a>.</td></tr>
       <tr><td>diagram.primaryPanel</td><td><code>"home"</code></td><td>Optional centerpiece panel ID: show it large with playback below it and a collapsible Data flow underneath. Set Presentation → Centerpiece in the panel inspector. Homemap steps have device states, subject drag/tap placement, visibility, inheritance, and signal controls.</td></tr>
       <tr><td>diagram.brand</td><td><code>false | {app?, icon?, logo?, logoImage?, accent?, bg?, fg?}</code></td><td>The global fallback is edited once in <code>src/company-brand.config.js</code> and appears in the document header plus Phone, Device app, Camera screen and Security monitoring. Precedence is global → diagram → panel. <code>diagram.brand:false</code> opts the diagram out; <code>panel.brand:false</code> suppresses one panel; partial objects override only supplied fields. Choose a library icon, 1–4 character monogram, or upload an embedded PNG/JPEG/WebP up to 512 KiB. Colors use <code>#RGB</code> or <code>#RRGGBB</code>.</td></tr>
@@ -445,11 +440,10 @@
 
   </div>
 
-  <section id="workbench-reader-preview" class="workbench-reader-preview" aria-label="Read-only page preview" hidden>
-    <button type="button" id="workbench-reader-back" class="workbench-reader-back">← Back to workbench</button>
-    <div id="workbench-reader" class="docview" aria-label="Read-only rendered documentation page"></div>
-  </section>
+
 </main>
+  <dialog id="page-preview" class="page-preview" aria-label="Read-only page preview"><header><b>Page preview</b><button type="button" class="bbtn" id="close-page-preview">Close preview</button></header><div id="page-preview-surface"><div id="page-preview-view" class="docview" aria-label="Read-only rendered documentation page"></div></div></dialog>
+
 
 
 

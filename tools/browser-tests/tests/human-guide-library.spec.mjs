@@ -13,7 +13,7 @@ function library(){
 }
 const guide=page=>page.locator('#human-guide');
 const screen=(page,name)=>page.locator('#welcome-'+name+'-screen');
-const openGuide=page=>page.locator('[data-open-human-guide]:visible').first().click();
+async function openGuide(page){if(!await page.locator('[data-open-human-guide]:visible').count())await page.locator('.workspace-help>summary').click();await page.locator('[data-open-human-guide]:visible').first().click();}
 
 test('human guide is readable, keyboard accessible and isolates the active editor',async({page,server},info)=>{
   await page.setViewportSize({width:1440,height:1000});

@@ -1,4 +1,4 @@
-import {test,expect,pagePreview} from '../helpers/test.mjs';
+import {test,expect,prepareEditorSurface} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -37,7 +37,7 @@ async function pickerFixture(page,server){
   await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
   fixture.requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))fixture.requests.push(request.url());});
   await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
-  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   fixture.before=await page.locator('#src').inputValue();return fixture;
 }
 async function openTopology(page){await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await expect(page.getByRole('dialog',{name:'Referenced topology',exact:true})).toBeVisible();}
@@ -62,7 +62,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#topology-namespace').fill('invalid namespace');await expect(page.locator('#topology-add')).toBeDisabled();
   await page.locator('#topology-namespace').fill('notify');await expect(page.locator('#topology-add')).toBeEnabled();
   await testInfo.attach('reference-picker',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
   expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']}]);
   expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(d.topologyImports[0].position).toBeUndefined();
@@ -77,7 +77,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.blocks).toEqual(raw.page.blocks);expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
-  await page.reload();await pagePreview(page);await expect(page.locator('#src')).toHaveValue(after);
+  await page.reload();await prepareEditorSurface(page);await expect(page.locator('#src')).toHaveValue(after);
   await expect(page.locator('#docview')).not.toContainText('LATER DEPLOYMENT');
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await expect(page.locator('#topology-nodes')).not.toContainText('LATER DEPLOYMENT');
   await page.locator('#topology-cancel').click();expect(fixture.requests).toHaveLength(2);
@@ -104,7 +104,7 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
   await page.locator('#topology-cancel').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.unroute(fixture.specURL('first'));
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   await expect(page.locator('#docview [data-dv-node="first::dispatch"]')).toBeVisible();
   expect(fixture.requests.filter(url=>url===fixture.specURL('first'))).toHaveLength(2);
   const after=await page.locator('#src').inputValue();
@@ -117,7 +117,7 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
 test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{
   await pickerFixture(page,server);await page.setViewportSize({width:760,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
   await page.getByLabel('Import destination section',{exact:true}).selectOption('1');await page.locator('#topology-section').selectOption('1');
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.blocks[0].diagram.topologyImports).toBeUndefined();
   expect(raw.page.blocks[1].diagram.topologyImports).toEqual([{spec:'first',export:'archive',as:'first'}]);
   await expect(page.locator('#docview [data-dv-node="first::archive"]')).toBeVisible();
@@ -131,7 +131,7 @@ test('reference picker explains unavailable legacy catalogs without fetching inv
   const fixture=await publish(server),spec=fixture.specs.second;spec.page.canon=fixture.index.diagrams[1].canon;
   await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify({version:1,diagrams:[{id:'second',spec}]}));
   const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
-  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-status')).toContainText('unavailable');
   await expect(page.locator('#topology-add')).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(before);expect(requests).toEqual([]);
 });
@@ -144,10 +144,17 @@ test('the backend workspace handoff drags a whole floating import with authored 
   const handoff={version:1,id:'checkout',revision:digest(spec),action:'edit'};
   await page.goto(fixture.url+'?canon=checkout#fv='+encodeURIComponent(JSON.stringify(handoff)));
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
-  await pagePreview(page);await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
+  await prepareEditorSurface(page);await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
   expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
   const before=await page.locator('#src').inputValue(),root=page.locator('#docview');
+  await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeEnabled();await page.locator('#diagram-add-close').click();
+  const author=await root.elementHandle();await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
+  await expect(page.locator('#page-preview-view [data-dv-node="platform::api"]')).toBeVisible();
+  await expect(page.locator('#page-preview-view [data-dv-node="platform::store"]')).toBeVisible();
+  expect(await author.evaluate(el=>el.isConnected)).toBe(false);
+  await page.locator('#close-page-preview').click();await page.locator('#workspace-appearance>summary').click();
+  expect(await author.evaluate(el=>el.isConnected)).toBe(true);await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
   const node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
   const center=async id=>node(id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};});
   const original=await Promise.all(['client','platform::api','platform::store'].map(center));
@@ -176,11 +183,11 @@ test('the backend workspace handoff drags a whole floating import with authored 
   await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value;src.dispatchEvent(new Event('input',{bubbles:true}));},stale);
   await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);
   await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
-  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await pagePreview(page);
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await prepareEditorSurface(page);
   await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.sections[0].diagram).toEqual(d);
-  await page.reload();await pagePreview(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
+  await page.reload();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
   expect(await Promise.all(['client','platform::api','platform::store'].map(center))).toEqual(placed);
   await testInfo.attach('floating-import',{body:await root.screenshot(),contentType:'image/png'});
 });
@@ -197,7 +204,7 @@ test('a published topology consumer renders and its imported node inspector is r
   await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
   expect(requests).toEqual([fixture.specURL('second'),fixture.specURL('first')]);
   await expect(page.locator('#canon-reader [data-dv-node="platform::api"]')).toBeVisible();
-  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   await expect(page.locator('#workspace-provenance')).toContainText('Referenced topology (frozen session)');
   await page.locator('#docview [data-dv-node="platform::api"]').click();
   await page.locator('#editor-tab-inspect').click();
@@ -215,11 +222,11 @@ test('a published topology consumer renders and its imported node inspector is r
   await page.locator('#editor-tab-json').click();
   await page.locator('#src').fill(JSON.stringify(source,null,2));
   await page.locator('#go').click();
-  await pagePreview(page);
+  await prepareEditorSurface(page);
   await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
   await expect(page.locator('#docview')).not.toContainText('PROVIDER CHANGED');
   await page.locator('#editor-tab-steps').click();
-  await page.locator('#steps-list [data-step-index="1"]').click();await pagePreview(page);
+  await page.locator('#steps-list [data-step-index="1"]').click();await prepareEditorSurface(page);
   await expect(page.locator('#docview .step-text')).toContainText('Local narrative change');
   await expect(page.locator('#docview .stepid')).toHaveText('persist');
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(source);
@@ -232,7 +239,7 @@ test('a published topology consumer renders and its imported node inspector is r
   const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
   expect(recovered.topologyContext.specs.find(s=>s.page.canon.id==='first').page.sections[0].diagram.nodes.api.title).toBe('API');
   expect(requests).toHaveLength(2);
-  await page.reload();await pagePreview(page);
+  await page.reload();await prepareEditorSurface(page);
   await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
   await expect(page.locator('#docview')).not.toContainText('PROVIDER CHANGED');
   expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(source.page.sections[0].diagram);

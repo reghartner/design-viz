@@ -1837,7 +1837,7 @@ function createBoardGrid(sectionEl, hasPanels, primaryPanel){
 
 /* Reader-only layout: move existing elements, preserving widget state, the
    selected path/step, running playback, and board sizing. Never re-render. */
-function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
+function createDiagramFocusControl(layout, panel, aside, bar, initial, changed, modeRail){
   var group = layout.viewChoicesHost, buttons = {}, mode = null, destroyed = false;
   group.setAttribute('role','group'); group.setAttribute('aria-label','View focus');
   function setMode(value){
@@ -1847,10 +1847,10 @@ function createDiagramFocusControl(layout, panel, aside, bar, initial, changed){
     if (home){
       layout.flowDisclosure.appendChild(layout.diagramCol);
       layout.grid.appendChild(aside);
-      if (bar) layout.primaryHost.appendChild(bar);
+      if (bar){if(modeRail)layout.primaryHost.appendChild(modeRail);layout.primaryHost.appendChild(bar);}
     } else {
       layout.grid.insertBefore(layout.diagramCol, layout.primaryHost);
-      if (bar) layout.diagramCol.appendChild(bar);
+      if (bar){if(modeRail)layout.diagramCol.appendChild(modeRail);layout.diagramCol.appendChild(bar);}
       layout.primaryHost.appendChild(aside);
     }
     layout.grid.classList.toggle('panel-first',home);
@@ -1899,7 +1899,7 @@ function setExploreIndicator(control,visible,description){
     control.classList.remove('has-explore-indicator');control.removeAttribute('data-explore-view');
     control.removeAttribute('aria-description');control.removeAttribute('title');return;
   }
-  if(!badge){badge=document.createElement('span');badge.className='explore-indicator-badge';badge.setAttribute('aria-hidden','true');control.appendChild(badge);}
+  if(!badge){badge=document.createElement('span');badge.className='explore-indicator-badge';badge.setAttribute('aria-hidden','true');badge.innerHTML='<svg viewBox="0 0 16 16" width="14" height="14" focusable="false"><rect x="1.5" y="2" width="13" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 11v3m-3 0h6" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>';control.appendChild(badge);}
   control.classList.add('has-explore-indicator');control.setAttribute('data-explore-view','true');
   control.setAttribute('aria-description',description);control.title=description;
 }
@@ -1907,6 +1907,18 @@ function setExploreIndicator(control,visible,description){
    them instead of cloning them so selection, keyboard behavior, routes and
    authored labels keep one owner. Anchors put every control back when the
    reader returns to the page or a workbench preview is replaced. */
+function syncNavigationPopover(details){
+  var body=details.querySelector(':scope > .section-view-options-body,:scope > .explore-panel-body,:scope > .explore-edge-legend,:scope > #workspace-appearance-body,:scope > .workspace-help-body,:scope > .workspace-canvas-tools-body');
+  if(!body || !body.showPopover)return;
+  body.setAttribute('popover','manual');
+  if(!details.open){if(body.matches(':popover-open'))body.hidePopover();return;}
+  if(!body.matches(':popover-open'))body.showPopover();
+  var summary=details.querySelector('summary'),r=summary.getBoundingClientRect(),root=details.getRootNode(),host=root.host && root.host.getBoundingClientRect();
+  var left=host?Math.max(0,host.left):0,right=host?Math.min(window.innerWidth,host.right):window.innerWidth,bottom=host?Math.min(window.innerHeight,host.bottom):window.innerHeight;
+  var width=Math.min(body.offsetWidth || 330,right-left-24);
+  body.style.position='fixed';body.style.margin='0';body.style.inset='auto';body.style.width=width+'px';body.style.left=Math.max(left+12,Math.min(right-width-12,r.right-width))+'px';body.style.top=Math.min(bottom-48,r.bottom+6)+'px';body.style.maxHeight=Math.max(80,bottom-r.bottom-18)+'px';
+  if(body.classList.contains('workspace-canvas-tools-body')){body.style.maxHeight=Math.max(80,r.top-24)+'px';body.style.top=Math.max(12,r.top-body.scrollHeight-6)+'px';}
+}
 function createExploreNavigation(ctl,options){
   options=options || {};
   var doc=ctl.view.ownerDocument,nav=doc.createElement('nav'),tabs=doc.createElement('div'),diagrams=doc.createElement('div'),chapters=doc.createElement('div'),actions=doc.createElement('div');
@@ -1918,7 +1930,13 @@ function createExploreNavigation(ctl,options){
   function title(text){var label=doc.createElement('span');label.className='explore-navigation-label';label.textContent=text;return label;}
   tabs.appendChild(title('Tabs'));diagrams.appendChild(title('Diagrams'));chapters.appendChild(title('Chapters'));
   nav.appendChild(tabs);nav.appendChild(diagrams);nav.appendChild(chapters);nav.appendChild(actions);
-  var moved=[],current=null;
+  nav.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var popover=ev.target.closest('details[open]');if(popover){ev.preventDefault();ev.stopPropagation();popover.open=false;popover.querySelector('summary').focus();}return;}if(ev.target.closest('input,textarea,select,summary,button') && !((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();});
+  nav.addEventListener('toggle',function(ev){if(ev.target.tagName!=='DETAILS')return;if(ev.target.open)nav.querySelectorAll('details[open]').forEach(function(other){if(other!==ev.target)other.open=false;});syncNavigationPopover(ev.target);},true);
+  function refreshNavigationGeometry(){if(!nav.isConnected)return;ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(nav.getBoundingClientRect().bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);}
+  var navigationSize=new ResizeObserver(refreshNavigationGeometry);
+  var moved=[],current=null,revealFrame=0;
+  function rememberNavigationCamera(){if(current && current.viewport){current.viewport.snapshotCanvasState();current.viewport.snapshotReaderState();}}
+  nav.addEventListener('click',rememberNavigationCamera,true);nav.addEventListener('keydown',rememberNavigationCamera,true);
   function activeElement(){var focused=doc.activeElement;while(focused && focused.shadowRoot && focused.shadowRoot.activeElement)focused=focused.shadowRoot.activeElement;return focused;}
   function containsFocus(node,focused){return !!(node && focused && (node===focused || node.contains && node.contains(focused)));}
   function move(node,host){
@@ -1928,19 +1946,16 @@ function createExploreNavigation(ctl,options){
   }
   function restore(refocus){
     var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});
+    nav.querySelectorAll('details[open]').forEach(function(details){details.open=false;syncNavigationPopover(details);});
     moved.reverse().forEach(function(entry){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();if(entry.anchor)entry.anchor.remove();});
-    moved=[];current=null;nav.remove();tabs.hidden=diagrams.hidden=chapters.hidden=false;
+    moved=[];current=null;cancelAnimationFrame(revealFrame);revealFrame=0;navigationSize.disconnect();nav.remove();tabs.hidden=diagrams.hidden=chapters.hidden=false;
     if(refocus!==false && owned && focused.isConnected)focused.focus({preventScroll:true});
   }
   function diagramRecords(){
     var embedded=ctl.sections.find(function(rec){return rec.sectionEl.classList.contains('dv-embed-target');});
-    return ctl.sections.filter(function(rec){
-      if(!rec.hasDiagram || rec.detailOnly || embedded && rec!==embedded)return false;
-      if(!rec.tabBlock)return true;
-      return ctl.sections.find(function(candidate){return !candidate.detailOnly && candidate.hasDiagram && candidate.viewport && candidate.tabBlock===rec.tabBlock && candidate.tab===rec.tab;})!==rec;
-    });
+    return ctl.sections.filter(function(rec){return !rec.detailOnly && (!embedded || rec===embedded);});
   }
-  var navigable=diagramRecords();if(!ctl.tabBlocks.length && navigable.length<2)navigable=[];
+  var navigable=diagramRecords();
   var sectionButtons=navigable.map(function(rec){
     var button=doc.createElement('button');button.type='button';button.className='tabbtn explore-diagram-button';
     button.textContent=rec.sectionEl.querySelector('.sec-h')?.textContent.trim() || rec.reference || 'Diagram '+rec.number;
@@ -1949,20 +1964,41 @@ function createExploreNavigation(ctl,options){
   });
   function mount(rec){
     if(!rec || !rec.sectionEl)return false;
-    if(current===rec && nav.isConnected)return true;
+    if(current===rec && nav.isConnected){var pending=rec.sectionEl.querySelector('.section-viewport>.diagram-views>.section-view-settings');if(pending)move(pending,actions);return true;}
     var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false);
     var host=rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice'),flow=host && host.querySelector(':scope > .layout-flow-toggle');
-    if(!host)return false;
-    host.prepend(nav);current=rec;
+    if(!host){host=rec.sectionEl.querySelector('.diagram-views');if(!host){host=doc.createElement('div');host.className='diagram-views';rec.sectionEl.prepend(host);}}
+    host.prepend(nav);current=rec;navigationSize.observe(nav);
     var movedTabs=false,embedded=ctl.view.querySelector('.dv-embed-target');
     if(!embedded)ctl.tabBlocks.forEach(function(tabBlock){movedTabs=move(tabBlock.bar,tabs) || movedTabs;});
     tabs.hidden=!movedTabs;
     var selected=rec,detail=ctl.details && ctl.details.snapshot && ctl.details.snapshot();
     if(detail && detail.section)selected=ctl.sections.find(function(candidate){return candidate.reference===detail.section;}) || selected;
-    sectionButtons.forEach(function(entry){entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
-    diagrams.hidden=!sectionButtons.length;chapters.hidden=!move(choices,chapters);
-    var movedAction=move(options.action,actions),movedFlow=move(flow,actions);actions.hidden=!movedAction && !movedFlow;
+    var peers=sectionButtons.filter(function(entry){return entry.rec.tabBlock===selected.tabBlock && entry.rec.tab===selected.tab;});
+    diagrams.querySelector('.explore-navigation-label').textContent=peers.some(function(entry){return !entry.rec.hasDiagram;})?'Sections':'Diagrams';
+    sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0 && !!entry.rec.tabBlock;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
+    diagrams.hidden=peers.length<2 && !sectionButtons.some(function(entry){return !entry.rec.tabBlock && entry.rec!==selected;});chapters.hidden=!move(choices,chapters);
+    move(options.action,actions);
+    move(host.querySelector('.section-view-settings'),actions);
+    move(host.querySelector('.viewport-actions'),actions);
+    move(flow,actions);actions.hidden=false;
+    // Selection can unhide its section only after the navigation is mounted.
+    // Reveal the selected chips after that layout, while retaining their real DOM.
+    revealFrame=requestAnimationFrame(function(){
+      revealFrame=0;if(!nav.isConnected)return;
+      nav.querySelectorAll('[aria-pressed="true"],[aria-selected="true"]').forEach(function(button){
+        // Only reveal within horizontal navigation lanes. scrollIntoView also
+        // scrolls the reader document and can undo an initial contract hash.
+        for(var lane=button.parentElement;lane && nav.contains(lane);lane=lane.parentElement){
+          if(lane.scrollWidth<=lane.clientWidth)continue;
+          var item=button.getBoundingClientRect(),bounds=lane.getBoundingClientRect();
+          if(item.left<bounds.left)lane.scrollLeft+=item.left-bounds.left;
+          else if(item.right>bounds.right)lane.scrollLeft+=item.right-bounds.right;
+        }
+      });
+    });
     if((owned || moved.some(function(entry){return containsFocus(entry.node,focused);})) && focused.isConnected)focused.focus({preventScroll:true});
+    ctl.view.dispatchEvent(new CustomEvent('navigation-mounted'));
     return true;
   }
   return {element:nav,mount:mount,restore:restore,destroy:restore};
@@ -2021,6 +2057,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   if(visibilityObserver)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
   function move(node,host){
     if(!node)return;
+    if(node===bar){var rail=box.querySelector('.playback-mode-rail');if(rail && rail.parentNode!==host)move(rail,host);}
     var anchor=document.createComment('layout position');node.parentNode.insertBefore(anchor,node);
     saved.push({node:node,anchor:anchor});host.appendChild(node);
   }
@@ -2097,6 +2134,13 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   activate();
   return {panelId:base && base.panelId,mode:function(){return active?'layout':base?base.mode():'flow';},setMode:setMode,
     layoutId:function(){return layoutId;},setLayout:setLayout,
+    setLayoutTarget:function(value){
+      value=value || 'default';if(value===(target || 'default'))return;
+      restore(true);target=value;visibility=Object.create(null);items=sectionLayoutItems(d,target,layoutId);
+      dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
+      showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
+      grid.setAttribute('data-layout-target',target);activate();
+    },
     views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
     snapshotReaderState:function(){return {visibility:Object.assign({},visibility),showDiagram:showDiagram,viewport:viewport.snapshotReaderState()};},
     restoreReaderState:function(saved){if(saved){visibility=Object.assign(Object.create(null),saved.visibility);showDiagram=saved.showDiagram;paintFlow();viewport.restoreReaderState(saved.viewport);}},
@@ -2515,7 +2559,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       if(onChange)onChange();
     }
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
-      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged);
+      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged,result.modeRail);
     var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
     if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
@@ -2636,6 +2680,9 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   stepper.copyButton = copyStep;
   if (view === 'step') stepper.enterStep(true); /* host may disable automatic playback */
   result.stepper = stepper;
+  var modeRail=document.createElement('div');modeRail.className='playback-mode-rail';modeRail.appendChild(tog);
+  bar.parentNode.insertBefore(modeRail,bar);
+  result.modeRail=modeRail;
   addFocusControl();
   return result;
 }

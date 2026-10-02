@@ -36,12 +36,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   player.setAttribute('data-dv-step-controls','');
   var actions=document.createElement('div');actions.className='viewport-actions';toolbar.appendChild(actions);
   function button(text,action,host,cls){var b=document.createElement('button');b.type='button';b.className=cls || 'mbtn';b.textContent=text;b.addEventListener('click',action);(host || actions).appendChild(b);return b;}
-  var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=true;
+  var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=false;
   var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
   var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
-  var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=true;
-  var legendSummary=document.createElement('summary');legendSummary.textContent='Edge legend';legendMenu.appendChild(legendSummary);
+  var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=false;
+  var legendSummary=document.createElement('summary');legendSummary.textContent='Legend';legendMenu.appendChild(legendSummary);
   var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
+  var panelBody=document.createElement('div');panelBody.className='explore-panel-body';menu.appendChild(panelBody);panelBody.appendChild(choices);
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
   var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(available).forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
@@ -59,6 +60,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var overlayOut=button('−',function(){changeOverlayScale(overlayScale()-.1);},overlayZoom);overlayOut.setAttribute('aria-label','Shrink panels and controls');
   var overlayLabel=button('100%',function(){changeOverlayScale(1);},overlayZoom,'mbtn explore-overlay-value');overlayLabel.setAttribute('aria-label','Reset panels and controls size');overlayLabel.title='Reset panels and controls to 100%';
   var overlayIn=button('+',function(){changeOverlayScale(overlayScale()+.1);},overlayZoom);overlayIn.setAttribute('aria-label','Enlarge panels and controls');
+  panelBody.appendChild(focus);panelBody.appendChild(stack);panelBody.appendChild(overlayZoom);
+  if(document.getElementById('workspace-canvas')){button('Saved visibility…',function(){var chapter=box.querySelector('.section-view-options');if(chapter){chapter.open=true;menu.open=false;chapter.querySelector('summary').focus();}},panelBody);}
   var playerGrip=button('⠿',function(){},player,'explore-player-grip');
   playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
   var playerResize=button('◢',function(){},player,'explore-window-resize');
@@ -68,6 +71,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   playerGrip.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'move');});
   playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
   var legend=board.querySelector('.lg');
+  if(legend)Array.prototype.slice.call(legend.querySelectorAll('.li')).forEach(function(item){legendItems.appendChild(item);});
+  function standardPanels(){
+    if(active)return;choices.replaceChildren();summary.textContent='Panels';overlayZoom.hidden=true;
+    Array.prototype.forEach.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'),function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index];if(!panel)return;var label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=!card.hidden;check.addEventListener('change',function(){card.hidden=!check.checked;});label.appendChild(check);var title=document.createElement('span');title.textContent=panel.title || panel.id;label.appendChild(title);choices.appendChild(label);});
+    if(prose){var label=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span');check.type='checkbox';check.checked=!prose.collapsed;text.textContent='Section notes';check.addEventListener('change',function(){setProseCollapsed(prose,!check.checked,false,window);});label.appendChild(check);label.appendChild(text);choices.appendChild(label);}
+  }
+  menu.addEventListener('toggle',function(){if(menu.open && !active)standardPanels();});
+  standardPanels();
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
@@ -199,7 +210,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
     }
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
-    var insetTop=workbenchCanvas?142:readerCanvas?96:12,insetBottom=workbenchCanvas?68:12;
+    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getBoundingClientRect();
+    var insetTop=12,insetBottom=workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):12;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
     stacked.forEach(function(w){
@@ -224,12 +236,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     player.style.setProperty('--explore-tracks-height',tracks+'px');
     var controls=memory.controls;
     if(!controls){
-      var height=Math.min((b.h-24)/contentScale,tracks+76),right=maxWidth && b.w-maxWidth>420?maxWidth+28:12;
-      controls=workbenchCanvas?{x:84,y:b.h-height*contentScale-68,w:Math.max(300,b.w-right-84),h:height}:{x:12,y:b.h-height*contentScale-12,w:b.w-right-12,h:height};
+      var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
+      var height=Math.min((b.h-24)/contentScale,tracks+112+(Math.min(b.w-24,controlWidth*contentScale)<560?64:0));
+      controls=workbenchCanvas?{x:84,y:b.h-height*contentScale-insetBottom,w:controlWidth,h:height}:{x:12,y:b.h-height*contentScale-12,w:controlWidth,h:height};
     }
     playerWindow.state=memory.controls || Object.assign({},controls);
     apply(playerWindow,constrain(playerWindow,scaledRect(playerWindow,controls)));
-    player.hidden=!bar || bar.hidden;
+    player.hidden=!bar && !player.querySelector('.playback-mode-rail');
+    player.classList.toggle('player-ambient',!!bar && bar.hidden);
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
     if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
@@ -341,15 +355,15 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function enter(){
     if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
     if(boardSize && boardSize.suspend)boardSize.suspend();
-    active=true;memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
+    active=true;choices.replaceChildren();memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
-    if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);
+    var modeRail=box.querySelector('.playback-mode-rail');if(modeRail)move(modeRail,player);
+    if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);overlayZoom.hidden=false;
     // Reuse the rendered samples so protocol overrides, skins and response
     // dashes stay identical to Standard. The move anchors restore them on leave.
-    if(legend)Array.prototype.slice.call(legend.querySelectorAll('.li')).forEach(function(item){move(item,legendItems);});
-    legendMenu.hidden=!legendItems.children.length;
+    legendMenu.hidden=false;
     board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
     if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
@@ -373,9 +387,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
-    windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=true;
+    windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
     stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
-    shell.classList.remove('viewport-explore');menu.hidden=focus.hidden=stack.hidden=true;
+    shell.classList.remove('viewport-explore');menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
   function isFullscreen(){return document.fullscreenElement===shell;}
@@ -453,6 +467,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(!definition)definition={id:'flow',presentation:'standard'};
       enter();
     },
+    currentCamera:function(){return camera();},
+    canvasCommand:function(){return expand;},
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,.15,4);sizeGraph(true);},
     overlayScale:overlayScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
@@ -460,7 +476,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
       sizeGraph(false);positionCamera(memory.layout.camera);return true;
     },
-    setView:function(view,tiles,sourceGrid){leave(true);definition=view;items=tiles || [];panelSource=sourceGrid || grid;var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
+    setView:function(view,tiles,sourceGrid){leave(true);definition=view;items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){
@@ -470,7 +486,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       definition.exploreLayout=copy(normalized);return true;
     },
     reset:function(){
-      if(!active)return;var token=beginEdit();if(token===false)return;
+      if(!active)return;var token=beginEdit(true);if(token===false)return;
       var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};leave();delete memories[id];
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
     },
@@ -492,7 +508,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       return true;
     },
     snapshotReaderState:function(){
-      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
       return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open,legendOpen:legendMenu.open};
     },
     restoreReaderState:function(saved){

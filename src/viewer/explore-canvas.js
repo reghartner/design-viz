@@ -3,20 +3,19 @@
    views keep their document layout. Navigation never edits the spec. */
 function initViewerExploreCanvas(ctl,view,opts){
   var container=opts && opts.container || document.body;
-  var active=null,detailRoot=null,detailOriginExplore=false,pageOnly=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
+  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
   var fitObserver=new ResizeObserver(function(entries){
     if(!frame && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))frame=requestAnimationFrame(firstFit);
   }),fitRecord=null,fitDefinition=null,fitKey=null;
-  var back=document.createElement('button');back.type='button';back.className='mbtn';back.textContent='Back to page';
   function selectSection(rec){
-    pageOnly=false;detailRoot=null;
+    detailRoot=null;
     if(ctl.details)ctl.details.showSection(rec.reference);
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
     ctl.activeTarget={kind:'diagram',section:rec.number};
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   }
-  var navigation=createExploreNavigation(ctl,{action:back,selectSection:selectSection});
+  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;
@@ -35,7 +34,16 @@ function initViewerExploreCanvas(ctl,view,opts){
       navigation.restore();previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);
     }
     container.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
-    if(!active){navigation.restore();return;}
+    if(!active){
+      // Moving the real tab bars changes the height above a routed contract.
+      // Keep its reader scroll anchor; dialog/native hosts own their own scroll.
+      var anchor=container===document.body && view.querySelector('.dv-hash-target');
+      if(anchor!==document.activeElement)anchor=null;
+      var top=anchor && anchor.getBoundingClientRect().top;
+      if(rec)navigation.mount(rec);else navigation.restore();
+      if(anchor && anchor.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
+      return;
+    }
     active.sectionEl.classList.add('explore-active-section');
     navigation.mount(active);
     var detail=ctl.details && ctl.details.snapshot(),root=detail && ctl.sections.find(function(r){return r.reference===detail.section;});
@@ -50,17 +58,15 @@ function initViewerExploreCanvas(ctl,view,opts){
       });
     }
   }
-  back.addEventListener('click',function(){var rec=active;pageOnly=true;if(document.fullscreenElement && document.exitFullscreen)document.exitFullscreen().catch(function(){});show(null);if(rec)rec.sectionEl.scrollIntoView({block:'start'});});
   function viewChanged(ev){
     var rec=ctl.sections.find(function(r){return r.sectionEl.contains(ev.target);});
-    if(rec){pageOnly=false;show(rec);}
+    if(rec){show(rec);}
     else if(ctl.details && ctl.details.activeSections().some(function(r){return r.sectionEl.contains(ev.target);})){
-      pageOnly=false;detailChanged();
+      detailChanged();
     }
   }
   view.addEventListener('diagram-view-change',viewChanged);
   function detailChanged(){
-    if(pageOnly)return;
     var stack=ctl.details && ctl.details.activeSections?ctl.details.activeSections():[];
     if(stack.length>1){
       if(detailRoot!==stack[0]){detailRoot=stack[0];detailOriginExplore=active===detailRoot;}
@@ -79,17 +85,18 @@ function initViewerExploreCanvas(ctl,view,opts){
   function exploreDefinition(rec){var definition=rec && rec.viewport && rec.viewport.viewDefinition();return definition && definition.presentation==='explore'?rec:null;}
   function navigationChanged(){
     var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
-    pageOnly=false;detailRoot=null;
+    detailRoot=null;
     var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
-    if(!rec && target && target.kind==='tab')rec=exploreDefinition(tabPrimary(target));
+    if(!rec && target && target.kind==='tab')rec=tabPrimary(target) || ctl.sections.find(function(r){return r.tabBlock===target.tabBlock && r.tab===target.tab;});
     if(rec!==active)show(rec);
   }
   var priorChange=ctl.onChange;
   function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
-  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?exploreDefinition(tabPrimary(target)):null;
+  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?tabPrimary(target):null;
   if(!initial && (!target || target.kind!=='tab'))initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && !r.tabBlock;});
+  if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
   return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();show(null);navigation.destroy();}};
 }

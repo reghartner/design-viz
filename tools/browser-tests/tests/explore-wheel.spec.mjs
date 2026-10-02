@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,closeTools,pagePreview,trackResources,resources} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,prepareEditorSurface,chapterOptions,trackResources,resources} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
@@ -62,21 +62,21 @@ for(const surface of ['standalone','workbench','native'])test(surface+' Ctrl-scr
   if(sibling){expect(await width(sibling)).toBe(originalSibling);expect(new URL(page.url()).hash).toBe(hash);}
 });
 
-test('contained editor wheel zoom is one authored camera edit, and stale or cancelled gestures cannot write',async({page,server})=>{
-  const text=JSON.stringify(spec(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,text);await pagePreview(page);
+test('editor wheel zoom stays temporary until an explicit camera save, and stale or cancelled gestures cannot write',async({page,server})=>{
+  const text=JSON.stringify(spec(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);
   const board=page.locator('.explore-board');await board.scrollIntoViewIfNeeded();await page.clock.install();
   const initial=await width(board);for(let i=0;i<3;i++)expect(await dispatch(board,-20)).toBe(true);
-  await page.clock.fastForward(300);await expect.poll(()=>page.locator('#src').inputValue()).not.toBe(text);
+  await page.clock.fastForward(300);await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#undo-builder')).toBeDisabled();await chapterOptions(page);await page.getByRole('button',{name:'Use current camera as opening view',exact:true}).click();
   const saved=await page.locator('#src').inputValue(),camera=JSON.parse(saved).page.blocks[0].diagram.layouts[1].exploreLayout.camera;
   expect(camera.zoom).toBeCloseTo(Math.exp(.36),4);expect(await width(board)).toBeCloseTo(initial*Math.exp(.36),0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#redo-builder')).toBeDisabled();
   await dispatch(board,-30);await page.locator('#section-story').getByRole('button',{name:'Standard',exact:true}).click();
   await page.clock.fastForward(400);await expect(page.locator('#src')).toHaveValue(saved);
-  await page.locator('#section-story').getByRole('button',{name:'Explore',exact:true}).click();await pagePreview(page);
+  await page.locator('#section-story').getByRole('button',{name:'Explore',exact:true}).click();await prepareEditorSurface(page);
   const invalid=saved+'\n{ unfinished';await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},invalid);
   const staleWidth=await width(board);expect(await dispatch(board,-30)).toBe(true);await page.clock.fastForward(400);
-  expect(await width(board)).toBe(staleWidth);await expect(page.locator('#src')).toHaveValue(invalid);
+  expect(await width(board)).toBeCloseTo(staleWidth*Math.exp(.18),0);await expect(page.locator('#src')).toHaveValue(invalid);await chapterOptions(page);await page.getByRole('button',{name:'Use current camera as opening view',exact:true}).click();await expect(page.locator('#src')).toHaveValue(invalid);
 });
 
 test('wheel units and limits are consistent; inactive and destroyed viewports release the gesture',async({page,server})=>{

@@ -1,4 +1,5 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {chapterOptions} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -21,13 +22,13 @@ test('Explore keeps the graph through playback and Standard restores authored vi
 test('legacy Data flow and saved layout remain curated until their View type changes',async({page,server})=>{
   const spec=await named(),d=spec.page.sections[0].diagram;
   d.sectionLayout=d.layouts[0].sectionLayout;delete d.layouts;delete d.defaultLayout;d.autoplay=false;
-  const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);await pagePreview(page);
+  const input=JSON.stringify(spec);await page.goto(server.origin+'/workbench.html');await paste(page,input);await prepareEditorSurface(page);
   const section=page.locator('#docview .doc-sec').first();
   await section.getByRole('button',{name:'Data flow',exact:true}).click();
   await expect(section.locator('.board')).toBeVisible();await expect(section.locator('.explore-stage')).toBeHidden();
   await section.getByRole('button',{name:'Layout',exact:true}).click();
   await expect(section.locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(input);
-  await section.getByRole('combobox',{name:'Viewing mode',exact:true}).selectOption('explore');
+  await chapterOptions(page,section);await section.getByRole('combobox',{name:'Viewing mode',exact:true}).selectOption('explore');
   await expect(section.locator('.explore-board')).toBeVisible();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
 });
 
@@ -55,10 +56,10 @@ test('reader canvas follows same-view hash navigation and diagram button target'
   await page.getByRole('button',{name:'Story 0',exact:true}).click();
   await expect(page.locator('.explore-active-section .sec-h')).toHaveText('Story 0');
   await expect.poll(()=>new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('story0');
-  await page.getByRole('button',{name:'Back to page',exact:true}).click();
+  await page.locator('#section-story0').getByRole('button',{name:'Home story',exact:true}).click();
   await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
-  await page.locator('#section-story0').getByRole('button',{name:'STEP',exact:true}).click();
-  await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+  await page.locator('#section-story0').getByRole('button',{name:'Service flow',exact:true}).click();
+  await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
 });
 
 

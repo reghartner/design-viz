@@ -1,12 +1,26 @@
-/* The selected view determines the editor surface, just as in the reader.
-   Back to page is temporary navigation, retained while editing that view. */
+/* The selected Chapter owns the editor surface, just as in the reader. */
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
-  var pageButton=document.getElementById('workspace-page'),pageOverride=false,selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
+  var selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
   var savedSelection=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null;
   var fitObserver=new ResizeObserver(function(entries){
     if(!fitPending && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))fitPending=requestAnimationFrame(autoFit);
   });
+  var header=document.querySelector('.workbench-header'),measuredNav=null;
+  function measureChrome(){
+    if(document.body.classList.contains('welcome-active') || document.body.classList.contains('workbench-reader-preview-active'))return;
+    var head=header.getBoundingClientRect().bottom;document.body.style.setProperty('--workspace-header-bottom',head+'px');
+    var nav=navigation && navigation.element,edge=nav && nav.isConnected?nav.getBoundingClientRect().bottom:head;
+    document.body.style.setProperty('--workspace-content-top',Math.ceil(edge+10)+'px');
+    document.dispatchEvent(new CustomEvent('workbench-chrome-resize'));
+  }
+  var chromeObserver=new ResizeObserver(measureChrome);chromeObserver.observe(header);
+  view.addEventListener('navigation-mounted',function(){var nav=navigation && navigation.element;if(nav && nav!==measuredNav){if(measuredNav)chromeObserver.unobserve(measuredNav);measuredNav=nav;chromeObserver.observe(nav);}measureChrome();});
+  view.addEventListener('workbench-navigation-refresh',function(){if(navigation)navigation.mount(current());measureChrome();});
+  var canvasCommand=null,canvasCommandAnchor=null,canvasMenu=document.getElementById('workspace-canvas-tools');
+  function restoreCanvasCommand(){if(canvasCommandAnchor && canvasCommandAnchor.parentNode){canvasCommandAnchor.parentNode.replaceChild(canvasCommand,canvasCommandAnchor);}canvasCommand=canvasCommandAnchor=null;}
+  function mountCanvasCommand(rec){restoreCanvasCommand();if(!rec || !rec.viewport)return;canvasCommand=rec.viewport.canvasCommand();canvasCommandAnchor=document.createComment('canvas command');canvasCommand.before(canvasCommandAnchor);canvasMenu.querySelector('div').prepend(canvasCommand);}
+  canvasMenu.addEventListener('keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();canvasMenu.open=false;canvasMenu.querySelector('summary').focus();}});
   function records(){var ctl=getController();return ctl && ctl.sections || [];}
   // Child copies have transient DOM IDs. Keep their geometry by the source
   // sections along the local node chain, and re-resolve every link on restore.
@@ -59,7 +73,7 @@ function initWorkbenchCanvas(){
     var definition=rec && rec.viewport && rec.viewport.viewDefinition();
     return !!(definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
   }
-  function diagramMode(){return exploreView(current()) && !pageOverride;}
+  function diagramMode(){return exploreView(current());}
   function identity(rec){
     var p=rec && rec.presentation,definition=rec && rec.viewport && rec.viewport.viewDefinition();
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
@@ -94,15 +108,14 @@ function initWorkbenchCanvas(){
     select(rec.number-1);
   });
   function paintZoom(){
-    var vp=viewport(),value=vp && vp.canvasZoom(),scale=vp?vp.overlayScale():1;
+    var vp=viewport(),value=vp && vp.canvasZoom();
     document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';
-    document.getElementById('workspace-overlay-tools').hidden=!diagramMode() || !vp;
-    document.getElementById('workspace-overlay-size').textContent=Math.round(scale*100)+'%';
-    document.getElementById('workspace-overlay-out').disabled=scale<=.5;document.getElementById('workspace-overlay-in').disabled=scale>=1.25;
   }
   function fit(){
     var vp=viewport();if(!diagramMode() || !vp)return;
-    var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=195,width=bounds?bounds.width:innerWidth;
+    var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=24,width=bounds?bounds.width:innerWidth;
+    var player=current() && current().sectionEl.querySelector('.explore-player'),playerRect=player && !player.hidden && player.getBoundingClientRect();
+    if(bounds && playerRect)bottom=Math.max(bottom,bounds.bottom-playerRect.top+12);
     document.querySelectorAll('.workspace-window:not([hidden])').forEach(function(win){
       var r=win.getBoundingClientRect();if(r.left<innerWidth/2)left=Math.max(left,Math.min(width*.4,r.right-(bounds?bounds.left:0)+16));else right=Math.max(right,Math.min(width*.4,(bounds?bounds.right:innerWidth)-r.left+16));
     });
@@ -139,15 +152,22 @@ function initWorkbenchCanvas(){
       });
       rec.inheritedExplore=inherited;all=all.concat(rec);
     }
-    var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));if(key!==selectionKey)pageOverride=false;selectionKey=key;
+    var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
-    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{action:pageButton,selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
-    if(navigation){if(diagramMode())navigation.mount(rec);else navigation.restore();}
+    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
+    // Measure navigation in its selected, visible section before the viewport
+    // restores its camera. Hidden navigation reports zero height and would cause
+    // an unnecessary resize (and camera rounding) immediately after restoration.
     all.forEach(function(r){
       var on=diagramMode() && r===rec;
       r.sectionEl.classList.toggle('workspace-active-section',on);
       r.sectionEl.classList.toggle('workspace-empty-section',on && !r.viewport);
+    });
+    if(rec && rec.tabBlock){var tabs=ctl.tabBlocks[rec.tabBlock-1];if(tabs && tabs.active()!==rec.tab)tabs.select(rec.tab,false,false);}
+    if(navigation){navigation.mount(rec);measureChrome();}
+    all.forEach(function(r){
+      var on=diagramMode() && r===rec;
       if(r.viewport && !on){
         r.viewport.setWorkbenchCanvas(false);
         if(r===rec && exploreView(r) && !r.pageCanvasVisited){r.viewport.restoreInitialCamera(true);r.pageCanvasVisited=true;}
@@ -158,21 +178,22 @@ function initWorkbenchCanvas(){
     // A Chapter can enter Explore before the shared navigation is mounted.
     // Reconcile the camera immediately with the stage space the top bar took.
     if(diagramMode() && rec && rec.viewport){rec.viewport.refresh();if(!rec.canvasVisited)rec.viewport.restoreInitialCamera();}
-    if(rec && rec.tabBlock){var ctl=getController(),tabs=ctl.tabBlocks[rec.tabBlock-1];if(tabs && tabs.active()!==rec.tab)tabs.select(rec.tab,false,false);}
-    document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;});
-    pageButton.hidden=!exploreView(rec);pageButton.textContent=pageOverride?'Open Explore':'Back to page';
-    paintZoom();selecting=false;
+    document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;b.hidden=b.disabled;});
+    mountCanvasCommand(rec);paintZoom();selecting=false;measureChrome();
     if(changedSection && rec && !diagramMode())rec.sectionEl.scrollIntoView({block:'start'});
   }
   function capture(){
-    cancelFit();if(navigation)navigation.restore();
-    if(skipCapture){skipCapture=false;saved=null;savedDetail=null;return;}
+    cancelFit();
+    if(skipCapture){skipCapture=false;saved=null;savedDetail=null;restoreCanvasCommand();if(navigation)navigation.restore();return;}
     saveDetail();
     var ctl=getController(),snapshot=ctl && ctl.details && ctl.details.snapshot();
     var context=detailContext(snapshot);savedDetail=context?{context:context,navigation:snapshot}:null;
     activeCanvas=null;activeDetail=null;
     var page=getPage();saved=page?workbenchPreviewSections(page):null;savedSelection=saved && saved[section];
-    if(saved)records().forEach(function(rec){var s=saved[rec.number-1];if(s && rec.viewport){s.reader=rec.viewport.snapshotCanvasState();s.config=JSON.stringify([s.diagram.layouts,s.diagram.sectionLayout]);s.visited=rec.canvasVisited;}});
+    if(saved)records().forEach(function(rec){var s=saved[rec.number-1];if(s && rec.viewport){
+      s.reader=rec.viewport.snapshotCanvasState();s.config=JSON.stringify([s.diagram.layouts,s.diagram.sectionLayout]);s.visited=rec.canvasVisited;
+    }});
+    restoreCanvasCommand();if(navigation)navigation.restore();
   }
   function rendered(outcome){
     if(!outcome.ok || !outcome.replaced)return;
@@ -192,16 +213,18 @@ function initWorkbenchCanvas(){
             memory[definition.id]={panels:{},focus:state.focus,scroll:state.scroll,zoom:state.zoom,layout:definition.exploreLayout || {}};
           });
         }
-        rec.viewport.restoreCanvasState(memory);var definition=rec.viewport.viewDefinition();rec.canvasVisited=prior.visited && !!(definition && memory[definition.id]);
+        rec.viewport.restoreCanvasState(memory);var definition=rec.viewport.viewDefinition();
+        rec.canvasVisited=prior.visited && !!(definition && memory[definition.id]);
       }
     });
-    if(saved && matches.get(section)!==savedSelection){pageOverride=false;selectionKey=null;}
+    if(saved && matches.get(section)!==savedSelection){selectionKey=null;}
     saved=null;savedSelection=null;
     var ctl=getController(),resolved=savedDetail && resolveDetail(savedDetail.context);
     if(resolved && ctl && ctl.details){
       section=resolved.indices[0];ctl.details.restore(Object.assign({},savedDetail.navigation,{section:resolved.reference}));
     }
     savedDetail=null;select(section);
+
   }
   function setZoom(value){var vp=viewport();if(diagramMode() && vp){vp.canvasZoom(value);paintZoom();}}
   function paintHand(){surface.classList.toggle('canvas-hand',hand || spaceHeld);document.getElementById('workspace-pan').setAttribute('aria-pressed',String(hand));}
@@ -222,7 +245,7 @@ function initWorkbenchCanvas(){
   window.addEventListener('keydown',function(ev){
     if(!diagramMode() || document.body.classList.contains('welcome-active'))return;
     if(ev.key==='Escape' && drag){ev.preventDefault();ev.stopPropagation();finish(true);return;}
-    if(ev.code==='Space' && !ev.ctrlKey && !ev.metaKey && !ev.target.closest('input,textarea,select,button,[contenteditable="true"],.workspace-window')){ev.preventDefault();spaceHeld=true;paintHand();}
+    if(ev.code==='Space' && !ev.ctrlKey && !ev.metaKey && !ev.target.closest('input,textarea,select,button,summary,[contenteditable="true"],.workspace-window,dialog')){ev.preventDefault();spaceHeld=true;paintHand();}
   },true);
   window.addEventListener('keyup',function(ev){if(ev.code==='Space'){spaceHeld=false;paintHand();}});
   window.addEventListener('blur',function(){spaceHeld=false;paintHand();finish(true);});
@@ -260,18 +283,12 @@ function initWorkbenchCanvas(){
   view.addEventListener('change',function(ev){if(ev.target.closest('.section-view-settings'))selectedByEvent(ev);},true);
   // Automatic Home/Data views predate viewport change events.
   view.addEventListener('click',function(ev){if(ev.target.closest('[data-view-focus],[data-view-layout]'))selectedByEvent(ev);});
-  pageButton.addEventListener('click',function(){pageOverride=!pageOverride;select(section);if(pageOverride && current())current().sectionEl.scrollIntoView({block:'start'});});
   document.getElementById('workspace-pan').addEventListener('click',function(){hand=!hand;paintHand();});
   document.getElementById('workspace-zoom-in').addEventListener('click',function(){setZoom(viewport().canvasZoom()*1.2);});
   document.getElementById('workspace-zoom-out').addEventListener('click',function(){setZoom(viewport().canvasZoom()/1.2);});
   document.getElementById('workspace-zoom').addEventListener('click',function(){setZoom(1);});
-  function setOverlay(value){var vp=viewport();if(diagramMode() && vp){vp.setOverlayScale(value);paintZoom();}}
-  document.getElementById('workspace-overlay-out').addEventListener('click',function(){var vp=viewport();if(vp)setOverlay(vp.overlayScale()-.1);});
-  document.getElementById('workspace-overlay-in').addEventListener('click',function(){var vp=viewport();if(vp)setOverlay(vp.overlayScale()+.1);});
-  document.getElementById('workspace-overlay-size').addEventListener('click',function(){setOverlay(1);});
   document.getElementById('workspace-fit').addEventListener('click',fit);
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,
-    showPage:function(){pageOverride=true;select(section);},
-    reset:function(){cancelFit();if(navigation)navigation.restore();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;pageOverride=false;},fit:fit};
+    reset:function(){cancelFit();if(navigation)navigation.restore();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;},fit:fit};
 }

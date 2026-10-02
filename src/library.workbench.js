@@ -215,7 +215,7 @@ function initWorkbenchLibrary(opts){
       ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
-      if(!handoff || handoff.action==='view')exploreCanvas=initViewerExploreCanvas(ctl,reader);
+      if(!handoff || handoff.action==='view')exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
     }catch(ex){
       if(token!==sequence)return;

@@ -1,3 +1,4 @@
+import {canvasTools} from '../helpers/test.mjs';
 import {readFile} from 'node:fs/promises';
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
@@ -10,7 +11,7 @@ test('floating tools leave the diagram full-window and global actions available'
   const size=page.viewportSize();
   const shell=await page.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
   const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox();
-  expect(shell).toEqual({x:84,y:104,width:size.width-96,height:size.height-116});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:size.width-96,height:size.height-contentTop-12});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);
   await expect(page.locator('#workspace-columns')).toBeHidden();
   for(const name of ['inspect','steps','outline','json','file']){
@@ -18,7 +19,7 @@ test('floating tools leave the diagram full-window and global actions available'
     for(const id of ['diagram-add','undo-builder','redo-builder','file-save'])await expect(page.locator('#'+id)).toBeInViewport();
   }
   await expect(page.locator('.editor-pane:visible')).toHaveCount(5);
-  await page.locator('#workspace-panels').click();await expect(page.locator('.editor-pane:visible')).toHaveCount(0);
+  await canvasTools(page);await page.locator('#workspace-panels').click();await expect(page.locator('.editor-pane:visible')).toHaveCount(0);
 });
 
 test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{

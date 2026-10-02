@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 
 function longSpec(){
   return {page:{title:'Scroll retention',sections:Array.from({length:5},(_,i)=>({
@@ -16,7 +16,7 @@ function longSpec(){
 }
 
 for(const focus of [false,true])test(`row reorder keeps the ${focus?'focused preview':'page'} in place`,async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(longSpec()));await pagePreview(page);
+  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(longSpec()));await prepareEditorSurface(page);
   await page.evaluate(()=>document.fonts.ready);
   if(focus){
     await page.locator('#editor-tab-file').click();await page.locator('.workspace-preferences summary').click();

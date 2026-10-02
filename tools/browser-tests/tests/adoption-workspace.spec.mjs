@@ -1,3 +1,4 @@
+import {openAutoArrange} from '../helpers/test.mjs';
 import {test,expect,paste} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {readFile} from 'node:fs/promises';
@@ -59,28 +60,23 @@ test('compact chrome keeps Add, Auto arrange, appearance and workspace controls 
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec()));
   for(const [width,height] of [[1800,800],[1501,800],[1500,800],[1499,800],[1281,800],[1280,800],[1279,800],[1240,800],[1200,800],[1190,800],[1181,800],[1180,800],[1150,800],[1050,800],[1024,800],[850,800],[820,800],[720,800],[640,800],[421,800],[420,800],[400,800],[390,800],[390,360]]){
     await page.setViewportSize({width,height});
-    const controls=await page.evaluate(width=>['#workbench-home','#diagram-add','#auto-arrange','#workbench-reader-open','#file-save','.workspace-save>[data-workbench-tour]','#undo-builder','#redo-builder','#diagram-add-target','#workspace-appearance>summary','#editor-tab-agent']
-      .concat(width>1050?['#workspace-home']:[],width>1280?['.workspace-save>[data-open-human-guide]']:[]).map(selector=>{
+    const controls=await page.evaluate(()=>['#diagram-add','#file-save','#undo-builder','#redo-builder','#workspace-appearance>summary','.workspace-help>summary','#docview .explore-navigation .section-view-options>summary','#editor-tab-agent'].map(selector=>{
       const node=document.querySelector(selector),r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
       return {selector,left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1),inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};
-    }),width);
+    }));
     for(const control of controls)expect(control,JSON.stringify(control)+' at '+width+'×'+height+'px').toMatchObject({inside:true,reachable:true});
-    const header=await page.locator('.workbench-header').evaluate(element=>{const rect=element.getBoundingClientRect();return {left:+rect.left.toFixed(1),right:+rect.right.toFixed(1),width:+rect.width.toFixed(1),clientWidth:element.clientWidth,scrollWidth:element.scrollWidth};});
-    expect(header.scrollWidth,JSON.stringify(header)+' at '+width+'×'+height+'px').toBeLessThanOrEqual(header.clientWidth+1);
-    await expect(page.locator('#workbench-reader-open')).toHaveAccessibleName('Preview read-only page');
-    await expect(page.locator('#auto-arrange')).toHaveAccessibleName('Auto arrange');
+    const header=await page.locator('.workbench-header').evaluate(el=>({client:el.clientWidth,scroll:el.scrollWidth}));
+    expect(header.scroll).toBeLessThanOrEqual(header.client+1);
     await expect(page.locator('#file-save')).toHaveAccessibleName('Download JSON');
-    await expect(page.locator('.workspace-save>[data-workbench-tour]')).toHaveAccessibleName('Take the workbench tour');
-    if(width>1280)await expect(page.locator('.workspace-save>[data-open-human-guide]')).toBeVisible();
-    else await expect(page.locator('.workspace-save>[data-open-human-guide]')).toBeHidden();
+    await page.locator('.workspace-help>summary').click();await expect(page.locator('.workspace-help [data-workbench-tour]')).toBeVisible();await expect(page.locator('.workspace-help [data-workbench-tour]')).toHaveAccessibleName('Take the workbench tour');await page.locator('.workspace-help>summary').click();
     await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeVisible();await page.keyboard.press('Escape');
     if(width===390){
       const before=await page.locator('#src').inputValue();
-      await page.locator('#auto-arrange').click();await expect(page.locator('#auto-arrange-dialog')).toBeVisible();
+      await openAutoArrange(page);await expect(page.locator('#auto-arrange-dialog')).toBeVisible();
       await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();
       await expect(page.locator('#src')).toHaveValue(before);
     }
-    await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#sk-pastel')).toBeVisible();
+    await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#sk-pastel')).toBeVisible();await expect(page.locator('#open-page-preview')).toBeVisible();await expect(page.locator('#open-page-preview')).toHaveAccessibleName('Open page preview');
     await page.locator('#workspace-appearance>summary').click();await arrangeEditor(page,'present');
   }
 });
@@ -106,6 +102,7 @@ test('short floating tools keep their close buttons and rail reachable above can
       await page.locator('#editor-tab-'+tool).click();const win=page.locator('#workspace-window-'+tool);
       await expect(win).toBeVisible();const close=win.locator('.workspace-window-close');
       expect(await close.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),tool+' close at '+width+'px').toBe(true);
+      const canvasMenu=page.locator('#workspace-canvas-tools>summary');expect(await canvasMenu.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);})).toBe(true);
       await close.click();await expect(win).toBeHidden();await expect(page.locator('#editor-tab-'+tool)).toBeFocused();await expect(page.locator('#editor-tab-'+tool)).toBeInViewport();
     }
   }

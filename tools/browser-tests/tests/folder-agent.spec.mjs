@@ -1,4 +1,6 @@
+import {canvasTools} from '../helpers/test.mjs';
 import {test,expect} from '@playwright/test';
+import {chooseAddDestination} from '../helpers/test.mjs';
 import {readFile,writeFile,mkdir,mkdtemp,rm,stat,rename,readdir} from 'node:fs/promises';
 import {execFileSync,spawn} from 'node:child_process';
 import path from 'node:path';
@@ -77,7 +79,7 @@ async function expectWorkbenchCanvas(page){
   const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
   const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
   const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
-  expect(shell).toEqual({x:84,y:104,width:viewport.width-96,height:viewport.height-116});
+  const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:viewport.width-96,height:viewport.height-contentTop-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
 }
 async function copyRequest(page,text){
@@ -398,9 +400,9 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
     await win.locator('.workspace-window-close').click();await expect(win).toBeHidden();
     await page.locator('#editor-tab-agent').click();await expect(page.locator('#folder-agent-input')).toHaveValue('Keep this draft while I inspect');
     expect((await win.boundingBox()).width).toBeCloseTo(moved.width,0);
-    await page.locator('#workspace-panels').click();await expect(win).toBeHidden();await expect(page.locator('#workspace-window-inspect')).toBeHidden();
+    await canvasTools(page);await page.locator('#workspace-panels').click();await expect(win).toBeHidden();await expect(page.locator('#workspace-window-inspect')).toBeHidden();
     const canvas=await page.locator('#workspace-canvas').boundingBox();expect(canvas).toEqual({x:0,y:0,...page.viewportSize()});
-    await page.locator('#workspace-panels').click();await expect(win).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+    await canvasTools(page);await page.locator('#workspace-panels').click();await expect(win).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
     await page.screenshot({path:info.outputPath('floating-agent-and-inspect.png')});
     await page.reload();await expect(win).toBeVisible();expect((await win.boundingBox()).x).toBeCloseTo(moved.x,0);
     await page.setViewportSize({width:700,height:700});const small=await win.boundingBox();expect(small.x).toBeGreaterThanOrEqual(12);expect(small.x+small.width).toBeLessThanOrEqual(688);
@@ -413,7 +415,7 @@ test('diagram itself fills the browser and pans and zooms without editing source
   try{
     const raw=JSON.parse(source);raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
+    await canvasTools(page);await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
     const canvas=page.locator('.workspace-active-section .explore-board');
     await expectWorkbenchCanvas(page);
     await expect(page.locator('#docview .doc-title')).toBeHidden();
@@ -460,30 +462,32 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     otherDiagram.layouts=[{id:'flow',name:'Data',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',attachTo:'diagram',x:0,y:12,w:12,h:4}]}}];
     const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#workspace-panels').click();
+    await canvasTools(page);await page.locator('#workspace-panels').click();
     await page.locator('button[data-layout-id="technical"]').click();
     await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
     await page.locator('#workspace-fit').click();
-    await page.locator('#diagram-add-target').selectOption('1');
+    await chooseAddDestination(page,'1');
     await expectWorkbenchCanvas(page);
     await expect(page.locator('[data-dv-node="customer"]')).toBeInViewport();
     await expect(page.locator('[data-dv-node="a"]')).toBeHidden();
     await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();
-    await page.locator('#diagram-add-target').selectOption('0');
+    await chooseAddDestination(page,'0');
     await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
     await page.locator('#workspace-zoom-out').click();
     const camera=()=>page.locator('.workspace-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
-    const prior=await camera();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const prior=await camera();
     await page.locator('#editor-tab-json').click();
     await page.locator('#src').fill(input.replace('"Backend"','"Customer support"'));await page.locator('#go').click();
     await expect(page.locator('[data-dv-node="b"]')).toContainText('Customer support');
     expect(await camera()).toEqual(prior);
     await page.locator('#workspace-window-json .workspace-window-close').click();
-    await page.locator('#workspace-page').click();
-    await expect(page.locator('#docview .doc-title')).toBeVisible();
-    await expect(page.locator('.workbench-diagram-canvas')).toHaveCount(0);
-    await expect(page.getByRole('button',{name:'Arrange section',exact:true}).first()).toBeVisible();
-    await page.locator('#workspace-page').click();
+    await page.locator('#workspace-appearance>summary').click();
+    await page.locator('#open-page-preview').click();
+    await expect(page.locator('#page-preview')).toBeVisible();
+    await expect(page.locator('#page-preview .viewer-diagram-canvas>.explore-stage')).toBeVisible();
+    await page.locator('#page-preview .explore-navigation').getByRole('button',{name:'Delivery',exact:true}).click();
+    await expect(page.locator('#page-preview .viewer-diagram-canvas')).toContainText('Customer support');
+    await page.locator('#close-page-preview').click();
     expect(await camera()).toEqual(prior);
     await expect(page.locator('#src')).toHaveValue(input.replace('"Backend"','"Customer support"'));
     await page.screenshot({path:info.outputPath('full-diagram-canvas.png')});
@@ -635,7 +639,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await expect(view.locator('.stepline')).toContainText('Recording ready');
     await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');
     await view.locator('.path-chip[data-dv-path="happy"]').click();
-    await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
     await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
     const collapsed=await stage.boundingBox();
     await page.locator('#agent-update-ledger-summary').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
@@ -857,12 +861,25 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
     expect(await preview.inputValue()).not.toContain(source);expect(await preview.inputValue()).not.toContain('"rows"');
-    await page.setViewportSize({width:640,height:360});await preview.focus();
-    await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback.png')});
-    expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
-    await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
-    await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
-    expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
+    for(const width of [768,640,390])for(let cycle=0;cycle<2;cycle++){
+      await page.setViewportSize({width,height:360});
+      await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-working')).toHaveAccessibleName(/Open Agent/);
+      for(const selector of ['#workbench-home','#workspace-home','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#file-save']){
+        const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};});
+        expect(control,selector+' while Agent is active at '+width+'px').toEqual({inside:true,reachable:true});
+      }
+      if(!await preview.isVisible())await page.locator('#folder-agent-send').click();
+      await expect(preview).toBeVisible();await preview.focus();
+      await page.screenshot({path:info.outputPath('unified-agent-short-copy-fallback-'+width+'-'+cycle+'.png')});
+      expect(await preview.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'manual copy remains reachable at short height').toBe(true);
+      const windowRect=await page.locator('#workspace-window-agent').boundingBox();
+      await page.locator('#folder-agent-copy-back').click();await expect(preview).toBeHidden();
+      await expect(page.locator('#folder-agent-input')).toHaveValue('Review this.');await expect(page.locator('#folder-agent-input')).toBeFocused();
+      expect(await page.locator('#folder-agent-send').evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}), 'Copy request remains reachable after returning to draft').toBe(true);
+      for(const id of ['#folder-agent-input','#workspace-canvas-tools>summary'])expect(await page.locator(id).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return hit===node || node.contains(hit);}),id+' remains reachable alongside Copy request').toBe(true);
+      expect(await page.locator('#workspace-window-agent').boundingBox()).toEqual(windowRect);
+      await page.screenshot({path:info.outputPath('unified-agent-short-return-draft-'+width+'-'+cycle+'.png')});
+    }
     await page.setViewportSize({width:1280,height:900});
     await page.locator('#workspace-window-agent .workspace-window-close').click();await page.locator('#editor-tab-json').click();await page.locator('#src').fill('{');
     await page.locator('#workspace-window-json .workspace-window-close').click();await openAgent(page);

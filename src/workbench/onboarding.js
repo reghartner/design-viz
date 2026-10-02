@@ -174,7 +174,7 @@ function initWorkbenchOnboarding(opts){
   });
   var workbenchEntry=doc.createElement('button');workbenchEntry.type='button';workbenchEntry.className='bbtn';
   workbenchEntry.textContent='Take the workbench tour';workbenchEntry.setAttribute('aria-label','Take the workbench tour');workbenchEntry.setAttribute('data-workbench-tour','');
-  doc.querySelector('.workspace-save').prepend(workbenchEntry);
+  doc.querySelector('.workspace-help-body').appendChild(workbenchEntry);
   doc.querySelectorAll('[data-workbench-tour]').forEach(function(node){node.addEventListener('click',function(){open();});});
   // A tour entry beside the existing written guide, on every real setup surface.
   doc.querySelectorAll('[data-open-human-guide="hg-agent"]').forEach(function(node){

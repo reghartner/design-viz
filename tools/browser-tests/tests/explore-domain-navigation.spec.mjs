@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,canvasTools} from '../helpers/test.mjs';
 import {writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -41,7 +41,7 @@ for(const native of [false,true])test(`${native?'native':'standalone'} story nav
 for(const host of ['standalone','native','workbench'])test(`${host} nested Explore drill-down has no page flash with motion enabled`,async({page,server})=>{
   await page.emulateMedia({reducedMotion:'no-preference'});
   let root;
-  if(host==='workbench'){await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(story()));await page.getByRole('button',{name:'Hide tools',exact:true}).click();root=page.locator('#docview');}
+  if(host==='workbench'){await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(story()));await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();root=page.locator('#docview');}
   else root=await open(page,server,story(),host==='native');
   await expect(root.locator('.explore-navigation-diagrams')).toBeHidden();
   for(let depth=0;depth<2;depth++){
@@ -58,7 +58,8 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await parent.locator('[data-dv-detail]').click();
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
-    const viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:104,sw:viewport.width-96,sh:viewport.height-116}:{sx:0,sy:0,sw:viewport.width,sh:viewport.height};
+    const contentTop=host==='workbench'?await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top'))):0;
+    const viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:0,sw:viewport.width,sh:viewport.height};
     const first=frames[0];
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');

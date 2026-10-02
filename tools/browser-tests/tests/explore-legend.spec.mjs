@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -14,7 +14,7 @@ function fixture(){
 }
 async function open(page,server,surface,raw){
   if(surface==='workbench'){
-    await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await pagePreview(page);
+    await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await prepareEditorSurface(page);
     return page.locator('#docview');
   }
   if(surface==='native'){
@@ -31,23 +31,23 @@ async function open(page,server,surface,raw){
 
 for(const surface of ['standalone','workbench','native'])test(surface+' Explore exposes the same edge samples and restores Standard legend',async({page,server},info)=>{
   const raw=fixture(),root=await open(page,server,surface,raw),source=surface==='workbench'?await page.locator('#src').inputValue():null;
-  const standard=root.locator('.board>.lg>.li'),expected=await standard.evaluateAll(nodes=>nodes.map(node=>node.outerHTML));
+  const standard=root.locator('.explore-edge-legend .li'),expected=await standard.evaluateAll(nodes=>nodes.map(node=>node.outerHTML));
   expect(expected).toHaveLength(3);const original=await standard.first().elementHandle();
-  await expect(root.locator('.explore-legend-menu')).toBeHidden();
+  await expect(root.locator('.explore-legend-menu')).toBeVisible();
   for(let round=0;round<2;round++){
     await root.getByRole('button',{name:'Explore',exact:true}).click();
     const summary=root.locator('.explore-legend-menu>summary'),legend=root.getByRole('group',{name:'Edge legend',exact:true});
     await expect(summary).toBeVisible();await expect(legend).toBeHidden();await summary.focus();await page.keyboard.press('Enter');
     await expect(legend).toBeVisible();expect(await legend.locator('.li').evaluateAll(nodes=>nodes.map(node=>node.outerHTML))).toEqual(expected);
-    expect(await original.evaluate(node=>node.parentElement.classList.contains('explore-edge-legend'))).toBe(true);
+    expect(await original.evaluate(node=>!!node.closest('.explore-edge-legend'))).toBe(true);
     await expect(legend).toContainText('Company API');await expect(legend).toContainText('Event stream');await expect(legend).toContainText('response / ack');
     await page.keyboard.press('Escape');await expect(legend).toBeHidden();await expect(summary).toBeFocused();
     await summary.click();await root.getByRole('button',{name:'Business',exact:true}).click();
-    await expect(root.locator('.explore-legend-menu')).toBeHidden();
+    await expect(root.locator('.explore-legend-menu')).toBeVisible();
     expect(await standard.evaluateAll(nodes=>nodes.map(node=>node.outerHTML))).toEqual(expected);
   }
   await root.getByRole('button',{name:'Explore',exact:true}).click();
-  if(surface==='workbench'){await page.locator('#workspace-page').click();await closeTools(page);}
+  if(surface==='workbench'){await closeTools(page);}
   if(surface==='native')await page.evaluate(()=>viewer.setCanvas(true));
   await page.setViewportSize({width:640,height:800});
   const summary=root.locator('.explore-legend-menu>summary');await summary.click();
@@ -72,5 +72,5 @@ test('Explore omits an empty edge legend',async({page,server})=>{
   const raw=fixture(),d=raw.page.blocks[0].diagram;d.edges=[];d.steps=[];delete d.paths;delete raw.page.protocols;
   d.layouts.forEach(layout=>delete layout.steps);d.defaultLayout='explore';
   const root=await open(page,server,'standalone',raw);await expect(root.locator('.explore-stage')).toBeVisible();
-  await expect(root.locator('.explore-legend-menu')).toBeHidden();
+  await expect(root.locator('.explore-legend-menu')).toBeVisible();
 });

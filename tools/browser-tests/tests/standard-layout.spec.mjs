@@ -1,4 +1,5 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {arrangeChapter} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 
 function fixture(){
@@ -11,8 +12,8 @@ function fixture(){
 async function open(page,server,raw=fixture()){
   await page.setViewportSize({width:1500,height:800});
   const source=JSON.stringify(raw);
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);await pagePreview(page);
-  await page.getByRole('button',{name:'Arrange section',exact:true}).click();
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await prepareEditorSurface(page);
+  await arrangeChapter(page);
   await page.evaluate(()=>document.fonts.ready);
   return source;
 }
@@ -31,12 +32,12 @@ for(const attached of [true,false])test(`Standard diagram grows beyond the viewp
     const sizes=await tile.evaluate(el=>{
       const col=el.querySelector('.diagramcol').getBoundingClientRect();
       const board=el.querySelector('.board').getBoundingClientRect();
-      const controls=el.querySelector('.termbar')?.getBoundingClientRect();
+      const controls=el.querySelector('.termbar')?.getBoundingClientRect(),mode=el.querySelector('.playback-mode-rail')?.getBoundingClientRect();
       const drawing=el.querySelector('.boardcanvas>svg').getBoundingClientRect();
       const margins=Array.from(el.querySelector('.diagramcol').children).reduce((sum,child)=>{
         const style=getComputedStyle(child);return sum+parseFloat(style.marginTop)+parseFloat(style.marginBottom);
       },0);
-      return {available:col.height-(controls?.height || 0)-margins,board:board.height,
+      return {available:col.height-(controls?.height || 0)-(mode?.height || 0)-margins,board:board.height,
         revealed:Math.min(board.bottom,drawing.bottom)-Math.max(board.top,drawing.top)};
     });
     expect(sizes.board).toBeGreaterThan(800*.7);
@@ -50,6 +51,7 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   const raw=fixture(),items=raw.page.blocks[0].diagram.layouts[0].sectionLayout.default;
   if(stacked){items[0].h=24;items[1].x=0;items[1].w=8;}
   const source=await open(page,server,raw);
+  await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();
   const tile=page.locator('[data-layout-key="panel:home"]'),handle=tile.locator('.section-tile-move');
   await handle.scrollIntoViewIfNeeded();
   await page.locator('.workmain').evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle(page);

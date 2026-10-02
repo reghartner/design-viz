@@ -94,7 +94,7 @@ test('tabbed view-only embeds keep Chapters without an empty document Tabs group
  const url=await build(server,spec,'tabbed-view-embed');await page.goto(url+'#embed=front-door&v=service-flow');
  const sec=page.locator('#section-front-door'),nav=sec.locator('.explore-navigation');
  await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveClass(/dv-embed-target/);
- await expect(nav.locator('.explore-navigation-tabs')).toBeHidden();await expect(nav.locator('.tabbtn')).toHaveCount(0);
+ await expect(nav.locator('.explore-navigation-tabs')).toBeHidden();await expect(nav.locator('.explore-navigation-tabs .tabbtn')).toHaveCount(0);await expect(nav.locator('.explore-navigation-diagrams')).toBeHidden();await expect(nav.locator('.explore-diagram-button')).toHaveCount(1);await expect(nav.locator('.explore-diagram-button')).toHaveAttribute('aria-pressed','true');await expect(nav.getByRole('button',{name:'Other',exact:true,includeHidden:true})).toHaveCount(0);
  await expect(nav.locator('.explore-navigation-chapters')).toBeVisible();await expect(selected(page)).toHaveText('Service flow');
  await expect(page.locator('#section-other')).toBeHidden();expect(viewOf(page)).toBe('service-flow');
  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');

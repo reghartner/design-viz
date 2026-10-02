@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {chooseAddDestination,test,expect,paste} from '../helpers/test.mjs';
 const ref=name=>'component:default/'+name;
 const catalog={version:1,source:'Example company · approved catalog',services:[
   {entityRef:ref('doorbell'),title:'Doorbell gateway',owner:'group:default/devices',dependsOn:[ref('recording')],consumesApis:['api:default/recording-v1','api:default/recording-v2','api:default/notification']},
@@ -55,7 +55,7 @@ test('homepage seeds selected services with catalog bindings, optional edges and
 test('Add seeds only the destination, reuses nodes and supports one-action undo without duplicate inserts',async({page,server})=>{
   await page.route('**/catalog.json',route=>route.fulfill({json:catalog}));
   await page.goto(server.origin+'/workbench.html');const before=source();await paste(page,before);
-  await page.locator('#diagram-add-target').selectOption('1');await openAdd(page);
+  await chooseAddDestination(page,'1');await openAdd(page);
   await expect(page.locator('#catalog-destination')).toContainText('Target services');
   await choose(page,'Doorbell gateway');await choose(page,'Recording service');
   await expect(page.locator('#catalog-preview')).toContainText('1 new nodes · 1 already on the diagram · 1 new connections');

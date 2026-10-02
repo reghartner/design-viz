@@ -9,30 +9,23 @@ In the workbench, select a section and a Chapter using the
 buttons above the graph. **Viewing mode** chooses Standard or Explore for
 that Chapter; **Make opening chapter** saves which Chapter opens on a fresh page. The saved
 choice reads **Opening chapter**. Selecting a different Chapter to inspect it does not
-change the saved default or write JSON. Expand **Chapter options**, enter a **Chapter
+change the saved default or write JSON. Expand **Chapter**, enter a **Chapter
 name**, and choose **Rename chapter** (or press Enter) to save it; **Duplicate chapter**
 creates a separate copy. These controls let you keep a curated Standard Chapter
 and an Explore Chapter of the same story side by side.
 
-The editor and exported HTML show the same selected type: Standard uses the
-curated page; Explore opens across the full browser. **Back to page** reveals
-the surrounding document and the contained Explore view; **Open Explore**
-returns to the full-browser view. These navigation actions do not change the
-saved mode. Selecting another Chapter or section follows its mode again.
-The same **Viewing mode** dropdown stays in the shared Chapter header on both
-surfaces. On the page, **Arrange section** provides tile arrangement and the
-other Chapter settings. There is no separate editor presentation control.
+The editor and exported HTML honor the same selected Chapter: Standard uses the curated page; Explore fills the browser. A small screen icon identifies Explore on chapter and tab chips. Tabs and Chapters stay visible in either mode. **Chapter → Viewing mode** changes the selected chapter in one undoable source transaction. **Chapter → Arrange chapter and saved visibility…** opens the detailed arrangement editor; chapter name, duplication, deletion and opening-choice commands have one owner in the Chapter popover.
 
 For a host preview, select **Responsive**, **Backstage**, or **Confluence** in
-**Canvas appearance**. Host previews use adjustable content widths (1080 and 760
+**Preview → Open page preview**. Host previews use adjustable content widths (1080 and 760
 pixels initially). They simulate available space; they do not connect to a host
 or reproduce its navigation, theme, permissions, or enclosing macro. Horizontal
 scrolling lets you inspect a preview wider than your editor split.
 
-To arrange a Standard view, choose **Arrange section** on the page. Each panel, the data-flow diagram, and any detached step controls
+To arrange a Standard view, choose **Chapter → Arrange chapter and saved visibility…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
 a twelve-column grid. Overlapping tiles move down to remain visible. Click
-**Done arranging** to see the reader view. Diagram nodes and Home elements
+**Hide arrangement controls** tucks away the fields while you drag tiles. Choose **Done arranging** to finish. Diagram nodes and Home elements
 retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
 map or elsewhere in the section. They move as one live group.
@@ -66,7 +59,7 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
 - Choose an element in the arrangement controls and edit **Column**, **Row**,
   **Width**, and **Height** for precise placement or phone editing. Column and
   Row are displayed starting at 1. Width is in columns; height is in grid rows.
-- **Optimize layout** saves a starting arrangement for the selected target.
+- **Optimize layout** saves a starting arrangement for the selected arrangement profile.
   It arranges only visible elements and preserves hidden panels and Data flow
   in that layout/profile. Hidden tiles retain their saved size and position and
   reserve no space; if all supporting panels are hidden, the main tile fills the row.
@@ -74,12 +67,12 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
   panels in four columns; without supporting panels, main tiles fill the row.
   Confluence gives the diagram and Home a full row,
   with smaller panels paired below. A declared centerpiece comes first.
-- **Reset layout** removes only the selected target's arrangement. The default
+- **Reset layout** removes only the selected host arrangement. The default
   arrangement applies if one exists; otherwise the existing Home/Data flow
   presentation returns. This differs from the workspace's editor-split reset.
 
 Layouts are saved in the spec and survive JSON, HTML and Confluence export.
-The selected preview host and width are temporary workspace state. At section
+The selected arrangement profile, preview host and preview width are temporary workspace state. Profile selection writes no source; each arrangement edit is one Undo operation. Explore floating geometry, camera, and notes defaults remain shared across profiles; its tile visibility follows the selected profile. At section
 widths of 640 pixels or less, tiles stack in reading order; use the numeric
 controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
 internally. Diagram Auto / Fit width / Readable controls remain available.
@@ -89,9 +82,8 @@ when included in the destination view. Legacy single arrangements still have
 an automatic **Data flow** choice; sections without saved arrangements retain
 Home / Data flow until you create named Chapters.
 
-On the canvas, use **Chapter options → Chapter name**, then **Rename chapter** or Enter
-to name the selected Chapter, for example **Front door** or **Home**. In Page
-preview, **Rename chapter** beside **Arrange section** opens the naming control.
+On the canvas, use **Chapter → Chapter name**, then **Rename chapter** or Enter
+to name the selected Chapter, for example **Front door** or **Home**. The separate page preview is read-only.
 Names are up to 40 characters
 and apply across that layout's host profiles. A legacy single view
 stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
@@ -118,8 +110,8 @@ in view. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
-1. Select the existing Chapter and choose **Chapter options →
-   Duplicate chapter**. The copy becomes active. Open **Chapter options** again and
+1. Select the existing Chapter and choose **Chapter →
+   Duplicate chapter**. The copy becomes active. Open **Chapter** again and
    give it a **Chapter name**, such as **Service flow**, then choose **Rename chapter**.
 2. Choose **Viewing mode → Explore** for the engineering copy, leaving
    the original in **Standard**. Each Chapter keeps its own presentation across
@@ -143,14 +135,13 @@ To build that from an existing arrangement:
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
 copies its Viewing mode, path and step selections, and all profiles independently;
 swapping, moving, sizing and visibility edit
-only the selected host profile in the active layout. Repeat a swap in other
-explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
+the selected arrangement profile in the active layout. Sibling profiles remain unchanged. Step controls stay available, attached or detached; they cannot be hidden or
 swapped with a panel. All authoring
 operations support Undo/Redo. **Delete chapter** removes the arrangement, never
 its panels, diagram or steps. Deleting the default selects the first remaining
 layout; deleting the last named layout restores the automatic presentation.
 
-**Reset layout** removes the active host profile. A named layout with no profiles
+**Reset layout** removes the selected host profile. A named layout with no profiles
 left receives an automatic Responsive arrangement. **Optimize layout** preserves
 visibility and rearranges only visible elements in that profile.
 
@@ -169,10 +160,8 @@ authored default; deleting the selected view falls back to the remaining default
 
 Select the Chapter and choose **Viewing mode → Explore**. The editor opens the same
 full-browser presentation used by exported HTML. Move and resize its panels
-there to save their floating defaults. **Back to page** shows the contained
-Explore workspace, including while arranging. **Open Explore** returns to the
-full-browser view without changing the saved type.
-**Edge legend** beside the panel controls shows the diagram's protocol colors,
+there to save their floating defaults. Chapter mode remains authoritative while arranging. **Preview → Open page preview** provides a separate reader without changing the editor.
+**Legend** beside the panel controls shows the diagram's protocol colors,
 line samples and response/ack key. It works in the editor, exported viewers and
 agent update previews. Press Escape to close it; opening it does not edit the story.
 The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph. Each supporting panel
@@ -226,14 +215,7 @@ Panning, zooming and fitting this full-browser canvas are temporary navigation;
 they do not change the saved opening camera or add Undo entries. Standard
 shows its authored tiles on the page and has no floating canvas panels. See
 [workspace controls](workbench-workspace.md).
-**In the contained Explore view after Back to page**, moving or resizing a panel or step controls, panning,
-zooming, and choosing **Stack at edge** save defaults in the selected view. Each
-completed gesture is one Undo/Redo action; Escape cancels a drag. **Arrange
-section** keeps Explore visible. Saving a move, resize, pan, or zoom keeps the
-live viewport in place, including in expanded and browser fullscreen views. **Arrange
-section** exposes element visibility, step selection,
-and view settings. **Optimize layout** and **Reset layout** reset Explore
-positions and camera to the automatic stack and sizing, respecting hidden panels.
+Use **Chapter → Use current camera as opening view** to save current pan and zoom, or **Reset opening camera** to restore automatic framing. Each command uses one Undo entry. Panel and control moves/resizes save independently; temporary camera gestures never enter a later panel save. **Chapter → Arrange chapter and saved visibility…** exposes element visibility, paths and steps. **Optimize layout** and **Reset layout** restore automatic stacking and sizing while respecting hidden panels.
 Temporary Hide/Restore actions never change saved visibility; use **Visible
 elements** for that. **Section notes** has its own saved visibility checkbox in
 Explore. Reset and Optimize preserve that visibility while clearing its position

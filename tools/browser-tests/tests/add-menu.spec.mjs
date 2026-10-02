@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {chooseAddDestination,test,expect,paste} from '../helpers/test.mjs';
 import {editorSpec,source} from '../fixtures/editor-spec.mjs';
 
 const open=async(page,kind)=>{
@@ -18,7 +18,7 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   const add=page.locator('#diagram-add'),target=page.locator('#diagram-add-target');
   expect((await add.boundingBox()).y).toBeLessThan((await page.locator('.editor-tabs').boundingBox()).y);
   await page.locator('#editor-tab-json').click();
-  await target.selectOption('2');
+  await chooseAddDestination(page,'2');
   await expect(page.locator('#tab-1-1')).toHaveAttribute('aria-selected','true');
   await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-pressed','true');
   await expect(target.locator('option:checked')).toContainText('Operations');
@@ -42,7 +42,7 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   const after=await text(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
-  await target.selectOption('0');await open(page,'edge');
+  await chooseAddDestination(page,'0');await open(page,'edge');
   await expect(page.locator('#diagram-add-menu')).toBeHidden();
   await expect(add).toBeDisabled();await expect(target).toBeDisabled();
   // Other sections cannot retarget an addition while this diagram owns the canvas.
@@ -104,7 +104,7 @@ test('Add UI stays within a narrow editor and its modal fits supported skins',as
   await page.locator('#workspace-window-inspect .workspace-window-resize').focus();await page.keyboard.press('Shift+ArrowLeft');
   await page.locator('#workspace-appearance>summary').click();
   const box=await page.locator('.workspace-tools').boundingBox();
-  for(const id of ['diagram-add','diagram-add-target']){
+  for(const id of ['diagram-add']){
     const child=await page.locator('#'+id).boundingBox();expect(child.x+child.width).toBeLessThanOrEqual(box.x+box.width);
   }
   for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
@@ -112,6 +112,8 @@ test('Add UI stays within a narrow editor and its modal fits supported skins',as
     await page.locator('#diagram-add').click();
     const dialog=page.locator('#diagram-add-menu');
     expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+    await page.locator('.diagram-add-destination-picker summary').click();
+    await expect(page.locator('#diagram-add-target')).toBeInViewport();
     await expect(page.locator('#add-node')).toBeInViewport();
     if(skin==='pastel')await testInfo.attach('add-chooser-pastel',{body:await page.screenshot(),contentType:'image/png'});
     await page.locator('#add-node').click();

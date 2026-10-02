@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,pagePreview,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function spec(){
@@ -28,7 +28,7 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
     const input=path.join(server.root,'navigation.json');await writeFile(input,text);
     execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'navigation.html')]);
     await page.goto(server.origin+'/navigation.html');
-  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await pagePreview(page);}
+  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
   const board=page.locator('.board');await expect(board).toBeVisible();
   await board.getByRole('button',{name:'Zoom in',exact:true}).focus();
   const before=await width(board),height=(await board.boundingBox()).height,pageY=await page.evaluate(()=>scrollY);
@@ -74,7 +74,7 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
     const input=path.join(server.root,'navigation-views.json');await writeFile(input,text);
     execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'navigation-views.html')]);
     await page.goto(server.origin+'/navigation-views.html');
-  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await pagePreview(page);}
+  }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
   const board=page.locator('.board');
   await board.getByRole('button',{name:'Zoom in',exact:true}).click();await board.getByRole('button',{name:'Zoom in',exact:true}).click();
   await board.evaluate(el=>{el.scrollLeft=120;el.scrollTop=140;});

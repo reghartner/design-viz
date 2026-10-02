@@ -1,4 +1,4 @@
-import {test,expect,paste,pagePreview} from '../helpers/test.mjs';
+import {test,expect,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 
 async function mousePan(page,board){
@@ -34,7 +34,7 @@ async function mousePan(page,board){
 }
 
 test('mouse scroll controls work in the workbench without editing the spec or conflicting with node gestures',async({page,server})=>{
-  await page.goto(server.origin+'/workbench.html');await paste(page,source);await pagePreview(page);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await prepareEditorSurface(page);
   const board=page.locator('.board');await mousePan(page,board);
   await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('[data-dv-node="a"]').click();await page.locator('#editor-tab-inspect').click();await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');

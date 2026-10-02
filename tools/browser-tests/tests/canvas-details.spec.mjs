@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,canvasTools} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -17,7 +17,7 @@ async function childCanvas(root,page){
   const shell=await child.locator('.viewer-diagram-canvas,.workbench-diagram-canvas').boundingBox();
   const board=await child.locator('.explore-board').boundingBox(),nav=await child.locator('.explore-navigation').boundingBox(),head=await child.locator('.detail-head').boundingBox();
   const viewport=page.viewportSize(),workbench=await page.locator('body').evaluate(el=>el.classList.contains('workspace-diagram'));
-  if(workbench){expect(shell.x).toBe(84);expect(shell.y).toBe(104);expect(shell.width).toBe(viewport.width-96);expect(shell.height).toBe(viewport.height-116);}
+  if(workbench){const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(shell.x).toBe(84);expect(shell.y).toBe(contentTop);expect(shell.width).toBe(viewport.width-96);expect(shell.height).toBe(viewport.height-contentTop-12);expect(shell.y).toBeGreaterThanOrEqual(nav.y+nav.height);}
   else{expect(shell.x).toBe(0);expect(shell.y).toBe(0);expect(shell.width).toBe(viewport.width);expect(shell.height).toBe(viewport.height);}
   expect(board.x).toBeGreaterThanOrEqual(shell.x);expect(board.x+board.width).toBeLessThanOrEqual(shell.x+shell.width);
   expect(board.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board.y+board.height).toBeLessThanOrEqual(shell.y+shell.height);
@@ -28,7 +28,7 @@ async function childCanvas(root,page){
 
 test('editor canvas follows nested details, returns to its camera and edits the real child section',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,editorSource);
-  await page.getByRole('button',{name:'Hide tools',exact:true}).click();
+  await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   const root=page.locator('#docview'),parent=root.locator('#section-doorbell-domains');
   await expect(parent.locator('.explore-board')).toBeVisible();
   const camera=()=>parent.locator('.board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
@@ -82,7 +82,7 @@ test('canvas keeps unavailable, loading and failed detail messages above the dia
     expect(await notice.evaluate(el=>{const r=el.getBoundingClientRect();return el.contains(el.getRootNode().elementFromPoint(r.x+r.width/2,r.y+r.height/2));})).toBe(true);
   }
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(withExploreRoot(structuredClone(raw))));
-  await page.getByRole('button',{name:'Hide tools',exact:true}).click();
+  await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   await page.locator('#section-doorbell-domains [data-dv-detail="connectivity"]').click();
   await visibleNotice(page.locator('#docview'),'host');
   await writeFile(path.join(server.root,'notice-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));

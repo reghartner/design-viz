@@ -104,7 +104,7 @@
 .agent-working-indicator:hover{border-color:var(--accent);}.agent-working-indicator:focus-visible{outline:3px solid color-mix(in srgb,var(--accent) 55%,transparent);outline-offset:3px;}
 @keyframes agent-working-pulse{70%{box-shadow:0 0 0 7px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
 @media(prefers-reduced-motion:reduce){.agent-working-indicator>span{animation:none;}}
-@media(max-width:540px){.agent-working-indicator{gap:0;padding:8px;}.agent-working-indicator>b{display:none;}}
+@media(max-width:760px){.agent-working-indicator{gap:0;padding:8px;}.agent-working-indicator>b{display:none;}}
 
 .agent-update-dialog>.agent-update-ledger{flex:none;margin:8px 24px;}
 .agent-update-ledger>summary{cursor:pointer;font-weight:600;}

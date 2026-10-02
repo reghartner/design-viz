@@ -32,7 +32,8 @@ work before Backstage is integrated, using the static site's published
 `diagrams.json` index and the referenced JSON spec files. They open directly in fresh tabs, survive reloads, and support
 browser Back/Forward. Reading never replaces a saved local draft.
 
-The folder name supplies the ID. Keep it stable after publishing links. The link
+The leaf folder name supplies the ID. Namespace folders do not appear in public
+IDs, so every leaf ID must be unique across the manifest. Keep it stable after publishing links. The link
 opens the latest published version; renaming the folder or removing its canon
 entry makes an old link unavailable.
 Unknown IDs or a missing published snapshot show an error with Retry.
@@ -54,14 +55,16 @@ membership. Per-spec `page.canon` flags do not enroll a document. For example:
 {
   "version": 1,
   "diagrams": [
-    {"folder": "diagrams/doorbell", "owner": "group:default/home-team"}
+    {"folder": "diagrams/home/doorbell", "owner": "group:default/home-team"}
   ]
 }
 ```
 
-Each folder contains the required `<folder-name>.spec.json`; the folder name
-supplies the stable ID. Use the actual owning team's entity reference. A matching
-HTML export is optional because the library loads and renders the JSON spec. See
+Every path segment below `diagrams/` must be kebab-case. Each leaf folder
+contains the required `<leaf-name>.spec.json`; the leaf name supplies the stable
+ID and must be globally unique even when diagrams use different namespaces. Use
+the actual owning team's entity reference. A matching HTML export is optional
+because the library loads and renders the JSON spec. See
 the [folder conventions](../diagrams/README.md).
 The provider derives compatibility `page.canon` metadata in memory, preserving
 the authored JSON and its evidence. The central entry controls ID, owner and
@@ -97,7 +100,7 @@ rows, steps, panels, or embedded specs. For example:
     "title": "Doorbell delivery",
     "canon": {"version": 1, "id": "doorbell", "kind": "canonical", "owner": "group:default/home-team"},
     "counts": {"nodes": 12, "steps": 8, "panels": 3},
-    "specUrl": "../diagrams/doorbell/doorbell.spec.json",
+    "specUrl": "../diagrams/home/doorbell/doorbell.spec.json",
     "revision": "<64-character-source-sha256>"
   }]
 }
@@ -126,7 +129,8 @@ node tools/canon/library.mjs --out workbench/diagrams.json
 
 Spec URLs are relative to the output index's directory. Generate the index at
 its final served location, and deploy the index and authored source tree together.
-The supplied nginx Dockerfiles do this. A mixed index/source deployment fails
+The supplied nginx Dockerfiles recursively copy and serve the complete
+`diagrams/` tree, including namespace folders. A mixed index/source deployment fails
 revision checks before replacing a draft; reload after the deployment completes.
 For a custom deployment, copying only `flowspec.html` and `diagrams.json` is
 insufficient; retain the referenced spec paths too.

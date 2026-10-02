@@ -5,7 +5,8 @@ metadata. Canonical promotion is a human review, not an inference from Backstage
 `examples/canon/` is a fictional central repository, catalog and source history.
 
 Maintained diagram pages belong in the top-level [`diagrams/`](../diagrams/README.md)
-directory, with each required spec in its own subfolder. Root
+directory, with each required spec in its own leaf folder. Kebab-case namespace
+folders may organize those leaf folders. Root
 [`canon.json`](../canon.json) is the single authority: adding a folder promotes it;
 removing the entry removes it from canon. Backstage and the nginx workbench read
 this same list. Promotion is a reviewed edit to that file, not a flag in a spec.
@@ -19,8 +20,11 @@ freeze dependencies until reload/reopen. A provider's exported node/edge identit
 a compatibility contract for its consumers; removed identities still referenced
 by consumer narratives or connecting edges stop the build.
 
-A canon entry is `{"folder":"diagrams/doorbell","owner":"group:default/home-team"}`.
-The folder supplies the ID and required `doorbell.spec.json` filename.
+A canon entry may be flat, or namespaced like
+`{"folder":"diagrams/home/doorbell","owner":"group:default/home-team"}`.
+Every segment below `diagrams/` is kebab-case. The leaf folder supplies the ID
+and required `doorbell.spec.json` filename; namespace folders do not become part
+of the ID, so leaf IDs must be unique across the manifest.
 The provider derives `page.canon` metadata for existing viewer/evidence contracts:
 `{"version":1,"id":"doorbell","kind":"canonical","owner":"group:default/home-team"}`.
 Authored `page.canon` values cannot override membership, ID or owner. Legacy

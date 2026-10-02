@@ -273,8 +273,10 @@ requires the updated viewer/Forge bundle as usual.
 ## Shared canon membership
 
 The company GitHub adapter and nginx publisher use root `canon.json` as their
-membership authority. It lists `diagrams/<name>` folders and their owners; the
-folder determines the stable ID and required `<name>.spec.json` path.
+membership authority. It lists flat or namespaced folders below `diagrams/` and
+their owners; each segment is kebab-case. The leaf folder determines the stable
+ID and required `<leaf>.spec.json` path, and leaf IDs are globally unique across
+namespaces.
 Per-spec flags cannot enroll documents. The package's pure `/backend` helpers
 `parseCanonManifest`, `materializeCanonSpec` and `prepareCanonSnapshot` let the GitHub adapter use the same
 rules as the static publisher while retaining its transport and authorization.

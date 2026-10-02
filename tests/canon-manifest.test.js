@@ -1,6 +1,6 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path'),vm=require('node:vm');
 const library=require('../tools/canon/manifest.cjs');
-const entry={folder:'diagrams/checkout',owner:'group:default/checkout-team'};
+const entry={folder:'diagrams/payments/checkout',owner:'group:default/checkout-team'};
 const manifest={version:1,diagrams:[entry]};
 function spec(){return {page:{title:'Checkout',sections:[{heading:'Request',diagram:{nodes:{service:{title:'Service',binding:{entityRef:'component:default/checkout'}}},rows:[['service']],edges:[],steps:[{id:'receive',title:'Receive request',nodes:['service']}]}}]}};}
 async function fixture(t){
@@ -15,8 +15,17 @@ test('central membership overrides embedded flags without mutating authored spec
  const resolved=library.spec(raw,library.entries(manifest)[0]);
  assert.deepEqual(resolved.page.canon,{version:1,id:'checkout',kind:'canonical',owner:entry.owner});
  assert.equal(raw.page.canon.kind,'design');
- for(const folder of ['../outside','diagrams/../outside','diagrams/a/b','https://evil.test/a','diagrams/a%2fb','diagrams/a\\b'])assert.throws(()=>library.entries({version:1,diagrams:[{...entry,folder}]}));
+ assert.deepEqual(library.entries({version:1,diagrams:[{...entry,folder:'diagrams/flat-diagram'}]})[0],{
+   id:'flat-diagram',folder:'diagrams/flat-diagram',owner:entry.owner,
+   path:'diagrams/flat-diagram/flat-diagram.spec.json',html:'diagrams/flat-diagram/flat-diagram.html',
+ });
+ assert.deepEqual(library.entries(manifest)[0],{
+   id:'checkout',folder:'diagrams/payments/checkout',owner:entry.owner,
+   path:'diagrams/payments/checkout/checkout.spec.json',html:'diagrams/payments/checkout/checkout.html',
+ });
+ for(const folder of ['../outside','/diagrams/a','diagrams/../outside','diagrams/','diagrams//a','diagrams/a/','diagrams/a//b','diagrams/a/.','diagrams/a/..','https://evil.test/a','diagrams/a%2fb','diagrams/a%2Fb','diagrams/a\\b'])assert.throws(()=>library.entries({version:1,diagrams:[{...entry,folder}]}));
  assert.throws(()=>library.entries({version:1,diagrams:[entry,entry]}),/Duplicate/);
+ assert.throws(()=>library.entries({version:1,diagrams:[entry,{...entry,folder:'diagrams/archive/checkout'}]}),/Duplicate canon ID: checkout/);
  assert.throws(()=>library.entries({version:2,diagrams:[]}),/version 1/);
 });
 test('Backstage and drift load only central members; removing a folder removes its associations',async t=>{
@@ -56,7 +65,7 @@ test('the publisher snapshot and Backstage resolve identical membership and revi
  const backstage=await loadCanonDiagrams(file,{diagramUrls:({id})=>({viewerUrl:'https://flows.test/?diagram='+id,editUrl:'https://flows.test/?diagram='+id})});
  const raw=JSON.parse(await fs.readFile(path.join(folder,'checkout.spec.json'),'utf8'));
  assert.equal(snapshot.version,3);assert.equal(snapshot.diagrams[0].spec,undefined);
- assert.equal(snapshot.diagrams[0].specUrl,'../diagrams/checkout/checkout.spec.json');
+ assert.equal(snapshot.diagrams[0].specUrl,'../diagrams/payments/checkout/checkout.spec.json');
  assert.deepEqual(JSON.parse(await fs.readFile(path.join(path.dirname(output),snapshot.diagrams[0].specUrl),'utf8')),authored);
  assert.deepEqual(snapshot.diagrams[0].canon,{version:1,id:'checkout',kind:'canonical',owner:entry.owner});
  assert.equal(await fs.readFile(path.join(folder,'checkout.spec.json'),'utf8'),authoredText);

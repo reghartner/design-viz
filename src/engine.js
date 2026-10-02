@@ -2361,10 +2361,42 @@ function createBoardNavigation(board, group, legend, changed){
   function lost(ev){finish(ev,(ev.buttons&1)!==0);}
   function key(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();cancel();}}
   function click(ev){if(suppressClick){suppressClick=false;ev.preventDefault();ev.stopPropagation();}}
+  function scrollableY(el){
+    if(!el || el===document.body || el===document.documentElement)return false;
+    var overflow=getComputedStyle(el).overflowY;
+    return /^(auto|scroll|overlay)$/.test(overflow) && el.scrollHeight>el.clientHeight+1;
+  }
+  function parentElement(el){
+    if(el.parentElement)return el.parentElement;
+    var root=el.getRootNode && el.getRootNode();return root && root.host || null;
+  }
+  function roomY(el,delta){
+    return delta<0?el.scrollTop>1:el.scrollTop+el.clientHeight<el.scrollHeight-1;
+  }
+  function containsY(el){return /^(contain|none)$/.test(getComputedStyle(el).overscrollBehaviorY);}
+  function innerRoomY(target,delta){
+    var el=target && target.nodeType===1?target:target && target.parentElement;
+    while(el && el!==board){if(scrollableY(el) && (roomY(el,delta) || containsY(el)))return true;el=parentElement(el);}
+    return roomY(board,delta);
+  }
+  function outerScrollerY(delta){
+    var el=parentElement(board);
+    while(el){if(scrollableY(el)){if(roomY(el,delta))return el;if(containsY(el))return null;}el=parentElement(el);}
+    el=document.scrollingElement;
+    return el && roomY(el,delta)?el:null;
+  }
   function wheel(ev){
-    if(!enabled() || !ev.ctrlKey && !ev.metaKey)return;
-    ev.preventDefault();var delta=ev.deltaY*(ev.deltaMode===1?16:ev.deltaMode===2?board.clientHeight:1);
-    scale(Math.exp(-delta*.006));
+    if(!enabled())return;
+    var unit=ev.deltaMode===1?16:ev.deltaMode===2?board.clientHeight:1;
+    var delta=ev.deltaY*unit;
+    if(ev.ctrlKey || ev.metaKey){ev.preventDefault();scale(Math.exp(-delta*.006));return;}
+    // Chromium can latch a diagonal trackpad gesture to this horizontal
+    // scroller even when its vertical axis is already at a boundary. Route
+    // only the dominant vertical component so horizontal overscroll remains
+    // contained and native scrolling still owns every in-board movement.
+    if(!board.classList.contains('board-zoomed') || !delta || Math.abs(delta)<=Math.abs(ev.deltaX*unit) || innerRoomY(ev.target,delta))return;
+    var scroller=outerScrollerY(delta);if(!scroller || !ev.cancelable)return;
+    ev.preventDefault();scroller.scrollTop+=delta;
   }
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});

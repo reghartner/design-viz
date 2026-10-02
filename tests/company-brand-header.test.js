@@ -48,3 +48,11 @@ test('all rendered viewer entrypoints share one header implementation and embed 
   }
   assert.match(readStyles('style.core.css'),/body\.dv-embed \.doc-heading/);
 });
+
+test('workbench example and Canon reader suppress the complete title and company lockup wrapper',()=>{
+  const styles=readStyles('style.workbench.css');
+  assert.match(styles,/#welcome-example-stage>\.doc-heading[^}]*display:none/);
+  assert.match(styles,/#canon-reader \.doc-heading\{display:none\}/);
+  assert.doesNotMatch(styles,/#welcome-example-stage>\.doc-title/);
+  assert.doesNotMatch(styles,/#canon-reader \.doc-title\{display:none\}/);
+});

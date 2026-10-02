@@ -484,9 +484,10 @@ def find_chrome(explicit: str | None = None) -> str | None:
 def clip_expression(section_reference: str, margin: int) -> str:
     """JS that returns the diagram clip rect for a section, in page coordinates.
 
-    The rect covers the visible Explore stage, custom composition or legacy
+    The rect covers the visible Explore canvas, custom composition or legacy
     board grid, plus step controls wherever they are attached or detached. Explore
-    keeps the graph, floating panels and pinned controls inside its stage. Custom layouts
+    keeps its navigation, graph, floating panels and pinned controls inside the
+    full-browser canvas shell. Custom layouts
     relocate panels out of ``.boardgrid`` and hide that old container, so both
     grid types must be considered. Zero-area hidden elements contribute nothing.
     Expand by ``margin`` CSS pixels and clamp to the document. Return null when
@@ -498,7 +499,7 @@ def clip_expression(section_reference: str, margin: int) -> str:
         "if (!sec) return null;"
         "var pad = %d;"
         "var parts = Array.prototype.slice.call(sec.querySelectorAll("
-        "'.explore-stage, .section-layout-grid, .boardgrid, .termbar'));"
+        "'.viewer-diagram-canvas, .explore-stage, .section-layout-grid, .boardgrid, .termbar'));"
         "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
         "parts.forEach(function(el){"
         "var r = el.getBoundingClientRect();"

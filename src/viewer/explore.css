@@ -107,18 +107,40 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
  body.viewer-exploring{overflow:hidden;}
  .docview.explore-full-window,.explore-full-window .doc-sec{container-type:normal;}
  .explore-full-window .explore-active-section{position:static;}
- .explore-full-window .viewer-diagram-canvas{position:fixed;inset:0;z-index:80;background:var(--explore-bg);}
- .explore-full-window .viewer-diagram-canvas>.explore-stage{position:absolute;inset:0;width:100%;height:100%!important;border:0;border-radius:0;}
- .explore-full-window .viewer-diagram-canvas>.diagram-views{position:absolute;top:12px;left:12px;right:12px;z-index:45;display:flex;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;border:0;background:none;}
+ .explore-full-window .viewer-diagram-canvas{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;gap:8px;box-sizing:border-box;padding:12px;background:var(--explore-bg);}
+ .explore-full-window .viewer-diagram-canvas>.explore-stage{position:relative;inset:auto;flex:1 1 auto;min-height:0;width:100%;height:auto!important;border:0;border-radius:0;}
+ .explore-full-window .viewer-diagram-canvas>.diagram-views{position:relative;inset:auto;z-index:45;display:flex;flex:none;flex-wrap:wrap;gap:8px;align-items:center;pointer-events:none;margin:0;padding:0;border:0;background:none;}
  .viewer-diagram-canvas>.diagram-views>*{pointer-events:auto;}
- .viewer-diagram-canvas .diagram-view-choice,.viewer-diagram-canvas .viewport-actions,.explore-reader-navigation{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 4px 18px #14244212;}
- .explore-reader-navigation{display:flex;align-items:center;gap:8px;font:12px 'IBM Plex Sans',sans-serif;}
- .explore-reader-navigation select{font:inherit;max-width:220px;padding:5px;background:var(--explore-bg);color:var(--dink);border:1px solid var(--explore-border);border-radius:6px;}
- .viewer-diagram-canvas .explore-tools{top:78px;bottom:auto;}
+ .viewer-diagram-canvas .diagram-view-choice,.viewer-diagram-canvas .viewport-actions,.explore-navigation{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 4px 18px #14244212;}
+ .explore-navigation{display:flex;flex:1 1 auto;align-items:center;flex-wrap:wrap;gap:7px 12px;min-width:0;max-width:100%;box-sizing:border-box;font:12px 'IBM Plex Sans',sans-serif;}
+ .native-canvas .explore-navigation{margin-left:var(--flowview-host-actions-inline-offset,0px);}
+ .explore-navigation-group{display:flex;align-items:center;gap:6px;flex:none;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;}
+ .explore-navigation [hidden]{display:none!important;}
+ .explore-navigation-label{font:600 10px 'IBM Plex Sans',sans-serif;color:var(--dfaint);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
+ body .explore-navigation .tabbar{width:max-content;margin:0;padding:0;border:0;flex-wrap:nowrap;gap:5px;background:none;box-shadow:none;}
+ .explore-navigation .tabunit{flex:none;}
+ .viewer-diagram-canvas .explore-navigation .diagram-view-choice{flex-wrap:nowrap;max-width:none;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+ .explore-navigation-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex:none;}
+ .viewer-diagram-canvas .explore-tools{top:10px;bottom:auto;}
  .docview .viewer-diagram-canvas .explore-board{background-image:radial-gradient(color-mix(in srgb,var(--dtext) 16%,transparent) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
  .viewer-diagram-canvas .explore-board::-webkit-scrollbar{display:none;}
  .viewer-diagram-canvas:fullscreen{padding:0;}
  .viewer-diagram-canvas .layout-flow-toggle{background:var(--explore-bg);}
+}
+
+@media screen and (max-width:640px){
+ .explore-full-window .viewer-diagram-canvas{padding:8px;}
+ .explore-navigation{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:5px 8px;padding:6px;}
+ .native-canvas .explore-navigation{margin-left:0;margin-top:var(--flowview-host-actions-block-offset,0px);}
+ .explore-navigation-tabs{grid-column:1 / -1;grid-row:1;}
+ .explore-navigation-chapters{grid-column:1;grid-row:2;}
+ .explore-navigation-actions{grid-column:2;grid-row:2;}
+ .explore-navigation-diagrams{grid-column:1 / -1;grid-row:3;}
+ .explore-navigation-label{font-size:9px;}
+ .explore-navigation .tabbtn,.explore-navigation .diagram-view-choice .mbtn{min-height:34px;padding:5px 8px;}
+ .viewer-diagram-canvas .explore-tools{right:10px;}
+ .viewer-diagram-canvas .explore-tools .lg{max-width:none;}
+ .viewer-diagram-canvas .explore-tools .mbtn{padding:4px 6px;}
 }
 
 @media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}

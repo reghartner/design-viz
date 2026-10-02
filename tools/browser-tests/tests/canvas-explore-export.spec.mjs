@@ -99,7 +99,8 @@ test('main canvas Explore gestures author one history entry each and survive sta
 });
 
 test('authored Explore rectangles and camera use final full-canvas bounds in editor and fresh export',async({page,server,context},info)=>{
-  const layout={panels:[{panel:'home',x:.2,y:.4,w:.2,h:.25,stacked:false}],controls:{x:.08,y:.78,w:.52,h:.16},camera:{zoom:.7,x:.5,y:.5}};
+  // The player needs 92 px; use a feasible normalized height in the 514 px editor stage.
+  const layout={panels:[{panel:'home',x:.2,y:.4,w:.2,h:.25,stacked:false}],controls:{x:.08,y:.72,w:.52,h:.22},camera:{zoom:.7,x:.5,y:.5}};
   const raw=fixture(layout);await open(page,server,raw);const original=await source(page);
   await expectSavedGeometry(page,layout);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   const reader=await exported(context,server,original,'canvas-authored-export');await expectSavedGeometry(reader,layout);

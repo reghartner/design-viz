@@ -1,6 +1,25 @@
 import {test,expect,resources,trackResources} from '../helpers/test.mjs';
 
-test('expanded Explore owns the full browser and returns to the same curated viewer',async({page,server})=>{
+const overlaps=(a,b)=>!(a.x+a.width<=b.x||a.x>=b.x+b.width||a.y+a.height<=b.y||a.y>=b.y+b.height);
+async function expandedGeometry(dialog){
+  const actions=await dialog.getByRole('toolbar',{name:'Diagram actions'}).boundingBox();
+  const nav=await dialog.locator('.explore-navigation').boundingBox(),stage=await dialog.locator('.explore-stage').boundingBox();
+  const controls=[];
+  for(const control of await dialog.locator('.explore-navigation button,.viewport-actions button,.explore-tools button').all()){
+    const box=await control.boundingBox();if(box)controls.push(box);
+  }
+  return {actions,nav,stage,controls};
+}
+async function canvasCamera(dialog){
+  return dialog.locator('.explore-board').evaluate(el=>{
+    const svg=el.querySelector('svg'),width=parseFloat(el.style.getPropertyValue('--explore-width'));
+    const mx=parseFloat(el.style.getPropertyValue('--explore-margin-x')),my=parseFloat(el.style.getPropertyValue('--explore-margin-y'));
+    return {zoom:width/svg.viewBox.baseVal.width,x:(el.scrollLeft+el.clientWidth/2-mx)/width,
+      y:(el.scrollTop+el.clientHeight/2-my)/(width*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width)};
+  });
+}
+
+test('expanded Explore owns the full browser and returns to the same curated viewer',async({page,server},info)=>{
   await page.setViewportSize({width:1600,height:1000});await page.addInitScript(trackResources);
   await page.goto(server.origin+'/native/index.html#company-route');await page.waitForFunction(()=>!!window.__host);
   const baseline=await resources(page);
@@ -11,18 +30,42 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Explore alpha',exact:true});
   await expect(dialog).toBeVisible();
-  const box=await dialog.locator('.explore-board').boundingBox();
-  expect(box.x).toBe(0);expect(box.y).toBe(0);expect(box.width).toBe(1600);expect(box.height).toBe(1000);
+  const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
+  const board=await dialog.locator('.explore-board').boundingBox();
+  expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
+  expect(desktop.actions.y).toBe(desktop.nav.y);expect(overlaps(desktop.actions,desktop.nav)).toBe(false);
+  expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
+  const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await expect.poll(async()=>(await canvasCamera(dialog)).zoom).toBeGreaterThan(fittedCamera.zoom);
+  await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=80;el.scrollTop+=20;});const savedCamera=await canvasCamera(dialog);
+  await info.attach('backstage-expanded-desktop',{body:await page.screenshot(),contentType:'image/png'});
   expect(await dialog.locator('[data-flowview-native]').evaluate((node,previous)=>node===previous,original)).toBe(true);
   await expect(dialog.locator('.preadout')).toHaveText('Success');
   await expect(dialog.locator('[data-view-id]')).toHaveAttribute('data-view-id','brief');
   await expect(page.locator('#beta .native-canvas')).toHaveCount(0);
   expect(await page.evaluate(()=>__host.requests.length)).toBe(2);
+  await page.setViewportSize({width:480,height:800});const narrow=await expandedGeometry(dialog);
+  expect(narrow.nav.y).toBeGreaterThanOrEqual(narrow.actions.y+narrow.actions.height);
+  expect(narrow.stage.y).toBeGreaterThanOrEqual(narrow.nav.y+narrow.nav.height);
+  expect(narrow.controls.every(control=>!overlaps(narrow.actions,control))).toBe(true);
+  await expect(dialog.getByRole('img',{name:'flow diagram'})).toBeVisible();
+  await info.attach('backstage-expanded-narrow',{body:await page.screenshot(),contentType:'image/png'});
+  await page.setViewportSize({width:1600,height:1000});const restored=await expandedGeometry(dialog);
+  expect(restored.actions.y).toBe(restored.nav.y);expect(overlaps(restored.actions,restored.nav)).toBe(false);
+  await expect.poll(async()=>{const actual=await canvasCamera(dialog);
+    return Math.max(...Object.keys(savedCamera).map(key=>Math.abs(actual[key]-savedCamera[key])));
+  }).toBeLessThan(.01);
   await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
   await expect(alpha.locator('.explore-stage')).toBeHidden();
   await expect(alpha.locator('.preadout')).toHaveText('Success');
+  expect(await alpha.locator('[data-flowview-native]').evaluate(node=>[
+    node.style.getPropertyValue('--flowview-host-actions-inline-offset'),
+    node.style.getPropertyValue('--flowview-host-actions-block-offset')
+  ])).toEqual(['','']);
   await expect(alpha.getByRole('button',{name:'Explore canvas',exact:true})).toBeFocused();
   await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
+  const reopened=await expandedGeometry(dialog);expect(reopened.actions.y).toBe(reopened.nav.y);expect(overlaps(reopened.actions,reopened.nav)).toBe(false);
+  expect(reopened.controls.every(control=>!overlaps(reopened.actions,control))).toBe(true);
   await page.evaluate(()=>__host.left(false));await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('#host-sentinel').click();
   await page.evaluate(()=>__host.right(false));

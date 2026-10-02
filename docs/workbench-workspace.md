@@ -67,14 +67,14 @@ source uses `\n`. Code remains literal, preserves indentation, and scrolls withi
 its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
-Each named view has one saved **View type**: **Standard** shows the curated
+Each named **Chapter** has one saved **Viewing mode**: **Standard** shows the curated
 page arrangement, while **Explore** fills the browser with the diagram and
 floating panels. The editor displays the selected type just as the exported
-HTML does. Select a **Section** in the top toolbar and use its view buttons to
-switch between the saved views.
+HTML does. Select a **Section** in the top toolbar and use its Chapter buttons to
+switch between the saved perspectives.
 
 In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
-Moving or resizing a data panel or the step controls saves that view's floating
+Moving or resizing a data panel or the step controls saves that Chapter's floating
 defaults in the source, so the placement survives HTML export. Standard keeps
 its panels in the authored page arrangement; use **Arrange section** to edit
 that arrangement.
@@ -90,28 +90,28 @@ panel. Loading another file or resuming a folder starts fresh history; recover
 the previous story through **Earlier drafts**.
 Camera and panel state follow matched sections through source edits; new projects
 start fresh. Local drill-down panels keep their own geometry through preview
-refreshes; undoing a closed detail’s geometry does not reopen it. Each named view
+refreshes; undoing a closed detail’s geometry does not reopen it. Each named Chapter
 retains its own camera for the session.
 Canvas panning, zooming and **Fit diagram** remain temporary navigation and do
 not add Undo entries or change the saved opening camera. Use **Back to page**
 to author the camera in the contained Explore view.
 
-Choose a named view above the graph to work on it. The adjacent **View type**
-control saves **Standard** or **Explore** for that view. Keep
-both kinds in one story: open **View options → Duplicate view**, give the copy
-a **View name**, save it with **Rename view** or Enter, and choose its
-type independently. Changing a legacy or automatic view to Explore
-creates its named view in one Undo operation.
+Choose a named Chapter above the graph to work on it. The adjacent **Viewing mode**
+control saves **Standard** or **Explore** for that Chapter. Keep
+both modes in one story: open **Chapter options → Duplicate chapter**, give the copy
+a **Chapter name**, save it with **Rename chapter** or Enter, and choose its
+mode independently. Changing a legacy or automatic chapter to Explore
+creates its named Chapter in one Undo operation.
 
-**Make default** saves the selected view as the opening choice for a fresh
-published page; it then reads **Default view**. Merely selecting another view
-does not edit the source or change that default. View type, name, duplication
+**Make opening chapter** saves the selected Chapter as the opening choice for a fresh
+published page; it then reads **Opening chapter**. Merely selecting another Chapter
+does not edit the source or change that default. Viewing mode, name, duplication
 and default changes use the normal source Undo/Redo history.
 
 **Back to page** reveals prose, contract cards and the contained Explore view.
 **Open Explore** returns to its full-browser view. This navigation does not
-change the saved View type. Selecting another view or section follows that view's
-type again. There is no separate editor presentation dropdown.
+change the saved Viewing mode. Selecting another Chapter or section follows that Chapter's
+mode again. There is no separate editor presentation dropdown.
 Explore panel and step-control placement can be saved from either surface.
 In the contained view, panning and zooming also save the opening camera.
 **Arrange section** exposes the page arrangement and saved view settings;

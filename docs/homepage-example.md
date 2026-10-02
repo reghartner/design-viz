@@ -10,7 +10,7 @@ For an existing company diagram, the recommended change is to give the homepage 
 
 1. Open the diagram in the workbench and download its JSON. Choose a concise section that works at card size; keep a clear first state and a few meaningful steps. An alternate path and local child diagram give the reader tour more features to demonstrate.
 2. Put the featured diagram first, with any local detail sections after it. A simple `page.sections` wrapper is easiest; a tabbed document needs its card visibility and expansion behavior checked separately.
-3. Save the desired opening view using **Make default** in the workbench. The homepage preserves that view's arrangement and Standard or Explore type. Include the panels you want visible together; Home map, App screens, and Device app are the current selection, not a requirement of the renderer.
+3. Save the desired opening Chapter using **Make opening chapter** in the workbench. The homepage preserves that Chapter's arrangement and Standard or Explore viewing mode. Include the panels you want visible together; Home map, App screens, and Device app are the current selection, not a requirement of the renderer.
 4. Embed screen images and any other media as data URLs. The expanded example and reader tour block network requests, so remote media URLs and remote child-diagram dependencies will not work there. Use local sections for drill-downs.
 
 The JSON and embedded images ship inside the downloadable workbench HTML, so choose an example suitable for the audience that receives that file.

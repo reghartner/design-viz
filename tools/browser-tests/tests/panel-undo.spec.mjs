@@ -124,7 +124,7 @@ test('layout edits cannot strand an earlier geometry history entry for an inacti
   const movedSource=await page.locator('#src').inputValue();expect(movedSource).not.toBe(source);
   await sec.getByRole('button',{name:'Engineering',exact:true}).click();await pagePreview(page);
   await sec.getByRole('button',{name:'Arrange section',exact:true}).click();
-  await sec.getByRole('button',{name:'Duplicate view',exact:true}).click();const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);
+  await sec.getByRole('button',{name:'Duplicate chapter',exact:true}).click();const edited=await page.locator('#src').inputValue();expect(edited).not.toBe(source);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(movedSource);

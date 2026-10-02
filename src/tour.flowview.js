@@ -885,6 +885,10 @@ function wireTour(ctl, view, win, config, options){
       sec.stepper.jump(0);
     }
   }
+  function refreshSectionViewport(sec){
+    if(sec && sec.presentation && sec.presentation.refreshViewport)sec.presentation.refreshViewport();
+    else if(sec && sec.viewport)sec.viewport.refresh();
+  }
   function branchIsVisible(sec,ds){
     if(ds.step!=='@fork' && ds.step!=='@rejoin')return true;
     var paths=sec.stepper.paths(), a=paths[0].indices,b=paths[1].indices;
@@ -921,6 +925,7 @@ function wireTour(ctl, view, win, config, options){
             selectSectionTab(sec);
             if(applyDiagramState(sec,state)){
               stageAdvance(step,sec);
+              refreshSectionViewport(sec);
               var target=queryTarget(step,sec,step.demo && step.demo.click || step.target);
               disclose(target);
               valid=isRendered(target) && branchIsVisible(sec,ds);
@@ -1034,6 +1039,7 @@ function wireTour(ctl, view, win, config, options){
         index += dir; continue;
       }
       stageAdvance(step,sec);
+      refreshSectionViewport(sec);
       /* a click step's validity rests on its click control (which must have
          a target to spotlight afterwards): the click is what puts the menu
          on screen, and it fires only after the settle loop steadies layout */
@@ -1107,8 +1113,7 @@ function wireTour(ctl, view, win, config, options){
       (function settle(){
         if (!active || gen !== myGen) return;
         recenter(spot);
-        if(sec && sec.presentation && sec.presentation.refreshViewport)sec.presentation.refreshViewport();
-        else if(sec && sec.viewport)sec.viewport.refresh();
+        refreshSectionViewport(sec);
         var top = Math.round(spot.getBoundingClientRect().top);
         var inView = top >= 0 && top <= win.innerHeight;
         if ((inView && top === lastTop) || --settleTries <= 0){

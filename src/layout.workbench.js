@@ -81,48 +81,48 @@ function initSectionLayoutEditor(opts){
     var host=section.querySelector('.section-viewport>.diagram-views');if(!host)return;
     var rec=sectionScope(section),row=host.querySelector('.section-view-settings');
     rec.viewFields.destroy();rec.viewFields=createWorkbenchLifetime();var fieldLife=rec.viewFields;controlsLife=fieldLife;
-    if(!row){row=el('div','section-view-settings');row.setAttribute('role','group');row.setAttribute('aria-label','View settings');host.appendChild(row);}
+    if(!row){row=el('div','section-view-settings');row.setAttribute('role','group');row.setAttribute('aria-label','Chapter settings');host.appendChild(row);}
     row.replaceChildren();
     var index=Number(section.getAttribute('data-dv-section')),id=selectedView(index),definition=diagramLayoutViews(d).find(function(v){return v.id===id || v.legacy && id==='layout';});
     function current(){return row.isConnected && ready() && selectedView(index)===id;}
     function activate(nextId){var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();}
     var choices=host.querySelector('.diagram-view-choice');
-    if(choices){choices.setAttribute('role','group');choices.setAttribute('aria-label','Views');}
-    if(choices && !choices.querySelector('.workbench-views-label'))choices.prepend(el('span','workbench-views-label','Views'));
+    if(choices){choices.setAttribute('role','group');choices.setAttribute('aria-label','Chapters');}
+    if(choices && !choices.querySelector('.workbench-views-label'))choices.prepend(el('span','workbench-views-label','Chapters'));
     function focusControl(selector){
       var next=view.querySelector('[data-dv-section="'+index+'"] .section-view-settings '+selector);if(!next)return;
       var options=next.closest('details');if(options){options.open=true;sectionScope(next.closest('.doc-sec')).optionsOpen=true;}
       next.focus({preventScroll:true});
     }
-    var label=el('label',null,'View type '),select=el('select');select.setAttribute('aria-label','View type');
+    var label=el('label',null,'Viewing mode '),select=el('select');select.setAttribute('aria-label','Viewing mode');
     [['standard','Standard'],['explore','Explore']].forEach(function(choice){var option=el('option',null,choice[1]);option.value=choice[0];select.appendChild(option);});
-    select.value=definition?definition.presentation:'standard';select.title='Standard uses a curated page layout. Explore uses the full canvas. The editor and built HTML use the same view type.';
+    select.value=definition?definition.presentation:'standard';select.title='Standard uses a curated page layout. Explore uses the full canvas. The selected chapter keeps this viewing mode in the editor and built HTML.';
     fieldLife.listen(select,'change',function(){
       if(!current()){select.value=definition?definition.presentation:'standard';return;}
-      cancel();var nextId=opts.setPresentation(index,id,select.value);if(nextId){activate(nextId);focusControl('[aria-label="View type"]');}
+      cancel();var nextId=opts.setPresentation(index,id,select.value);if(nextId){activate(nextId);focusControl('[aria-label="Viewing mode"]');}
     });label.appendChild(select);row.appendChild(label);
     var openingId=d.layouts && d.layouts.length?sectionLayoutDefinition(d).id:d.sectionLayout?'layout':d.primaryPanel?'home':'flow';
     var isDefault=openingId===id;
-    var opening=button(isDefault?'Default view':'Make default',function(){if(current()){var nextId=opts.makeDefault(index,id);if(nextId)activate(nextId);}});
-    opening.disabled=isDefault;opening.title=isDefault?'This view opens first in the built HTML.':'Open this view first in the built HTML.';row.appendChild(opening);
-    var options=el('details','section-view-options');options.open=rec.optionsOpen;options.appendChild(el('summary',null,'View options'));
+    var opening=button(isDefault?'Opening chapter':'Make opening chapter',function(){if(current()){var nextId=opts.makeDefault(index,id);if(nextId)activate(nextId);}});
+    opening.disabled=isDefault;opening.title=isDefault?'This Chapter opens first in the built HTML.':'Open this Chapter first in the built HTML.';row.appendChild(opening);
+    var options=el('details','section-view-options');options.open=rec.optionsOpen;options.appendChild(el('summary',null,'Chapter options'));
     fieldLife.listen(options,'toggle',function(){if(options.isConnected)rec.optionsOpen=options.open;});
-    var body=el('div','section-view-options-body'),nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
-    name.setAttribute('aria-label','View name');name.value=definition?definition.name:(id==='home'?'Home':'Data flow');
+    var body=el('div','section-view-options-body'),nameLabel=el('label',null,'Chapter name '),name=el('input');name.type='text';name.maxLength=40;
+    name.setAttribute('aria-label','Chapter name');name.value=definition?definition.name:(id==='home'?'Home':'Data flow');
     name.disabled=!definition || definition.legacy;
-    function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="View name"]');}
+    function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="Chapter name"]');}
     fieldLife.listen(name,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();renameView();}});
     nameLabel.appendChild(name);body.appendChild(nameLabel);
-    var rename=button('Rename view',renameView);rename.disabled=name.disabled;body.appendChild(rename);
-    body.appendChild(button('Duplicate view',function(){
+    var rename=button('Rename chapter',renameView);rename.disabled=name.disabled;body.appendChild(rename);
+    body.appendChild(button('Duplicate chapter',function(){
       if(!current())return;rec.optionsOpen=true;
       var nextId=opts.duplicate(index,id);if(!nextId)return;
       var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();
       var nextSection=view.querySelector('[data-dv-section="'+index+'"]');if(!nextSection)return;
       var nextOptions=nextSection.querySelector('.section-view-options');if(nextOptions){nextOptions.open=true;sectionScope(nextSection).optionsOpen=true;}
-      var nextName=nextSection.querySelector('.section-view-settings [aria-label="View name"]');if(nextName){nextName.focus({preventScroll:true});nextName.select();}
+      var nextName=nextSection.querySelector('.section-view-settings [aria-label="Chapter name"]');if(nextName){nextName.focus({preventScroll:true});nextName.select();}
     }));
-    body.appendChild(el('p','fnote','Views share the same story and steps. Each view saves its type, arrangement and opening choice.'));
+    body.appendChild(el('p','fnote','Chapters share the same story and steps. Each chapter saves its viewing mode, arrangement and opening choice.'));
     options.appendChild(body);row.appendChild(options);
     fieldLife.listen(row,'click',function(ev){ev.stopPropagation();});fieldLife.listen(row,'pointerdown',function(ev){ev.stopPropagation();});
   }
@@ -155,7 +155,7 @@ function initSectionLayoutEditor(opts){
     var index=Number(section.getAttribute('data-dv-section')),id=activeLayout(index),definition=sectionLayoutDefinition(d,id);
     var items=currentItems(index,d);if(!items)return;
     var explore=definition && definition.presentation==='explore';
-    if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this view with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
+    if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this Chapter with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
     var dock=sectionLayoutDock(items);
     if(!explore){if(dock && selected==='steps')selected=dock;
     var choose=el('select');choose.setAttribute('aria-label','Layout element');
@@ -209,9 +209,9 @@ function initSectionLayoutEditor(opts){
         if(Array.isArray(d.paths) && d.paths.length>1){
           var pathDetail=el('details','layout-step-selection');pathDetail.open=pathsOpen;
           var pathCount=definition.paths?definition.paths.length:d.paths.length;
-          pathDetail.appendChild(el('summary',null,'Paths shown in this view · '+(definition.paths?pathCount+' selected':'All '+pathCount)));
+          pathDetail.appendChild(el('summary',null,'Paths shown in this Chapter · '+(definition.paths?pathCount+' selected':'All '+pathCount)));
           fieldLife.listen(pathDetail,'toggle',function(){if(pathDetail.isConnected)pathsOpen=pathDetail.open;});
-          pathDetail.appendChild(el('p','fnote','Hidden paths stay in the shared story, but readers cannot select or play them in this view.'));
+          pathDetail.appendChild(el('p','fnote','Hidden paths stay in the shared story, but readers cannot select or play them in this Chapter.'));
           pathDetail.appendChild(button('Show all paths',function(){if(ready() && activeLayout(index)===id)opts.paths(index,id,null);}));
           var pathList=el('div','layout-step-options');
           d.paths.forEach(function(path){
@@ -227,7 +227,7 @@ function initSectionLayoutEditor(opts){
         }
         var detail=el('details','layout-step-selection');detail.open=stepsOpen;
         var count=definition.steps?definition.steps.length:(d.steps || []).length;
-        detail.appendChild(el('summary',null,'Steps shown in this view · '+(definition.steps?count+' selected':'All '+count)));
+        detail.appendChild(el('summary',null,'Steps shown in this Chapter · '+(definition.steps?count+' selected':'All '+count)));
         fieldLife.listen(detail,'toggle',function(){if(detail.isConnected)stepsOpen=detail.open;});
         detail.appendChild(el('p','fnote','Skipped steps still affect the story. Each path plays only its selected stops, in story order.'));
         detail.appendChild(button('Show all steps',function(){if(ready() && activeLayout(index)===id)opts.steps(index,id,null);}));
@@ -250,18 +250,18 @@ function initSectionLayoutEditor(opts){
       row.appendChild(swap);var swapButton=button('Swap places',function(){persist(index,sectionLayoutSwap(items,selected,swap.value));});
       swapButton.disabled=!swap.options.length;swapButton.title='Exchange position, size and visibility with the selected element.';row.appendChild(swapButton);
     }
-    var nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
-    name.value=definition?definition.name:'';name.placeholder='View';name.setAttribute('aria-label','View name');
+    var nameLabel=el('label',null,'Chapter name '),name=el('input');name.type='text';name.maxLength=40;
+    name.value=definition?definition.name:'';name.placeholder='Chapter';name.setAttribute('aria-label','Chapter name');
     fieldLife.listen(name,'change',function(){if(ready())opts.rename(index,name.value,id);});
     nameLabel.appendChild(name);row.insertBefore(nameLabel,row.firstChild);
-    row.appendChild(button('Duplicate view',function(){
+    row.appendChild(button('Duplicate chapter',function(){
       if(!ready())return;var nextId=opts.duplicate(index,id);
       if(nextId){var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();}
     }));
     if(definition && !definition.legacy){
-      var makeDefault=button(sectionLayoutDefinition(d).id===id?'Default view':'Make default',function(){if(ready())opts.makeDefault(index,id);});
+      var makeDefault=button(sectionLayoutDefinition(d).id===id?'Opening chapter':'Make opening chapter',function(){if(ready())opts.makeDefault(index,id);});
       makeDefault.disabled=sectionLayoutDefinition(d).id===id;row.appendChild(makeDefault);
-      row.appendChild(button('Delete view',function(){if(ready()){editing=null;opts.remove(index,id);refresh();}}));
+      row.appendChild(button('Delete chapter',function(){if(ready()){editing=null;opts.remove(index,id);refresh();}}));
     }
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
   }
@@ -283,9 +283,9 @@ function initSectionLayoutEditor(opts){
           if(!Array.isArray(current.layouts)){opts.ensureView(index);return;}
           forceLayout(index);refresh();
         });arrange.setAttribute('data-arrange-toggle','');controls.appendChild(arrange);
-        var rename=button('Rename view',function(){
+        var rename=button('Rename chapter',function(){
           if(!ready())return;editing=index;if(opts.pause)opts.pause();forceLayout(index);refresh();
-          var name=section.querySelector('[aria-label="View name"]');if(name){name.focus();name.select();}
+          var name=section.querySelector('[aria-label="Chapter name"]');if(name){name.focus();name.select();}
         });rename.setAttribute('data-layout-rename','');controls.appendChild(rename);
         controls.appendChild(button('Optimize layout',function(){
           if(!ready())return;editing=index;
@@ -319,7 +319,7 @@ function initSectionLayoutEditor(opts){
           return {text:opts.src.value,panel:host && host.getAttribute('data-explore-panel'),content:host && host.getAttribute('data-explore-content'),player:host && host.classList.contains('explore-player'),label:host && focused.getAttribute('aria-label')};
         },
         commit:function(id,value,token){
-          if(!ready() || !token || token.text!==opts.src.value || activeLayout(index)!==id){feedback('Source or view changed; Explore adjustment cancelled.');return false;}
+          if(!ready() || !token || token.text!==opts.src.value || activeLayout(index)!==id){feedback('Source or Chapter changed; Explore adjustment cancelled.');return false;}
           var ok=opts.setExploreLayout(index,id,value);
           if(ok){
             feedback('Saved Explore positions, sizes, pan and zoom · Undo restores the previous framing.');

@@ -1,27 +1,27 @@
 # Arrange a section and preview its host
 
-Each named view has one saved **View type**: **Standard** preserves the
+Each named **Chapter** has one saved **Viewing mode**: **Standard** preserves the
 authored tile arrangement; **Explore** gives the graph a full-height workspace
 with independent floating panels and pinned step controls. Omitted settings use
 Standard, so existing diagrams keep their presentation.
 
-In the workbench, select a section and a view using the
-buttons above the graph. **View type** chooses Standard or Explore for
-that view; **Make default** saves which view opens on a fresh page. The saved
-choice reads **Default view**. Selecting a different view to inspect it does not
-change the saved default or write JSON. Expand **View options**, enter a **View
-name**, and choose **Rename view** (or press Enter) to save it; **Duplicate view**
-creates a separate copy. These controls let you keep a curated Standard view
-and an Explore view of the same story side by side.
+In the workbench, select a section and a Chapter using the
+buttons above the graph. **Viewing mode** chooses Standard or Explore for
+that Chapter; **Make opening chapter** saves which Chapter opens on a fresh page. The saved
+choice reads **Opening chapter**. Selecting a different Chapter to inspect it does not
+change the saved default or write JSON. Expand **Chapter options**, enter a **Chapter
+name**, and choose **Rename chapter** (or press Enter) to save it; **Duplicate chapter**
+creates a separate copy. These controls let you keep a curated Standard Chapter
+and an Explore Chapter of the same story side by side.
 
 The editor and exported HTML show the same selected type: Standard uses the
 curated page; Explore opens across the full browser. **Back to page** reveals
 the surrounding document and the contained Explore view; **Open Explore**
 returns to the full-browser view. These navigation actions do not change the
-saved type. Selecting another view or section follows its type again.
-The same **View type** dropdown stays in the shared view header on both
+saved mode. Selecting another Chapter or section follows its mode again.
+The same **Viewing mode** dropdown stays in the shared Chapter header on both
 surfaces. On the page, **Arrange section** provides tile arrangement and the
-other view settings. There is no separate editor View mode.
+other Chapter settings. There is no separate editor presentation control.
 
 For a host preview, select **Responsive**, **Backstage**, or **Confluence** in
 **Canvas appearance**. Host previews use adjustable content widths (1080 and 760
@@ -83,15 +83,15 @@ The selected preview host and width are temporary workspace state. At section
 widths of 640 pixels or less, tiles stack in reading order; use the numeric
 controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
 internally. Diagram Auto / Fit width / Readable controls remain available.
-Saved named views appear as the complete set of view buttons. All views reuse
+Saved Chapters appear as the complete set of Chapter buttons. All Chapters reuse
 the live widgets and preserve the selected alternate, step and playback state
 when included in the destination view. Legacy single arrangements still have
 an automatic **Data flow** choice; sections without saved arrangements retain
-Home / Data flow until you create named views.
+Home / Data flow until you create named Chapters.
 
-On the canvas, use **View options → View name**, then **Rename view** or Enter
-to name the selected view, for example **Front door** or **Home**. In Page
-preview, **Rename view** beside **Arrange section** opens the naming control.
+On the canvas, use **Chapter options → Chapter name**, then **Rename chapter** or Enter
+to name the selected Chapter, for example **Front door** or **Home**. In Page
+preview, **Rename chapter** beside **Arrange section** opens the naming control.
 Names are up to 40 characters
 and apply across that layout's host profiles. A legacy single view
 stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
@@ -106,7 +106,7 @@ and workbench edits, but does not rewrite the spec. Arrange section returns the 
 remain selectable in **Layout element**, so they can be shown or swapped without
 removing their declarations.
 
-## Multiple named layouts of one story
+## Multiple Chapters in one story
 
 Use **Open file** with
 [`src/starters/named-layouts.json`](../src/starters/named-layouts.json)
@@ -118,15 +118,15 @@ in view. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
-1. Select the existing view and choose **View options →
-   Duplicate view**. The copy becomes active. Open **View options** again and
-   give it a **View name**, such as **Service flow**, then choose **Rename view**.
-2. Choose **View type → Explore** for the engineering copy, leaving
-   the original in **Standard**. Each view keeps its own presentation across
+1. Select the existing Chapter and choose **Chapter options →
+   Duplicate chapter**. The copy becomes active. Open **Chapter options** again and
+   give it a **Chapter name**, such as **Service flow**, then choose **Rename chapter**.
+2. Choose **Viewing mode → Explore** for the engineering copy, leaving
+   the original in **Standard**. Each Chapter keeps its own presentation across
    every host profile; changing it is one Undo/Redo operation.
-3. Select whichever view should open for readers and choose **Make default**.
-   Switching views afterward does not change this saved opening choice.
-4. To customize the curated arrangement, select its Standard view and choose
+3. Select whichever Chapter should open for readers and choose **Make opening chapter**.
+   Switching Chapters afterward does not change this saved opening choice.
+4. To customize the curated arrangement, select its Standard Chapter and choose
    **Arrange section**. Select **Data
    flow** in **Layout element**, choose your Home panel in
    **Swap places with**, then click **Swap places**. Position, size and visibility
@@ -141,12 +141,12 @@ To build that from an existing arrangement:
    buttons above the section.
 
 Each layout owns its Responsive, Backstage and Confluence profiles. Duplication
-copies its View type, path and step selections, and all profiles independently;
+copies its Viewing mode, path and step selections, and all profiles independently;
 swapping, moving, sizing and visibility edit
 only the selected host profile in the active layout. Repeat a swap in other
 explicit host profiles as needed. Step controls stay available, attached or detached; they cannot be hidden or
 swapped with a panel. All authoring
-operations support Undo/Redo. **Delete view** removes the arrangement, never
+operations support Undo/Redo. **Delete chapter** removes the arrangement, never
 its panels, diagram or steps. Deleting the default selects the first remaining
 layout; deleting the last named layout restores the automatic presentation.
 
@@ -167,7 +167,7 @@ authored default; deleting the selected view falls back to the remaining default
 
 ## Explore presentation
 
-Select the view and choose **View type → Explore**. The editor opens the same
+Select the Chapter and choose **Viewing mode → Explore**. The editor opens the same
 full-browser presentation used by exported HTML. Move and resize its panels
 there to save their floating defaults. **Back to page** shows the contained
 Explore workspace, including while arranging. **Open Explore** returns to the
@@ -237,7 +237,7 @@ and size. Defaults are shared across host profiles and scale to the
 available viewport. Duplicating a view preserves its defaults. Returning a view to **Standard** restores its authored arrangement.
 
 Keep Standard as the default for a business presentation and add an Explore
-view for engineering inspection. The View type setting belongs to the named
+Chapter for engineering inspection. The Viewing mode setting belongs to the named
 view, never to a Responsive, Backstage or Confluence profile. Duplicating the
 view preserves the setting; changing the preview host does not change it.
 
@@ -327,10 +327,10 @@ the playback status says **Previewing a hidden step**. Exact navigation can also
 preview a path excluded from the view. Arrows, Play or clicking
 the view button return to its saved selection. This does not change the spec.
 
-Named views are the complete set of view buttons; there is no additional automatic
-Data flow mode. Name any view **Data flow** and choose the diagram, panels and
-attachment it should show. **Make default** chooses the view that opens first.
-Older specs without named views keep their automatic Home/Data flow behavior.
+Chapters are the complete set of buttons; there is no additional automatic
+Data flow mode. Name any Chapter **Data flow** and choose the diagram, panels and
+attachment it should show. **Make opening chapter** chooses the Chapter that opens first.
+Older specs without named layouts keep their automatic Home/Data flow behavior.
 
 ## Spec contract
 

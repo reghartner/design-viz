@@ -176,8 +176,9 @@ Per step:
   selects the first matching named view; an ordinary diagram without named
   views already uses Standard. An explicit `view` takes precedence. A
   requested presentation that is unavailable warns and skips the lesson.
-  These are reader view selections; the tour never changes a view's
-  authored View type setting.
+  These are reader chapter selections; the tour never changes a chapter's
+  authored Viewing mode setting. The underlying `view` field and IDs remain
+  stable for existing specs and links.
 - `copy` — `eyebrow` (omitted = automatic "TOUR · STEP n OF m"), `heading`,
   `body`; chooser adds `choices` (`{persona, label, sub}`) and `note`.
   Optional `reducedMotionBody` replaces `body` when reduced motion is on,
@@ -222,13 +223,16 @@ Per step:
   keyboard users take part. Do not describe an action as demonstrated
   when the tour only points at its button.
 
-## Authoring a Standard and Explore sequence
+## Authoring a Standard and Explore chapter sequence
 
-Teach view choice before controls. Named views can change the arrangement
+Teach chapter choice before controls. Named chapters can change the arrangement
 and the visible step stops; they need not be called “Story” and “Data flow.”
 Standard preserves the authored tiles. Explore puts the graph in a larger
-workspace with movable panels and pinned step controls. Both are reader
-views of the same underlying story.
+workspace with movable panels and pinned step controls. Explore chapter buttons
+carry an **EXPLORE** marker, and a document tab carries the same marker when
+its primary diagram's current chapter uses Explore viewing mode. The marker's tooltip and
+accessible description explain that the canvas can be panned and zoomed.
+Both viewing modes present the same underlying story.
 
 The built-in Explore pair declares `presentation: "explore"`. Its first
 lesson highlights a visible floating panel and explains moving, resizing

@@ -3,7 +3,7 @@ import { FlowviewCompatibility } from './generated/compatibility';
 import type { NativeViewerOptions } from './generated/nativeViewer';
 import { useInlineViewer } from './hooks/useInlineViewer';
 import type { ViewerTarget } from './viewer/protocol';
-import { useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 import { CanvasFrame } from './components/CanvasFrame';
 import { EvidenceLink } from './components/EvidenceLink';
 import { workspaceLink } from './viewer/workspaceLink';
@@ -27,6 +27,7 @@ export function InlineFlowview({
   const expanded = expandedRevision === identity;
   const [position, setPosition] = useState<{identity: string; target: ViewerTarget | null}>();
   const toggle = useRef<HTMLButtonElement>(null);
+  const canvasActions = useRef<HTMLDivElement>(null);
   const close = () => { setExpandedRevision(undefined); requestAnimationFrame(() => toggle.current?.focus()); };
   const {
     state,
@@ -36,6 +37,23 @@ export function InlineFlowview({
     retry,
   } = useInlineViewer(diagram, loadSpec, target, resolveDiagramLink, expanded,
     next => setPosition({identity, target: next}));
+  useLayoutEffect(() => {
+    const actions = canvasActions.current, canvas = host.current;
+    if (!expanded || !rendered || !actions || !canvas) return;
+    const measure = () => {
+      const bounds = actions.getBoundingClientRect();
+      canvas.style.setProperty('--flowview-host-actions-inline-offset', `${Math.ceil(bounds.width) + 8}px`);
+      canvas.style.setProperty('--flowview-host-actions-block-offset', `${Math.ceil(bounds.height) + 8}px`);
+    };
+    measure();
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+    observer?.observe(actions);
+    return () => {
+      observer?.disconnect();
+      canvas.style.removeProperty('--flowview-host-actions-inline-offset');
+      canvas.style.removeProperty('--flowview-host-actions-block-offset');
+    };
+  }, [expanded, rendered, host]);
   const address = position?.identity === identity ? position.target : target;
   const compatibility =
     state.spec === undefined
@@ -48,7 +66,7 @@ export function InlineFlowview({
         display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'none'} :
         {display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
         {!expanded && <h3 style={{margin:0,fontSize:22}}>{diagram.title}</h3>}
-        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',
+        <div ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',
           background:'#fff',border:'1px solid #dce1f1',borderRadius:10,padding:8,boxShadow:expanded?'0 4px 18px #14244212':undefined}}>
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Explore canvas'}

@@ -177,7 +177,7 @@ test('skipping viewer intro records only visited topics and next entry starts in
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);
   await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose your reading view');
+  await expect(heading(frame)).toHaveText('Choose a chapter');
   await frame.getByRole('button',{name:'Skip tour',exact:true}).click();
   await expect(heading(practice(page))).toHaveText('Start with your own agent');
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv_tour_features_v1')).seen)).toEqual(['views']);
@@ -251,7 +251,7 @@ test('parent tour chrome blocks edit shortcuts and entering fullscreen works',as
 test('closing the first viewer card keeps the introduction available and expansion retains the selected outcome',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose your reading view');
+  await expect(heading(frame)).toHaveText('Choose a chapter');
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
   expect(await page.evaluate(()=>localStorage.getItem('dv_tour_v1'))).toBeNull();
   await page.getByRole('button',{name:'Take the tour →',exact:true}).click();

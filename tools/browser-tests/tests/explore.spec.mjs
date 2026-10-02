@@ -20,8 +20,12 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(5);
  const before=await page.locator('.boardcanvas>svg').count();
- const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board'));
- expect(stage).toEqual({x:0,y:0,width:page.viewportSize().width,height:page.viewportSize().height});expect(board).toEqual(stage);
+ const shell=await rect(page.locator('.viewer-diagram-canvas')),nav=await rect(page.locator('.explore-navigation'));
+ const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board')),viewport=page.viewportSize();
+ expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+ expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+ expect(stage.x).toBeGreaterThanOrEqual(shell.x);expect(stage.x+stage.width).toBeLessThanOrEqual(shell.x+shell.width);
+ expect(board).toEqual(stage);
  let bottom=stage.y;for(const card of await floats(page).all()){const r=await rect(card);expect(r.y).toBeGreaterThanOrEqual(bottom);expect(Math.abs(r.x+r.width-stage.x-stage.width+13)).toBeLessThan(3);bottom=r.y+r.height;}
  expect(bottom).toBeLessThan(stage.y+stage.height);
  const play=page.getByRole('button',{name:'Next step',exact:true}),pos=await rect(play);

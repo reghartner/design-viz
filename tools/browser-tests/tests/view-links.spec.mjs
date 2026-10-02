@@ -71,11 +71,31 @@ test('view-only embeds target their section even without steps or when other sec
  spec.page.sections.unshift({id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}});
  const url=await build(server,spec,'no-step-views');await page.goto(url+'#embed=front-door&v=service-flow');
  await expect(page.locator('#section-other')).toBeHidden();await expect(page.locator('#section-front-door')).toHaveClass(/dv-embed-target/);
- const story=page.getByRole('combobox',{name:'Explore story',includeHidden:true});
- await expect(story).toBeHidden();
- await expect(story.locator('option')).toHaveCount(1);
- await expect(story.locator('option:checked')).toHaveText(named.page.sections[0].heading);
- const board=await page.locator('#section-front-door .explore-board').boundingBox();expect(board.width).toBe(page.viewportSize().width);expect(board.height).toBe(page.viewportSize().height);
+ await expect(page.locator('.explore-navigation-diagrams')).toBeHidden();
+ const shell=await page.locator('#section-front-door .viewer-diagram-canvas').boundingBox();
+ const nav=await page.locator('#section-front-door .explore-navigation').boundingBox();
+ const stage=await page.locator('#section-front-door .explore-stage').boundingBox();
+ const board=await page.locator('#section-front-door .explore-board').boundingBox(),viewport=page.viewportSize();
+ expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+ expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+ expect(board.x).toBeGreaterThanOrEqual(stage.x);expect(board.y).toBeGreaterThanOrEqual(stage.y);
+ expect(board.x+board.width).toBeLessThanOrEqual(stage.x+stage.width);
+ expect(board.y+board.height).toBeLessThanOrEqual(stage.y+stage.height);
  await expect(selected(page)).toHaveText('Service flow');await expect(page.locator('#section-front-door .board')).toBeVisible();
+ expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');
+});
+
+test('tabbed view-only embeds keep Chapters without an empty document Tabs group',async({page,server})=>{
+ const spec=structuredClone(named),target=spec.page.sections[0];
+ spec.page.blocks=[{tabs:[
+  {label:'Other tab',sections:[{id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}}]},
+  {label:'Target tab',sections:[target]},
+ ]}];delete spec.page.sections;
+ const url=await build(server,spec,'tabbed-view-embed');await page.goto(url+'#embed=front-door&v=service-flow');
+ const sec=page.locator('#section-front-door'),nav=sec.locator('.explore-navigation');
+ await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveClass(/dv-embed-target/);
+ await expect(nav.locator('.explore-navigation-tabs')).toBeHidden();await expect(nav.locator('.tabbtn')).toHaveCount(0);
+ await expect(nav.locator('.explore-navigation-chapters')).toBeVisible();await expect(selected(page)).toHaveText('Service flow');
+ await expect(page.locator('#section-other')).toBeHidden();expect(viewOf(page)).toBe('service-flow');
  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');
 });

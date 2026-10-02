@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,openInspectorGroup,paste,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,openInspectorGroup,paste,inspectPageElement,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const example=JSON.parse(await readFile(path.join(repo,'examples/tab-handoffs/tab-handoffs.spec.json'),'utf8'));
 async function standalone(page,server,raw=example){
@@ -50,6 +50,64 @@ test('workbench authors a local handoff atomically, previews its arrow tip and u
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
  await page.locator('#redo-builder').click();
  await expect(page.locator('[data-dv-handoff="delivery"]')).toBeVisible();
+});
+
+for(const [sourcePresentation,destination] of [['explore','explore'],['explore','standard'],['standard','explore']])
+test(`workbench ${sourcePresentation} to ${destination} handoffs keep the destination visible and selected`,async({page,server})=>{
+ const raw=structuredClone(example),tabs=raw.page.blocks[0].tabs;
+ if(sourcePresentation==='explore'){
+  tabs[0].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tabs[0].sections[0].diagram.defaultLayout='canvas';
+ }
+ if(destination==='explore'){
+  tabs[1].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tabs[1].sections[0].diagram.defaultLayout='canvas';
+ }
+ const source=JSON.stringify(raw,null,2),orders=section(page,'orders'),delivery=section(page,'delivery');
+ await page.goto(server.origin+'/workbench.html');await paste(page,source);
+ await orders.getByRole('button',{name:'Go to step 2',exact:true}).click();
+ const next=orders.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true});
+ if(sourcePresentation==='explore' && destination==='explore'){
+  await closeTools(page);await next.locator('.handoff-hit').click();
+ }else{await next.focus();await next.press('Enter');}
+ await expect(page.locator('#tab-0-1')).toHaveAttribute('aria-selected','true');
+ await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
+ await expect(page.locator('#diagram-add-target')).toHaveValue('1');
+ await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await delivery.getByRole('button',{name:'Back to Order intake',exact:false}).press('Enter');
+ await expect(orders.locator('[data-dv-node="start"]')).toBeInViewport();
+ await expect(orders.locator('.step-text')).toHaveText('Validate hands off to Accept.');
+ await expect(page.locator('#diagram-add-target')).toHaveValue('0');
+ await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await next.focus();await next.press('Enter');
+ const reciprocal=delivery.getByRole('button',{name:'Open Order intake diagram in this spec',exact:true});
+ await reciprocal.focus();await reciprocal.press('Enter');
+ await expect(orders.locator('[data-dv-node="start"]')).toBeInViewport();
+ await expect(page.locator('#diagram-add-target')).toHaveValue('0');
+ await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+test('workbench handoff Back restores an Explore detail and its source editing context',async({page,server})=>{
+ const raw=structuredClone(example),tabs=raw.page.blocks[0].tabs;
+ for(const tab of tabs){
+  tab.sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tab.sections[0].diagram.defaultLayout='canvas';
+ }
+ tabs[0].sections[0].diagram.nodes.middle.detail={section:'child'};
+ raw.page.blocks.push({id:'child',heading:'Child flow',detailOnly:true,diagram:{view:'step',autoplay:false,nodes:{go:{title:'Delivery',handoff:{localSection:'delivery'}}},rows:[['go']],steps:[{id:'ready',nodes:['go'],text:'Ready'}]}});
+ const source=JSON.stringify(raw,null,2),orders=section(page,'orders'),delivery=section(page,'delivery');
+ await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
+ await orders.locator('[data-dv-detail="middle"]').click();
+ const child=page.locator('[data-dv-detail-preview]:visible');
+ await expect(child.locator('[data-dv-node="go"]')).toBeInViewport();
+ const handoff=child.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true});
+ await handoff.focus();await handoff.press('Enter');
+ await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
+ await expect(page.locator('#diagram-add-target')).toHaveValue('1');
+ await delivery.getByRole('button',{name:'Back to Child flow',exact:false}).press('Enter');
+ await expect(child.locator('[data-dv-node="go"]')).toBeInViewport();
+ await expect(page.locator('#diagram-add-target')).toHaveValue('0');
+ await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
 test('native local handoffs stay inside their viewer and release navigation on destroy',async({page,server})=>{

@@ -14,8 +14,14 @@ const editorSource=JSON.stringify(withExploreRoot(JSON.parse(source)),null,2);
 async function childCanvas(root,page){
   const child=root.locator('[data-dv-detail-preview]:visible');
   await expect(child).toHaveCount(1);await expect(child.locator('.explore-board')).toBeVisible();
-  const board=await child.locator('.explore-board').boundingBox(),head=await child.locator('.detail-head').boundingBox();
-  expect(board.width).toBe(page.viewportSize().width);expect(board.height).toBe(page.viewportSize().height);
+  const shell=await child.locator('.viewer-diagram-canvas,.workbench-diagram-canvas').boundingBox();
+  const board=await child.locator('.explore-board').boundingBox(),nav=await child.locator('.explore-navigation').boundingBox(),head=await child.locator('.detail-head').boundingBox();
+  const viewport=page.viewportSize(),workbench=await page.locator('body').evaluate(el=>el.classList.contains('workspace-diagram'));
+  if(workbench){expect(shell.x).toBe(84);expect(shell.y).toBe(104);expect(shell.width).toBe(viewport.width-96);expect(shell.height).toBe(viewport.height-116);}
+  else{expect(shell.x).toBe(0);expect(shell.y).toBe(0);expect(shell.width).toBe(viewport.width);expect(shell.height).toBe(viewport.height);}
+  expect(board.x).toBeGreaterThanOrEqual(shell.x);expect(board.x+board.width).toBeLessThanOrEqual(shell.x+shell.width);
+  expect(board.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board.y+board.height).toBeLessThanOrEqual(shell.y+shell.height);
+  expect(board.height).toBeGreaterThan(300);
   expect(head.width).toBeGreaterThan(120);expect(head.height).toBeLessThan(180);
   return child;
 }
@@ -51,7 +57,7 @@ test('native canvas owns details while keeping root navigation, sibling isolatio
   await expect(page.locator('#b [data-dv-detail-preview]')).toHaveCount(0);
   await page.evaluate(()=>viewer.setCanvas(false));await expect(child.locator('.explore-stage')).toBeHidden();
   await page.evaluate(()=>viewer.setCanvas(true));child=await childCanvas(root,page);
-  await expect(child.getByRole('combobox',{name:'Explore story',exact:true})).toBeHidden();
+  await expect(child.locator('.explore-navigation-diagrams')).toBeHidden();
   await child.locator('.detail-breadcrumb button').first().click();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);await expect(parent.locator('.explore-board')).toBeVisible();
   await page.evaluate(()=>{viewer.destroy();other.destroy();});await expect(root).toBeEmpty();

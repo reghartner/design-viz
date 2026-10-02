@@ -27,15 +27,15 @@ async function open(page,server,raw,native=false){
 }
 
 for(const native of [false,true])test(`${native?'native':'standalone'} story navigation excludes detail-only domains`,async({page,server})=>{
-  const root=await open(page,server,story(true),native),menu=root.getByRole('combobox',{name:'Explore story',exact:true});
-  await expect(menu.locator('option')).toHaveText(['root story','other story']);
+  const root=await open(page,server,story(true),native),diagrams=root.locator('.explore-navigation-diagrams');
+  await expect(diagrams.getByRole('button')).toHaveText(['root story','other story']);
   await root.locator('#section-root [data-dv-detail]').click();
   const child=root.locator('[data-dv-detail-preview]:visible');await expect(child.locator('.explore-board')).toBeVisible();
-  await expect(menu.locator('option:checked')).toHaveText('root story');
-  await menu.selectOption({label:'other story'});
+  await expect(diagrams.getByRole('button',{name:'root story',exact:true})).toHaveAttribute('aria-pressed','true');
+  await diagrams.getByRole('button',{name:'other story',exact:true}).click();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
   await expect(root.locator('#section-other .explore-board')).toBeVisible();
-  await menu.selectOption({label:'root story'});await expect(root.locator('#section-root .explore-board')).toBeVisible();
+  await diagrams.getByRole('button',{name:'root story',exact:true}).click();await expect(root.locator('#section-root .explore-board')).toBeVisible();
 });
 
 for(const host of ['standalone','native','workbench'])test(`${host} nested Explore drill-down has no page flash with motion enabled`,async({page,server})=>{
@@ -43,7 +43,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
   let root;
   if(host==='workbench'){await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(story()));await page.getByRole('button',{name:'Hide tools',exact:true}).click();root=page.locator('#docview');}
   else root=await open(page,server,story(),host==='native');
-  await expect(root.getByRole('combobox',{name:'Explore story',exact:true})).toBeHidden();
+  await expect(root.locator('.explore-navigation-diagrams')).toBeHidden();
   for(let depth=0;depth<2;depth++){
     const parent=depth?root.locator('[data-dv-detail-preview]:visible'):root.locator('#section-root');
     // Sample every painted frame from the gesture, including the entry animation.
@@ -51,14 +51,22 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
       window.domainFrames=[];let remaining=24;const host=el.getRootNode();
       host.addEventListener('click',()=>requestAnimationFrame(function sample(){
         const child=Array.from(host.querySelectorAll('[data-dv-detail-preview]')).find(s=>!s.hidden);
-        if(child){const board=child.querySelector('.explore-board'),r=board.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,opacity:style.opacity,transform:style.transform});}
+        if(child){const board=child.querySelector('.explore-board'),shell=child.querySelector('.viewer-diagram-canvas,.workbench-diagram-canvas'),nav=child.querySelector('.explore-navigation'),r=board.getBoundingClientRect(),s=shell.getBoundingClientRect(),n=nav.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,sx:s.x,sy:s.y,sw:s.width,sh:s.height,navBottom:n.bottom,opacity:style.opacity,transform:style.transform});}
         if(--remaining)requestAnimationFrame(sample);
       }),{once:true,capture:true});
     });
     await parent.locator('[data-dv-detail]').click();
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
-    for(const frame of frames){expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');expect(frame.x).toBe(0);expect(frame.y).toBe(0);expect(frame.w).toBe(page.viewportSize().width);expect(frame.h).toBe(page.viewportSize().height);}
+    const viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:104,sw:viewport.width-96,sh:viewport.height-116}:{sx:0,sy:0,sw:viewport.width,sh:viewport.height};
+    const first=frames[0];
+    for(const frame of frames){
+      expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');
+      expect({sx:frame.sx,sy:frame.sy,sw:frame.sw,sh:frame.sh}).toEqual(expectedShell);
+      expect({x:frame.x,y:frame.y,w:frame.w,h:frame.h,navBottom:frame.navBottom}).toEqual({x:first.x,y:first.y,w:first.w,h:first.h,navBottom:first.navBottom});
+      expect(frame.x).toBeGreaterThanOrEqual(frame.sx);expect(frame.x+frame.w).toBeLessThanOrEqual(frame.sx+frame.sw);
+      expect(frame.y).toBeGreaterThanOrEqual(frame.navBottom);expect(frame.y+frame.h).toBeLessThanOrEqual(frame.sy+frame.sh);expect(frame.h).toBeGreaterThan(300);
+    }
   }
   await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();
   await expect(root.locator('#section-root .explore-board')).toBeVisible();

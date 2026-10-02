@@ -380,6 +380,10 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   (d.edges || []).forEach(function(e, ei){
     var EP = DP + '.edges[' + ei + ']';
     deltaWarnings(e, EP, warnings);
+    if(e && e.curveControls!=null && !validCurveControls(e.curveControls))
+      errors.push(EP+'.curveControls: expected 3n-1 endpoint-relative cubic controls (2..95), with t: 0..1 and finite dx/dy between -100000 and 100000');
+    if(e && e.curveControls!=null && e.curvePoints!=null)
+      errors.push(EP+': use either curveControls or curvePoints, not both');
     if(e && e.curvePoints!=null && !validCurvePoints(e.curvePoints))
       errors.push(EP+'.curvePoints: expected up to 32 {t: 0..1, dx, dy} points with finite offsets between -100000 and 100000');
     ['fromPort','toPort'].forEach(function(key){

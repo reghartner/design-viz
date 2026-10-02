@@ -1,0 +1,24 @@
+{
+  "packages": [
+    {
+      "file": "viz-3.31.0.js",
+      "member": "package/dist/viz-global.js",
+      "tarball": "https://registry.npmjs.org/@viz-js/viz/-/viz-3.31.0.tgz",
+      "integrity": "sha512-r7zlQdRvcwvIpjHGgs+KNWHeE/P5/Dq7k8ZAKaMCbZqomxCBJV78gVuQYaHzFVca+kB0mX0fMW9UFevCOBG50A==",
+      "sha256": "c9e0b310f9883910e01c66054b48b7ff4be3d8695141116635e72b0af152692e"
+    },
+    {
+      "file": "webcola-3.4.0.js",
+      "member": "package/WebCola/cola.min.js",
+      "tarball": "https://registry.npmjs.org/webcola/-/webcola-3.4.0.tgz",
+      "integrity": "sha512-4BiLXjXw3SJHo3Xd+rF+7fyClT6n7I+AR6TkBqyQ4kTsePSAMDLRCXY1f3B/kXJeP9tYn4G1TblxTO+jAt0gaw==",
+      "sha256": "b45eba3fb02d22d9ea9a2bcad07ddbec8296f807f05e96f8c9d4abbc497f65c7"
+    }
+  ],
+  "licenses": {
+    "Viz-LICENSE": "f1fb91bf7cbcb42b2af56949e4fa909e1979d5b57c2826cabacdb4b631457720",
+    "Graphviz-COPYING": "8c349f80764d0648e645f41ef23772a70c995a0924b5235f735f4a3d09df127c",
+    "Expat-COPYING": "31b15de82aa19a845156169a17a5488bf597e561b2c318d159ed583139b25e87",
+    "WebCola-LICENSE": "b03b0b7015dc39f9335f2caf76fd373011c5927b8a81f9779adf23a55f94f2c3"
+  }
+}

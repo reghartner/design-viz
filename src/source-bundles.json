@@ -77,6 +77,8 @@
     "workbench/io-model.js",
     "workbench/io-browser.js",
     "workbench/io.js",
+    "workbench/auto-arrange-core.js",
+    "workbench/auto-arrange.js",
     "workbench/edge-curves.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
@@ -241,6 +243,20 @@
         "workbench/onboarding.css"
       ]
     },
-    "iconLibrary": "icons/library.js"
+    "iconLibrary": "icons/library.js",
+    "autoArrangeWorker": [
+      "workbench/vendor/viz-3.31.0.js",
+      "workbench/vendor/webcola-3.4.0.js",
+      "core/geometry.js",
+      "workbench/auto-arrange-core.js",
+      "workbench/auto-arrange-worker.js"
+    ],
+    "autoArrangeNotices": [
+      "workbench/vendor/NOTICE.txt",
+      "workbench/vendor/Viz-LICENSE",
+      "workbench/vendor/Graphviz-COPYING",
+      "workbench/vendor/Expat-COPYING",
+      "workbench/vendor/WebCola-LICENSE"
+    ]
   }
 }

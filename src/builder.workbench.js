@@ -1093,6 +1093,25 @@ function initWorkbenchBuilder(opts){
     }
   });
 
+  var autoArrange=createAutoArrangeController({document:document,src:src,view:view,button:document.getElementById('auto-arrange'),
+    pause:pausePreview,message:inspectorMessage,run:startAutoArrangeWorker,
+    context:function(){
+      var snapshot=session.snapshot();if(snapshot.error)return snapshot;
+      if(opts.isActive && !opts.isActive())return {error:'Open an editable project before arranging.'};
+      if(interactions.adding() || interactions.connecting())return {error:'Finish adding or connecting nodes before arranging.'};
+      if(snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return {error:'Render the current source before arranging.'};
+      var got=builderDiagram(snapshot.text,snapshot.raw,session.insertSection);if(got.error)return got;
+      return Object.assign(snapshot,{section:session.insertSection,diagram:got.d,label:builderInsertTargetText(snapshot.raw,session.insertSection).replace(/^into /,'')});
+    },
+    commit:function(plan,snapshot){return applyPlan(plan,{after:function(){
+      clearMultiSelect();setSelected(null);
+      life.delay(function(){var current=session.snapshot();
+        if(current.text===plan.text && current.project===snapshot.project && session.insertSection===snapshot.section && opts.workspace && opts.workspace.canvas)opts.workspace.canvas.fit();
+      },0);
+    }},snapshot);}
+  });
+  life.own(function(){autoArrange.destroy();});
+
   var jumpToFinding = life.guard(function(message, rawPath){
     var parsed = parseEditor();
     if (parsed.error) return;
@@ -1108,6 +1127,7 @@ function initWorkbenchBuilder(opts){
   applyRowGrabs(); /* the boot render happened before this wiring ran */
   function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject({preserveHistory:true});}
   function retireProjectUI(){
+    if(autoArrange)autoArrange.cancel();
     io.retireProject();
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();
     pausePreview();

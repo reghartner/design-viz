@@ -1348,6 +1348,11 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 }
 .folder-agent-guide #folder-agent-file-picker{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
 @media(max-width:540px){
+  /* Reserve Add's real width beside Auto arrange. Shorten the tour label just
+     as we shorten Add below, keeping all header actions visible in one row. */
+  .workspace-canvas .workspace-create{flex:none;}
+  .workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}
+  .workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
   .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}

@@ -4,6 +4,53 @@ const C=require('../tools/canon/core.cjs');
 const source=()=>['platform','checkout'].map(id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8')));
 const diagram=s=>s.page.sections[0].diagram;
 const resolve=specs=>C.materializeTopology(specs);
+function notificationSource(selected){
+  const targets=['push','email','sms'],ids=['dispatcher',...targets];
+  const spec=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/notifications'},sections:[{id:'delivery',diagram:d}]}});
+  const keys=selected.map(id=>'notify::dispatcher->notify::'+id);
+  return [spec('notification-child',{
+    nodes:Object.fromEntries(ids.map(id=>[id,{title:id}])),rows:[['dispatcher'],targets],
+    edges:targets.map(to=>({from:'dispatcher',to,kind:'https'})),
+    topologyExports:{channels:{nodes:ids,edges:targets.map(id=>'dispatcher->'+id)}},
+  }),spec('notification-parent',{
+    topologyImports:[{spec:'notification-child',export:'channels',as:'notify'}],
+    steps:[{id:'send-first',edge:keys[0]},{id:'send-second',edge:keys[1]},{id:'send-both',edges:keys}],
+    paths:[{id:'separate',steps:['send-first','send-second']},{id:'together',steps:['send-both']}],
+  })];
+}
+test('a parent can fire any chosen two of three imported notification edges in its own steps',()=>{
+  const routing=C.viewerRouting();
+  for(const selected of [['push','email'],['push','sms'],['email','sms']]){
+    const specs=notificationSource(selected),consumer=diagram(resolve(specs)[1]);
+    const keys=selected.map(id=>'notify::dispatcher->notify::'+id);
+    assert.deepEqual(consumer.steps,diagram(specs[1]).steps);
+    assert.deepEqual(routing.diagramForPath(consumer,'separate').steps.flatMap(routing.stepKeys),keys);
+    assert.deepEqual(routing.diagramForPath(consumer,'together').steps.flatMap(routing.stepKeys),keys);
+    const unused=['push','email','sms'].find(id=>!selected.includes(id));
+    const unusedKey='notify::dispatcher->notify::'+unused;
+    assert.equal(consumer.edges.length,3);assert.ok(consumer.edges.some(e=>e.from+'->'+e.to===unusedKey));
+    assert.ok(!consumer.steps.flatMap(routing.stepKeys).includes(unusedKey));
+    assert.deepEqual(C.validateSpec({page:{sections:[{diagram:consumer}]}}).errors,[]);
+  }
+});
+test('removing or renaming either notification edge chosen by the parent rejects the whole snapshot',()=>{
+  for(const selected of [['push','email'],['push','sms'],['email','sms']])for(const target of selected)for(const change of ['remove','rename']){
+    const specs=notificationSource(selected),provider=diagram(specs[0]),exp=provider.topologyExports.channels;
+    if(change==='remove'){
+      provider.edges=provider.edges.filter(e=>e.to!==target);exp.edges=exp.edges.filter(key=>key!=='dispatcher->'+target);
+    }else{
+      const renamed=target+'-renamed';provider.nodes[renamed]=provider.nodes[target];delete provider.nodes[target];
+      provider.rows=provider.rows.map(row=>row.map(id=>id===target?renamed:id));
+      provider.edges.find(e=>e.to===target).to=renamed;
+      exp.nodes=exp.nodes.map(id=>id===target?renamed:id);exp.edges=exp.edges.map(key=>key==='dispatcher->'+target?'dispatcher->'+renamed:key);
+    }
+    const before=structuredClone(specs);
+    assert.throws(()=>resolve(specs),error=>error.message.includes('notification-parent') &&
+      error.message.includes('import notify (notification-child export channels)') &&
+      error.message.includes('missing edge notify::dispatcher->notify::'+target));
+    assert.deepEqual(specs,before);
+  }
+});
 test('materializes closed, namespaced topology with consumer narrative and binding; deterministic, nonmutating and idempotent',()=>{
   const specs=source(),before=structuredClone(specs),out=resolve(specs),d=diagram(out[1]);
   assert.deepEqual(specs,before);assert.deepEqual(resolve(specs),out);assert.deepEqual(resolve(out),out);

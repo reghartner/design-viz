@@ -55,7 +55,11 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(library.diagrams[0].spec,undefined);
   assert.deepEqual(library.diagrams[0].canon,expected.page.canon);
   const specResponse=await probeHttp(new URL(library.diagrams[0].specUrl,url).href,2000);
-  assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),spec);
+  assert.equal(specResponse.status,200);assert.deepEqual(JSON.parse(specResponse.body),expected);
+  // The lazy library serves the derived snapshot; the authored source is a
+  // separate URL and must retain its original membership metadata.
+  const sourceResponse=await probeHttp('http://127.0.0.1:'+port+'/diagrams/feature/feature.spec.json',2000);
+  assert.equal(sourceResponse.status,200);assert.deepEqual(JSON.parse(sourceResponse.body),spec);
   const canonResponse=await probeHttp('http://127.0.0.1:'+port+'/canon.json',2000);
   assert.deepEqual(JSON.parse(canonResponse.body),manifest);assert.match(canonResponse.headers['cache-control'],/no-cache/);
   const licenseResponse=await probeHttp('http://127.0.0.1:'+port+'/LICENSE',2000);

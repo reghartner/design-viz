@@ -54,6 +54,21 @@ supply them. Other layout settings remain consumer-owned.
 
 ## Compatibility and publication
 
+A consumer can choose which imported edges its own story fires. For example,
+exporting `dispatcher->push`, `dispatcher->email` and `dispatcher->sms` under
+`notify` makes all three available. The parent can fire just push and SMS together:
+
+```json
+{"id":"notify-customer", "edges":["notify::dispatcher->notify::push", "notify::dispatcher->notify::sms"]}
+```
+
+Or use separate local steps, each with an `edge` field naming one of those keys.
+The email edge remains in the imported topology without participating in either
+step. Any two can be selected; removing or renaming either referenced identity
+in the provider fails the complete build. These are narrative references to
+edges: a structural edge's `from` and `to` still connect **nodes**, never another
+edge or an arbitrary point on it. Child steps/paths are not imported.
+
 The complete snapshot must resolve before validation, indexing or publishing.
 Missing providers/exports, malformed declarations, cycles, collisions, broken
 export closure/placement and dangling materialized references stop the build.

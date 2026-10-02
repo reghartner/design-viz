@@ -31,7 +31,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
   var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
   var canvas=document.createElement('div');canvas.className='explore-canvas';stage.appendChild(canvas);
-  var tools=document.createElement('div');tools.className='explore-tools';stage.appendChild(tools);
+  var tools=document.createElement('div');tools.className='explore-tools';tools.setAttribute('role','group');tools.setAttribute('aria-label','Explore sizing and zoom');stage.appendChild(tools);
   var player=document.createElement('div');player.className='explore-player';stage.appendChild(player);
   player.setAttribute('data-dv-step-controls','');
   var actions=document.createElement('div');actions.className='viewport-actions';toolbar.appendChild(actions);
@@ -72,6 +72,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
   var legend=board.querySelector('.lg');
   if(legend)Array.prototype.slice.call(legend.querySelectorAll('.li')).forEach(function(item){legendItems.appendChild(item);});
+  function syncTools(){
+    // Every reader Explore surface shares the compact row. Workbench canvas
+    // controls have their own owner, so its panel sizing stays in the menu.
+    if(active && (!workbenchCanvas || readerCanvas)){shell.insertBefore(tools,stage);tools.appendChild(overlayZoom);}
+    else{stage.appendChild(tools);panelBody.appendChild(overlayZoom);}
+  }
   function standardPanels(){
     if(active)return;choices.replaceChildren();summary.textContent='Panels';overlayZoom.hidden=true;
     Array.prototype.forEach.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'),function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index];if(!panel)return;var label=document.createElement('label'),check=document.createElement('input');check.type='checkbox';check.checked=!card.hidden;check.addEventListener('change',function(){card.hidden=!check.checked;});label.appendChild(check);var title=document.createElement('span');title.textContent=panel.title || panel.id;label.appendChild(title);choices.appendChild(label);});
@@ -360,7 +366,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     var modeRail=box.querySelector('.playback-mode-rail');if(modeRail)move(modeRail,player);
-    if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);overlayZoom.hidden=false;
+    if(bar)move(bar,player);move(board,canvas);if(legend)move(legend,tools);overlayZoom.hidden=false;syncTools();
     // Reuse the rendered samples so protocol overrides, skins and response
     // dashes stay identical to Standard. The move anchors restore them on leave.
     legendMenu.hidden=false;
@@ -389,7 +395,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(prose)prose.setFloating(false);
     windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
     stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
-    shell.classList.remove('viewport-explore');menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
+    shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
   function isFullscreen(){return document.fullscreenElement===shell;}
@@ -460,7 +466,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       w.state.hidden=false;memory.focus=false;paint();return true;
     },
     viewDefinition:function(){return definition;},
-    setReaderCanvas:function(on){readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);fitHeight();paint();},
+    setReaderCanvas:function(on){
+      readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);
+      syncTools();fitHeight();paint();
+    },
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
       leave();if(on)canvasBoardHidden=board.hidden;var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);

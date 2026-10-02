@@ -42,8 +42,8 @@ export function InlineFlowview({
     if (!expanded || !rendered || !actions || !canvas) return;
     const measure = () => {
       const bounds = actions.getBoundingClientRect();
-      canvas.style.setProperty('--flowview-host-actions-inline-offset', `${Math.ceil(bounds.width) + 8}px`);
-      canvas.style.setProperty('--flowview-host-actions-block-offset', `${Math.ceil(bounds.height) + 8}px`);
+      canvas.style.setProperty('--flowview-host-actions-inline-offset', `${Math.ceil(bounds.width)}px`);
+      canvas.style.setProperty('--flowview-host-actions-block-offset', `${Math.ceil(bounds.height)}px`);
     };
     measure();
     const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
@@ -62,19 +62,19 @@ export function InlineFlowview({
   return (
     <div aria-label="Inline diagram viewer">
       <CanvasFrame expanded={expanded} onClose={close} title={diagram.title}>
-      <div style={expanded ? {position:'absolute',top:12,left:12,right:12,zIndex:100,
+      <div style={expanded ? {position:'absolute',top:0,left:0,right:0,zIndex:100,
         display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'none'} :
         {display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
         {!expanded && <h3 style={{margin:0,fontSize:22}}>{diagram.title}</h3>}
-        <div ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',
-          background:'#fff',border:'1px solid #dce1f1',borderRadius:10,padding:8,boxShadow:expanded?'0 4px 18px #14244212':undefined}}>
+        <div ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',maxWidth:'100%',boxSizing:'border-box',
+          background:'#fff',border:'1px solid #dce1f1',borderRadius:expanded?0:10,padding:expanded?'6px 12px':8}}>
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Explore canvas'}
           </button>
           <EvidenceLink prominent url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'build')}>Build with Claude</EvidenceLink>
+          <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in workbench</EvidenceLink>
           <details style={{position:'relative'}}><summary style={{cursor:'pointer'}}>More</summary><div style={{position:'absolute',right:0,top:'100%',zIndex:120,minWidth:190,display:'grid',gap:12,padding:14,border:'1px solid #dce1f1',borderRadius:8,background:'#fff',boxShadow:'0 4px 18px #14244212'}}>
             <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
-            <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in workbench</EvidenceLink>
           </div></details>
         </div>
       </div>

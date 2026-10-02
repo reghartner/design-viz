@@ -193,9 +193,15 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await expect(page.locator('#section-standard [data-dv-node="s0"]')).toBeInViewport();
  await expect(page.locator('#section-standard [data-dv-node="s1"]')).toBeInViewport();
  await expect.poll(()=>page.evaluate(()=>{
-  const bar=document.querySelector('.explore-full-window .diagram-views'),stage=document.querySelector('.explore-full-window .explore-stage'),tools=stage&&stage.querySelector('.explore-tools');
+  const shell=document.querySelector('.explore-full-window .viewer-diagram-canvas');
+  const bar=shell?.querySelector(':scope > .diagram-views'),tools=shell?.querySelector(':scope > .explore-tools'),stage=shell?.querySelector(':scope > .explore-stage');
   if(!bar || !stage || !tools)return false;const b=bar.getBoundingClientRect(),s=stage.getBoundingClientRect(),t=tools.getBoundingClientRect();
-  return s.top>=b.bottom && t.top>=s.top && t.bottom<=s.bottom;
+  // Reader sizing belongs between navigation and canvas, without overlapping
+  // either surface or leaving the old floating-toolbar gutter.
+  return tools.nextElementSibling===stage && t.height>0 && s.height>0
+   && t.top>=b.bottom && t.top-b.bottom<=1
+   && s.top>=t.bottom && s.top-t.bottom<=1
+   && t.left>=b.left && t.right<=b.right;
  })).toBe(true);
  const narrow=info.outputPath('explore-navigation-narrow.png');await page.screenshot({path:narrow});
  await info.attach('explore-navigation-narrow',{path:narrow,contentType:'image/png'});

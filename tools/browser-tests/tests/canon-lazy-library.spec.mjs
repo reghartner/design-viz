@@ -320,3 +320,32 @@ test('invalid lazy specs show an error and retry fetches repaired content',async
   data=fixture.specs.first;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('First story');
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();
 });
+
+for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit action across chapters, tabs and history'+(handoffAction?' for an edit handoff':''),async({page,server},info)=>{
+  const fixture=await publish(server),sources=[];
+  for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
+  const source=sources[1],section=source.page.sections[0],d=section.diagram;
+  d.layouts=[{id:'canvas',name:'Engineering',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},{id:'standard',name:'Overview',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
+  const other=structuredClone(section);other.id='alternate';other.heading='Alternate diagram';
+  source.page.sections=[{tabs:[{label:'First tab',sections:[section]},{label:'Second tab',sections:[other]}]}];
+  const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('checkout'),workspace=snapshot.loadWorkspace('checkout');
+  await page.route('**/api/canon/context?*',route=>route.fulfill({json:{spec,...workspace,catalog:{version:1,services:[]}}}));
+  const handoff={version:1,id:'checkout',revision:digest(spec),action:handoffAction || 'view'};
+  await page.goto(fixture.url+'?canon=checkout#fv='+encodeURIComponent(JSON.stringify(handoff)));
+  const edit=page.locator('#canon-reader-edit'),nav=page.locator('#canon-reader .explore-navigation');
+  await expect(edit).toBeEnabled();await expect(nav.locator('#canon-reader-edit')).toBeVisible();const original=await edit.elementHandle();
+  for(const width of [1440,390]){
+    await page.setViewportSize({width,height:1000});await expect(edit).toBeInViewport();
+    await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
+    await nav.getByRole('button',{name:'Overview',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
+    await nav.getByRole('tab',{name:'Second tab',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeInViewport();
+    await nav.getByRole('tab',{name:'First tab',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+    await nav.getByRole('button',{name:'Engineering',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+    expect(await original.evaluate(el=>el===document.querySelector('#canon-reader-edit'))).toBe(true);
+    await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
+  }
+  await edit.click();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
+  await expect(page.locator('#docview [data-dv-node="platform::api"]').first()).toBeVisible();await expect(page.locator('#workspace-provenance')).toContainText('Referenced topology (frozen session)');await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.goBack();await expect(nav.locator('#canon-reader-edit')).toBeVisible();await edit.click();await prepareEditorSurface(page);
+  expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);await expect(page.locator('#undo-builder')).toBeDisabled();
+});

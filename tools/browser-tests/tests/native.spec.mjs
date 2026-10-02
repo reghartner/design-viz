@@ -17,7 +17,7 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   const leftPanel=alpha.locator('[data-explore-panel="state"]'),rightPanel=beta.locator('[data-explore-panel="state"]');
   const originalRight=await rightPanel.boundingBox();
   const leftBefore=await leftPanel.boundingBox(),graphBefore=await alpha.locator('.explore-board .boardcanvas>svg').boundingBox();
-  await alpha.locator('.explore-panel-menu summary').click();await alpha.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
+  await alpha.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
   await expect(alpha.locator('.explore-overlay-value')).toHaveText('90%');
   expect((await leftPanel.boundingBox()).width).toBeCloseTo(leftBefore.width*.9,0);
   expect(await rightPanel.boundingBox()).toEqual(originalRight);

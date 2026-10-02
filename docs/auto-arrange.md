@@ -19,7 +19,7 @@ WebCola stress layouts with Graphviz nop2 spline routing. External Graphviz
 labels preserve the graph's ranks while leaving room for labels. Candidate
 generation keeps at least 48 logical units between final card rectangles;
 layered ranks receive additional clearance for their routed connections.
-scoring uses the final viewer geometry, including ports and computed nested
+Candidate scoring uses the final viewer geometry, including ports and computed nested
 group boxes: reject overlapping cards/groups and routes through unrelated
 cards, then minimize nonincident crossing pairs, total route length and area.
 This bounded search does not promise an optimal or crossing-free result.

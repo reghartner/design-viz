@@ -36,6 +36,18 @@ test('nested groups are disjoint with correct title padding; cycles, loops, para
  assert.ok(outer.x+outer.w<=other.x || other.x+other.w<=outer.x || outer.y+outer.h<=other.y || other.y+other.h<=outer.y);
  for(const id of ['e','f']){const p=L.pos[id];assert.ok(p.cx+p.w/2<=outer.x || p.cx-p.w/2>=outer.x+outer.w || p.cy+p.h/2<=outer.y || p.cy-p.h/2>=outer.y+outer.h);}
 });
+test('commerce feedback graph keeps all 20 nodes and 36 connections while laying out six disjoint groups',()=>{
+ const raw=require('./fixtures/auto-arrange-commerce.json'),before=JSON.stringify(raw),next=arrange(raw);
+ const original=raw.page.blocks[0].diagram,d=next.page.blocks[0].diagram;
+ assert.equal(Object.keys(d.nodes).length,20);assert.equal(d.edges.length,36);assert.equal(Object.keys(d.groups).length,6);
+ assert.deepEqual(d.edges,original.edges);assert.deepEqual(d.nodes,original.nodes);assert.deepEqual(d.groups,original.groups);
+ assert.equal(JSON.stringify(raw),before);assert.deepEqual(arrange(next),next);noOverlap(d);
+ const L=B.layout(d),boxes=Object.values(L.groups);
+ for(let i=0;i<boxes.length;i++)for(let j=i+1;j<boxes.length;j++){
+  const a=boxes[i],b=boxes[j];assert.ok(a.x+a.w<=b.x || b.x+b.w<=a.x || a.y+a.h<=b.y || b.y+b.h<=a.y);
+ }
+ for(const edge of d.edges){const path=B.edgePath(edge,L);assert.match(path,/ C /);assert.doesNotMatch(path,/NaN|Infinity/);}
+});
 test('refuses malformed, oversized and deeply nested graphs without publication',()=>{
  for(const d of [{nodes:{},rows:[[]]}, {nodes:{a:{}},rows:[['a']],edges:[{from:'a',to:'missing'}]}, {nodes:{a:{}},rows:null}, {nodes:Object.fromEntries(Array.from({length:151},(_,i)=>['n'+i,{}])),rows:[[]]}]){
   const before=JSON.stringify(d);assert.ok(B.planAutoArrangeNodes(before,d,0).error);assert.equal(JSON.stringify(d),before);

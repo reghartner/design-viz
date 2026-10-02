@@ -1,0 +1,411 @@
+{
+  "page": {
+    "title": "20-node commerce platform",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "heading": "20 nodes · 36 connections · 6 groups",
+        "diagram": {
+          "title": "Commerce platform",
+          "nodes": {
+            "web": {
+              "title": "Web app",
+              "group": "clients",
+              "icon": "gear"
+            },
+            "mobile": {
+              "title": "Mobile app",
+              "group": "clients",
+              "icon": "gear"
+            },
+            "gateway": {
+              "title": "API gateway",
+              "group": "entry",
+              "icon": "gear"
+            },
+            "auth": {
+              "title": "Authentication",
+              "group": "entry",
+              "icon": "gear"
+            },
+            "catalog": {
+              "title": "Catalog",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "cart": {
+              "title": "Cart",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "checkout": {
+              "title": "Checkout",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "orders": {
+              "title": "Orders",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "inventory": {
+              "title": "Inventory",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "payments": {
+              "title": "Payments",
+              "group": "commerce",
+              "icon": "gear"
+            },
+            "events": {
+              "title": "Event bus",
+              "group": "processing",
+              "icon": "gear"
+            },
+            "fulfillment": {
+              "title": "Fulfillment",
+              "group": "processing",
+              "icon": "gear"
+            },
+            "retry": {
+              "title": "Retry queue",
+              "group": "processing",
+              "icon": "gear"
+            },
+            "postgres": {
+              "title": "PostgreSQL",
+              "group": "data",
+              "icon": "gear"
+            },
+            "redis": {
+              "title": "Redis",
+              "group": "data",
+              "icon": "gear"
+            },
+            "search": {
+              "title": "Search index",
+              "group": "data",
+              "icon": "gear"
+            },
+            "email": {
+              "title": "Email",
+              "group": "external",
+              "icon": "gear"
+            },
+            "shipping": {
+              "title": "Shipping",
+              "group": "external",
+              "icon": "gear"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "group": "external",
+              "icon": "gear"
+            },
+            "monitor": {
+              "title": "Monitoring",
+              "group": "external",
+              "icon": "gear"
+            }
+          },
+          "groups": {
+            "clients": {
+              "title": "Clients"
+            },
+            "entry": {
+              "title": "API edge"
+            },
+            "commerce": {
+              "title": "Commerce services"
+            },
+            "processing": {
+              "title": "Async processing"
+            },
+            "data": {
+              "title": "Data stores"
+            },
+            "external": {
+              "title": "Integrations"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "floats": [
+            {
+              "id": "web",
+              "side": "below",
+              "x": 150,
+              "y": 90
+            },
+            {
+              "id": "mobile",
+              "side": "below",
+              "x": 360,
+              "y": 90
+            },
+            {
+              "id": "gateway",
+              "side": "below",
+              "x": 690,
+              "y": 90
+            },
+            {
+              "id": "auth",
+              "side": "below",
+              "x": 930,
+              "y": 90
+            },
+            {
+              "id": "catalog",
+              "side": "below",
+              "x": 150,
+              "y": 340
+            },
+            {
+              "id": "cart",
+              "side": "below",
+              "x": 380,
+              "y": 340
+            },
+            {
+              "id": "checkout",
+              "side": "below",
+              "x": 610,
+              "y": 340
+            },
+            {
+              "id": "orders",
+              "side": "below",
+              "x": 150,
+              "y": 540
+            },
+            {
+              "id": "inventory",
+              "side": "below",
+              "x": 380,
+              "y": 540
+            },
+            {
+              "id": "payments",
+              "side": "below",
+              "x": 610,
+              "y": 540
+            },
+            {
+              "id": "events",
+              "side": "below",
+              "x": 930,
+              "y": 340
+            },
+            {
+              "id": "fulfillment",
+              "side": "below",
+              "x": 1160,
+              "y": 340
+            },
+            {
+              "id": "retry",
+              "side": "below",
+              "x": 1160,
+              "y": 540
+            },
+            {
+              "id": "postgres",
+              "side": "below",
+              "x": 150,
+              "y": 800
+            },
+            {
+              "id": "redis",
+              "side": "below",
+              "x": 390,
+              "y": 800
+            },
+            {
+              "id": "search",
+              "side": "below",
+              "x": 630,
+              "y": 800
+            },
+            {
+              "id": "email",
+              "side": "below",
+              "x": 930,
+              "y": 800
+            },
+            {
+              "id": "shipping",
+              "side": "below",
+              "x": 1160,
+              "y": 800
+            },
+            {
+              "id": "analytics",
+              "side": "below",
+              "x": 930,
+              "y": 1000
+            },
+            {
+              "id": "monitor",
+              "side": "below",
+              "x": 1160,
+              "y": 1000
+            }
+          ],
+          "edges": [
+            {
+              "from": "web",
+              "to": "gateway"
+            },
+            {
+              "from": "mobile",
+              "to": "gateway"
+            },
+            {
+              "from": "gateway",
+              "to": "auth"
+            },
+            {
+              "from": "gateway",
+              "to": "catalog"
+            },
+            {
+              "from": "gateway",
+              "to": "cart"
+            },
+            {
+              "from": "gateway",
+              "to": "checkout"
+            },
+            {
+              "from": "auth",
+              "to": "redis"
+            },
+            {
+              "from": "catalog",
+              "to": "search"
+            },
+            {
+              "from": "catalog",
+              "to": "redis"
+            },
+            {
+              "from": "cart",
+              "to": "redis"
+            },
+            {
+              "from": "checkout",
+              "to": "cart"
+            },
+            {
+              "from": "checkout",
+              "to": "inventory"
+            },
+            {
+              "from": "checkout",
+              "to": "payments"
+            },
+            {
+              "from": "checkout",
+              "to": "orders"
+            },
+            {
+              "from": "orders",
+              "to": "postgres"
+            },
+            {
+              "from": "inventory",
+              "to": "postgres"
+            },
+            {
+              "from": "payments",
+              "to": "postgres"
+            },
+            {
+              "from": "orders",
+              "to": "events"
+            },
+            {
+              "from": "payments",
+              "to": "events"
+            },
+            {
+              "from": "inventory",
+              "to": "events"
+            },
+            {
+              "from": "events",
+              "to": "fulfillment"
+            },
+            {
+              "from": "events",
+              "to": "email"
+            },
+            {
+              "from": "events",
+              "to": "analytics"
+            },
+            {
+              "from": "fulfillment",
+              "to": "inventory"
+            },
+            {
+              "from": "fulfillment",
+              "to": "shipping"
+            },
+            {
+              "from": "fulfillment",
+              "to": "retry"
+            },
+            {
+              "from": "retry",
+              "to": "fulfillment",
+              "ret": true,
+              "label": "retry"
+            },
+            {
+              "from": "shipping",
+              "to": "events"
+            },
+            {
+              "from": "analytics",
+              "to": "postgres"
+            },
+            {
+              "from": "analytics",
+              "to": "monitor"
+            },
+            {
+              "from": "email",
+              "to": "monitor"
+            },
+            {
+              "from": "payments",
+              "to": "monitor"
+            },
+            {
+              "from": "gateway",
+              "to": "monitor"
+            },
+            {
+              "from": "events",
+              "to": "monitor"
+            },
+            {
+              "from": "catalog",
+              "to": "postgres"
+            },
+            {
+              "from": "cart",
+              "to": "events"
+            }
+          ],
+          "autoplay": false,
+          "view": "ambient"
+        }
+      }
+    ]
+  }
+}

@@ -38,9 +38,17 @@ function planAutoArrangeNodes(text,raw,sectionIdx){
         graph.setNode(child.id,{width:child.w,height:child.h});
         child.members.forEach(function(id){owners.set(id,child.id);unit.members.push(id);});
       });
-      edges.forEach(function(edge,i){
+      edges.forEach(function(edge){
         var from=owners.get(edge.from),to=owners.get(edge.to);
-        if(from && to && from!==to)graph.setEdge(from,to,{},'e'+i);
+        if(from && to && from!==to){
+          /* Several authored connections can project onto the same group
+             pair. Preserve their influence as a weighted constraint instead
+             of asking Dagre to route artificial parallel edges (which can
+             produce nonfinite bend points in feedback graphs). Only node
+             positions are used; every authored edge remains unchanged. */
+          var prior=graph.edge(from,to);
+          graph.setEdge(from,to,{weight:(prior?prior.weight:0)+1});
+        }
       });
       dagre.layout(graph);
       unit.children.forEach(function(child){var p=graph.node(child.id);child.x=p.x;child.y=p.y;});

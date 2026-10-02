@@ -18,7 +18,10 @@ changes, then run the planner, browser and source-assembly tests.
 The source manifest includes this only in `builder.workbench.js`. Viewer exports,
 backend and native viewers use saved floats and do not contain Dagre. The planner
 uses deterministic insertion order and top-to-bottom layered layouts, recursively
-packing groups using renderer padding. Only positions are used, never Dagre's
+packing groups using renderer padding. Connections projected onto the same
+directed node/group pair become one layout constraint weighted by multiplicity;
+this avoids artificial parallel routing failures in feedback graphs while
+preserving every authored connection. Only positions are used, never Dagre's
 orthogonal edge paths. Input is bounded to 150 nodes, 150 groups, 500 connections,
 and 20 group levels to keep a synchronous one-shot edit small. Crossings and
 edge/node intersections are possible, especially between groups and in cycles.

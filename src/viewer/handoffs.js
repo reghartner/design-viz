@@ -85,8 +85,11 @@ function wireLocalHandoffs(ctl, page){
       }
       rec.sectionEl.hidden=false;
       if(rec.stepper){rec.stepper.onShow();rec.stepper.pause();}
-      if(saved)restore(saved);
       ctl.activeTarget={kind:'diagram',section:rec.number};
+      // Workbench canvas selection must move to the base section before a saved
+      // detail stack is restored; its detail-navigation refresh uses that base.
+      ctl.view.dispatchEvent(new CustomEvent('local-handoff-navigation',{detail:{section:rec.number-1}}));
+      if(saved)restore(saved);
       visible=ctl.details && ctl.details.activeSection() || rec;
       paintBack(visible);
       remember();

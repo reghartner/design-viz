@@ -72,6 +72,13 @@ function initWorkbenchCanvas(){
       select(rec.number-1);
     }else select(section);
   }
+  view.addEventListener('local-handoff-navigation',function(ev){
+    var index=ev.detail && ev.detail.section;if(!Number.isInteger(index))return;
+    var rec=records().find(function(r){return r.number===index+1;});
+    if(!rec)return;
+    view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:index}));
+    select(index);
+  });
   function paintZoom(){
     var vp=viewport(),value=vp && vp.canvasZoom(),scale=vp?vp.overlayScale():1;
     document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';

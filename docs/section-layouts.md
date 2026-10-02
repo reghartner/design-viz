@@ -206,7 +206,11 @@ restores the notes.
 Use **Panels · N** to choose which available panels to show. Panels hidden by
 the authored view or the current step are identified in that menu. **Hide
 panels** clears the graph; **Restore panels** brings the available panels back.
-**Stack at edge** puts them back into a column along the right side. **Expand**
+**Stack at edge** puts them at full size in a column along the right side, adding
+more columns to the left when the first one is full. Dragging a panel always
+releases it for free placement, including at the top and right edges. A panel
+taller than the available stack lane stays full-size and top-aligned, with the
+next panel starting a column to its left. **Expand**
 opens a larger view, using browser fullscreen when available and an expanded
 in-page view otherwise; **Exit expanded view** returns to the page.
 

@@ -564,8 +564,20 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
             clip = state["clip"]
             self.assertIsNotNone(clip)
-            for part in [state["canvas"], state["stage"], state["graph"], state["bar"], state["notes"],
-                         *(panel["rect"] for panel in state["panels"])]:
+            parts = [state["canvas"], state["stage"], state["graph"], state["bar"]]
+            # Full-size stacks may extend below or left of the stage. Export
+            # captures their visible intersection with its overflow:hidden
+            # boundary, not the off-canvas portion of each DOM rectangle.
+            stage = state["stage"]
+            for floating in [state["notes"], *(panel["rect"] for panel in state["panels"])]:
+                visible = {"left": max(floating["left"], stage["left"]),
+                           "right": min(floating["right"], stage["right"]),
+                           "top": max(floating["top"], stage["top"]),
+                           "bottom": min(floating["bottom"], stage["bottom"])}
+                self.assertGreater(visible["right"], visible["left"])
+                visible["height"] = visible["bottom"] - visible["top"]
+                parts.append(visible)
+            for part in parts:
                 self.assertGreater(part["height"], 0)
                 self.assertLessEqual(clip["x"], part["left"])
                 self.assertLessEqual(clip["y"], part["top"])

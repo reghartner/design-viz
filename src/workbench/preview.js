@@ -113,7 +113,11 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   /* An unpublished draft has no public document ID. Its controls deliberately
      use this Workbench document as a local/recovery base; Canon supplies its
      stable published route in library.workbench.js. */
-  var linkBase=typeof window!=='undefined'?String(window.location.href).split('#')[0]:null;
+  /* Practice chapters run in an opaque about:srcdoc frame. They deliberately
+     have no durable public address, so leave their copy controls inert instead
+     of aborting the practice bootstrap with an invalid fixed link base. */
+  var linkBase=typeof window!=='undefined' && typeof fixedDeepLinkBase==='function'?
+    fixedDeepLinkBase(String(window.location.href).split('#')[0],window):null;
   var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
   ctl.destroy=function(){if(links)links.destroy();destroy();};
   try{
@@ -143,7 +147,8 @@ function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
   options=options || {};
   var saved=options.snapshot || workbenchReaderPreviewSnapshot(page,authoringCtl);
   var ctl=renderPage(view,page,skin,null,{autoplay:false,layoutTarget:options.layoutTarget});
-  var linkBase=typeof window!=='undefined'?String(window.location.href).split('#')[0]:null;
+  var linkBase=typeof window!=='undefined' && typeof fixedDeepLinkBase==='function'?
+    fixedDeepLinkBase(String(window.location.href).split('#')[0],window):null;
   var links=typeof wireDeepLinks==='function' && linkBase?wireDeepLinks(ctl,window,null,{history:false,linkBase:linkBase}):null,destroy=ctl.destroy;
   ctl.destroy=function(){if(links)links.destroy();destroy();};
   ctl.suppressFragmentWrites=true;

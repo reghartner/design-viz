@@ -50,6 +50,24 @@ test('branding renders embedded images and escaped names, preserves monograms, r
  assert.equal(c.FlowBrand.clean({accent:'#fff;background:url(x)'}).accent,undefined);
  const warnings=[];c.FlowBrand.warnings({logoImage:'https://x.test',icon:'<script>',accent:'red'},'brand',warnings);assert.equal(warnings.length,3);
 });
+test('compact branding exposes an additive styling hook for every mark without changing full-size lockups',()=>{
+ for(const brand of [{logoImage:png},{icon:'shield'},{logo:'CO'}]){
+   const compact=c.FlowBrand.render(brand,{compact:true,className:'surface-brand'});
+   assert.match(compact,/class="fv-brand fv-brand-compact surface-brand"/);
+   assert.match(compact,/fv-brand-mark/);
+   assert.doesNotMatch(compact,/fv-brand-name/);
+ }
+ const full=c.FlowBrand.render({app:'Company',logoImage:png},{className:'surface-brand'});
+ assert.match(full,/class="fv-brand surface-brand"/);
+ assert.doesNotMatch(full,/fv-brand-compact/);
+ assert.match(full,/fv-brand-name/);
+});
+test('compact marks are bounded and Screen marks shrink with their canvas',()=>{
+ const styles=entrypointAssets('native').styles.map(s=>s.source).join('\n');
+ assert.match(styles,/\.fv-brand-compact \.fv-brand-mark\{width:clamp\(12px,1\.35em,18px\);height:clamp\(12px,1\.35em,18px\);\}/);
+ assert.match(styles,/\.screen-brand \.fv-brand-mark\{width:clamp\(12px,7cqi,20px\);height:clamp\(12px,7cqi,20px\);\}/);
+ assert.match(styles,/\.screenbox\{[^}]*container-type:inline-size;/);
+});
 test('validator accepts shared branding and reports malformed brand fields without fetching',()=>{
  const spec={nodes:{a:{}},rows:[['a']],brand:{app:'Home company',icon:'shield'},panels:[{id:'cam',type:'screen',brand:{logoImage:png}}]};
  let result=c.validate(c.normalize(spec));assert.deepEqual(plain(result.errors),[]);assert.deepEqual(plain(result.warnings),[]);

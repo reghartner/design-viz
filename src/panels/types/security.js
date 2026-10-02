@@ -39,7 +39,7 @@
     var video = state.video || 'closed', scene = state.scene || panel.scene;
     if (SCENE_NAMES.indexOf(scene) < 0) scene = 'static-noise';
     var modes = {closed:'off', opening:'boot', reviewing:'active', unavailable:'unavailable'};
-    return {video:video, panel:{scene:scene}, state:{mode:modes[video], scenePlayback:state.scenePlayback,
+    return {video:video, panel:{scene:scene, brand:panel.brand}, state:{mode:modes[video], scenePlayback:state.scenePlayback,
       spotlight:state.spotlight, siren:state.siren, reason:state.videoReason || 'The operator cannot reach this camera.'}};
   }
   function audioClass(audio) {

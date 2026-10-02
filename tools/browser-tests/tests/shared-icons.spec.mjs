@@ -61,6 +61,29 @@ test('native viewer renders shared branding and step icons without extra assets;
  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });
 
+test('embedded company marks stay compact and shrink in narrow and nested Screen canvases',async({page,server})=>{
+ await writeFile(path.join(server.root,'compact-brand-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'compact-brand-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./compact-brand-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/compact-brand-native.html');await page.waitForFunction(()=>!!window.mount);
+ const raw=fixture(),d=raw.page.sections[0].diagram;
+ d.brand={app:'Cedar',logoImage:'data:image/png;base64,'+png};
+ await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+ const root=page.locator('#host'),screen=root.locator('.pt-screen .screenbox'),nested=root.locator('.pt-security .secmon-video .screenbox');
+ const screenMark=screen.locator('.fv-brand-compact img'),nestedMark=nested.locator('.fv-brand-compact img');
+ await expect(screenMark).toBeVisible();await expect(nestedMark).toBeVisible();
+ await expect(screenMark).toHaveCSS('object-fit','contain');await expect(nestedMark).toHaveCSS('object-fit','contain');
+ await screen.evaluate(el=>el.style.width='400px');
+ const normal=await screenMark.boundingBox();
+ expect(normal.width).toBeCloseTo(20,0);expect(normal.height).toBeCloseTo(20,0);
+ await screen.evaluate(el=>el.style.width='160px');
+ const narrow=await screenMark.boundingBox();
+ expect(narrow.width).toBeCloseTo(12,0);expect(narrow.height).toBeCloseTo(12,0);expect(narrow.width).toBeLessThan(normal.width);
+ await nested.evaluate(el=>el.style.width='140px');
+ const nestedSize=await nestedMark.boundingBox();
+ expect(nestedSize.width).toBeCloseTo(12,0);expect(nestedSize.height).toBeCloseTo(12,0);
+ await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
+});
+
 test('step icon picker changes a device card and Inherit removes only that step override',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();

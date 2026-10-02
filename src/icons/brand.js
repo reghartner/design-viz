@@ -67,7 +67,7 @@ var FlowBrand = (function () {
     if (b.accent) styles.push('--fv-brand-accent:' + b.accent);
     if (b.bg) styles.push('--fv-brand-bg:' + b.bg);
     if (b.fg) styles.push('--fv-brand-fg:' + b.fg);
-    return '<span class="fv-brand' + (o.className ? ' ' + esc(o.className) : '') + '"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') + '>' + mark +
+    return '<span class="fv-brand' + (o.compact ? ' fv-brand-compact' : '') + (o.className ? ' ' + esc(o.className) : '') + '"' + (styles.length ? ' style="' + styles.join(';') + '"' : '') + '>' + mark +
       (!o.compact && b.app ? '<span class="fv-brand-name">' + esc(b.app) + '</span>' : '') + '</span>';
   }
   return Object.freeze({isObject:object,clean:clean,resolve:resolve,effective:effective,global:global,

@@ -186,5 +186,6 @@ test('the global fallback renders on all four company-brand surfaces', () => {
   assert.match(surfaces.deviceapp,/fv-brand[^]*?YOUR COMPANY/);
   assert.match(surfaces.phone,/phonebrand[^]*?YC[^]*?YOUR COMPANY/);
   assert.match(surfaces.screen,/screen-brand[^]*?YC/);
+  assert.match(surfaces.security,/screen-brand[^]*?YC/);
   assert.match(surfaces.security,/secmon-desk-brand[^]*?YOUR COMPANY/);
 });

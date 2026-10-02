@@ -1377,7 +1377,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         clearEditingPreview();
         var changedPath=pathId!==selectedPath.id;
         stopAuto();
-        if(restart)selectPath(pathId,0);
+        if(restart){selectPath(pathId,0);paintPathOverview();}
         else if(pathId!==selectedPath.id)selectPath(pathId,index);
         else setStep(index);
         if(restart || changedPath)secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
@@ -1400,7 +1400,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       if(choice.disabled)choice.title='No steps from this path are shown in this view.';
       choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
       choice.addEventListener('click',function(ev){
-        ev.stopPropagation();clearEditingPreview();selectPath(path.id,0);
+        ev.stopPropagation();clearEditingPreview();selectPath(path.id,0);paintPathOverview();
         secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
@@ -1438,6 +1438,26 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     for (j = 0; j < lit.length; j++) lit[j].classList.remove('lit');
     var dots = svg.querySelectorAll('.cpkt');
     for (j = 0; j < dots.length; j++) dots[j].style.visibility = 'hidden';
+  }
+  function lightEdgeKeys(keys){
+    keys.forEach(function(key){
+      var info = board.edgeIds[key];
+      if (!info) return;
+      var pe = document.getElementById(info.domId);
+      if (pe) pe.classList.add('lit');
+      if (info.labelEl) info.labelEl.classList.add('lit');
+    });
+  }
+  /* A path chip is an overview gesture: broaden only edge paint while the
+     selected step continues to own captions, nodes, failures and panels. */
+  function paintPathOverview(){
+    var keys = [], seen = Object.create(null);
+    steps.forEach(function(step){
+      step.keys.forEach(function(key){
+        if (!seen[key]){ seen[key] = true; keys.push(key); }
+      });
+    });
+    lightEdgeKeys(keys);
   }
   function fireDot(key, delayMs){
     var info = board.edgeIds[key];
@@ -1524,12 +1544,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     setFragmentStep(secBox, cur, true);
     var s = steps[cur];
     renderRuntimeConditions(board,termbar.runtimeStatus,s.conditions);
-    s.keys.forEach(function(key){
-      var info = board.edgeIds[key];
-      var pe = document.getElementById(info.domId);
-      if (pe) pe.classList.add('lit');
-      if (info.labelEl) info.labelEl.classList.add('lit');
-    });
+    lightEdgeKeys(s.keys);
     applyStepNodeFocus(board.nodeEls, s, board.edgeIds);
     showCommunicationFailures(board,s.failures,!RM);
     /* ordered packet chain: explicit packets list, else edges in step order */

@@ -472,6 +472,7 @@ function initWorkbenchBuilder(opts){
         status.dataset.state=state;
       }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
+    editError:function(message){inspectorMessage(message);},
     historyChanged:function(undo,redo){
       if(undoBtn)undoBtn.disabled=!undo;
       if(redoBtn)redoBtn.disabled=!redo;
@@ -1196,6 +1197,9 @@ function initWorkbenchBuilder(opts){
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
     if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
+    var raw=session.snapshot().raw,imports=[];
+    (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});
+    if(el && imports.length){el.textContent+=' · Imported topology snapshot';el.title+=' Structural edits belong in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Rebuild canon to refresh this snapshot.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
   var agentOptions={document:document,practice:opts.practice,

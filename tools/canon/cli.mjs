@@ -11,6 +11,8 @@ if(!['scan','decide'].includes(command)){
 }
 try{
   const r=await registry(flag('registry','examples/canon/registry.json')),statePath=flag('state','.local/canon-state.json'),state=await stateFile(statePath);
+  // Evidence updates belong to authored owners, never to expanded imports.
+  r.specs=r.entries.map(entry=>entry.sourceSpec || entry.spec);
   let next;
   if(command==='scan'){
     if(args.includes('--github') && flag('local-sources'))throw new Error('Choose either GitHub or local sources.');

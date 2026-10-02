@@ -80,6 +80,10 @@ function createBuilderSession(options){
       if(disposed || !plan || plan.error)return false;
       var before=text(),expected=hooks && hooks.snapshot;
       if(expected && (expected.text!==before || expected.project!==project))return false;
+      if(typeof FlowTopology!=='undefined'){
+        var topologyError=FlowTopology.editError(parse(before).raw,parse(plan.text).raw);
+        if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
+      }
       pushUndo(hooks && hooks.history || before);
       if(hooks && hooks.beforePublish)hooks.beforePublish();
       options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();

@@ -1,4 +1,5 @@
 {
+  "canon.js": ["canon.js", "canon-topology.js"],
   "validator.js": [
     "panels/registry.js",
     "icons/library.js",

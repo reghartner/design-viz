@@ -77,11 +77,12 @@ docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
 
 The Python build validates against its freshly generated runtime. Docker's Node
 build stage reads root `canon.json` and its listed folders; nginx receives the
-resulting index beside `flowspec.html` and serves the original `diagrams/` files. The final image needs no Node process,
+resulting index beside `flowspec.html` and serves materialized JSON files in
+`workbench/diagrams.json.specs/`. The final image needs no Node process,
 API, browser GitHub token or live Backstage connection. The read-only library,
 direct links, Back/Forward and explicit **Edit in Workbench** behavior are unchanged.
 
-`diagrams.json` is a generated, gitignored index, not another hand-maintained
+`diagrams.json` and its `.specs/` directory are generated and gitignored, not another hand-maintained
 membership file. Its version 2 entries contain `id`, `title`, `canon` membership,
 `counts` (nodes, steps, panels), and a relative `specUrl`. They contain no diagram
 rows, steps, panels, or embedded specs. For example:
@@ -94,19 +95,22 @@ rows, steps, panels, or embedded specs. For example:
     "title": "Doorbell delivery",
     "canon": {"version": 1, "id": "doorbell", "kind": "canonical", "owner": "group:default/home-team"},
     "counts": {"nodes": 12, "steps": 8, "panels": 3},
-    "specUrl": "../diagrams/doorbell/doorbell.spec.json"
+    "specUrl": "diagrams.json.specs/<content-sha256>.json"
   }]
 }
 ```
 
 The browser loads the index for library cards, then fetches only the selected
-spec for reading or editing. Membership from the index is applied in memory,
-just as in the Backstage provider; the source file remains unchanged. Existing
+spec for reading or editing. Each content-addressed spec is a self-contained
+snapshot with derived membership and any [shared topology](shared-topology.md)
+already resolved, just as in the Backstage provider; source files remain unchanged. Existing
 version 1 embedded libraries remain readable, including the offline demo.
 
 An empty `canon.json` list creates a valid empty index.
 Missing files, malformed metadata, duplicate folders, invalid specs, escaping
-paths, a spec over 30 MB, or an index over 30 MB fail publication and preserve the prior index.
+paths, incompatible topology imports, a source/materialized spec over 30 MB, or
+an index over 30 MB fail publication and preserve the prior index. New spec files
+are installed before the atomic index switch; old files remain usable by old readers.
 Output cannot overwrite the source manifest or anything under `diagrams/`.
 
 Run the publisher directly from the repository root:
@@ -116,8 +120,9 @@ node tools/canon/library.mjs --out workbench/diagrams.json
 ```
 
 Spec URLs are relative to the output index's directory. Generate the index at
-its final location relative to the served source tree, and deploy both the index
-and the referenced files together. The supplied nginx Dockerfile does this.
+its final served location, and deploy both the index and its adjacent `.specs/`
+directory together. The supplied nginx Dockerfiles do this. Do not remove old
+content-addressed files while clients may still hold the previous index.
 For a custom deployment, copying only `flowspec.html` and `diagrams.json` is
 insufficient; retain the referenced spec paths too.
 

@@ -1,7 +1,15 @@
 import {describe,it,expect} from 'vitest';
-import {parseCanonManifest,materializeCanonSpec,buildEntityDiagramIndex,diagramsForEntity} from '../src/backend';
+import {parseCanonManifest,materializeCanonSpec,materializeCanonSpecs,buildEntityDiagramIndex,diagramsForEntity} from '../src/backend';
+import {readFileSync} from 'node:fs';
 
 describe('central canon membership for GitHub adapters',()=>{
+  it('materializes a full approved topology snapshot before entity indexing',()=>{
+    const source=['platform','checkout'].map(id=>JSON.parse(readFileSync('../../examples/canon/topology/'+id+'.json','utf8')));
+    const snapshot=materializeCanonSpecs(source);
+    expect(()=>buildEntityDiagramIndex(source)).toThrow(/materializeCanonSpecs/);
+    expect(diagramsForEntity(buildEntityDiagramIndex(snapshot),'component:default/api').diagrams).toHaveLength(2);
+    expect(materializeCanonSpecs(snapshot)).toEqual(snapshot);
+  });
   it('uses manifest identity and ownership before indexing service bindings',()=>{
     const entries=parseCanonManifest({version:1,diagrams:[{folder:'diagrams/checkout',owner:'group:default/team'}]});
     expect(entries).toEqual([{

@@ -2368,6 +2368,14 @@ function renderInspector(){
         page: normalize(parsed.raw) || {},
         diagram: rec ? specValueAt(parsed.raw, rec.diagram) : null
       };
+      var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(ctx.diagram,
+        t.kind==='node'?'nodes':t.kind==='edge'?'edges':t.kind==='group'?'groups':'',
+        t.kind==='edge'?val.from+'->'+val.to:t.id);
+      if(imported){
+        var note=document.createElement('p');note.className='fnote';
+        note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Edit the provider and rebuild canon. Author this consumer’s steps, paths, failures, and panels here.';
+        guide.appendChild(note);return;
+      }
       if (t.kind === 'step' && ctx.diagram && ctx.diagram.paths){
         var sharing = diagramPathList(ctx.diagram).filter(function(route){return route.indices.indexOf(t.index) >= 0;});
         if (sharing.length > 1){

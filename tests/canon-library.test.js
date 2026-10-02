@@ -107,7 +107,8 @@ test('publisher CLI defaults to the company directory structure and retains expl
   fs.writeFileSync(path.join(f.root,'canon.json'),JSON.stringify({version:1,diagrams:[{folder:'diagrams/company',owner:raw.page.canon.owner}]}));
   execFileSync(process.execPath,[cli],{cwd:f.root});
   const generated=JSON.parse(fs.readFileSync(path.join(f.root,'workbench/diagrams.json')));
-  assert.equal(generated.diagrams[0].specUrl,'../diagrams/company/company.spec.json');
+  assert.match(generated.diagrams[0].specUrl,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.root,'workbench',generated.diagrams[0].specUrl))),raw);
   assert.deepEqual(generated.diagrams[0].canon,raw.page.canon);
   const legacy=path.join(f.root,'legacy.json');execFileSync(process.execPath,[cli,'--registry',path.join(__dirname,'../examples/canon/registry.json'),'--out',legacy]);
   assert.deepEqual(JSON.parse(fs.readFileSync(legacy)).diagrams[0].canon,spec.page.canon);
@@ -155,12 +156,14 @@ test('version 2 indexes validate metadata and URLs without embedding or mutating
   assert.equal(context.canonLibrarySpecURL('../diagrams/a/a.spec.json','https://company.test/prefix/workbench/diagrams.json'),'https://company.test/prefix/diagrams/a/a.spec.json');
 });
 
-test('published URLs resolve to the unchanged source, including encoded filenames',async t=>{
+test('published URLs resolve to immutable copies while preserving sources with encoded filenames',async t=>{
   const {publishLibrary}=await import('../tools/canon/library.mjs'),{fileURLToPath,pathToFileURL}=require('node:url');
   const f=discoveryFixture(t),file=f.write('nested/a #1.json',namedSpec('encoded'));
   const output=path.join(f.root,'workbench/diagrams.json');
   const library=await publishLibrary({diagramsDir:f.directory,output});
   const url=library.diagrams[0].specUrl;
-  assert.match(url,/a%20%231.json$/);assert.equal(fileURLToPath(new URL(url,pathToFileURL(output))),file);
+  assert.match(url,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
+  const published=fileURLToPath(new URL(url,pathToFileURL(output)));
+  assert.notEqual(published,file);assert.deepEqual(JSON.parse(fs.readFileSync(published)),JSON.parse(fs.readFileSync(file)));
   assert.ok(!JSON.stringify(library).includes('rows'));assert.ok(!JSON.stringify(library).includes('codeRefs'));
 });

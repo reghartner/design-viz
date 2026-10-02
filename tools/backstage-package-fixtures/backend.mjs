@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec } from '@flowview/backstage-plugin/backend';
+import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec, materializeCanonSpecs } from '@flowview/backstage-plugin/backend';
 
 async function main() {
   const response = await fetch(process.argv[2]);
@@ -10,7 +10,7 @@ async function main() {
     folder: 'diagrams/consumer-recording', owner: 'group:default/diagram-owners',
   }]});
   assert.equal(entry.path, 'diagrams/consumer-recording/consumer-recording.spec.json');
-  const spec = materializeCanonSpec(source, entry);
+  const [spec] = materializeCanonSpecs([materializeCanonSpec(source, entry)]);
   assert.deepEqual(spec.page.canon, {
     version: 1, id: 'consumer-recording', kind: 'canonical', owner: entry.owner,
   });

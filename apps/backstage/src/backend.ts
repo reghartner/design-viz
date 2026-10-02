@@ -2,6 +2,7 @@ import manifest from '../../../tools/canon/manifest.cjs';
 import {
   buildEntityDiagramIndex as buildIndex,
   diagramsForEntity as forEntity,
+  materializeCanonSpecs as materializeBatch,
 } from '../../../tools/canon/entity-diagrams.mjs';
 import type {AssociatedDiagram, EntityDiagrams} from './api/types';
 
@@ -56,4 +57,10 @@ export function parseCanonManifest(raw: unknown): CanonEntry[] {
 /** Derive viewer metadata from an enrolled entry without modifying source JSON. */
 export function materializeCanonSpec(raw: unknown, entry: CanonEntry): unknown {
   return manifest.spec(raw, entry);
+}
+
+/** Resolve the complete canon snapshot from one approved SHA before filtering
+ * for viewer authorization. Serve these exact results from spec endpoints. */
+export function materializeCanonSpecs(specs: readonly unknown[]): unknown[] {
+  return materializeBatch(specs);
 }

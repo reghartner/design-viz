@@ -204,7 +204,7 @@ test('the real build packages the added panel into viewer, editor and the headle
   const output=execFileSync('python3',[path.join(temp,'tools/build.py')],{cwd:temp,encoding:'utf8',timeout:30000});
   assert.match(output,/built template\/flowview.html/);
   const entry=JSON.parse(fs.readFileSync(path.join(temp,'workbench/diagrams.json'))).diagrams[0];
-  assert.equal(entry.spec,undefined);assert.equal(entry.specUrl,'../diagrams/extension/extension.spec.json');
+  assert.equal(entry.spec,undefined);assert.match(entry.specUrl,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
   assert.deepEqual(entry.canon,published.page.canon);
   for (const name of ['template/flowview.html','workbench/flowspec.html']) {
     const html=fs.readFileSync(path.join(temp,name),'utf8');

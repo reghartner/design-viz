@@ -1,4 +1,4 @@
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,pagePreview} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -19,13 +19,34 @@ async function publish(server){
   const registryPath=path.join(root,'canon.json'),output=path.join(workbench,'diagrams.json');
   await writeFile(registryPath,JSON.stringify({version:1,diagrams:Object.keys(specs).map(id=>({folder:'diagrams/'+id,owner:'group:default/home'}))}));
   const index=await publishLibrary({registryPath,output});
-  return {root,specs,index,url:server.origin+'/company/workbench/flowspec.html',specURL:id=>server.origin+'/company/diagrams/'+id+'/'+id+'.spec.json'};
+  return {root,specs,index,url:server.origin+'/company/workbench/flowspec.html',specURL:id=>server.origin+'/company/workbench/'+index.diagrams.find(entry=>entry.id===id).specUrl};
 }
 test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recursive:true,force:true});});
 
+test('a published topology consumer renders and its imported node inspector is read only',async({page,server})=>{
+  const fixture=await publish(server);
+  for(const [id,example] of [['first','platform'],['second','checkout']]){
+    const spec=JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+example+'.json',import.meta.url),'utf8'));
+    if(id==='second')spec.page.sections[0].diagram.topologyImports[0].spec='first';
+    await writeFile(path.join(fixture.root,'diagrams',id,id+'.spec.json'),JSON.stringify(spec));
+  }
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await expect(page.locator('#canon-reader [data-dv-node="platform::api"]')).toBeVisible();
+  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await expect(page.locator('#workspace-provenance')).toContainText('Imported topology snapshot');
+  await page.locator('#docview [data-dv-node="platform::api"]').click();
+  await page.locator('#editor-tab-inspect').click();
+  await expect(page.locator('#guide')).toContainText('Read-only topology from first / core');
+  await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveCount(0);
+  const source=JSON.parse(await page.locator('#src').inputValue());
+  expect(source.page.sections[0].diagram.steps[1].edge).toBe('platform::api->platform::store');
+  expect(source.page.sections[0].diagram.topologyImports).toBeUndefined();
+});
+
 test('the real metadata index fetches only the opened spec and imports the same canonical content',async({page,server})=>{
   const fixture=await publish(server),requests=[];
-  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  page.on('request',request=>{if(request.url().includes('/diagrams.json.specs/'))requests.push(request.url());});
   expect(fixture.index.version).toBe(2);expect(JSON.stringify(fixture.index)).not.toContain('rows');
   await page.goto(fixture.url);await page.locator('#welcome-library').click();
   await expect(page.locator('.canon-library-card')).toHaveCount(2);expect(requests).toEqual([]);
@@ -44,7 +65,7 @@ test('the real metadata index fetches only the opened spec and imports the same 
 test('a direct link beneath a deployment prefix loads one spec, reloads and preserves the saved draft',async({page,server})=>{
   const fixture=await publish(server),requests=[],draft=JSON.stringify({text:'unfinished draft {',at:1});
   await page.addInitScript(value=>localStorage.setItem('dv-workbench-draft',value),draft);
-  page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  page.on('request',request=>{if(request.url().includes('/diagrams.json.specs/'))requests.push(request.url());});
   await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-title')).toHaveText('Second story');
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();expect(requests).toEqual([fixture.specURL('second')]);
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(draft);
@@ -54,7 +75,7 @@ test('a direct link beneath a deployment prefix loads one spec, reloads and pres
 test('a late spec response cannot replace another reader or an edited draft',async({page,server})=>{
   const fixture=await publish(server);let release,started;
   const held=new Promise(resolve=>release=resolve),requested=new Promise(resolve=>started=resolve);
-  await page.route('**/first.spec.json',async route=>{started();await held;await route.fulfill({json:fixture.specs.first});});
+  await page.route(fixture.specURL('first'),async route=>{started();await held;await route.fulfill({json:fixture.specs.first});});
   await page.goto(fixture.url);await page.locator('#welcome-library').click();await page.getByRole('link',{name:/First story/}).click();await requested;
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await page.goBack();await page.getByRole('link',{name:/Second story/}).click();
   await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
@@ -65,7 +86,7 @@ test('a late spec response cannot replace another reader or an edited draft',asy
 
 test('invalid lazy specs show an error and retry fetches repaired content',async({page,server})=>{
   const fixture=await publish(server);let data={page:{title:'Broken',sections:[{diagram:{nodes:{a:{}},rows:[['a']],edges:[{from:'missing',to:'a'}]}}]}};
-  await page.route('**/first.spec.json',route=>route.fulfill({json:data}));
+  await page.route(fixture.specURL('first'),route=>route.fulfill({json:data}));
   await page.goto(fixture.url+'?diagram=first');await expect(page.locator('#canon-reader-error')).toContainText('Invalid diagram');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await expect(page.locator('#canon-reader')).toBeEmpty();
   data=fixture.specs.first;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('First story');

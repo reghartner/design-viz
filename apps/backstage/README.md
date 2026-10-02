@@ -189,14 +189,16 @@ The company GitHub source adapter reads that manifest and its listed JSON specs
 at the **same approved Git SHA**. Use the pure `/backend` helpers:
 
 ```ts
-import {parseCanonManifest, materializeCanonSpec, buildEntityDiagramIndex}
+import {parseCanonManifest, materializeCanonSpec, materializeCanonSpecs, buildEntityDiagramIndex}
   from '@flowview/backstage-plugin/backend';
 
 const entries = parseCanonManifest(manifestJson);
 // Read entry.path at the pinned SHA through your authenticated GitHub adapter.
-// Authorize each entry for this requesting viewer.
-const specs = authorizedEntries.map(entry =>
-  materializeCanonSpec(specJsonByPath[entry.path], entry));
+// Resolve imports from ALL entries at that SHA, then authorize materialized
+// results. Access to a consumer includes the topology it intentionally embeds.
+const snapshot = materializeCanonSpecs(entries.map(entry =>
+  materializeCanonSpec(specJsonByPath[entry.path], entry)));
+const specs = snapshot.filter(spec => authorizedIds.has(spec.page.canon.id));
 const index = buildEntityDiagramIndex(specs, {diagramUrls});
 ```
 
@@ -204,13 +206,20 @@ const index = buildEntityDiagramIndex(specs, {diagramUrls});
 publish optional standalone exports. Canon membership and readers require only
 `entry.path`; new adapters should not fetch or validate the HTML path.
 
-The example's `authorizedEntries`, `specJsonByPath` and `diagramUrls` come from
+The example's `authorizedIds`, `specJsonByPath` and `diagramUrls` come from
 your company adapter. Return the same materialized spec from `loadSpec`, with
 its indexed digest; keep raw authored JSON unchanged. Existing node bindings
 still determine which service/API entity lists the diagram. Refresh manifest
 membership along with specs so removed entries disappear. Missing or invalid
 listed files must fail the snapshot, rather than publishing a partial list.
 These helpers do not fetch files or grant authorization.
+
+`materializeCanonSpec` derives membership for one source; the plural
+`materializeCanonSpecs` resolves the complete batch. The index refuses unresolved
+imports/exports. Cache and atomically replace the entire validated snapshot;
+serve the same materialized values from `loadSpec`. A removed exported node or
+edge still used by a consumer fails the snapshot. See the
+[shared topology contract](../../docs/shared-topology.md) and executable example.
 
 For a local checkout, `tools/canon/library.mjs` also exports
 `loadCanonDiagrams(file, {authorize, ...indexOptions})`. The standard nginx build

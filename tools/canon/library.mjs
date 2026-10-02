@@ -3,7 +3,8 @@
 import {readdir,readFile,realpath,stat} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import path from 'node:path';
-import {registry,atomicJSON,canonLibrary} from './registry.mjs';
+import {registry,atomicJSON,canonLibrary,materializeEntries} from './registry.mjs';
+import {digest} from './drift.mjs';
 import C from './core.cjs';
 import {buildEntityDiagramIndex} from './entity-diagrams.mjs';
 
@@ -13,14 +14,18 @@ export async function loadCanonDiagrams(file='canon.json',{authorize=()=>true,..
   return {specs,index:buildEntityDiagramIndex(specs,options)};
 }
 
-async function libraryFromEntries(entries,output){
+async function libraryFromEntries(entries,output,artifacts=[]){
   const ids=new Map();
-  return {version:2,diagrams:await Promise.all(entries.map(async entry=>{
+  for(const entry of entries){
     const label=entry.filename || entry.id;
     if(typeof entry.id!=='string' || !entry.id.trim() || entry.id.length>200)throw new Error(label+': every library diagram needs an ID of 1–200 characters.');
     if(ids.has(entry.id))throw new Error('Duplicate canon ID '+entry.id+': '+ids.get(entry.id)+' and '+label);
     ids.set(entry.id,label);
     if((await stat(entry.filename)).size>30*1024*1024)throw new Error(label+': diagram exceeds 30 MB.');
+  }
+  entries=materializeEntries(entries);
+  return {version:2,diagrams:await Promise.all(entries.map(async entry=>{
+    const label=entry.filename || entry.id;
     const errors=C.validate(entry.spec).concat(C.validateSpec(entry.spec).errors);
     if(errors.length)throw new Error('Invalid diagram '+label+': '+errors.join('; '));
     const counts={nodes:0,steps:0,panels:0};
@@ -29,7 +34,11 @@ async function libraryFromEntries(entries,output){
       counts.steps+=(section.diagram.steps || []).length;
       counts.panels+=(section.diagram.panels || []).length;
     }
-    const specUrl=path.relative(path.dirname(path.resolve(output)),(await realpath(entry.filename))).split(path.sep).map(encodeURIComponent).join('/');
+    // Content-addressed materializations are installed before the index switch.
+    // Old indexes continue to load their exact old snapshot during publication.
+    const specUrl=encodeURIComponent(path.basename(output)+'.specs')+'/'+digest(entry.spec)+'.json';
+    if(Buffer.byteLength(JSON.stringify(entry.spec))>30*1024*1024)throw new Error(label+': materialized diagram exceeds 30 MB.');
+    artifacts.push({filename:path.join(path.dirname(output),decodeURIComponent(specUrl)),spec:entry.spec});
     return {id:entry.id,title:entry.title || entry.spec.page.title || entry.id,
       canon:entry.spec.page.canon,counts,specUrl};
   }))};
@@ -38,7 +47,7 @@ export async function buildLibrary(registryPath,output='workbench/diagrams.json'
 
 /* Only regular JSON files under the chosen directory are inputs. Never follow
    symlinks into another repository or publish files merely because they exist. */
-export async function buildLibraryFromDirectory(directory,output='workbench/diagrams.json'){
+export async function buildLibraryFromDirectory(directory,output='workbench/diagrams.json',artifacts=[]){
   const entries=[];
   async function walk(folder){
     const children=await readdir(folder,{withFileTypes:true});
@@ -55,7 +64,7 @@ export async function buildLibraryFromDirectory(directory,output='workbench/diag
     }
   }
   await walk(await realpath(directory));
-  return libraryFromEntries(entries,await physicalPath(output));
+  return libraryFromEntries(entries,await physicalPath(output),artifacts);
 }
 
 /* Resolve existing ancestors too: a not-yet-created output can still sit
@@ -79,7 +88,7 @@ export async function publishLibrary({registryPath,diagramsDir,output='workbench
   if(registryPath && diagramsDir)throw new Error('Choose --diagrams or --registry, not both.');
   if(!registryPath && !diagramsDir)registryPath='canon.json';
   const destination=path.resolve(output),physicalDestination=await physicalPath(destination);
-  let library;
+  let library;const artifacts=[];
   if(registryPath){
     if(path.resolve(registryPath)===destination || await realpath(registryPath)===physicalDestination)throw new Error('Output must not overwrite the source registry.');
     if(path.basename(registryPath)==='canon.json'){
@@ -88,13 +97,16 @@ export async function publishLibrary({registryPath,diagramsDir,output='workbench
     }
     const source=await registry(registryPath);
     if((await Promise.all(source.entries.map(entry=>realpath(entry.filename)))).includes(physicalDestination))throw new Error('Output must not overwrite a source spec.');
-    library=await libraryFromEntries(source.entries,physicalDestination);
+    library=await libraryFromEntries(source.entries,physicalDestination,artifacts);
   }else{
     const directory=path.resolve(diagramsDir);
     if(withinDirectory(destination,directory) || withinDirectory(physicalDestination,await realpath(directory)))throw new Error('Output must be outside the diagram source directory.');
-    library=await buildLibraryFromDirectory(directory,destination);
+    library=await buildLibraryFromDirectory(directory,destination,artifacts);
   }
   if(Buffer.byteLength(JSON.stringify(library,null,2)+'\n')>30*1024*1024)throw new Error('Library exceeds 30 MB.');
+  const artifactDirectory=path.join(path.dirname(physicalDestination),path.basename(physicalDestination)+'.specs');
+  if(await physicalPath(artifactDirectory)!==artifactDirectory)throw new Error('Materialized spec directory must not be a symlink.');
+  for(const artifact of artifacts)await atomicJSON(artifact.filename,artifact.spec);
   await atomicJSON(destination,library);
   return library;
 }

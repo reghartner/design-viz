@@ -724,6 +724,11 @@ textarea.fctl{resize:vertical; min-height:44px;}
 .inspector-actions{padding:0 0 10px;border-bottom:1px solid var(--line);}
 .inspector-actions .bbtn,.igroup-actions .bbtn{white-space:normal;}
 .inspector-actions>.bdanger{margin-left:auto;}
+.topology-export-form{min-width:0;margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:6px;}
+.topology-export-form legend{font-weight:600;}
+.topology-export-form .frow{margin:6px 0;}
+.topology-export-form .fnote{overflow-wrap:anywhere;}
+.topology-export-form input,.topology-export-form select{width:100%;min-width:0;box-sizing:border-box;}
 .igroup-actions{position:sticky;top:0;z-index:2;background:var(--card);padding:8px 0;margin:0 0 8px;border-bottom:1px solid var(--line);}
 .igroup-actions .igroup-apply{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);}
 .node-handoff-editor,.node-detail-editor{min-width:0;}

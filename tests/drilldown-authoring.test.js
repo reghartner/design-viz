@@ -238,7 +238,7 @@ function ui(spec=fixture(),options={}){
   }
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
-  for(const name of ['validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
+  for(const name of ['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
     'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/icon-picker','workbench/brand','workbench/inspector','workbench/io-model','workbench/edge-curves','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
@@ -346,11 +346,13 @@ test('Explore caption and keyboard handles select view step controls while numbe
 });
 
 function extractionFixture(){
+  const codeRef=line=>({id:'orders-'+line,repository:'https://example.com/orders',path:'orders.ts',revision:'a'.repeat(40),
+    anchor:{start:'function order'+line+'() {',end:'} // order'+line},startLine:line,endLine:line+2});
   return {page:{title:'Keep formatting',sections:[{id:'top',heading:'Overview',text:'Prose stays byte-for-byte.',diagram:{
-    nodes:{outside:{title:'Caller'},a:{title:'Validate',group:'inner',codeRefs:[{file:'orders.ts',line:4}]},b:{title:'Store',group:'inner'},end:{title:'Receiver'},idle:{title:'Observer'}},
+    nodes:{outside:{title:'Caller'},a:{title:'Validate',group:'inner',codeRefs:[codeRef(4)]},b:{title:'Store',group:'inner'},end:{title:'Receiver'},idle:{title:'Observer'}},
     groups:{inner:{title:'Orders',parent:'platform'},platform:{title:'Platform'}},rows:[['outside',['a','b']],['end','idle']],
     edges:[{from:'outside',to:'a',kind:'https',label:'POST'}, {from:'a',to:'b',kind:'int',label:'save'}, {from:'b',to:'end',kind:'int'}, {from:'outside',to:'idle',kind:'https'}],
-    steps:[{id:'enter',edge:'outside->a',text:'Enter'},{edges:['a->b','outside->idle'],text:'Mixed activity',nodes:['a','idle'],tone:{b:'ok',idle:'warn'},packets:[{edge:'a->b',label:'payload'},{edge:'outside->idle',label:'observe'}],codeRefs:[{file:'orders.ts',line:10}]},
+    steps:[{id:'enter',edge:'outside->a',text:'Enter'},{id:'mixed',edges:['a->b','outside->idle'],text:'Mixed activity',nodes:['a','idle'],tone:{b:'ok',idle:'warn'},packets:[{edge:'a->b',label:'payload'},{edge:'outside->idle',label:'observe'}],codeRefs:[codeRef(10)]},
       {id:'failed',failures:{'a->b':'dropped','outside->idle':'blocked'},text:'Internal failure'}, {id:'leave',edge:'b->end',text:'Return'}, {id:'unrelated',edge:'outside->idle',text:'Observe'}]
   }},{heading:'Unrelated',text:'Keep this exact section.'}]}};
 }

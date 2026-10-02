@@ -22,6 +22,18 @@ contract and a frozen deployed Canon v3 catalog; agent authoring can write the
 reference directly or use the pure `planAddTopologyImport` command. See the linked
 contract for subset validation and session acquisition rules.
 
+For provider exports, use the same declaration rules as the multi-select
+Inspector: at least two selected topology items in one section, at least one
+node, every selected connection's endpoints included, and a spec-wide unique
+name matching `[a-zA-Z0-9][a-zA-Z0-9_.-]*`. Node-only exports are valid. Use
+`planTopologyExport(text, raw, targets, {action, name, existingName}, context)`
+for create/update/remove; targets identify nodes by `id` and connections by
+`key` (`from->to`). Save only `diagram.topologyExports`, without moving or copying
+topology. Local declarations need no catalog; imported/namespaced topology needs
+the frozen provider context and full-candidate validation. Update explicitly
+replaces membership and may rename the chosen export; removal deletes only that
+declaration. See the shared-topology guide for planner and selection details.
+
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its
 storyboard. So the core of this skill is a **storyboard worksheet** that you

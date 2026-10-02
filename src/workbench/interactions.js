@@ -197,6 +197,12 @@ function createBuilderInteractions(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
+  function compatibleKinds(a,b){return a===b || (['node','edge'].indexOf(a)>=0 && ['node','edge'].indexOf(b)>=0);}
+  function selectionEdgeKey(t){
+    if(t.kind!=='edge')return undefined;
+    var snap=parseEditor();if(snap.error || (snap.renderedText!=null && snap.renderedText!==snap.text))return undefined;
+    try{var raw=session.resolve(snap.raw),rec=specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),edge=d && (d.edges || [])[t.index];return edge && builderEdgeKey(edge);}catch(ex){return undefined;}
+  }
   function multiIdent(t){
     return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
   }
@@ -214,6 +220,7 @@ function createBuilderInteractions(opts){
   function reapplyMultiSel(){
     if (!multiSel.length) return;
     multiSel = multiSel.filter(function(t){
+      if(t.kind==='edge' && t.key!==selectionEdgeKey(t))return false;
       var el = findTargetEl(t);
       if (!el) return false;
       t.el = el;
@@ -221,6 +228,9 @@ function createBuilderInteractions(opts){
       return true;
     });
     if (!multiSel.length) dropMultiUI();
+    else if(multiSel.length===1){
+      var only=multiSel[0];clearMultiSelect();selectTarget(only,false,true);
+    }
     else renderMultiInspector();
   }
   function toggleMultiSelect(target){
@@ -228,14 +238,14 @@ function createBuilderInteractions(opts){
       inspectorMessage('multi-select supports nodes, edges, steps, panels, bullets, and contract rows');
       return;
     }
-    if (multiSel.length && multiSel[0].kind !== target.kind){
+    if (multiSel.length && !compatibleKinds(multiSel[0].kind,target.kind)){
       inspectorMessage('multi-select holds ' + multiSel[0].kind + 's — Esc clears it, then start over');
       return;
     }
     /* a mismatched modifier-click against an existing SINGLE selection is
        refused the same way — it must leave that selection standing, never
        silently replace it */
-    if (!multiSel.length && session.target && session.target.kind !== target.kind){
+    if (!multiSel.length && session.target && !compatibleKinds(session.target.kind,target.kind)){
       inspectorMessage('multi-select works within one kind — the current selection is a ' +
         session.target.kind + '; plain-click to switch');
       return;
@@ -247,12 +257,12 @@ function createBuilderInteractions(opts){
     var prev = session.target;
     session.target = null;
     setSelected(null);
-    if (!multiSel.length && prev && prev.kind === target.kind &&
+    if (!multiSel.length && prev && compatibleKinds(prev.kind,target.kind) &&
         multiIdent(prev) !== multiIdent(target)){
       var seedEl = findTargetEl(prev);
       if (seedEl){
         multiSel.push({section: prev.section, kind: prev.kind,
-                       id: prev.id, index: prev.index, card:prev.card, bulletPath:prev.bulletPath, el: seedEl});
+                       id: prev.id, index: prev.index, key:selectionEdgeKey(prev), card:prev.card, bulletPath:prev.bulletPath, el: seedEl});
         seedEl.classList.add('dv-sel');
       }
     }
@@ -263,7 +273,7 @@ function createBuilderInteractions(opts){
       if (gone.el && gone.el.classList) gone.el.classList.remove('dv-sel');
     } else {
       multiSel.push({section: target.section, kind: target.kind,
-                     id: target.id, index: target.index, card:target.card, bulletPath:target.bulletPath, el: target.el});
+                     id: target.id, index: target.index, key:selectionEdgeKey(target), card:target.card, bulletPath:target.bulletPath, el: target.el});
       if (target.el && target.el.classList) target.el.classList.add('dv-sel');
     }
     if (!multiSel.length){ dropMultiUI(); return; }
@@ -275,6 +285,7 @@ function createBuilderInteractions(opts){
                     index: only.index, card:only.card, bulletPath:only.bulletPath, el: only.el}, false, true);
       return;
     }
+    if(opts.selectionChanged)opts.selectionChanged();
     renderMultiInspector();
   }
   function bulkDeleteSelected(){

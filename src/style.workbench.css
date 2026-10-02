@@ -1379,6 +1379,13 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:0;line-height:1.2;padding:6px 8px;}
   .workspace-canvas #file-save::after{content:'JSON';font-size:11px;}
 }
+@media(max-width:420px){
+  /* Keep all five labeled actions in the header without clipping: reclaim
+     horizontal chrome before reducing any label or hit target. */
+  .workspace-canvas:not(.welcome-active) .workbench-header{left:8px;right:8px;padding-left:8px;padding-right:8px;gap:5px;}
+  .workspace-canvas .workspace-tools{gap:4px;}
+  .workspace-canvas .workspace-save{gap:3px;}
+}
 
 /* In compact windows, editor panels overlap canvas chrome. Keep editor
    controls above that chrome and the tool rail accessible. */

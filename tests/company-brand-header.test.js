@@ -8,7 +8,10 @@ const escapeRegex=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 function assertRenderedBrand(html,brand){
   assert.match(html,new RegExp('<span class="fv-brand-name">'+escapeRegex(escapeHtml(brand.app))+'</span>'));
   if(brand.logoImage)assert.ok(html.includes('src="'+escapeHtml(brand.logoImage)+'"'));
-  else assert.match(html,new RegExp('aria-label="'+escapeRegex(escapeHtml(brand.app+' logo'))+'"[^>]*>'+escapeRegex(escapeHtml(brand.logo))+'</span>'));
+  else {
+    assert.match(html,new RegExp('aria-label="'+escapeRegex(escapeHtml(brand.app+' logo'))+'"'));
+    assert.match(html,new RegExp('<span class="fv-brand-monogram-text">'+escapeRegex(escapeHtml(brand.logo))+'</span>'));
+  }
   assert.ok(html.includes('style="--fv-brand-accent:'+brand.accent+';--fv-brand-bg:'+brand.bg+';--fv-brand-fg:'+brand.fg+'"'));
 }
 

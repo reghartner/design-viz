@@ -1448,8 +1448,9 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       if (info.labelEl) info.labelEl.classList.add('lit');
     });
   }
-  /* A path chip is an overview gesture: broaden only edge paint while the
-     selected step continues to own captions, nodes, failures and panels. */
+  /* A path chip is an overview gesture: broaden delivered edge and endpoint
+     focus while the selected step continues to own captions, tones, failures
+     and panels. Explicit node-only step focus stays step-scoped. */
   function paintPathOverview(){
     var keys = [], seen = Object.create(null);
     steps.forEach(function(step){
@@ -1457,7 +1458,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
         if (!seen[key]){ seen[key] = true; keys.push(key); }
       });
     });
+    Object.keys(board.nodeEls || {}).forEach(function(id){
+      var node = board.nodeEls[id];
+      if (node && node.classList) node.classList.remove('lit');
+    });
     lightEdgeKeys(keys);
+    applyStepNodeFocus(board.nodeEls, {keys:keys}, board.edgeIds);
   }
   function fireDot(key, delayMs){
     var info = board.edgeIds[key];

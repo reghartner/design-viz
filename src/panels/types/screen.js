@@ -515,7 +515,7 @@ PanelRegistry.extend('screen', {
     },
     {
       order: 478,
-      css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;}
+      css: String.raw`.screenbox{position:relative; border-radius:8px; overflow:hidden; aspect-ratio:16/9; background:#05080B;container-type:inline-size;}
 .screenbox .scene{display:block; width:100%; height:100%;}
 .screenbox.m-active .walker, .screenbox.m-live .walker, .screenbox.m-rec .walker, .screenbox.m-save .walker, .screenbox.m-playing .walker{animation:walkin 3.2s ease-out forwards;}
 @keyframes walkin{from{transform:translateX(40px);} to{transform:translateX(160px);}}

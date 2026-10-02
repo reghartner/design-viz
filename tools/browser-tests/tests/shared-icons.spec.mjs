@@ -61,6 +61,54 @@ test('native viewer renders shared branding and step icons without extra assets;
  await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });
 
+test('raster, monogram and icon company marks stay contained in narrow Screen canvases',async({page,server})=>{
+ await writeFile(path.join(server.root,'compact-brand-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'compact-brand-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./compact-brand-native.js";window.mount=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/compact-brand-native.html');await page.waitForFunction(()=>!!window.mount);
+ const raw=fixture(),d=raw.page.sections[0].diagram;
+ d.brand={app:'Cedar',logoImage:'data:image/png;base64,'+png};
+ await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+ const root=page.locator('#host'),screen=root.locator('.pt-screen .screenbox');
+ const screenMark=screen.locator('.fv-brand-compact img');
+ await expect(screenMark).toBeVisible();await expect(screenMark).toHaveCSS('object-fit','contain');
+ await screen.evaluate(el=>el.style.width='400px');
+ const normal=await screenMark.boundingBox();
+ expect(normal.width).toBeCloseTo(20,0);expect(normal.height).toBeCloseTo(20,0);
+ await screen.evaluate(el=>el.style.width='160px');
+ const narrow=await screenMark.boundingBox();
+ expect(narrow.width).toBeCloseTo(12,0);expect(narrow.height).toBeCloseTo(12,0);expect(narrow.width).toBeLessThan(normal.width);
+ d.brand={app:'Cedar',logo:'ABCD'};
+ await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+ const monogramScreen=root.locator('.pt-screen .screenbox');await monogramScreen.evaluate(el=>el.style.width='160px');
+ const monogram=monogramScreen.locator('.fv-brand-monogram'),text=monogram.locator('.fv-brand-monogram-text');
+ await expect(monogram).toBeVisible();await expect(text).toHaveText('ABCD');
+ const monogramBox=await monogram.boundingBox(),textBox=await text.boundingBox();
+ expect(monogramBox.width).toBeCloseTo(12,0);expect(monogramBox.height).toBeCloseTo(12,0);
+ expect(textBox.x).toBeGreaterThanOrEqual(monogramBox.x-.5);expect(textBox.x+textBox.width).toBeLessThanOrEqual(monogramBox.x+monogramBox.width+.5);
+ expect(textBox.y).toBeGreaterThanOrEqual(monogramBox.y-.5);expect(textBox.y+textBox.height).toBeLessThanOrEqual(monogramBox.y+monogramBox.height+.5);
+ for(const logo of ['WW','WWW','漢漢','漢漢漢']){
+   d.brand={app:'Cedar',logo};
+   await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+   const wideScreen=root.locator('.pt-screen .screenbox');await wideScreen.evaluate(el=>el.style.width='160px');
+   const wideMark=wideScreen.locator('.fv-brand-monogram'),wideText=wideMark.locator('.fv-brand-monogram-text');
+   await expect(wideText).toHaveText(logo);
+   const wideMarkBox=await wideMark.boundingBox(),wideTextBox=await wideText.boundingBox();
+   expect(wideTextBox.x,logo).toBeGreaterThanOrEqual(wideMarkBox.x-.5);expect(wideTextBox.x+wideTextBox.width,logo).toBeLessThanOrEqual(wideMarkBox.x+wideMarkBox.width+.5);
+   expect(wideTextBox.y,logo).toBeGreaterThanOrEqual(wideMarkBox.y-.5);expect(wideTextBox.y+wideTextBox.height,logo).toBeLessThanOrEqual(wideMarkBox.y+wideMarkBox.height+.5);
+ }
+ d.brand={app:'Cedar',logo:'C'};
+ await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+ const singleScreen=root.locator('.pt-screen .screenbox');await singleScreen.evaluate(el=>el.style.width='160px');
+ const single=singleScreen.locator('.fv-brand-monogram-text'),singleBox=await single.boundingBox();
+ expect(singleBox.height).toBeGreaterThanOrEqual(7);expect(singleBox.width).toBeLessThanOrEqual(12);
+ d.brand={app:'Cedar',icon:'shield'};
+ await page.evaluate(raw=>{viewer.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin:'pastel'});},raw);
+ const iconScreen=root.locator('.pt-screen .screenbox');await iconScreen.evaluate(el=>el.style.width='160px');
+ const icon=iconScreen.locator('.fv-brand-compact svg.fv-brand-mark');await expect(icon).toBeVisible();
+ const iconBox=await icon.boundingBox();expect(iconBox.width).toBeCloseTo(12,0);expect(iconBox.height).toBeCloseTo(12,0);
+ await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
+});
+
 test('step icon picker changes a device card and Inherit removes only that step override',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();

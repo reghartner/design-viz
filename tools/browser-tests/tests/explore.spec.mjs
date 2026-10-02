@@ -4,10 +4,14 @@ import path from 'node:path';
 import {test,expect} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
-async function build(server){
+async function build(server,{unstacked=false,oversized=false}={}){
  const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;sec.id='doorbell';d.autoplay=false;
  delete d.layouts[1].exploreLayout;d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.panels.push({id:'queue',type:'queue',title:'Upload queue',initial:{depth:3}});
+ if(unstacked)d.layouts[1].exploreLayout={
+  panels:d.panels.map((panel,index)=>({panel:panel.id,x:.02+index*.2,y:.12,w:.18,h:oversized && panel.id==='outcome' ? .95 : .22,stacked:false})),
+  prose:{x:.02,y:.52,w:.22,h:.26,stacked:false}
+ };
  d.steps[1].panelVisibility={queue:false};d.steps[1].text='A deliberately long engineering caption. '.repeat(60);
  for(let r=0;r<8;r++){const row=[];for(let c=0;c<8;c++){const id='extra'+r+'_'+c;d.nodes[id]={title:'Service '+r+'.'+c};row.push(id);}d.rows.push(row);}
  const input=path.join(server.root,'explore.json'),output=path.join(server.root,'explore.html');await writeFile(input,JSON.stringify(spec));
@@ -15,7 +19,7 @@ async function build(server){
 }
 const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
-test('Business remains standard; linked Explore has a full-height canvas and independent vertical stack',async({page,server})=>{
+test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(5);
@@ -26,8 +30,11 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(stage.x).toBeGreaterThanOrEqual(shell.x);expect(stage.x+stage.width).toBeLessThanOrEqual(shell.x+shell.width);
  expect(board).toEqual(stage);
- let bottom=stage.y;for(const card of await floats(page).all()){const r=await rect(card);expect(r.y).toBeGreaterThanOrEqual(bottom);expect(Math.abs(r.x+r.width-stage.x-stage.width+13)).toBeLessThan(3);bottom=r.y+r.height;}
- expect(bottom).toBeLessThan(stage.y+stage.height);
+ const stacked=await Promise.all((await floats(page).all()).map(rect));
+ const rights=stacked.map(r=>r.x+r.width),rightmost=Math.max(...rights);
+ expect(Math.abs(rightmost-stage.x-stage.width+12)).toBeLessThan(3);
+ expect(Math.min(...rights)).toBeLessThan(rightmost-100);
+ for(const r of stacked)expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);
  const play=page.getByRole('button',{name:'Next step',exact:true}),pos=await rect(play);
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
  await page.locator('.explore-board').evaluate(el=>{el.scrollLeft=1000;el.scrollTop=900;});
@@ -37,6 +44,44 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
  await page.getByRole('button',{name:'Fit diagram',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
+});
+test('right and top-right remain free placement; Stack at edge preserves size and wraps left',async({page,server})=>{
+ const url=await build(server,{unstacked:true});await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ const stage=await rect(page.locator('.explore-stage')),cards=await floats(page).all();expect(cards).toHaveLength(5);
+ const home=page.locator('[data-explore-panel=home]'),grip=home.locator('.explore-window-grip');
+ const start=await rect(home),handle=await rect(grip),target={x:stage.x+stage.width-start.width-12,y:stage.y+12};
+ await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);await page.mouse.down();
+ await page.mouse.move(handle.x+handle.width/2+target.x-start.x,handle.y+handle.height/2+target.y-start.y,{steps:5});await page.mouse.up();
+ await expect(home).not.toHaveClass(/explore-stacked/);const placed=await rect(home);
+ expect(placed.x).toBeCloseTo(target.x,0);expect(placed.y).toBeCloseTo(target.y,0);
+ await expect(grip).toHaveAttribute('title','Drag to move; arrow keys to move');
+ const freeSizes=await Promise.all(cards.map(async card=>{const r=await rect(card);return {width:r.width,height:r.height};}));
+ await page.getByRole('button',{name:'Stack at edge',exact:true}).click();
+ for(const card of cards)await expect(card).toHaveClass(/explore-stacked/);
+ const stacked=await Promise.all(cards.map(rect));
+ stacked.forEach((r,index)=>{expect(r.width).toBeCloseTo(freeSizes[index].width,0);expect(r.height).toBeCloseTo(freeSizes[index].height,0);});
+ const rights=stacked.map(r=>r.x+r.width),rightmost=Math.max(...rights);
+ expect(Math.abs(rightmost-stage.x-stage.width+12)).toBeLessThan(3);
+ expect(Math.min(...rights)).toBeLessThan(rightmost-100);
+ const columns=[];stacked.forEach(r=>{const right=r.x+r.width;let column=columns.find(c=>Math.abs(c.right-right)<2);if(!column){column={right,rects:[]};columns.push(column);}column.rects.push(r);});
+ expect(columns.length).toBeGreaterThan(1);
+ for(const column of columns){
+  column.rects.sort((a,b)=>a.y-b.y);expect(column.rects[0].y).toBeCloseTo(stage.y+96,0);
+  column.rects.forEach((r,index)=>{expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);if(index)expect(r.y-column.rects[index-1].y-column.rects[index-1].height).toBeCloseTo(8,0);});
+ }
+});
+test('an oversized stacked panel remains full-size and sends the following panel left',async({page,server})=>{
+ const url=await build(server,{unstacked:true,oversized:true});await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ const stage=await rect(page.locator('.explore-stage')),oversized=page.locator('[data-explore-panel=outcome]'),following=page.locator('[data-explore-panel=clip]');
+ const beforeOversized=await rect(oversized),beforeFollowing=await rect(following),laneHeight=stage.height-96-12;
+ expect(beforeOversized.height).toBeGreaterThan(laneHeight);
+ await page.getByRole('button',{name:'Stack at edge',exact:true}).click();
+ const afterOversized=await rect(oversized),afterFollowing=await rect(following);
+ expect(afterOversized.width).toBeCloseTo(beforeOversized.width,0);expect(afterOversized.height).toBeCloseTo(beforeOversized.height,0);
+ expect(afterFollowing.width).toBeCloseTo(beforeFollowing.width,0);expect(afterFollowing.height).toBeCloseTo(beforeFollowing.height,0);
+ expect(afterOversized.y).toBeCloseTo(stage.y+96,0);expect(afterFollowing.y).toBeCloseTo(stage.y+96,0);
+ expect(afterOversized.y+afterOversized.height).toBeGreaterThan(stage.y+stage.height-12);
+ expect(afterFollowing.x+afterFollowing.width).toBeCloseTo(afterOversized.x-8,0);
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');

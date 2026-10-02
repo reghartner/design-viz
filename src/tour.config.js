@@ -176,7 +176,7 @@ var TOUR_DEFAULT_CONFIG = {
       diagramState: {presentation: 'explore', mode: 'step'},
       target: {selector: '.explore-panel-choices', within: 'section'},
       secondary: [
-        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge gathers available panels on the right.'}
+        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge keeps available panels full size, adding columns to the left.'}
       ],
       copy: {
         heading: 'Bring a panel back',

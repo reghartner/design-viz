@@ -352,8 +352,10 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 #workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media(min-width:800px){body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,60px));overflow:auto;}}
 @media(max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{gap:8px;}body:not(.welcome-active) .workbench-header{padding:10px 12px;gap:12px;}.workspace-tools .editor-add-destination{max-width:180px;}}
-@media(max-width:1180px){.workspace-canvas .workbench-reader-open-label{font-size:0;}.workspace-canvas .workbench-reader-open-label::after{content:'Preview';font-size:12px;}.workspace-canvas .workspace-save>[data-open-human-guide]{display:none;}}
-@media(max-width:1180px){.workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}.workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}}
+/* Expanded action labels need about 1500px before Add's destination retains a
+   useful hit target. Compact through that boundary, not merely at phone sizes. */
+@media(max-width:1500px){.workspace-canvas .workbench-reader-open-label{font-size:0;}.workspace-canvas .workbench-reader-open-label::after{content:'Preview';font-size:12px;}.workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}.workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}}
+@media(max-width:1180px){.workspace-canvas .workspace-save>[data-open-human-guide]{display:none;}}
 @media(max-width:1100px){body:not(.welcome-active) .workbench-header{flex-wrap:wrap;}body:not(.welcome-active) .workbench-brand{font-size:17px;}.workspace-tools{flex-wrap:wrap;}.workspace-create{flex-basis:50%;}.workspace-tools .editor-add-destination{max-width:none;}}
 @media(max-width:799px){
   .workwrap{grid-template-columns:56px minmax(0,1fr);padding:0 8px;}

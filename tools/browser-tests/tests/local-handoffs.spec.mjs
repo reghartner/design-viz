@@ -41,6 +41,13 @@ test('workbench authors a local handoff atomically, previews its arrow tip and u
  await inspectPageElement(page,page.locator('[data-dv-node="continue"] .t1').first());
  await openInspectorGroup(page.locator('#guide .node-handoff-editor'));
  await page.getByLabel('Handoff destination',{exact:true}).selectOption({label:'This spec'});
+ await expect(page.getByLabel('Destination section',{exact:true})).toHaveCount(1);
+ await expect(page.getByRole('combobox',{name:'Import destination section',exact:true})).toHaveCount(0);
+ await page.locator('#diagram-add').click();await page.locator('#add-topology').click();
+ await expect(page.getByRole('combobox',{name:'Import destination section',exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await expect(page.getByRole('combobox',{name:'Import destination section',exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('Destination section',{exact:true})).toHaveCount(1);
  await page.getByLabel('Destination section',{exact:true}).selectOption('delivery');
  await page.getByRole('button',{name:'Apply handoff',exact:true}).click();
  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff).toEqual({localSection:'delivery'});

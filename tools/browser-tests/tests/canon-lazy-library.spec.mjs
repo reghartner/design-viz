@@ -116,7 +116,7 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
 
 test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{
   await pickerFixture(page,server);await page.setViewportSize({width:760,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
-  await page.locator('#topology-destination').selectOption('1');await page.locator('#topology-section').selectOption('1');
+  await page.getByLabel('Import destination section',{exact:true}).selectOption('1');await page.locator('#topology-section').selectOption('1');
   await page.locator('#topology-add').click();await pagePreview(page);
   const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.blocks[0].diagram.topologyImports).toBeUndefined();
   expect(raw.page.blocks[1].diagram.topologyImports).toEqual([{spec:'first',export:'archive',as:'first'}]);

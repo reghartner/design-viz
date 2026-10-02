@@ -113,6 +113,7 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
  .viewer-diagram-canvas>.diagram-views>*{pointer-events:auto;}
  .viewer-diagram-canvas .diagram-view-choice,.viewer-diagram-canvas .viewport-actions,.explore-navigation{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 4px 18px #14244212;}
  .explore-navigation{display:flex;flex:1 1 auto;align-items:center;flex-wrap:wrap;gap:7px 12px;min-width:0;max-width:100%;box-sizing:border-box;font:12px 'IBM Plex Sans',sans-serif;}
+ .native-canvas .explore-navigation{margin-left:var(--flowview-host-actions-inline-offset,0px);}
  .explore-navigation-group{display:flex;align-items:center;gap:6px;flex:none;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;}
  .explore-navigation [hidden]{display:none!important;}
  .explore-navigation-label{font:600 10px 'IBM Plex Sans',sans-serif;color:var(--dfaint);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
@@ -130,6 +131,7 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 @media screen and (max-width:640px){
  .explore-full-window .viewer-diagram-canvas{padding:8px;}
  .explore-navigation{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:5px 8px;padding:6px;}
+ .native-canvas .explore-navigation{margin-left:0;margin-top:var(--flowview-host-actions-block-offset,0px);}
  .explore-navigation-tabs{grid-column:1 / -1;grid-row:1;}
  .explore-navigation-chapters{grid-column:1;grid-row:2;}
  .explore-navigation-actions{grid-column:2;grid-row:2;}

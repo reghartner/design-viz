@@ -57,6 +57,8 @@ test('compact branding exposes an additive styling hook for every mark without c
    assert.match(compact,/fv-brand-mark/);
    assert.doesNotMatch(compact,/fv-brand-name/);
  }
+ assert.match(c.FlowBrand.render({logo:'ABCD'},{compact:true}),/fv-brand-monogram-4[^>]*><span class="fv-brand-monogram-text">ABCD<\/span>/);
+ assert.match(c.FlowBrand.render({logo:'<&'},{compact:true}),/fv-brand-monogram-2[^>]*><span class="fv-brand-monogram-text">&lt;&amp;<\/span>/);
  const full=c.FlowBrand.render({app:'Company',logoImage:png},{className:'surface-brand'});
  assert.match(full,/class="fv-brand surface-brand"/);
  assert.doesNotMatch(full,/fv-brand-compact/);

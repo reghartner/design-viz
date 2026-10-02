@@ -2,6 +2,11 @@
 .fv-brand-mark{display:block;flex:none;width:1.8em;height:1.8em;object-fit:contain;}
 .fv-brand-compact .fv-brand-mark{width:clamp(12px,1.35em,18px);height:clamp(12px,1.35em,18px);}
 .fv-brand-monogram{display:grid;place-items:center;border-radius:.3em;background:var(--fv-brand-bg,var(--fv-brand-accent,#6675c4));color:var(--fv-brand-fg,#fff);font-size:.8em;font-weight:700;}
+.fv-brand-compact .fv-brand-monogram{container-type:inline-size;overflow:hidden;font-size:inherit;position:relative;}
+.fv-brand-compact .fv-brand-monogram-text{display:block;position:absolute;left:50%;top:50%;font-size:60cqi;line-height:1;white-space:nowrap;transform:translate(-50%,-50%) scaleX(var(--fv-brand-monogram-scale,1));transform-origin:center;}
+.fv-brand-compact .fv-brand-monogram-2{--fv-brand-monogram-scale:.9;}
+.fv-brand-compact .fv-brand-monogram-3{--fv-brand-monogram-scale:.72;}
+.fv-brand-compact .fv-brand-monogram-4{--fv-brand-monogram-scale:.36;}
 .fv-brand-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .screen-brand{position:absolute;right:12px;bottom:12px;max-width:55%;padding:5px 8px;border-radius:7px;background:#152137bb;color:white;font:600 11px/1.3 'IBM Plex Sans',sans-serif;pointer-events:none;}
 

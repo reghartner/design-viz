@@ -61,7 +61,7 @@ var FlowBrand = (function () {
     var b = clean(raw), o = options || {}, mark = '', name = b.app || 'Company';
     if (b.logoImage) mark = '<img class="fv-brand-mark" src="' + esc(b.logoImage) + '" alt="' + esc(name + ' logo') + '">';
     else if (b.icon) mark = FlowIcons.render(b.icon, {className:'fv-brand-mark', label:o.compact ? name : undefined});
-    else if (b.logo) mark = '<span class="fv-brand-mark fv-brand-monogram" aria-label="' + esc(name + ' logo') + '">' + esc(b.logo) + '</span>';
+    else if (b.logo) mark = '<span class="fv-brand-mark fv-brand-monogram fv-brand-monogram-' + b.logo.length + '" aria-label="' + esc(name + ' logo') + '"><span class="fv-brand-monogram-text">' + esc(b.logo) + '</span></span>';
     if (!mark && (!b.app || o.compact)) return '';
     var styles = [];
     if (b.accent) styles.push('--fv-brand-accent:' + b.accent);

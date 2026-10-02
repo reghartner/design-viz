@@ -3,7 +3,9 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {trackResources} from './resources.mjs';
+import companyBrandHelper from '../../../tests/helpers/company-brand.cjs';
 const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.woff':'font/woff'};
+export const activeCompanyBrand=companyBrandHelper.companyBrand();
 export const test=base.extend({
   // Fresh profiles would auto-start the first-run guided tour and its scrim
   // would swallow every click. Seed the completion flag for all contract
@@ -68,6 +70,18 @@ export const test=base.extend({
   },{auto:true}],
 });
 export {expect,trackResources};
+export async function expectCompanyBrand(container,brand=activeCompanyBrand){
+  const lockup=container.locator('.fv-brand').first();
+  await expect(lockup.locator('.fv-brand-name')).toHaveText(brand.app);
+  if(brand.logoImage){
+    await expect(lockup.locator('img.fv-brand-mark')).toHaveAttribute('src',brand.logoImage);
+    await expect(lockup.locator('img.fv-brand-mark')).toHaveAttribute('alt',brand.app+' logo');
+  }else{
+    await expect(lockup.locator('.fv-brand-monogram')).toHaveText(brand.logo);
+    await expect(lockup.locator('.fv-brand-monogram')).toHaveAttribute('aria-label',brand.app+' logo');
+  }
+  await expect(lockup).toHaveAttribute('style','--fv-brand-accent:'+brand.accent+';--fv-brand-bg:'+brand.bg+';--fv-brand-fg:'+brand.fg);
+}
 // A deliberate authoring gesture, used only when a test needs this exact group.
 export async function openInspectorGroup(group){
   await expect(group).toHaveCount(1);

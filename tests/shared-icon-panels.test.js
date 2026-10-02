@@ -3,9 +3,12 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const {readSource} = require('../tools/source-loader.cjs');
+const {companyBrand} = require('./helpers/company-brand.cjs');
 const C = vm.createContext({URL});
 for (const name of ['validator.js', 'engine.js', 'builder.workbench.js']) vm.runInContext(readSource(name), C);
 const plain = value => JSON.parse(JSON.stringify(value));
+const escapeHtml = value => String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const escapeRegex = value => String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
 const patch = app => ({panels:{app}});
 const app = () => ({id:'app',type:'deviceapp',fields:[
   {id:'power',kind:'battery',icon:'battery'}, {id:'temperature',icon:'temperature'},
@@ -175,16 +178,29 @@ test('branded phone surfaces, camera watermark and monitoring desk accept the sh
 });
 
 test('the global fallback renders on all four company-brand surfaces', () => {
-  const brand=C.FlowBrand.effective();
-  assert.deepEqual(plain(brand),{app:'YOUR COMPANY',logo:'YC',accent:'#6750A4',bg:'#6750A4',fg:'#FFFFFF'});
+  const brand=C.FlowBrand.effective(),expected=companyBrand();
+  assert.deepEqual(plain(brand),expected);
   const surfaces={
     deviceapp:render('deviceapp',{brand},{}),
     phone:render('phone',{brand},{}),
     screen:render('screen',{brand},{mode:'live'}),
     security:render('security',{brand},{})
   };
-  assert.match(surfaces.deviceapp,/fv-brand[^]*?YOUR COMPANY/);
-  assert.match(surfaces.phone,/phonebrand[^]*?YC[^]*?YOUR COMPANY/);
-  assert.match(surfaces.screen,/screen-brand[^]*?YC/);
-  assert.match(surfaces.security,/secmon-desk-brand[^]*?YOUR COMPANY/);
+  const name=escapeRegex(escapeHtml(expected.app));
+  assert.match(surfaces.deviceapp,new RegExp('fv-brand[^]*?<span class="fv-brand-name">'+name+'</span>'));
+  assert.match(surfaces.security,new RegExp('secmon-desk-brand[^]*?<span class="fv-brand-name">'+name+'</span>'));
+  if(expected.logoImage){
+    const image=escapeRegex(escapeHtml(expected.logoImage));
+    assert.match(surfaces.phone,new RegExp('phonebrand[^]*?<img[^>]+src="'+image+'"'));
+    assert.match(surfaces.screen,new RegExp('screen-brand[^]*?<img[^>]+src="'+image+'"'));
+  }else{
+    const logo=escapeRegex(escapeHtml(expected.logo));
+    assert.match(surfaces.phone,new RegExp('phonebrand[^]*?<span class="phonelogo"[^>]*>'+logo+'</span>[^]*?<span class="phonebrandname">'+name+'</span>'));
+    assert.match(surfaces.screen,new RegExp('screen-brand[^]*?fv-brand-monogram[^>]*>'+logo+'</span>'));
+  }
+  const flowStyle='style="--fv-brand-accent:'+escapeRegex(expected.accent)+';--fv-brand-bg:'+escapeRegex(expected.bg)+';--fv-brand-fg:'+escapeRegex(expected.fg)+'"';
+  assert.match(surfaces.deviceapp,new RegExp(flowStyle));
+  assert.match(surfaces.screen,new RegExp(flowStyle));
+  assert.match(surfaces.security,new RegExp(flowStyle));
+  assert.match(surfaces.phone,new RegExp('style="--phacc:'+escapeRegex(expected.accent)+';--phbg:'+escapeRegex(expected.bg)+';--phfg:'+escapeRegex(expected.fg)+'"'));
 });

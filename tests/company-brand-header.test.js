@@ -1,6 +1,16 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource,entrypoint,readStyles}=require('../tools/source-loader.cjs');
+const {companyBrand}=require('./helpers/company-brand.cjs');
+
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+const escapeRegex=value=>String(value).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function assertRenderedBrand(html,brand){
+  assert.match(html,new RegExp('<span class="fv-brand-name">'+escapeRegex(escapeHtml(brand.app))+'</span>'));
+  if(brand.logoImage)assert.ok(html.includes('src="'+escapeHtml(brand.logoImage)+'"'));
+  else assert.match(html,new RegExp('aria-label="'+escapeRegex(escapeHtml(brand.app+' logo'))+'"[^>]*>'+escapeRegex(escapeHtml(brand.logo))+'</span>'));
+  assert.ok(html.includes('style="--fv-brand-accent:'+brand.accent+';--fv-brand-bg:'+brand.bg+';--fv-brand-fg:'+brand.fg+'"'));
+}
 
 function harness(){
   function element(tag='div'){
@@ -22,19 +32,18 @@ function harness(){
 }
 
 test('shared renderPage header shows the global lockup and honors page overrides and opt-out',()=>{
-  const h=harness(),view=h.element();
+  const h=harness(),view=h.element(),global=companyBrand();
   h.context.renderPage(view,{title:'System map',sections:[]},'aurora');
   assert.equal(view.children[0].className,'doc-heading');
   assert.equal(view.children[0].children[0].textContent,'System map');
   assert.match(view.children[0].children[1].innerHTML,/doc-company-brand-lockup/);
-  assert.match(view.children[0].children[1].innerHTML,/YOUR COMPANY/);
-  assert.match(view.children[0].children[1].innerHTML,/YC/);
+  assertRenderedBrand(view.children[0].children[1].innerHTML,global);
 
-  const local=h.element();
-  h.context.renderPage(local,{title:'Local',brand:{app:'Local Co',logo:'LC'},sections:[]},'aurora');
-  assert.match(local.children[0].children[1].innerHTML,/Local Co/);
-  assert.match(local.children[0].children[1].innerHTML,/LC/);
-  assert.doesNotMatch(local.children[0].children[1].innerHTML,/YOUR COMPANY/);
+  const local=h.element(),localName=global.app==='Local Co'?'Local Override':'Local Co';
+  h.context.renderPage(local,{title:'Local',brand:{app:localName,logo:'LC'},sections:[]},'aurora');
+  const localHtml=local.children[0].children[1].innerHTML;
+  assertRenderedBrand(localHtml,{...global,app:localName,logo:'LC',logoImage:undefined});
+  assert.doesNotMatch(localHtml,new RegExp('<span class="fv-brand-name">'+escapeRegex(escapeHtml(global.app))+'</span>'));
 
   const off=h.element();
   h.context.renderPage(off,{title:'Private',brand:false,sections:[]},'aurora');

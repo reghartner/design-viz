@@ -1,6 +1,9 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
+const {companyConfig,companyBrand}=require('./helpers/company-brand.cjs');
+
+const escapeHtml=value=>String(value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 
 function element(tag='div'){
   const node={tag,children:[],options:[],attributes:{},className:'',textContent:'',
@@ -29,13 +32,20 @@ function setup(options={}){
 }
 
 test('workbench previews inherited global values without copying them into authored overrides',()=>{
-  const h=setup();
+  const h=setup(),config=companyConfig(),brand=companyBrand(config);
   const preview=h.fold.children.find(child=>child.className==='fv-brand-preview');
-  assert.match(preview.innerHTML,/YOUR COMPANY/);assert.match(preview.innerHTML,/YC/);
-  assert.equal(h.fields[0].value,undefined);assert.equal(h.fields[0].opts.placeholder,'YOUR COMPANY');
+  assert.ok(preview.innerHTML.includes('<span class="fv-brand-name">'+escapeHtml(brand.app)+'</span>'));
+  if(brand.logoImage)assert.ok(preview.innerHTML.includes('src="'+escapeHtml(brand.logoImage)+'"'));
+  else assert.ok(preview.innerHTML.includes('>'+escapeHtml(brand.logo)+'</span>'));
+  assert.ok(preview.innerHTML.includes('style="--fv-brand-accent:'+brand.accent+';--fv-brand-bg:'+brand.bg+';--fv-brand-fg:'+brand.fg+'"'));
+  assert.equal(h.fields[0].value,undefined);assert.equal(h.fields[0].opts.placeholder,brand.app);
+  assert.equal(h.fields[1].opts.placeholder,brand.logo||'1–4 characters');
+  assert.equal(h.fields[2].opts.placeholder,brand.accent);
+  assert.equal(h.fields[3].opts.placeholder,brand.bg);
+  assert.equal(h.fields[4].opts.placeholder,brand.fg);
   h.mode.commit('panel');
   assert.deepEqual(JSON.parse(JSON.stringify(h.changes)),[{shared:false,value:{}}]);
-  assert.doesNotMatch(JSON.stringify(h.changes),/YOUR COMPANY|6750A4/);
+  for(const value of Object.values(config))assert.ok(!JSON.stringify(h.changes).includes(value));
 });
 
 test('workbench keeps diagram and panel opt-outs explicit',()=>{

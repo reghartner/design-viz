@@ -160,10 +160,21 @@ both artifacts. Oversized handwritten artifacts are refused before replacing
 the last saved pair.
 
 **Preview Agent Updates** shows the proposed rendered diagram and full ledger,
-with **Current state** and **Proposed state** controls. Explore stays inside the
-preview area so you can navigate its paths, zoom and panels while comparison,
-ledger and commit controls remain available. Preview navigation does not edit
-the proposed source. Neither candidate is
+with **Current state** and **Proposed state** controls. Change highlights start
+on: Proposed marks added content in green and modified content in amber;
+Current marks removed counterparts in red and modified counterparts in amber.
+The compact legend reports the number of rendered section, node, edge, panel
+and step changes in the selected state. Use **Highlights: On/Off** when the
+unmarked rendering is easier to inspect. Highlights follow redraws, paths and
+contained Explore navigation; they do not become spec data.
+
+Use **Full preview** to give a large diagram the complete viewport and collapse
+the summary, ledger and JSON chrome. The state switch, highlight legend and
+toggle, **Discard update**, **Commit update** and **Back to workbench** remain
+available; **Standard preview** restores the supporting material. Explore stays
+inside the preview area so you can navigate its paths, zoom and panels while
+comparison and approval controls remain available. Preview navigation does not
+edit the proposed source. Neither candidate is
 accepted until **Commit update**. One Undo/Redo restores both. This saves local
 artifacts; it does not make a Git commit. The agent should reread the accepted
 pair after approval, especially after a merge, and submit a correction if the

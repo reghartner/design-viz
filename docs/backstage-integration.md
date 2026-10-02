@@ -276,7 +276,10 @@ The company GitHub adapter and nginx publisher use root `canon.json` as their
 membership authority. It lists `diagrams/<name>` folders and their owners; the
 folder determines the stable ID and required `<name>.spec.json` path.
 Per-spec flags cannot enroll documents. The package's pure `/backend` helpers
-`parseCanonManifest` and `materializeCanonSpec` let the GitHub adapter use the same
+`parseCanonManifest`, `materializeCanonSpec` and `prepareCanonSnapshot` let the GitHub adapter use the same
 rules as the static publisher while retaining its transport and authorization.
-Read the manifest and listed files at one approved SHA, then index only authorized
-materialized specs. See [integration details](../apps/backstage/README.md#central-canon-membership).
+Read the manifest and listed files at one approved SHA, resolve in memory at load,
+and authorize each consumer's entire provider closure. Serve derived viewer values
+but retain authored imports for Workbench. Freeze dependencies for each open session;
+never live-update an open consumer. No flattened files are published. See
+[integration details](../apps/backstage/README.md#central-canon-membership).

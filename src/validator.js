@@ -311,7 +311,7 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (!d) return;
   var DP = P + '.diagram';
   if(Object.prototype.hasOwnProperty.call(d,'topologyImports') || Object.prototype.hasOwnProperty.call(d,'topologyExports'))
-    errors.push(DP+': unresolved topology declarations — build the complete canon snapshot before rendering or validating this spec');
+    errors.push(DP+': unresolved topology declarations — resolve the approved authored provider snapshot in memory before rendering or validating this spec');
   validatePaths(d, DP, errors);
   storyTimeWarnings(d, DP, warnings);
   sectionLayoutWarnings(d, DP, warnings);

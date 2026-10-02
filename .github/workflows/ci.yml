@@ -180,7 +180,6 @@ jobs:
             workbench/flowspec.html
             workbench/catalog.json
             workbench/diagrams.json
-            workbench/diagrams.json.specs/
             src/starters/
             canon.json
             diagrams/

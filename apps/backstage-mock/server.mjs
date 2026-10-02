@@ -8,7 +8,7 @@ import {scan,decide,propose,digest,effectiveSpecs,SnapshotSources,reportMarkdown
 import C from '../../tools/canon/core.cjs';
 import {runDoorbellRehearsal} from '../../tools/canon/doorbell-rehearsal.mjs';
 import {referencePreview,approveReference,compareTrace} from '../../tools/canon/traces.mjs';
-import {buildEntityDiagramIndex,diagramsForEntity} from '../../tools/canon/entity-diagrams.mjs';
+import {buildEntityDiagramIndex,diagramsForEntity,prepareCanonSnapshot} from '../../tools/canon/entity-diagrams.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 
 export async function createCanonServer({registryPath=path.join(root,'examples/canon/registry.json'),statePath=path.join(root,'.local/canon/state.json')}={}){
@@ -25,6 +25,7 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
       // A freshly read registry makes added/removed diagrams visible without a
       // server restart. Approved local overlays remain the mock's authority.
       const reg=await registry(registryPath),specs=()=>effectiveSpecs(reg.specs,state);
+      const snapshot=()=>prepareCanonSnapshot(specs().map(publicSpec),{publicBaseUrl:origin});
       const find=id=>{const spec=specs().find(s=>s.page.canon.id===id);if(!spec)throw new Error('Diagram not found.');return spec;};
       if(req.method==='POST'){
         if(req.headers.origin && req.headers.origin!==origin)return send(403,{error:'Cross-origin writes are not allowed.'});
@@ -66,7 +67,9 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
       if(url.pathname==='/api/canon/catalog')return send(200,catalog);
       if(url.pathname==='/workbench/catalog.json')return send(200,catalog);
       if(url.pathname==='/workbench/starters.json')return send(200,[]);
-      if(url.pathname==='/workbench/diagrams.json')return send(200,{version:1,diagrams:specs().map(spec=>({id:spec.page.canon.id,title:spec.page.title,spec}))});
+      if(url.pathname==='/workbench/diagrams.json'){
+        const prepared=snapshot();return send(200,{version:1,diagrams:prepared.specs.map(spec=>({id:spec.page.canon.id,title:spec.page.title,spec,...prepared.loadWorkspace(spec.page.canon.id)}))});
+      }
       if(url.pathname==='/api/canon/entity-diagrams'){
         const index=buildEntityDiagramIndex(specs().map(publicSpec),{publicBaseUrl:origin});
         return send(200,diagramsForEntity(index,url.searchParams.get('entityRef')));
@@ -86,12 +89,15 @@ export async function createCanonServer({registryPath=path.join(root,'examples/c
         }
         if(review?.type==='spec'){
           if(review.diagramId!==spec.page.canon.id || review.baseRevision!==revision || review.status!=='open')throw new Error('Proposal is stale; reopen the current canonical spec before editing.');
-          return send(200,{simulated:true,catalog,spec:review.proposedSpec,revision});
+          const prepared=prepareCanonSnapshot(specs().map(s=>publicSpec(s.page.canon.id===spec.page.canon.id?review.proposedSpec:s)));
+          return send(200,{simulated:true,catalog,spec:prepared.loadSpec(spec.page.canon.id),...prepared.loadWorkspace(spec.page.canon.id),revision});
         }
-        return send(200,{simulated:true,catalog,spec,revision});
+        const prepared=prepareCanonSnapshot(specs().map(s=>publicSpec(s.page.canon.id===spec.page.canon.id?spec:s)));
+        return send(200,{simulated:true,catalog,spec:prepared.loadSpec(spec.page.canon.id),...prepared.loadWorkspace(spec.page.canon.id),revision});
       }
       if(url.pathname.startsWith('/api/canon/specs/')){
-        const spec=find(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length)));
+        const spec=snapshot().loadSpec(decodeURIComponent(url.pathname.slice('/api/canon/specs/'.length)));
+        if(!spec)return send(404,{error:'Diagram not found.'});
         if(url.searchParams.has('revision') && url.searchParams.get('revision')!==digest(publicSpec(spec)))
           return send(409,{error:'Diagram changed. Refresh the association list.'});
         return send(200,spec);

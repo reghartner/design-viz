@@ -7,6 +7,9 @@ function createBuilderSession(options){
   var baselineText=options.source.read(), projectOpen=!options.deferInitialSave;
   var undoStack=[], redoStack=[], target=null, insertSection=0,historyVersion=0;
   var importedText=null, project=0, disposed=false;
+  var topologyContext=null;
+  function resolve(raw,context){return typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,arguments.length>1?context:topologyContext);}
+  function artifacts(){return Object.assign({},options.artifacts?options.artifacts():{},topologyContext?{topologyContext:topologyContext}:{});}
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;
   function text(){return options.source.read();}
   function parse(value){
@@ -20,7 +23,7 @@ function createBuilderSession(options){
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
   }
-  function save(){if(disposed)return;projectOpen=true;if(options.artifacts)persistence.save(text(),baselineText,options.artifacts());else persistence.save(text(),baselineText);}
+  function save(){if(disposed)return;projectOpen=true;if(options.artifacts || topologyContext)persistence.save(text(),baselineText,artifacts());else persistence.save(text(),baselineText);}
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
@@ -39,7 +42,7 @@ function createBuilderSession(options){
     save();return true;
   }
   function preserveDraft(){
-    if(projectOpen){if(options.artifacts)persistence.preserve(text(),baselineText,options.artifacts());else persistence.preserve(text(),baselineText);}
+    if(projectOpen){if(options.artifacts || topologyContext)persistence.preserve(text(),baselineText,artifacts());else persistence.preserve(text(),baselineText);}
     else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline,initialDraft);
   }
   function invalidateProject(policy){
@@ -57,6 +60,7 @@ function createBuilderSession(options){
     if(disposed)return false;
     // Archive first: failure must leave the current document and history intact.
     preserveDraft();invalidateProject();persistence.cancel();
+    topologyContext=hooks && hooks.topologyContext?JSON.parse(JSON.stringify(hooks.topologyContext)):null;
     options.source.write(value);baselineText=baseline==null?value:baseline;
     initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
@@ -68,6 +72,9 @@ function createBuilderSession(options){
   }
   return {
     text:text,
+    resolve:resolve,
+    topologyContext:function(){return topologyContext?JSON.parse(JSON.stringify(topologyContext)):null;},
+    validate:function(raw){try{return validate(normalize(resolve(raw)));}catch(ex){return {errors:[ex.message],warnings:[]};}},
     parse:function(){return parse(text());},
     snapshot:function(){
       var value=text(),parsed=parse(value);
@@ -80,6 +87,9 @@ function createBuilderSession(options){
       if(disposed || !plan || plan.error)return false;
       var before=text(),expected=hooks && hooks.snapshot;
       if(expected && (expected.text!==before || expected.project!==project))return false;
+      if(topologyContext){
+        try{resolve(JSON.parse(plan.text));}catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}
+      }
       if(typeof FlowTopology!=='undefined'){
         var topologyError=FlowTopology.editError(parse(before).raw,parse(plan.text).raw);
         if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
@@ -127,14 +137,14 @@ function createBuilderSession(options){
     earlierDrafts:persistence.archived,
     restoreEarlierDraft:function(entry,hooks){
       if(!entry || typeof entry.text!=='string')return false;
-      var ok=replaceProject(entry.text,entry.baseline,hooks);if(ok && options.restoreArtifacts){options.restoreArtifacts(entry);save();}return ok;
+      var ok=replaceProject(entry.text,entry.baseline,Object.assign({},hooks,{topologyContext:entry.topologyContext}));if(ok && options.restoreArtifacts){options.restoreArtifacts(entry);save();}return ok;
     },
     isProjectOpen:function(){return projectOpen;},
     invalidateProject:invalidateProject,replaceProject:replaceProject,
     restoreDraft:function(hooks){
       if(disposed || !initialDraft)return false;
       var draft=initialDraft,missingBaseline=recoveredBaseline==null;
-      replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,hooks);
+      replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,Object.assign({},hooks,{topologyContext:draft.topologyContext}));
       if(options.restoreArtifacts){options.restoreArtifacts(draft);save();}
       return {missingBaseline:missingBaseline};
     },

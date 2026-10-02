@@ -1,5 +1,5 @@
-/* Build-time topology linking. Input is one complete approved snapshot, never
-   network-resolved. Published specs contain no unresolved declarations. */
+/* Pure topology resolution. Callers supply one approved authored snapshot;
+   build validation and runtime views derive values in memory, never source files. */
 var FlowTopology = (function(){
   'use strict';
   var own=function(o,k){return Object.prototype.hasOwnProperty.call(o,k);};
@@ -194,6 +194,24 @@ var FlowTopology = (function(){
     });
     return error;
   }
-  return {materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError};
+  function dependencies(spec){
+    var ids=new Set();sections(spec).forEach(function(sec){
+      var imports=sec.diagram.topologyImports;
+      if(imports!=null && !Array.isArray(imports))fail('source','topologyImports must be an array');
+      (imports || []).forEach(function(imp){if(!object(imp) || typeof imp.spec!=='string')fail('source','import requires a spec ID');ids.add(imp.spec);});
+    });return Array.from(ids);
+  }
+  function resolveSource(raw,context){
+    if(!context){if(declarations(raw))fail('editor','open this authored spec from Canon to load its providers');return raw;}
+    if(context.version!==1 || !Array.isArray(context.specs) || typeof context.id!=='string')fail('editor','invalid authored provider snapshot');
+    var candidate=clone(raw);if(!object(candidate.page))fail('editor','expected a page spec');
+    var original=context.specs.find(function(spec){return spec.page && spec.page.canon && spec.page.canon.id===context.id;});
+    if(!original)fail('editor','consumer is missing from the authored snapshot');
+    candidate.page.canon=clone(original.page.canon);
+    var inputs=context.specs.map(function(spec){return spec.page.canon.id===context.id?candidate:spec;});
+    return materialize(inputs).find(function(spec){return spec.page.canon.id===context.id;});
+  }
+  return {materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();
 FlowCanon.materializeTopology=FlowTopology.materialize;
+FlowCanon.topologyDependencies=FlowTopology.dependencies;

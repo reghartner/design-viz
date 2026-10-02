@@ -7,15 +7,35 @@ export function normalizeEntityRef(value){
   if(!C.entityRef(value))throw new Error('Use a full entity reference: kind:namespace/name.');
   return value.toLowerCase();
 }
-// Consumers fetch every listed file at one approved SHA, materialize the batch,
-// then authorize the resulting specs for the viewer and build their index.
+// Fetch every listed file at one approved SHA. Derived values are memory-only;
+// authorization must cover a consumer and every provider in its closure.
 export function materializeCanonSpecs(specs){return C.materializeTopology(specs);}
+export function prepareCanonSnapshot(authoredSpecs,{authorize=()=>true,...options}={}){
+  const source=authoredSpecs.map(C.clone),resolved=materializeCanonSpecs(source),allowed=new Set();
+  for(const spec of source){
+    const decision=authorize(spec);
+    if(typeof decision!=='boolean')throw new Error('prepareCanonSnapshot authorize must return a boolean; resolve asynchronous policy decisions before preparing the snapshot.');
+    if(decision)allowed.add(spec.page.canon.id);
+  }
+  const byId=new Map(source.map(s=>[s.page.canon.id,s]));
+  function closure(id,seen=new Set()){
+    if(seen.has(id))return seen;seen.add(id);
+    for(const dependency of C.topologyDependencies(byId.get(id)))closure(dependency,seen);
+    return seen;
+  }
+  const readable=new Set([...allowed].filter(id=>[...closure(id)].every(dep=>allowed.has(dep))));
+  const specs=resolved.filter(s=>readable.has(s.page.canon.id));
+  const authored=source.filter(s=>readable.has(s.page.canon.id));
+  return {specs,authoredSpecs:authored,index:buildEntityDiagramIndex(specs,options),
+    loadSpec:id=>{const spec=specs.find(s=>s.page.canon.id===id);return spec?C.clone(spec):null;},
+    loadWorkspace:id=>readable.has(id)?{source:C.clone(byId.get(id)),topologyContext:{version:1,id,specs:[...closure(id)].map(key=>C.clone(byId.get(key)))}}:null};
+}
 export function buildEntityDiagramIndex(specs,{publicBaseUrl='',diagramUrls}={}){
+  if(specs.some(spec=>C.sections(spec).some(s=>Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports'))))specs=materializeCanonSpecs(specs);
   if(publicBaseUrl && (!C.http(publicBaseUrl) || new URL(publicBaseUrl).search || new URL(publicBaseUrl).hash))throw new Error('Configure an HTTP(S) public base URL without credentials, query or fragment.');
   if(diagramUrls!==undefined && typeof diagramUrls!=='function')throw new Error('diagramUrls must be a function returning viewerUrl and editUrl.');
   const base=(C.http(publicBaseUrl) || '').replace(/\/$/,''),routing=C.viewerRouting(),entities=new Map(),ids=new Set();
   for(const spec of specs){
-    if(C.sections(spec).some(s=>Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports')))throw new Error('Unresolved topology: call materializeCanonSpecs on the complete approved snapshot before authorization and indexing.');
     const errors=C.validateSpec(spec).errors;if(errors.length)throw new Error(errors.join('\n'));
     const page=C.pageOf(spec),canon=page.canon;
     if(!canon || ids.has(canon.id))throw new Error('Indexed diagrams require unique page.canon IDs.');ids.add(canon.id);

@@ -8,8 +8,10 @@ description: Author or update a Flowview diagram from an HLD, a system descripti
 **Shared topology?** When reusing a canon provider's structural nodes/edges,
 read [shared topology](../../../docs/shared-topology.md). Author explicit exports
 and namespaced imports, keep narrative local, and validate the complete canon
-batch. Standalone validation expects materialized JSON. Do not copy generated
-`topologyProvenance` back over the authored import declarations.
+batch in memory. Publish/save authored references only; readers and Workbench
+resolve providers on open and freeze them until reload/reopen. Never write generated
+`topologyProvenance` over authored import declarations. Use the canon publisher
+for full-batch validation; standalone validation expects a resolved in-memory value.
 
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its

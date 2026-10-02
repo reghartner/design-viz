@@ -93,14 +93,16 @@ for supported capabilities, CI checks and the company fork release workflow.
 
 ## Section object
 
-### Shared topology at canon build time
+### Shared topology references
 
 Diagram source may declare `topologyExports: {name: {nodes: [nodeId], edges:
 ["from->to"]}}` or `topologyImports: [{spec: canonId, export: name, as:
 namespace}]`. Imported node IDs are `namespace::nodeId`; consumer steps and
 connecting edges use those identities directly. Consumers own steps, paths,
 failures and panels. Canon resolves the complete snapshot before ordinary spec
-validation; published specs have no unresolved declarations. Exported placements
+validation in memory; published/editable specs retain their references. Readers
+resolve on open and freeze providers for the session, never live-refreshing.
+Exported placements
 and identity compatibility are checked, and incompatible provider edits fail the
 whole publication. See the [full shared topology contract](../docs/shared-topology.md)
 for placement, namespace, provenance and build rules, and its executable example.

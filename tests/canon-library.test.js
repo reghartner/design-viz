@@ -19,7 +19,7 @@ test('static publisher preserves canonical evidence and source files; browser ac
   const {buildLibrary}=await import('../tools/canon/library.mjs');
   const registry=path.join(__dirname,'../examples/canon/registry.json'),before=fs.readFileSync(registry,'utf8');
   const result=await buildLibrary(registry);
-  assert.equal(result.version,2);assert.equal(result.diagrams[0].spec,undefined);assert.deepEqual(result.diagrams[0].canon,spec.page.canon);
+  assert.equal(result.version,3);assert.equal(result.diagrams[0].spec,undefined);assert.deepEqual(result.diagrams[0].canon,spec.page.canon);
   assert.deepEqual(JSON.parse(JSON.stringify(context.canonLibrarySpec(spec,result.diagrams[0]))),spec);assert.equal(fs.readFileSync(registry,'utf8'),before);
   assert.equal(context.parseCanonLibrary(result).length,1);assert.equal(Object.hasOwn(result.diagrams[0],'path'),false);
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-library-'));
@@ -80,7 +80,7 @@ test('discovery ignores symlinks and fails explicitly for a missing source direc
   fs.writeFileSync(path.join(external,'private.json'),JSON.stringify(namedSpec('outside')));
   fs.symlinkSync(external,path.join(f.directory,'linked-dir'),'dir');
   fs.symlinkSync(path.join(external,'private.json'),path.join(f.directory,'linked.json'));
-  assert.deepEqual(await buildLibraryFromDirectory(f.directory),{version:2,diagrams:[]});
+  assert.deepEqual(await buildLibraryFromDirectory(f.directory),{version:3,diagrams:[]});
   await assert.rejects(buildLibraryFromDirectory(path.join(f.root,'typo')),/ENOENT/);
 });
 
@@ -93,9 +93,9 @@ test('publishing follows additions, edits and removals and never replaces a good
   const updated=namedSpec('story');updated.page.title='Updated story';fs.writeFileSync(file,JSON.stringify(updated));await publishLibrary(options);
   assert.equal(JSON.parse(fs.readFileSync(output)).diagrams[0].title,'Updated story');
   delete updated.page.canon;fs.writeFileSync(file,JSON.stringify(updated));await publishLibrary(options);
-  assert.deepEqual(JSON.parse(fs.readFileSync(output)),{version:2,diagrams:[]});
+  assert.deepEqual(JSON.parse(fs.readFileSync(output)),{version:3,diagrams:[]});
   f.write('nested/story.json',namedSpec('story'));await publishLibrary(options);fs.rmSync(file);await publishLibrary(options);
-  assert.deepEqual(JSON.parse(fs.readFileSync(output)),{version:2,diagrams:[]});
+  assert.deepEqual(JSON.parse(fs.readFileSync(output)),{version:3,diagrams:[]});
   await assert.rejects(publishLibrary({...options,output:path.join(f.directory,'manifest.json')}),/outside the diagram source directory/);
 });
 
@@ -107,7 +107,7 @@ test('publisher CLI defaults to the company directory structure and retains expl
   fs.writeFileSync(path.join(f.root,'canon.json'),JSON.stringify({version:1,diagrams:[{folder:'diagrams/company',owner:raw.page.canon.owner}]}));
   execFileSync(process.execPath,[cli],{cwd:f.root});
   const generated=JSON.parse(fs.readFileSync(path.join(f.root,'workbench/diagrams.json')));
-  assert.match(generated.diagrams[0].specUrl,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
+  assert.equal(generated.diagrams[0].specUrl,'../diagrams/company/company.spec.json');
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.root,'workbench',generated.diagrams[0].specUrl))),raw);
   assert.deepEqual(generated.diagrams[0].canon,raw.page.canon);
   const legacy=path.join(f.root,'legacy.json');execFileSync(process.execPath,[cli,'--registry',path.join(__dirname,'../examples/canon/registry.json'),'--out',legacy]);
@@ -138,10 +138,12 @@ test('output aliases cannot overwrite discovered specs or an explicit registry s
 });
 
 
-test('version 2 indexes validate metadata and URLs without embedding or mutating source content',async()=>{
+test('version 2 and 3 indexes validate metadata and URLs without embedding or mutating source content',async()=>{
   const {buildLibrary}=await import('../tools/canon/library.mjs');
   const raw=await buildLibrary(path.join(__dirname,'../examples/canon/registry.json'));
   const entries=context.parseCanonLibrary(raw),entry=entries[0];
+  assert.equal(context.parseCanonLibrary({...raw,version:2}).length,1);
+  assert.throws(()=>context.parseCanonLibrary({...raw,diagrams:[{...raw.diagrams[0],revision:'bad'}]}),/revision/);
   assert.equal(entry.spec,undefined);assert.ok(entry.counts.nodes>0);assert.ok(entry.counts.steps>0);
   const original=structuredClone(spec);original.page.canon={id:'old',kind:'design'};
   const before=JSON.stringify(original),resolved=context.canonLibrarySpec(original,entry);
@@ -156,14 +158,14 @@ test('version 2 indexes validate metadata and URLs without embedding or mutating
   assert.equal(context.canonLibrarySpecURL('../diagrams/a/a.spec.json','https://company.test/prefix/workbench/diagrams.json'),'https://company.test/prefix/diagrams/a/a.spec.json');
 });
 
-test('published URLs resolve to immutable copies while preserving sources with encoded filenames',async t=>{
+test('published URLs address authored sources with encoded filenames',async t=>{
   const {publishLibrary}=await import('../tools/canon/library.mjs'),{fileURLToPath,pathToFileURL}=require('node:url');
   const f=discoveryFixture(t),file=f.write('nested/a #1.json',namedSpec('encoded'));
   const output=path.join(f.root,'workbench/diagrams.json');
   const library=await publishLibrary({diagramsDir:f.directory,output});
   const url=library.diagrams[0].specUrl;
-  assert.match(url,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
+  assert.equal(url,'../docs/diagrams/nested/a%20%231.json');
   const published=fileURLToPath(new URL(url,pathToFileURL(output)));
-  assert.notEqual(published,file);assert.deepEqual(JSON.parse(fs.readFileSync(published)),JSON.parse(fs.readFileSync(file)));
+  assert.equal(published,file);assert.deepEqual(JSON.parse(fs.readFileSync(published)),JSON.parse(fs.readFileSync(file)));
   assert.ok(!JSON.stringify(library).includes('rows'));assert.ok(!JSON.stringify(library).includes('codeRefs'));
 });

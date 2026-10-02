@@ -3,6 +3,7 @@ import {
   buildEntityDiagramIndex as buildIndex,
   diagramsForEntity as forEntity,
   materializeCanonSpecs as materializeBatch,
+  prepareCanonSnapshot as prepareSnapshot,
 } from '../../../tools/canon/entity-diagrams.mjs';
 import type {AssociatedDiagram, EntityDiagrams} from './api/types';
 
@@ -59,8 +60,20 @@ export function materializeCanonSpec(raw: unknown, entry: CanonEntry): unknown {
   return manifest.spec(raw, entry);
 }
 
-/** Resolve the complete canon snapshot from one approved SHA before filtering
- * for viewer authorization. Serve these exact results from spec endpoints. */
+/** Resolve a complete approved canon snapshot in memory. This low-level helper
+ * does not authorize; prefer prepareCanonSnapshot for request-scoped serving. */
 export function materializeCanonSpecs(specs: readonly unknown[]): unknown[] {
   return materializeBatch(specs);
+}
+
+/** Resolve only in memory from one approved authored revision. Authorization
+ * must allow the consumer AND every provider in its dependency closure. */
+export function prepareCanonSnapshot(specs: readonly unknown[], options?: EntityDiagramIndexOptions & {
+  authorize?: (spec: unknown) => boolean;
+}): {
+  specs: unknown[]; authoredSpecs: unknown[]; index: EntityDiagramIndex;
+  loadSpec: (id: string) => unknown;
+  loadWorkspace: (id: string) => {source: unknown; topologyContext: {version: number; id: string; specs: unknown[]}} | null;
+} {
+  return prepareSnapshot(specs, options) as ReturnType<typeof prepareCanonSnapshot>;
 }

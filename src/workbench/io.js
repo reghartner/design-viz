@@ -208,7 +208,7 @@ function createBuilderIO(opts){
         fetchExportTemplate(run,function(err, tplText){
           if(!exportCurrent(run))return;
           if (err){ inspectorMessage(err); return; }
-          var built = buildExportHtml(tplText, exportText.trim());
+          var built = buildExportHtml(tplText, exportText.trim(),session.topologyContext?session.topologyContext():null);
           if (built.error){ inspectorMessage(built.error); return; }
           writeIntoDirectory(dir,jsonName,exportText,run)
             .then(function(){ return writeIntoDirectory(dir,htmlName,built.html,run); })
@@ -228,7 +228,7 @@ function createBuilderIO(opts){
       fetchExportTemplate(run,function(err, tplText){
           if(!exportCurrent(run))return;
         if (err){ inspectorMessage(err); return; }
-        var built = buildExportHtml(tplText, exportText.trim());
+        var built = buildExportHtml(tplText, exportText.trim(),session.topologyContext?session.topologyContext():null);
         if (built.error){ inspectorMessage(built.error); return; }
         try{
           downloadTextFile(jsonName, exportText, 'application/json');

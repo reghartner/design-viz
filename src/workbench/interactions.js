@@ -531,13 +531,13 @@ function createBuilderInteractions(opts){
     var mode = addToStep;
     var plan = null;
     if (target.kind === 'node'){
-      plan = planStepToggleNode(session.text(), parsed.raw, mode.section, mode.step, target.id);
+      plan = planStepToggleNode(session.text(), session.resolve?session.resolve(parsed.raw):parsed.raw, mode.section, mode.step, target.id);
     } else if (target.kind === 'edge'){
       var rec = specSectionPaths(parsed.raw)[mode.section];
-      var edges = rec ? (specValueAt(parsed.raw, rec.diagram) || {}).edges : null;
+      var edges = rec ? (specValueAt(session.resolve?session.resolve(parsed.raw):parsed.raw, rec.diagram) || {}).edges : null;
       var e = Array.isArray(edges) ? edges[target.index] : null;
       if (!e){ formError('edge not found — the render and the editor may be out of sync'); return; }
-      plan = planStepToggleHop(session.text(), parsed.raw, mode.section, mode.step, builderEdgeKey(e));
+      plan = planStepToggleHop(session.text(), session.resolve?session.resolve(parsed.raw):parsed.raw, mode.section, mode.step, builderEdgeKey(e));
     } else {
       var rec2 = specSectionPaths(parsed.raw)[mode.section];
       var panels = rec2 ? (specValueAt(parsed.raw, rec2.diagram) || {}).panels : null;
@@ -670,7 +670,7 @@ function createBuilderInteractions(opts){
     }
     var fromId = connect.fromId,quick=connect.quick;
     session.insertSection = target.section;
-    var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id);
+    var plan = planAddEdgeBetween(session.text(), parsed.raw, target.section, fromId, target.id,session.resolve?session.resolve(parsed.raw):null);
     if (plan.error){ cancelConnect(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
     cancelConnect(null);

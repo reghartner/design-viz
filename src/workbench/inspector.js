@@ -752,7 +752,7 @@ function stepForm(val, ctx){
     var t = session.target, panelRows=[];
     function toggled(planFn){
       return function(key){
-        commitCascade(function(raw){ return planFn(session.text(), raw, t.section, t.index, key); },
+        commitCascade(function(raw){ return planFn(session.text(), session.resolve?session.resolve(raw):raw, t.section, t.index, key); },
           {after: function(){ renderInspector(); }});
       };
     }
@@ -814,7 +814,7 @@ function stepForm(val, ctx){
       });
       input.value = failures[key] || 'delivered';
       formLife.listen(input,'change',function(){
-        commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,key,input.value);},
+        commitCascade(function(raw){return planStepCommunication(session.text(),session.resolve?session.resolve(raw):raw,t.section,t.index,key,input.value);},
           {after:function(){renderInspector();}});
       });
       return input;
@@ -829,7 +829,7 @@ function stepForm(val, ctx){
     addFailure.disabled = addFailure.children.length < 2;
     formLife.listen(addFailure,'change',function(){
       if (!addFailure.value) return;
-      commitCascade(function(raw){return planStepCommunication(session.text(),raw,t.section,t.index,addFailure.value,'dropped');},
+      commitCascade(function(raw){return planStepCommunication(session.text(),session.resolve?session.resolve(raw):raw,t.section,t.index,addFailure.value,'dropped');},
         {after:function(){renderInspector();}});
     });
     rows.push(frow('Add failed communication',addFailure));
@@ -861,7 +861,7 @@ function stepForm(val, ctx){
       } else input.value = '';
       formLife.listen(input,'change', function(){
         commitCascade(function(raw){
-          return planStepTone(session.text(), raw, t.section, t.index, id, input.value === '' ? null : input.value);
+          return planStepTone(session.text(), session.resolve?session.resolve(raw):raw, t.section, t.index, id, input.value === '' ? null : input.value);
         }, {after: function(){ renderInspector(); }});
       });
       return input;
@@ -879,7 +879,7 @@ function stepForm(val, ctx){
     formLife.listen(addTone,'change', function(){
       if (!addTone.value) return;
       commitCascade(function(raw){
-        return planStepTone(session.text(), raw, t.section, t.index, addTone.value, 'alert');
+        return planStepTone(session.text(), session.resolve?session.resolve(raw):raw, t.section, t.index, addTone.value, 'alert');
       }, {after: function(){ renderInspector(); }});
     });
     rows.push(frow('Add node tone', addTone));
@@ -2330,6 +2330,20 @@ function renderInspector(){
     var parsed = parseEditor();
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
     var loc = path ? jsonLocate(session.text(), path) : null;
+    var resolved=parsed.raw;
+    try{if(!parsed.error && session.resolve)resolved=session.resolve(parsed.raw);}catch(ex){}
+    var resolvedPath=!parsed.error?builderTargetPath(resolved,t):null;
+    var resolvedValue=resolvedPath?specValueAt(resolved,resolvedPath):null;
+    var resolvedRec=!parsed.error?specSectionPaths(resolved)[t.section]:null;
+    var resolvedDiagram=resolvedRec?specValueAt(resolved,resolvedRec.diagram):null;
+    var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(resolvedDiagram,
+      t.kind==='node'?'nodes':t.kind==='edge'?'edges':t.kind==='group'?'groups':'',
+      t.kind==='edge' && resolvedValue?resolvedValue.from+'->'+resolvedValue.to:t.id);
+    if(imported){
+      var note=document.createElement('p');note.className='fnote';
+      note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Imported structure is resolved in memory; your source keeps its references. Edit this consumer’s steps, paths, failures, and panels here.';
+      guide.appendChild(note);return;
+    }
 
     var p = document.createElement(loc ? 'button' : 'span');
     p.className = 'gpath';
@@ -2366,16 +2380,8 @@ function renderInspector(){
       var rec = specSectionPaths(parsed.raw)[t.section];
       var ctx = {
         page: normalize(parsed.raw) || {},
-        diagram: rec ? specValueAt(parsed.raw, rec.diagram) : null
+        diagram: resolvedDiagram
       };
-      var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(ctx.diagram,
-        t.kind==='node'?'nodes':t.kind==='edge'?'edges':t.kind==='group'?'groups':'',
-        t.kind==='edge'?val.from+'->'+val.to:t.id);
-      if(imported){
-        var note=document.createElement('p');note.className='fnote';
-        note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Edit the provider and rebuild canon. Author this consumer’s steps, paths, failures, and panels here.';
-        guide.appendChild(note);return;
-      }
       if (t.kind === 'step' && ctx.diagram && ctx.diagram.paths){
         var sharing = diagramPathList(ctx.diagram).filter(function(route){return route.indices.indexOf(t.index) >= 0;});
         if (sharing.length > 1){

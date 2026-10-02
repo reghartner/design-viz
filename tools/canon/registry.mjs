@@ -5,11 +5,12 @@ import library from './manifest.cjs';
 import C from './core.cjs';
 export async function json(file){return JSON.parse(await readFile(file,'utf8'));}
 export function materializeEntries(entries){
+  for(const entry of entries)if(C.sections(entry.spec).some(s=>s.diagram.topologyProvenance))throw new Error('Publish authored references, not generated topologyProvenance: '+entry.id);
   // Legacy callers keep their diagnostics; topology snapshots validate as a
   // batch before any consumer can be indexed, digested, or published.
   if(!entries.some(entry=>C.sections(entry.spec).some(s=>s.diagram.topologyProvenance || Object.hasOwn(s.diagram,'topologyImports') || Object.hasOwn(s.diagram,'topologyExports'))))return entries;
   const specs=C.materializeTopology(entries.map(entry=>entry.spec));
-  return entries.map((entry,i)=>({...entry,sourceSpec:entry.sourceSpec || entry.spec,spec:specs[i]}));
+  return entries.map((entry,i)=>({...entry,resolvedSpec:specs[i]}));
 }
 export async function canonLibrary(file='canon.json'){
   const root=await realpath(path.dirname(path.resolve(file))),manifest=await json(file),entries=[];
@@ -23,7 +24,8 @@ export async function canonLibrary(file='canon.json'){
   }
   const resolved=materializeEntries(entries);
   for(const entry of resolved){
-    const errors=C.validate(entry.spec).concat(C.validateSpec(entry.spec).errors);
+    const rendered=entry.resolvedSpec || entry.spec;
+    const errors=C.validate(rendered).concat(C.validateSpec(rendered).errors);
     if(errors.length)throw new Error(entry.path+': '+errors.join('\n'));
   }
   return {root,entries:resolved,specs:resolved.map(entry=>entry.spec)};

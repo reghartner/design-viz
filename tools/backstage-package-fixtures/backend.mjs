@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec, materializeCanonSpecs } from '@flowview/backstage-plugin/backend';
+import { buildEntityDiagramIndex, diagramsForEntity, parseCanonManifest, materializeCanonSpec, materializeCanonSpecs, prepareCanonSnapshot } from '@flowview/backstage-plugin/backend';
 
 async function main() {
   const response = await fetch(process.argv[2]);
@@ -11,6 +11,9 @@ async function main() {
   }]});
   assert.equal(entry.path, 'diagrams/consumer-recording/consumer-recording.spec.json');
   const [spec] = materializeCanonSpecs([materializeCanonSpec(source, entry)]);
+  const runtime=prepareCanonSnapshot([spec]);
+  assert.deepEqual(runtime.loadSpec(entry.id),spec);
+  assert.deepEqual(runtime.loadWorkspace(entry.id).source,spec);
   assert.deepEqual(spec.page.canon, {
     version: 1, id: 'consumer-recording', kind: 'canonical', owner: entry.owner,
   });

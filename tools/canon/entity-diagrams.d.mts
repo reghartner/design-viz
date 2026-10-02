@@ -9,3 +9,8 @@ export function buildEntityDiagramIndex(specs: readonly unknown[], options?: {
 }): unknown;
 export function diagramsForEntity(index: unknown, entityRef: string): unknown;
 export function materializeCanonSpecs(specs: readonly unknown[]): unknown[];
+export function prepareCanonSnapshot(specs: readonly unknown[], options?: {
+  authorize?: (spec: unknown) => boolean;
+  publicBaseUrl?: string;
+  diagramUrls?: (diagram: {id: string; revision: string; spec: unknown}) => {viewerUrl: string; editUrl: string};
+}): unknown;

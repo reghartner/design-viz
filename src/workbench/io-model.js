@@ -112,7 +112,7 @@ function exportTemplateOpeners(templateText){
   return (templateText.match(openRe) || []).length;
 }
 
-function buildExportHtml(templateText, specText){
+function buildExportHtml(templateText, specText,topologyContext){
   /* the close-tag scan is case-insensitive — HTML tag names are, so
      "</SCRIPT" would break out of the JSON block just as surely */
   if (/<\/script/i.test(specText))
@@ -130,6 +130,9 @@ function buildExportHtml(templateText, specText){
   if (end < 0) return {error: 'the page template’s flowspec block never closes'};
   var out = templateText.slice(0, bodyFrom) + '\n' + specText.trim() +
             templateText.slice(end);
+  if(topologyContext){
+    out=out.slice(0,start)+'<scr'+'ipt type="application/json" id="flowview-topology">'+JSON.stringify(topologyContext).replace(/</g,'\\u003c')+'</scr'+'ipt>\n'+out.slice(start);
+  }
   var page = spec && spec.page ? spec.page : spec;
   var title = page && typeof page.title === 'string' ? page.title : '';
   if (title){

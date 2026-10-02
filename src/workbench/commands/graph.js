@@ -98,7 +98,7 @@ function planAddPanel(text, raw, sectionIdx, type){
    compatible meaning (for example state, span, or initial), so only common
    identity/visibility and supported branding survive. Registry steps are edited
    once, including dormant legacy aliases, without changing path membership. */
-function planReplacePanel(text,raw,sectionIdx,panelIdx,type){
+function planReplacePanel(text,raw,sectionIdx,panelIdx,type,validateSource){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   var old=Array.isArray(got.d.panels) && got.d.panels[panelIdx],authoring=panelAuthoring(type);
   if(!specObject(old) || !Number.isInteger(panelIdx) || !old.id)return {error:'Select an existing panel to replace.'};
@@ -150,7 +150,7 @@ function planReplacePanel(text,raw,sectionIdx,panelIdx,type){
   if(failed)return failed;
   var plan=planReplaceValue(out,raw,got.path.concat(['panels',panelIdx]),JSON.stringify(entry,null,2));
   if(plan.error)return plan;
-  var errors=validate(normalize(JSON.parse(plan.text))).errors;
+  var errors=(validateSource?validateSource(JSON.parse(plan.text)):validate(normalize(JSON.parse(plan.text)))).errors;
   if(errors.length)return {error:'The replacement would be invalid: '+errors.join('; ')};
   plan.kind='panel';plan.index=panelIdx;plan.replacement=review;return plan;
 }
@@ -561,18 +561,19 @@ var NODE_PRESETS = [
 
 var PANEL_TEMPLATES = panelAuthoringMap('template');
 
-function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId){
+function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId, resolved){
   /* Connect mode: the operator clicked the exact source and target. */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
-  var nodes = got.d.nodes || {};
+  var known=resolved?builderDiagram(text,resolved,sectionIdx).d:got.d;
+  var nodes = known.nodes || {};
   if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
     return {error: 'unknown node id "' + fromId + '"'};
   if (!Object.prototype.hasOwnProperty.call(nodes, toId))
     return {error: 'unknown node id "' + toId + '"'};
   if (fromId === toId) return {error: 'source and target are the same node'};
   var key = fromId + '->' + toId;
-  if ((got.d.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
+  if ((known.edges || []).some(function(e){ return e && builderEdgeKey(e) === key; }))
     return {error: 'edge "' + key + '" already exists \u2014 click it to edit'};
   var item = '{"from": ' + JSON.stringify(fromId) + ', "to": ' + JSON.stringify(toId) +
              ', "kind": "int", "label": "describe the hop"}';

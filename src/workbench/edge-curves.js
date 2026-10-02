@@ -11,7 +11,10 @@ function createEdgeCurveEditor(opts){
     var section=Number(sec.getAttribute('data-dv-section')),index=Number(el.getAttribute('data-dv-edge'));
     var got=builderDiagram(snapshot.text,snapshot.raw,section);if(got.error)return null;
     var edge=(got.d.edges || [])[index];if(!edge)return null;
-    return {snapshot:snapshot,section:section,index:index,edge:edge,L:layout(got.d),svg:el.ownerSVGElement,el:el};
+    var resolved=snapshot.raw;
+    try{if(opts.session.resolve)resolved=opts.session.resolve(resolved);}catch(ex){return null;}
+    var preview=builderDiagram(snapshot.text,resolved,section);if(preview.error)return null;
+    return {snapshot:snapshot,section:section,index:index,edge:edge,L:layout(preview.d),svg:el.ownerSVGElement,el:el};
   }
   function element(tag,attrs){
     var el=document.createElementNS('http://www.w3.org/2000/svg',tag);

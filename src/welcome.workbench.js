@@ -384,9 +384,9 @@ function initWorkbenchWelcome(opts){
   renderTemplates(); updatePrompt();
   var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct){
+  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct,topologyContext){
     if(direct)builder.preserveDraft();
-    builder.loadSpec(spec,request?{title:(spec.page || spec).title || request.id,id:request.id,entity:request.entity || null,digest:request.revision || null,origin:'Backstage'}:null);
+    if(!builder.loadSpec(spec,request?{title:(spec.page || spec).title || request.id,id:request.id,entity:request.entity || null,digest:request.revision || null,origin:'Backstage'}:null,topologyContext))throw new Error('Could not open the authored source. Your draft has not changed.');
     if(request){var url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('fv');url.hash=hash.toString();history.replaceState(history.state,'',url.pathname+url.search+url.hash);}
     if(direct)navigation.replace('editor',true);else enterEditor();
     if(request){builder.navigate(request.target);if(request.action==='build')builder.startAgent();}

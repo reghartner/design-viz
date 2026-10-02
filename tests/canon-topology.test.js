@@ -131,15 +131,20 @@ test('nested providers resolve from the same batch and retain stable namespace i
   const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/team'},sections:[{diagram:{topologyImports:[{spec:'checkout',export:'story',as:'shared'}]}}]}};
   const out=resolve([outer,...specs]);assert.ok(diagram(out[0]).nodes['shared::platform::api']);
 });
-test('Backstage indexes the same materializations and refuses unresolved inputs',async()=>{
-  const {materializeCanonSpecs,buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
+test('Backstage resolves approved authored snapshots in memory and retains source for editing',async()=>{
+  const {materializeCanonSpecs,prepareCanonSnapshot,buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');
   const specs=source(),materialized=materializeCanonSpecs(specs);assert.deepEqual(materialized,resolve(specs));
-  assert.throws(()=>buildEntityDiagramIndex(specs),/materializeCanonSpecs/);
+  assert.deepEqual(buildEntityDiagramIndex(specs),buildEntityDiagramIndex(materialized));
+  const prepared=prepareCanonSnapshot(specs),workspace=prepared.loadWorkspace('checkout');
+  assert.deepEqual(workspace.source,specs[1]);assert.deepEqual(prepared.loadSpec('checkout'),materialized[1]);
+  assert.equal(workspace.topologyContext.specs.length,2);
+  assert.equal(prepareCanonSnapshot(specs,{authorize:s=>s.page.canon.id==='checkout'}).loadSpec('checkout'),null);
+  assert.throws(()=>prepareCanonSnapshot(specs,{authorize:async()=>false}),/must return a boolean/);
   const matches=diagramsForEntity(buildEntityDiagramIndex(materialized),'component:default/api').diagrams;
   assert.deepEqual(matches.map(s=>s.id).sort(),['checkout','platform']);
   assert.ok(matches.find(s=>s.id==='checkout').sections[0].paths.some(p=>p.steps.some(s=>s.id==='persist')));
 });
-test('publisher installs immutable materialized specs and preserves previous snapshot on failed compatibility',async t=>{
+test('publisher writes only an authored-source index and preserves it on failed compatibility',async t=>{
   const {publishLibrary}=await import('../tools/canon/library.mjs');
   const root=fs.mkdtempSync(path.join(os.tmpdir(),'topology-library-'));t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
   const specs=source(),write=s=>fs.writeFileSync(path.join(root,s.page.canon.id+'.json'),JSON.stringify(s));specs.forEach(write);
@@ -147,13 +152,48 @@ test('publisher installs immutable materialized specs and preserves previous sna
   const output=path.join(root,'published/diagrams.json'),options={registryPath:path.join(root,'registry.json'),output};
   const library=await publishLibrary(options),before=fs.readFileSync(output,'utf8');
   const loaded=library.diagrams.map(entry=>JSON.parse(fs.readFileSync(path.resolve(path.dirname(output),entry.specUrl),'utf8')));
-  assert.deepEqual(loaded,resolve(specs));
+  assert.equal(library.version,3);assert.deepEqual(loaded,specs);
+  assert.deepEqual(fs.readdirSync(path.dirname(output)),['diagrams.json']);
   const oldUrl=library.diagrams[1].specUrl;
   diagram(specs[0]).nodes.api.title='Changed presentation';write(specs[0]);const next=await publishLibrary(options);
-  assert.notEqual(next.diagrams[1].specUrl,oldUrl);
+  assert.equal(next.diagrams[1].specUrl,oldUrl);
+  assert.notEqual(next.diagrams[0].revision,library.diagrams[0].revision);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.resolve(path.dirname(output),oldUrl),'utf8')),loaded[1]);
   const good=fs.readFileSync(output,'utf8');diagram(specs[0]).edges=[];diagram(specs[0]).topologyExports.core.edges=[];write(specs[0]);
   await assert.rejects(publishLibrary(options),/checkout.*missing edge/);assert.equal(fs.readFileSync(output,'utf8'),good);assert.notEqual(good,before);
+});
+test('backend proposals validate the full authored batch without flattening the proposed consumer',async()=>{
+  const {propose,initialState,digest}=await import('../tools/canon/drift.mjs');
+  const specs=source(),edited=structuredClone(specs[1]);diagram(edited).steps[0].text='Reviewed narrative';
+  const result=propose(specs,initialState(),{id:'checkout',spec:edited,baseRevision:digest(specs[1])});
+  assert.deepEqual(result.state.reviews[result.id].proposedSpec,edited);
+  diagram(edited).steps[1].edge='platform::removed->platform::store';
+  assert.throws(()=>propose(specs,initialState(),{id:'checkout',spec:edited,baseRevision:digest(specs[1])}),/missing edge/);
+});
+test('reference backend serves derived runtime views and authored workspace context from the same snapshot',async t=>{
+  const {createCanonServer}=await import('../apps/backstage-mock/server.mjs');
+  const {digest}=await import('../tools/canon/drift.mjs');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'topology-backend-'));
+  t.after(()=>fs.rmSync(root,{recursive:true,force:true}));
+  const specs=source();
+  for(const spec of specs)fs.writeFileSync(path.join(root,spec.page.canon.id+'.json'),JSON.stringify(spec));
+  for(const name of ['catalog.json','repositories.json'])fs.copyFileSync(path.join(__dirname,'../examples/canon',name),path.join(root,name));
+  const registryPath=path.join(root,'registry.json');
+  fs.writeFileSync(registryPath,JSON.stringify({version:1,diagrams:specs.map(s=>({id:s.page.canon.id,path:s.page.canon.id+'.json'}))}));
+  const server=await createCanonServer({registryPath,statePath:path.join(root,'state.json')});
+  await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>server.close(r)));
+  const base='http://127.0.0.1:'+server.address().port;
+  const get=async suffix=>{const response=await fetch(base+suffix);assert.equal(response.status,200);return response.json();};
+  const index=await get('/api/canon/entity-diagrams?entityRef=component:default/api');
+  const entry=index.diagrams.find(d=>d.id==='checkout');
+  const rendered=await get('/api/canon/specs/checkout?revision='+entry.revision);
+  assert.equal(digest(rendered),entry.revision);assert.deepEqual(rendered,resolve(specs)[1]);
+  const workspace=await get('/api/canon/context?id=checkout');
+  assert.deepEqual(workspace.source,specs[1]);assert.deepEqual(workspace.spec,rendered);
+  assert.equal(workspace.topologyContext.specs.length,2);
+  const library=await get('/workbench/diagrams.json');
+  assert.deepEqual(library.diagrams.find(d=>d.id==='checkout').source,specs[1]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root,'checkout.json'))),specs[1]);
 });
 test('Workbench protects imported structure while allowing consumer narrative changes',()=>{
   const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),context={URL,TextEncoder};
@@ -170,11 +210,13 @@ test('central canon resolves the complete membership before authorizing consumer
   const specs=source();
   for(const spec of specs){const id=spec.page.canon.id,folder=path.join(root,'diagrams',id);fs.mkdirSync(folder,{recursive:true});fs.writeFileSync(path.join(folder,id+'.spec.json'),JSON.stringify(spec));}
   const file=path.join(root,'canon.json');fs.writeFileSync(file,JSON.stringify({version:1,diagrams:specs.map(s=>({folder:'diagrams/'+s.page.canon.id,owner:s.page.canon.owner}))}));
-  const loaded=await loadCanonDiagrams(file,{authorize:entry=>entry.id==='checkout'});
-  assert.equal(loaded.specs.length,1);assert.ok(diagram(loaded.specs[0]).nodes['platform::api']);
-  assert.deepEqual(loaded.index.entities['component:default/api'].map(s=>s.id),['checkout']);
+  const denied=await loadCanonDiagrams(file,{authorize:entry=>entry.id==='checkout'});
+  assert.equal(denied.specs.length,0);
+  const loaded=await loadCanonDiagrams(file);
+  assert.ok(diagram(loaded.loadSpec('checkout')).nodes['platform::api']);
+  assert.deepEqual(loaded.loadWorkspace('checkout').source,specs[1]);
   const {registry}=await import('../tools/canon/registry.mjs'),reg=await registry(file);
-  assert.deepEqual(reg.entries.map(e=>e.sourceSpec),specs,'authored inputs remain available for evidence baseline writes');
+  assert.deepEqual(reg.entries.map(e=>e.spec),specs,'authored inputs remain available for evidence baseline writes');
 });
 test('Workbench session rejects structure before writing or recording Undo; narrative change has one Undo',()=>{
   const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),context={URL,TextEncoder};
@@ -187,4 +229,31 @@ test('Workbench session rejects structure before writing or recording Undo; narr
   const narrative=JSON.parse(text);diagram(narrative).steps[0].text='Edited consumer';
   assert.equal(session.accept({text:JSON.stringify(narrative)}),true);assert.equal(writes,1);
   assert.equal(session.undo(),true);assert.equal(text,original);assert.equal(session.canUndo(),false);
+});
+
+test('authored editor sessions resolve a frozen closure while preserving source, Undo, recovery and export',()=>{
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),context={URL,TextEncoder};
+  vm.createContext(context);vm.runInContext(loader.composeSources(['canon.js','validator.js','workbench/session.js','workbench/io-model.js']),context);
+  const specs=source(),snapshot={version:1,id:'checkout',specs},original=JSON.stringify(specs[1]);
+  let text='',saved,preview;
+  const session=context.createBuilderSession({source:{read:()=>text,write:value=>text=value},
+    persistence:{read:()=>({}),preserve(){},cancel(){},save:(text,baseline,artifacts)=>{saved={text,baseline,...artifacts};}},
+    render(){preview=session.resolve(JSON.parse(text));}});
+  session.replaceProject(original,null,{topologyContext:snapshot});
+  diagram(specs[0]).nodes.api.title='CHANGED AFTER OPEN';
+  assert.equal(diagram(session.resolve(JSON.parse(text))).nodes['platform::api'].title,'API');
+  const edited=JSON.parse(text);diagram(edited).steps[1].text='Local narrative';
+  diagram(edited).edges.push({from:'client',to:'platform::store'});
+  assert.equal(session.accept({text:JSON.stringify(edited)}),true);
+  assert.equal(diagram(preview).steps[1].text,'Local narrative');
+  assert.ok(diagram(preview).edges.some(e=>e.from==='client' && e.to==='platform::store'));
+  assert.deepEqual(JSON.parse(saved.text),edited);assert.equal(saved.baseline,original);
+  assert.ok(diagram(saved.topologyContext.specs[1]).topologyImports);
+  assert.equal(diagram(JSON.parse(saved.text)).topologyProvenance,undefined);
+  const invalid=structuredClone(edited);diagram(invalid).steps[1].edge='platform::gone->platform::store';
+  assert.equal(session.accept({text:JSON.stringify(invalid)}),false);assert.deepEqual(JSON.parse(text),edited);
+  const template='<title>Example</title>\n<script type="application/json" id="flowspec">\n{}\n</script>';
+  const html=context.buildExportHtml(template,text,session.topologyContext()).html;
+  assert.ok(html.includes('flowview-topology'));assert.ok(html.includes('topologyImports'));assert.ok(!html.includes('topologyProvenance'));
+  assert.equal(session.undo(),true);assert.equal(text,original);
 });

@@ -78,9 +78,11 @@ The per-folder build `manifest.json` is unrelated to canon membership.
 The central list starts empty while existing diagrams are moved manually.
 The nginx image bundles `canon.json` and `diagrams/`; rebuild/redeploy after
 changing them. Its existing canon library opens a selected diagram read-only; **Edit in
-Workbench** explicitly imports a local editable copy. Saving a draft does not
+Workbench** explicitly opens an authored, reference-preserving local copy; its
+resolved preview freezes providers until reload/reopen. No live updates occur.
+Saving a draft does not
 publish it or change membership. Backstage's GitHub adapter uses the `/backend`
-package's `parseCanonManifest` and `materializeCanonSpec` helpers at one approved
+package's `parseCanonManifest`, `materializeCanonSpec` and `prepareCanonSnapshot` helpers at one approved
 revision. Checkout-based adapters can use `loadCanonDiagrams` from
 `tools/canon/library.mjs` with per-viewer authorization. See the [Backstage integration guide](../apps/backstage/README.md).
 

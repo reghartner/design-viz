@@ -13,8 +13,9 @@ this same list. Promotion is a reviewed edit to that file, not a flag in a spec.
 ## Authoring contract, version 1
 
 Canon also supports [shared topology exports/imports](shared-topology.md).
-Resolve all enrolled specs from one approved snapshot before ordinary validation,
-entity indexing and publication. A provider's exported node/edge identities form
+Resolve all enrolled specs in memory from one approved snapshot for validation
+and entity indexing; publish authored JSON only. Readers resolve on open and
+freeze dependencies until reload/reopen. A provider's exported node/edge identities form
 a compatibility contract for its consumers; removed identities still referenced
 by consumer narratives or connecting edges stop the build.
 

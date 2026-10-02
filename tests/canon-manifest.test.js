@@ -55,9 +55,9 @@ test('the publisher snapshot and Backstage resolve identical membership and revi
  const snapshot=await publishLibrary({registryPath:file,output});
  const backstage=await loadCanonDiagrams(file,{diagramUrls:({id})=>({viewerUrl:'https://flows.test/?diagram='+id,editUrl:'https://flows.test/?diagram='+id})});
  const raw=JSON.parse(await fs.readFile(path.join(folder,'checkout.spec.json'),'utf8'));
- assert.equal(snapshot.version,2);assert.equal(snapshot.diagrams[0].spec,undefined);
- assert.match(snapshot.diagrams[0].specUrl,/^diagrams\.json\.specs\/[a-f0-9]{64}\.json$/);
- assert.deepEqual(JSON.parse(await fs.readFile(path.join(path.dirname(output),snapshot.diagrams[0].specUrl),'utf8')),backstage.specs[0]);
+ assert.equal(snapshot.version,3);assert.equal(snapshot.diagrams[0].spec,undefined);
+ assert.equal(snapshot.diagrams[0].specUrl,'../diagrams/checkout/checkout.spec.json');
+ assert.deepEqual(JSON.parse(await fs.readFile(path.join(path.dirname(output),snapshot.diagrams[0].specUrl),'utf8')),authored);
  assert.deepEqual(snapshot.diagrams[0].canon,{version:1,id:'checkout',kind:'canonical',owner:entry.owner});
  assert.equal(await fs.readFile(path.join(folder,'checkout.spec.json'),'utf8'),authoredText);
  assert.deepEqual({...raw,page:{...raw.page,canon:snapshot.diagrams[0].canon}},backstage.specs[0]);

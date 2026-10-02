@@ -1,8 +1,10 @@
 # Shared topology imports
 
 A provider owns reusable structure; each consumer owns its narrative. Imports
-resolve at canon build time from the complete approved snapshot. Renderers never
-fetch providers, reconcile revisions, or update an open editor automatically.
+are validated against the complete approved snapshot at build time, then resolved
+in memory when a reader or editor opens them. The fetched provider closure is
+frozen for that session: no polling, live refresh, or automatic reconciliation.
+Reloading/reopening can pick up a newly deployed revision.
 Black-box `handoff` and detail navigation remain separate contracts.
 
 In the provider's diagram, declare an export with explicit stable node IDs and
@@ -81,40 +83,50 @@ selection to include additions is explicit. Do not silently retarget consumers.
 `FlowCanon.materializeTopology(specs)` is pure and deterministic. Specs require
 unique derived `page.canon.id` metadata. The backend package exposes the same
 implementation as `materializeCanonSpecs`; call `materializeCanonSpec(raw,entry)`
-first to derive each source's membership. Fetch all sources at one approved SHA,
-materialize the entire snapshot, then apply viewer authorization to the results.
-An authorized consumer includes the provider content that it embeds; make this
-part of your repository review/access policy. Index and serve those same results.
+first to derive each source's membership. Fetch all sources at one approved SHA.
+The backend's `prepareCanonSnapshot(authoredSpecs, {authorize})` validates and
+resolves in memory, indexes only consumers whose entire provider closure is
+authorized, and exposes `loadSpec(id)` for a derived viewer value and
+`loadWorkspace(id)` for `{source, topologyContext}`. Cache this adapter only by
+approved revision **and authorization scope**. Never combine provider revisions
+or allow a consumer to bypass a provider's authorization.
 
-The publisher creates ordinary self-contained JSON under
-`<index filename>.specs/<content SHA256>.json` and switches the index atomically
-only after every file passes. Existing content-addressed files remain available
-for readers holding an old index. Deploy this directory with the index; do not
-delete old files during a live index switch. Failed validation leaves the prior
-published snapshot intact. Raw source files stay unchanged. `buildLibrary` and
-`buildLibraryFromDirectory` return proposed indexes without writing artifacts;
-use `publishLibrary` or its CLI to install the files and index together.
+The publisher writes only a version-3 metadata index, atomically after full-batch
+validation. Each entry points to authored JSON and includes its SHA256 revision
+(of `JSON.stringify` after applying index membership). No flattened spec files
+or provenance artifacts are published. Docker copies authored `diagrams/` into
+the final nginx image; the build validates, nginx serves, and the browser fetches
+the selected consumer and its provider closure on open. There is no Node service.
+Deploy sources and index together. A source/index revision mismatch fails closed
+before rendering or changing a draft; reload after a deployment switch. Legacy
+v1 embedded libraries and v2 snapshot URLs remain readable.
 
-Materialization removes source declarations and writes `topologyProvenance`
-on consumers (version, provider/export/namespace and imported identity lists).
-Materializing such a snapshot again is idempotent, with no provider refresh.
-Never mix source declarations with this generated provenance. To refresh,
-rebuild the original authored sources. Evidence baseline tools likewise update
-the original providers, preserving imports instead of flattening them.
+Derived values remove declarations and contain `topologyProvenance` solely in
+memory for read-only inspector cues. They are not saveable authored documents.
+Build tooling and evidence baselines preserve imports/exports in source files.
 
 ## Authoring in Workbench
 
 Open the published consumer and choose **Edit in Workbench**. The local copy
 renders imported topology and exposes ordinary steps, paths, failures and panels.
-The provenance label names the snapshot; imported node/edge/group inspectors
-identify their provider and omit structural controls. Builder transactions reject
-changes to imported structure or placement before writing source or adding Undo
-history. Consumer narrative and local connecting edges remain editable.
+The provenance label names the frozen session; imported node/edge/group inspectors
+identify their provider and omit structural controls. The source editor, Save,
+JSON Download, recovery and Undo baseline retain the authored consumer's imports,
+without imported hardcopy or generated provenance. Each preview resolves local
+edits against the same frozen provider sources. Broken references are rejected
+before builder transactions write source or add Undo. Raw invalid text remains
+repairable while the last valid preview stays visible.
 
-Raw JSON editing is an explicit escape hatch, not an access-control boundary.
-There is no live update/reconciliation UI. Downloaded JSON is a materialized local
-snapshot; copy reviewed narrative changes back to the consumer source, preserving
-its `topologyImports`, and rebuild canon. Edit shared structure in the provider.
+Consumer narrative and local node-to-imported-node edges remain editable. Edit
+shared structure in the provider. Opening from Canon must load/validate the entire
+closure before replacing a current draft. Recovery stores that authored closure
+as auxiliary session context. Offline HTML export embeds the authored consumer
+and frozen authored provider context, resolving only in memory on open.
+
+The earlier generated-snapshot/copy-changes-back workflow is superseded: **do not
+edit or download a flattened snapshot**. Review and commit the authored consumer
+directly, preserving `topologyImports`. Provider changes require a rebuild and
+explicit reload/reopen; an already-open consumer never updates automatically.
 
 ## Executable example
 

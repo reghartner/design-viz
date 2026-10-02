@@ -104,6 +104,8 @@ function applyEmbedMode(ctl){
 }
 
 function boot(raw){
+  var topology=document.getElementById('flowview-topology');
+  if(topology){try{raw=FlowTopology.resolveSource(raw,JSON.parse(topology.textContent));}catch(ex){fail([ex.message]);return;}}
   var page = normalize(raw);
   if (raw && raw.tour && page && !page.tour && window.console)
     console.warn('flowspec: top-level "tour" is ignored — the tour config belongs inside "page" (page.tour)');

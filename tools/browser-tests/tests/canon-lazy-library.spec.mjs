@@ -37,7 +37,7 @@ async function pickerFixture(page,server){
   await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
   fixture.requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))fixture.requests.push(request.url());});
   await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
-  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   fixture.before=await page.locator('#src').inputValue();return fixture;
 }
 async function openTopology(page){await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await expect(page.getByRole('dialog',{name:'Referenced topology',exact:true})).toBeVisible();}
@@ -62,7 +62,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#topology-namespace').fill('invalid namespace');await expect(page.locator('#topology-add')).toBeDisabled();
   await page.locator('#topology-namespace').fill('notify');await expect(page.locator('#topology-add')).toBeEnabled();
   await testInfo.attach('reference-picker',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
   expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']}]);
   expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(d.topologyImports[0].position).toBeUndefined();
@@ -77,7 +77,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.blocks).toEqual(raw.page.blocks);expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
-  await page.reload();await pagePreview(page);await expect(page.locator('#src')).toHaveValue(after);
+  await page.reload();await prepareEditorSurface(page);await expect(page.locator('#src')).toHaveValue(after);
   await expect(page.locator('#docview')).not.toContainText('LATER DEPLOYMENT');
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await expect(page.locator('#topology-nodes')).not.toContainText('LATER DEPLOYMENT');
   await page.locator('#topology-cancel').click();expect(fixture.requests).toHaveLength(2);
@@ -104,7 +104,7 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
   await page.locator('#topology-cancel').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.unroute(fixture.specURL('first'));
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   await expect(page.locator('#docview [data-dv-node="first::dispatch"]')).toBeVisible();
   expect(fixture.requests.filter(url=>url===fixture.specURL('first'))).toHaveLength(2);
   const after=await page.locator('#src').inputValue();
@@ -117,7 +117,7 @@ for(const failure of ['revision','malformed'])test('reference picker fails close
 test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{
   await pickerFixture(page,server);await page.setViewportSize({width:760,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
   await page.getByLabel('Import destination section',{exact:true}).selectOption('1');await page.locator('#topology-section').selectOption('1');
-  await page.locator('#topology-add').click();await pagePreview(page);
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.blocks[0].diagram.topologyImports).toBeUndefined();
   expect(raw.page.blocks[1].diagram.topologyImports).toEqual([{spec:'first',export:'archive',as:'first'}]);
   await expect(page.locator('#docview [data-dv-node="first::archive"]')).toBeVisible();
@@ -131,7 +131,7 @@ test('reference picker explains unavailable legacy catalogs without fetching inv
   const fixture=await publish(server),spec=fixture.specs.second;spec.page.canon=fixture.index.diagrams[1].canon;
   await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify({version:1,diagrams:[{id:'second',spec}]}));
   const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
-  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
   const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-status')).toContainText('unavailable');
   await expect(page.locator('#topology-add')).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(before);expect(requests).toEqual([]);
 });

@@ -19,7 +19,7 @@ function initDiagramAddMenu(opts){
     life.listen(choice,'click',function(){confirm(function(){opts.addNode(item);});});
   });
   function showError(message){error.textContent=message || '';error.hidden=!message;}
-  function same(current){return snapshot && !current.error && current.text===snapshot.text && current.section===snapshot.section && current.chapter===snapshot.chapter;}
+  function same(current){return snapshot && !current.error && current.project===snapshot.project && current.text===snapshot.text && current.section===snapshot.section && current.chapter===snapshot.chapter;}
   function paint(current){
     choices.concat(presetButtons).forEach(function(action){
       var prose=action.hasAttribute('data-add-prose');

@@ -6,7 +6,7 @@ function initTopologyPicker(opts){
   var provider=el('provider'),section=el('section'),exportChoice=el('export'),namespace=el('namespace'),destination=el('destination');
   var snapshot=null,loader=null,loaderKey=null,loaded=null,records=[],nodes=new Set(),edges=new Set(),invalid=false,generation=0,plan=null;
   function message(value){el('status').textContent=value || '';}
-  function same(){var now=opts.context();return snapshot && snapshot.project===now.project && snapshot.text===now.text && snapshot.section===now.section;}
+  function same(){var now=opts.context();return snapshot && !now.error && snapshot.project===now.project && snapshot.text===now.text && snapshot.section===now.section && snapshot.chapter===now.chapter;}
   function selectedExport(){var record=records[Number(section.value)];return record && record.diagram.topologyExports[exportChoice.value];}
   function reference(){return {spec:provider.value,export:exportChoice.value,as:namespace.value.trim(),nodes:Array.from(nodes),edges:Array.from(edges)};}
   function refresh(){

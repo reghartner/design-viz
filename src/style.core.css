@@ -157,7 +157,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
   .board:not(.explore-board)>.lg{top:0;z-index:4;}
   .board:not(.explore-board) .boardcanvas{cursor:grab;touch-action:pan-x pan-y;}
   .board.board-dragging,.board.board-dragging .boardcanvas{cursor:grabbing;user-select:none;}
-  .board.board-zoomed:not(.explore-board){height:var(--board-viewport-height);box-sizing:border-box;overscroll-behavior:contain;overflow-anchor:none;}
+  .board.board-zoomed:not(.explore-board){height:var(--board-viewport-height);box-sizing:border-box;overscroll-behavior-x:contain;overflow-anchor:none;}
   .board.board-zoomed:not(.explore-board) .boardcanvas{width:max(100%,var(--board-zoom-width));}
   .board.board-zoomed:not(.explore-board) .boardcanvas>svg{width:var(--board-zoom-width);min-width:0;max-width:none;margin:0 auto;}
 }

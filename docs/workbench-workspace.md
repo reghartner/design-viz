@@ -210,7 +210,9 @@ including default curved edges, explicit `routing:"curves"`, and lane routing.
 Auto scales smoothly with the column width; Readable keeps labels larger.
 Drag the background to pan, use **− / +** or Ctrl/⌘ + wheel to zoom, and choose
 **Fit diagram** to fit both dimensions. Manual zoom keeps the frame height
-stable; **Fit width** returns to responsive sizing. When a diagram overflows, **Scroll** buttons and
+stable; **Fit width** returns to responsive sizing. Ordinary wheel scrolling continues
+to the page when a Standard diagram reaches its scroll boundary, so panels below
+it remain reachable. When a diagram overflows, **Scroll** buttons and
 a draggable slider appear beneath its view choices. Click the arrows or drag/click
 the slider to pan with a regular mouse; trackpad and native scrolling stay in sync.
 Tab to the slider for keyboard positioning, or to the diagram region to pan with arrow

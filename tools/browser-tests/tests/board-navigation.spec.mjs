@@ -97,3 +97,54 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
     expect(await width(board)).toBeCloseTo(initial.width,0);expect(await scroll(board)).toEqual(initial.scroll);
   }
 });
+
+for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Standard wheel reaches below-fold panels after fitting and at zoom boundaries',async({page,server},info)=>{
+  const raw=spec(),section=raw.page.sections[0],d=section.diagram;
+  raw.page.skin='pastel';section.id='services';
+  d.panels=[{id:'below',type:'state',title:'Below-fold panel',states:['Ready'],initial:{state:'Ready'}}];
+  const tiles=[{x:0,y:0,w:12,h:16},{panel:'below',x:0,y:22,w:12,h:20}];
+  d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:tiles}},
+    {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:tiles}}];d.defaultLayout='standard';
+  const input=path.join(server.root,'scroll-boundary.json'),output=path.join(server.root,'scroll-boundary.html');
+  await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.setViewportSize({width:1280,height:800});
+  let reader=page;
+  if(embedded){
+    await writeFile(path.join(server.root,'scroll-host.html'),'<!doctype html><style>body{margin:0}iframe{display:block;width:100%;height:740px;border:0}</style><iframe title="Embedded reader" src="scroll-boundary.html#embed=services&tour=0"></iframe>');
+    await page.goto(server.origin+'/scroll-host.html');reader=page.frameLocator('iframe');
+  }else await page.goto(server.origin+'/scroll-boundary.html#tour=0');
+  const board=reader.locator('.board'),panel=reader.locator('[data-dv-panel="0"]');
+  const pageY=()=>reader.locator('body').evaluate(()=>scrollY);
+  const resetPage=()=>reader.locator('body').evaluate(()=>scrollTo(0,0));
+  const point=async()=>{const b=await board.boundingBox();return {x:b.x+b.width*.7,y:b.y+Math.min(b.height*.5,240)};};
+  await expect(board).toBeVisible();await expect(panel).not.toBeInViewport();
+  await board.getByRole('button',{name:'Fit diagram',exact:true}).click();
+  await expect(board).toHaveClass(/board-zoomed/);
+  await expect(board).toHaveCSS('overscroll-behavior-x','contain');
+  await expect(board).toHaveCSS('overscroll-behavior-y','auto');
+  expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
+  let before=await pageY(),p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,600);
+  await expect.poll(pageY).toBeGreaterThan(before+200);
+  await expect(panel).toBeInViewport();
+  await page.screenshot({path:info.outputPath('standard-fit-scroll-'+(embedded?'iframe':'standalone')+'.png')});
+  await resetPage();
+  // Real modified wheel remains diagram zoom, without moving its containing page.
+  before=await pageY();const fitted=await width(board);p=await point();await page.mouse.move(p.x,p.y);
+  await page.keyboard.down('Control');await page.mouse.wheel(0,-180);await page.keyboard.up('Control');
+  await expect.poll(()=>width(board)).toBeGreaterThan(fitted*1.5);expect(await pageY()).toBe(before);
+  expect(await board.evaluate(el=>el.scrollHeight-el.clientHeight)).toBeGreaterThan(100);
+  await board.evaluate(el=>{el.scrollTop=0;});p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,80);
+  await expect.poll(()=>board.evaluate(el=>el.scrollTop)).toBeGreaterThan(20);expect(await pageY()).toBe(before);
+  await board.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  const camera={width:await width(board),scroll:await scroll(board)};
+  await page.mouse.wheel(0,600);await expect.poll(pageY).toBeGreaterThan(before+200);await expect(panel).toBeInViewport();
+  await resetPage();await reader.getByRole('button',{name:'Explore',exact:true}).click();
+  await expect(board).toHaveClass(/explore-board/);
+  await expect(board).toHaveCSS('overscroll-behavior-y','contain');
+  await reader.getByRole('button',{name:'Standard',exact:true}).click();
+  expect(await width(board)).toBeCloseTo(camera.width,0);expect(await scroll(board)).toEqual(camera.scroll);
+  await expect(reader.locator('body')).not.toHaveClass(/viewer-exploring/);
+  await resetPage();p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,600);
+  await expect.poll(pageY).toBeGreaterThan(200);await expect(panel).toBeInViewport();
+});

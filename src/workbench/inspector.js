@@ -251,7 +251,7 @@ function iconPickerControl(select){
   }
 function brandControl(val,ctx){
     var target=Object.assign({},session.target),source=session.text();
-    return createFlowBrandControl({document:document,shared:ctx.diagram.brand,local:val.brand,
+    return createFlowBrandControl({document:document,global:FlowBrand.global(),shared:ctx.diagram.brand,local:val.brand,
       controls:{row:frow,action:actionButton,text:textControl,select:selectControl},iconPicker:iconPickerControl,
       source:function(){return session.text();},listen:listen,onRetire:function(fn){formLife.own(fn);},error:formError,
       change:function(shared,value){return commitCascade(function(raw){

@@ -5,7 +5,12 @@ exports and asset selections. `tools/source-loader.cjs` is the only physical
 source expansion and substitution implementation. Python calls its CLI; host
 builders and Node tests call the same API. Assembly runs during development and
 packaging. Deployed pages and packages contain static code and local assets,
-without a source checkout, runtime filesystem reads or source evaluation.
+without a source checkout, runtime filesystem reads or source evaluation. The
+validator bundle includes `src/company-brand.config.js` exactly once before
+`src/icons/brand.js`, so standalone, workbench, native, Backstage, Forge and
+Confluence renderers receive the same offline global company brand. Rebrand all
+targets by editing that config object; do not add host-specific runtime fetches
+or generated copies.
 
 ## Entrypoints and host boundaries
 

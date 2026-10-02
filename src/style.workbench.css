@@ -502,7 +502,10 @@ body.workspace-focus .workspace-tools{margin-top:0;}
    show through, matching the published pages. */
 .docview.sk-aurora.sk-editorial, .docview.sk-aurora.sk-terminal,
 .docview.sk-aurora.sk-pastel, .docview.sk-aurora.sk-blueprint{background:transparent;}
-.doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:24px; color:var(--dink); margin:0 0 4px;}
+.doc-heading{display:flex;align-items:center;gap:16px;margin:0 0 4px;}
+.doc-title{font-family:'Sora',sans-serif; font-weight:700; font-size:24px; color:var(--dink); margin:0;min-width:0;}
+.doc-company-brand{margin-left:auto;min-width:0;max-width:45%;color:var(--dink);font:650 12px/1.3 'IBM Plex Sans',sans-serif;}
+.doc-company-brand .fv-brand-mark{width:26px;height:26px;}
 .doc-sub{font:500 11px 'IBM Plex Mono',monospace; color:var(--dfaint); margin:0;}
 /* spec editor */
 .specbox{margin-top:14px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
@@ -1265,7 +1268,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-diagram:not(.welcome-active) #docview,.workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec{container-type:normal;}
 .workspace-diagram:not(.welcome-active) #docview{padding:0;}
 .workspace-diagram:not(.welcome-active) .layout-preview-stage,.workspace-diagram:not(.welcome-active) .layout-preview-frame{width:100%!important;overflow:visible;padding:0;}
-.workspace-diagram:not(.welcome-active) #docview>.doc-title,.workspace-diagram:not(.welcome-active) #docview>.tabbar,.workspace-diagram:not(.welcome-active) #docview>header{display:none;}
+.workspace-diagram:not(.welcome-active) #docview>.doc-heading,.workspace-diagram:not(.welcome-active) #docview>.tabbar,.workspace-diagram:not(.welcome-active) #docview>header{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .doc-sec.workspace-active-section{display:block;position:fixed;inset:0;margin:0;padding:0;border:0;border-radius:0;background:none;box-shadow:none;outline:0;}
 .workspace-diagram:not(.welcome-active) .workspace-active-section>:not(.section-viewport){display:none;}

@@ -51,14 +51,28 @@ patches an existing `supply` card in the `app` panel.
 
 ## Share a company name and mark
 
+The source-controlled global default lives in
+[`src/company-brand.config.js`](../src/company-brand.config.js). Replace the
+conspicuous `YOUR COMPANY` values there once to update the shared document
+header plus every inheriting Phone, Device app, Camera screen and Security
+monitoring surface. `logo` accepts either a 1–4 character monogram or a complete
+embedded PNG/JPEG/WebP data URI. `primaryColor` and `secondaryColor` accept
+`#RGB` or `#RRGGBB`. The file is bundled into every viewer; it never fetches a
+runtime logo or configuration.
+
 Select a **Phone**, **Device app**, **Camera screen** or **Security monitoring**
 panel and expand **Inspect → Company branding**. **Use brand** offers:
 
-- **Shared across this diagram**: edit the name and mark once for every
-  supported panel that inherits this diagram's brand.
+- **Diagram / global brand**: preview the effective global brand and optionally
+  save only the fields this diagram overrides.
 - **Override for this panel**: customize this panel while retaining omitted
-  shared values.
-- **No brand on this panel**: hide the shared brand on this panel.
+  global and diagram values.
+- **No brand on this panel**: hide all inherited branding on this panel.
+
+The diagram-scope controls also provide **Hide global brand in this diagram**.
+That writes `diagram.brand:false`; restoring the global brand removes the field.
+Inherited values appear in the preview and as input hints, but they are not
+copied into the authored spec when choosing an override scope.
 
 Set **Company / app name** and choose **Library icon**, **Monogram**, or
 **Upload logo**. Choosing a mark replaces the other mark formats in that scope.
@@ -66,10 +80,14 @@ Monograms contain 1–4 characters. Uploads accept PNG, JPEG or WebP up to 512 K
 and 4096 × 4096 pixels; the image is embedded in the saved spec. **Accent color**,
 **Monogram background**, and **Text color** accept `#RGB` or `#RRGGBB`.
 
-The shared declaration is `diagram.brand`. A missing `panel.brand` inherits;
-`false` suppresses branding; an object overrides supplied properties. A valid
-local `logoImage`, `icon`, or `logo` replaces the shared mark as a unit. If a
-manually authored object contains multiple marks, rendering prefers
+Precedence is global → `page.brand` for the document-header lockup, and global
+→ `diagram.brand` → `panel.brand` for supported panels. `page.brand:false`
+hides the header lockup. `diagram.brand:false` opts the diagram out of the
+global fallback; a local panel object can still brand a specific panel. A
+missing `panel.brand` inherits, `false` suppresses branding, and an object
+overrides supplied properties. A valid local `logoImage`, `icon`, or `logo`
+replaces the inherited mark as a unit. If a manually authored object contains
+multiple marks, rendering prefers
 `logoImage`, then `icon`, then `logo`. The compact Camera watermark needs a mark;
 an app name alone is shown on the other supported surfaces.
 
@@ -152,8 +170,10 @@ them to the existing 21-symbol sprite, preserving legacy diagram tint behavior.
 `symbols({newOnly:false})` emits all 63 for consumers that have no legacy sprite.
 Do not append the full set to a document that already contains those IDs.
 
-[`src/icons/brand.js`](../src/icons/brand.js) owns `FlowBrand.clean`, `resolve`,
-`warnings`, and `render`. [`src/panels/media.js`](../src/panels/media.js) owns the
+[`src/company-brand.config.js`](../src/company-brand.config.js) is the one global
+company-brand edit point. [`src/icons/brand.js`](../src/icons/brand.js) converts
+it into the safe immutable model and owns `FlowBrand.clean`, `resolve`,
+`effective`, `warnings`, and `render`. [`src/panels/media.js`](../src/panels/media.js) owns the
 shared embedded-raster validator used by images, app screens and branding.
 The editor owns transactions and form lifetime through
 [`icon-picker.js`](../src/workbench/icon-picker.js) and

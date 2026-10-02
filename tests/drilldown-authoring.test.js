@@ -464,3 +464,25 @@ test('retargeting a local detail resets child bindings while retaining unrelated
   assert.deepEqual(saved.future,{keep:true});h.session.undo();assert.equal(h.text,before);
  }
 });
+
+test('local handoffs follow section identity, move and deletion while external destinations stay untouched',()=>{
+ const raw=fixture();delete raw.page.blocks[1].tabs[0].sections[0].detailOnly;
+ const assigned=run('planSetNodeHandoff',raw,0,'domain',{localSection:'inside'}).raw;
+ parent(assigned).nodes.other.handoff={spec:'external',section:'inside'};delete parent(assigned).nodes.other.detail;
+ const renamed=run('planSetSectionIdentity',assigned,1,'id','renamed').raw;
+ assert.equal(parent(renamed).nodes.domain.handoff.localSection,'renamed');
+ assert.equal(parent(renamed).nodes.other.handoff.section,'inside');
+ assert.deepEqual(Array.from(B.validate(B.normalize(renamed)).errors),[]);
+ const moved=run('planMoveTab',renamed,1,0,1).raw;
+ assert.equal(parent(moved).nodes.domain.handoff.localSection,'renamed');
+ const removed=run('planDeleteTab',moved,1,1).raw;
+ assert.equal(parent(removed).nodes.domain.handoff,undefined);
+ assert.equal(parent(removed).nodes.other.handoff.section,'inside');
+ const hidden=fixture();assert.match(B.planSetNodeHandoff(JSON.stringify(hidden),hidden,0,'domain',{localSection:'inside'}).error,/not detail-only/);
+});
+
+test('handoff authoring rejects the current section without changing source',()=>{
+ const raw=fixture(),text=JSON.stringify(raw);
+ const result=B.planSetNodeHandoff(text,raw,0,'domain',{localSection:'overview'});
+ assert.match(result.error,/different diagram section/);assert.equal(result.text,undefined);assert.equal(JSON.stringify(raw),text);
+});

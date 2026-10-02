@@ -212,7 +212,7 @@ function planMoveSection(text, raw, sectionIdx, delta){
 }
 
 /* Repoint local detail declarations after section identity/order changes.
-   Only the affected detail values are rewritten; all other source bytes stay
+   Only the affected detail and local handoff values are rewritten; all other source bytes stay
    intact. Removed targets lose their detail action in this same transaction. */
 function builderSectionListMap(listPath,index,delta){
   return function(path){
@@ -244,15 +244,19 @@ function builderDocumentDetailResult(plan,raw,mapPath,copies){
     if(!nextOwner)return;
     var d=specValueAt(raw,record.diagram);
     Object.keys(d && d.nodes || {}).forEach(function(id){
-      var detail=d.nodes[id] && d.nodes[id].detail,index=builderDetailIndex(records,detail);
-      if(index<0 || error)return;
-      var targetPath=mapPath(records[index].path),target=targetPath && nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(targetPath);});
-      if(target && String(detail.section)===target.reference)return;
-      var copy=target?builderClone(detail):null;
-      if(copy)copy.section=target.reference;
-      var changed=jsonSetField(out,nextOwner.diagram.concat(['nodes',id]),'detail',copy?JSON.stringify(copy,null,2):null);
-      if(!changed){error={error:'could not update a detail reference'};return;}
-      out=changed.text;
+      ['detail','handoff'].forEach(function(field){
+        var value=d.nodes[id] && d.nodes[id][field],key=field==='handoff'?'localSection':'section';
+        if(!value || (field==='handoff' && value.localSection==null))return;
+        var index=builderDetailIndex(records,field==='handoff'?{section:value.localSection}:value);
+        if(index<0 || error)return;
+        var targetPath=mapPath(records[index].path),target=targetPath && nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(targetPath);});
+        if(target && String(value[key])===target.reference)return;
+        var copy=target?builderClone(value):null;
+        if(copy)copy[key]=target.reference;
+        var changed=jsonSetField(out,nextOwner.diagram.concat(['nodes',id]),field,copy?JSON.stringify(copy,null,2):null);
+        if(!changed){error={error:'could not update a '+field+' reference'};return;}
+        out=changed.text;
+      });
     });
   }
   records.forEach(function(record){updateOwner(record,mapPath(record.path));});
@@ -280,7 +284,7 @@ function planSetSectionIdentity(text,raw,sectionIdx,key,value){
   }
   var plan=builderDocumentDetailResult(planSetField(text,raw,rec.section,key,value==null?null:JSON.stringify(value)),raw);
   if(plan.error)return plan;
-  var errors=[];validateDetails(normalize(JSON.parse(plan.text)),errors,[]);
+  var errors=[],page=normalize(JSON.parse(plan.text));validateDetails(page,errors,[]);validateLocalHandoffs(page,errors);
   return errors.length?{error:errors.join('\n')}:plan;
 }
 function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
@@ -289,6 +293,12 @@ function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
   if(handoff!=null){
     if(node.detail!=null)return {error:'Remove the existing domain detail before applying a diagram handoff.'};
     var errors=[];validateHandoff(handoff,node,'node '+nodeId+'.handoff',errors);
+    if(handoff.localSection!=null){
+      var destination=localHandoffTarget(normalize(raw),handoff);
+      if(!destination)errors.push('Choose an existing diagram section that is not detail-only.');
+      else if(destination.number===sectionIdx+1)errors.push('Choose a different diagram section.');
+      else handoff=Object.assign({},handoff,{localSection:destination.reference});
+    }
     if(errors.length)return {error:errors.join('\n')};
   }
   return planSetField(text,raw,path,'handoff',handoff==null?null:JSON.stringify(handoff,null,2));

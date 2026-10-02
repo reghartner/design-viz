@@ -37,3 +37,30 @@ test('handoff art uses bounded arrow geometry and safe links while preserving bu
  const editing=B.handoffNodeContent(node,p,'push','test',{authoring:true});assert.match(editing,/class="card handoff-card"[\s\S]*<a/);
  const missing=B.handoffNodeContent({title:'Push',handoff:{spec:'push'}},p,'push','test',{});assert.doesNotMatch(missing,/<a/);assert.match(missing,/DESTINATION UNAVAILABLE/);
 });
+
+test('local handoffs resolve across tabs, are distinct from external selectors and reject missing or hidden targets',()=>{
+ const raw=require('../examples/tab-handoffs/tab-handoffs.spec.json'),page=B.normalize(raw);
+ const handoff=page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff;
+ assert.deepEqual(Array.from(B.validate(page).errors),[]);
+ assert.equal(B.localHandoffTarget(page,handoff).tab,1);
+ assert.ok(B.FlowviewCompatibility.detect(raw).includes('flow.local-handoff'));
+ for(const value of [{localSection:'missing'},{localSection:''},{localSection:2},{localSection:'delivery',url:'https://example.com'}, {localSection:'delivery',spec:'other'}]){
+  const copy=structuredClone(page);copy.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff=value;
+  assert.ok(B.validate(copy).errors.length,JSON.stringify(value));
+ }
+ const hidden=structuredClone(page);hidden.blocks[0].tabs[1].sections[0].detailOnly=true;
+ assert.match(B.validate(hidden).errors.join('\n'),/not detail-only/);
+ const node={title:'Delivery',handoff},p={w:170,h:54};
+ const html=B.handoffNodeContent(node,p,'continue','test',{localHandoffTarget:v=>B.localHandoffTarget(page,v)});
+ assert.match(html,/role="button" tabindex="0" data-dv-handoff="delivery"/);
+ assert.doesNotMatch(html,/href=|target="_blank"/);assert.match(html,/CONTINUE/);
+});
+
+test('self handoffs are rejected while detail-to-overview handoffs remain valid',()=>{
+ const page=B.normalize(structuredClone(require('../examples/tab-handoffs/tab-handoffs.spec.json')));
+ page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff={localSection:'orders'};
+ assert.match(B.validate(page).errors.join('\n'),/choose a different diagram section/);
+ page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff={localSection:'delivery'};
+ page.blocks.push({id:'child',heading:'Child',detailOnly:true,diagram:{nodes:{back:{handoff:{localSection:'orders'}}},rows:[['back']]}});
+ assert.deepEqual(Array.from(B.validate(page).errors),[]);
+});

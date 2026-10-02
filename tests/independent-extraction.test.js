@@ -344,3 +344,15 @@ test('generated dependency IDs avoid the exported root heading alias',()=>{
   assert.equal(section(exported,0).heading,'Dependency1');
   assert.equal(B.detailTarget(exported.page,diagram(exported).nodes.accept.detail).section.heading,'Nested processing');
 });
+
+test('extraction carries local handoff dependencies as visible diagrams with rewritten references',()=>{
+ const raw=fixture();
+ raw.page.blocks.push({id:'delivery',heading:'Delivery',diagram:{nodes:{next:{title:'Next'}},rows:[['next']]}});
+ diagram(raw).nodes.accept.handoff={localSection:'delivery'};
+ for(const mode of ['local','external']){
+  const result=extract(raw,['accept','store'],{mode,title:'Orders',handoff:{url:'https://example.com/orders'}});
+  const child=result.plan.childSpec,local=child.page.sections[0].diagram.nodes.accept.handoff;
+  const target=child.page.sections.find(s=>s.id===local.localSection);
+  assert.ok(target);assert.equal(target.detailOnly,undefined);assert.equal(target.heading,'Delivery');valid(child);
+ }
+});

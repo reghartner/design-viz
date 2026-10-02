@@ -508,22 +508,36 @@ function handoffControls(val){
     var target=session.target,fold=document.createElement('details'),summary=document.createElement('summary');
     fold.className='node-handoff-editor';summary.textContent='Diagram handoff';fold.appendChild(summary);
     var note=document.createElement('p');note.className='fnote';
-    note.textContent='The node’s arrow continues in a separate diagram document. Supply a destination URL or a stable spec ID for the host to resolve. Use link above for source documentation. Apply saves these fields together.';
+    note.textContent='Continue to another diagram in this spec or a separate document. This spec switches to the destination’s tab and offers a return button. Apply saves the destination.';
     fold.appendChild(note);
     if(val.detail!=null){
       var conflict=document.createElement('p');conflict.className='fnote';
       conflict.textContent='Remove the existing domain detail before applying a diagram handoff.';fold.appendChild(conflict);
     }
     var actions=actionGroup('Diagram handoff actions');fold.appendChild(actions);
-    var draft=val.handoff || {},fields={};
+    var draft=val.handoff || {},fields={},local=draft.localSection!=null;
+    var kind=selectControl(['This spec','Separate document'],local?'This spec':'Separate document',function(){return true;},false);
+    kind.setAttribute('aria-label','Handoff destination');fold.appendChild(frow('Handoff destination',kind));
+    var localFields=document.createElement('div'),externalFields=document.createElement('div');
+    var records=sectionRecords(normalize(parseEditor().raw)).filter(function(record){return record.section.diagram && !record.section.detailOnly && record.number!==target.section+1;});
+    var destination=selectControl(records.map(function(record){return record.reference;}),draft.localSection,function(){return true;},true);
+    Array.prototype.forEach.call(destination.options || [],function(option){
+      var record=records.find(function(rec){return rec.reference===option.value;});
+      if(record)option.textContent=(record.tabLabel?record.tabLabel+' → ':'')+(record.section.heading || record.reference);
+    });
+    destination.setAttribute('aria-label','Destination section');localFields.appendChild(frow('Destination section',destination));fold.appendChild(localFields);fold.appendChild(externalFields);
+    function showDestination(){local=kind.value==='This spec';localFields.hidden=!local;externalFields.hidden=local;}
+    listen(kind,'change',showDestination);showDestination();
     [['url','Destination URL','https://…'],['spec','Spec ID (optional)','stable-spec-id'],
       ['revision','Revision (optional)','pinned revision; requires a spec ID'],['section','Section (optional)','section ID; requires a spec ID']].forEach(function(field){
       var control=document.createElement('input');control.type='text';control.className='fctl';
       control.value=draft[field[0]]==null?'':String(draft[field[0]]);control.placeholder=field[2];fields[field[0]]=control;
-      fold.appendChild(frow(field[1],control));
+      externalFields.appendChild(frow(field[1],control));
     });
     actions.appendChild(actionButton('Apply handoff',function(){
-      var handoff={};Object.keys(fields).forEach(function(key){var value=fields[key].value.trim();if(value)handoff[key]=value;});
+      var handoff={};
+      if(local)handoff.localSection=destination.value;
+      else Object.keys(fields).forEach(function(key){var value=fields[key].value.trim();if(value)handoff[key]=value;});
       var ok=commitCascade(function(raw){return planSetNodeHandoff(session.text(),raw,target.section,target.id,handoff);});
       if(ok)refreshFormSoon();
     },'igroup-apply'));

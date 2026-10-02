@@ -198,6 +198,14 @@ closed for a fresh selection; open the named group before using its controls.
 Ordinary fields save as edited; handoff/detail composers have their own Apply
 at the top of the expanded group. Open groups remain open during same-object edits.
 
+For a continuation between peer diagrams on different tabs, use a node
+`handoff: {localSection: "destination-section-id"}`. It switches tabs in place
+and provides a return button while retaining both diagrams' reading positions.
+Use an ordinary diagram section with a stable ID as the destination; `detail`
+remains the focused drilldown option. See
+[diagram handoffs](../../../cookbook/diagram-handoffs.md) for local and external
+destinations and the **Diagram handoff → This spec** editor controls.
+
 When handing off a page for human editing, the workbench’s **Change panel type…**
 action reviews discarded setup and step state before replacement. See
 [Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).

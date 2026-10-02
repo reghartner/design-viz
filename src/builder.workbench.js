@@ -931,6 +931,7 @@ function initWorkbenchBuilder(opts){
     if(panelPicker)panelPicker.invalidate();
     if(addMenu)addMenu.invalidate();
     if(catalogPicker)catalogPicker.invalidate();
+    if(topologyPicker)topologyPicker.invalidate();
     interactions.beforeReplace(request);
     if(sectionLayoutEditor && sectionLayoutEditor.beforeReplace)sectionLayoutEditor.beforeReplace();
     hideDiff();
@@ -1067,7 +1068,7 @@ function initWorkbenchBuilder(opts){
         return {section:index,label:builderInsertTargetText(parsed.raw,index).replace(/^into /,'')};
       });
       var rec=parsed.error ? null : specSectionPaths(parsed.raw)[session.insertSection];
-      return {text:session.text(),raw:parsed.raw,section:session.insertSection,sections:sections,
+      return {text:session.text(),raw:parsed.raw,project:parsed.project,section:session.insertSection,sections:sections,
         label:rec ? builderInsertTargetText(parsed.raw,session.insertSection).replace(/^into /,'') : '',
         diagram:rec && specValueAt(parsed.raw,rec.diagram),prose:!!(rec && rec.section.length),error:error,locked:locked};
   }
@@ -1082,6 +1083,22 @@ function initWorkbenchBuilder(opts){
   });
   var catalogBtn=document.getElementById('add-catalog');
   if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
+  var topologyPicker=initTopologyPicker({document:document,src:src,pause:pausePreview,
+    context:function(){return Object.assign(additionContext(),{topologyContext:session.topologyContext()});},
+    insert:function(plan,snapshot,context){
+      if(!session.accept(plan,{snapshot:snapshot,topologyContext:context,beforePublish:clearMultiSelect}))return false;
+      session.insertSection=plan.section;
+      var record=specSectionPaths(JSON.parse(plan.text))[plan.section],ti=record.section.indexOf('tabs');
+      if(ti>=0){var tab=document.getElementById('tab-'+record.section[ti-1]+'-'+record.section[ti+1]);if(tab)tab.click();}
+      if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(plan.section);
+      var target={kind:'node',section:plan.section,id:plan.id};
+      var node=findTargetEl(target);selectTarget(Object.assign(target,{el:node}),false);
+      if(node)node.scrollIntoView({block:'nearest',inline:'nearest'});
+      refreshProvenance();return true;
+    }
+  });
+  var topologyBtn=document.getElementById('add-topology');
+  if(topologyBtn)life.listen(topologyBtn,'click',function(){confirmAddition(function(){if(topologyPicker)topologyPicker.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
     addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
     chooseSection:function(index){
@@ -1134,6 +1151,7 @@ function initWorkbenchBuilder(opts){
     pausePreview();
     interactions.retire();
     if(catalogPicker)catalogPicker.close(false);
+    if(topologyPicker)topologyPicker.close(false);
     if(addMenu)addMenu.close(false); if (panelPicker) panelPicker.close(); hideDiff(); clearMultiSelect(); clearStepMarkers();
     setSelected(null); retireInspector();
   }
@@ -1173,6 +1191,7 @@ function initWorkbenchBuilder(opts){
   life.own(function(){if(panelPicker)panelPicker.destroy();});
   life.own(function(){if(addMenu)addMenu.destroy();});
   life.own(function(){if(catalogPicker)catalogPicker.destroy();});
+  life.own(function(){if(topologyPicker)topologyPicker.destroy();});
   life.own(function(){interactions.destroy();});
   life.own(function(){hideDiff();if(guide)guide.hidden=true;});
   var agentChanges=new Map(),sourceOrigin=null;

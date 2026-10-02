@@ -87,14 +87,25 @@ function createBuilderSession(options){
       if(disposed || !plan || plan.error)return false;
       var before=text(),expected=hooks && hooks.snapshot;
       if(expected && (expected.text!==before || expected.project!==project))return false;
-      if(topologyContext){
-        try{resolve(JSON.parse(plan.text));}catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}
+      var nextContext=hooks && hooks.topologyContext || topologyContext;
+      if(nextContext){
+        try{
+          if(nextContext!==topologyContext){
+            if(!topologyContext || nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
+            topologyContext.specs.forEach(function(spec){
+              var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
+              if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
+            });
+          }
+          resolve(JSON.parse(plan.text),nextContext);
+        }catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}
       }
       if(typeof FlowTopology!=='undefined'){
         var topologyError=FlowTopology.editError(parse(before).raw,parse(plan.text).raw);
         if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
       }
       pushUndo(hooks && hooks.history || before);
+      if(nextContext!==topologyContext)topologyContext=JSON.parse(JSON.stringify(nextContext));
       if(hooks && hooks.beforePublish)hooks.beforePublish();
       options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);

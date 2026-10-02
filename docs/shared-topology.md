@@ -36,6 +36,24 @@ occupy it. Edge keys naturally become `as::from->as::to`. Different imports in
 one diagram require distinct namespaces. Nested imports are allowed; cycles
 are rejected. Stable attachment aliases/ports are not part of this version.
 
+Consumers can select a **subset inside a named export** with optional `nodes` and
+`edges` arrays of provider-local stable IDs/edge keys:
+
+```json
+{"spec":"platform", "export":"core", "as":"api", "nodes":["api"], "edges":[]}
+```
+
+Each omitted array means the full corresponding export array. `nodes` must select
+at least one node; `edges: []` deliberately selects no connections. Both arrays
+must contain unique strings and may not reach outside the named export. Every
+selected edge requires both selected endpoints: removing a node does not silently
+remove its connections. Export order determines layout, not selection order.
+Groups/ancestors and protocols follow selected objects automatically. A removed
+or renamed explicitly selected identity fails resolution even if no step uses it.
+New unselected identities do not expand a pinned subset; omission follows the
+provider's full export on explicit reopen. Narrative edge selection is separate:
+importing three edges and firing only two is still supported.
+
 Exports include selected nodes and edges, their catalog/code metadata, and the
 group ancestry required by those nodes. Group IDs and parent references receive
 the same namespace. Custom edge protocol definitions follow the export;
@@ -73,8 +91,7 @@ reload/reopen; the internal geometry is freshly derived around the same origin.
 An import-only parent may omit nodes/rows/edges. Its derived layout uses an empty
 row scaffold `[[]]` for renderer compatibility; imported IDs never enter rows.
 Local connecting endpoints must still be placed. Other layout settings remain
-consumer-owned. A human Add-to-Diagram import picker is a follow-up, not part of
-this change; it can create these same authored import/position fields.
+consumer-owned.
 
 ## Compatibility and publication
 
@@ -129,6 +146,37 @@ Build tooling and evidence baselines preserve imports/exports in source files.
 
 ## Authoring in Workbench
 
+In a deployed Canon v3 editor, choose **Add to diagram → Referenced topology**.
+Search by provider name, ID or owner, then choose its page section and named
+export. Only that export's nodes and connections are offered. All start selected;
+uncheck unwanted objects, keeping both endpoints of each selected connection.
+Closure errors and namespace collisions disable insertion and explain what to
+fix. Choose a destination diagram section and a unique namespace. **Add reference**
+inserts one authored import in one Undo transaction, selects its first node, and
+previews the floating child immediately. Select-all uses the full-export shorthand;
+a partial selection writes explicit `nodes`/`edges`. No position is written until
+you drag the child. Escape/Cancel, stale source, failed fetches, revision mismatch
+or invalid imports leave source and history unchanged.
+
+The dialog deliberately loads a chosen provider and its dependencies from the
+same v3 index/revision lock captured on Canon entry. It never reloads that index
+or refreshes existing providers. Browsing caches successful fetches for this
+session; only successful insertion extends persisted provider context. Undo
+removes the import but retains the frozen cache for Redo. Recovery carries that
+context and catalog; JSON downloads contain references only, while offline HTML
+exports also embed the frozen authored context. Offline, legacy v1/v2 and backend
+sessions without a v3 authored-source catalog show an unavailable explanation,
+without guessing network paths. Reopen Canon to use a later deployment.
+
+Agent and UI authoring use the same contract. The headless
+`planAddTopologyImport(text, raw, sectionIndex, reference, context)` in
+`src/workbench/commands/topology.js` returns a surgical source plan after resolving
+the complete candidate with `FlowTopology.resolveSource`. It accepts the same
+subset and placement fields, never writes provider hardcopy, and reports invalid
+closure/collisions before publication. UI applies this plan through the normal
+session transaction; agents can author equivalent reference JSON and validate
+the complete approved batch using the Canon publisher.
+
 Open the published consumer and choose **Edit in Workbench**. The local copy
 renders imported topology and exposes ordinary steps, paths, failures and panels.
 The provenance label names the frozen session; imported node/edge/group inspectors
@@ -154,8 +202,8 @@ explicit reload/reopen; an already-open consumer never updates automatically.
 ## Executable example
 
 [`examples/canon/topology`](../examples/canon/topology/registry.json) includes a
-platform provider, default-floating checkout consumer, and explicitly positioned
-`checkout-positioned` consumer with local narrative steps:
+platform provider, default-floating checkout consumer, explicitly positioned
+`checkout-positioned` consumer, and node-only `checkout-subset` consumer:
 
 ```sh
 python3 tools/build.py

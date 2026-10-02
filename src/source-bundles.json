@@ -53,6 +53,7 @@
     "workbench/commands/extraction.js",
     "workbench/commands/narrative.js",
     "workbench/commands/layout.js",
+    "workbench/commands/topology.js",
     "workbench/persistence.js",
     "workbench/session.js",
     "workbench/field-values.js",
@@ -85,6 +86,7 @@
     "workbench/interactions.js",
     "workbench/add-menu.js",
     "workbench/catalog-picker.js",
+    "workbench/topology-picker.js",
     "workbench/story-brief.js",
     "builder.workbench.js"
   ],

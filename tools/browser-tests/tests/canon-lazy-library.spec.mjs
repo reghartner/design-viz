@@ -25,6 +25,107 @@ async function publish(server){
 }
 test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recursive:true,force:true});});
 
+async function pickerFixture(page,server){
+  const fixture=await publish(server);
+  fixture.provider={page:{title:'Notification platform',sections:[
+    {id:'channels',heading:'Notification channels',diagram:{nodes:{dispatch:{title:'Dispatcher'},push:{title:'Push'},email:{title:'Email'},sms:{title:'SMS'},private:{title:'Never exported'}},rows:[['dispatch'],['push','email','sms','private']],edges:['push','email','sms'].map(to=>({from:'dispatch',to,kind:'https'})),topologyExports:{channels:{nodes:['dispatch','push','email','sms'],edges:['dispatch->push','dispatch->email','dispatch->sms']}}}},
+    {id:'archive',heading:'Archive section',diagram:{nodes:{archive:{title:'Archive'}},rows:[['archive']],edges:[],topologyExports:{archive:{nodes:['archive'],edges:[]}}}}
+  ]}};
+  await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.provider));
+  fixture.specs.second.page.blocks.push({id:'destination',heading:'Another destination',diagram:{nodes:{local:{title:'Second local'}},rows:[['local']],edges:[]}});
+  await writeFile(path.join(fixture.root,'diagrams/second/second.spec.json'),JSON.stringify(fixture.specs.second));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  fixture.requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))fixture.requests.push(request.url());});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();
+  await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  fixture.before=await page.locator('#src').inputValue();return fixture;
+}
+async function openTopology(page){await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await expect(page.getByRole('dialog',{name:'Referenced topology',exact:true})).toBeVisible();}
+
+test('reference picker browses bounded exports, inserts a closed subset, and preserves history/source/frozen recovery',async({page,server},testInfo)=>{
+  const fixture=await pickerFixture(page,server);
+  expect(fixture.requests).toEqual([fixture.specURL('second')]);await openTopology(page);
+  await expect(page.locator('#topology-add')).toBeEnabled();
+  await expect(page.locator('#topology-search')).toBeFocused();
+  await page.locator('#topology-search').fill('notification');
+  await expect(page.locator('#topology-provider option')).toHaveCount(1);
+  await expect(page.locator('#topology-owner')).toContainText('group:default/home');
+  await expect(page.locator('#topology-section option')).toHaveText(['Notification channels','Archive section']);
+  await page.locator('#topology-section').selectOption('1');await expect(page.locator('#topology-export')).toHaveValue('archive');
+  await expect(page.locator('#topology-nodes input')).toHaveCount(1);
+  await page.locator('#topology-section').selectOption('0');
+  await expect(page.locator('#topology-nodes input')).toHaveCount(4);await expect(page.locator('#topology-edges input')).toHaveCount(3);
+  await expect(page.locator('#topology-contents')).not.toContainText('Never exported');
+  await page.locator('#topology-nodes input[value="email"]').uncheck();
+  await expect(page.locator('#topology-add')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('both endpoints');
+  await page.locator('#topology-edges input[value="dispatch->email"]').uncheck();
+  await page.locator('#topology-namespace').fill('invalid namespace');await expect(page.locator('#topology-add')).toBeDisabled();
+  await page.locator('#topology-namespace').fill('notify');await expect(page.locator('#topology-add')).toBeEnabled();
+  await testInfo.attach('reference-picker',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
+  await page.locator('#topology-add').click();await pagePreview(page);
+  const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[0].diagram;
+  expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify',nodes:['dispatch','push','sms'],edges:['dispatch->push','dispatch->sms']}]);
+  expect(d.nodes['notify::push']).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();expect(d.topologyImports[0].position).toBeUndefined();
+  await expect(page.locator('#docview [data-dv-node="notify::push"]')).toBeVisible();await expect(page.locator('#docview [data-dv-node="notify::email"]')).toHaveCount(0);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+  fixture.provider.page.sections[0].diagram.nodes.push.title='LATER DEPLOYMENT';await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.provider));
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-namespace').fill('notify');await expect(page.locator('#topology-add')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('duplicate namespace');
+  await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#diagram-add')).toBeFocused();
+  expect(fixture.requests).toEqual([fixture.specURL('second'),fixture.specURL('first')]);
+  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  expect(saved.page.blocks).toEqual(raw.page.blocks);expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
+  await page.reload();await pagePreview(page);await expect(page.locator('#src')).toHaveValue(after);
+  await expect(page.locator('#docview')).not.toContainText('LATER DEPLOYMENT');
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await expect(page.locator('#topology-nodes')).not.toContainText('LATER DEPLOYMENT');
+  await page.locator('#topology-cancel').click();expect(fixture.requests).toHaveLength(2);
+});
+
+test('reference picker cancels stale async work and leaves source/history untouched',async({page,server})=>{
+  const fixture=await pickerFixture(page,server);let release;
+  const held=new Promise(resolve=>release=resolve);
+  await page.route(fixture.specURL('first'),async route=>{await held;await route.fulfill({json:fixture.provider});});
+  await openTopology(page);await expect(page.locator('#topology-status')).toContainText('Loading approved');
+  await page.keyboard.press('Escape');release();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  const changed=fixture.before+'\n';await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value;src.dispatchEvent(new Event('input',{bubbles:true}));},changed);
+  await expect(page.locator('#topology-add')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('source or project changed');
+  await page.locator('#topology-cancel').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(page.locator('#undo-builder')).toBeDisabled();
+  expect(fixture.requests).toHaveLength(2);
+});
+
+for(const failure of ['revision','malformed'])test('reference picker fails closed on '+failure+' provider response',async({page,server})=>{
+  const fixture=await pickerFixture(page,server),changed=structuredClone(fixture.provider);changed.page.title='Changed deployment';
+  await page.route(fixture.specURL('first'),route=>route.fulfill(failure==='revision'?{json:changed}:{body:'not json',contentType:'application/json'}));
+  await openTopology(page);await expect(page.locator('#topology-status')).not.toContainText('Loading approved');
+  await expect(page.locator('#topology-add')).toBeDisabled();if(failure==='revision')await expect(page.locator('#topology-status')).toContainText('revision mismatch');
+  await page.locator('#topology-cancel').click();await expect(page.locator('#src')).toHaveValue(fixture.before);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+test('reference picker targets another section, uses the full-export shorthand and suggests a collision-free namespace',async({page,server},info)=>{
+  await pickerFixture(page,server);await page.setViewportSize({width:760,height:1000});await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-destination').selectOption('1');await page.locator('#topology-section').selectOption('1');
+  await page.locator('#topology-add').click();await pagePreview(page);
+  const raw=JSON.parse(await page.locator('#src').inputValue());expect(raw.page.blocks[0].diagram.topologyImports).toBeUndefined();
+  expect(raw.page.blocks[1].diagram.topologyImports).toEqual([{spec:'first',export:'archive',as:'first'}]);
+  await expect(page.locator('#docview [data-dv-node="first::archive"]')).toBeVisible();
+  await openTopology(page);await expect(page.locator('#topology-namespace')).toHaveValue('first-2');
+  await expect(page.locator('#topology-add')).toBeEnabled();
+  await info.attach('reference-picker-narrow',{body:await page.locator('#topology-picker').screenshot(),contentType:'image/png'});
+  await page.locator('#topology-cancel').click();
+});
+
+test('reference picker explains unavailable legacy catalogs without fetching invented sources',async({page,server})=>{
+  const fixture=await publish(server),spec=fixture.specs.second;spec.page.canon=fixture.index.diagrams[1].canon;
+  await writeFile(path.join(fixture.root,'workbench/diagrams.json'),JSON.stringify({version:1,diagrams:[{id:'second',spec}]}));
+  const requests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))requests.push(request.url());});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await pagePreview(page);
+  const before=await page.locator('#src').inputValue();await openTopology(page);await expect(page.locator('#topology-status')).toContainText('unavailable');
+  await expect(page.locator('#topology-add')).toBeDisabled();await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(before);expect(requests).toEqual([]);
+});
+
 test('the backend workspace handoff drags a whole floating import with authored placement and one Undo',async({page,server},testInfo)=>{
   const fixture=await publish(server),sources=[];
   for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));

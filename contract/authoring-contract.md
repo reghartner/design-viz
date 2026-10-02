@@ -103,6 +103,15 @@ failures and panels. Each import defaults to a floating block. Optional
 `position: {x, y}` on the import fixes its minimum node-center coordinates in
 parent diagram units; dragging any imported node moves the entire block and
 writes only that position. Internal node-center spacing is provider-derived.
+Optional `nodes: [providerNodeId]` and `edges: ["from->to"]` on an import select
+within its named export; omission means the full corresponding array. Require
+at least one node, unique identities, and both endpoints of every selected edge.
+`edges: []` allows node-only imports; groups and protocols follow automatically.
+The Workbench **Add to diagram → Referenced topology** picker creates this same
+reference contract from a frozen deployed Canon v3 catalog, in one Undo action.
+An explicit provider selection can extend the frozen session closure; it never
+refreshes already-loaded providers. Offline/legacy sessions without that catalog
+cannot browse providers. Save/download source remains reference-only.
 Canon resolves the complete snapshot before ordinary spec
 validation in memory; published/editable specs retain their references. Readers
 resolve on open and freeze providers for the session, never live-refreshing.

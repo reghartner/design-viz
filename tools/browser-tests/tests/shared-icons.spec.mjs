@@ -33,7 +33,9 @@ test('visual icon picker searches, filters, chooses one transaction, and closes 
 
 test('company logo upload is shared across panels with override, opt-out and Undo',async({page,server},info)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
- const root=page.locator('#docview');await expect(root.locator('.fv-brand-name').first()).toHaveText('Cedar');
+ const root=page.locator('#docview');
+ await expect(root.locator('.doc-heading .fv-brand-name')).toHaveText('YOUR COMPANY');
+ await expect(root.locator('.pt-deviceapp .fv-brand-name')).toHaveText('Cedar');
  await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
  const guide=page.locator('#guide'),brand=guide.locator('.fv-brand-editor');await brand.evaluate(el=>{el.open=true;});
  await expect(brand.locator('.flow-icon-control > select')).toBeHidden();

@@ -43,6 +43,51 @@ async function readCanonLibraryJSON(response,label){
   return JSON.parse(text);
 }
 
+/* Explicit authoring acquisition only. The catalog is captured on Canon entry;
+   never reload it or replace an already-frozen provider during this session. */
+function createTopologyCatalogLoader(context){
+  var catalog=context && context.catalog;
+  if(!catalog || catalog.version!==3 || !context.catalogURL || !/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology is unavailable. Open a diagram from a deployed Canon v3 library. Offline and legacy libraries do not provide an authored-source catalog.');
+  var entries=parseCanonLibrary(catalog),base=new URL(context.catalogURL);
+  if(base.origin!==new URL(location.href).origin || !/\.json$/.test(base.pathname) || base.search || base.hash)throw new Error('The frozen catalog address is unavailable at this origin. Reopen Canon here.');
+  context=JSON.parse(JSON.stringify(context));
+  var requests=new Map();
+  (context.specs || []).forEach(function(source){requests.set(source.page.canon.id,Promise.resolve(source));});
+  function source(entry){
+    if(!requests.has(entry.id)){
+      var request=(async function(){
+        var response=await fetch(canonLibrarySpecURL(entry.specUrl,base),{cache:'no-cache',redirect:'error'});
+        var raw=canonLibrarySpec(await readCanonLibraryJSON(response,'Provider '+entry.id),entry);
+        try{await verifyWorkspaceHandoff(raw,{id:entry.id,revision:entry.revision},window.crypto);}
+        catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen Canon after deployment; your draft has not changed.');}
+        return raw;
+      })().catch(function(ex){
+        // Share in-flight work, but cache only verified successful sources.
+        // A retry still checks the original revision lock; it is not a refresh.
+        if(requests.get(entry.id)===request)requests.delete(entry.id);
+        throw ex;
+      });
+      requests.set(entry.id,request);
+    }
+    return requests.get(entry.id);
+  }
+  return {entries:entries,load:async function(id,currentContext){
+    var frozen=currentContext || context;
+    var specs=new Map(frozen.specs.map(function(spec){return [spec.page.canon.id,spec];})),visited=new Set();
+    async function visit(key){
+      if(visited.has(key))return;visited.add(key);
+      var entry=entries.find(function(item){return item.id===key;});
+      if(!entry)throw new Error('Missing authored provider '+key+' in the frozen catalog.');
+      var raw=await source(entry);specs.set(key,raw);
+      for(var dependency of FlowTopology.dependencies(raw))await visit(dependency);
+    }
+    await visit(id);
+    var expanded=Object.assign({},frozen,{specs:Array.from(specs.values())});
+    var resolved=FlowTopology.materialize(expanded.specs);
+    return {context:JSON.parse(JSON.stringify(expanded)),source:JSON.parse(JSON.stringify(specs.get(id))),resolved:resolved.find(function(spec){return spec.page.canon.id===id;})};
+  }};
+}
+
 function initWorkbenchLibrary(opts){
   var grid=document.getElementById('welcome-library-grid'),status=document.getElementById('welcome-library-status');
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');
@@ -117,7 +162,7 @@ function initWorkbenchLibrary(opts){
       }
     }
     await visit(entry);
-    var context={version:1,id:entry.id,specs:Array.from(sources.values())};
+    var context={version:1,id:entry.id,specs:Array.from(sources.values()),catalog:{version:3,diagrams:snapshotEntries},catalogURL:new URL('diagrams.json',location.href).href};
     return {source:source,spec:FlowTopology.resolveSource(source,context),topologyContext:context};
   }
   function cards(){

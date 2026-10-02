@@ -1,0 +1,16 @@
+{
+  "page": {
+    "title": "Reference only the public API",
+    "canon": {"version":1,"id":"checkout-subset","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id": "checkout", "heading": "Node-only subset of the platform export",
+      "diagram": {
+        "topologyImports": [{"spec":"platform","export":"core","as":"service","nodes":["api"],"edges":[]}],
+        "nodes": {"client":{"title":"Checkout"}},
+        "rows": [["client"]],
+        "edges": [{"from":"client","to":"service::api","kind":"https","label":"Submit order"}],
+        "steps": [{"id":"submit","edge":"client->service::api","text":"The local story calls the referenced API. Storage is outside this selected subset."}]
+      }
+    }]
+  }
+}

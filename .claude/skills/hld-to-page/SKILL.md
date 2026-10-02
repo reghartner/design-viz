@@ -14,8 +14,13 @@ resolve providers on open and freeze them until reload/reopen. Never write gener
 for full-batch validation; standalone validation expects a resolved in-memory value.
 Imports default to floating child blocks. Set optional `position: {x,y}` on the
 import for a stable diagram-unit origin, or drag any imported node in Workbench
-to move the whole block. Never copy nodes to place them. The human import picker
-is a follow-up; author the reference directly for now.
+to move the whole block. Never copy nodes to place them. Optional import `nodes`
+and `edges` arrays select provider-local identities inside the named export;
+omission imports the full corresponding set. Selected edges require both selected
+endpoints. The human **Add to diagram → Referenced topology** picker uses this same
+contract and a frozen deployed Canon v3 catalog; agent authoring can write the
+reference directly or use the pure `planAddTopologyImport` command. See the linked
+contract for subset validation and session acquisition rules.
 
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its

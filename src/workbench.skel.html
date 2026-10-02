@@ -347,6 +347,7 @@
       <button type="button" id="add-paragraph" data-add-kind="paragraph" data-add-prose><span class="diagram-add-symbol" aria-hidden="true">¶</span><span><b>Paragraph</b><small>Write context above the diagram</small></span></button>
       <button type="button" id="add-bullet" data-add-kind="bullet" data-add-prose><span class="diagram-add-symbol" aria-hidden="true">•</span><span><b>Bullet point</b><small>Start a list or add its next point</small></span></button>
       <button type="button" id="add-catalog" data-add-kind="catalog" aria-haspopup="dialog" aria-controls="catalog-picker"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
+      <button type="button" id="add-topology" data-add-kind="topology" aria-haspopup="dialog" aria-controls="topology-picker"><span class="diagram-add-symbol" aria-hidden="true">◇</span><span><b>Referenced topology</b><small>Reuse a provider’s exported structure</small></span></button>
     </div>
     <div id="diagram-add-nodes" hidden>
       <button type="button" class="bbtn" id="diagram-add-back">← All additions</button>
@@ -591,6 +592,30 @@
   </div>
   <button type="button" class="bbtn" id="folder-agent-disconnect-guide" hidden>Disconnect shared folder</button>
   <p id="folder-agent-status" class="folder-agent-hint" role="status"></p>
+</dialog>
+
+<dialog id="topology-picker" class="catalog-picker topology-picker" aria-labelledby="topology-heading" aria-describedby="topology-intro">
+  <header class="catalog-header"><div><div class="catalog-kicker">SHARED STRUCTURE · AUTHORED REFERENCE</div><h2 id="topology-heading">Referenced topology</h2><p id="topology-intro">Browse a provider’s named exports. Keep its structure connected to the source.</p></div><button type="button" class="bbtn" id="topology-close" aria-label="Close referenced topology">×</button></header>
+  <div class="catalog-body">
+    <section class="catalog-main" aria-label="Provider catalog">
+      <label class="catalog-field">Search providers<input id="topology-search" type="search" placeholder="Name, ID or owner" autocomplete="off"></label>
+      <label class="catalog-field">Provider diagram<select id="topology-provider"></select></label>
+      <p id="topology-owner" class="catalog-note"></p>
+      <div class="topology-choices"><label class="catalog-field">Provider section<select id="topology-section"></select></label><label class="catalog-field">Named export<select id="topology-export"></select></label></div>
+      <div id="topology-contents" hidden>
+        <div class="catalog-toolbar"><button type="button" class="bbtn" id="topology-all">Select all</button><span>Connections require both selected endpoints.</span></div>
+        <div class="topology-choices"><fieldset><legend>Nodes</legend><div id="topology-nodes" class="topology-checks"></div></fieldset><fieldset><legend>Connections</legend><div id="topology-edges" class="topology-checks"></div></fieldset></div>
+      </div>
+    </section>
+    <section class="catalog-options" aria-label="Import destination">
+      <div class="catalog-field"><label for="topology-destination">Import destination section</label><select id="topology-destination"></select></div>
+      <label class="catalog-field">Namespace<input id="topology-namespace" type="text" autocomplete="off" spellcheck="false"></label>
+      <p class="catalog-note">IDs become <code>namespace::node</code>. Choose a unique namespace. Imported internals remain provider-owned; your steps and local connections may reference them.</p>
+      <p class="catalog-note">The child starts as a floating block. Drag any imported node to position the whole child. Providers stay frozen until you reopen Canon.</p>
+      <p id="topology-status" class="catalog-summary" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+  <footer class="catalog-footer"><button type="button" class="bbtn" id="topology-cancel">Cancel</button><button type="button" class="bbtn primary" id="topology-add" disabled>Add reference</button></footer>
 </dialog>
 
 <dialog id="catalog-picker" class="catalog-picker" aria-labelledby="catalog-heading" aria-describedby="catalog-destination">

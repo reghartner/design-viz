@@ -108,7 +108,14 @@ authored spec and its provider closure for reading or editing. It verifies sourc
 revisions and resolves [shared topology](shared-topology.md) in memory. Edit in
 Workbench keeps authored imports in the source, saves and recovery; only preview
 uses the derived value. The dependency closure stays frozen until reload/reopen,
-with absolutely no live provider updates. Existing version 1 embedded libraries
+with absolutely no live provider updates. In the editor, **Add to diagram →
+Referenced topology** can explicitly acquire a new provider closure from that
+same frozen v3 index, with revision verification; it cannot refresh existing
+providers. Selection is bounded by named exports and may narrow their nodes and
+edges. Only the authored import is inserted; recovery retains the extended frozen
+context. Offline/legacy sessions without a v3 catalog cannot browse providers.
+See [shared topology authoring](shared-topology.md#authoring-in-workbench).
+Existing version 1 embedded libraries
 and legacy version 2 snapshot URLs remain readable, including the offline demo.
 
 An empty `canon.json` list creates a valid empty index.

@@ -1086,6 +1086,15 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .catalog-picker[open]{display:flex;flex-direction:column;}
 .catalog-picker [hidden]{display:none!important;}
 .catalog-picker::backdrop{background:#17213c66;backdrop-filter:blur(5px);}
+.topology-picker .catalog-field{margin-bottom:16px;}
+.topology-picker select{display:block;width:100%;margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink);font:inherit;}
+.topology-picker select:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
+.topology-choices{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.topology-choices fieldset{min-width:0;border:1px solid var(--line);border-radius:9px;}
+.topology-checks{display:flex;flex-direction:column;gap:10px;max-height:280px;overflow:auto;}
+.topology-checks label{display:flex;align-items:flex-start;gap:8px;overflow-wrap:anywhere;font-size:12px;cursor:pointer;}
+.topology-checks input{flex:none;accent-color:var(--accent);}
+@media(max-width:600px){.topology-choices{grid-template-columns:1fr;}}
 .catalog-picker button,.catalog-picker input,.catalog-picker textarea{box-sizing:border-box;}
 .catalog-picker button:focus-visible,.catalog-picker input:focus-visible,.catalog-picker textarea:focus-visible,.catalog-picker summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;}
 .catalog-header{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;padding:26px 30px;border-bottom:1px solid var(--line);}

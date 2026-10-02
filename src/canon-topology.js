@@ -55,8 +55,9 @@ var FlowTopology = (function(){
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges'],where);
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.export) || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
+          ['nodes','edges'].forEach(function(key){if(own(imp,key))list(imp[key],where+' '+key);});
           if(own(imp,'position')){
             shape(imp.position,['x','y'],where+' position');
             if(!positionedFloat(imp.position))fail(where,'position requires finite x/y coordinates between -100000 and 100000');
@@ -79,7 +80,15 @@ var FlowTopology = (function(){
           visit(imp.spec,chain.concat(where));
           var source=exportsById.get(imp.spec).get(imp.export);
           if(!source)fail(where,'missing export '+imp.export);
-          var provider=source.d,exp=source.exp,selected=new Set(exp.nodes),nodes=provider.nodes || {};
+          var provider=source.d,exp=clone(source.exp),nodes=provider.nodes || {};
+          ['nodes','edges'].forEach(function(key){
+            if(!own(imp,key))return;
+            imp[key].forEach(function(identity){if(!exp[key].includes(identity))fail(where,'selected '+key+' identity is not exported: '+identity);});
+            // Provider order, not checkbox order, defines deterministic geometry.
+            exp[key]=exp[key].filter(function(identity){return imp[key].includes(identity);});
+          });
+          if(!exp.nodes.length)fail(where,'select at least one exported node');
+          var selected=new Set(exp.nodes);
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
           if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];

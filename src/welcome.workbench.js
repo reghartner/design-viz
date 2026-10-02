@@ -238,7 +238,11 @@ function initWorkbenchWelcome(opts){
     try { builder.loadSpec(JSON.parse(JSON.stringify(spec))); error(failureId, ''); enterEditor(); }
     catch (ex){ error(failureId, ex.message || 'This project could not be opened.'); el(failureId).scrollIntoView({block:'nearest'}); }
   }
-  el('workbench-home').addEventListener('click', show);
+  var homeLink=el('workbench-home');
+  /* Keep a real, rename-safe navigation target for open-in-new-tab and for
+     the no-script fallback. Ordinary clicks retain the in-app history. */
+  homeLink.href=window.location.pathname;
+  homeLink.addEventListener('click', function(ev){ev.preventDefault();show();});
   el('workspace-home').addEventListener('click', show);
   headerResume.addEventListener('click', resumeProject);
   resume.addEventListener('click', resumeProject);

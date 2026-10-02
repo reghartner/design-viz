@@ -110,6 +110,8 @@ function renderWorkbenchPreview(view, page, skin, previousPage, previousCtl, lif
   if(lifecycle && lifecycle.beforeReplace)lifecycle.beforeReplace();
   if (previousCtl) previousCtl.destroy();
   var ctl = renderPage(view, page, skin, null, {autoplay:false,authoring:true,layoutTarget:'default'});
+  var links=typeof wireDeepLinks==='function' && typeof window!=='undefined'?wireDeepLinks(ctl,window,null,{history:false}):null,destroy=ctl.destroy;
+  ctl.destroy=function(){if(links)links.destroy();destroy();};
   try{
     restoreActiveTabs(ctl, tabs);
     restoreWorkbenchPreview(page, ctl, saved);
@@ -137,6 +139,8 @@ function renderWorkbenchReaderPreview(view,page,skin,authoringCtl,options){
   options=options || {};
   var saved=options.snapshot || workbenchReaderPreviewSnapshot(page,authoringCtl);
   var ctl=renderPage(view,page,skin,null,{autoplay:false,layoutTarget:options.layoutTarget});
+  var links=typeof wireDeepLinks==='function' && typeof window!=='undefined'?wireDeepLinks(ctl,window,null,{history:false}):null,destroy=ctl.destroy;
+  ctl.destroy=function(){if(links)links.destroy();destroy();};
   ctl.suppressFragmentWrites=true;
   try{
     restoreActiveTabs(ctl,saved.tabs);restoreWorkbenchPreview(page,ctl,saved.sections);

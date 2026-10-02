@@ -1773,7 +1773,7 @@ test('prose collapse controls have print expansion and explicit six-skin styling
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)\{[\s\S]*?\.prosechev\{transition:none !important;\}/);
 });
 
-function deepLinkHarness(activeTarget){
+function deepLinkHarness(activeTarget, options){
   const pageBase = 'https://pages.example.test/page.html?mode=view';
   const historyWrites = [], historyCalls = [], posts = [], copied = [], windowListeners = {};
   const button = {
@@ -1806,7 +1806,8 @@ function deepLinkHarness(activeTarget){
     navigator: {clipboard: {writeText(value){ copied.push(value); return Promise.resolve(); }}},
     setTimeout(){ return 1; },
     clearTimeout(){},
-    addEventListener(type, fn){ windowListeners[type] = fn; }
+    addEventListener(type, fn){ windowListeners[type] = fn; },
+    removeEventListener(type, fn){ if(windowListeners[type]===fn)delete windowListeners[type]; }
   };
   const tabBlock = {
     index:1, count:1, slugs:['overview'], copyButtons:[button], buttons:[],
@@ -1822,7 +1823,7 @@ function deepLinkHarness(activeTarget){
     },
     activeTarget:activeTarget || {kind:'tab', tabBlock:1, tab:0}
   };
-  const channel = C.wireDeepLinks(ctl, win);
+  const channel = C.wireDeepLinks(ctl, win, null, options);
   return {button, channel, copied, ctl, historyCalls, historyWrites, posts, win, windowListeners};
 }
 
@@ -2096,6 +2097,19 @@ test('standalone history writes retain every replaceState argument', () => {
   assert.deepStrictEqual(nonempty.historyCalls[0], [null, '', '#t=overview']);
   assert.deepStrictEqual(empty.historyCalls[0],
     [null, '', '/page.html?mode=view']);
+});
+
+test('host-owned deep links bind current-state copies without changing host routing', () => {
+  const h = deepLinkHarness(undefined, {history:false});
+  assert.deepStrictEqual(h.historyCalls, []);
+  assert.strictEqual(h.windowListeners.hashchange, undefined);
+  h.ctl.onChange();
+  assert.deepStrictEqual(h.historyCalls, []);
+  h.button.listeners.click();
+  assert.strictEqual(h.copied[0],
+    'https://pages.example.test/page.html?mode=view#t=overview');
+  h.channel.destroy();
+  assert.strictEqual(h.win.dvSetLinkBase, undefined);
 });
 
 test('section references are heading-slug primary, unique, and positional only without headings', () => {

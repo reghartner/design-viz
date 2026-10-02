@@ -1985,6 +1985,10 @@ function createExploreNavigation(ctl,options){
     sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0 && !!entry.rec.tabBlock;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
     diagrams.hidden=peers.length<2 && !sectionButtons.some(function(entry){return !entry.rec.tabBlock && entry.rec!==selected;});chapters.hidden=!move(choices,chapters);
     move(options.action,actions);
+    /* The chapter heading sits behind the full-window Explore surface. Keep
+       its real (already wired) embed-link control in the unified navigation,
+       alongside the other chapter actions, and restore it with the rest. */
+    move(rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
     move(host.querySelector('.section-view-settings'),actions);
     move(host.querySelector('.viewport-actions'),actions);
     move(flow,actions);actions.hidden=false;
@@ -3089,12 +3093,14 @@ function bindCopyControl(win, button, urlFn){
   });
 }
 
-function wireDeepLinks(ctl, win, preservedHash){
+function wireDeepLinks(ctl, win, preservedHash, options){
   /* preservedHash (optional): raw "k=v&k=v" text kept at the FRONT of
      every hash this channel writes and of every copied link — the embed
      mode passes "embed=<ref>[&sk=<skin>]" so reloads and links keep the
      embedded view. parseHash ignores the keys, so state handling is
      unaffected. */
+  options=options || {};
+  var manageHistory=options.history!==false;
   var suppress = false;
   var linkBase = null;
   var linkBasePath = null;
@@ -3123,7 +3129,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     linkBase = canonical;
     return true;
   }
-  win.dvSetLinkBase = function(base){
+  var priorSetLinkBase=win.dvSetLinkBase;
+  function setLinkBase(base){
     var canonical = canonicalLinkBase(base);
     if (canonical === null) return false;
     /* Direct calls are same-origin privileged and take precedence: they may
@@ -3134,7 +3141,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     mirrorSource = win.parent;
     mirrorOrigin = win.location.origin;
     return true;
-  };
+  }
+  win.dvSetLinkBase = setLinkBase;
   function section(number){
     for (var i = 0; i < ctl.sections.length; i++)
       if (ctl.sections[i].number === number) return ctl.sections[i];
@@ -3267,10 +3275,13 @@ function wireDeepLinks(ctl, win, preservedHash){
     /* ctl.suppressFragmentWrites: the guided tour drives steppers for its
        demos and spotlights; those moves must never clobber a shared link's
        fragment. The tour restores the pre-tour state before clearing it. */
-    if (suppress || ctl.suppressFragmentWrites) return;
+    /* Host-owned channels never mutate the address bar, so they may keep
+       their copy state current even while normal fragment writes are muted. */
+    if (suppress || (manageHistory && ctl.suppressFragmentWrites)) return;
     syncChangedTarget();
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
+    if(!manageHistory)return h;
     try {
       var historyState=ctl.handoffs?Object.assign({},win.history.state,{dvHandoff:ctl.handoffs.historyState()}):null;
       win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](historyState, '',
@@ -3415,11 +3426,21 @@ function wireDeepLinks(ctl, win, preservedHash){
     });
   });
   ctl.bindDetailCopy=function(button){bindCopy(button,currentHash);};
-  ctl.onChange = write;
+  var priorChange=ctl.onChange,priorActiveStepper=ctl.activeStepper;
+  function linkedChange(){write();if(priorChange)priorChange.apply(ctl,arguments);}
+  ctl.onChange = linkedChange;
   ctl.activeStepper = activeStepper;
-  win.addEventListener('hashchange', apply);
-  if (win.location.hash) apply(); else write();
-  return {receiveLinkBaseMessage:receiveLinkBaseMessage};
+  if(manageHistory)win.addEventListener('hashchange', apply);
+  if(manageHistory && win.location.hash)apply();else write();
+  return {receiveLinkBaseMessage:receiveLinkBaseMessage,destroy:function(){
+    if(manageHistory)win.removeEventListener('hashchange',apply);
+    if(ctl.onChange===linkedChange)ctl.onChange=priorChange;
+    ctl.activeStepper=priorActiveStepper;
+    if(win.dvSetLinkBase===setLinkBase){
+      if(priorSetLinkBase)win.dvSetLinkBase=priorSetLinkBase;
+      else delete win.dvSetLinkBase;
+    }
+  }};
 }
 
 /* ---------------- presenter mode (C1): fullscreen + keyboard ---------------- */

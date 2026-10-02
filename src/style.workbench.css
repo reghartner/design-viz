@@ -26,7 +26,7 @@
 /* The welcome surface has its own quiet palette; project skins remain in the editor. */
 body.welcome-active{background:#f7f8fc;margin:0;}
 .workbench-header{display:flex;align-items:center;justify-content:space-between;max-width:1676px;margin:auto;padding:21px 30px;border-bottom:1px solid var(--line);gap:20px;}
-.workbench-brand{display:flex;align-items:center;gap:11px;padding:0;border:0;background:none;color:var(--ink);font:600 21px 'Sora',sans-serif;letter-spacing:-.9px;cursor:pointer;}
+.workbench-brand{display:flex;align-items:center;gap:11px;padding:0;border:0;background:none;color:var(--ink);font:600 21px 'Sora',sans-serif;letter-spacing:-.9px;text-decoration:none;cursor:pointer;}
 .workbench-mark{width:30px;height:30px;color:#6866c6;}
 .workbench-brand-detail{font:400 13px 'IBM Plex Sans',sans-serif;letter-spacing:0;border-left:1px solid var(--line);padding-left:14px;margin-left:4px;color:var(--sub);}
 .workbench-header-links{display:flex;align-items:center;gap:26px;font-size:13px;}
@@ -1181,8 +1181,8 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .canon-library-badge{font:10px/1.4 system-ui,sans-serif!important;font-weight:750!important;letter-spacing:1.2px;color:#6a6090;background:#eae5f4;padding:6px 9px;border-radius:6px}
 .canon-library-owner{color:#7a8194;overflow-wrap:anywhere}.canon-library-action{margin-top:auto;color:#7161a3;font-weight:650}
 .canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:108px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
-#canon-reader{margin:28px 0 50px;max-width:none}/* Step and embed links still use the standalone viewer. */
-#canon-reader .copychip{display:none}#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
+#canon-reader{margin:28px 0 50px;max-width:none}
+#welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-heading{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
 

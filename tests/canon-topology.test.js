@@ -55,7 +55,9 @@ test('materializes closed, namespaced topology with consumer narrative and bindi
   const specs=source(),before=structuredClone(specs),out=resolve(specs),d=diagram(out[1]);
   assert.deepEqual(specs,before);assert.deepEqual(resolve(specs),out);assert.deepEqual(resolve(out),out);
   assert.deepEqual(resolve([...specs].reverse()).reverse(),out);
-  assert.deepEqual(d.rows,[['client'],['platform::api','platform::store']]);
+  assert.deepEqual(d.rows,[['client']]);
+  assert.deepEqual(d.floats.map(f=>f.id),['platform::api','platform::store']);
+  assert.ok(d.floats.every(f=>Number.isFinite(f.x) && Number.isFinite(f.y)));
   assert.equal(d.nodes['platform::api'].binding.entityRef,'component:default/api');
   assert.equal(d.nodes['platform::api'].group,'platform::backend');
   assert.deepEqual(d.groups['platform::backend'],{label:'Platform'});
@@ -67,23 +69,24 @@ test('removed exported node referenced by consumer edge fails with consumer/impo
   const specs=source(),d=diagram(specs[0]);delete d.nodes.api;d.rows=[['store']];d.edges=[];d.topologyExports.core={nodes:['store'],edges:[]};
   assert.throws(()=>resolve(specs),/checkout.*import platform.*platform export core.*missing node platform::api/);
 });
-test('float-only exported fragments preserve coordinates without importing the provider row anchor',()=>{
+test('float-only exported fragments preserve relative coordinates without importing the provider row anchor',()=>{
   const specs=source(),provider=diagram(specs[0]);
   provider.nodes.anchor={title:'Provider anchor'};provider.rows=[['anchor']];
   provider.floats=[{id:'api',x:100,y:100},{id:'store',x:300,y:100}];
   const before=structuredClone(specs),out=resolve(specs),consumer=diagram(out[1]);
   assert.deepEqual(specs,before);assert.deepEqual(consumer.rows,[['client']]);
-  assert.deepEqual(consumer.floats,[{id:'platform::api',x:100,y:100},{id:'platform::store',x:300,y:100}]);
+  assert.equal(consumer.floats[1].x-consumer.floats[0].x,200);
+  assert.equal(consumer.floats[1].y-consumer.floats[0].y,0);
   assert.equal(consumer.nodes['platform::anchor'],undefined);
   assert.deepEqual(consumer.edges[1],{from:'platform::api',to:'platform::store',kind:'https',label:'Persist'});
   assert.deepEqual(C.validateSpec(out[1]).errors,[]);assert.deepEqual(resolve(out),out);
 });
-test('float-only imports do not bypass ordinary materialized consumer row validation',()=>{
+test('floating imports do not bypass validation of unplaced local connection endpoints',()=>{
   const specs=source(),provider=diagram(specs[0]);
   provider.nodes.anchor={title:'Provider anchor'};provider.rows=[['anchor']];
   provider.floats=[{id:'api',x:100,y:100},{id:'store',x:300,y:100}];
   delete diagram(specs[1]).rows;
-  assert.throws(()=>resolve(specs),/Topology checkout: invalid materialized spec:.*rows: required/);
+  assert.throws(()=>resolve(specs),/Topology checkout: invalid materialized spec:.*client.*not a placed node/);
 });
 test('removed exported edge used by consumer step or failure fails despite ordinary validator warnings',()=>{
   for(const failureOnly of [false,true]){
@@ -130,6 +133,59 @@ test('nested providers resolve from the same batch and retain stable namespace i
   const specs=source(),consumer=diagram(specs[1]);consumer.topologyExports={story:{nodes:['platform::api','platform::store'],edges:['platform::api->platform::store']}};
   const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/team'},sections:[{diagram:{topologyImports:[{spec:'checkout',export:'story',as:'shared'}]}}]}};
   const out=resolve([outer,...specs]);assert.ok(diagram(out[0]).nodes['shared::platform::api']);
+});
+test('floating blocks preserve mixed row, stack and provider-float center geometry and saved origins',()=>{
+  for(const nativeFloat of [{id:'audit',side:'below',dx:30,dy:-10},{id:'audit',x:-120,y:310}]){
+    const specs=source(),provider=diagram(specs[0]),consumer=diagram(specs[1]);
+    provider.nodes.cache={title:'Cache'};provider.nodes.audit={title:'Audit'};
+    provider.rows=[[['api','store'],'cache']];provider.floats=[nativeFloat];
+    provider.topologyExports.core.nodes.push('cache','audit');
+    consumer.topologyImports[0].position={x:280,y:460};
+    const before=structuredClone(specs),expected=C.viewerRouting().layout(provider).pos,out=diagram(resolve(specs)[1]);
+    const actual=C.viewerRouting().layout(out).pos;
+    for(const a of Object.keys(expected))for(const b of Object.keys(expected)){
+      assert.equal(actual['platform::'+a].cx-actual['platform::'+b].cx,expected[a].cx-expected[b].cx);
+      assert.equal(actual['platform::'+a].cy-actual['platform::'+b].cy,expected[a].cy-expected[b].cy);
+    }
+    assert.equal(Math.min(...out.floats.map(f=>f.x)),280);assert.equal(Math.min(...out.floats.map(f=>f.y)),460);
+    assert.deepEqual(out.rows,[['client']]);assert.deepEqual(specs,before);
+    provider.rows=[['api','cache'],['store']];
+    const refreshed=diagram(resolve(specs)[1]);
+    assert.equal(Math.min(...refreshed.floats.map(f=>f.x)),280);assert.equal(Math.min(...refreshed.floats.map(f=>f.y)),460);
+    assert.notDeepEqual(refreshed.floats,out.floats);
+  }
+});
+test('unpositioned imports form separate floating blocks, including an import-only parent',()=>{
+  const specs=source(),consumer=diagram(specs[1]);
+  consumer.topologyImports.push({spec:'platform',export:'core',as:'second'});
+  const out=diagram(resolve(specs)[1]);assert.deepEqual(out.rows,consumer.rows);
+  const [first,second]=out.topologyProvenance.imports;
+  assert.ok(second.position.y>first.position.y);
+  const only=notificationSource(['push','sms']),resolved=diagram(resolve(only)[1]);
+  assert.deepEqual(resolved.rows,[[]]);assert.equal(resolved.floats.length,4);
+  assert.deepEqual(C.validateSpec(resolve(only)[1]).errors,[]);
+});
+test('malformed or overflowing block placements fail with consumer/import diagnostics',()=>{
+  for(const position of [null,[],{}, {x:2},{x:'2',y:4},{x:0,y:100001},{x:0,y:0,z:1},{x:100000,y:0}]){
+    const specs=source();diagram(specs[1]).topologyImports[0].position=position;
+    assert.throws(()=>resolve(specs),/Topology checkout.*import.*position|Topology checkout.*import.*coordinate/);
+  }
+});
+test('placing an import rewrites only authored position and has one Undo; invalid/stale writes nothing',()=>{
+  const vm=require('node:vm'),loader=require('../tools/source-loader.cjs'),context={URL,TextEncoder};
+  vm.createContext(context);vm.runInContext(loader.composeSources(['validator.js','canon.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/layout.js','workbench/session.js']),context);
+  const specs=source(),original='  '+JSON.stringify(specs[1],null,2)+'\n',provider=JSON.stringify(specs[0]);let text='',writes=0;
+  const session=context.createBuilderSession({source:{read:()=>text,write:value=>{text=value;writes++;}},persistence:{read:()=>({}),preserve(){},cancel(){},save(){}},render(){}});
+  session.replaceProject(original,null,{topologyContext:{version:1,id:'checkout',specs}});writes=0;
+  const snapshot=session.snapshot(),plan=context.planPlaceTopologyImport(text,JSON.parse(text),0,'platform',333.34,-70.25);
+  const expected=structuredClone(specs[1]);diagram(expected).topologyImports[0].position={x:333.3,y:-70.2};
+  assert.equal(session.accept(plan,{snapshot}),true);assert.equal(writes,1);assert.deepEqual(JSON.parse(text),expected);
+  assert.ok(text.startsWith('  '));assert.ok(text.endsWith('\n'));assert.equal(JSON.stringify(specs[0]),provider);
+  const after=text;assert.equal(session.accept(plan,{snapshot}),false);assert.equal(text,after);
+  assert.ok(context.planPlaceTopologyImport(text,JSON.parse(text),0,'platform',Infinity,0).error);
+  assert.ok(context.planPlaceTopologyImport(text,JSON.parse(text),0,'missing',0,0).error);
+  assert.equal(session.undo(),true);assert.equal(text,original);assert.equal(session.canUndo(),false);
+  assert.equal(session.redo(),true);assert.equal(text,after);
 });
 test('Backstage resolves approved authored snapshots in memory and retains source for editing',async()=>{
   const {materializeCanonSpecs,prepareCanonSnapshot,buildEntityDiagramIndex,diagramsForEntity}=await import('../tools/canon/entity-diagrams.mjs');

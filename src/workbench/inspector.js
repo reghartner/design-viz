@@ -2341,7 +2341,7 @@ function renderInspector(){
       t.kind==='edge' && resolvedValue?resolvedValue.from+'->'+resolvedValue.to:t.id);
     if(imported){
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Imported structure is resolved in memory; your source keeps its references. Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Drag any imported node to move the whole floating block. Only this import’s position is saved; internal structure stays provider-owned. Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);return;
     }
 

@@ -12,6 +12,10 @@ batch in memory. Publish/save authored references only; readers and Workbench
 resolve providers on open and freeze them until reload/reopen. Never write generated
 `topologyProvenance` over authored import declarations. Use the canon publisher
 for full-batch validation; standalone validation expects a resolved in-memory value.
+Imports default to floating child blocks. Set optional `position: {x,y}` on the
+import for a stable diagram-unit origin, or drag any imported node in Workbench
+to move the whole block. Never copy nodes to place them. The human import picker
+is a follow-up; author the reference directly for now.
 
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its

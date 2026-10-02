@@ -18,8 +18,8 @@ edge identities (Flowview edges are keyed by `from->to`, not a separate edge ID)
 
 Export names are unique across all diagrams/sections of that provider spec.
 An edge export must include both endpoints. Every exported node must have exactly
-one base `rows` or `floats` placement. An export may consist entirely of floats;
-the complete materialized consumer must still have valid `rows`. A consumer
+one base `rows` or `floats` placement. An export may consist entirely of floats.
+A consumer
 imports by the provider's canon ID and export name:
 
 ```json
@@ -45,14 +45,36 @@ local navigation destination valid in the consumer, or use an explicit external
 handoff destination. Provider steps, paths, panels, reveal/hide step indices,
 and named layout alternatives do not cross the export boundary.
 
-Placement preserves the provider's selected base row order, columns and stack
-order, filtering out unselected slots and empty rows. Selected rows append after
-the consumer's own rows in import declaration order. Floats retain their side,
-nudges or absolute coordinates; their automatic anchoring uses the materialized
-graph. This is relative placement, not a frozen screenshot. Authors should use
-row-based exports for reusable blocks; explicit float coordinates remain in the
-consumer's coordinate system. Consumers may omit nodes/rows/edges if imports
-supply them. Other layout settings remain consumer-owned.
+Each import is **one floating child block**, never extra parent rows. The resolver
+first lays out the selected provider fragment in isolation: selected row columns
+and stacks retain their order; unselected slots/empty rows are filtered out.
+Native floats (automatic side/nudges or explicit coordinates) resolve against
+that fragment's own exported edges. All resulting node centers then translate
+together into the parent as absolute floats. Their relative center spacing and
+edge metadata are preserved; cards use the renderer's normal float dimensions,
+not the provider's row/stack card dimensions. This is not a frozen screenshot.
+
+Optional consumer-owned placement lives only on the import:
+
+```json
+{"spec":"platform", "export":"core", "as":"platform", "position":{"x":260,"y":200}}
+```
+
+`position.x/y` are diagram units: the minimum node-center X and Y of the block.
+Both must be finite numbers in `[-100000,100000]`; translated member coordinates
+must also fit that range. Unknown placement fields fail validation. Without a
+position, blocks start at X=110 below existing parent nodes/floats, in declaration
+order. Dragging any imported node moves **all** nodes and incident edge previews
+and saves a position on that import, with one Undo/Redo. Internal structure stays
+read-only. Escape, blur, invalid placement or a source change during drag cancels
+without writing. Saved positions survive provider layout updates on explicit
+reload/reopen; the internal geometry is freshly derived around the same origin.
+
+An import-only parent may omit nodes/rows/edges. Its derived layout uses an empty
+row scaffold `[[]]` for renderer compatibility; imported IDs never enter rows.
+Local connecting endpoints must still be placed. Other layout settings remain
+consumer-owned. A human Add-to-Diagram import picker is a follow-up, not part of
+this change; it can create these same authored import/position fields.
 
 ## Compatibility and publication
 
@@ -118,7 +140,8 @@ before builder transactions write source or add Undo. Raw invalid text remains
 repairable while the last valid preview stays visible.
 
 Consumer narrative and local node-to-imported-node edges remain editable. Edit
-shared structure in the provider. Opening from Canon must load/validate the entire
+shared structure in the provider; drag any imported node to place its whole block.
+Opening from Canon must load/validate the entire
 closure before replacing a current draft. Recovery stores that authored closure
 as auxiliary session context. Offline HTML export embeds the authored consumer
 and frozen authored provider context, resolving only in memory on open.
@@ -131,7 +154,8 @@ explicit reload/reopen; an already-open consumer never updates automatically.
 ## Executable example
 
 [`examples/canon/topology`](../examples/canon/topology/registry.json) includes a
-platform provider and checkout consumer with successful and blocked-storage paths:
+platform provider, default-floating checkout consumer, and explicitly positioned
+`checkout-positioned` consumer with local narrative steps:
 
 ```sh
 python3 tools/build.py

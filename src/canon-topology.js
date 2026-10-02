@@ -36,7 +36,7 @@ var FlowTopology = (function(){
           if(d.topologyProvenance){
             if(!object(d.topologyProvenance) || d.topologyProvenance.version!==1 || !Array.isArray(d.topologyProvenance.imports))fail(at,'invalid generated topologyProvenance');
             d.topologyProvenance.imports.forEach(function(imp){
-              shape(imp,['spec','export','as','nodes','edges','groups'],at+' provenance');
+              shape(imp,['spec','export','as','nodes','edges','groups','position'],at+' provenance');
               if(typeof imp.spec!=='string' || !token(imp.export) || !token(imp.as))fail(at,'invalid generated import provenance');
               ['nodes','edges','groups'].forEach(function(key){list(imp[key],at+' provenance '+key);});
             });
@@ -55,8 +55,12 @@ var FlowTopology = (function(){
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position'],where);
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.export) || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
+          if(own(imp,'position')){
+            shape(imp.position,['x','y'],where+' position');
+            if(!positionedFloat(imp.position))fail(where,'position requires finite x/y coordinates between -100000 and 100000');
+          }
         });
       });
     });
@@ -78,7 +82,13 @@ var FlowTopology = (function(){
           var provider=source.d,exp=source.exp,selected=new Set(exp.nodes),nodes=provider.nodes || {};
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
-          if(d.rows==null)d.rows=[];if(!Array.isArray(d.rows))fail(where,'consumer rows must be an array');
+          if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];
+          if(!Array.isArray(d.rows) || d.rows.some(function(row){return !Array.isArray(row) || row.some(function(slot){return typeof slot!=='string' && (!Array.isArray(slot) || slot.some(function(key){return typeof key!=='string';}));});}))fail(where,'broken consumer row placement');
+          // Default each block below existing content. Explicit positions are
+          // absolute origins, so provider size changes never reset a saved drag.
+          var parentLayout=layout(d),bottom=0;
+          Object.keys(parentLayout.pos).forEach(function(key){var p=parentLayout.pos[key];bottom=Math.max(bottom,p.cy+p.h/2);});
+          var position=imp.position?clone(imp.position):{x:LEFT_X,y:bottom+80};
           if(Object.keys(d.nodes).some(function(key){return key.startsWith(prefix);}))fail(where,'namespace collision with existing node '+prefix);
           var groups=Object.create(null),nodeIds=[],edgeIds=[];
           function group(key,seen){
@@ -109,8 +119,6 @@ var FlowTopology = (function(){
             placements.set(f.id,placements.get(f.id)+1);var copy=clone(f);copy.id=prefix+copy.id;return copy;
           });
           placements.forEach(function(count,key){if(count!==1)fail(where,'exported node '+key+' needs exactly one row/float placement (found '+count+')');});
-          d.rows.push.apply(d.rows,rows);
-          if(floats.length){if(d.floats==null)d.floats=[];if(!Array.isArray(d.floats))fail(where,'consumer floats must be an array');d.floats.push.apply(d.floats,floats);}
           Object.keys(groups).forEach(function(key){
             if(d.groups==null)d.groups={};if(!object(d.groups) || own(d.groups,prefix+key))fail(where,'group namespace collision '+prefix+key);
             d.groups[prefix+key]=groups[key];
@@ -128,7 +136,21 @@ var FlowTopology = (function(){
               if(spec.page.protocols==null)spec.page.protocols={};Object.defineProperty(spec.page.protocols,edge.kind,{value:clone(byId.get(imp.spec).page.protocols[edge.kind]),enumerable:true,writable:true,configurable:true});
             }
           });
-          provenance.push({spec:imp.spec,export:imp.export,as:imp.as,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
+          // Resolve row/stack and automatic-float geometry within this export,
+          // then translate every center together into consumer-owned free space.
+          var fragment={nodes:{},groups:{},rows:rows.length?rows:[[]],floats:floats,edges:d.edges.filter(function(e){return edgeIds.includes(edgeKey(e));})};
+          nodeIds.forEach(function(key){fragment.nodes[key]=d.nodes[key];});
+          Object.keys(groups).forEach(function(key){fragment.groups[prefix+key]=d.groups[prefix+key];});
+          var fragmentLayout=layout(fragment),minX=Infinity,minY=Infinity;
+          nodeIds.forEach(function(key){var p=fragmentLayout.pos[key];minX=Math.min(minX,p.cx);minY=Math.min(minY,p.cy);});
+          if(d.floats==null)d.floats=[];
+          if(!Array.isArray(d.floats))fail(where,'consumer floats must be an array');
+          nodeIds.forEach(function(key){
+            var p=fragmentLayout.pos[key],f={id:key,side:'below',x:position.x+p.cx-minX,y:position.y+p.cy-minY};
+            if(!positionedFloat(f))fail(where,'block placement exceeds supported coordinate range for '+key);
+            d.floats.push(f);
+          });
+          provenance.push({spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(provenance.length || d.topologyProvenance)checkReferences(d,at);

@@ -25,7 +25,7 @@ async function publish(server){
 }
 test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recursive:true,force:true});});
 
-test('the backend workspace handoff edits authored imports while previewing the approved runtime view',async({page,server})=>{
+test('the backend workspace handoff drags a whole floating import with authored placement and one Undo',async({page,server},testInfo)=>{
   const fixture=await publish(server),sources=[];
   for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
   const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('checkout'),workspace=snapshot.loadWorkspace('checkout');
@@ -36,6 +36,42 @@ test('the backend workspace handoff edits authored imports while previewing the 
   await pagePreview(page);await expect(page.locator('#docview [data-dv-node="platform::api"]')).toBeVisible();
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
   expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
+  const before=await page.locator('#src').inputValue(),root=page.locator('#docview');
+  const node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
+  const center=async id=>node(id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};});
+  const original=await Promise.all(['client','platform::api','platform::store'].map(center));
+  async function drag(){
+    const box=await node('platform::api').locator('.card').boundingBox(),scale=await node('platform::api').evaluate(n=>n.ownerSVGElement.getScreenCTM().a);
+    const x=box.x+box.width/2,y=box.y+box.height/2;
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+90*scale,y+70*scale,{steps:12});
+  }
+  await drag();await expect(root.locator('.dv-ghost')).toHaveCount(2);
+  await expect(root.locator('.dv-free-edge-preview')).toHaveCount(2);await page.mouse.up();
+  const after=await page.locator('#src').inputValue(),moved=JSON.parse(after),d=moved.page.sections[0].diagram;
+  const origin=spec.page.sections[0].diagram.topologyProvenance.imports[0].position;
+  expect(d.topologyImports[0].position.x).toBeCloseTo(origin.x+90,0);
+  expect(d.topologyImports[0].position.y).toBeCloseTo(origin.y+70,0);
+  const expected=JSON.parse(before);expected.page.sections[0].diagram.topologyImports[0].position=d.topologyImports[0].position;
+  expect(moved).toEqual(expected);expect(d.floats).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();
+  const placed=await Promise.all(['client','platform::api','platform::store'].map(center));
+  expect(placed[0]).toEqual(original[0]);
+  for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(90,0);expect(placed[i].y-original[i].y).toBeCloseTo(70,0);}
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+  await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+  await drag();await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(after);
+  await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await drag();const stale=after+'\n';
+  await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value;src.dispatchEvent(new Event('input',{bubbles:true}));},stale);
+  await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);
+  await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await pagePreview(page);
+  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
+  expect(saved.page.sections[0].diagram).toEqual(d);
+  await page.reload();await pagePreview(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
+  expect(await Promise.all(['client','platform::api','platform::store'].map(center))).toEqual(placed);
+  await testInfo.attach('floating-import',{body:await root.screenshot(),contentType:'image/png'});
 });
 
 test('a published topology consumer renders and its imported node inspector is read only',async({page,server})=>{

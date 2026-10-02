@@ -99,7 +99,11 @@ Diagram source may declare `topologyExports: {name: {nodes: [nodeId], edges:
 ["from->to"]}}` or `topologyImports: [{spec: canonId, export: name, as:
 namespace}]`. Imported node IDs are `namespace::nodeId`; consumer steps and
 connecting edges use those identities directly. Consumers own steps, paths,
-failures and panels. Canon resolves the complete snapshot before ordinary spec
+failures and panels. Each import defaults to a floating block. Optional
+`position: {x, y}` on the import fixes its minimum node-center coordinates in
+parent diagram units; dragging any imported node moves the entire block and
+writes only that position. Internal node-center spacing is provider-derived.
+Canon resolves the complete snapshot before ordinary spec
 validation in memory; published/editable specs retain their references. Readers
 resolve on open and freeze providers for the session, never live-refreshing.
 Exported placements

@@ -1,0 +1,13 @@
+{
+  "page": {
+    "title": "Positioned shared platform",
+    "canon": {"version":1,"id":"checkout-positioned","kind":"canonical","owner":"group:default/commerce"},
+    "sections": [{
+      "id":"checkout", "heading":"Drag either service to move the whole child",
+      "diagram": {
+        "topologyImports": [{"spec":"platform","export":"core","as":"platform","position":{"x":260,"y":200}}],
+        "steps": [{"id":"persist","edge":"platform::api->platform::store","text":"The parent fires an imported edge without copying child structure."}]
+      }
+    }]
+  }
+}

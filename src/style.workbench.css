@@ -352,6 +352,8 @@ body.workspace-focus .workspace-tools{margin-top:0;}
 #workspace-focus[aria-pressed="true"]{color:var(--accent);border-color:var(--accent);}
 @media(min-width:800px){body.workspace-focus .workmain{max-height:calc(100dvh - var(--workspace-toolbar,60px));overflow:auto;}}
 @media(max-width:1180px){.workwrap{padding:0 12px;}.workspace-tools{gap:8px;}body:not(.welcome-active) .workbench-header{padding:10px 12px;gap:12px;}.workspace-tools .editor-add-destination{max-width:180px;}}
+@media(max-width:1180px){.workspace-canvas .workbench-reader-open-label{font-size:0;}.workspace-canvas .workbench-reader-open-label::after{content:'Preview';font-size:12px;}.workspace-canvas .workspace-save>[data-open-human-guide]{display:none;}}
+@media(max-width:1180px){.workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}.workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}}
 @media(max-width:1100px){body:not(.welcome-active) .workbench-header{flex-wrap:wrap;}body:not(.welcome-active) .workbench-brand{font-size:17px;}.workspace-tools{flex-wrap:wrap;}.workspace-create{flex-basis:50%;}.workspace-tools .editor-add-destination{max-width:none;}}
 @media(max-width:799px){
   .workwrap{grid-template-columns:56px minmax(0,1fr);padding:0 8px;}
@@ -1361,15 +1363,17 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 }
 .folder-agent-guide #folder-agent-file-picker{box-sizing:border-box;width:100%;margin-top:6px;padding:8px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--ink);font:13px 'IBM Plex Sans',sans-serif;}
 @media(max-width:540px){
-  /* Reserve Add's real width beside Auto arrange. Shorten the tour label just
-     as we shorten Add below, keeping all header actions visible in one row. */
+  /* Reserve Add's real width beside Auto arrange and compact the remaining
+     dense labels, keeping every header action visible in one row. */
   .workspace-canvas .workspace-create{flex:none;}
-  .workspace-canvas .workspace-save>[data-workbench-tour]{font-size:0;}
-  .workspace-canvas .workspace-save>[data-workbench-tour]::after{content:'Tour';font-size:11px;}
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
+  .workspace-canvas #auto-arrange{font-size:0;}
+  .workspace-canvas #auto-arrange::after{content:'Arrange';font-size:11px;}
   .workspace-canvas #workbench-reader-open{max-width:92px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
-  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas .workbench-reader-open-label::after{font-size:11px;}
+  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:0;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas #file-save::after{content:'JSON';font-size:11px;}
 }
 
 /* In compact windows, editor panels overlap canvas chrome. Keep editor

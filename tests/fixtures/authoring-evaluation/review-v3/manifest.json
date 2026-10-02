@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "profile": "authoring-review-v3",
+  "description": "Prospective reviewer profile for the focused-guidance trial. It copies authoring-review-v2 with three clarifications (story-level role labels, hidden reported state, one deduction unit per row) and host validation of correctness rows; the seven criteria, their deduction amounts and caps, and the five presentation dimensions are unchanged. rubric.md and interpretations.json are delivered together as the reviewer prompt. Case inputs still come from the frozen overnight bundle. Scores are not directly comparable with authoring-review-v2 or the legacy judge2 rubric.",
+  "files": [
+    {
+      "path": "rubric.md",
+      "sha256": "119e004abdfb2bd61546c55b965a573ecc259845db49311b8ac3222787cc7741"
+    },
+    {
+      "path": "interpretations.json",
+      "sha256": "da0c3f3440091ebcbe2088e086dd0921c0724d95965eaa8ba15219ab9addd4be"
+    }
+  ]
+}

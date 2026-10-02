@@ -1,0 +1,67 @@
+{
+  "format": "authoring-context-followup-v1",
+  "asOfUtc": "2026-10-01T02:29:42.580042+00:00",
+  "scope": "Public usage and tool metadata plus retained presentation evidence. No new author, grade, hidden-reasoning inspection or activation.",
+  "sources": [
+    {
+      "archiveName": "rebaseline-context-waterfall.json",
+      "sha256": "7ae1b89b4d9eadc277e0bd0f57817314325d84d4f94b1b23b578b95615903b40",
+      "retention": "Unmodified local experiment archive; raw streams are not published."
+    },
+    {
+      "archiveName": "rebaseline-visible-payload-supplement.json",
+      "sha256": "8e91421228f754cde04e65ffbd3dc61bdc4425b4f03d48078fa66aa3cd8e6d52",
+      "retention": "Unmodified local experiment archive; raw streams are not published."
+    },
+    {
+      "archiveName": "v1-v2-context-landmarks.json",
+      "sha256": "0631c2fea1012abcd1fea92096351eb85fb66a1c62fdf92f050179baf31785dd",
+      "retention": "Unmodified local experiment archive; raw streams are not published."
+    },
+    {
+      "archiveName": "public-output-accounting.json",
+      "sha256": "c3216c21ae9a33040289828dad1017ec03dfb980e51cadf35771f18a532b3705",
+      "retention": "Unmodified local experiment archive; raw streams are not published."
+    },
+    {
+      "archiveName": "v2-presentation-mechanism-audit.json",
+      "sha256": "a0819eb54c26263731bbf136b19ddb3e3803f2044e790ce1e13ef2957d919287",
+      "retention": "Unmodified local experiment archive; raw streams are not published."
+    }
+  ],
+  "rebaseline": {
+    "runs": 4,
+    "meanPeakContextTokens": 204662.25,
+    "meanContextAtFirstSpecWriteTokens": 170909.75,
+    "firstSpecContextFractionOfPeakRange": [
+      0.82,
+      0.86
+    ],
+    "totalOutputTokens": 324892,
+    "reportedThinkingTokens": 153040,
+    "thinkingFraction": 0.4710488408455733
+  },
+  "withinCampaignDifferences": {
+    "v1FocusedMinusControl": {
+      "firstSpecContextTokens": -35300,
+      "peakContextTokens": -33114,
+      "preFirstSpecReadBytes": -105248.75,
+      "mutationInputJsonBytes": 8902.5,
+      "outputTokens": 5741
+    },
+    "v2FocusedMinusControl": {
+      "firstSpecContextTokens": -16431,
+      "peakContextTokens": -10828,
+      "preFirstSpecReadBytes": -29746,
+      "mutationInputJsonBytes": 1373.75,
+      "outputTokens": -1009
+    }
+  },
+  "limits": [
+    "Bytes are not tokens. No token field attributes output to file-writing arguments.",
+    "Thinking is a public numeric usage field; its content was not inspected. Output minus thinking is not file-output tokens.",
+    "Within-campaign descriptions do not establish the contribution of an individual file or instruction. Different campaigns are not interchangeable controls.",
+    "The v2 cue-salience explanation is a testable hypothesis, not demonstrated causality."
+  ],
+  "promotionStatus": "Unchanged: no tested strategy has passed its entire original promotion screen."
+}

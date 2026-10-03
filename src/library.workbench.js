@@ -35,6 +35,29 @@ function parseCanonLibrary(raw){
     return {id:entry.id,title:title,canon:entry.canon,counts:entry.counts,specUrl:entry.specUrl,version:raw.version,revision:entry.revision};
   });
 }
+
+/* A Canon edit starts from the reader's authored navigation identity, never
+   from DOM positions. This is deliberately the same small vocabulary used by
+   workspace handoffs and deep links, so paths with shared steps retain their
+   source occurrence instead of collapsing to a visible-step ordinal. */
+function canonReaderTarget(ctl){
+  if(!ctl || !Array.isArray(ctl.sections))return null;
+  var active=ctl.activeTarget || {},rec=null;
+  if(active.kind==='diagram')rec=ctl.sections.find(function(item){return item.number===active.section;});
+  if(!rec && active.kind==='tab')rec=ctl.sections.find(function(item){return item.stepper && item.tabBlock===active.tabBlock && item.tab===active.tab;});
+  if(!rec)rec=ctl.sections.find(function(item){
+    return item.stepper && (item.tabBlock==null || ctl.tabBlocks && ctl.tabBlocks[item.tabBlock-1] && ctl.tabBlocks[item.tabBlock-1].active()===item.tab);
+  });
+  if(!rec || rec.reference==null)return null;
+  var target={d:String(rec.reference)},sp=rec.stepper;
+  if(rec.presentation && rec.presentation.viewId)target.v=rec.presentation.viewId();
+  if(sp){
+    target.m=sp.mode();
+    if(sp.paths && sp.paths().length>1)target.p=sp.path();
+    if(target.m==='step')target.s=stepReference(sp.ids(),sp.current().n);
+  }
+  return target;
+}
 async function readCanonLibraryJSON(response,label){
   if(!response.ok)throw new Error(label+' unavailable ('+response.status+').');
   if(Number(response.headers.get('content-length'))>30*1024*1024)throw new Error(label+' exceeds 30 MB.');
@@ -95,8 +118,10 @@ function initWorkbenchLibrary(opts){
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
   var specRequests=new Map();
-  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireViewer(){
+    if(positionChange && ctl && ctl.onChange===positionChange.wrapped)ctl.onChange=positionChange.prior;
+    positionChange=null;
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
     if(tour)tour.destroy();tour=null;
     if(deepLinks)deepLinks.destroy();deepLinks=null;
@@ -213,12 +238,31 @@ function initWorkbenchLibrary(opts){
       document.getElementById('canon-reader-origin').textContent=origin+(handoff?' · Opened from '+(handoff.entity || 'Backstage'):'')+' · Reading does not change your draft.';
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
-      ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});
+      var remembered=opts.position && opts.position();
+      if(remembered){
+        try{applyWorkspaceTarget(ctl,page,remembered);}
+        catch(ex){
+          // The published story may have changed while this history entry was
+          // away. Rebuild once so a partially applied stale view/path cannot
+          // replace the authored opening state.
+          ctl.destroy();reader.replaceChildren();ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});
+          if(opts.savePosition)opts.savePosition(null);
+        }
+      }
+      edit.disabled=false;copy.disabled=!published;
       deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
       exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
+      if(opts.savePosition){
+        var priorChange=ctl.onChange,wrapped=function(){
+          if(priorChange)priorChange.apply(ctl,arguments);
+          if(!ctl.suppressFragmentWrites)opts.savePosition(canonReaderTarget(ctl));
+        };
+        positionChange={prior:priorChange,wrapped:wrapped};ctl.onChange=wrapped;
+      }
     }catch(ex){
       if(token!==sequence)return;
       current=null;edit.disabled=true;copy.disabled=true;retireViewer();reader.replaceChildren();
@@ -231,7 +275,11 @@ function initWorkbenchLibrary(opts){
   retry.addEventListener('click',refresh);readerRetry.addEventListener('click',refresh);
   edit.addEventListener('click',function(){
     if(!current)return;
-    try{opts.edit(JSON.parse(JSON.stringify(current.source)),opts.handoff && opts.handoff.id===current.id?opts.handoff:null,false,current.topologyContext);}
+    try{
+      var target=canonReaderTarget(ctl);
+      if(opts.savePosition)opts.savePosition(target);
+      opts.edit(JSON.parse(JSON.stringify(current.source)),opts.handoff && opts.handoff.id===current.id?opts.handoff:null,false,current.topologyContext,target);
+    }
     catch(ex){error.textContent=ex.message;error.hidden=false;}
   });
   window.addEventListener('pagehide',function(){sequence++;retireViewer();});

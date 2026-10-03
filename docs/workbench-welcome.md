@@ -14,8 +14,9 @@ points lead to the same editor:
 
 **User guide** opens the bundled human walkthrough, including alternates and
 shared-step editing. **Canon diagrams** opens the [published library](workbench-canon-library.md)
-read-only; choose **Edit in Workbench** to start a local edit. Browser navigation
-also covers the library and its reader.
+read-only; choose **Edit in Workbench** to start a local edit at the reader's
+current chapter, path, and step. Browser navigation also covers the library and
+its reader, including that reading position when you return from the editor.
 
 Examples cover simple service requests, retries, traces, Backstage architecture,
 rollout decisions, a shared engineering/business story, a connected home, and

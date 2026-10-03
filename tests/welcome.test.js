@@ -140,12 +140,16 @@ test('missing or unsupported route metadata falls back safely without losing hos
   assert.deepEqual(array.history.state.flowviewPreviousState,['host',1]);
 });
 
-test('canon library navigation retains only the diagram ID across Back, Forward and reload',()=>{
+test('canon library navigation retains diagram identity and bounded reader position across Back, Forward and reload',()=>{
   const win=navigationWindow(),seen=[],nav=context.createWelcomeNavigation(win,'home',name=>seen.push(name));
   nav.go('library');nav.go('reader','doorbell');assert.equal(nav.diagram(),'doorbell');
+  nav.readerTarget({d:'delivery',v:'flow',m:'step',p:'failure',s:'retry',ignored:'private'});
+  assert.deepEqual(plain(nav.readerTarget()),{d:'delivery',v:'flow',m:'step',p:'failure',s:'retry'});
   win.history.back();assert.equal(nav.screen(),'library');assert.equal(nav.diagram(),undefined);
-  win.history.forward();assert.equal(nav.diagram(),'doorbell');
+  win.history.forward();assert.equal(nav.diagram(),'doorbell');assert.equal(nav.readerTarget().s,'retry');
   const restored=context.createWelcomeNavigation(win,'home',()=>{});assert.equal(restored.screen(),'reader');assert.equal(restored.diagram(),'doorbell');
+  assert.equal(restored.readerTarget().p,'failure');
+  restored.readerTarget({d:'x'.repeat(301),s:'retry'});assert.equal(restored.readerTarget(),null);
   assert.equal(win.history.length,3);assert.equal(win.location.hash,'#host');
   restored.go('editor');assert.equal(restored.diagram(),undefined);
 });

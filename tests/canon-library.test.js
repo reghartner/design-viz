@@ -6,6 +6,17 @@ const context={FlowCanon:C,URL};vm.createContext(context);
 for(const source of ['validator.js','library.workbench.js'])vm.runInContext(readSource(source),context);
 const spec=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/specs/doorbell.json')));
 const manifest=()=>({version:1,diagrams:[{id:'doorbell',title:'Reviewed doorbell',spec:structuredClone(spec)}]});
+test('reader handoff captures stable chapter, view, path and source step references',()=>{
+  const stepper={mode:()=> 'step',paths:()=>[{id:'happy'},{id:'failure'}],path:()=> 'failure',ids:()=>['start','retry','done'],current:()=>({n:1,id:'retry'})};
+  const ctl={activeTarget:{kind:'diagram',section:2},tabBlocks:[],sections:[
+    {number:1,reference:'overview'},
+    {number:2,reference:'delivery',presentation:{viewId:()=> 'flow'},stepper},
+  ]};
+  assert.deepEqual(JSON.parse(JSON.stringify(context.canonReaderTarget(ctl))),{d:'delivery',v:'flow',m:'step',p:'failure',s:'retry'});
+  stepper.ids=()=>['start',null,'done'];
+  assert.equal(context.canonReaderTarget(ctl).s,'2');
+  assert.equal(context.canonReaderTarget(null),null);
+});
 test('library parsing validates IDs and specs without changing the published snapshot',()=>{
   const raw=manifest(),before=JSON.stringify(raw);const entries=context.parseCanonLibrary(raw);
   assert.equal(entries[0].title,'Reviewed doorbell');assert.equal(JSON.stringify(raw),before);

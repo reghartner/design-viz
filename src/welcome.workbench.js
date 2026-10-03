@@ -95,9 +95,11 @@ function createWelcomeNavigation(win, initial, changed){
   function write(screen,replace,diagram,shareable){
     var selected=diagram===undefined?current.diagram:diagram;
     var published=shareable===undefined?current.shareable!==false:shareable;
+    var readerTarget=selected===current.diagram?current.readerTarget:null;
     current={v:1,screen:screen,visit:current.visit,depth:current.depth+(replace?0:1),canon:!!current.canon,retired:retired};
     if(screen==='reader' && typeof selected==='string'){
       current.diagram=selected;current.shareable=published;
+      if(readerTarget)current.readerTarget=readerTarget;
     }
     var url=new URL(win.location.href);
     var fields=url.search.slice(1).split('&').filter(function(field){
@@ -132,6 +134,21 @@ function createWelcomeNavigation(win, initial, changed){
     screen:function(){return current.screen;},
     diagram:function(){return current.diagram;},
     shareable:function(){return current.shareable!==false;},
+    readerTarget:function(value){
+      function clean(target){
+        if(!target || typeof target!=='object' || Array.isArray(target) || typeof target.d!=='string' || !target.d || target.d.length>300)return null;
+        var out={d:target.d};
+        ['v','p','s'].forEach(function(name){if(typeof target[name]==='string' && target[name].length<=300)out[name]=target[name];});
+        if(target.m==='step' || target.m==='ambient')out.m=target.m;
+        return out;
+      }
+      if(!arguments.length)return clean(current.readerTarget);
+      if(current.screen!=='reader')return;
+      var target=clean(value),next=Object.assign({},current);
+      if(target)next.readerTarget=target;else delete next.readerTarget;
+      current=next;
+      win.history.replaceState(stateWith(current),'',win.location.pathname+win.location.search+win.location.hash);
+    },
     retired:function(){return retired;},
     go:function(screen,diagram,shareable){move(screen,false,true,diagram,shareable);},
     replace:function(screen,focus){move(screen,true,focus);},
@@ -391,12 +408,15 @@ function initWorkbenchWelcome(opts){
   renderTemplates(); updatePrompt();
   var handoff=readWorkspaceHandoff(location.hash),legacyCanon=handoff && new URLSearchParams(location.search).get('canon');
   navigation=createWelcomeNavigation(window,opts.skipWelcome?'editor':'home',display);
-  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct,topologyContext){
+  library=initWorkbenchLibrary({builtin:opts.canon,handoff:handoff,legacyCanon:legacyCanon,selected:navigation.diagram,shareable:navigation.shareable,
+    position:navigation.readerTarget,savePosition:navigation.readerTarget,
+    open:function(id,published){navigation.go('reader',id,published);},edit:function(spec,request,direct,topologyContext,target){
     if(direct)builder.preserveDraft();
     if(!builder.loadSpec(spec,request?{title:(spec.page || spec).title || request.id,id:request.id,entity:request.entity || null,digest:request.revision || null,origin:'Backstage'}:null,topologyContext))throw new Error('Could not open the authored source. Your draft has not changed.');
     if(request){var url=new URL(location.href),hash=new URLSearchParams(url.hash.slice(1));hash.delete('fv');url.hash=hash.toString();history.replaceState(history.state,'',url.pathname+url.search+url.hash);}
     if(direct)navigation.replace('editor',true);else enterEditor();
     if(request){builder.navigate(request.target);if(request.action==='build')builder.startAgent();}
+    else if(target)builder.navigate(target);
   }});
   display(navigation.screen(),false);
   window.addEventListener('pagehide',function(){retireRead();if(builder.prepareWelcome)builder.prepareWelcome();});

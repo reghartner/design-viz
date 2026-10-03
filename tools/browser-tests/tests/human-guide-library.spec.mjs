@@ -121,6 +121,52 @@ test('canon browsing is read-only and editing opens a separate project while pre
   await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
+test('Canon edit and browser Back preserve the selected chapter, path and step with stale-state fallback',async({page,server},info)=>{
+  const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
+  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  const reader=page.locator('#canon-reader');
+  await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
+  await expect(reader.locator('.stepid')).toHaveText('press');
+  await reader.getByRole('button',{name:'Data flow',exact:true}).click();
+  await reader.locator('.path-chip[data-dv-path="failed"]').click();
+  await expect(reader.locator('.stepid')).toHaveText('failed');
+  await info.attach('canon-reader-selected-position',{body:await page.screenshot(),contentType:'image/png'});
+
+  await page.goBack();await expect(page.locator('#welcome-library-screen')).toBeVisible();
+  await page.goForward();await expect(page.locator('#welcome-reader-screen')).toBeVisible();
+  await expect(reader.locator('.stepid')).toHaveText('failed');
+  await expect(reader.locator('.path-chip[data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
+
+  await page.locator('#canon-reader-edit').click();
+  const editor=page.locator('#docview');
+  await expect(editor.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
+  await expect(editor.locator('.stepid')).toHaveText('failed');
+  await expect(editor.locator('.path-chip[data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#undo-builder')).toBeDisabled();
+  await info.attach('canon-editor-preserved-position',{body:await page.screenshot(),contentType:'image/png'});
+
+  await page.goBack();await expect(page.locator('#welcome-reader-screen')).toBeVisible();
+  await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
+  await expect(reader.locator('.stepid')).toHaveText('failed');
+  await expect(reader.locator('.path-chip[data-dv-path="failed"]')).toHaveAttribute('aria-pressed','true');
+
+  await page.evaluate(()=>{
+    const state=structuredClone(history.state);
+    state.flowviewWorkbenchEntry.readerTarget={d:'removed-chapter',v:'removed-view',m:'step',p:'removed-path',s:'removed-step'};
+    history.replaceState(state,'');
+  });
+  await page.reload();
+  await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+  await expect(reader.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
+  await expect(reader.locator('.stepid')).toHaveText('press');
+  expect((await page.evaluate(()=>history.state.flowviewWorkbenchEntry)).readerTarget).toBeUndefined();
+  await page.locator('#canon-reader-edit').click();
+  await expect(editor.locator('[data-view-id]')).toHaveAttribute('data-view-id','flow');
+  await expect(editor.locator('.stepid')).toHaveText('press');
+  await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
 test('empty or invalid company libraries do not masquerade as demos and late loads do not navigate',async({page,server})=>{
   let data={version:1,diagrams:[]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();

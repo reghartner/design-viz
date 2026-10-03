@@ -7,6 +7,9 @@ const fixture=require('./fixtures/auto-arrange-grouped.json');
 const Viz=require('../src/workbench/vendor/viz-3.31.0.js'),cola=require('../src/workbench/vendor/webcola-3.4.0.js');
 let viz;test.before(async()=>{viz=await Viz.instance();});
 function simple(){return {nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'},{from:'c',to:'a'}]};}
+function assertAutoPorts(edges){
+  edges.forEach(e=>{assert.equal(Object.hasOwn(e,'fromPort'),false);assert.equal(Object.hasOwn(e,'toPort'),false);});
+}
 function minimumCardGap(result){
   let closest=Infinity;
   result.positions.forEach((a,i)=>result.positions.slice(i+1).forEach(b=>{
@@ -18,7 +21,7 @@ function minimumCardGap(result){
 
 test('approved 20-node grouped fixture retains groups and native routes with clear final viewer paths',()=>{
   const d=fixture.page.blocks[0].diagram,result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result);
-  assert.equal(result.positions.length,20);assert.equal(result.edges.length,36);
+  assert.equal(result.positions.length,20);assert.equal(result.edges.length,36);assertAutoPorts(result.edges);assertAutoPorts(out.edges);
   assert.deepEqual(plain(out.groups),d.groups);assert.deepEqual(plain(out.nodes),d.nodes);
   assert.deepEqual(plain(out.edges.map(e=>[e.from,e.to,e.label])),plain(d.edges.map(e=>[e.from,e.to,e.label])));
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.ok(result.score.crossings<=10,JSON.stringify(result.score));
@@ -60,15 +63,20 @@ test('cyclic, disconnected, nested, self and parallel connections preserve ident
 test('atomic planner preserves semantic content, other sections and source; rejects malformed worker results',()=>{
   const d=simple();d.steps=[{edge:'a->b',text:'Keep'}];d.panels=[{id:'panel',type:'deviceapp'}];d.paths=[{id:'path',steps:[1]}];
   d.edges[0].label='Keep label';d.edges[0].bend=42;d.edges[0].labelDx=123;
+  d.edges[0].fromPort={side:'left',offset:.2};d.edges[0].toPort={side:'top',offset:.8};
   const raw={page:{title:'Keep',sections:[{diagram:d},{heading:'Unaffected',diagram:simple()}]}},text=JSON.stringify(raw,null,2);
   const result=C.autoArrangeCandidates(d,viz,cola),plan=C.planAutoArrange(text,raw,0,result),out=JSON.parse(plan.text);
   assert.notEqual(plan.text,text);assert.equal(JSON.stringify(raw,null,2),text);
   assert.deepEqual(out.page.sections[1],raw.page.sections[1]);
   const next=out.page.sections[0].diagram;
   for(const k of ['nodes','steps','paths','panels'])assert.deepEqual(next[k],d[k]);
+  assertAutoPorts(next.edges);
   assert.equal(next.edges[0].label,'Keep label');assert.equal(next.edges[0].bend,undefined);assert.ok(next.edges[0].curveControls);
   const invalid=plain(result);invalid.positions[0].x=NaN;assert.ok(C.planAutoArrange(text,raw,0,invalid).error);
   const poison=plain(result);poison.edges[0].from='missing';
+  poison.edges[0].fromPort={side:'right'};poison.edges[0].toPort={side:'invalid'};
+  assertAutoPorts(JSON.parse(C.planAutoArrange(text,raw,0,poison).text).page.sections[0].diagram.edges);
+  assertAutoPorts(C.autoArrangeDiagram(d,poison).edges);
   assert.equal(JSON.parse(C.planAutoArrange(text,raw,0,poison).text).page.sections[0].diagram.edges[0].from,'a');
 });
 
@@ -86,9 +94,41 @@ test('native cubic split preserves shape; controls, joins, endpoints, deletion a
   out.floats.forEach(f=>{f.x+=90;f.y+=50;});const moved=C.layout(out),anchors=C.edgeCurveAnchors(e,moved);
   anchors.forEach((p,i)=>{assert.ok(Math.abs(p.x-oldAnchors[i].x-90)<1e-8);assert.ok(Math.abs(p.y-oldAnchors[i].y-50)<1e-8);});
   out.floats.find(f=>f.id===e.from).x+=100;const final=C.layout(out),segs=C.edgeCurveSegments(e,final);
-  assert.deepEqual(plain(segs[0][0]),plain(C.edgePortPoint(final.pos[e.from],final.pos[e.to],e.fromPort)));
+  const firstAnchor=C.edgeCurveAnchors(e,final)[0];
+  assert.deepEqual(plain(segs[0][0]),plain(C.edgePortPoint(final.pos[e.from],{cx:firstAnchor.x,cy:firstAnchor.y})));
   C.expandPlacedEdgeBounds(out.edges,final,C.edgeAutoAdjust(out.edges,final));
   for(const p of C.samplePathD(C.edgePath(e,final)))assert.ok(p.x>=final.vb.x && p.x<=final.vb.x+final.vb.w && p.y>=final.vb.y && p.y<=final.vb.y+final.vb.h);
+});
+
+test('auto attachments change sides with moved nodes and ignore prior manual ports when placing labels',()=>{
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Connection'}]};
+  const json=viz.renderJSON(C.autoArrangeDot(d,'LR'),{engine:'dot'}),result=C.autoArrangeRead(d,json);
+  const manual=plain(d);manual.edges[0].fromPort={side:'left',offset:.2};manual.edges[0].toPort={side:'top',offset:.8};
+  assert.deepEqual(plain(C.autoArrangeRead(manual,json)),plain(result),'manual ports do not skew label nudges');
+  const out=C.autoArrangeDiagram(manual,result),edge=out.edges[0],before=C.edgeCurveSegments(edge,C.layout(out));
+  assertAutoPorts(out.edges);assert.equal(before[0][0].nx,1);assert.equal(before.at(-1).at(-1).nx,-1);
+  const from=out.floats.find(f=>f.id==='a'),to=out.floats.find(f=>f.id==='b');to.x=from.x;to.y=from.y+800;
+  const after=C.edgeCurveSegments(edge,C.layout(out));
+  assert.equal(after[0][0].ny,1);assert.equal(after.at(-1).at(-1).ny,-1);
+  assert.ok(C.validCurveControls(edge.curveControls));
+  assert.ok(!/NaN|Infinity/.test(C.edgePath(edge,C.layout(out))));
+});
+
+test('edge length scores straight center distances while curves still determine card hits and bounds',()=>{
+  const d={nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'}]};
+  const result={positions:[{id:'a',x:100,y:100},{id:'b',x:500,y:100},{id:'c',x:300,y:300}],
+    edges:[{curveControls:[{t:1/3,dx:0,dy:0},{t:2/3,dx:0,dy:0}]}]};
+  const straight=C.autoArrangeScore(d,result),bowed=plain(result);
+  bowed.edges[0].curveControls.forEach(p=>p.dy=800/3);
+  const curve=C.autoArrangeScore(d,bowed);
+  assert.equal(straight.length,400);assert.equal(curve.length,400);
+  assert.equal(straight.hits,0);assert.ok(curve.hits>0,'the drawn curve still checks unrelated cards');
+  bowed.edges[0].curveControls.forEach(p=>p.dy=600);
+  assert.ok(C.autoArrangeScore(d,bowed).area>straight.area,'the drawn curve still contributes occupied bounds');
+  const diagonal={...result,positions:[{id:'a',x:100,y:100},{id:'b',x:400,y:500},{id:'c',x:900,y:100}]};
+  assert.equal(C.autoArrangeScore(d,diagonal).length,500,'distance uses both axes and card centers');
+  d.edges.push({from:'a',to:'b'},{from:'a',to:'a'});diagonal.edges.push(diagonal.edges[0],diagonal.edges[0]);
+  assert.equal(C.autoArrangeScore(d,diagonal).length,1000,'parallel edges each count; a self edge has zero center distance');
 });
 
 test('native geometry roundtrips, resets both representations, validates shape, and advertises its capability',()=>{
@@ -127,7 +167,7 @@ test('directed paths follow topology in balanced snake rows with at most four ca
   assert.equal(C.autoArrangeChainPositions({nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'},{from:'a',to:'c'}]}),null,'forks do not become chains');
 });
 
-test('candidate ordering minimizes crossings before footprint, then routes and occupied area',()=>{
+test('candidate ordering minimizes crossings before footprint, then center distances and occupied area',()=>{
   const candidate=(crossings,shape,length,area)=>({score:{crossings,shape,length,area}});
   assert.ok(C.autoArrangeCompare(candidate(0,3,2000,10000),candidate(1,0,10,100))<0);
   assert.ok(C.autoArrangeCompare(candidate(0,0,2000,10000),candidate(0,.2,10,100))<0);
@@ -156,6 +196,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
   input.page.blocks.forEach((block,i)=>{
     const d=block.diagram,result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
+    assertAutoPorts(result.edges);assertAutoPorts(out.edges);
     assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.groups,d.groups);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);

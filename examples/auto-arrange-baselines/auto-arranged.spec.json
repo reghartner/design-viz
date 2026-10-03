@@ -44,14 +44,6 @@
             {
               "from": "sender",
               "to": "edge",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -68,14 +60,6 @@
             {
               "from": "edge",
               "to": "verify",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -92,14 +76,6 @@
             {
               "from": "verify",
               "to": "queue",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -116,14 +92,6 @@
             {
               "from": "queue",
               "to": "worker",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -140,14 +108,6 @@
             {
               "from": "worker",
               "to": "partner",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -255,14 +215,6 @@
             {
               "from": "uploader",
               "to": "api",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -279,14 +231,6 @@
             {
               "from": "api",
               "to": "store",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 1
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -303,14 +247,6 @@
             {
               "from": "api",
               "to": "scan",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -327,14 +263,6 @@
             {
               "from": "api",
               "to": "policy",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 1
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -351,14 +279,6 @@
             {
               "from": "store",
               "to": "review",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 1
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -375,14 +295,6 @@
             {
               "from": "scan",
               "to": "review",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -399,14 +311,6 @@
             {
               "from": "policy",
               "to": "review",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 1
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -423,14 +327,6 @@
             {
               "from": "review",
               "to": "reviewer",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -447,14 +343,6 @@
             {
               "from": "reviewer",
               "to": "publish",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -471,14 +359,6 @@
             {
               "from": "publish",
               "to": "archive",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -620,14 +500,6 @@
             {
               "from": "app",
               "to": "collector",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.8423333333333333
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.15919999999999998
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -644,14 +516,6 @@
             {
               "from": "jobs",
               "to": "collector",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.31313333333333354
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.6859999999999998
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -668,14 +532,6 @@
             {
               "from": "edge",
               "to": "collector",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5690000000000002
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.43133333333333324
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -692,14 +548,6 @@
             {
               "from": "collector",
               "to": "router",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5037333333333334
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.49626666666666663
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -716,14 +564,6 @@
             {
               "from": "router",
               "to": "metrics",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7608
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.24033333333333304
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -740,14 +580,6 @@
             {
               "from": "router",
               "to": "logs",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.11126666666666665
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.8887333333333334
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -764,14 +596,6 @@
             {
               "from": "router",
               "to": "traces",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.505
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.495
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -788,14 +612,6 @@
             {
               "from": "metrics",
               "to": "metricdb",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -812,14 +628,6 @@
             {
               "from": "logs",
               "to": "logdb",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.6379333333333334
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.3626666666666667
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -836,14 +644,6 @@
             {
               "from": "traces",
               "to": "tracedb",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -860,14 +660,6 @@
             {
               "from": "metricdb",
               "to": "dashboard",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.24419999999999997
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7546666666666666
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -884,14 +676,6 @@
             {
               "from": "logdb",
               "to": "dashboard",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7558
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.2453333333333334
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -908,14 +692,6 @@
             {
               "from": "tracedb",
               "to": "dashboard",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -932,14 +708,6 @@
             {
               "from": "metricdb",
               "to": "alerts",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5977999999999998
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.4025999999999999
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -957,14 +725,6 @@
               "from": "app",
               "to": "logs",
               "label": "direct logs",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.48600000000000004
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5139333333333334
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -977,21 +737,13 @@
                   "dy": 31.9
                 }
               ],
-              "labelDx": -25.053541332939133,
-              "labelDy": 6.542200944584124
+              "labelDx": -25.055867079610422,
+              "labelDy": 6.542917483151427
             },
             {
               "from": "alerts",
               "to": "router",
               "label": "reconfigure",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.571133333333333
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.7981818181818183
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -1019,21 +771,13 @@
                   "dy": -29.9
                 }
               ],
-              "labelDx": -109.70109436262419,
-              "labelDy": -35.54715417813355
+              "labelDx": -109.72892081207829,
+              "labelDy": -35.57916347529664
             },
             {
               "from": "router",
               "to": "logdb",
               "label": "legacy query",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.33406666666666673
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5943333333333334
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -1061,8 +805,8 @@
                   "dy": -11.3
                 }
               ],
-              "labelDx": -31.236510984384495,
-              "labelDy": 6.451811492145282
+              "labelDx": -34.78449992571552,
+              "labelDy": 10.70008998272965
             }
           ],
           "floats": [
@@ -1228,14 +972,6 @@
             {
               "from": "buyer",
               "to": "storefront",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5001999999999999
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5001999999999999
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1252,14 +988,6 @@
             {
               "from": "storefront",
               "to": "gateway",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5001999999999999
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5001999999999999
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1276,14 +1004,6 @@
             {
               "from": "gateway",
               "to": "cart",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5001999999999999
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5001999999999999
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1300,14 +1020,6 @@
             {
               "from": "cart",
               "to": "checkout",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.2582000000000001
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7409333333333332
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1324,14 +1036,6 @@
             {
               "from": "checkout",
               "to": "payment",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.7806818181818187
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.2195454545454564
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1348,14 +1052,6 @@
             {
               "from": "checkout",
               "to": "risk",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.1839999999999994
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.814533333333333
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1372,14 +1068,6 @@
             {
               "from": "checkout",
               "to": "inventory",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.8159999999999998
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.18560000000000096
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1396,14 +1084,6 @@
             {
               "from": "payment",
               "to": "order",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.716363636363636
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.2836363636363641
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1420,14 +1100,6 @@
             {
               "from": "risk",
               "to": "order",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.9106818181818167
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.09090909090909091
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1444,14 +1116,6 @@
             {
               "from": "inventory",
               "to": "order",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.3919333333333331
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.3921333333333329
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1468,14 +1132,6 @@
             {
               "from": "order",
               "to": "events",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.2582000000000001
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7411333333333339
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1492,14 +1148,6 @@
             {
               "from": "events",
               "to": "warehouse",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.7806818181818187
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.21954545454545382
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1516,14 +1164,6 @@
             {
               "from": "warehouse",
               "to": "carrier",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1540,14 +1180,6 @@
             {
               "from": "events",
               "to": "notify",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.18419999999999997
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.814533333333333
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1564,14 +1196,6 @@
             {
               "from": "notify",
               "to": "mail",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1588,14 +1212,6 @@
             {
               "from": "events",
               "to": "analytics",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.8162000000000004
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.18560000000000096
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1612,14 +1228,6 @@
             {
               "from": "analytics",
               "to": "ops",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7422000000000011
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.2592666666666673
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1637,14 +1245,6 @@
               "from": "cart",
               "to": "order",
               "label": "lookup",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.6641333333333341
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7402666666666664
-              },
               "curveControls": [
                 {
                   "t": 0.1111111111111111,
@@ -1687,21 +1287,13 @@
                   "dy": -0.1
                 }
               ],
-              "labelDx": -37.81253220818485,
-              "labelDy": -29.713181831835982
+              "labelDx": -40.59566360773215,
+              "labelDy": -35.259519651265464
             },
             {
               "from": "order",
               "to": "inventory",
               "label": "redo",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.6082666666666667
-              },
-              "toPort": {
-                "side": "bottom",
-                "offset": 0.6083999999999999
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -1714,21 +1306,13 @@
                   "dy": 4.2
                 }
               ],
-              "labelDx": -10.956094168488335,
-              "labelDy": 6.457663868733789
+              "labelDx": -6.874079999999822,
+              "labelDy": 6.447952069775056
             },
             {
               "from": "ops",
               "to": "order",
               "label": "manual patch",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.41066666666666757
-              },
-              "toPort": {
-                "side": "bottom",
-                "offset": 0.6148000000000002
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -1756,8 +1340,8 @@
                   "dy": 1.7
                 }
               ],
-              "labelDx": -33.06945455301502,
-              "labelDy": 6.283725871159504
+              "labelDx": -32.01619676405812,
+              "labelDy": 7.5422106929243
             }
           ],
           "floats": [
@@ -1977,14 +1561,6 @@
             {
               "from": "camera",
               "to": "upload",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5917333333333332
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.4093333333333334
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2001,14 +1577,6 @@
             {
               "from": "mobile",
               "to": "upload",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.3548666666666668
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.6434666666666667
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2025,14 +1593,6 @@
             {
               "from": "upload",
               "to": "auth",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5351333333333333
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.46506666666666663
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2049,14 +1609,6 @@
             {
               "from": "auth",
               "to": "queue",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2073,14 +1625,6 @@
             {
               "from": "upload",
               "to": "metadata",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.3544
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.3922666666666667
-              },
               "curveControls": [
                 {
                   "t": 0.08333333333333333,
@@ -2142,14 +1686,6 @@
             {
               "from": "queue",
               "to": "object",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2166,14 +1702,6 @@
             {
               "from": "object",
               "to": "splitter",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.8715333333333335
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.1878000000000001
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -2205,14 +1733,6 @@
             {
               "from": "splitter",
               "to": "thumbnail",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.4209999999999999
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5786666666666668
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2229,14 +1749,6 @@
             {
               "from": "splitter",
               "to": "transcoder",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.9325999999999999
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.06740000000000008
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2253,14 +1765,6 @@
             {
               "from": "splitter",
               "to": "captions",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.6767999999999998
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.3240000000000002
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2277,14 +1781,6 @@
             {
               "from": "thumbnail",
               "to": "thumbstore",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2301,14 +1797,6 @@
             {
               "from": "transcoder",
               "to": "videostore",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2325,14 +1813,6 @@
             {
               "from": "captions",
               "to": "textindex",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2349,14 +1829,6 @@
             {
               "from": "thumbstore",
               "to": "publish",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7368666666666664
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.2635333333333332
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2373,14 +1845,6 @@
             {
               "from": "videostore",
               "to": "publish",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.2631333333333335
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7364666666666668
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2397,14 +1861,6 @@
             {
               "from": "textindex",
               "to": "publish",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2421,14 +1877,6 @@
             {
               "from": "publish",
               "to": "cdn",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.24419999999999997
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7546666666666666
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2445,14 +1893,6 @@
             {
               "from": "publish",
               "to": "search",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.5
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2469,14 +1909,6 @@
             {
               "from": "publish",
               "to": "notify",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7558
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.24533333333333304
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2493,14 +1925,6 @@
             {
               "from": "publish",
               "to": "analytics",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 1
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2517,14 +1941,6 @@
             {
               "from": "publish",
               "to": "monitor",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.8222727272727287
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.11977272727272686
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -2557,14 +1973,6 @@
               "from": "publish",
               "to": "metadata",
               "label": "catalog write",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.9681818181818161
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.031136363636361155
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2577,21 +1985,13 @@
                   "dy": -2.9
                 }
               ],
-              "labelDx": -30.798359248491124,
-              "labelDy": 6.4013235825657375
+              "labelDx": -30.796280725862175,
+              "labelDy": 6.389194048196259
             },
             {
               "from": "transcoder",
               "to": "object",
               "label": "read",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.36900000000000016
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.6197727272727268
-              },
               "curveControls": [
                 {
                   "t": 0.16666666666666666,
@@ -2619,21 +2019,13 @@
                   "dy": -27.3
                 }
               ],
-              "labelDx": -18.312609369388383,
-              "labelDy": 4.140236711603848
+              "labelDx": -25.17850898099107,
+              "labelDy": 1.7389332584831436
             },
             {
               "from": "monitor",
               "to": "queue",
               "label": "retry upload",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.36320000000000013
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.5959090909090915
-              },
               "curveControls": [
                 {
                   "t": 0.1111111111111111,
@@ -2676,8 +2068,8 @@
                   "dy": -63.8
                 }
               ],
-              "labelDx": 113.13238817629599,
-              "labelDy": 159.97505604880814
+              "labelDx": 107.21699488433887,
+              "labelDy": 157.85351857081957
             }
           ],
           "groups": {
@@ -2862,14 +2254,6 @@
             {
               "from": "orders",
               "to": "audit",
-              "fromPort": {
-                "side": "right",
-                "offset": 0.21954545454545382
-              },
-              "toPort": {
-                "side": "left",
-                "offset": 0.7806818181818187
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2886,14 +2270,6 @@
             {
               "from": "orders",
               "to": "metrics",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.7265333333333335
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.2734666666666665
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2910,14 +2286,6 @@
             {
               "from": "orders",
               "to": "risk",
-              "fromPort": {
-                "side": "left",
-                "offset": 0.13409090909090857
-              },
-              "toPort": {
-                "side": "right",
-                "offset": 0.8661363636363627
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2934,14 +2302,6 @@
             {
               "from": "returns",
               "to": "audit",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.6624000000000001
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.33633333333333365
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2958,14 +2318,6 @@
             {
               "from": "returns",
               "to": "metrics",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.5602666666666671
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.4395999999999996
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -2982,14 +2334,6 @@
             {
               "from": "returns",
               "to": "risk",
-              "fromPort": {
-                "side": "bottom",
-                "offset": 0.22886666666666694
-              },
-              "toPort": {
-                "side": "top",
-                "offset": 0.7711999999999997
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -3006,14 +2350,6 @@
             {
               "from": "stock",
               "to": "audit",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.6561999999999997
-              },
-              "toPort": {
-                "side": "bottom",
-                "offset": 0.34453333333333375
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -3030,14 +2366,6 @@
             {
               "from": "stock",
               "to": "metrics",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.9542666666666666
-              },
-              "toPort": {
-                "side": "bottom",
-                "offset": 0.046999999999999695
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,
@@ -3054,14 +2382,6 @@
             {
               "from": "stock",
               "to": "risk",
-              "fromPort": {
-                "side": "top",
-                "offset": 0.38806666666666617
-              },
-              "toPort": {
-                "side": "bottom",
-                "offset": 0.6123333333333331
-              },
               "curveControls": [
                 {
                   "t": 0.3333333333333333,

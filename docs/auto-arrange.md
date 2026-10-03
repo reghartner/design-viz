@@ -9,9 +9,11 @@ this changes the current viewport, not saved camera settings.
 Groups, nesting, node definitions, connection order and identity, labels,
 steps, paths, panels, named views and other sections are preserved. Rows and
 floats become ordinary positioned floats. Old routing, ports, bends, curve
-points and label nudges are replaced with explicit ports, native cubic controls
-and computed label nudges. Existing viewers need the `layout.cubic-curves`
-capability to display the new routes faithfully.
+points and label nudges are replaced with automatic edge attachments, native
+cubic controls and computed label nudges. Arranged edges never save `fromPort`
+or `toPort`; shared geometry chooses the attachment side from the adjacent
+curve control and updates it when nodes move. Existing viewers need the
+`layout.cubic-curves` capability to display the new routes faithfully.
 
 Directed chains, including grouped chains, use at most four cards per row and reverse each
 successive row, so a six-card chain reads left to right across three cards, then
@@ -34,15 +36,18 @@ External Graphviz labels preserve the graph's ranks while leaving room for
 labels. Candidate generation keeps at least 48 logical units between final card
 rectangles; layered ranks receive additional clearance for their connections.
 
-Candidate scoring uses final viewer geometry, including ports and nested group
-boxes: reject overlapping cards/groups and routes through unrelated cards,
+Candidate scoring uses final viewer geometry, including automatic attachments
+and nested group boxes: reject overlapping cards/groups and routes through unrelated cards,
 then minimize nonincident crossing pairs. Disjoint route bounding boxes skip
 segment intersection checks, keeping disconnected graphs inexpensive to score.
 Among candidates with equal crossing counts, prefer an occupied footprint
 from square through 16:9 landscape. All
 ratios inside that range are equally preferred; ratios outside it are ranked
-by logarithmic distance to the nearest limit. Total route length and occupied
-area break ties. The footprint encloses cards, groups and sampled routes,
+by logarithmic distance to the nearest limit. Total straight-line, center-to-center
+edge distance and occupied area break ties. Each edge contributes its Euclidean endpoint distance, including parallel
+edges; self edges contribute zero. Curve arc length does not affect this score.
+Sampled curves still determine card hits, crossings and occupied bounds.
+The footprint encloses cards, groups and sampled routes,
 excluding the viewer's minimum-width canvas and label boxes. Long chains
 prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.

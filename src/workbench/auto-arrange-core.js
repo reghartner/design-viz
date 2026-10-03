@@ -18,14 +18,8 @@ function autoArrangeDiagram(d,result){
   delete copy.routing;
   copy.edges=(copy.edges || []).map(function(e,i){
     ['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt'].forEach(function(k){delete e[k];});
-    return Object.assign(e,result.edges[i]);
+    Object.assign(e,result.edges[i]);delete e.fromPort;delete e.toPort;return e;
   });return copy;
-}
-function autoArrangePort(node,point){
-  var choices=[['top',Math.abs(point.y-(node.cy-node.h/2))],['right',Math.abs(point.x-(node.cx+node.w/2))],
-    ['bottom',Math.abs(point.y-(node.cy+node.h/2))],['left',Math.abs(point.x-(node.cx-node.w/2))]];
-  choices.sort(function(a,b){return a[1]-b[1];});var side=choices[0][0],horizontal=side==='top' || side==='bottom';
-  return {side:side,offset:Math.max(0,Math.min(1,horizontal?(point.x-node.cx+node.w/2)/node.w:(point.y-node.cy+node.h/2)/node.h))};
 }
 function autoArrangeDot(d,direction,positions,aspect){
   var ids=autoArrangeInput(d),groups=Object.assign(Object.create(null),d.groups || {});
@@ -60,12 +54,12 @@ function autoArrangeRead(d,json){
     var index=Number(e.id.slice(1)),original=d.edges[index],draw=(e._draw_ || []).filter(function(op){return op.op==='b' || op.op==='B';});
     if(draw.length!==1)throw new Error('A connection could not be routed.');
     var points=draw[0].points.map(function(p){return {x:p[0]-minX,y:-p[1]-minY};});
-    var route={fromPort:autoArrangePort(lookup[original.from],points[0]),toPort:autoArrangePort(lookup[original.to],points[points.length-1])};
-    // Keep all native controls. Port endpoints replace only the clipped ends.
+    var route={};
+    // Keep native controls; shared geometry chooses automatic card attachments.
     route.curveControls=points.slice(1,-1).map(function(p,i){return edgeCurvePoint(original,L,p,(i+1)/(points.length-1));});
     if(!validCurveControls(route.curveControls))throw new Error('A connection exceeds the editable curve limit.');
     if(original.label && e.xlp){
-      var label=e.xlp.split(',').map(Number),sample=samplePathD(edgePath(Object.assign({},original,route),L));
+      var label=e.xlp.split(',').map(Number),sample=samplePathD(edgePath(Object.assign({from:original.from,to:original.to},route),L));
       var lengths=[0];for(var k=1;k<sample.length;k++)lengths.push(lengths[k-1]+Math.hypot(sample[k].x-sample[k-1].x,sample[k].y-sample[k-1].y));
       var half=lengths[lengths.length-1]/2,j=1;while(j<lengths.length-1 && lengths[j]<half)j++;
       var t=(half-lengths[j-1])/(lengths[j]-lengths[j-1] || 1),mid={x:sample[j-1].x+(sample[j].x-sample[j-1].x)*t,y:sample[j-1].y+(sample[j].y-sample[j-1].y)*t};
@@ -91,7 +85,8 @@ function autoArrangeScore(d,result){
   var pathBounds=[],paths=arranged.edges.map(function(e){
     var path=samplePathD(edgePath(e,L));
     hits+=countPathRectHits(path,ids.filter(function(id){return id!==e.from && id!==e.to;}).map(function(id){return rect(L.pos[id]);}));
-    for(var i=1;i<path.length;i++)length+=Math.hypot(path[i].x-path[i-1].x,path[i].y-path[i-1].y);
+    // Routing aesthetics do not change edge length: measure card centers.
+    var from=L.pos[e.from],to=L.pos[e.to];length+=Math.hypot(to.cx-from.cx,to.cy-from.cy);
     var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
     path.forEach(function(p){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);});
     pathBounds.push({x:left,y:top,w:right-left,h:bottom-top});

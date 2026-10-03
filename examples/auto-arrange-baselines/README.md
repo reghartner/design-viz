@@ -36,6 +36,11 @@ Section 06 is intentionally nonplanar: each of three event streams connects to
 each of three consumers, so at least one crossing is unavoidable. The bounded
 search currently finds three crossing pairs; it does not promise the optimum.
 
+All saved edges use automatic attachments, with no `fromPort` or `toPort`.
+Moving cards updates their attachment sides while preserving editable native
+curves. Length tie-breaking uses straight center-to-center distances; curved
+routes still determine collision, crossing and occupied-bounds checks.
+
 Shape preference never overrides collision safety or fewer crossing pairs.
 Graphviz's target-ratio candidates can add whitespace, and labels, symmetry,
 alignment and the overall silhouette still need human judgment. These files

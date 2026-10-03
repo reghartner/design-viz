@@ -1,6 +1,7 @@
 /* Bounded deterministic layout search. Runs in a worker; this pure module is
    also exercised against the final viewer geometry in Node tests. */
 var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
+var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
 function autoArrangeInput(d){
   var ids=Object.keys(d.nodes || {}),edges=d.edges || [];
@@ -26,7 +27,7 @@ function autoArrangePort(node,point){
   choices.sort(function(a,b){return a[1]-b[1];});var side=choices[0][0],horizontal=side==='top' || side==='bottom';
   return {side:side,offset:Math.max(0,Math.min(1,horizontal?(point.x-node.cx+node.w/2)/node.w:(point.y-node.cy+node.h/2)/node.h))};
 }
-function autoArrangeDot(d,direction,positions){
+function autoArrangeDot(d,direction,positions,aspect){
   var ids=autoArrangeInput(d),groups=Object.assign(Object.create(null),d.groups || {});
   ids.forEach(function(id){var key=d.nodes[id].group;if(key && !groups[key])groups[key]={};});
   var gids=Object.keys(groups),parents=sanitizedGroupParents(groups);
@@ -36,6 +37,7 @@ function autoArrangeDot(d,direction,positions){
     gids.filter(function(c){return parents[c]===g;}).map(group).join('')+
     ids.filter(function(id){return d.nodes[id].group===g;}).map(node).join('')+'}';}
   var source='digraph G {graph [rankdir='+direction+',compound=true,newrank=true,splines=true,overlap=true,notranslate=true,nodesep='+(AUTO_ARRANGE_CARD_GAP/72)+',ranksep='+(AUTO_ARRANGE_RANK_GAP/72)+'];'+
+    (aspect?'graph [ratio='+1/aspect+'];':'')+
     'node [shape=box,fixedsize=true,width='+150/72+',height='+44/72+'];edge [dir=none,fontsize=11,fontname="Arial"];';
   if(positions)source+=ids.map(node).join('');
   else source+=gids.filter(function(g){return !parents[g];}).map(group).join('')+ids.filter(function(id){return !d.nodes[id].group;}).map(node).join('');
@@ -86,10 +88,13 @@ function autoArrangeScore(d,result){
     groupIds.slice(i+1).forEach(function(h){if(!ancestor(g,h) && !ancestor(h,g) && overlap(L.groups[g],L.groups[h]))overlaps++;});
     ids.forEach(function(id){if(!ancestor(g,arranged.nodes[id].group) && overlap(L.groups[g],rect(L.pos[id])))overlaps++;});
   });
-  var paths=arranged.edges.map(function(e){
+  var pathBounds=[],paths=arranged.edges.map(function(e){
     var path=samplePathD(edgePath(e,L));
     hits+=countPathRectHits(path,ids.filter(function(id){return id!==e.from && id!==e.to;}).map(function(id){return rect(L.pos[id]);}));
     for(var i=1;i<path.length;i++)length+=Math.hypot(path[i].x-path[i-1].x,path[i].y-path[i-1].y);
+    var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+    path.forEach(function(p){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);});
+    pathBounds.push({x:left,y:top,w:right-left,h:bottom-top});
     return path;
   });
   function intersects(a,b,c,d){
@@ -99,9 +104,20 @@ function autoArrangeScore(d,result){
   }
   paths.forEach(function(a,i){paths.slice(i+1).forEach(function(b,k){
     var e=arranged.edges[i],f=arranged.edges[i+k+1];if(e.from===f.from || e.from===f.to || e.to===f.from || e.to===f.to)return;
+    // Disconnected components and distant routes cannot cross. Avoid comparing
+    // every pair of their sampled segments (quadratic in both path lengths).
+    var ar=pathBounds[i],br=pathBounds[i+k+1];
+    if(ar.x+ar.w<br.x || br.x+br.w<ar.x || ar.y+ar.h<br.y || br.y+br.h<ar.y)return;
     for(var ai=1;ai<a.length;ai++)for(var bi=1;bi<b.length;bi++)if(intersects(a[ai-1],a[ai],b[bi-1],b[bi])){crossings++;return;}
   });});
-  return {overlaps:overlaps,hits:hits,crossings:crossings,length:length,area:L.vb.w*L.vb.h};
+  // Score the occupied geometry, not the viewer's minimum-width canvas.
+  var bounds=ids.map(function(id){return rect(L.pos[id]);}).concat(groupIds.map(function(g){return L.groups[g];}),pathBounds);
+  var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  bounds.forEach(function(b){left=Math.min(left,b.x);top=Math.min(top,b.y);right=Math.max(right,b.x+b.w);bottom=Math.max(bottom,b.y+b.h);});
+  var width=right-left,height=bottom-top,aspect=width/height;
+  // Every shape from square to a landscape monitor is equally preferred.
+  var shape=aspect<1?Math.log(1/aspect):aspect>16/9?Math.log(aspect/(16/9)):0;
+  return {overlaps:overlaps,hits:hits,crossings:crossings,length:length,area:width*height,width:width,height:height,aspect:aspect,shape:shape};
 }
 function autoArrangeColaPositions(d,cola,seed){
   var ids=autoArrangeInput(d),state=seed;
@@ -111,21 +127,57 @@ function autoArrangeColaPositions(d,cola,seed){
   new cola.Layout().nodes(nodes).links(links).size([1200,900]).linkDistance(AUTO_ARRANGE_LINK_DISTANCE).avoidOverlaps(true).start(60,100,250,0,false);
   var positions=Object.create(null);nodes.forEach(function(n){positions[n.id]={x:n.x,y:n.y};});return positions;
 }
+function autoArrangeChainPositions(d){
+  var ids=autoArrangeInput(d),edges=d.edges || [],next=Object.create(null),incoming=Object.create(null);
+  if(edges.length!==ids.length-1)return null;
+  for(var i=0;i<edges.length;i++){
+    var e=edges[i];if(e.from===e.to || next[e.from]!=null || incoming[e.to]!=null)return null;
+    next[e.from]=e.to;incoming[e.to]=e.from;
+  }
+  var starts=ids.filter(function(id){return incoming[id]==null;});if(starts.length!==1)return null;
+  var order=[],id=starts[0];while(id!=null && order.indexOf(id)<0){order.push(id);id=next[id];}
+  if(order.length!==ids.length)return null;
+  var rows=Math.ceil(ids.length/4),columns=Math.ceil(ids.length/rows);
+  var width=150+(columns-1)*(150+AUTO_ARRANGE_CARD_GAP);
+  var rowGap=rows>1?Math.max(44+AUTO_ARRANGE_RANK_GAP,(width/1.5-44)/(rows-1)):0;
+  // Longer paths also need horizontal room once minimum row clearance sets
+  // their height. Expand column spacing instead of squeezing cards together.
+  var columnGap=columns>1?Math.max(150+AUTO_ARRANGE_CARD_GAP,((44+(rows-1)*rowGap)*1.5-150)/(columns-1)):0;
+  var positions=Object.create(null);
+  order.forEach(function(id,i){var row=Math.floor(i/columns),column=row%2?columns-1-i%columns:i%columns;
+    positions[id]={x:column*columnGap,y:row*rowGap};
+  });return positions;
+}
+function autoArrangeCompare(a,b){
+  return a.score.crossings-b.score.crossings || a.score.shape-b.score.shape || a.score.length-b.score.length || a.score.area-b.score.area;
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[];
-  function attempt(direction,positions){
-    try{var result=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,direction,positions),{engine:positions?'nop2':'dot'}));
+  function attempt(direction,positions,aspect){
+    try{var result=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,direction,positions,aspect),{engine:positions?'nop2':'dot'}));
       result.score=autoArrangeScore(d,result);if(!result.score.overlaps && !result.score.hits)candidates.push(result);
     }catch(ex){/* An alternative layout may still produce a usable route. */}
   }
+  // A directed path has an unambiguous reading order. Preserve it in rows of
+  // at most four, balancing row lengths and reversing alternate rows. Require
+  // the normal safety checks before accepting the routed result.
+  var chain=autoArrangeChainPositions(d);
+  if(chain){attempt('LR',chain);if(candidates.length)return candidates[0];}
   attempt('TB');attempt('LR');
+  // Graphviz expands rank spacing on the short axis and reroutes its splines.
+  // Keep ordinary candidates as well: fewer crossings always outrank shape.
+  // Additional spline routing/scoring is expensive on large, dense graphs.
+  // Reserve the extra attempts for small diagrams within the worker budget.
+  if(ids.length<=AUTO_ARRANGE_COMPACT_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_COMPACT_LIMITS.edges){
+    attempt('TB',null,1.5);attempt('LR',null,1.5);
+  }
   if(!ids.some(function(id){return d.nodes[id].group;}) && ids.length>1 && cola){
     [1,91].forEach(function(seed){
       try{attempt('LR',autoArrangeColaPositions(d,cola,seed));
       }catch(ex){/* Layered alternatives remain available. */}
     });
   }
-  candidates.sort(function(a,b){return a.score.crossings-b.score.crossings || a.score.length-b.score.length || a.score.area-b.score.area;});
+  candidates.sort(autoArrangeCompare);
   if(!candidates.length)throw new Error('Could not find a layout with clear cards and connections. The diagram is unchanged.');
   return candidates[0];
 }

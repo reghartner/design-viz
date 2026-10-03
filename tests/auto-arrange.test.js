@@ -103,3 +103,137 @@ test('native geometry roundtrips, resets both representations, validates shape, 
   assert.ok(!entrypoint('standalone').source.includes('Viz.js 3.31.0'));
   assert.ok(C.AUTO_ARRANGE_WORKER_SOURCE.includes('Viz.js 3.31.0'));
 });
+
+test('directed paths follow topology in balanced snake rows with at most four cards',()=>{
+  for(const count of [1,4,5,6,9]){
+    const ids=Array.from({length:count},(_,i)=>'n'+i);
+    // Neither declaration nor edge order supplies the traversal order.
+    const d={nodes:Object.fromEntries(ids.slice().reverse().map(id=>[id,{title:id}])),rows:[ids],
+      edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})).reverse()};
+    const columns=Math.ceil(count/Math.ceil(count/4));
+    const result=C.autoArrangeCandidates(d,viz,cola),byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+    const rows=new Map();
+    ids.forEach((id,i)=>{const p=byId[id];if(!rows.has(p.y))rows.set(p.y,[]);rows.get(p.y).push(id);
+      if(i && i%columns){assert.equal(p.y,byId[ids[i-1]].y);assert.ok(Math.floor(i/columns)%2?p.x<byId[ids[i-1]].x:p.x>byId[ids[i-1]].x);}
+      if(i && !(i%columns)){assert.ok(p.y>byId[ids[i-1]].y);assert.equal(p.x,byId[ids[i-1]].x);}
+    });
+    assert.deepEqual([...rows.values()].map(row=>row.length),Array.from({length:Math.ceil(count/4)},(_,i)=>Math.min(columns,count-i*columns)));
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+    if(count>1)assert.ok(minimumCardGap(result)>=48);
+    if(count>4)assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9);
+    if(count===6)assert.deepEqual([...rows.values()].map(row=>row.length),[3,3]);
+  }
+  assert.equal(C.autoArrangeChainPositions(simple()),null,'cycles do not become chains');
+  assert.equal(C.autoArrangeChainPositions({nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'},{from:'a',to:'c'}]}),null,'forks do not become chains');
+});
+
+test('candidate ordering minimizes crossings before footprint, then routes and occupied area',()=>{
+  const candidate=(crossings,shape,length,area)=>({score:{crossings,shape,length,area}});
+  assert.ok(C.autoArrangeCompare(candidate(0,3,2000,10000),candidate(1,0,10,100))<0);
+  assert.ok(C.autoArrangeCompare(candidate(0,0,2000,10000),candidate(0,.2,10,100))<0);
+  assert.ok(C.autoArrangeCompare(candidate(0,0,10,10000),candidate(0,0,20,100))<0);
+  assert.ok(C.autoArrangeCompare(candidate(0,0,10,100),candidate(0,0,10,200))<0);
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[]};
+  function score(dx,dy){return C.autoArrangeScore(d,{positions:[{id:'a',x:100,y:100},{id:'b',x:100+dx,y:100+dy}],edges:[]});}
+  assert.equal(score(150,256).aspect,1);assert.equal(score(150,256).shape,0);
+  assert.equal(score(250,181).aspect,16/9);assert.equal(score(250,181).shape,0);
+  assert.ok(score(0,256).shape>0);assert.ok(score(600,100).shape>0);
+  assert.equal(score(150,256).area,300*300,'minimum viewer width is excluded');
+});
+
+test('unsafe candidate geometry is rejected even when every attempt returns it',()=>{
+  const d=simple(),json=viz.renderJSON(C.autoArrangeDot(d,'TB'),{engine:'dot'});
+  const nodes=json.objects.filter(n=>/^n\d+$/.test(n.name));nodes[1].pos=nodes[0].pos;
+  assert.ok(C.autoArrangeScore(d,C.autoArrangeRead(d,json)).overlaps>0);
+  assert.throws(()=>C.autoArrangeCandidates(d,{renderJSON:()=>json},null),/clear cards and connections/);
+});
+
+test('six reproducible baselines preserve semantics and fit complex graphs within square to 16:9',()=>{
+  const input=require('../examples/auto-arrange-baselines/graph-input.spec.json');
+  const saved=require('../examples/auto-arrange-baselines/auto-arranged.spec.json');
+  for(const spec of [input,saved])assert.deepEqual(plain(C.validate(C.normalize(spec)).errors),[]);
+  assert.equal(input.page.blocks.length,6);
+  input.page.blocks.forEach((block,i)=>{
+    const d=block.diagram,result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
+    assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.groups,d.groups);
+    assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
+    assert.ok(minimumCardGap(result)>=48,block.id+' gap '+minimumCardGap(result));
+    assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);
+    assert.equal(result.score.crossings,i===5?3:0,block.id);
+    if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
+  });
+});
+
+test('extra aspect attempts stay within the small-graph budget, including the supported 80-node grouped case',()=>{
+  function attempts(d){
+    const sources=[];
+    // Exhaust every attempt without paying for native routing. A failed engine
+    // must not cause more optional work than a successful candidate would.
+    assert.throws(()=>C.autoArrangeCandidates(d,{renderJSON(source){sources.push(source);throw new Error('test routing failure');}},null),/clear cards/);
+    return sources;
+  }
+  function sized(nodes,edges){
+    return {nodes:Object.fromEntries(Array.from({length:nodes},(_,i)=>['n'+i,{group:'g'}])),groups:{g:{}},
+      edges:Array.from({length:edges},()=>({from:'n0',to:'n1'}))};
+  }
+  assert.equal(attempts(sized(24,48)).filter(source=>source.includes('ratio=')).length,2);
+  for(const d of [sized(25,48),sized(24,49)]){
+    const sources=attempts(d);assert.equal(sources.length,2);assert.ok(sources.every(source=>!source.includes('ratio=')));
+  }
+  const d={nodes:{},groups:{},edges:[]},source=fixture.page.blocks[0].diagram;
+  for(let copy=0;copy<4;copy++){
+    const prefix='copy'+copy+'_';
+    for(const [id,node] of Object.entries(source.nodes))d.nodes[prefix+id]={...node,group:prefix+node.group};
+    for(const [id,group] of Object.entries(source.groups)){
+      d.groups[prefix+id]={...group};if(group.parent)d.groups[prefix+id].parent=prefix+group.parent;
+    }
+    d.edges.push(...source.edges.map(edge=>({...edge,from:prefix+edge.from,to:prefix+edge.to})));
+  }
+  assert.equal(Object.keys(d.nodes).length,80);assert.equal(d.edges.length,144);
+  assert.equal(attempts(d).length,2,'large supported grouped graphs keep the original two-candidate routing budget');
+});
+
+test('route-bounds pruning retains crossings and ignores distant disconnected routes',()=>{
+  const d={nodes:{a:{},b:{},c:{},d:{},e:{},f:{}},rows:[['a','b','c','d','e','f']],
+    edges:[{from:'a',to:'b'},{from:'c',to:'d'},{from:'e',to:'f'}]};
+  const positions={a:{x:0,y:0},b:{x:400,y:400},c:{x:0,y:400},d:{x:400,y:0},e:{x:1000,y:0},f:{x:1000,y:400}};
+  const result=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR',positions),{engine:'nop2'}));
+  const score=C.autoArrangeScore(d,result);
+  assert.equal(score.overlaps,0);assert.equal(score.hits,0);assert.equal(score.crossings,1);
+});
+
+test('long grouped chains keep compact snake geometry across the optional candidate cutoff',()=>{
+  for(const count of [24,25,80])for(const grouping of ['common','nested','rows']){
+    const ids=Array.from({length:count},(_,i)=>'n'+i),groups=grouping==='nested'?{outer:{title:'Outer'},common:{title:'Shared',parent:'outer'}}:{common:{title:'Shared'}};
+    const nodes=Object.fromEntries(ids.map((id,i)=>{
+      const group=grouping==='rows'?'row'+Math.floor(i/4):'common';
+      if(grouping==='rows')groups[group]={title:'Stage '+Math.floor(i/4)};
+      return [id,{title:id,group}];
+    }));
+    const d={nodes,groups,rows:[ids],edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id}))};
+    let attempts=0;
+    const result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);
+    const out=plain(C.autoArrangeDiagram(d,result));
+    assert.equal(attempts,1,count+' '+grouping+' accepts the safe snake directly');
+    assert.deepEqual(out.nodes,nodes);assert.deepEqual(out.groups,groups);
+    assert.deepEqual(out.edges.map(({from,to})=>({from,to})),d.edges);
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+    assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,count+' '+grouping+' '+result.score.aspect);
+    assert.ok(minimumCardGap(result)>=48);
+    const rows=new Map();result.positions.forEach(p=>rows.set(p.y,(rows.get(p.y)||0)+1));
+    assert.equal(rows.size,Math.ceil(count/4));assert.ok([...rows.values()].every(count=>count<=4));
+  }
+});
+
+test('grouped snakes with overlapping group boxes fall back to safe clustered candidates',()=>{
+  const ids=Array.from({length:6},(_,i)=>'n'+i);
+  const d={nodes:Object.fromEntries(ids.map((id,i)=>[id,{group:i%2?'odd':'even'}])),groups:{odd:{},even:{}},rows:[ids],
+    edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id}))};
+  const snake=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR',C.autoArrangeChainPositions(d)),{engine:'nop2'}));
+  assert.ok(C.autoArrangeScore(d,snake).overlaps>0);
+  let attempts=0;const result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);
+  assert.ok(attempts>1);assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
+  assert.deepEqual(plain(C.autoArrangeDiagram(d,result).groups),d.groups);
+});

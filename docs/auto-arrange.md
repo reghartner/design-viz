@@ -13,20 +13,50 @@ points and label nudges are replaced with explicit ports, native cubic controls
 and computed label nudges. Existing viewers need the `layout.cubic-curves`
 capability to display the new routes faithfully.
 
-Grouped graphs compare two global clustered Graphviz dot candidates (top to
-bottom and left to right). Ungrouped graphs also compare two deterministic
-WebCola stress layouts with Graphviz nop2 spline routing. External Graphviz
-labels preserve the graph's ranks while leaving room for labels. Candidate
-generation keeps at least 48 logical units between final card rectangles;
-layered ranks receive additional clearance for their routed connections.
-Candidate scoring uses the final viewer geometry, including ports and computed nested
-group boxes: reject overlapping cards/groups and routes through unrelated
-cards, then minimize nonincident crossing pairs, total route length and area.
-This bounded search does not promise an optimal or crossing-free result.
+Directed chains, including grouped chains, use at most four cards per row and reverse each
+successive row, so a six-card chain reads left to right across three cards, then
+right to left across three. Rows are balanced and spaced toward a 3:2 occupied
+footprint without reducing the minimum card gap. Long chains also expand
+column spacing once minimum row clearance determines their height. Detection follows edge
+topology rather than node or edge declaration order. Cycles, forks and disconnected graphs use the
+general candidate search. The snake is accepted only after collision and route
+checks, including every resulting group box. A snake that would overlap groups
+is rejected and the clustered search remains available.
 
-There are at most four candidates, 80 nodes and 160 edges per diagram. A worker
-has a 20-second deadline and is terminated on cancellation, source changes,
-section changes, project retirement or builder teardown. Failure never changes
+Grouped graphs compare global clustered Graphviz dot candidates in top to
+bottom and left to right directions. Graphs with at most 24 nodes and 48 edges also
+try both directions with a 3:2 target footprint. Larger or denser graphs keep
+the ordinary candidate budget so extra routing and scoring do not exhaust the
+worker deadline. The target candidates expand spacing on the short axis and reroute the native
+splines; they do not compress cards. Ungrouped graphs also compare two
+deterministic WebCola stress layouts with Graphviz nop2 spline routing.
+External Graphviz labels preserve the graph's ranks while leaving room for
+labels. Candidate generation keeps at least 48 logical units between final card
+rectangles; layered ranks receive additional clearance for their connections.
+
+Candidate scoring uses final viewer geometry, including ports and nested group
+boxes: reject overlapping cards/groups and routes through unrelated cards,
+then minimize nonincident crossing pairs. Disjoint route bounding boxes skip
+segment intersection checks, keeping disconnected graphs inexpensive to score.
+Among candidates with equal crossing counts, prefer an occupied footprint
+from square through 16:9 landscape. All
+ratios inside that range are equally preferred; ratios outside it are ranked
+by logarithmic distance to the nearest limit. Total route length and occupied
+area break ties. The footprint encloses cards, groups and sampled routes,
+excluding the viewer's minimum-width canvas and label boxes. Long chains
+prioritize the four-card row limit and minimum clearance when those
+constraints prevent the target footprint.
+
+The bounded search does not promise an optimal, crossing-free or in-range
+result. In particular, fewer crossings win even when that requires a less
+compact shape, and target spacing can introduce whitespace. There are at most
+seven attempts for small diagrams (a snake plus six general candidates). Above
+24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
+and, for ungrouped graphs, two stress candidates); grouped graphs use only
+the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges
+per diagram. A worker has a 20-second deadline and is terminated on
+cancellation, source changes, section changes, project retirement or builder
+teardown. Failure never changes
 the source. Freshness is checked again before the atomic session transaction.
 Native paths are stored in the spec, so opening or exporting never recomputes
 layout. Moving nodes deforms their authored routes without running a layout.
@@ -55,3 +85,14 @@ same browser bundles; normal builds are network-free. Build with
 fixture: ten nonincident crossing pairs, no node/group overlap and no route
 through an unrelated card. Browser contracts inspect the actual SVG, native
 control and card dragging, cancellation, one Undo/Redo, reload and export.
+
+## Shape baselines
+
+`examples/auto-arrange-baselines/graph-input.spec.json` contains six importable
+comparison diagrams: a chain, a fork/join, three larger systems with legacy
+monoliths and direct/back couplings, and a deliberately nonplanar K₃,₃.
+Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
+`auto-arranged.spec.json` using the production algorithm and print occupied
+geometry/crossing metrics. The focused tests verify these outputs exactly,
+including the 3+3 snake, semantic preservation, collision safety and the square
+to 16:9 footprint of all six diagrams.

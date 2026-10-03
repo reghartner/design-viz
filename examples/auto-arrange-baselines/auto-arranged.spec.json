@@ -1,0 +1,3121 @@
+{
+  "page": {
+    "title": "Auto arrange shape baselines",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "request-path",
+        "heading": "01 · Webhook delivery · 6 nodes",
+        "text": "A single request path, balanced into two rows of three cards. The second row reads right to left.",
+        "diagram": {
+          "title": "01 · Webhook delivery · 6 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "sender": {
+              "title": "Sender",
+              "icon": "terminal"
+            },
+            "edge": {
+              "title": "Edge API",
+              "icon": "router"
+            },
+            "verify": {
+              "title": "Verifier",
+              "icon": "shield"
+            },
+            "queue": {
+              "title": "Delivery queue",
+              "icon": "package"
+            },
+            "worker": {
+              "title": "Worker",
+              "icon": "server"
+            },
+            "partner": {
+              "title": "Partner API",
+              "icon": "cloud"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "sender",
+              "to": "edge",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 24.8,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -24.8,
+                  "dy": 0
+                }
+              ]
+            },
+            {
+              "from": "edge",
+              "to": "verify",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 24.8,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -24.8,
+                  "dy": 0
+                }
+              ]
+            },
+            {
+              "from": "verify",
+              "to": "queue",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": -27.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": 27.1
+                }
+              ]
+            },
+            {
+              "from": "queue",
+              "to": "worker",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -24.7,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 24.8,
+                  "dy": 0
+                }
+              ]
+            },
+            {
+              "from": "worker",
+              "to": "partner",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -24.7,
+                  "dy": 0
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 24.8,
+                  "dy": 0
+                }
+              ]
+            }
+          ],
+          "floats": [
+            {
+              "id": "sender",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "edge",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "verify",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "queue",
+              "side": "below",
+              "x": 528,
+              "y": 428
+            },
+            {
+              "id": "worker",
+              "side": "below",
+              "x": 324,
+              "y": 428
+            },
+            {
+              "id": "partner",
+              "side": "below",
+              "x": 120,
+              "y": 428
+            }
+          ]
+        }
+      },
+      {
+        "id": "approval-diamond",
+        "heading": "02 · Document approval · 9 nodes",
+        "text": "A three-branch review that rejoins before publication. All branches are logically parallel.",
+        "diagram": {
+          "title": "02 · Document approval · 9 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "uploader": {
+              "title": "Uploader",
+              "icon": "terminal"
+            },
+            "api": {
+              "title": "Upload API",
+              "icon": "cloud"
+            },
+            "store": {
+              "title": "File store",
+              "icon": "db"
+            },
+            "scan": {
+              "title": "Malware scan",
+              "icon": "shield"
+            },
+            "policy": {
+              "title": "Policy check",
+              "icon": "shield"
+            },
+            "review": {
+              "title": "Review queue",
+              "icon": "gear"
+            },
+            "reviewer": {
+              "title": "Reviewer",
+              "icon": "gear"
+            },
+            "publish": {
+              "title": "Publisher",
+              "icon": "cloud"
+            },
+            "archive": {
+              "title": "Archive",
+              "icon": "db"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "uploader",
+              "to": "api",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "api",
+              "to": "store",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 1
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12.9,
+                  "dy": 4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 12.8,
+                  "dy": -3.9
+                }
+              ]
+            },
+            {
+              "from": "api",
+              "to": "scan",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "api",
+              "to": "policy",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 1
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 12.9,
+                  "dy": 4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -12.8,
+                  "dy": -3.9
+                }
+              ]
+            },
+            {
+              "from": "store",
+              "to": "review",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 1
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 12.9,
+                  "dy": 4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -12.8,
+                  "dy": -3.9
+                }
+              ]
+            },
+            {
+              "from": "scan",
+              "to": "review",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "policy",
+              "to": "review",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 1
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12.9,
+                  "dy": 4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 12.8,
+                  "dy": -3.9
+                }
+              ]
+            },
+            {
+              "from": "review",
+              "to": "reviewer",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "reviewer",
+              "to": "publish",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "archive",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            }
+          ],
+          "floats": [
+            {
+              "id": "uploader",
+              "side": "below",
+              "x": 526,
+              "y": 100
+            },
+            {
+              "id": "api",
+              "side": "below",
+              "x": 526,
+              "y": 216
+            },
+            {
+              "id": "store",
+              "side": "below",
+              "x": 120,
+              "y": 332
+            },
+            {
+              "id": "scan",
+              "side": "below",
+              "x": 526,
+              "y": 332
+            },
+            {
+              "id": "policy",
+              "side": "below",
+              "x": 932,
+              "y": 332
+            },
+            {
+              "id": "review",
+              "side": "below",
+              "x": 526,
+              "y": 448
+            },
+            {
+              "id": "reviewer",
+              "side": "below",
+              "x": 526,
+              "y": 564
+            },
+            {
+              "id": "publish",
+              "side": "below",
+              "x": 526,
+              "y": 680
+            },
+            {
+              "id": "archive",
+              "side": "below",
+              "x": 526,
+              "y": 796
+            }
+          ]
+        }
+      },
+      {
+        "id": "telemetry-fan",
+        "heading": "03 · Telemetry pipeline · 13 nodes",
+        "text": "Three producers feed three signal lanes around a legacy observability monolith. The app still writes logs directly, and alerts call back into legacy configuration.",
+        "diagram": {
+          "title": "03 · Telemetry pipeline · 13 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "app": {
+              "title": "Web app",
+              "icon": "terminal"
+            },
+            "jobs": {
+              "title": "Job runner",
+              "icon": "server"
+            },
+            "edge": {
+              "title": "Edge gateway",
+              "icon": "router"
+            },
+            "collector": {
+              "title": "Collector",
+              "icon": "server"
+            },
+            "router": {
+              "title": "Legacy observability",
+              "icon": "router"
+            },
+            "metrics": {
+              "title": "Metrics job",
+              "icon": "server"
+            },
+            "logs": {
+              "title": "Logs job",
+              "icon": "server"
+            },
+            "traces": {
+              "title": "Traces job",
+              "icon": "server"
+            },
+            "metricdb": {
+              "title": "Metrics store",
+              "icon": "db"
+            },
+            "logdb": {
+              "title": "Logs store",
+              "icon": "db"
+            },
+            "tracedb": {
+              "title": "Trace store",
+              "icon": "db"
+            },
+            "dashboard": {
+              "title": "Dashboard",
+              "icon": "gear"
+            },
+            "alerts": {
+              "title": "Alert manager",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "app",
+              "to": "collector",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.8423333333333333
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.15919999999999998
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 9.2,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -8.9,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "jobs",
+              "to": "collector",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.31313333333333354
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.6859999999999998
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 4.8,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "edge",
+              "to": "collector",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5690000000000002
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.43133333333333324
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 1.8,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -1.8,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "collector",
+              "to": "router",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5037333333333334
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.49626666666666663
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0.1,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -0.1,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "router",
+              "to": "metrics",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7608
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.24033333333333304
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 7,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -6.7,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "router",
+              "to": "logs",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.11126666666666665
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.8887333333333334
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -10.3,
+                  "dy": 4.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 10.3,
+                  "dy": -4.1
+                }
+              ]
+            },
+            {
+              "from": "router",
+              "to": "traces",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.505
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.495
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0.1,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -0.1,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "metrics",
+              "to": "metricdb",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "logs",
+              "to": "logdb",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.6379333333333334
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.3626666666666667
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 3.7,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -3.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "traces",
+              "to": "tracedb",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "metricdb",
+              "to": "dashboard",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.24419999999999997
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7546666666666666
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -6.8,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 6.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "logdb",
+              "to": "dashboard",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7558
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.2453333333333334
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 6.8,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -6.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "tracedb",
+              "to": "dashboard",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "metricdb",
+              "to": "alerts",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5977999999999998
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.4025999999999999
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 2.6,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -2.5,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "app",
+              "to": "logs",
+              "label": "direct logs",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.48600000000000004
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5139333333333334
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 3.1,
+                  "dy": -31.6
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -3.2,
+                  "dy": 31.9
+                }
+              ],
+              "labelDx": -25.053541332939133,
+              "labelDy": 6.542200944584124
+            },
+            {
+              "from": "alerts",
+              "to": "router",
+              "label": "reconfigure",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.571133333333333
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.7981818181818183
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 80.3,
+                  "dy": -11.2
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 171.9,
+                  "dy": -67.4
+                },
+                {
+                  "t": 0.5,
+                  "dx": 167,
+                  "dy": -80
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 186.6,
+                  "dy": -59.7
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 110.2,
+                  "dy": -29.9
+                }
+              ],
+              "labelDx": -109.70109436262419,
+              "labelDy": -35.54715417813355
+            },
+            {
+              "from": "router",
+              "to": "logdb",
+              "label": "legacy query",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.33406666666666673
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5943333333333334
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -12.1,
+                  "dy": 2
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -8.1,
+                  "dy": -9.5
+                },
+                {
+                  "t": 0.5,
+                  "dx": 2,
+                  "dy": -22
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 1.1,
+                  "dy": -22.1
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -0.4,
+                  "dy": -11.3
+                }
+              ],
+              "labelDx": -31.236510984384495,
+              "labelDy": 6.451811492145282
+            }
+          ],
+          "floats": [
+            {
+              "id": "app",
+              "side": "below",
+              "x": 154,
+              "y": 100
+            },
+            {
+              "id": "jobs",
+              "side": "below",
+              "x": 576,
+              "y": 100
+            },
+            {
+              "id": "edge",
+              "side": "below",
+              "x": 372,
+              "y": 100
+            },
+            {
+              "id": "collector",
+              "side": "below",
+              "x": 427,
+              "y": 216
+            },
+            {
+              "id": "router",
+              "side": "below",
+              "x": 430,
+              "y": 332
+            },
+            {
+              "id": "metrics",
+              "side": "below",
+              "x": 638,
+              "y": 448
+            },
+            {
+              "id": "logs",
+              "side": "below",
+              "x": 120,
+              "y": 448
+            },
+            {
+              "id": "traces",
+              "side": "below",
+              "x": 434,
+              "y": 448
+            },
+            {
+              "id": "metricdb",
+              "side": "below",
+              "x": 638,
+              "y": 564
+            },
+            {
+              "id": "logdb",
+              "side": "below",
+              "x": 230,
+              "y": 564
+            },
+            {
+              "id": "tracedb",
+              "side": "below",
+              "x": 434,
+              "y": 564
+            },
+            {
+              "id": "dashboard",
+              "side": "below",
+              "x": 434,
+              "y": 680
+            },
+            {
+              "id": "alerts",
+              "side": "below",
+              "x": 716,
+              "y": 680
+            }
+          ]
+        }
+      },
+      {
+        "id": "fulfillment",
+        "heading": "04 · Order fulfillment · 16 nodes",
+        "text": "A legacy commerce monolith joins three checks and emits fulfillment events. Cart lookups bypass checkout, reservations retry backward, and operations patch orders directly.",
+        "diagram": {
+          "title": "04 · Order fulfillment · 16 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "buyer": {
+              "title": "Buyer",
+              "icon": "terminal"
+            },
+            "storefront": {
+              "title": "Storefront",
+              "icon": "db"
+            },
+            "gateway": {
+              "title": "Gateway",
+              "icon": "router"
+            },
+            "cart": {
+              "title": "Cart service",
+              "icon": "gear"
+            },
+            "checkout": {
+              "title": "Checkout",
+              "icon": "gear"
+            },
+            "payment": {
+              "title": "Payments",
+              "icon": "gear"
+            },
+            "risk": {
+              "title": "Risk check",
+              "icon": "shield"
+            },
+            "inventory": {
+              "title": "Inventory",
+              "icon": "gear"
+            },
+            "order": {
+              "title": "Legacy commerce",
+              "icon": "gear"
+            },
+            "events": {
+              "title": "Event bus",
+              "icon": "router"
+            },
+            "warehouse": {
+              "title": "Warehouse",
+              "icon": "package"
+            },
+            "carrier": {
+              "title": "Carrier",
+              "icon": "package"
+            },
+            "notify": {
+              "title": "Notifier",
+              "icon": "phone"
+            },
+            "mail": {
+              "title": "Email service",
+              "icon": "gear"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear"
+            },
+            "ops": {
+              "title": "Ops dashboard",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "buyer",
+              "to": "storefront",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5001999999999999
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5001999999999999
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "storefront",
+              "to": "gateway",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5001999999999999
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5001999999999999
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "gateway",
+              "to": "cart",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5001999999999999
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5001999999999999
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "cart",
+              "to": "checkout",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.2582000000000001
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7409333333333332
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -6.5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 6.3,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "checkout",
+              "to": "payment",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.7806818181818187
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.2195454545454564
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 32,
+                  "dy": -4.5
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -32,
+                  "dy": 4.5
+                }
+              ]
+            },
+            {
+              "from": "checkout",
+              "to": "risk",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.1839999999999994
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.814533333333333
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -8.5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 8.2,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "checkout",
+              "to": "inventory",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.8159999999999998
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.18560000000000096
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 8.5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -8.1,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "payment",
+              "to": "order",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.716363636363636
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.2836363636363641
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -73.8,
+                  "dy": -8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 73.8,
+                  "dy": 8
+                }
+              ]
+            },
+            {
+              "from": "risk",
+              "to": "order",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.9106818181818167
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.09090909090909091
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 2.8,
+                  "dy": 1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -2.3,
+                  "dy": -0.9
+                }
+              ]
+            },
+            {
+              "from": "inventory",
+              "to": "order",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.3919333333333331
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.3921333333333329
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -21.6,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -21.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "order",
+              "to": "events",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.2582000000000001
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7411333333333339
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -6.4,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 6.3,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "events",
+              "to": "warehouse",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.7806818181818187
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.21954545454545382
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 32,
+                  "dy": -4.5
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -32,
+                  "dy": 4.5
+                }
+              ]
+            },
+            {
+              "from": "warehouse",
+              "to": "carrier",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "events",
+              "to": "notify",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.18419999999999997
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.814533333333333
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -8.4,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 8.2,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "notify",
+              "to": "mail",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "events",
+              "to": "analytics",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.8162000000000004
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.18560000000000096
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 8.5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -8.1,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "analytics",
+              "to": "ops",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7422000000000011
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.2592666666666673
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 6.5,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -6.2,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "cart",
+              "to": "order",
+              "label": "lookup",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.6641333333333341
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7402666666666664
+              },
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 56,
+                  "dy": 18.5
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 120.7,
+                  "dy": 52.9
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 141.4,
+                  "dy": 94
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 141.1,
+                  "dy": 73.8
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 136.2,
+                  "dy": 42.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 121.7,
+                  "dy": 22
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 101.7,
+                  "dy": 13.8
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 66.2,
+                  "dy": -0.1
+                }
+              ],
+              "labelDx": -37.81253220818485,
+              "labelDy": -29.713181831835982
+            },
+            {
+              "from": "order",
+              "to": "inventory",
+              "label": "redo",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.6082666666666667
+              },
+              "toPort": {
+                "side": "bottom",
+                "offset": 0.6083999999999999
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 21.6,
+                  "dy": -4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 21.6,
+                  "dy": 4.2
+                }
+              ],
+              "labelDx": -10.956094168488335,
+              "labelDy": 6.457663868733789
+            },
+            {
+              "from": "ops",
+              "to": "order",
+              "label": "manual patch",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.41066666666666757
+              },
+              "toPort": {
+                "side": "bottom",
+                "offset": 0.6148000000000002
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 11.2,
+                  "dy": 8.6
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 21.8,
+                  "dy": 18.2
+                },
+                {
+                  "t": 0.5,
+                  "dx": 35,
+                  "dy": 36
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 26.8,
+                  "dy": 23.8
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 5.2,
+                  "dy": 1.7
+                }
+              ],
+              "labelDx": -33.06945455301502,
+              "labelDy": 6.283725871159504
+            }
+          ],
+          "floats": [
+            {
+              "id": "buyer",
+              "side": "below",
+              "x": 1069.97,
+              "y": 100
+            },
+            {
+              "id": "storefront",
+              "side": "below",
+              "x": 1069.97,
+              "y": 216
+            },
+            {
+              "id": "gateway",
+              "side": "below",
+              "x": 1069.97,
+              "y": 332
+            },
+            {
+              "id": "cart",
+              "side": "below",
+              "x": 1069.97,
+              "y": 448
+            },
+            {
+              "id": "checkout",
+              "side": "below",
+              "x": 877,
+              "y": 564
+            },
+            {
+              "id": "payment",
+              "side": "below",
+              "x": 120,
+              "y": 680
+            },
+            {
+              "id": "risk",
+              "side": "below",
+              "x": 625,
+              "y": 680
+            },
+            {
+              "id": "inventory",
+              "side": "below",
+              "x": 1128.97,
+              "y": 680
+            },
+            {
+              "id": "order",
+              "side": "below",
+              "x": 1128.97,
+              "y": 796
+            },
+            {
+              "id": "events",
+              "side": "below",
+              "x": 935.9699999999999,
+              "y": 912
+            },
+            {
+              "id": "warehouse",
+              "side": "below",
+              "x": 179,
+              "y": 1028
+            },
+            {
+              "id": "carrier",
+              "side": "below",
+              "x": 179,
+              "y": 1144
+            },
+            {
+              "id": "notify",
+              "side": "below",
+              "x": 684,
+              "y": 1028
+            },
+            {
+              "id": "mail",
+              "side": "below",
+              "x": 684,
+              "y": 1144
+            },
+            {
+              "id": "analytics",
+              "side": "below",
+              "x": 1187.97,
+              "y": 1028
+            },
+            {
+              "id": "ops",
+              "side": "below",
+              "x": 1380.97,
+              "y": 1144
+            }
+          ]
+        }
+      },
+      {
+        "id": "media-platform",
+        "heading": "05 · Media platform · 20 nodes",
+        "text": "Five groups surround a legacy media monolith and three processing lanes. Publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
+        "diagram": {
+          "title": "05 · Media platform · 20 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "camera",
+              "group": "sources"
+            },
+            "mobile": {
+              "title": "Mobile app",
+              "icon": "phone",
+              "group": "sources"
+            },
+            "upload": {
+              "title": "Upload API",
+              "icon": "cloud",
+              "group": "ingest"
+            },
+            "auth": {
+              "title": "Identity",
+              "icon": "shield",
+              "group": "ingest"
+            },
+            "queue": {
+              "title": "Upload queue",
+              "icon": "gear",
+              "group": "ingest"
+            },
+            "metadata": {
+              "title": "Metadata DB",
+              "icon": "db",
+              "group": "ingest"
+            },
+            "object": {
+              "title": "Object store",
+              "icon": "db",
+              "group": "ingest"
+            },
+            "splitter": {
+              "title": "Job splitter",
+              "icon": "server",
+              "group": "process"
+            },
+            "thumbnail": {
+              "title": "Thumbnail job",
+              "icon": "server",
+              "group": "process"
+            },
+            "transcoder": {
+              "title": "Transcoder",
+              "icon": "server",
+              "group": "process"
+            },
+            "captions": {
+              "title": "Caption job",
+              "icon": "server",
+              "group": "process"
+            },
+            "thumbstore": {
+              "title": "Image store",
+              "icon": "db",
+              "group": "data"
+            },
+            "videostore": {
+              "title": "Video store",
+              "icon": "db",
+              "group": "data"
+            },
+            "textindex": {
+              "title": "Text index",
+              "icon": "db",
+              "group": "data"
+            },
+            "publish": {
+              "title": "Legacy media core",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "cdn": {
+              "title": "CDN",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "search": {
+              "title": "Search API",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "notify": {
+              "title": "Notifications",
+              "icon": "phone",
+              "group": "delivery"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear",
+              "group": "delivery"
+            },
+            "monitor": {
+              "title": "Monitoring",
+              "icon": "gear",
+              "group": "delivery"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "upload",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5917333333333332
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.4093333333333334
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 1.9,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -1.7,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "mobile",
+              "to": "upload",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.3548666666666668
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.6434666666666667
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -3.1,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 2.7,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "upload",
+              "to": "auth",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5351333333333333
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.46506666666666663
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0.9,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -0.9,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "auth",
+              "to": "queue",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "upload",
+              "to": "metadata",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.3544
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.3922666666666667
+              },
+              "curveControls": [
+                {
+                  "t": 0.08333333333333333,
+                  "dx": -38.7,
+                  "dy": -38.9
+                },
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -61.2,
+                  "dy": -91.1
+                },
+                {
+                  "t": 0.25,
+                  "dx": -74,
+                  "dy": -142.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -100.3,
+                  "dy": -164.9
+                },
+                {
+                  "t": 0.4166666666666667,
+                  "dx": -102,
+                  "dy": -225.1
+                },
+                {
+                  "t": 0.5,
+                  "dx": -102,
+                  "dy": -241.8
+                },
+                {
+                  "t": 0.5833333333333334,
+                  "dx": -102,
+                  "dy": -320.6
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -102,
+                  "dy": -399.4
+                },
+                {
+                  "t": 0.75,
+                  "dx": -102,
+                  "dy": -3.4
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -102,
+                  "dy": 4.1
+                },
+                {
+                  "t": 0.9166666666666666,
+                  "dx": -44.9,
+                  "dy": 16.1
+                }
+              ]
+            },
+            {
+              "from": "queue",
+              "to": "object",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "object",
+              "to": "splitter",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.8715333333333335
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.1878000000000001
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 28.9,
+                  "dy": 10.2
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 4.1,
+                  "dy": -1.1
+                },
+                {
+                  "t": 0.5,
+                  "dx": -22.5,
+                  "dy": -12.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -30.1,
+                  "dy": -16.5
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -33.1,
+                  "dy": -17.2
+                }
+              ]
+            },
+            {
+              "from": "splitter",
+              "to": "thumbnail",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.4209999999999999
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5786666666666668
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -2.1,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 2,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "splitter",
+              "to": "transcoder",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.9325999999999999
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.06740000000000008
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 11.5,
+                  "dy": 4.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -11.5,
+                  "dy": -4.1
+                }
+              ]
+            },
+            {
+              "from": "splitter",
+              "to": "captions",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.6767999999999998
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.3240000000000002
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 4.7,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -4.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "thumbnail",
+              "to": "thumbstore",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "transcoder",
+              "to": "videostore",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "captions",
+              "to": "textindex",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "thumbstore",
+              "to": "publish",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7368666666666664
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.2635333333333332
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 4.9,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -4.8,
+                  "dy": -3.2
+                }
+              ]
+            },
+            {
+              "from": "videostore",
+              "to": "publish",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.2631333333333335
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7364666666666668
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -4.9,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 4.8,
+                  "dy": -3.2
+                }
+              ]
+            },
+            {
+              "from": "textindex",
+              "to": "publish",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 3.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -3
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "cdn",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.24419999999999997
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7546666666666666
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -6.8,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 6.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "search",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.5
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 0,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "notify",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7558
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.24533333333333304
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 6.8,
+                  "dy": 4.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -6.6,
+                  "dy": -4
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "analytics",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 1
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 12.6,
+                  "dy": 3.9
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -12.5,
+                  "dy": -3.8
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "monitor",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.8222727272727287
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.11977272727272686
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 72.9,
+                  "dy": 12.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 151.8,
+                  "dy": 25.4
+                },
+                {
+                  "t": 0.5,
+                  "dx": 204,
+                  "dy": 36
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 110.6,
+                  "dy": 18.3
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 17.6,
+                  "dy": 0.8
+                }
+              ]
+            },
+            {
+              "from": "publish",
+              "to": "metadata",
+              "label": "catalog write",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.9681818181818161
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.031136363636361155
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -9.6,
+                  "dy": 2.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 9.8,
+                  "dy": -2.9
+                }
+              ],
+              "labelDx": -30.798359248491124,
+              "labelDy": 6.4013235825657375
+            },
+            {
+              "from": "transcoder",
+              "to": "object",
+              "label": "read",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.36900000000000016
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.6197727272727268
+              },
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 44.2,
+                  "dy": -23.6
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 56.6,
+                  "dy": -70.9
+                },
+                {
+                  "t": 0.5,
+                  "dx": 64,
+                  "dy": -70.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 114.3,
+                  "dy": -53.2
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 65.5,
+                  "dy": -27.3
+                }
+              ],
+              "labelDx": -18.312609369388383,
+              "labelDy": 4.140236711603848
+            },
+            {
+              "from": "monitor",
+              "to": "queue",
+              "label": "retry upload",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.36320000000000013
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.5959090909090915
+              },
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 57.3,
+                  "dy": 17.4
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 101.1,
+                  "dy": 8.1
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 214.7,
+                  "dy": -1.9
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 328.2,
+                  "dy": -165.4
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 441.8,
+                  "dy": -86.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 555.3,
+                  "dy": -6.9
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 668.9,
+                  "dy": -96.5
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 177.4,
+                  "dy": -63.8
+                }
+              ],
+              "labelDx": 113.13238817629599,
+              "labelDy": 159.97505604880814
+            }
+          ],
+          "groups": {
+            "sources": {
+              "title": "Sources"
+            },
+            "ingest": {
+              "title": "Ingestion"
+            },
+            "process": {
+              "title": "Processing"
+            },
+            "data": {
+              "title": "Output stores"
+            },
+            "delivery": {
+              "title": "Delivery"
+            }
+          },
+          "floats": [
+            {
+              "id": "camera",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "mobile",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "upload",
+              "side": "below",
+              "x": 199,
+              "y": 224.80000000000007
+            },
+            {
+              "id": "auth",
+              "side": "below",
+              "x": 227,
+              "y": 340.80000000000007
+            },
+            {
+              "id": "queue",
+              "side": "below",
+              "x": 227,
+              "y": 456.80000000000007
+            },
+            {
+              "id": "metadata",
+              "side": "below",
+              "x": 199,
+              "y": 1170.4
+            },
+            {
+              "id": "object",
+              "side": "below",
+              "x": 227,
+              "y": 572.8000000000001
+            },
+            {
+              "id": "splitter",
+              "side": "below",
+              "x": 496,
+              "y": 688.8000000000001
+            },
+            {
+              "id": "thumbnail",
+              "side": "below",
+              "x": 433,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "transcoder",
+              "side": "below",
+              "x": 841,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "captions",
+              "side": "below",
+              "x": 637,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "thumbstore",
+              "side": "below",
+              "x": 433,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "videostore",
+              "side": "below",
+              "x": 841,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "textindex",
+              "side": "below",
+              "x": 637,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "publish",
+              "side": "below",
+              "x": 637,
+              "y": 1054.4
+            },
+            {
+              "id": "cdn",
+              "side": "below",
+              "x": 433,
+              "y": 1170.4
+            },
+            {
+              "id": "search",
+              "side": "below",
+              "x": 637,
+              "y": 1170.4
+            },
+            {
+              "id": "notify",
+              "side": "below",
+              "x": 841,
+              "y": 1170.4
+            },
+            {
+              "id": "analytics",
+              "side": "below",
+              "x": 1045,
+              "y": 1170.4
+            },
+            {
+              "id": "monitor",
+              "side": "below",
+              "x": 1249,
+              "y": 1170.4
+            }
+          ]
+        }
+      },
+      {
+        "id": "subscription-matrix",
+        "heading": "06 · Subscription matrix · forced crossing",
+        "text": "Each of three event streams feeds each of three consumers. These nine direct edges form K₃,₃, so at least one crossing is unavoidable.",
+        "diagram": {
+          "title": "06 · Subscription matrix · forced crossing",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "orders": {
+              "title": "Order events",
+              "icon": "gear"
+            },
+            "returns": {
+              "title": "Return events",
+              "icon": "gear"
+            },
+            "stock": {
+              "title": "Stock events",
+              "icon": "gear"
+            },
+            "audit": {
+              "title": "Audit sink",
+              "icon": "db"
+            },
+            "metrics": {
+              "title": "Metrics sink",
+              "icon": "db"
+            },
+            "risk": {
+              "title": "Risk sink",
+              "icon": "shield"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "orders",
+              "to": "audit",
+              "fromPort": {
+                "side": "right",
+                "offset": 0.21954545454545382
+              },
+              "toPort": {
+                "side": "left",
+                "offset": 0.7806818181818187
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 22.2,
+                  "dy": -3.6
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -22.2,
+                  "dy": 3.6
+                }
+              ]
+            },
+            {
+              "from": "orders",
+              "to": "metrics",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.7265333333333335
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.2734666666666665
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 0.2,
+                  "dy": 0.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -0.2,
+                  "dy": -0.1
+                }
+              ]
+            },
+            {
+              "from": "orders",
+              "to": "risk",
+              "fromPort": {
+                "side": "left",
+                "offset": 0.13409090909090857
+              },
+              "toPort": {
+                "side": "right",
+                "offset": 0.8661363636363627
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -23.8,
+                  "dy": -5.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 23.8,
+                  "dy": 5.1
+                }
+              ]
+            },
+            {
+              "from": "returns",
+              "to": "audit",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.6624000000000001
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.33633333333333365
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -3.7,
+                  "dy": -3.4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 3.4,
+                  "dy": 3.1
+                }
+              ]
+            },
+            {
+              "from": "returns",
+              "to": "metrics",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.5602666666666671
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.4395999999999996
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -15.3,
+                  "dy": -37.7
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 15.3,
+                  "dy": 37.5
+                }
+              ]
+            },
+            {
+              "from": "returns",
+              "to": "risk",
+              "fromPort": {
+                "side": "bottom",
+                "offset": 0.22886666666666694
+              },
+              "toPort": {
+                "side": "top",
+                "offset": 0.7711999999999997
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 4.4,
+                  "dy": -2.4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -4.4,
+                  "dy": 2.4
+                }
+              ]
+            },
+            {
+              "from": "stock",
+              "to": "audit",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.6561999999999997
+              },
+              "toPort": {
+                "side": "bottom",
+                "offset": 0.34453333333333375
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -20.3,
+                  "dy": 19.4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 20.5,
+                  "dy": -19.6
+                }
+              ]
+            },
+            {
+              "from": "stock",
+              "to": "metrics",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.9542666666666666
+              },
+              "toPort": {
+                "side": "bottom",
+                "offset": 0.046999999999999695
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 19.9,
+                  "dy": -6.6
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -19.7,
+                  "dy": 6.5
+                }
+              ]
+            },
+            {
+              "from": "stock",
+              "to": "risk",
+              "fromPort": {
+                "side": "top",
+                "offset": 0.38806666666666617
+              },
+              "toPort": {
+                "side": "bottom",
+                "offset": 0.6123333333333331
+              },
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 15.4,
+                  "dy": 20.5
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -15.3,
+                  "dy": -20.3
+                }
+              ]
+            }
+          ],
+          "floats": [
+            {
+              "id": "orders",
+              "side": "below",
+              "x": 358.67999999999995,
+              "y": 326.99
+            },
+            {
+              "id": "returns",
+              "side": "below",
+              "x": 438.56999999999994,
+              "y": 100
+            },
+            {
+              "id": "stock",
+              "side": "below",
+              "x": 338.6,
+              "y": 566.79
+            },
+            {
+              "id": "audit",
+              "side": "below",
+              "x": 637.2099999999999,
+              "y": 281.4
+            },
+            {
+              "id": "metrics",
+              "side": "below",
+              "x": 594.12,
+              "y": 482.65000000000003
+            },
+            {
+              "id": "risk",
+              "side": "below",
+              "x": 120,
+              "y": 275.87
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -95,10 +95,11 @@ function initWorkbenchLibrary(opts){
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
   var specRequests=new Map();
-  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
+  var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireViewer(){
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
     if(tour)tour.destroy();tour=null;
+    if(deepLinks)deepLinks.destroy();deepLinks=null;
     if(ctl)ctl.destroy();ctl=null;
   }
   function stop(){
@@ -213,6 +214,7 @@ function initWorkbenchLibrary(opts){
       var spec=JSON.parse(JSON.stringify(current.spec));
       var page=normalize(spec);
       ctl=renderPage(reader,page,spec.page.skin,null,{autoplay:false});edit.disabled=false;copy.disabled=!published;
+      deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
       exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});

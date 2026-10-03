@@ -6,6 +6,15 @@ const home=page=>page.locator('#welcome-home');
 const editor=page=>page.locator('#workbench-workspace');
 const screen=(page,name)=>page.locator('#welcome-'+name+'-screen');
 
+test('the Flowview brand is a real workbench navigation target and still returns home in-app',async({page,server})=>{
+ await page.goto(server.origin+'/workbench.html');const homeLink=page.locator('#workbench-home');
+ await expect(homeLink).toHaveAttribute('href','/workbench.html');
+ const [direct]=await Promise.all([page.context().waitForEvent('page'),homeLink.click({button:'middle'})]);await direct.waitForLoadState();
+ await expect(home(direct)).toBeVisible();await direct.close();await expect(home(page)).toBeVisible();
+ await paste(page,source);await expect(editor(page)).toBeVisible();await homeLink.click();
+ await expect(home(page)).toBeVisible();expect(new URL(page.url()).pathname).toBe('/workbench.html');
+});
+
 test('browser navigation follows entry screens, retains unfinished input and can leave the app',async({page,server})=>{
   await page.route('**/previous.html',route=>route.fulfill({contentType:'text/html',body:'<h1>Previous page</h1>'}));
   await page.addInitScript(()=>history.replaceState({...history.state,hostMarker:'preserved'},'',location.href));

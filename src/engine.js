@@ -1985,6 +1985,10 @@ function createExploreNavigation(ctl,options){
     sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0 && !!entry.rec.tabBlock;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
     diagrams.hidden=peers.length<2 && !sectionButtons.some(function(entry){return !entry.rec.tabBlock && entry.rec!==selected;});chapters.hidden=!move(choices,chapters);
     move(options.action,actions);
+    /* The chapter heading sits behind the full-window Explore surface. Keep
+       its real (already wired) embed-link control in the unified navigation,
+       alongside the other chapter actions, and restore it with the rest. */
+    move(rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
     move(host.querySelector('.section-view-settings'),actions);
     move(host.querySelector('.viewport-actions'),actions);
     move(flow,actions);actions.hidden=false;
@@ -3089,15 +3093,53 @@ function bindCopyControl(win, button, urlFn){
   });
 }
 
-function wireDeepLinks(ctl, win, preservedHash){
+/* Several renderers may share one host window (the authoring preview remains
+   alive behind the read-only preview). Route the legacy same-origin setter to
+   the newest live channel without making teardown order part of correctness. */
+var deepLinkBaseSetters=new WeakMap();
+function registerDeepLinkBaseSetter(win,setter){
+  var owner=deepLinkBaseSetters.get(win);
+  if(!owner){
+    var hadOwn=Object.prototype.hasOwnProperty.call(win,'dvSetLinkBase'),prior=win.dvSetLinkBase,setters=[];
+    var dispatch=function(base){return setters.length?setters[setters.length-1](base):typeof prior==='function'?prior(base):false;};
+    owner={hadOwn:hadOwn,prior:prior,setters:setters,dispatch:dispatch};deepLinkBaseSetters.set(win,owner);win.dvSetLinkBase=dispatch;
+  }
+  owner.setters.push(setter);var released=false;
+  return function(){
+    if(released)return;released=true;
+    var index=owner.setters.indexOf(setter);if(index>=0)owner.setters.splice(index,1);
+    if(owner.setters.length)return;
+    deepLinkBaseSetters.delete(win);
+    if(win.dvSetLinkBase!==owner.dispatch)return;
+    if(owner.hadOwn)win.dvSetLinkBase=owner.prior;else delete win.dvSetLinkBase;
+  };
+}
+
+function fixedDeepLinkBase(base,win){
+  var canonical=canonicalLinkBase(base);
+  if(canonical!==null)return canonical;
+  /* Fixed bases come from our own host integrations, unlike message/direct
+     setters. Keep downloaded Workbench builds usable without widening the
+     externally supplied link-base protocols beyond HTTP(S). */
+  if(typeof base!=='string' || /[\s"]/.test(base) || !win.location || win.location.protocol!=='file:')return null;
+  try{
+    var parsed=new URL(base);
+    return parsed.protocol==='file:' && !/[\s"]/.test(parsed.href)?parsed.href:null;
+  }catch(ex){return null;}
+}
+
+function wireDeepLinks(ctl, win, preservedHash, options){
   /* preservedHash (optional): raw "k=v&k=v" text kept at the FRONT of
      every hash this channel writes and of every copied link — the embed
      mode passes "embed=<ref>[&sk=<skin>]" so reloads and links keep the
      embedded view. parseHash ignores the keys, so state handling is
      unaffected. */
+  options=options || {};
+  var manageHistory=options.history!==false;
   var suppress = false;
-  var linkBase = null;
-  var linkBasePath = null;
+  var linkBase = options.linkBase==null?null:fixedDeepLinkBase(options.linkBase,win);
+  if(options.linkBase!=null && linkBase===null)throw new Error('Invalid deep-link base.');
+  var linkBasePath = linkBase===null?null:'fixed';
   var mirrorSource = null;
   var mirrorOrigin = null;
   var fragmentState = {tabBlock:null, tab:null, diagramSection:null,
@@ -3108,7 +3150,7 @@ function wireDeepLinks(ctl, win, preservedHash){
        message pins both its WindowProxy and origin; navigation updates from
        that pair are allowed, while every other sender/origin is ignored. */
     if (event.source !== win.parent) return false;
-    if (linkBasePath === 'direct') return false;
+    if (linkBasePath === 'direct' || linkBasePath === 'fixed') return false;
     if (linkBasePath === 'message' &&
         (event.source !== mirrorSource || event.origin !== mirrorOrigin)) return false;
     if (typeof event.origin !== 'string' || !event.origin || event.origin === '*')
@@ -3123,7 +3165,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     linkBase = canonical;
     return true;
   }
-  win.dvSetLinkBase = function(base){
+  function setLinkBase(base){
+    if(linkBasePath==='fixed')return false;
     var canonical = canonicalLinkBase(base);
     if (canonical === null) return false;
     /* Direct calls are same-origin privileged and take precedence: they may
@@ -3134,7 +3177,8 @@ function wireDeepLinks(ctl, win, preservedHash){
     mirrorSource = win.parent;
     mirrorOrigin = win.location.origin;
     return true;
-  };
+  }
+  var releaseSetLinkBase=linkBasePath==='fixed'?function(){}:registerDeepLinkBaseSetter(win,setLinkBase);
   function section(number){
     for (var i = 0; i < ctl.sections.length; i++)
       if (ctl.sections[i].number === number) return ctl.sections[i];
@@ -3267,10 +3311,13 @@ function wireDeepLinks(ctl, win, preservedHash){
     /* ctl.suppressFragmentWrites: the guided tour drives steppers for its
        demos and spotlights; those moves must never clobber a shared link's
        fragment. The tour restores the pre-tour state before clearing it. */
-    if (suppress || ctl.suppressFragmentWrites) return;
+    /* Host-owned channels never mutate the address bar, so they may keep
+       their copy state current even while normal fragment writes are muted. */
+    if (suppress || (manageHistory && ctl.suppressFragmentWrites)) return;
     syncChangedTarget();
     if (fragmentState.row == null) clearRowTarget();
     var h = currentHash();
+    if(!manageHistory)return h;
     try {
       var historyState=ctl.handoffs?Object.assign({},win.history.state,{dvHandoff:ctl.handoffs.historyState()}):null;
       win.history[ctl.detailHistoryPush || ctl.handoffHistoryPush ? 'pushState' : 'replaceState'](historyState, '',
@@ -3375,18 +3422,23 @@ function wireDeepLinks(ctl, win, preservedHash){
   function bindCopy(button, hashFn){
     bindCopyControl(win, button, function(){ return fullURL(hashFn()); });
   }
-  /* embed-link chips copy the page's OWN address (search kept for the
-     ?spec= mode, hash replaced) — NOT the registered host link base:
-     the #embed fragment only works on the raw page an iframe points
-     at, never on a wrapping host page. */
+  /* Standalone embed chips keep the raw page address because #embed works on
+     that page, not a wrapping shell. Hosted renderers instead expose the
+     chapter as a normal, restorable chain link on their canonical base. */
   ctl.sections.forEach(function(sec){
     var embedBtn = sec.sectionEl && sec.sectionEl.querySelector ?
       sec.sectionEl.querySelector('.embedcopy') : null;
-    if (embedBtn) bindCopyControl(win, embedBtn, function(){
-      var view=sec.presentation && sec.presentation.viewId && sec.presentation.viewId();
-      return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference))+
-        (view?'&v='+encodeURIComponent(view):'');
-    });
+    if (embedBtn){
+      if(!manageHistory){
+        var chapterLabel=(embedBtn.getAttribute('aria-label') || String(sec.reference)).replace(/^Copy embed link for /,'').replace(/ —.*$/,'');
+        embedBtn.innerHTML=COPY_ICON;embedBtn.title='Copy link';embedBtn.setAttribute('aria-label','Copy link to chapter '+chapterLabel);
+        bindCopy(embedBtn,function(){var state=cloneState(fragmentState);state.diagramSection=sec.number;return stateHash(state);});
+      }else bindCopyControl(win, embedBtn, function(){
+        var view=sec.presentation && sec.presentation.viewId && sec.presentation.viewId();
+        return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference))+
+          (view?'&v='+encodeURIComponent(view):'');
+      });
+    }
   });
   var initial = ctl.activeTarget || {kind:'page'};
   if (initial.kind === 'diagram') fragmentState.diagramSection = initial.section;
@@ -3415,11 +3467,19 @@ function wireDeepLinks(ctl, win, preservedHash){
     });
   });
   ctl.bindDetailCopy=function(button){bindCopy(button,currentHash);};
-  ctl.onChange = write;
+  var priorChange=ctl.onChange,priorActiveStepper=ctl.activeStepper;
+  function linkedChange(){write();if(priorChange)priorChange.apply(ctl,arguments);}
+  ctl.onChange = linkedChange;
   ctl.activeStepper = activeStepper;
-  win.addEventListener('hashchange', apply);
-  if (win.location.hash) apply(); else write();
-  return {receiveLinkBaseMessage:receiveLinkBaseMessage};
+  if(manageHistory)win.addEventListener('hashchange', apply);
+  var initialState=parseHash(win.location.hash),hasInitialTarget=Object.keys(initialState).some(function(key){return initialState[key]!=null;});
+  if(win.location.hash && (manageHistory || options.restoreHash!==false && hasInitialTarget))apply();else write();
+  return {receiveLinkBaseMessage:receiveLinkBaseMessage,destroy:function(){
+    if(manageHistory)win.removeEventListener('hashchange',apply);
+    if(ctl.onChange===linkedChange)ctl.onChange=priorChange;
+    ctl.activeStepper=priorActiveStepper;
+    releaseSetLinkBase();
+  }};
 }
 
 /* ---------------- presenter mode (C1): fullscreen + keyboard ---------------- */

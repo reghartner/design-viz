@@ -71,7 +71,8 @@ class BuildTests(unittest.TestCase):
         text = self.texts["flowview.html"]
         self.assertIn("e.data.type === 'dv_linkbase'", text)
         self.assertIn("deepLinkChannel.receiveLinkBaseMessage(e)", text)
-        self.assertIn("win.dvSetLinkBase = function(base)", text)
+        self.assertIn("function registerDeepLinkBaseSetter(win,setter)", text)
+        self.assertIn("win.dvSetLinkBase=dispatch", text)
         # a registration posted during async ?spec= boot must be queued and
         # replayed once the channel exists, not dropped
         self.assertIn("pendingLinkBase = e", text)

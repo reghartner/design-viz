@@ -54,6 +54,8 @@ function applySkinClasses(body, view, name){
     var label = view.querySelector('[data-dv-skin-label]');
     if (label) label.textContent = 'generated from spec · skin: ' + name;
   }
+  var scope = body && body.querySelectorAll ? body : view;
+  if (scope && scope.querySelectorAll) scope.querySelectorAll('.boardcanvas>svg').forEach(refreshLaneTitles);
   return true;
 }
 
@@ -777,6 +779,66 @@ function layoutCoinGroup(group){
   });
   return pts;
 }
+/* Lane cards reserve two title lines without changing row heights. Measure the
+   active skin's font, including the space occupied by links and drill-down. */
+function refreshLaneTitles(svg){
+  if (!svg._fitLaneTitles) return;
+  svg._fitLaneTitles();
+  /* Font loading and host skin changes can alter widths after the first
+     render. A replaced/destroyed board must not receive delayed updates. */
+  if (svg.ownerDocument.fonts) svg.ownerDocument.fonts.ready.then(function(){
+    if (svg.isConnected && svg.parentNode && svg.parentNode.firstChild === svg) svg._fitLaneTitles();
+  });
+}
+function fitLaneNodeTitle(node, title, width){
+  var text = node.querySelector('.t1'), sub = node.querySelector('.t2');
+  if (!text) return; /* handoff cards own their presentation */
+  var right = width - 12, firstRight = right, secondRight = right;
+  node.querySelectorAll('.nlink circle,.nbackref circle').forEach(function(circle){
+    firstRight = Math.min(firstRight, Number(circle.getAttribute('cx')) - Number(circle.getAttribute('r')) - 4);
+  });
+  var hasSub = sub && sub.textContent;
+  if (hasSub) secondRight = Math.min(secondRight, firstRight);
+  var detail = node.querySelector('.detail-trigger rect');
+  if (detail) secondRight = Math.min(secondRight, Number(detail.getAttribute('x')) - 4);
+  function fits(value, available){
+    text.textContent = value;
+    return text.getComputedTextLength() <= available;
+  }
+  function take(value, available, ellipsis, suffix){
+    var chars = Array.from(value), low = 0, high = chars.length;
+    while (low < high){
+      var mid = Math.ceil((low + high) / 2);
+      if (fits(chars.slice(0,mid).join('') + (ellipsis ? '…' : '') + (suffix || ''), available)) low = mid;
+      else high = mid - 1;
+    }
+    return chars.slice(0,low).join('');
+  }
+  text.setAttribute('aria-label', title);
+  text.setAttribute('y','25');
+  if (sub) sub.setAttribute('y','41');
+  /* Non-layout DOMs such as Forge's jsdom harness lack SVG measurement.
+     Preserve the authored name when there is no geometry to fit against. */
+  if (typeof text.getComputedTextLength !== 'function'){
+    text.textContent = title;
+    return;
+  }
+  if (fits(title, firstRight - 46)) return;
+  var first = take(title, firstRight - 46, false), split = first.lastIndexOf(' ');
+  if (split > 0) first = first.slice(0,split);
+  var rest = title.slice(first.length).trimStart();
+  /* Keep the separator in textContent, but on the second line: a trailing
+     SVG space expands the first tspan's bounds without painting a glyph. */
+  var second = (title.charAt(first.length) === ' ' ? ' ' : '') + rest;
+  if (!fits(second, secondRight - 46)) second = take(second, secondRight - 46, true).trimEnd() + '…';
+  var y = hasSub ? 17 : 25;
+  text.textContent = '';
+  [first, second].forEach(function(line, index){
+    var span = document.createElementNS(SVGNS,'tspan');
+    span.setAttribute('x','46');span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
+  });
+  if (hasSub) sub.setAttribute('y','48');
+}
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
   var SK = SKINS[skinBase(skin)];
@@ -845,7 +907,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
-    var shownTitle = L.routing === 'lanes' && Array.from(nodeTitle).length > 13 ? Array.from(nodeTitle).slice(0,12).join('')+'…' : nodeTitle;
     var siblingPages = typeof n.title === 'string' &&
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
@@ -858,7 +919,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
          '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
          '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
-         '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(shownTitle) + '</text>' +
+         '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
          '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>') +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
@@ -886,6 +947,13 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
       if (d.nodes[id].delta === true) appendDeltaMarker(node, d.nodes[id], d.nodes[id].title || id, 4, -6);
     }
   });
+  if (L.routing === 'lanes'){
+    function fitTitles(){
+      Object.keys(nodeEls).forEach(function(id){fitLaneNodeTitle(nodeEls[id], d.nodes[id].title || id, L.pos[id].w);});
+    }
+    svg._fitLaneTitles = fitTitles;
+    refreshLaneTitles(svg);
+  }
   el._nodeBacklinks=wireNodeBacklinks(el, svg, d, prefix, backlinks);
   el._nodeLinks=wireNodeReferences(el,svg,d,prefix);
 

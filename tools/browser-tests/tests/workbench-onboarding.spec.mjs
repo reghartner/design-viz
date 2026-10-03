@@ -22,8 +22,10 @@ test('canonical homepage setup defaults to copy/paste with user-owned agent',asy
   await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','true');
 });
 
-test('homepage fits the authored default view and supports Explore through expansion',async({page,server},info)=>{
+test('homepage names the practice destination and keeps the System flow chapter through expansion',async({page,server},info)=>{
   await page.goto(server.origin+'/workbench.html');
+  const practiceAction=page.getByRole('button',{name:'Open practice viewer ↗',exact:true});
+  await expect(practiceAction).toBeVisible();
   const example=page.locator('#welcome-example-view'),stage=example.locator('#welcome-example-stage');
   const section=example.locator('#section-visitor'),grid=section.locator('.section-layout-grid');
   await expect(stage.locator(':scope > .doc-heading')).toHaveCount(1);
@@ -41,7 +43,7 @@ test('homepage fits the authored default view and supports Explore through expan
   }
   await fits();await page.screenshot({path:info.outputPath('landing-default-view.png')});
   const defaultHeight=(await example.boundingBox()).height;
-  await section.getByRole('button',{name:'Explore',exact:true}).click();
+  await section.getByRole('button',{name:'System flow',exact:true}).click();
   await expect(grid).toBeHidden();await expect(section.locator('.explore-board')).toBeVisible();
   await expect(section.locator('.explore-zoom')).toHaveText('52%');
   await fits();expect((await example.boundingBox()).height).not.toBe(defaultHeight);
@@ -51,14 +53,22 @@ test('homepage fits the authored default view and supports Explore through expan
   await section.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();
   const caption=await section.locator('.stepline').innerText();
   await page.screenshot({path:info.outputPath('landing-explore-view.png')});
-  await page.locator('#welcome-example-expand').click();
+  await practiceAction.click();
   const expanded=practice(page).locator('#section-visitor');
-  await expect(expanded.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(expanded.locator('.explore-board')).toBeVisible();
   await expect.poll(()=>expanded.locator('.stepline').innerText()).toBe(caption);
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
   await section.getByRole('button',{name:'Story',exact:true}).click();
   await expect(grid).toBeVisible();await fits();
+  const authored=await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8');
+  await paste(page,authored);
+  const editorSection=page.locator('#docview #section-visitor');
+  await editorSection.getByRole('button',{name:'System flow',exact:true}).click();
+  await editorSection.locator('.section-view-options summary').click();
+  await expect(editorSection.getByLabel('Viewing mode',{exact:true})).toHaveValue('explore');
+  await page.screenshot({path:info.outputPath('editor-system-flow.png')});
+  await page.locator('#workspace-home').click();
   await page.setViewportSize({width:390,height:844});await fits();
   await expect(app).toHaveCSS('grid-row','10 / span 15');
   await page.locator('.welcome-example').screenshot({path:info.outputPath('landing-narrow-view.png')});
@@ -75,7 +85,7 @@ test('homepage opens an authored Explore default without exposing the Standard g
   });
   await page.goto(server.origin+'/workbench.html');
   const section=page.locator('#welcome-example-view #section-visitor');
-  await expect(section.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(section.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(section.locator('.explore-board')).toBeVisible();
   await expect(section.locator('.section-layout-grid')).toBeHidden();
   await expect(section.locator('.explore-player')).toBeVisible();
@@ -312,7 +322,7 @@ test('company config owns landing and reader while editing exercises remain fict
   await expect(section).toBeVisible();
   await expect(card.locator('#section-company-processing')).toBeHidden();
   await expect(card.getByText('Company introduction before the featured diagram.')).toBeHidden();
-  await expect(section.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(section.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(section.locator('.section-layout-grid')).toBeHidden();
   const fits=async()=>{await expect.poll(async()=>{
     const outer=await card.boundingBox(),inner=await card.locator('#welcome-example-stage').boundingBox();
@@ -329,7 +339,7 @@ test('company config owns landing and reader while editing exercises remain fict
   await expect(page.locator('.workbench-tour-header>b')).toHaveText('Company <architecture> · Internal </script> example');
   await expect(practice(page).locator('#docview')).toHaveClass(/sk-blueprint/);
   await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
-  await expect(expanded.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect.poll(()=>expanded.locator('.stepline').textContent()).toBe(caption);
   await expect(expanded.getByText('Company ingestion',{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath('company-expanded.png')});

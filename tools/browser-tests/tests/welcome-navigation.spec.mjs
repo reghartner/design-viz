@@ -9,8 +9,16 @@ const screen=(page,name)=>page.locator('#welcome-'+name+'-screen');
 test('the Flowview brand is a real workbench navigation target and still returns home in-app',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const homeLink=page.locator('#workbench-home');
  await expect(homeLink).toHaveAttribute('href','/workbench.html');
- const [direct]=await Promise.all([page.context().waitForEvent('page'),homeLink.click({button:'middle'})]);await direct.waitForLoadState();
- await expect(home(direct)).toBeVisible();await direct.close();await expect(home(page)).toBeVisible();
+ const modified=await homeLink.evaluate(link=>{
+   let observed=false,defaultPrevented;
+   const observe=event=>{observed=true;defaultPrevented=event.defaultPrevented;event.preventDefault();};
+   window.addEventListener('click',observe);
+   try{link.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,button:0,ctrlKey:true}));}
+   finally{window.removeEventListener('click',observe);}
+   return {isAnchor:link.tagName==='A',href:new URL(link.href).pathname,observed,defaultPrevented};
+ });
+ expect(modified).toEqual({isAnchor:true,href:'/workbench.html',observed:true,defaultPrevented:false});
+ await expect(home(page)).toBeVisible();
  await paste(page,source);await expect(editor(page)).toBeVisible();await homeLink.click();
  await expect(home(page)).toBeVisible();expect(new URL(page.url()).pathname).toBe('/workbench.html');
 });

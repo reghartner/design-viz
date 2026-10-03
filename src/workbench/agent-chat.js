@@ -85,7 +85,7 @@ function initWorkbenchAgentChat(opts){
   contextSummary.id='folder-agent-focus-summary';contextBody.append(get('context-heading'),get('context'),previousContext.querySelector('.folder-agent-hint'));contextDetails.append(contextSummary,contextBody);
   var reviewCard=element('section','folder-agent-receipt'),reviewSummary=element('p'),reviewAccept=button('review-accept','Preview Agent Updates');
   reviewCard.id='folder-agent-review';reviewCard.hidden=true;reviewCard.append(reviewSummary,reviewAccept);history.insertBefore(reviewCard,activity);
-  var reviewer=initWorkbenchAgentReview({document:doc,snapshot:function(){return client && client.reviewSnapshot();},
+  var reviewer=initWorkbenchAgentReview({document:doc,resolve:opts.resolve,snapshot:function(){return client && client.reviewSnapshot();},
     accept:async function(version){try{if(client)await client.acceptReview(version);}catch(ex){status('Could not commit: '+ex.message);}},
     reject:async function(message,version){try{if(client)await client.rejectReview(message,version);}catch(ex){status('Could not return the update: '+ex.message);}}});
   life.own(function(){reviewer.destroy();});life.listen(reviewAccept,'click',reviewer.open);

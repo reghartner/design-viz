@@ -165,6 +165,39 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(h.errors).toEqual([]);expect(h.requests.filter(url=>!['/index.html','/starters.json','/catalog.json'].includes(new URL(url).pathname))).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
+test('agent topology declarations preview both states and commit authored source with one Undo/Redo',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyExports={delivery:{nodes:['a','b'],edges:['a->b']}};
+    const current=JSON.stringify(raw,null,4)+'\n',proposed=current.replace('"title": "Doorbell"','"title": "Customer camera"');
+    await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(current);
+    await page.locator('#welcome-paste-form button[type=submit]').click();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);await h.listen();
+    await page.locator('#folder-agent-input').fill('Rename the exported camera');await page.locator('#folder-agent-send').click();
+    const request=await publishedRequest(h,'Rename the exported camera'),state=await h.read('state.json');
+    await writeFile(path.join(h.session,'candidate.spec.json'),proposed);
+    await writeFile(path.join(h.session,'candidate.ledger.md'),'# Coverage ledger\n\nRename the camera and preserve the delivery topology export.\n');
+    h.run('propose','--ledger','candidate.ledger.md','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--summary','Exported camera renamed');
+    await expect(page.locator('#agent-update-banner')).toBeVisible();await page.locator('#agent-update-open').click();
+    const view=page.locator('#agent-update-view'),commit=page.locator('#agent-update-commit');
+    await expect(view.locator('[data-dv-node="a"]')).toContainText('Customer camera');await expect(commit).toBeEnabled();
+    await expect(page.locator('#agent-update-source')).toHaveValue(proposed);await expect(page.locator('#src')).toHaveValue(current);
+    await page.locator('#agent-update-current').click();await expect(view.locator('[data-dv-node="a"]')).toContainText('Doorbell');
+    await expect(page.locator('#agent-update-source')).toHaveValue(current);await expect(commit).toBeDisabled();
+    await page.locator('#agent-update-proposed').click();await expect(view.locator('[data-dv-node="a"]')).toContainText('Customer camera');
+    await expect(page.locator('#agent-update-source')).toHaveValue(proposed);await expect(commit).toBeEnabled();
+    await page.screenshot({path:info.outputPath('agent-topology-preview.png')});await commit.click();
+    await expect.poll(async()=>{try{return (await h.read('result.json')).status;}catch{return null;}}).toBe('applied');
+    await expect(page.locator('#src')).toHaveValue(proposed);await expect(page.locator('[data-dv-node="a"]')).toContainText('Customer camera');
+    expect((await h.read('state.json')).source).toBe(proposed);
+    expect(await readFile(path.join(h.session,'candidate.spec.json'),'utf8')).toBe(proposed);
+    const project=await h.read('project.json');expect(await readFile(path.join(h.folder,project.spec),'utf8')).toBe(proposed);
+    expect(proposed).not.toContain('topologyProvenance');
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(current);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(proposed);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 test('new-story entry, picker cancellation and unsupported browser have useful states',async({page})=>{
   const h=await setup(page);
   try{

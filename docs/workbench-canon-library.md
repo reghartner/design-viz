@@ -6,8 +6,11 @@ into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
 a reader restores its selected diagram from the published index and its selected spec.
 
-**Edit in Workbench** opens a local editable copy through the normal import
-transaction, with a fresh Undo/Redo history. The previous project is kept in
+**Edit in Workbench** opens a local editable copy at the chapter, view, playback
+mode, path, and step currently shown in the reader through the normal import
+transaction, with a fresh Undo/Redo history. Browser Back returns to the same reader position.
+If a published update removes that position, the reader and copy use the
+document's authored opening state. The previous project is kept in
 **Earlier drafts**. Browsing alone never
 replaces a current project, draft, or its history. Returning to a reader displays
 the published version, not unsaved editor changes. Use **Continue** on welcome

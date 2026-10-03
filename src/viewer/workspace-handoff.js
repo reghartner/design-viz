@@ -58,10 +58,18 @@ function applyWorkspaceTarget(ctl,page,target){
   ctl.activeTarget={kind:'diagram',section:rec.number};
   if(target.v!=null && (rec.presentation ? !rec.presentation.setView || !rec.presentation.setView(target.v) : target.v!=='flow'))
     throw new Error('The linked view is unavailable. Refresh diagrams in Backstage.');
+  var sp=rec.stepper;
   if(target.p!=null || target.s!=null){
-    var sp=rec.stepper,resolved=sp && resolveSourceStep(source.section.diagram,target.p || sp.path(),target.s);
+    var resolved=sp && resolveSourceStep(source.section.diagram,target.p || sp.path(),target.s);
     if(!resolved || (target.s!=null ? resolved.sourceIndex<0 || !sp.jumpSource(resolved.sourceIndex,resolved.path.id) : !sp.selectPath(resolved.path.id)))
       throw new Error('The linked story step is unavailable. Refresh diagrams in Backstage.');
+  }
+  if(target.m==='ambient'){
+    if(!sp || !sp.enterAmbient)throw new Error('The linked story mode is unavailable. Refresh diagrams in Backstage.');
+    sp.enterAmbient();
+  }else if(target.m==='step' && target.s==null){
+    if(!sp || !sp.enterStep)throw new Error('The linked story mode is unavailable. Refresh diagrams in Backstage.');
+    sp.enterStep(false);
   }
   return rec;
 }

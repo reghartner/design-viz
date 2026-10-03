@@ -449,7 +449,7 @@
             },
             {
               "id": "explore",
-              "name": "Explore",
+              "name": "System flow",
               "presentation": "explore",
               "sectionLayout": {
                 "default": [

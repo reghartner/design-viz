@@ -166,7 +166,9 @@ function initWorkbenchAgentReview(opts){
     el('ledger-summary').textContent='Coverage ledger · '+(viewing==='current'?'Current state':shown.ledger!==shown.currentLedger?'Changed in this update':'Unchanged');
     if(!source){el('view').textContent='Resolve the issues above with your agent to get a complete, valid preview.';return;}
     try{
-      var page=normalize(JSON.parse(source)),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
+      // Resolve a fresh render copy; source, change highlights and commit keep
+      // the authored declarations and the session owns frozen provider context.
+      var raw=JSON.parse(source),page=normalize(opts.resolve?opts.resolve(raw):raw),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});
       canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll')});rendered=true;decorate();
       var Observer=doc.defaultView && doc.defaultView.MutationObserver;

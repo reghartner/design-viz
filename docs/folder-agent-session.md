@@ -168,6 +168,10 @@ and step changes in the selected state. Use **Highlights: On/Off** when the
 unmarked rendering is easier to inspect. Highlights follow redraws, paths and
 contained Explore navigation; they do not become spec data.
 
+Topology exports and imports preview using the same frozen provider context as
+the workbench. The JSON, change comparison and committed source retain authored
+declarations; previewing does not copy provider nodes into your source.
+
 Use **Full preview** to give a large diagram the complete viewport and collapse
 the summary, ledger and JSON chrome. The state switch, highlight legend and
 toggle, **Discard update**, **Commit update** and **Back to workbench** remain

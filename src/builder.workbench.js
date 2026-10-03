@@ -1225,7 +1225,7 @@ function initWorkbenchBuilder(opts){
     if(el && imports.length){el.textContent+=' · Referenced topology (frozen session)';el.title+=' Authored imports are preserved. Provider structure belongs in '+imports.map(function(imp){return imp.spec+' / '+imp.export;}).join(', ')+'. Reopen Canon to load a later deployment; this session never refreshes automatically.';}
   }
   var agentLedger=null,agentLedgerProject=null,agentLedgerEpoch=0;
-  var agentOptions={document:document,practice:opts.practice,
+  var agentOptions={document:document,practice:opts.practice,resolve:session.resolve,
     setLedger:function(text,persist){agentLedger=text || '';agentLedgerProject=session.snapshot().project;if(persist && session.isProjectOpen())session.save();},
     snapshot:function(){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());

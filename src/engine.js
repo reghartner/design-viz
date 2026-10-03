@@ -1843,11 +1843,12 @@ function createBoardGrid(sectionEl, hasPanels, primaryPanel){
 
 /* Reader-only layout: move existing elements, preserving widget state, the
    selected path/step, running playback, and board sizing. Never re-render. */
-function createDiagramFocusControl(layout, panel, aside, bar, initial, changed, modeRail){
+function createDiagramFocusControl(layout, panel, aside, bar, initial, changed, modeRail, changing){
   var group = layout.viewChoicesHost, buttons = {}, mode = null, destroyed = false;
   group.setAttribute('role','group'); group.setAttribute('aria-label','View focus');
   function setMode(value){
     if (destroyed || ['panel','flow'].indexOf(value) < 0 || value === mode) return;
+    if (changing) changing();
     mode = value;
     var home = value === 'panel';
     if (home){
@@ -2617,11 +2618,16 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
     function presentationChanged(host){
       if(result.stepper)result.stepper.scrollTargetEl=host;
       if(!ready)return;
+      if(standardViewport)standardViewport.setView({id:result.presentation.viewId(),presentation:'standard'});
       box.setAttribute('data-view-id',result.presentation.viewId());
       if(onChange)onChange();
     }
     if (primaryPanel) result.presentation = createDiagramFocusControl(boardLayout, primaryPanel, aside, bar,
-      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged,result.modeRail);
+      d.primaryPanel === primaryPanel.id ? 'panel' : 'flow', presentationChanged,result.modeRail,function(){
+        // Explore must restore its live controls before Home/Data flow moves
+        // them. The changed callback then mounts the selected view's canvas.
+        if(standardViewport)standardViewport.suspend();
+      });
     var composition=createSectionComposition(box,boardLayout,d,boardDiv,bar,result.presentation,options && options.layoutTarget,presentationChanged,result.stepper,result.boardSize,prose);
     if(composition){result.presentation=composition;result.viewport=composition.viewport;}
     else {
@@ -2634,6 +2640,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
       if(!toolbar){toolbar=document.createElement('div');toolbar.className='diagram-views';box.insertBefore(toolbar,surface);}
       standardViewport=createSectionViewport(box,toolbar,surface,boardDiv,bar,d,result.boardSize,prose);
       result.viewport=standardViewport;
+      if(result.presentation)standardViewport.setView({id:result.presentation.viewId(),presentation:'standard'});
     }
     ready=true;
     box.setAttribute('data-view-id',result.presentation?result.presentation.viewId():'flow');

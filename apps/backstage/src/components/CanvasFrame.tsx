@@ -20,7 +20,7 @@ export function CanvasFrame({ expanded, onClose, children, title }: {
   }, [expanded, surface]);
   return <>
     <div ref={inline}/>
-    <dialog ref={dialog} aria-label={'Explore ' + title}
+    <dialog ref={dialog} aria-label={'Canvas: ' + title}
       onCancel={event => { event.preventDefault(); onClose(); }}
       style={{ position: 'fixed', inset: 0, margin: 0, padding: 0, border: 0,
         width: '100vw', height: '100dvh', maxWidth: 'none', maxHeight: 'none',

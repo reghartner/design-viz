@@ -18,11 +18,11 @@ list, catalog annotation, or manual Backstage link maintenance is required.
 
 The tab renders the selected diagram inline with playback, alternate paths, Home,
 panels and node evidence links. Service step buttons jump inside that viewer.
-It also shows canonical/design status, owner and design-document links. **Explore
+It also shows canonical/design status, owner and design-document links. **Expand
 canvas** opens the same live viewer in a full-window modal, with floating panels,
 playback and a **Back to entity** action. Escape returns to the inline view;
 opening/closing does not reload the spec or change the authored Home layout.
-**Edit in workbench** and **Build with Claude** open the external editor in a new
+**Edit in Workbench** and **Build with Claude** open the external editor in a new
 tab with the diagram ID, spec digest, entity, section, named view, path and step.
 The list refreshes every
 60 seconds while visible, on focus, and on demand. Changing services cancels old
@@ -40,7 +40,7 @@ Walk through the [current platform presentation](../../docs/diagrams/platform/in
 for the GitHub-backed company topology. The [earlier lifecycle guide](../../docs/diagrams/backstage/backstage.html)
 retains the reference adapter's read-API topology.
 
-## Explore and Build with Claude
+## Expand canvas and Build with Claude
 
 The host owns the full-window modal; the renderer stays in its isolated root.
 The live subtree moves into the modal and back without a second read or mount.

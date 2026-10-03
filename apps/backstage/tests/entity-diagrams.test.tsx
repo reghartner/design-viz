@@ -17,7 +17,7 @@ it('shows matched flows and links directly to an alternate step, with safe evide
   fireEvent.click(screen.getByText(/Where this service appears/));
   expect(screen.getByRole('button',{name:'3. No delivery'})).toBeTruthy();
   expect(screen.getByLabelText('Inline diagram viewer')).toBeTruthy();
-  expect(screen.queryByRole('link',{name:'Edit in workbench'})).toBeNull();
+  expect(screen.queryByRole('link',{name:'Edit in Workbench'})).toBeNull();
   expect(screen.getByText('Associated diagrams (1)')).toBeTruthy();
 });
 

@@ -183,3 +183,48 @@ test('visible host Edit opens the exact Explore chapter and step in the Canon re
     await expect(reader.locator('#undo-builder')).toBeDisabled();await reader.close();
   }
 });
+
+test('Home and Data flow retain live step controls across Explore switches and reopen',async({page,server},info)=>{
+  await page.setViewportSize({width:1600,height:1000});await page.addInitScript(trackResources);
+  await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
+  const baseline=await resources(page);
+  await page.evaluate(()=>{__host.revision('home');__host.left(true);__host.right(true);});
+  const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+  await expect(alpha.locator('.stepid')).toHaveText('quiet');
+  await alpha.getByRole('button',{name:'Next step',exact:true}).click();
+  await expect(alpha.locator('.stepid')).toHaveText('detect');
+  const original=await alpha.locator('.termbar').elementHandle();
+  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Explore alpha',exact:true});
+  for(const name of ['Data flow','Home','Data flow']){
+    await dialog.getByRole('button',{name,exact:true}).click();
+    await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
+    await expect(dialog.locator('.explore-player .playback-mode-rail')).toBeVisible();
+    await expect(dialog.locator('.schips')).toBeInViewport();
+    await expect(dialog.locator('.stepid')).toHaveText('detect');
+    await dialog.getByRole('button',{name:'Next step',exact:true}).click();
+    await expect(dialog.locator('.stepid')).toHaveText('upload');
+    await dialog.getByRole('button',{name:'Previous step',exact:true}).click();
+    await expect(dialog.locator('.stepid')).toHaveText('detect');
+    expect(await dialog.locator('.termbar').evaluate((node,previous)=>node===previous,original)).toBe(true);
+  }
+  await dialog.locator('.schips [data-step-source="3"]').click();
+  await expect(dialog.locator('.stepid')).toHaveText('persist');
+  await info.attach('backstage-focus-controls',{body:await page.screenshot(),contentType:'image/png'});
+  await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();
+  await expect(alpha.locator('.diagramcol > .termbar')).toBeVisible();
+  await expect(alpha.locator('.stepid')).toHaveText('persist');
+  await alpha.getByRole('button',{name:'Home',exact:true}).click();
+  await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
+  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
+  await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
+  await expect(dialog.locator('.stepid')).toHaveText('persist');
+  await dialog.getByRole('button',{name:'Data flow',exact:true}).click();
+  await dialog.getByRole('button',{name:'Home',exact:true}).click();
+  await page.keyboard.press('Escape');
+  await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
+  await expect(alpha.locator('.stepid')).toHaveText('persist');
+  await expect(beta.locator('.stepid')).toHaveText('done');
+  await page.evaluate(()=>{__host.left(false);__host.right(false);});
+  await expect.poll(()=>resources(page)).toEqual(baseline);
+});

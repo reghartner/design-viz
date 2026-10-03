@@ -3,6 +3,7 @@
 var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
+var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
 function autoArrangeSmall(d){return Object.keys(d.nodes || {}).length<=AUTO_ARRANGE_SMALL_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_SMALL_LIMITS.edges;}
 var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
 function autoArrangeInput(d){
@@ -224,6 +225,75 @@ function autoArrangeLeafPositions(d,result){
     });
   });return best;
 }
+function autoArrangeAlignmentFits(score,original){
+  var diagonal=Math.hypot(score.width,score.height),before=Math.hypot(original.width,original.height);
+  return diagonal<=before*1.25 && (original.shape>0 || !score.shape || score.area<=original.area*.9 && diagonal<=before);
+}
+function autoArrangeAlignedPositions(d,result){
+  var ids=Object.keys(d.nodes),edges=d.edges || [];
+  if(ids.length>AUTO_ARRANGE_COMPACT_LIMITS.nodes || edges.length>AUTO_ARRANGE_COMPACT_LIMITS.edges || ids.some(function(id){return d.nodes[id].group;}))return null;
+  function distinct(axis){return new Set(result.positions.map(function(p){return Math.round(p[axis]*10);})).size;}
+  function repeated(axis){var counts=Object.create(null);result.positions.forEach(function(p){var key=Math.round(p[axis]*10);counts[key]=(counts[key] || 0)+1;});return Object.keys(counts).filter(function(k){return counts[k]>1;}).length;}
+  var horizontal=repeated('x')>repeated('y');
+  // Force layouts without recognizable ranks keep their existing silhouette.
+  if(Math.max(repeated('x'),repeated('y'))<2)return null;
+  function clusters(axis,size){
+    var groups=[];
+    result.positions.slice().sort(function(a,b){return a[axis]-b[axis];}).forEach(function(p){
+      var last=groups[groups.length-1];if(!last || p[axis]-last[0][axis]>size)groups.push(last=[]);last.push(p);
+    });return groups;
+  }
+  var columns=clusters('x',150),rows=clusters('y',44),centers=distinct('x')+distinct('y');
+  // A common grid already exists when no nearby coordinates need merging.
+  if(columns.length+rows.length===centers)return null;
+  function spacing(groups,axis,minimum,round){
+    var centers=groups.map(function(g){return g.reduce(function(sum,p){return sum+p[axis];},0)/g.length;}),gaps=centers.slice(1).map(function(c,i){return c-centers[i];}).sort(function(a,b){return a-b;});
+    var middle=Math.floor(gaps.length/2),gap=gaps.length?(gaps.length%2?gaps[middle]:(gaps[middle-1]+gaps[middle])/2):minimum;
+    return Math.max(minimum,round?Math.round(gap/12)*12:gap);
+  }
+  var dx=spacing(columns,'x',150+AUTO_ARRANGE_CARD_GAP,true),dy=spacing(rows,'y',44+AUTO_ARRANGE_CARD_GAP,false);
+  var left=Math.min.apply(null,result.positions.map(function(p){return p.x;})),top=Math.min.apply(null,result.positions.map(function(p){return p.y;}));
+  var cells=Object.create(null),degree=Object.create(null);
+  columns.forEach(function(g,col){g.forEach(function(p){cells[p.id]={col:col};});});
+  rows.forEach(function(g,row){g.forEach(function(p){cells[p.id].row=row;});});
+  ids.forEach(function(id){degree[id]={incoming:0,outgoing:0};});
+  edges.forEach(function(e){degree[e.from].outgoing++;degree[e.to].incoming++;});
+  // Geometry work scales down with graph size. No extra search runs above the
+  // existing small/medium candidate cutoff, preserving the large-graph budget.
+  var budget=Math.min(AUTO_ARRANGE_ALIGNMENT_LIMITS.checks,Math.floor(AUTO_ARRANGE_ALIGNMENT_LIMITS.work/(ids.length*Math.max(1,edges.length)))),evaluations=0;
+  var width=columns.length+(horizontal?0:1),height=rows.length+(horizontal?1:0);
+  var cache=Object.create(null),automatic=edges.map(function(){return {};});
+  function evaluate(placed){
+    // Empty internal grid lines add no structure; close them before comparing.
+    var cs=Array.from(new Set(ids.map(function(id){return placed[id].col;}))).sort(function(a,b){return a-b;}),rs=Array.from(new Set(ids.map(function(id){return placed[id].row;}))).sort(function(a,b){return a-b;});
+    var packed=Object.create(null);ids.forEach(function(id){packed[id]={col:cs.indexOf(placed[id].col),row:rs.indexOf(placed[id].row)};});placed=packed;
+    var key=ids.map(function(id){return placed[id].col+','+placed[id].row;}).join(';');if(cache[key])return cache[key];
+    if(evaluations>=budget)return null;evaluations++;
+    var candidate={positions:ids.map(function(id){return {id:id,x:left+placed[id].col*dx,y:top+placed[id].row*dy};}),edges:automatic};
+    var score=autoArrangeScore(d,candidate),diagonal=0;
+    edges.forEach(function(e){var a=placed[e.from],b=placed[e.to];if(a.col!==b.col && a.row!==b.row)diagonal++;});
+    candidate.score=score;
+    return cache[key]={cells:placed,result:candidate,rank:[score.overlaps,score.hits,score.crossings,score.length+diagonal*Math.max(dx,dy),Math.hypot(score.width,score.height)]};
+  }
+  function better(a,b){if(!a)return false;for(var i=0;i<a.rank.length;i++)if(a.rank[i]!==b.rank[i])return a.rank[i]<b.rank[i];return false;}
+  var best=evaluate(cells);
+  for(var pass=0;pass<AUTO_ARRANGE_ALIGNMENT_LIMITS.passes && evaluations<budget;pass++){
+    var next=best;
+    for(var i=0;i<ids.length && evaluations<budget;i++){
+      var id=ids[i];if(!degree[id].incoming || !degree[id].outgoing)continue;
+      for(var row=0;row<height && evaluations<budget;row++)for(var col=0;col<width && evaluations<budget;col++){
+        if(ids.some(function(other){return best.cells[other].row===row && best.cells[other].col===col;}))continue;
+        var placed=Object.assign(Object.create(null),best.cells);placed[id]={row:row,col:col};
+        var candidate=evaluate(placed);if(better(candidate,next))next=candidate;
+      }
+    }
+    if(next===best)break;best=next;
+  }
+  var aligned=best.result;
+  var usedColumns=new Set(aligned.positions.map(function(p){return p.x;})),usedRows=new Set(aligned.positions.map(function(p){return p.y;}));
+  if(usedColumns.size+usedRows.size>centers || !autoArrangeAlignmentFits(aligned.score,result.score))return null;
+  return aligned;
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -258,6 +328,13 @@ function autoArrangeCandidates(d,viz,cola){
   if(small && !ids.some(function(id){return d.nodes[id].group;})){
     var positions=autoArrangeLeafPositions(d,chosen),refined=positions && attempt('LR',positions);
     if(refined && autoArrangeCompare(refined,chosen,true)<0)chosen=refined;
+  }
+  var aligned=autoArrangeAlignedPositions(d,chosen);
+  if(aligned){
+    if(!aligned.score.overlaps && !aligned.score.hits && aligned.score.crossings<=chosen.score.crossings)return aligned;
+    var placed=Object.create(null);aligned.positions.forEach(function(p){placed[p.id]={x:p.x,y:p.y};});
+    var routed=attempt('LR',placed);
+    if(routed && routed.score.crossings<=chosen.score.crossings && autoArrangeAlignmentFits(routed.score,chosen.score))chosen=routed;
   }
   return autoArrangeNaturalRoutes(d,chosen);
 }

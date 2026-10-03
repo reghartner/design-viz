@@ -20,8 +20,8 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 | --- | ---: | ---: | --- | ---: | ---: | ---: |
 | 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 558 × 248 | 2.25 |
 | 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 962 × 624 | 1.54 |
-| 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 746 × 624 | 1.20 |
-| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 1411 × 1088 | 1.30 |
+| 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 870 × 624 | 1.39 |
+| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 1206 × 972 | 1.24 |
 | 05 Media platform | 20 | 24 | Five groups, legacy publishing, direct catalog write and upload retry | 0 | 1307 × 1162 | 1.12 |
 | 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 3 | 667 × 511 | 1.31 |
 
@@ -38,8 +38,8 @@ terminal Archive card beside Publisher. Small ungrouped diagrams (at most
 12 nodes and 24 edges) get at most one such refinement after structural layout
 selection. It must preserve card clearance and pass rerouting, collision and
 crossing checks; occupied diagonal then takes precedence over edge length
-when crossings and shape tie. The three larger systems retain their existing
-shape preference and geometry.
+when crossings and shape tie. The telemetry and fulfillment cases also receive the bounded alignment pass
+described below; the grouped media example retains its geometry.
 
 Sections 01–05 retain zero-crossing layouts even with the added coupling.
 Section 06 is intentionally nonplanar: each of three event streams connects to
@@ -47,14 +47,29 @@ each of three consumers, so at least one crossing is unavoidable. The bounded
 search currently finds three crossing pairs; it does not promise the optimum.
 
 All saved edges use automatic attachments, with no `fromPort` or `toPort`.
-Cases 01, 02 and 06 use natural automatic curves throughout. Cases 03 and 04
-retain one native curve each; case 05 retains three. Removing any retained
+Cases 01–04 and 06 use natural automatic curves throughout; case 05 retains
+three native curves. Removing any retained
 curve would cause an unrelated-card hit or increase crossings. Automatic
 routes use the viewer's avoidance and have no saved label nudges. Moving cards
 updates their routes and attachment sides; retained native curves remain
-editable. Node positions and footprint metrics are unchanged by this route
-simplification. Length tie-breaking uses straight center-to-center distances;
+editable. Length tie-breaking uses straight center-to-center distances;
 drawn routes still determine collision, crossing and occupied-bounds checks.
+
+Telemetry uses four columns spaced 240 units apart and six rows spaced 116
+units apart. Logs and Alerts share the router's row; logs storage, traces,
+metrics and metrics storage share the next row. These assignments come from
+a deterministic grid search using topology and shared viewer geometry. The
+manual reference supplied only the intended shape; no IDs or coordinates from
+that file are special-cased. Fulfillment uses five 264-unit columns and nine
+116-unit rows, with an unused internal row removed. Both have zero overlaps,
+card hits and crossings, and all their connections use natural curves.
+
+The alignment pass prioritizes fewer shared centers and regular gaps, checks
+safety before accepting a grid, and keeps source/sink positions in that grid.
+Only recognizable ranked, ungrouped diagrams with at most 24 nodes and 48
+edges enter the bounded search. The grouped and nonplanar examples retain
+their prior placement. An expanded footprint is accepted only for improved
+alignment within the footprint guards, never merely to reach a screen ratio.
 
 Shape preference never overrides collision safety or fewer crossing pairs.
 Graphviz's target-ratio candidates can add whitespace, and labels, symmetry,

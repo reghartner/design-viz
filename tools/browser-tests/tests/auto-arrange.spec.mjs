@@ -19,26 +19,47 @@ test('one button confirms, arranges offline, permits control and node drags, and
  await openAutoArrange(page);await expect(page.locator('#auto-arrange-dialog')).toContainText('one Undo');
  await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(before);
  await arrange(page);const arranged=await source(page);expect(arranged).not.toBe(before);
- expect((await diagram(page)).edges.every(e=>e.curveControls)).toBe(true);
+ for(const e of (await diagram(page)).edges){
+  for(const field of ['curveControls','curvePoints','fromPort','toPort','labelDx','labelDy'])expect(e[field]).toBeUndefined();
+ }
+ const naturalRoute=await edge(page).getAttribute('d');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Existing curve handles move native controls through the ordinary editor.
- const q=await edgePoint(page);await page.mouse.click(q.x,q.y);
- const handle=page.locator('[data-curve-point="0"]'),box=await handle.boundingBox();
- await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+35,box.y+box.height/2+25,{steps:10});await page.mouse.up();
- const edited=await source(page);expect(edited).not.toBe(arranged);expect((await diagram(page)).edges[0].curveControls).toBeTruthy();
+ // An automatic edge exposes one unshaped handle; dragging authors a through-point.
+ const q=await edgePoint(page,.15);await page.mouse.click(q.x,q.y);
+ const handle=page.locator('[data-curve-point="-1"]');await expect(handle).toHaveCount(1);
+ const box=await handle.boundingBox();
+ await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+15,box.y+box.height/2+75,{steps:10});await page.mouse.up();
+ await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(1);
+ const edited=await source(page);expect(edited).not.toBe(arranged);expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
+ await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Inserting on a native segment adds one cubic join, and Reset clears it.
- const initialCount=(await diagram(page)).edges[1].curveControls.length,insert=await page.locator('#docview path.edge[data-dv-edge="1"]').evaluate(e=>{const p=e.getPointAtLength(e.getTotalLength()*.5),m=e.getScreenCTM();return {x:m.a*p.x+m.c*p.y+m.e,y:m.b*p.x+m.d*p.y+m.f};});
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
+ // Drag another part of the authored curve to add one point, then Reset both forms.
+ const insert=await edgePoint(page,.8);
  await page.mouse.move(insert.x,insert.y);await page.mouse.down();await page.mouse.move(insert.x+15,insert.y-30,{steps:10});await page.mouse.up();
- expect((await diagram(page)).edges[1].curveControls.length).toBe(initialCount+3);
- await page.locator('#guide').getByRole('button',{name:'Reset curve',exact:true}).click();expect((await diagram(page)).edges[1].curveControls).toBeUndefined();
- await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Move a freely placed card; authored control geometry stays and attachments move.
- const card=page.locator('#docview g.node[data-dv-node="a"] .card'),b=await card.boundingBox(),old=(await diagram(page)).floats.find(f=>f.id==='a');
- await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+50,b.y+b.height/2+30,{steps:10});await page.mouse.up();
- const moved=await source(page);expect((await diagram(page)).floats.find(f=>f.id==='a').x).not.toBe(old.x);
- expect((await diagram(page)).edges[0].curveControls).toEqual(JSON.parse(arranged).page.blocks[0].diagram.edges[0].curveControls);
+ await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(2);
+ const twoPoints=await source(page);
+ await page.locator('#guide').getByRole('button',{name:'Reset curve',exact:true}).click();
+ expect((await diagram(page)).edges[0].curvePoints).toBeUndefined();expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
+ await expect(edge(page)).toHaveAttribute('d',naturalRoute);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(twoPoints);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
+ // Move Source below Service: the natural attachment changes from right to top.
+ const node=page.locator('#docview g.node[data-dv-node="a"]'),card=node.locator('.card');await node.hover();
+ const b=await card.boundingBox(),placed=(await diagram(page)).floats,old=placed.find(f=>f.id==='a'),destination=placed.find(f=>f.id==='b');
+ const scale=await card.evaluate(el=>{const m=el.getScreenCTM();return {x:m.a,y:m.d};});
+ const initialStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
+ expect(initialStart.x).toBeCloseTo(old.x+75,3);expect(initialStart.y).toBeCloseTo(old.y,3);
+ await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
+ await page.mouse.move(b.x+b.width/2+(destination.x-old.x)*scale.x,b.y+b.height/2+(destination.y+170-old.y)*scale.y,{steps:12});await page.mouse.up();
+ const moved=await source(page),movedDiagram=await diagram(page),position=movedDiagram.floats.find(f=>f.id==='a');
+ expect(position.y).toBeGreaterThan(destination.y+100);
+ for(const field of ['curveControls','curvePoints','fromPort','toPort'])expect(movedDiagram.edges[0][field]).toBeUndefined();
+ const movedStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
+ expect(movedStart.x).toBeCloseTo(position.x,3);expect(movedStart.y).toBeCloseTo(position.y-22,3);
+ await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
  const route=await edge(page).getAttribute('d');
  await page.reload();await expect(page.locator('#src')).toHaveValue(arranged);await expect(edge(page)).toHaveAttribute('d',route);
@@ -48,7 +69,7 @@ test('one button confirms, arranges offline, permits control and node drags, and
  await expect(exported.locator('text.lbl').first()).toBeVisible();expect(moved).not.toBe(arranged);
 });
 
-test('research fixture renders final native splines and retry label with no node collisions',async({page,server})=>{
+test('research fixture renders natural and retained routes and retry label with no node collisions',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await pasteDiagram(page,JSON.stringify(grouped,null,2));await arrange(page);
  const paths=await page.locator('#docview path.edge').evaluateAll(edges=>edges.map(e=>e.getAttribute('d')));expect(paths).toHaveLength(36);
  const hits=await page.locator('#docview svg').first().evaluate(svg=>{

@@ -63,6 +63,32 @@ compares crossings first, then shape, then occupied diagonal
 (`hypot(width, height)`) before edge distance for this local comparison. Blocked or unsafe tucks leave the structural layout
 unchanged. Larger or denser diagrams receive no extra attempt.
 
+Ranked ungrouped diagrams with at most 24 nodes and 48 edges also receive a
+bounded alignment pass when nearby card centers use scattered coordinates.
+It merges nearby centers into rows and columns, infers consistent gaps from
+the existing spacing, and searches nearby empty grid cells. Sources and sinks
+keep their grid positions while intermediate cards can share rows despite
+having different graph depths. Empty grid lines are closed, so occupied rows
+and columns have equal gaps. The objective checks card/group overlap, unrelated
+card hits and crossings first, then balances straight connection distance with
+a penalty for diagonal connections. This supports staggered processing/storage
+rows without hardcoded node identities or preserved Graphviz ranks.
+
+An aligned result must use no more distinct row/column centers and keep the
+chosen layout's crossing budget. Its occupied diagonal may grow by at most
+25%. A layout already within square–16:9 stays in that range unless the new
+layout uses at least 10% less area and no greater diagonal. Alignment can
+therefore add room for a cleaner grid, but never expands a graph just to meet
+an aspect ratio. A safe automatic grid needs no additional routing. Otherwise,
+one native routing attempt must pass the same safety and footprint checks;
+failure preserves the original layout. Grouped layouts and force layouts
+without recognizable ranks retain their placement.
+
+The search runs at most eight passes and 900 geometry evaluations, with the
+evaluation cap reduced by the product of node and edge counts. Diagrams above
+24 nodes or 48 edges receive no alignment work. This keeps the 80-node worker
+budget unchanged.
+
 After structural selection and any leaf refinement, routing starts with an
 all-automatic candidate. If it clears unrelated cards and does not increase
 nonincident crossings, all native controls are removed. Otherwise, automatic
@@ -85,8 +111,8 @@ constraints prevent the target footprint.
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less
 compact shape, and target spacing can introduce whitespace. There are at most
-eight attempts for small diagrams (a snake, six general candidates and one
-local leaf refinement). Successful snakes return immediately. Above
+nine routing attempts for small diagrams (a snake, six general candidates,
+one local leaf refinement and one optional aligned-grid reroute). Successful snakes return immediately. Above
 24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
 and, for ungrouped graphs, two stress candidates); grouped graphs use only
 the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges
@@ -132,5 +158,6 @@ Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
 `auto-arranged.spec.json` using the production algorithm and print occupied
 geometry/crossing metrics. The focused tests verify these outputs exactly,
 including the compact 3+3 snake, a terminal-leaf tuck that preserves its fork,
-semantic preservation and collision safety. The short chain deliberately
+aligned telemetry and fulfillment grids, semantic preservation and collision
+safety. The short chain deliberately
 exceeds 16:9; the five remaining baselines stay between square and 16:9.

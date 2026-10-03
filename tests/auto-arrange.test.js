@@ -133,9 +133,9 @@ test('safe automatic routes have natural labels, dynamic attachments and editabl
 });
 
 test('natural route selection and scoring use the same avoidance geometry as the viewer',()=>{
-  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[2].diagram;
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[4].diagram;
   const result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result),L=C.layout(out);
-  const index=out.edges.findIndex(e=>e.from==='router' && e.to==='logdb'),edge=out.edges[index];assert.equal(edge.curveControls,undefined);
+  const index=out.edges.findIndex(e=>e.from==='publish' && e.to==='analytics'),edge=out.edges[index];assert.equal(edge.curveControls,undefined);
   const rects=Object.entries(L.pos).filter(([id])=>id!==edge.from && id!==edge.to).map(([,p])=>({x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h}));
   const adjustments=C.resolveEdgeAvoidance(out.edges,L,C.edgeAutoAdjust(out.edges,L));
   assert.ok(C.countPathRectHits(C.samplePathD(C.edgePath(edge,L)),rects)>0,'the unadjusted route would hit a card');
@@ -274,7 +274,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
     assertAutoPorts(result.edges);assertAutoPorts(out.edges);
     const retained=out.edges.filter(e=>e.curveControls);
-    assert.equal(retained.length,[0,0,1,1,3,0][i],block.id+' retains only needed curves');
+    assert.equal(retained.length,[0,0,0,0,3,0][i],block.id+' retains only needed curves');
     assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),retained.length>0);
     out.edges.forEach((edge,index)=>{
       if(!edge.curveControls){assert.equal(edge.labelDx,undefined);assert.equal(edge.labelDy,undefined);return;}
@@ -289,8 +289,43 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     if(i===0){assert.equal(result.score.width,558);assert.equal(result.score.height,248);}
     else{assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);}
     assert.equal(result.score.crossings,i===5?3:0,block.id);
+    if(i===2 || i===3){
+      for(const axis of ['x','y']){
+        const values=[...new Set(result.positions.map(p=>p[axis]))].sort((a,b)=>a-b),gap=values[1]-values[0];
+        values.slice(1).forEach((value,j)=>assert.ok(Math.abs(value-values[j]-gap)<.1,block.id+' has equally spaced occupied '+axis+' centers'));
+      }
+      assert.equal(out.edges.some(e=>e.curveControls),false,'aligned cases retain natural curves');
+      const byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+      if(i===2){
+        const expectedRows=[['app','edge','jobs'],['collector'],['logs','router','alerts'],['logdb','traces','metrics','metricdb'],['tracedb'],['dashboard']];
+        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+116*index,id+' is on the intended shared row')));
+        const expectedColumns=[['app','logs','logdb'],['edge','collector','router','traces','tracedb','dashboard'],['jobs','metrics'],['alerts','metricdb']];
+        expectedColumns.forEach((column,index)=>column.forEach(id=>assert.equal(byId[id].x,120+240*index,id+' is on the intended shared column')));
+        assert.equal(result.score.width,870);assert.equal(result.score.height,624);
+      }else{assert.ok(result.score.width<1411);assert.ok(result.score.height<1088);}
+    }
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
   });
+});
+
+test('failed aligned rerouting retains the safe selected layout',()=>{
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[2].diagram;
+  const align=C.autoArrangeAlignedPositions;
+  try{
+    C.autoArrangeAlignedPositions=()=>null;
+    const expected=C.autoArrangeCandidates(d,viz,null);
+    C.autoArrangeAlignedPositions=()=>{
+      const unsafe=plain(expected);unsafe.positions[1].x=unsafe.positions[0].x;unsafe.positions[1].y=unsafe.positions[0].y;
+      unsafe.score=C.autoArrangeScore(d,unsafe);assert.ok(unsafe.score.overlaps>0);return unsafe;
+    };
+    let retries=0;
+    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+      if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
+      return viz.renderJSON(source,options);
+    }},null);
+    assert.equal(retries,1);assert.deepEqual(plain(result),plain(expected));
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+  }finally{C.autoArrangeAlignedPositions=align;}
 });
 
 test('extra aspect attempts stay within the small-graph budget, including the supported 80-node grouped case',()=>{

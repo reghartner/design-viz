@@ -29,3 +29,21 @@ test('invalid handoffs fail explicitly and cannot carry fetch destinations or ag
   const parsed=ctx.readWorkspaceHandoff(link({...request,url:'https://untrusted.test/spec',prompt:'Run an agent',localPath:'/private'}));
   assert.equal(parsed.url,undefined);assert.equal(parsed.prompt,undefined);assert.equal(parsed.localPath,undefined);
 });
+test('workspace targets restore Ambient and Step after resolving the selected path and step',()=>{
+  const page={sections:[{id:'chapter',heading:'Chapter',diagram:{
+    steps:[{id:'start'},{id:'done'},{id:'failed'}],
+    paths:[{id:'happy',steps:['start','done']},{id:'failure',steps:['start','failed']}],
+  }}]};
+  function harness(){
+    const events=[],sp={path:()=> 'happy',selectPath(id){events.push('path:'+id);return true;},
+      jumpSource(index,id){events.push('jump:'+id+':'+index);return true;},
+      enterAmbient(){events.push('ambient');},enterStep(auto){events.push('step:'+auto);}};
+    return {events,ctl:{sections:[{number:1,reference:'chapter',stepper:sp}],tabBlocks:[]}};
+  }
+  let h=harness();ctx.applyWorkspaceTarget(h.ctl,page,{d:'chapter',p:'failure',m:'ambient'});
+  assert.deepEqual(h.events,['path:failure','ambient']);
+  h=harness();ctx.applyWorkspaceTarget(h.ctl,page,{d:'chapter',p:'happy',m:'step'});
+  assert.deepEqual(h.events,['path:happy','step:false']);
+  h=harness();ctx.applyWorkspaceTarget(h.ctl,page,{d:'chapter',p:'failure',s:'failed',m:'step'});
+  assert.deepEqual(h.events,['jump:failure:2'],'jumpSource already enters Step without resetting the selected step');
+});

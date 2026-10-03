@@ -167,6 +167,35 @@ test('Canon edit and browser Back preserve the selected chapter, path and step w
   await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
+test('Canon edit and browser Back preserve Ambient mode while stale modes use the authored default',async({page,server})=>{
+  const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
+  await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  const reader=page.locator('#canon-reader'),editor=page.locator('#docview');
+  await reader.getByRole('button',{name:'AMBIENT',exact:true}).click();
+  await expect(reader.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.locator('.termbar')).toBeHidden();
+
+  await page.locator('#canon-reader-edit').click();
+  await expect(editor.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(editor.locator('.termbar')).toBeHidden();
+  await page.goBack();await expect(page.locator('#welcome-reader-screen')).toBeVisible();
+  await expect(reader.getByRole('button',{name:'AMBIENT',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.locator('.termbar')).toBeHidden();
+
+  await page.evaluate(()=>{
+    const state=structuredClone(history.state);
+    state.flowviewWorkbenchEntry.readerTarget.m='retired-mode';history.replaceState(state,'');
+  });
+  await page.reload();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
+  await expect(reader.getByRole('button',{name:'STEP',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(reader.locator('.termbar')).toBeVisible();
+  expect((await page.evaluate(()=>history.state.flowviewWorkbenchEntry.readerTarget)).m).toBeUndefined();
+  await page.locator('#canon-reader-edit').click();
+  await expect(editor.getByRole('button',{name:'STEP',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(editor.locator('.termbar')).toBeVisible();
+});
+
 test('empty or invalid company libraries do not masquerade as demos and late loads do not navigate',async({page,server})=>{
   let data={version:1,diagrams:[]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();

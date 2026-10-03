@@ -42,6 +42,27 @@ test('imports, previews and saves a snapshot without shipping the workbench',asy
   assert.deepEqual(JSON.parse(s.calls.submits[0].config.specJson),JSON.parse(home));
   assert.deepEqual(Object.keys(s.calls.submits[0]),['config']);
 });
+test('lane diagrams retain full accessible names and remain usable without SVG text measurement',async t=>{
+  const raw={page:{title:'Notification delivery',sections:[{heading:'Delivery',diagram:{routing:'lanes',autoplay:false,
+    nodes:{service:{title:'Notification service'},queue:{title:'Notification queue'}},rows:[['service','queue']],
+    edges:[{from:'service',to:'queue'}],steps:[{edge:'service->queue',text:'Send notification'},{nodes:['queue'],text:'Notification queued'}]
+  }}]}};
+  const s=await setup(t);s.paste(JSON.stringify(raw));
+  assert.equal(s.el('save').disabled,false,s.el('import-status').textContent);
+  const view=s.el('docview');
+  assert.ok(view.querySelector('.lane-bridge'),'the requested lane diagram rendered');
+  for(const [id,node] of Object.entries(raw.page.sections[0].diagram.nodes)){
+    const title=view.querySelector('[data-dv-node="'+id+'"] .t1');
+    assert.equal(typeof title.getComputedTextLength,'undefined','exercise the real non-layout DOM capability');
+    assert.equal(title.textContent,node.title);
+    assert.equal(title.getAttribute('aria-label'),node.title);
+    assert.equal(title.parentNode.querySelector('title').textContent,node.title);
+  }
+  view.querySelectorAll('.schip')[1].click();
+  assert.match(view.querySelector('.stepline').textContent,/STEP 2\/2/);
+  s.el('save').click();await settle();
+  assert.deepEqual(JSON.parse(s.calls.submits[0].config.specJson),raw);
+});
 test('invalid replacements clear the preview and prevent a stale save',async t=>{
   const s=await setup(t);s.paste(home);s.paste('{');
   assert.equal(s.el('save').disabled,true);assert.equal(s.el('docview').textContent,'');

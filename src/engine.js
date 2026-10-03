@@ -817,6 +817,12 @@ function fitLaneNodeTitle(node, title, width){
   text.setAttribute('aria-label', title);
   text.setAttribute('y','25');
   if (sub) sub.setAttribute('y','41');
+  /* Non-layout DOMs such as Forge's jsdom harness lack SVG measurement.
+     Preserve the authored name when there is no geometry to fit against. */
+  if (typeof text.getComputedTextLength !== 'function'){
+    text.textContent = title;
+    return;
+  }
   if (fits(title, firstRight - 46)) return;
   var first = take(title, firstRight - 46, false), split = first.lastIndexOf(' ');
   if (split > 0) first = first.slice(0,split);

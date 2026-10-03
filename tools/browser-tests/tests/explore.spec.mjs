@@ -19,6 +19,7 @@ async function build(server,{unstacked=false,oversized=false}={}){
 }
 const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
+const overlaps=(a,b)=>Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1 && Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1;
 test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -70,6 +71,25 @@ test('right and top-right remain free placement; Stack at edge preserves size an
   column.rects.forEach((r,index)=>{expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);if(index)expect(r.y-column.rects[index-1].y-column.rects[index-1].height).toBeCloseTo(8,0);});
  }
 });
+test('automatic Explore panels open at readable content size across desktop viewports and Workbench',async({page,server},info)=>{
+ const url=await build(server);
+ for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1440,900]]){
+  await page.setViewportSize({width,height});
+  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+  else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
+  await page.evaluate(()=>document.fonts.ready);
+  const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
+  expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
+  for(const win of windows){
+   expect(win.width,win.id).toBeGreaterThanOrEqual(299);expect(win.width,win.id).toBeLessThanOrEqual(341);
+   expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
+  }
+  for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
+  const controls=await rect(page.locator('.explore-player'));
+  for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
+  await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
+ }
+});
 for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and sends the following panel left',async({page,server})=>{
  const url=await build(server,{unstacked:true,oversized:true});
  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -92,7 +112,7 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  const home=page.locator('[data-explore-panel=home]'),handle=home.locator('.explore-window-resize');
- let r=await rect(handle);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+100,r.y+15,{steps:5});await page.mouse.up();
+ const initial=await rect(home);let r=await rect(handle);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+initial.width-145,r.y+15,{steps:5});await page.mouse.up();
  expect((await rect(home)).width).toBeLessThan(160);const narrow=await rect(home);
  const grip=home.locator('.explore-window-grip');await grip.focus();await page.keyboard.press('ArrowLeft');await expect(home).not.toHaveClass(/explore-stacked/);
  const detached=await rect(home);await grip.press('ArrowLeft');expect((await rect(home)).x).toBeLessThan(detached.x);

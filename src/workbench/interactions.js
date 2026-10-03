@@ -417,6 +417,7 @@ function createBuilderInteractions(opts){
     clipboardHomeTarget=null;
     pausePreview();
     if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
+    else if(opts.workspace && opts.workspace.inspectSelection)opts.workspace.inspectSelection();
     if (target.kind === 'group') clearMultiSelect(); /* this action establishes a single selection */
     setSelected(target.el);
     session.target = {section: target.section, kind: target.kind,

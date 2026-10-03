@@ -4,6 +4,15 @@ import {test,expect,paste} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 
 async function open(page,server,text=source){await page.goto(server.origin+'/workbench.html');await paste(page,text);}
+async function expectCenterHit(locator,label){
+  await expect(locator,label).toBeVisible();
+  const result=await locator.evaluate(el=>{
+    const rect=el.getBoundingClientRect(),hit=document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2);
+    return {reachable:hit===el || el.contains(hit),rect:{x:rect.x,y:rect.y,width:rect.width,height:rect.height},hit:hit && (hit.id || hit.className || hit.tagName)};
+  });
+  expect(result,label+' center is reachable').toMatchObject({reachable:true});
+  expect(result.rect.width,label+' has width').toBeGreaterThan(0);expect(result.rect.height,label+' has height').toBeGreaterThan(0);
+}
 
 test('floating tools leave the diagram full-window and global actions available',async({page,server})=>{
   const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
@@ -20,6 +29,41 @@ test('floating tools leave the diagram full-window and global actions available'
   }
   await expect(page.locator('.editor-pane:visible')).toHaveCount(5);
   await canvasTools(page);await page.locator('#workspace-panels').click();await expect(page.locator('.editor-pane:visible')).toHaveCount(0);
+});
+
+test('fresh desktop entry leaves Standard and Explore controls clear until selection opens Inspect',async({page,server},testInfo)=>{
+  const onboarding=JSON.parse(await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8'));
+  const pixel='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';
+  onboarding.page.sections[0].diagram.panels.flatMap(panel=>panel.screens || []).forEach(screen=>{screen.src=pixel;});
+  const onboardingSource=JSON.stringify(onboarding);
+  let entry=0;
+  async function fresh(width){
+    await page.setViewportSize({width,height:900});await page.goto(server.origin+'/workbench.html');await page.evaluate(()=>localStorage.clear());
+    await page.goto(server.origin+'/workbench.html?issue-340='+(++entry));await paste(page,onboardingSource);
+    await expect(page.locator('#workspace-window-inspect')).toBeHidden();
+  }
+  for(const width of [1280,1440,1920]){
+    await fresh(width);
+    const story=page.locator('.section-layout-grid').filter({visible:true});
+    const ambient=story.getByRole('button',{name:'AMBIENT',exact:true}),step=story.getByRole('button',{name:'STEP',exact:true});
+    await expectCenterHit(ambient,'Standard AMBIENT at '+width);await ambient.click();await expect(ambient).toHaveAttribute('aria-pressed','true');
+    await expectCenterHit(step,'Standard STEP at '+width);await step.click();await expect(step).toHaveAttribute('aria-pressed','true');
+    await expectCenterHit(story.locator('.ptitle').filter({hasText:'Resident app'}),'Standard Resident app at '+width);
+    if(width===1280)await testInfo.attach('fresh-standard-1280',{body:await page.screenshot(),contentType:'image/png'});
+
+    await fresh(width);await page.locator('#docview').getByRole('button',{name:'Explore',exact:true}).first().click();
+    const controls=page.locator('.explore-player').filter({visible:true}),device=page.locator('.explore-window').filter({has:page.locator('.pt-deviceapp'),visible:true}),app=page.locator('.explore-window').filter({has:page.locator('.pt-appscreens'),visible:true});
+    await expectCenterHit(controls,'Explore story controls at '+width);
+    await expectCenterHit(device,'Explore Camera details at '+width);
+    await expectCenterHit(app,'Explore Resident app at '+width);
+    const before=await page.locator('#src').inputValue();await device.locator('.pwidget').click({position:{x:40,y:80}});
+    await expect(page.locator('#workspace-window-inspect')).toBeVisible();await expect(page.locator('#guide').getByLabel('Title',{exact:true})).toHaveValue('Camera details');
+    await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+    if(width===1280)await testInfo.attach('fresh-explore-1280-after-selection',{body:await page.screenshot(),contentType:'image/png'});
+  }
+  await page.locator('#workspace-window-inspect .workspace-window-close').click();await page.reload();
+  await expect(page.locator('#workspace-window-inspect')).toBeHidden();await page.locator('#docview .node').first().click();
+  await expect(page.locator('#workspace-window-inspect')).toBeHidden();
 });
 
 test('window resize preserves the JSON draft and the live preview DOM',async({page,server})=>{

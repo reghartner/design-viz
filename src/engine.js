@@ -824,14 +824,16 @@ function fitLaneNodeTitle(node, title, width){
     return;
   }
   if (fits(title, firstRight - 46)) return;
-  /* The separator remains in textContent, so reserve its painted width too. */
-  var first = take(title, firstRight - 46, false, ' '), split = first.lastIndexOf(' ');
+  var first = take(title, firstRight - 46, false), split = first.lastIndexOf(' ');
   if (split > 0) first = first.slice(0,split);
   var rest = title.slice(first.length).trimStart();
-  var second = fits(rest, secondRight - 46) ? rest : take(rest, secondRight - 46, true).trimEnd() + '…';
+  /* Keep the separator in textContent, but on the second line: a trailing
+     SVG space expands the first tspan's bounds without painting a glyph. */
+  var second = (title.charAt(first.length) === ' ' ? ' ' : '') + rest;
+  if (!fits(second, secondRight - 46)) second = take(second, secondRight - 46, true).trimEnd() + '…';
   var y = hasSub ? 17 : 25;
   text.textContent = '';
-  [first + (title.charAt(first.length) === ' ' ? ' ' : ''), second].forEach(function(line, index){
+  [first, second].forEach(function(line, index){
     var span = document.createElementNS(SVGNS,'tspan');
     span.setAttribute('x','46');span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
   });

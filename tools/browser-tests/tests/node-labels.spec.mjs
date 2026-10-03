@@ -27,6 +27,15 @@ async function expectContainedTitles(reader){
   });
   expect(failures,'title lines fit cards without covering controls or subtitles').toEqual([]);
 }
+async function expectWordSeparator(reader){
+  const title=reader.locator('[data-dv-node="n4"] .t1');
+  await expect(title).toHaveText('Clip metadata DB');
+  const lines=await title.locator('tspan').allTextContents();
+  if(!lines.length)return;
+  expect(lines.join('')).toBe('Clip metadata DB');
+  expect(lines[0]).not.toMatch(/\s$/);
+  expect(lines[1]).toMatch(/^ /);
+}
 
 for(const width of [1440,1280])test(`Canon lane names remain distinct at ${width}px Auto and Readable sizes`,async({page,server},info)=>{
   await page.setViewportSize({width,height:1000});await openCanon(page,server);
@@ -59,6 +68,7 @@ for(const skin of ['pastel','aurora'])test(`dense ${skin} lane titles stay bound
       await reader.getByRole('button',{name:mode,exact:true}).click();
       await expectContainedTitles(reader);
       for(const i of [0,1,2,3,4,7,8,9])await expect(reader.locator(`[data-dv-node="n${i}"] .t1`)).toHaveText(titles[i]);
+      await expectWordSeparator(reader);
       for(const i of [5,6]){
         await expect(reader.locator(`[data-dv-node="n${i}"] .t1`)).toHaveAttribute('aria-label',titles[i]);
         await expect(reader.locator(`[data-dv-node="n${i}"] .t1`)).toContainText('…');
@@ -75,5 +85,6 @@ for(const skin of ['pastel','aurora'])test(`dense ${skin} lane titles stay bound
     await page.evaluate(skin=>window.dvSetSkin(skin),next);
     await page.evaluate(()=>document.fonts.ready);
     await expectContainedTitles(reader);
+    await expectWordSeparator(reader);
   }
 });

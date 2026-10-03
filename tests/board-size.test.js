@@ -27,7 +27,13 @@ function harness(width=320, scrollWidth=1180){
   }};
   vm.createContext(context); vm.runInContext(code, context);
   const board = element(), legend = element();
-  Object.assign(board,{clientWidth:width,scrollWidth,scrollLeft:0});
+  Object.assign(board,{clientWidth:width,scrollWidth});
+  // Model the browser's clamping when controls request an end position beyond
+  // the integer range estimate. Fractional zoom limits are covered in Chromium.
+  let scrollLeft=0;
+  Object.defineProperty(board,'scrollLeft',{get:()=>scrollLeft,set:value=>{
+    scrollLeft=Math.max(0,Math.min(Math.max(0,board.scrollWidth-board.clientWidth),value));
+  }});
   const ctl = context.createBoardSizeControl(board, legend, 'Checkout');
   const pan = legend.children[0].children.find(el=>el.className==='board-pan');
   return {context,board,legend,ctl,observer:observers[0],

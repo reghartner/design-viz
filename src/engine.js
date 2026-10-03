@@ -2046,6 +2046,19 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
   var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize,prose);
+  /* A Standard arrangement has a stable 1000px design canvas. CSS zoom scales
+     its contents AND its flow size, so neither a transformed overflow area nor
+     a synthetic height spacer is needed. Observe the unscaled shell, including
+     host/split changes that do not resize the browser window. */
+  var layoutWidth=0;
+  var layoutSizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(entries){
+    var width=entries[0].contentRect.width;
+    if(width<=0 || width===layoutWidth)return;
+    layoutWidth=width;
+    grid.style.setProperty('--section-layout-scale',Math.min(1,width/1000));
+    grid.style.setProperty('--section-layout-width',width<1000?'1000px':'auto');
+  }):null;
+  if(layoutSizeObserver)layoutSizeObserver.observe(grid.parentNode);
   var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden,visibility=Object.create(null);
   function paintFlow(){
     flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
@@ -2164,7 +2177,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     },
     diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
-    destroy:function(){viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
+    destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }
 
 function sectionHasProse(sec){
@@ -2317,21 +2330,22 @@ function createBoardNavigation(board, group, legend, changed){
   group.appendChild(controls);
   function enabled(){return !retired && !board.classList.contains('explore-board');}
   function graph(){return canvas.querySelector('svg');}
-  function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/svg.viewBox.baseVal.width:1;}
+  function displayScale(){var grid=board.closest('.section-layout-grid');return grid && grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
+  function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/displayScale()/svg.viewBox.baseVal.width:1;}
   function refresh(){if(!enabled())return;var r=ratio();value.textContent=Math.round(r*100)+'%';out.disabled=r<=.1501;into.disabled=r>=3.999;}
   function zoom(next){
     var svg=graph();if(!enabled() || !svg || !board.clientWidth)return;
-    var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect();
-    var x=frame.left+board.clientLeft+board.clientWidth/2,y=frame.top+board.clientTop+legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2;
+    var frame=board.getBoundingClientRect(),before=svg.getBoundingClientRect(),display=displayScale();
+    var x=frame.left+(board.clientLeft+board.clientWidth/2)*display,y=frame.top+(board.clientTop+legend.offsetHeight+(board.clientHeight-legend.offsetHeight)/2)*display;
     var cx=(x-before.left)/before.width,cy=(y-before.top)/before.height;
-    board.style.setProperty('--board-viewport-height',frame.height+'px');
+    board.style.setProperty('--board-viewport-height',frame.height/display+'px');
     board.style.setProperty('--board-zoom-width',(svg.viewBox.baseVal.width*Math.max(.15,Math.min(4,next)))+'px');
     board.classList.add('board-zoomed');
     // Updating overflow controls before measuring accounts for their height.
     changed();
     var after=svg.getBoundingClientRect();
-    board.scrollLeft+=after.left+cx*after.width-x;
-    board.scrollTop+=after.top+cy*after.height-y;
+    board.scrollLeft+=(after.left+cx*after.width-x)/display;
+    board.scrollTop+=(after.top+cy*after.height-y)/display;
     refresh();
   }
   function scale(factor){zoom(ratio()*factor);}
@@ -2351,7 +2365,7 @@ function createBoardNavigation(board, group, legend, changed){
     if(!gesture || ev.pointerId!==gesture.id)return;
     var dx=ev.clientX-gesture.x,dy=ev.clientY-gesture.y;
     if(Math.abs(dx)+Math.abs(dy)>3)suppressClick=true;
-    board.scrollLeft=gesture.left-dx;board.scrollTop=gesture.top-dy;
+    var display=displayScale();board.scrollLeft=gesture.left-dx/display;board.scrollTop=gesture.top-dy/display;
   }
   function finish(ev,cancelled){
     if(!gesture || ev && ev.pointerId!==gesture.id)return;
@@ -2449,14 +2463,20 @@ function createBoardSizeControl(board, legend, label){
   function syncPan(){
     if (destroyed) return;
     var max = maxScroll(), offset = Math.max(0, Math.min(max, board.scrollLeft));
-    var percent = max > 1 ? offset / max * 100 : 0;
+    // Scroll metrics round to layout pixels, but a zoomed board scrolls in
+    // visible pixels. Keep edge detection within one visible pixel.
+    var scale = board.offsetWidth ? board.getBoundingClientRect().width / board.offsetWidth : 1;
+    var tolerance = 1 / (scale || 1), atStart = offset <= tolerance, atEnd = offset >= max - tolerance;
+    var percent = max > 1 ? (atStart ? 0 : atEnd ? 100 : offset / max * 100) : 0;
     position.value = String(percent);
     position.setAttribute('aria-valuetext', Math.round(percent) + '% from left');
-    left.disabled = offset <= 1; right.disabled = offset >= max - 1;
+    left.disabled = atStart; right.disabled = atEnd;
   }
   function panTo(offset){
     if (destroyed || !Number.isFinite(offset)) return;
-    board.scrollLeft = Math.max(0, Math.min(maxScroll(), offset)); syncPan();
+    // The integer estimate may fall one visible pixel short under CSS zoom.
+    // Overshoot endpoint requests so the browser clamps to its real limit.
+    board.scrollLeft = offset >= maxScroll() ? board.scrollWidth : Math.max(0, offset); syncPan();
   }
   position.addEventListener('input', function(){ panTo(Number(position.value) / 100 * maxScroll()); });
   board.addEventListener('scroll', syncPan, {passive:true});

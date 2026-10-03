@@ -365,17 +365,17 @@ function initSectionLayoutEditor(opts){
     var section=handle.closest('.doc-sec'),index=Number(section.getAttribute('data-dv-section'));if(editing!==index||!ready())return;
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
-    var items=currentItems(index),rect=grid.getBoundingClientRect();
-    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)/12,minHeight:grid.style.minHeight};
+    var items=currentItems(index),rect=grid.getBoundingClientRect(),scale=grid.offsetWidth?rect.width/grid.offsetWidth:1;
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)*scale/12,row:40*scale,minHeight:grid.style.minHeight};
     // Keep the scroll range while moving the bottom tile upward. Otherwise
     // scroll clamping moves the grid origin and feeds back into the next delta.
-    grid.style.minHeight=rect.height+'px';
+    grid.style.minHeight=rect.height/scale+'px';
     handle.setPointerCapture(ev.pointerId);grid.classList.add('layout-dragging');
   },true);
   life.listen(view,'pointermove',function(ev){
     if(!drag||ev.pointerId!==drag.pointer)return;ev.preventDefault();
     var rect=drag.grid.getBoundingClientRect();
-    var dy=(ev.clientY-drag.y+drag.top-rect.top)/40,d=rawDiagram(drag.section);
+    var dy=(ev.clientY-drag.y+drag.top-rect.top)/drag.row,d=rawDiagram(drag.section);
     drag.next=drag.controls?sectionLayoutResizeControls(d,drag.items,sectionLayoutControlsRows(d,drag.items)+dy):sectionLayoutGesture(drag.items,drag.key,(ev.clientX-drag.x+drag.left-rect.left)/drag.cell,dy,drag.resize);paint(drag.grid,drag.next);
   },true);
   life.listen(view,'pointerup',function(ev){

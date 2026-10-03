@@ -72,10 +72,16 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
   presentation returns. This differs from the workspace's editor-split reset.
 
 Layouts are saved in the spec and survive JSON, HTML and Confluence export.
-The selected arrangement profile, preview host and preview width are temporary workspace state. Profile selection writes no source; each arrangement edit is one Undo operation. Explore floating geometry, camera, and notes defaults remain shared across profiles; its tile visibility follows the selected profile. At section
-widths of 640 pixels or less, tiles stack in reading order; use the numeric
-controls or widen the preview to drag. Maps fit their tiles; dense panels scroll
-internally. Diagram Auto / Fit width / Readable controls remain available.
+The selected arrangement profile, preview host and preview width are temporary workspace state. Profile selection writes no source; each arrangement edit is one Undo operation. Explore floating geometry, camera, and notes defaults remain shared across profiles; its tile visibility follows the selected profile.
+
+Standard arrangements use a 1000-pixel reference canvas. Below that available
+section width, the entire arrangement scales down uniformly, preserving tile
+positions, proportions, gaps, and attached controls. Wider sections retain the
+full-size row heights and fill the available width. Chapter navigation stays at
+normal size. This applies to the arrangement editor, page previews, and exported
+HTML; Explore keeps its independent canvas behavior and printing uses a readable
+stack. Maps fit their tiles; dense panels scroll internally. Diagram Auto / Fit
+width / Readable controls remain available.
 Saved Chapters appear as the complete set of Chapter buttons. All Chapters reuse
 the live widgets and preserve the selected alternate, step and playback state
 when included in the destination view. Legacy single arrangements still have

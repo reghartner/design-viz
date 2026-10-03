@@ -2463,14 +2463,20 @@ function createBoardSizeControl(board, legend, label){
   function syncPan(){
     if (destroyed) return;
     var max = maxScroll(), offset = Math.max(0, Math.min(max, board.scrollLeft));
-    var percent = max > 1 ? offset / max * 100 : 0;
+    // Scroll metrics round to layout pixels, but a zoomed board scrolls in
+    // visible pixels. Keep edge detection within one visible pixel.
+    var scale = board.offsetWidth ? board.getBoundingClientRect().width / board.offsetWidth : 1;
+    var tolerance = 1 / (scale || 1), atStart = offset <= tolerance, atEnd = offset >= max - tolerance;
+    var percent = max > 1 ? (atStart ? 0 : atEnd ? 100 : offset / max * 100) : 0;
     position.value = String(percent);
     position.setAttribute('aria-valuetext', Math.round(percent) + '% from left');
-    left.disabled = offset <= 1; right.disabled = offset >= max - 1;
+    left.disabled = atStart; right.disabled = atEnd;
   }
   function panTo(offset){
     if (destroyed || !Number.isFinite(offset)) return;
-    board.scrollLeft = Math.max(0, Math.min(maxScroll(), offset)); syncPan();
+    // The integer estimate may fall one visible pixel short under CSS zoom.
+    // Overshoot endpoint requests so the browser clamps to its real limit.
+    board.scrollLeft = offset >= maxScroll() ? board.scrollWidth : Math.max(0, offset); syncPan();
   }
   position.addEventListener('input', function(){ panTo(Number(position.value) / 100 * maxScroll()); });
   board.addEventListener('scroll', syncPan, {passive:true});

@@ -41,15 +41,26 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
   expect(consumer.y+consumer.height).toBeLessThanOrEqual(transport.y);
   await page.screenshot({path:testInfo.outputPath('cost-compact-view.png'),fullPage:true});
   await page.getByRole('button',{name:'Architecture & cost',exact:true}).click();
+  // Compare at the reference canvas width before shrinking the whole layout.
+  const section=page.locator('.doc-sec').first(),tile=page.locator('.pt-cost');
+  await section.evaluate(el=>{el.style.width='1000px';el.style.boxSizing='content-box';});
+  await expect.poll(()=>section.locator('.section-layout-grid').evaluate(el=>el.getBoundingClientRect().width)).toBeCloseTo(1000,0);
+  const reference=await tile.boundingBox();
+  await section.evaluate(el=>{el.style.width='';el.style.boxSizing='';});
   await page.setViewportSize({width:390,height:844});
-  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1);
-  await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
-  const compactBars=await panel.locator('.cost-stack').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().width));
-  expect(compactBars[1]/compactBars[0]).toBeCloseTo(152/320,2);
-  expect(await panel.evaluate(el=>el.getBoundingClientRect().height)).toBeLessThan(340);
+  await expect.poll(()=>section.locator('.section-layout-grid').evaluate(el=>Number(getComputedStyle(el).zoom))).toBeLessThan(.4);
+  // Scaling retains the authored side-by-side routes and vertical bars.
+  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2);
+  expect(await panel.locator('.cost-plot').first().evaluate(el=>parseFloat(getComputedStyle(el).height))).toBeCloseTo(230,0);
+  const narrow=await tile.boundingBox(),scale=await section.locator('.section-layout-grid').evaluate(el=>Number(getComputedStyle(el).zoom));
+  expect(narrow.width).toBeCloseTo(reference.width*scale,0);
+  expect(narrow.height).toBeCloseTo(reference.height*scale,0);
+  const narrowBars=await panel.locator('.cost-stack').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().height));
+  expect(narrowBars[1]/narrowBars[0]).toBeCloseTo(152/320,2);
+  expect(narrow.x+narrow.width).toBeLessThanOrEqual(390);
   expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow.png')});
-  // Narrow panels use compact horizontal bars and keep the conclusion in the tile.
+  // The scaled panel keeps its conclusion and disclosure reachable by scrolling.
   await panel.locator('.cost-delta').scrollIntoViewIfNeeded();
   await expect(panel.locator('.cost-delta')).toBeInViewport();
   await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('cost-narrow-conclusion.png')});
@@ -101,7 +112,8 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
   await density.selectOption('expanded');
   await page.setViewportSize({width:390,height:844});
-  await expect(root.locator('.cost-plot').first()).toHaveCSS('height','230px');
+  // CSS zoom can round the computed layout height by a fraction of a pixel.
+  expect(await root.locator('.cost-plot').first().evaluate(el=>parseFloat(getComputedStyle(el).height))).toBeCloseTo(230,0);
   const baselines=await root.locator('.cost-plot').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().bottom));
   expect(Math.abs(baselines[0]-baselines[1])).toBeLessThanOrEqual(1);
 });

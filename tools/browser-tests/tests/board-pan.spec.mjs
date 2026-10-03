@@ -23,8 +23,14 @@ async function mousePan(page,board){
   // Native scrolling keeps the visible control synchronized.
   await board.evaluate(el=>{el.scrollLeft=(el.scrollWidth-el.clientWidth)/4;});
   await expect.poll(async()=>Number(await slider.inputValue())).toBeCloseTo(25,0);
-  await slider.press('End');await expect.poll(position).toBe(await max());
+  await slider.press('End');
+  // scrollWidth/clientWidth are integers; CSS zoom exposes a fractional native
+  // scroll limit. End must reach that actual limit, not an integer estimate.
+  const end=await board.evaluate(el=>{const reached=el.scrollLeft;el.scrollLeft=el.scrollWidth;return {reached,limit:el.scrollLeft,estimated:el.scrollWidth-el.clientWidth};});
+  await test.info().attach('horizontal-scroll-end',{body:JSON.stringify(end),contentType:'application/json'});
+  expect(end.reached).toBeCloseTo(end.limit,5);
   await expect(pan.getByRole('button',{name:'Scroll diagram right',exact:true})).toBeDisabled();
+  await expect(slider).toHaveValue('100');
   // The sticky control itself must remain reachable at either edge.
   const bounds=await pan.boundingBox(),frame=await board.boundingBox();
   expect(bounds.x).toBeGreaterThanOrEqual(frame.x);expect(bounds.x+bounds.width).toBeLessThanOrEqual(frame.x+frame.width);

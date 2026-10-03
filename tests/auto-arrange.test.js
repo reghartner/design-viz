@@ -26,7 +26,7 @@ test('approved 20-node grouped fixture retains groups and native routes with cle
   assert.deepEqual(plain(out.edges.map(e=>[e.from,e.to,e.label])),plain(d.edges.map(e=>[e.from,e.to,e.label])));
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.ok(result.score.crossings<=10,JSON.stringify(result.score));
   assert.ok(minimumCardGap(result)>=48,minimumCardGap(result));
-  assert.ok(out.edges.find(e=>e.label==='retry').labelDx!==undefined);
+  out.edges.forEach(e=>{if(!e.curveControls){assert.equal(e.labelDx,undefined);assert.equal(e.labelDy,undefined);}});
   assert.deepEqual(plain(C.autoArrangeCandidates(d,viz,cola)),plain(result));
 });
 
@@ -53,7 +53,8 @@ test('cyclic, disconnected, nested, self and parallel connections preserve ident
     const result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result),L=C.layout(out);
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
     assert.equal(out.edges.length,d.edges.length);assert.deepEqual(plain(out.nodes),d.nodes);
-    out.edges.forEach(e=>{assert.ok(C.validCurveControls(e.curveControls));assert.ok(!/NaN|Infinity/.test(C.edgePath(e,L)));});
+    out.edges.forEach(e=>{if(e.curveControls)assert.ok(C.validCurveControls(e.curveControls));assert.ok(!/NaN|Infinity/.test(C.edgePath(e,L)));});
+    assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),out.edges.some(e=>!!e.curveControls));
   }
   assert.throws(()=>C.autoArrangeInput({nodes:{}}),/Add a node/);
   assert.throws(()=>C.autoArrangeInput({nodes:{a:{}},edges:[{from:'a',to:'missing'}]}),/missing nodes/);
@@ -71,17 +72,22 @@ test('atomic planner preserves semantic content, other sections and source; reje
   const next=out.page.sections[0].diagram;
   for(const k of ['nodes','steps','paths','panels'])assert.deepEqual(next[k],d[k]);
   assertAutoPorts(next.edges);
-  assert.equal(next.edges[0].label,'Keep label');assert.equal(next.edges[0].bend,undefined);assert.ok(next.edges[0].curveControls);
+  assert.equal(next.edges[0].label,'Keep label');assert.equal(next.edges[0].bend,undefined);assert.equal(next.edges[0].curveControls,undefined);assert.equal(next.edges[0].labelDx,undefined);
   const invalid=plain(result);invalid.positions[0].x=NaN;assert.ok(C.planAutoArrange(text,raw,0,invalid).error);
   const poison=plain(result);poison.edges[0].from='missing';
-  poison.edges[0].fromPort={side:'right'};poison.edges[0].toPort={side:'invalid'};
+  poison.edges[0].fromPort={side:'right'};poison.edges[0].toPort={side:'invalid'};poison.edges[0].labelDx=123;
+  assert.equal(JSON.parse(C.planAutoArrange(text,raw,0,poison).text).page.sections[0].diagram.edges[0].labelDx,undefined);
+  for(const controls of [null,[],[{}],[{t:2,dx:0,dy:0},{t:.5,dx:0,dy:0}]]){
+    const invalid=plain(result);invalid.edges[0].curveControls=controls;assert.ok(C.planAutoArrange(text,raw,0,invalid).error);
+  }
+  for(const edge of [null,[],42,'invalid']){const invalid=plain(result);invalid.edges[0]=edge;assert.ok(C.planAutoArrange(text,raw,0,invalid).error);}
   assertAutoPorts(JSON.parse(C.planAutoArrange(text,raw,0,poison).text).page.sections[0].diagram.edges);
   assertAutoPorts(C.autoArrangeDiagram(d,poison).edges);
   assert.equal(JSON.parse(C.planAutoArrange(text,raw,0,poison).text).page.sections[0].diagram.edges[0].from,'a');
 });
 
 test('native cubic split preserves shape; controls, joins, endpoints, deletion and bounds remain editable',()=>{
-  const d=simple(),out=C.autoArrangeDiagram(d,C.autoArrangeCandidates(d,viz,cola)),e=out.edges[0],L=C.layout(out);
+  const d=simple(),out=C.autoArrangeDiagram(d,C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR'),{engine:'dot'}))),e=out.edges[0],L=C.layout(out);
   const before=C.edgeCurveSegments(e,L),split=C.splitEdgeCubic(e,L,0,.4),shaped={...e,curveControls:split.points},after=C.edgeCurveSegments(shaped,L);
   assert.equal(after.length,before.length+1);
   function at(s,t){const u=1-t;return {x:u*u*u*s[0].x+3*u*u*t*s[1].x+3*u*t*t*s[2].x+t*t*t*s[3].x,y:u*u*u*s[0].y+3*u*u*t*s[1].y+3*u*t*t*s[2].y+t*t*t*s[3].y};}
@@ -114,6 +120,35 @@ test('auto attachments change sides with moved nodes and ignore prior manual por
   assert.ok(!/NaN|Infinity/.test(C.edgePath(edge,C.layout(out))));
 });
 
+test('safe automatic routes have natural labels, dynamic attachments and editable handles',()=>{
+  const d={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b',label:'Natural',labelDx:999,labelDy:-999}]};
+  const result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result),e=out.edges[0],L=C.layout(out);
+  assert.deepEqual(plain(result.edges),[{}]);assert.equal(e.labelDx,undefined);assert.equal(e.labelDy,undefined);assertAutoPorts(out.edges);
+  assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),false);
+  assert.equal(C.placedEdgePoints(e,L,{})[0].nx,1);
+  const from=out.floats.find(f=>f.id==='a'),to=out.floats.find(f=>f.id==='b');to.x=from.x;to.y=from.y+300;
+  const moved=C.layout(out),points=C.placedEdgePoints(e,moved,{});assert.equal(points[0].ny,1);assert.equal(points[3].ny,-1);
+  const shaped={...e,curveControls:points.slice(1,-1).map((p,i)=>C.edgeCurvePoint(e,moved,p,(i+1)/3))};
+  assert.ok(C.validCurveControls(shaped.curveControls));assert.ok(C.splitEdgeCubic(shaped,moved,0,.5).points.length>2);
+});
+
+test('natural route selection and scoring use the same avoidance geometry as the viewer',()=>{
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[2].diagram;
+  const result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result),L=C.layout(out);
+  const index=out.edges.findIndex(e=>e.from==='router' && e.to==='logdb'),edge=out.edges[index];assert.equal(edge.curveControls,undefined);
+  const rects=Object.entries(L.pos).filter(([id])=>id!==edge.from && id!==edge.to).map(([,p])=>({x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h}));
+  const adjustments=C.resolveEdgeAvoidance(out.edges,L,C.edgeAutoAdjust(out.edges,L));
+  assert.ok(C.countPathRectHits(C.samplePathD(C.edgePath(edge,L)),rects)>0,'the unadjusted route would hit a card');
+  assert.equal(C.countPathRectHits(C.samplePathD(C.edgePath(edge,L,adjustments[index])),rects),0);
+  assert.equal(result.score.hits,0);assert.deepEqual(plain(result.score),plain(C.autoArrangeScore(d,result)));
+  const original=C.autoArrangeScore;let scores=0;
+  C.autoArrangeScore=(...args)=>{scores++;return original(...args);};
+  try{
+    const native=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));
+    C.autoArrangeNaturalRoutes(d,native);assert.equal(scores,1,'selection scores the final layout once, not once per edge');
+  }finally{C.autoArrangeScore=original;}
+});
+
 test('edge length scores straight center distances while curves still determine card hits and bounds',()=>{
   const d={nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'}]};
   const result={positions:[{id:'a',x:100,y:100},{id:'b',x:500,y:100},{id:'c',x:300,y:300}],
@@ -132,7 +167,7 @@ test('edge length scores straight center distances while curves still determine 
 });
 
 test('native geometry roundtrips, resets both representations, validates shape, and advertises its capability',()=>{
-  const d=C.autoArrangeDiagram(simple(),C.autoArrangeCandidates(simple(),viz,cola)),raw={page:{title:'Native',blocks:[{diagram:d}]}},text=JSON.stringify(raw);
+  const d=C.autoArrangeDiagram(simple(),C.autoArrangeRead(simple(),viz.renderJSON(C.autoArrangeDot(simple(),'LR'),{engine:'dot'}))),raw={page:{title:'Native',blocks:[{diagram:d}]}},text=JSON.stringify(raw);
   assert.equal(C.edgePath(d.edges[0],C.layout(d)),C.edgePath(JSON.parse(text).page.blocks[0].diagram.edges[0],C.layout(d)));
   assert.ok(C.FlowviewCompatibility.detect(d).includes('layout.cubic-curves'));
   const reset=JSON.parse(C.planEdgeCurve(text,raw,0,0,[]).text).page.blocks[0].diagram.edges[0];assert.equal(reset.curveControls,undefined);assert.equal(reset.curvePoints,undefined);
@@ -238,6 +273,15 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     const d=block.diagram,result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
     assertAutoPorts(result.edges);assertAutoPorts(out.edges);
+    const retained=out.edges.filter(e=>e.curveControls);
+    assert.equal(retained.length,[0,0,1,1,3,0][i],block.id+' retains only needed curves');
+    assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),retained.length>0);
+    out.edges.forEach((edge,index)=>{
+      if(!edge.curveControls){assert.equal(edge.labelDx,undefined);assert.equal(edge.labelDy,undefined);return;}
+      assert.ok(C.validCurveControls(edge.curveControls));
+      const natural=plain(result);natural.edges[index]={};const score=C.autoArrangeScore(d,natural);
+      assert.ok(score.hits>0 || score.crossings>result.score.crossings,block.id+' needs the retained curve '+index);
+    });
     assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.groups,d.groups);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);

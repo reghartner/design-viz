@@ -20,7 +20,8 @@ function autoArrangeDiagram(d,result){
   delete copy.routing;
   copy.edges=(copy.edges || []).map(function(e,i){
     ['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt'].forEach(function(k){delete e[k];});
-    Object.assign(e,result.edges[i]);delete e.fromPort;delete e.toPort;return e;
+    Object.assign(e,result.edges[i]);delete e.fromPort;delete e.toPort;
+    if(!hasCubicCurve(e)){delete e.labelDx;delete e.labelDy;}return e;
   });return copy;
 }
 function autoArrangeDot(d,direction,positions,aspect){
@@ -73,6 +74,24 @@ function autoArrangeRead(d,json){
   if(positions.length!==ids.length || edges.length!==(d.edges || []).length || edges.some(function(e){return !e;}))throw new Error('The layout did not return every node and connection.');
   return {positions:positions,edges:edges};
 }
+function autoArrangePathGeometry(path){
+  var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  path.forEach(function(p){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);});
+  return {path:path,bounds:{x:left,y:top,w:right-left,h:bottom-top}};
+}
+function autoArrangeIncident(e,f){return e.from===f.from || e.from===f.to || e.to===f.from || e.to===f.to;}
+function autoArrangePathsCross(a,b){
+  var ar=a.bounds,br=b.bounds;
+  if(ar.x+ar.w<br.x || br.x+br.w<ar.x || ar.y+ar.h<br.y || br.y+br.h<ar.y)return false;
+  function intersects(a,b,c,d){
+    if(Math.max(a.x,b.x)<Math.min(c.x,d.x) || Math.max(c.x,d.x)<Math.min(a.x,b.x) || Math.max(a.y,b.y)<Math.min(c.y,d.y) || Math.max(c.y,d.y)<Math.min(a.y,b.y))return false;
+    function side(p,q,r){return (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);}
+    return side(a,b,c)*side(a,b,d)<-1e-8 && side(c,d,a)*side(c,d,b)<-1e-8;
+  }
+  for(var ai=1;ai<a.path.length;ai++)for(var bi=1;bi<b.path.length;bi++)if(intersects(a.path[ai-1],a.path[ai],b.path[bi-1],b.path[bi]))return true;
+  return false;
+}
+function autoArrangeAdjust(d,L){return resolveEdgeAvoidance(d.edges,L,edgeAutoAdjust(d.edges,L));}
 function autoArrangeScore(d,result){
   var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),overlaps=0,hits=0,crossings=0,length=0;
   function rect(p){return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};}
@@ -84,29 +103,17 @@ function autoArrangeScore(d,result){
     groupIds.slice(i+1).forEach(function(h){if(!ancestor(g,h) && !ancestor(h,g) && overlap(L.groups[g],L.groups[h]))overlaps++;});
     ids.forEach(function(id){if(!ancestor(g,arranged.nodes[id].group) && overlap(L.groups[g],rect(L.pos[id])))overlaps++;});
   });
-  var pathBounds=[],paths=arranged.edges.map(function(e){
-    var path=samplePathD(edgePath(e,L));
+  var adjust=autoArrangeAdjust(arranged,L),paths=arranged.edges.map(function(e,index){
+    var path=samplePathD(edgePath(e,L,adjust[index]));
     hits+=countPathRectHits(path,ids.filter(function(id){return id!==e.from && id!==e.to;}).map(function(id){return rect(L.pos[id]);}));
     // Routing aesthetics do not change edge length: measure card centers.
     var from=L.pos[e.from],to=L.pos[e.to];length+=Math.hypot(to.cx-from.cx,to.cy-from.cy);
-    var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
-    path.forEach(function(p){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);});
-    pathBounds.push({x:left,y:top,w:right-left,h:bottom-top});
-    return path;
+    return autoArrangePathGeometry(path);
   });
-  function intersects(a,b,c,d){
-    if(Math.max(a.x,b.x)<Math.min(c.x,d.x) || Math.max(c.x,d.x)<Math.min(a.x,b.x) || Math.max(a.y,b.y)<Math.min(c.y,d.y) || Math.max(c.y,d.y)<Math.min(a.y,b.y))return false;
-    function side(p,q,r){return (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);}
-    return side(a,b,c)*side(a,b,d)<-1e-8 && side(c,d,a)*side(c,d,b)<-1e-8;
-  }
   paths.forEach(function(a,i){paths.slice(i+1).forEach(function(b,k){
-    var e=arranged.edges[i],f=arranged.edges[i+k+1];if(e.from===f.from || e.from===f.to || e.to===f.from || e.to===f.to)return;
-    // Disconnected components and distant routes cannot cross. Avoid comparing
-    // every pair of their sampled segments (quadratic in both path lengths).
-    var ar=pathBounds[i],br=pathBounds[i+k+1];
-    if(ar.x+ar.w<br.x || br.x+br.w<ar.x || ar.y+ar.h<br.y || br.y+br.h<ar.y)return;
-    for(var ai=1;ai<a.length;ai++)for(var bi=1;bi<b.length;bi++)if(intersects(a[ai-1],a[ai],b[bi-1],b[bi])){crossings++;return;}
+    if(!autoArrangeIncident(arranged.edges[i],arranged.edges[i+k+1]) && autoArrangePathsCross(a,b))crossings++;
   });});
+  var pathBounds=paths.map(function(p){return p.bounds;});
   // Score the occupied geometry, not the viewer's minimum-width canvas.
   var bounds=ids.map(function(id){return rect(L.pos[id]);}).concat(groupIds.map(function(g){return L.groups[g];}),pathBounds);
   var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
@@ -115,6 +122,44 @@ function autoArrangeScore(d,result){
   // Every shape from square to a landscape monitor is equally preferred.
   var shape=aspect<1?Math.log(1/aspect):aspect>16/9?Math.log(aspect/(16/9)):0;
   return {overlaps:overlaps,hits:hits,crossings:crossings,length:length,area:width*height,width:width,height:height,aspect:aspect,shape:shape};
+}
+function autoArrangeNaturalRoutes(d,result){
+  var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),count=arranged.edges.length;
+  var automatic=autoArrangeDiagram(d,{positions:result.positions,edges:result.edges.map(function(){return {};})});
+  var adjust=autoArrangeAdjust(automatic,L),paths=[],hits=[],cache=[],selected=result.edges.map(function(){return 0;});
+  arranged.edges.forEach(function(e,i){
+    paths.push([autoArrangePathGeometry(samplePathD(edgePath(e,L))),autoArrangePathGeometry(samplePathD(edgePath(automatic.edges[i],L,adjust[i])))]);
+    hits.push(countPathRectHits(paths[i][1].path,ids.filter(function(id){return id!==e.from && id!==e.to;}).map(function(id){var p=L.pos[id];return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};})));
+  });
+  // Placed floats have no shared endpoint spreading. Each automatic route and
+  // its avoidance bow depend only on its own endpoints and the fixed cards.
+  // Cache each native/automatic pair once, including mixed-route comparisons.
+  function cross(i,vi,j,vj){
+    if(i>j)return cross(j,vj,i,vi);
+    if(autoArrangeIncident(arranged.edges[i],arranged.edges[j]))return 0;
+    var key=(i*count+j)*4+vi*2+vj;
+    if(cache[key]===undefined)cache[key]=autoArrangePathsCross(paths[i][vi],paths[j][vj])?1:0;
+    return cache[key];
+  }
+  var nativeCrossings=0,automaticCrossings=0;
+  for(var i=0;i<count;i++)for(var j=i+1;j<count;j++){
+    nativeCrossings+=cross(i,0,j,0);automaticCrossings+=cross(i,1,j,1);
+  }
+  if(!hits.some(function(hit){return hit;}) && automaticCrossings<=nativeCrossings)selected.fill(1);
+  else {
+    var crossings=nativeCrossings,changed=true;
+    while(changed){
+      changed=false;
+      for(var i=0;i<count;i++){
+        if(selected[i] || hits[i])continue;
+        var delta=0;
+        for(var j=0;j<count;j++)if(j!==i)delta+=cross(i,1,j,selected[j])-cross(i,0,j,selected[j]);
+        if(crossings+delta<=nativeCrossings){selected[i]=1;crossings+=delta;changed=true;}
+      }
+    }
+  }
+  result.edges=result.edges.map(function(e,i){return selected[i]?{}:e;});
+  result.score=autoArrangeScore(d,result);return result;
 }
 function autoArrangeColaPositions(d,cola,seed){
   var ids=autoArrangeInput(d),state=seed;
@@ -190,7 +235,7 @@ function autoArrangeCandidates(d,viz,cola){
   // at most four, balancing row lengths and reversing alternate rows. Require
   // the normal safety checks before accepting the routed result.
   var chain=autoArrangeChainPositions(d);
-  if(chain){attempt('LR',chain);if(candidates.length)return candidates[0];}
+  if(chain){attempt('LR',chain);if(candidates.length)return autoArrangeNaturalRoutes(d,candidates[0]);}
   attempt('TB');attempt('LR');
   // Graphviz expands rank spacing on the short axis and reroutes its splines.
   // Keep ordinary candidates as well: fewer crossings always outrank shape.
@@ -214,5 +259,5 @@ function autoArrangeCandidates(d,viz,cola){
     var positions=autoArrangeLeafPositions(d,chosen),refined=positions && attempt('LR',positions);
     if(refined && autoArrangeCompare(refined,chosen,true)<0)chosen=refined;
   }
-  return chosen;
+  return autoArrangeNaturalRoutes(d,chosen);
 }

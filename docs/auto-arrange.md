@@ -9,11 +9,12 @@ this changes the current viewport, not saved camera settings.
 Groups, nesting, node definitions, connection order and identity, labels,
 steps, paths, panels, named views and other sections are preserved. Rows and
 floats become ordinary positioned floats. Old routing, ports, bends, curve
-points and label nudges are replaced with automatic edge attachments, native
-cubic controls and computed label nudges. Arranged edges never save `fromPort`
-or `toPort`; shared geometry chooses the attachment side from the adjacent
-curve control and updates it when nodes move. Existing viewers need the
-`layout.cubic-curves` capability to display the new routes faithfully.
+points and label nudges are discarded. Connections use the viewer's natural
+automatic curves and label placement wherever safe. Only necessary native
+cubic routes and their computed label nudges are retained. Arranged edges
+never save `fromPort` or `toPort`; shared geometry updates their attachment
+sides when nodes move. Only diagrams with retained curves need the
+`layout.cubic-curves` capability.
 
 Directed chains, including grouped chains, use at most four cards per row and reverse each
 successive row, so a six-card chain reads left to right across three cards, then
@@ -38,7 +39,7 @@ External Graphviz labels preserve the graph's ranks while leaving room for
 labels. Candidate generation keeps at least 48 logical units between final card
 rectangles; layered ranks receive additional clearance for their connections.
 
-Candidate scoring uses final viewer geometry, including automatic attachments
+Candidate scoring uses final viewer geometry, including automatic avoidance, attachments
 and nested group boxes: reject overlapping cards/groups and routes through unrelated cards,
 then minimize nonincident crossing pairs. Disjoint route bounding boxes skip
 segment intersection checks, keeping disconnected graphs inexpensive to score.
@@ -62,6 +63,22 @@ compares crossings first, then shape, then occupied diagonal
 (`hypot(width, height)`) before edge distance for this local comparison. Blocked or unsafe tucks leave the structural layout
 unchanged. Larger or denser diagrams receive no extra attempt.
 
+After structural selection and any leaf refinement, routing starts with an
+all-automatic candidate. If it clears unrelated cards and does not increase
+nonincident crossings, all native controls are removed. Otherwise, automatic
+routes replace native routes individually in edge order whenever that change
+clears cards and stays within the chosen layout's crossing count. The pass
+repeats until no further individual replacement is safe. Every retained curve
+therefore prevents a card hit or an increase beyond that crossing budget.
+Automatic edges have no saved controls or label nudges; retained curves stay
+editable. This step preserves all node positions.
+
+Checks use the viewer's shared automatic avoidance, so a safe automatic bow
+can avoid a card without saved controls. Path samples and native/automatic
+crossing pairs are cached; each pair has at most four combinations. The final
+layout receives one full score after selection, rather than one per edge.
+No additional Graphviz routing is needed for this step.
+
 Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
@@ -77,8 +94,9 @@ per diagram. A worker has a 20-second deadline and is terminated on
 cancellation, source changes, section changes, project retirement or builder
 teardown. Failure never changes
 the source. Freshness is checked again before the atomic session transaction.
-Native paths are stored in the spec, so opening or exporting never recomputes
-layout. Moving nodes deforms their authored routes without running a layout.
+Positions and any retained native paths are stored in the spec, so opening or
+exporting never reruns Graphviz or WebCola. Moving nodes updates natural routes
+and deforms retained curves through the shared viewer geometry.
 
 ## Distribution and maintenance
 
@@ -101,7 +119,7 @@ same browser bundles; normal builds are network-free. Build with
 `python3 tools/build.py`. Never commit its ignored generated HTML/runtime files.
 
 `tests/auto-arrange.test.js` includes the approved 20-node/36-edge/6-group
-fixture: ten nonincident crossing pairs, no node/group overlap and no route
+fixture: at most ten nonincident crossing pairs, no node/group overlap and no route
 through an unrelated card. Browser contracts inspect the actual SVG, native
 control and card dragging, cancellation, one Undo/Redo, reload and export.
 

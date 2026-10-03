@@ -47,9 +47,14 @@ each of three consumers, so at least one crossing is unavoidable. The bounded
 search currently finds three crossing pairs; it does not promise the optimum.
 
 All saved edges use automatic attachments, with no `fromPort` or `toPort`.
-Moving cards updates their attachment sides while preserving editable native
-curves. Length tie-breaking uses straight center-to-center distances; curved
-routes still determine collision, crossing and occupied-bounds checks.
+Cases 01, 02 and 06 use natural automatic curves throughout. Cases 03 and 04
+retain one native curve each; case 05 retains three. Removing any retained
+curve would cause an unrelated-card hit or increase crossings. Automatic
+routes use the viewer's avoidance and have no saved label nudges. Moving cards
+updates their routes and attachment sides; retained native curves remain
+editable. Node positions and footprint metrics are unchanged by this route
+simplification. Length tie-breaking uses straight center-to-center distances;
+drawn routes still determine collision, crossing and occupied-bounds checks.
 
 Shape preference never overrides collision safety or fewer crossing pairs.
 Graphviz's target-ratio candidates can add whitespace, and labels, symmetry,

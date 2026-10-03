@@ -43,83 +43,23 @@
           "edges": [
             {
               "from": "sender",
-              "to": "edge",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 24.8,
-                  "dy": 0
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -24.8,
-                  "dy": 0
-                }
-              ]
+              "to": "edge"
             },
             {
               "from": "edge",
-              "to": "verify",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 24.8,
-                  "dy": 0
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -24.8,
-                  "dy": 0
-                }
-              ]
+              "to": "verify"
             },
             {
               "from": "verify",
-              "to": "queue",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": -6.5
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": 6.6
-                }
-              ]
+              "to": "queue"
             },
             {
               "from": "queue",
-              "to": "worker",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -24.7,
-                  "dy": 0
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 24.8,
-                  "dy": 0
-                }
-              ]
+              "to": "worker"
             },
             {
               "from": "worker",
-              "to": "partner",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -24.7,
-                  "dy": 0
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 24.8,
-                  "dy": 0
-                }
-              ]
+              "to": "partner"
             }
           ],
           "floats": [
@@ -214,163 +154,43 @@
           "edges": [
             {
               "from": "uploader",
-              "to": "api",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4.2
-                }
-              ]
+              "to": "api"
             },
             {
               "from": "api",
-              "to": "store",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -12.9,
-                  "dy": 3.7
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 12.8,
-                  "dy": -3.7
-                }
-              ]
+              "to": "store"
             },
             {
               "from": "api",
-              "to": "scan",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4.2
-                }
-              ]
+              "to": "scan"
             },
             {
               "from": "api",
-              "to": "policy",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 12.9,
-                  "dy": 3.7
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -12.8,
-                  "dy": -3.7
-                }
-              ]
+              "to": "policy"
             },
             {
               "from": "store",
-              "to": "review",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 12.9,
-                  "dy": 3.7
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -12.8,
-                  "dy": -3.7
-                }
-              ]
+              "to": "review"
             },
             {
               "from": "scan",
-              "to": "review",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4.2
-                }
-              ]
+              "to": "review"
             },
             {
               "from": "policy",
-              "to": "review",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -12.9,
-                  "dy": 3.7
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 12.8,
-                  "dy": -3.7
-                }
-              ]
+              "to": "review"
             },
             {
               "from": "review",
-              "to": "reviewer",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4.2
-                }
-              ]
+              "to": "reviewer"
             },
             {
               "from": "reviewer",
-              "to": "publish",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4.2
-                }
-              ]
+              "to": "publish"
             },
             {
               "from": "publish",
-              "to": "archive",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 24.8,
-                  "dy": 0
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -24.8,
-                  "dy": 0
-                }
-              ]
+              "to": "archive"
             }
           ],
           "floats": [
@@ -499,246 +319,64 @@
           "edges": [
             {
               "from": "app",
-              "to": "collector",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 9.2,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -8.9,
-                  "dy": -4
-                }
-              ]
+              "to": "collector"
             },
             {
               "from": "jobs",
-              "to": "collector",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 4.8,
-                  "dy": -4
-                }
-              ]
+              "to": "collector"
             },
             {
               "from": "edge",
-              "to": "collector",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 1.8,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -1.8,
-                  "dy": -4
-                }
-              ]
+              "to": "collector"
             },
             {
               "from": "collector",
-              "to": "router",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0.1,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -0.1,
-                  "dy": -4
-                }
-              ]
+              "to": "router"
             },
             {
               "from": "router",
-              "to": "metrics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 7,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -6.7,
-                  "dy": -4
-                }
-              ]
+              "to": "metrics"
             },
             {
               "from": "router",
-              "to": "logs",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -10.3,
-                  "dy": 4.1
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 10.3,
-                  "dy": -4.1
-                }
-              ]
+              "to": "logs"
             },
             {
               "from": "router",
-              "to": "traces",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0.1,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -0.1,
-                  "dy": -4
-                }
-              ]
+              "to": "traces"
             },
             {
               "from": "metrics",
-              "to": "metricdb",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "metricdb"
             },
             {
               "from": "logs",
-              "to": "logdb",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 3.7,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -3.6,
-                  "dy": -4
-                }
-              ]
+              "to": "logdb"
             },
             {
               "from": "traces",
-              "to": "tracedb",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "tracedb"
             },
             {
               "from": "metricdb",
-              "to": "dashboard",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -6.8,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 6.6,
-                  "dy": -4
-                }
-              ]
+              "to": "dashboard"
             },
             {
               "from": "logdb",
-              "to": "dashboard",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 6.8,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -6.6,
-                  "dy": -4
-                }
-              ]
+              "to": "dashboard"
             },
             {
               "from": "tracedb",
-              "to": "dashboard",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "dashboard"
             },
             {
               "from": "metricdb",
-              "to": "alerts",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 2.6,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -2.5,
-                  "dy": -4
-                }
-              ]
+              "to": "alerts"
             },
             {
               "from": "app",
               "to": "logs",
-              "label": "direct logs",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 3.1,
-                  "dy": -31.6
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -3.2,
-                  "dy": 31.9
-                }
-              ],
-              "labelDx": -25.055867079610422,
-              "labelDy": 6.542917483151427
+              "label": "direct logs"
             },
             {
               "from": "alerts",
@@ -777,36 +415,7 @@
             {
               "from": "router",
               "to": "logdb",
-              "label": "legacy query",
-              "curveControls": [
-                {
-                  "t": 0.16666666666666666,
-                  "dx": -12.1,
-                  "dy": 2
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -8.1,
-                  "dy": -9.5
-                },
-                {
-                  "t": 0.5,
-                  "dx": 2,
-                  "dy": -22
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 1.1,
-                  "dy": -22.1
-                },
-                {
-                  "t": 0.8333333333333334,
-                  "dx": -0.4,
-                  "dy": -11.3
-                }
-              ],
-              "labelDx": -34.78449992571552,
-              "labelDy": 10.70008998272965
+              "label": "legacy query"
             }
           ],
           "floats": [
@@ -971,275 +580,71 @@
           "edges": [
             {
               "from": "buyer",
-              "to": "storefront",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "storefront"
             },
             {
               "from": "storefront",
-              "to": "gateway",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "gateway"
             },
             {
               "from": "gateway",
-              "to": "cart",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "cart"
             },
             {
               "from": "cart",
-              "to": "checkout",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -6.5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 6.3,
-                  "dy": -4
-                }
-              ]
+              "to": "checkout"
             },
             {
               "from": "checkout",
-              "to": "payment",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 32,
-                  "dy": -4.5
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -32,
-                  "dy": 4.5
-                }
-              ]
+              "to": "payment"
             },
             {
               "from": "checkout",
-              "to": "risk",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -8.5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 8.2,
-                  "dy": -4
-                }
-              ]
+              "to": "risk"
             },
             {
               "from": "checkout",
-              "to": "inventory",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 8.5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -8.1,
-                  "dy": -4
-                }
-              ]
+              "to": "inventory"
             },
             {
               "from": "payment",
-              "to": "order",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -73.8,
-                  "dy": -8
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 73.8,
-                  "dy": 8
-                }
-              ]
+              "to": "order"
             },
             {
               "from": "risk",
-              "to": "order",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 2.8,
-                  "dy": 1
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -2.3,
-                  "dy": -0.9
-                }
-              ]
+              "to": "order"
             },
             {
               "from": "inventory",
-              "to": "order",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -21.6,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -21.6,
-                  "dy": -4
-                }
-              ]
+              "to": "order"
             },
             {
               "from": "order",
-              "to": "events",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -6.4,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 6.3,
-                  "dy": -4
-                }
-              ]
+              "to": "events"
             },
             {
               "from": "events",
-              "to": "warehouse",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 32,
-                  "dy": -4.5
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -32,
-                  "dy": 4.5
-                }
-              ]
+              "to": "warehouse"
             },
             {
               "from": "warehouse",
-              "to": "carrier",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "carrier"
             },
             {
               "from": "events",
-              "to": "notify",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -8.4,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 8.2,
-                  "dy": -4
-                }
-              ]
+              "to": "notify"
             },
             {
               "from": "notify",
-              "to": "mail",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "mail"
             },
             {
               "from": "events",
-              "to": "analytics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 8.5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -8.1,
-                  "dy": -4
-                }
-              ]
+              "to": "analytics"
             },
             {
               "from": "analytics",
-              "to": "ops",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 6.5,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -6.2,
-                  "dy": -4
-                }
-              ]
+              "to": "ops"
             },
             {
               "from": "cart",
@@ -1293,55 +698,12 @@
             {
               "from": "order",
               "to": "inventory",
-              "label": "redo",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 21.6,
-                  "dy": -4
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 21.6,
-                  "dy": 4.2
-                }
-              ],
-              "labelDx": -6.874079999999822,
-              "labelDy": 6.447952069775056
+              "label": "redo"
             },
             {
               "from": "ops",
               "to": "order",
-              "label": "manual patch",
-              "curveControls": [
-                {
-                  "t": 0.16666666666666666,
-                  "dx": 11.2,
-                  "dy": 8.6
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 21.8,
-                  "dy": 18.2
-                },
-                {
-                  "t": 0.5,
-                  "dx": 35,
-                  "dy": 36
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 26.8,
-                  "dy": 23.8
-                },
-                {
-                  "t": 0.8333333333333334,
-                  "dx": 5.2,
-                  "dy": 1.7
-                }
-              ],
-              "labelDx": -32.01619676405812,
-              "labelDy": 7.5422106929243
+              "label": "manual patch"
             }
           ],
           "floats": [
@@ -1560,67 +922,19 @@
           "edges": [
             {
               "from": "camera",
-              "to": "upload",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 1.9,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -1.7,
-                  "dy": -3
-                }
-              ]
+              "to": "upload"
             },
             {
               "from": "mobile",
-              "to": "upload",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -3.1,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 2.7,
-                  "dy": -3
-                }
-              ]
+              "to": "upload"
             },
             {
               "from": "upload",
-              "to": "auth",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0.9,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -0.9,
-                  "dy": -4
-                }
-              ]
+              "to": "auth"
             },
             {
               "from": "auth",
-              "to": "queue",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "queue"
             },
             {
               "from": "upload",
@@ -1685,308 +999,72 @@
             },
             {
               "from": "queue",
-              "to": "object",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "object"
             },
             {
               "from": "object",
-              "to": "splitter",
-              "curveControls": [
-                {
-                  "t": 0.16666666666666666,
-                  "dx": 28.9,
-                  "dy": 10.2
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 4.1,
-                  "dy": -1.1
-                },
-                {
-                  "t": 0.5,
-                  "dx": -22.5,
-                  "dy": -12.8
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -30.1,
-                  "dy": -16.5
-                },
-                {
-                  "t": 0.8333333333333334,
-                  "dx": -33.1,
-                  "dy": -17.2
-                }
-              ]
+              "to": "splitter"
             },
             {
               "from": "splitter",
-              "to": "thumbnail",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -2.1,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 2,
-                  "dy": -4
-                }
-              ]
+              "to": "thumbnail"
             },
             {
               "from": "splitter",
-              "to": "transcoder",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 11.5,
-                  "dy": 4.1
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -11.5,
-                  "dy": -4.1
-                }
-              ]
+              "to": "transcoder"
             },
             {
               "from": "splitter",
-              "to": "captions",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 4.7,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -4.6,
-                  "dy": -4
-                }
-              ]
+              "to": "captions"
             },
             {
               "from": "thumbnail",
-              "to": "thumbstore",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -3
-                }
-              ]
+              "to": "thumbstore"
             },
             {
               "from": "transcoder",
-              "to": "videostore",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -3
-                }
-              ]
+              "to": "videostore"
             },
             {
               "from": "captions",
-              "to": "textindex",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -3
-                }
-              ]
+              "to": "textindex"
             },
             {
               "from": "thumbstore",
-              "to": "publish",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 4.9,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -4.8,
-                  "dy": -3.2
-                }
-              ]
+              "to": "publish"
             },
             {
               "from": "videostore",
-              "to": "publish",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -4.9,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 4.8,
-                  "dy": -3.2
-                }
-              ]
+              "to": "publish"
             },
             {
               "from": "textindex",
-              "to": "publish",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 3.3
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -3
-                }
-              ]
+              "to": "publish"
             },
             {
               "from": "publish",
-              "to": "cdn",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -6.8,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 6.6,
-                  "dy": -4
-                }
-              ]
+              "to": "cdn"
             },
             {
               "from": "publish",
-              "to": "search",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 0,
-                  "dy": -4
-                }
-              ]
+              "to": "search"
             },
             {
               "from": "publish",
-              "to": "notify",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 6.8,
-                  "dy": 4.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -6.6,
-                  "dy": -4
-                }
-              ]
+              "to": "notify"
             },
             {
               "from": "publish",
-              "to": "analytics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 12.6,
-                  "dy": 3.9
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -12.5,
-                  "dy": -3.8
-                }
-              ]
+              "to": "analytics"
             },
             {
               "from": "publish",
-              "to": "monitor",
-              "curveControls": [
-                {
-                  "t": 0.16666666666666666,
-                  "dx": 72.9,
-                  "dy": 12.4
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 151.8,
-                  "dy": 25.4
-                },
-                {
-                  "t": 0.5,
-                  "dx": 204,
-                  "dy": 36
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 110.6,
-                  "dy": 18.3
-                },
-                {
-                  "t": 0.8333333333333334,
-                  "dx": 17.6,
-                  "dy": 0.8
-                }
-              ]
+              "to": "monitor"
             },
             {
               "from": "publish",
               "to": "metadata",
-              "label": "catalog write",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -9.6,
-                  "dy": 2.8
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 9.8,
-                  "dy": -2.9
-                }
-              ],
-              "labelDx": -30.796280725862175,
-              "labelDy": 6.389194048196259
+              "label": "catalog write"
             },
             {
               "from": "transcoder",
@@ -2253,147 +1331,39 @@
           "edges": [
             {
               "from": "orders",
-              "to": "audit",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 22.2,
-                  "dy": -3.6
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -22.2,
-                  "dy": 3.6
-                }
-              ]
+              "to": "audit"
             },
             {
               "from": "orders",
-              "to": "metrics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 0.2,
-                  "dy": 0.1
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -0.2,
-                  "dy": -0.1
-                }
-              ]
+              "to": "metrics"
             },
             {
               "from": "orders",
-              "to": "risk",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -23.8,
-                  "dy": -5.1
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 23.8,
-                  "dy": 5.1
-                }
-              ]
+              "to": "risk"
             },
             {
               "from": "returns",
-              "to": "audit",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -3.7,
-                  "dy": -3.4
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 3.4,
-                  "dy": 3.1
-                }
-              ]
+              "to": "audit"
             },
             {
               "from": "returns",
-              "to": "metrics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -15.3,
-                  "dy": -37.7
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 15.3,
-                  "dy": 37.5
-                }
-              ]
+              "to": "metrics"
             },
             {
               "from": "returns",
-              "to": "risk",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 4.4,
-                  "dy": -2.4
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -4.4,
-                  "dy": 2.4
-                }
-              ]
+              "to": "risk"
             },
             {
               "from": "stock",
-              "to": "audit",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": -20.3,
-                  "dy": 19.4
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 20.5,
-                  "dy": -19.6
-                }
-              ]
+              "to": "audit"
             },
             {
               "from": "stock",
-              "to": "metrics",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 19.9,
-                  "dy": -6.6
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -19.7,
-                  "dy": 6.5
-                }
-              ]
+              "to": "metrics"
             },
             {
               "from": "stock",
-              "to": "risk",
-              "curveControls": [
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 15.4,
-                  "dy": 20.5
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": -15.3,
-                  "dy": -20.3
-                }
-              ]
+              "to": "risk"
             }
           ],
           "floats": [

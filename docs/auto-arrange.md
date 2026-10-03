@@ -89,6 +89,29 @@ evaluation cap reduced by the product of node and edge counts. Diagrams above
 24 nodes or 48 edges receive no alignment work. This keeps the 80-node worker
 budget unchanged.
 
+Deep ungrouped graphs can receive a second compact-grid candidate after
+alignment. This pass requires 8–20 nodes, at most 32 edges, one source, and a
+unary entrance of at least three cards that fits across the grid. It only runs
+when the existing rank count exceeds the compact grid by at least two rows.
+The entrance folds left to right across the first row; the remaining nodes
+can swap cells on a regular grid with 204-unit columns and 120-unit rows.
+The grid has `ceil(sqrt(nodeCount))` columns and room for roughly one empty
+cell per two cards. Forward connections retain their downstream order, and
+parallel two-hop fork/join branches share a processing row. Feedback edges
+remain free to travel upward.
+
+Twelve deterministic seeded searches each try 20,000 cell moves or swaps.
+Cached straight-segment/card and segment-pair geometry provides the cheap
+search objective; it also penalizes diagonal connections and reversed forward
+links. These estimates never authorize the final layout. At most four
+finalists receive the full viewer score, with native rerouting only when the
+automatic candidate is unsafe. Acceptance requires no overlaps or unrelated
+card hits, no crossing increase, shorter total center distance, no greater
+occupied diagonal, and the existing aspect guard. Failed or unsafe routing
+preserves the selected layout. The normal natural-route simplifier then removes
+any unnecessary native controls. Small, already compact, multi-source, grouped
+and larger diagrams keep their prior behavior.
+
 After structural selection and any leaf refinement, routing starts with an
 all-automatic candidate. If it clears unrelated cards and does not increase
 nonincident crossings, all native controls are removed. Otherwise, automatic
@@ -111,8 +134,9 @@ constraints prevent the target footprint.
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less
 compact shape, and target spacing can introduce whitespace. There are at most
-nine routing attempts for small diagrams (a snake, six general candidates,
-one local leaf refinement and one optional aligned-grid reroute). Successful snakes return immediately. Above
+thirteen routing attempts for small diagrams (a snake, six general candidates,
+one local leaf refinement, one optional aligned-grid reroute and up to four
+compact-grid finalists). Successful snakes return immediately. Above
 24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
 and, for ungrouped graphs, two stress candidates); grouped graphs use only
 the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges

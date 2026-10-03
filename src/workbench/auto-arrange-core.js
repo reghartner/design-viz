@@ -4,6 +4,7 @@ var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
 var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
+var AUTO_ARRANGE_FOLD_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 function autoArrangeSmall(d){return Object.keys(d.nodes || {}).length<=AUTO_ARRANGE_SMALL_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_SMALL_LIMITS.edges;}
 var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
 function autoArrangeInput(d){
@@ -294,6 +295,89 @@ function autoArrangeAlignedPositions(d,result){
   if(usedColumns.size+usedRows.size>centers || !autoArrangeAlignmentFits(aligned.score,result.score))return null;
   return aligned;
 }
+function autoArrangeFoldedPositions(d,result){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
+  // Folding is only useful for a deep ranked graph with a unary entrance.
+  // Keep already compact, multi-source, grouped and large diagrams untouched.
+  if(count>AUTO_ARRANGE_FOLD_LIMITS.nodes || edges.length>AUTO_ARRANGE_FOLD_LIMITS.edges || count<8 || ids.some(function(id){return d.nodes[id].group;}))return [];
+  var incoming=ids.map(function(){return [];}),outgoing=ids.map(function(){return [];});
+  var links=edges.map(function(e){var a=ids.indexOf(e.from),b=ids.indexOf(e.to);outgoing[a].push(b);incoming[b].push(a);return [a,b];});
+  var sources=ids.map(function(id,i){return i;}).filter(function(i){return !incoming[i].length;});
+  if(sources.length!==1)return [];
+  var columns=Math.ceil(Math.sqrt(count)),rows=Math.ceil(count*1.5/columns),entrance=[],node=sources[0];
+  while(outgoing[node].length===1 && entrance.indexOf(node)<0){
+    entrance.push(node);var next=outgoing[node][0];if(incoming[next].length!==1)break;node=next;
+  }
+  var old=Object.create(null);result.positions.forEach(function(p){old[p.id]=p;});
+  if(entrance.length<3 || entrance.length>columns || new Set(result.positions.map(function(p){return p.y;})).size<rows+2)return [];
+  var forward=links.map(function(e){return old[ids[e[1]]].y>=old[ids[e[0]]].y;}),siblings=[];
+  // Parallel two-hop branches retain a common processing row. Other branches
+  // can turn sideways or share their parent's row to shorten the deep spine.
+  outgoing.forEach(function(children){children.forEach(function(a,i){children.slice(i+1).forEach(function(b){
+    if(outgoing[a].some(function(join){return outgoing[b].indexOf(join)>=0 && old[ids[join]].y>Math.max(old[ids[a]].y,old[ids[b]].y);}))siblings.push([a,b]);
+  });});});
+  var dx=150+AUTO_ARRANGE_CARD_GAP,dy=Math.ceil((44+AUTO_ARRANGE_RANK_GAP)/12)*12,size=columns*rows,slots=size*size;
+  // At the 20-node cap there are at most 30 cells: card occupancy fits a
+  // 32-bit mask and the route-pair cache stays below one megabyte.
+  var xs=[],ys=[],distance=new Float64Array(slots),hits=new Uint32Array(slots),crossings=new Uint8Array(slots*slots);
+  for(var cell=0;cell<size;cell++){xs[cell]=(cell%columns)*dx;ys[cell]=Math.floor(cell/columns)*dy;}
+  function side(a,b,c){return (xs[b]-xs[a])*(ys[c]-ys[a])-(ys[b]-ys[a])*(xs[c]-xs[a]);}
+  for(var a=0;a<size;a++)for(var b=0;b<size;b++){
+    var route=a*size+b;distance[route]=Math.hypot(xs[b]-xs[a],ys[b]-ys[a])+(xs[a]!==xs[b] && ys[a]!==ys[b]?150:0);
+    for(var c=0;c<size;c++){
+      if(c===a || c===b)continue;
+      var enter=0,leave=1;
+      [[xs[a],xs[b]-xs[a],xs[c]-75,xs[c]+75],[ys[a],ys[b]-ys[a],ys[c]-22,ys[c]+22]].forEach(function(axis){
+        if(!axis[1]){if(axis[0]<=axis[2] || axis[0]>=axis[3])leave=-1;return;}
+        var t=(axis[2]-axis[0])/axis[1],u=(axis[3]-axis[0])/axis[1];enter=Math.max(enter,Math.min(t,u));leave=Math.min(leave,Math.max(t,u));
+      });
+      if(enter<leave)hits[route]|=1<<c;
+    }
+    for(var c=0;c<size;c++)for(var e=0;e<size;e++){
+      if(side(a,b,c)*side(a,b,e)<0 && side(c,e,a)*side(c,e,b)<0)crossings[route*slots+c*size+e]=1;
+    }
+  }
+  var pairs=[];links.forEach(function(e,i){links.slice(i+1).forEach(function(f,j){if(e[0]!==f[0] && e[0]!==f[1] && e[1]!==f[0] && e[1]!==f[1])pairs.push([i,i+j+1]);});});
+  function score(cells){
+    var occupied=0,value=0,routes=[];cells.forEach(function(cell){occupied|=1<<cell;});
+    links.forEach(function(e,i){
+      var a=cells[e[0]],b=cells[e[1]],route=a*size+b;routes.push(route);value+=distance[route];
+      if(forward[i] && ys[b]<ys[a])value+=10000;
+      var blocked=hits[route]&occupied;while(blocked){value+=1500;blocked&=blocked-1;}
+    });
+    pairs.forEach(function(p){value+=1500*crossings[routes[p[0]]*slots+routes[p[1]]];});
+    siblings.forEach(function(p){value+=4*Math.abs(ys[cells[p[0]]]-ys[cells[p[1]]]);});
+    return value;
+  }
+  var movable=ids.map(function(id,i){return i;}).filter(function(i){return entrance.indexOf(i)<0;}),state=1,finalists=[];
+  function random(){state=(1664525*state+1013904223)>>>0;return state/4294967296;}
+  // Fixed seeds and swaps can leave a local minimum; only a handful of finalists
+  // pay for actual viewer geometry or native routing. Cell geometry is cached.
+  for(var run=0;run<AUTO_ARRANGE_FOLD_LIMITS.runs;run++){
+    var available=[];for(var cell=columns;cell<size;cell++)available.push(cell);
+    for(var i=available.length-1;i>0;i--){var j=Math.floor(random()*(i+1)),swap=available[i];available[i]=available[j];available[j]=swap;}
+    var cells=[];entrance.forEach(function(node,i){cells[node]=columns-entrance.length+i;});movable.forEach(function(node,i){cells[node]=available[i];});
+    var value=score(cells),best=cells.slice(),bestValue=value;
+    for(var step=0;step<AUTO_ARRANGE_FOLD_LIMITS.steps;step++){
+      var index=movable[Math.floor(random()*movable.length)],cell=columns+Math.floor(random()*(size-columns)),other=cells.indexOf(cell),next=cells.slice();
+      next[index]=cell;if(other>=0)next[other]=cells[index];var cost=score(next),temperature=1000*Math.pow(.001,step/AUTO_ARRANGE_FOLD_LIMITS.steps);
+      if(cost<value || random()<Math.exp((value-cost)/temperature)){cells=next;value=cost;}
+      if(cost<bestValue){best=next;bestValue=cost;}
+    }
+    // Direction and fork rows are structural requirements, not routing hints.
+    if(links.some(function(e,i){return forward[i] && ys[best[e[1]]]<ys[best[e[0]]];}) || siblings.some(function(p){return ys[best[p[0]]]!==ys[best[p[1]]];}))continue;
+    var key=best.join(',');if(finalists.some(function(f){return f.key===key;}))continue;
+    finalists.push({key:key,cost:bestValue,cells:best});
+  }
+  finalists.sort(function(a,b){
+    if(a.cost!==b.cost)return a.cost-b.cost;
+    for(var i=0;i<count;i++)if(a.cells[i]!==b.cells[i])return a.cells[i]-b.cells[i];return 0;
+  });
+  return finalists.slice(0,AUTO_ARRANGE_FOLD_LIMITS.finalists).map(function(finalist){
+    var positions=Object.create(null),usedColumns=Array.from(new Set(finalist.cells.map(function(cell){return cell%columns;}))).sort(function(a,b){return a-b;}),usedRows=Array.from(new Set(finalist.cells.map(function(cell){return Math.floor(cell/columns);}))).sort(function(a,b){return a-b;});
+    ids.forEach(function(id,i){var cell=finalist.cells[i];positions[id]={x:120+usedColumns.indexOf(cell%columns)*dx,y:100+usedRows.indexOf(Math.floor(cell/columns))*dy};});return positions;
+  });
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -331,10 +415,19 @@ function autoArrangeCandidates(d,viz,cola){
   }
   var aligned=autoArrangeAlignedPositions(d,chosen);
   if(aligned){
-    if(!aligned.score.overlaps && !aligned.score.hits && aligned.score.crossings<=chosen.score.crossings)return aligned;
-    var placed=Object.create(null);aligned.positions.forEach(function(p){placed[p.id]={x:p.x,y:p.y};});
-    var routed=attempt('LR',placed);
-    if(routed && routed.score.crossings<=chosen.score.crossings && autoArrangeAlignmentFits(routed.score,chosen.score))chosen=routed;
+    if(!aligned.score.overlaps && !aligned.score.hits && aligned.score.crossings<=chosen.score.crossings)chosen=aligned;
+    else {
+      var placed=Object.create(null);aligned.positions.forEach(function(p){placed[p.id]={x:p.x,y:p.y};});
+      var routed=attempt('LR',placed);
+      if(routed && routed.score.crossings<=chosen.score.crossings && autoArrangeAlignmentFits(routed.score,chosen.score))chosen=routed;
+    }
   }
+  var folded=autoArrangeFoldedPositions(d,chosen);
+  folded.forEach(function(positions){
+    var result={positions:ids.map(function(id){return {id:id,x:positions[id].x,y:positions[id].y};}),edges:(d.edges || []).map(function(){return {};})};
+    result.score=autoArrangeScore(d,result);
+    if(result.score.overlaps || result.score.hits || result.score.crossings>chosen.score.crossings)result=attempt('LR',positions);
+    if(result && result.score.crossings<=chosen.score.crossings && autoArrangeAlignmentFits(result.score,chosen.score) && Math.hypot(result.score.width,result.score.height)<=Math.hypot(chosen.score.width,chosen.score.height) && result.score.length<chosen.score.length)chosen=result;
+  });
   return autoArrangeNaturalRoutes(d,chosen);
 }

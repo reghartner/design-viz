@@ -302,7 +302,13 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
         const expectedColumns=[['app','logs','logdb'],['edge','collector','router','traces','tracedb','dashboard'],['jobs','metrics'],['alerts','metricdb']];
         expectedColumns.forEach((column,index)=>column.forEach(id=>assert.equal(byId[id].x,120+240*index,id+' is on the intended shared column')));
         assert.equal(result.score.width,870);assert.equal(result.score.height,624);
-      }else{assert.ok(result.score.width<1411);assert.ok(result.score.height<1088);}
+      }else{
+        assert.equal(result.score.width,762);assert.equal(result.score.height,644);assert.ok(result.score.length<4200);
+        const expectedRows=[['buyer','storefront','gateway'],['cart','checkout'],['payment','risk','inventory'],['warehouse','events','order'],['carrier','notify','analytics','ops'],['mail']];
+        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+120*index,id+' shares the compact processing row')));
+        assert.ok(byId.buyer.x<byId.storefront.x && byId.storefront.x<byId.gateway.x,'entrance reads left to right');
+        for(const [from,to] of [['warehouse','carrier'],['notify','mail']])assert.equal(byId[from].x,byId[to].x,'terminal chain stays in its column');
+      }
     }
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
   });
@@ -326,6 +332,33 @@ test('failed aligned rerouting retains the safe selected layout',()=>{
     assert.equal(retries,1);assert.deepEqual(plain(result),plain(expected));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
   }finally{C.autoArrangeAlignedPositions=align;}
+});
+
+test('compact corridor search is name-independent, bounded, and cannot replace a safe layout with failed routing',()=>{
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[3].diagram,fold=C.autoArrangeFoldedPositions;
+  let seed;
+  try{C.autoArrangeFoldedPositions=()=>[];seed=C.autoArrangeCandidates(d,viz,null);}
+  finally{C.autoArrangeFoldedPositions=fold;}
+  const positions=fold(d,seed);assert.ok(positions.length>0 && positions.length<=4);
+  const ids=Object.keys(d.nodes),names=Object.fromEntries(ids.map((id,i)=>[id,'renamed_'+i]));
+  const renamed={...d,nodes:Object.fromEntries(ids.map(id=>[names[id],d.nodes[id]])),edges:d.edges.map(e=>({...e,from:names[e.from],to:names[e.to]}))};
+  const renamedSeed={...seed,positions:seed.positions.map(p=>({...p,id:names[p.id]}))};
+  const again=fold(renamed,renamedSeed);
+  assert.deepEqual(plain(again.map(p=>ids.map(id=>p[names[id]]))),plain(positions.map(p=>ids.map(id=>p[id]))));
+  let retries=0;
+  try{
+    C.autoArrangeFoldedPositions=()=>{
+      const unsafe=plain(positions[0]);unsafe[ids[1]]={...unsafe[ids[0]]};return [unsafe];
+    };
+    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+      if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
+      return viz.renderJSON(source,options);
+    }},null);
+    assert.equal(retries,1);assert.deepEqual(plain(result),plain(seed));
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+  }finally{C.autoArrangeFoldedPositions=fold;}
+  const tooLarge={nodes:Object.fromEntries(Array.from({length:21},(_,i)=>['n'+i,{}])),edges:[]};
+  assert.deepEqual(plain(fold(tooLarge,{positions:[]})),[],'large layouts skip folding before any geometry work');
 });
 
 test('extra aspect attempts stay within the small-graph budget, including the supported 80-node grouped case',()=>{

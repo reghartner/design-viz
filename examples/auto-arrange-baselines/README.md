@@ -21,7 +21,7 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 | 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 558 × 248 | 2.25 |
 | 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 962 × 624 | 1.54 |
 | 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 870 × 624 | 1.39 |
-| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 1206 × 972 | 1.24 |
+| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 762 × 644 | 1.18 |
 | 05 Media platform | 20 | 24 | Five groups, legacy publishing, direct catalog write and upload retry | 0 | 1307 × 1162 | 1.12 |
 | 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 3 | 667 × 511 | 1.31 |
 
@@ -60,15 +60,30 @@ units apart. Logs and Alerts share the router's row; logs storage, traces,
 metrics and metrics storage share the next row. These assignments come from
 a deterministic grid search using topology and shared viewer geometry. The
 manual reference supplied only the intended shape; no IDs or coordinates from
-that file are special-cased. Fulfillment uses five 264-unit columns and nine
-116-unit rows, with an unused internal row removed. Both have zero overlaps,
-card hits and crossings, and all their connections use natural curves.
+that file are special-cased. Fulfillment uses four 204-unit columns and six 120-unit rows. Its source chain
+folds across the first row, followed by checkout/cart and the parallel payment,
+risk and inventory branches. Order, Events and Warehouse share the fourth row;
+Carrier, Notify, Analytics and Ops share the fifth; Mail occupies the sixth.
+Warehouse/Carrier and Notify/Mail stay in their respective columns. Both
+diagrams have zero overlaps, card hits and crossings, and all their connections
+use natural curves.
 
-The alignment pass prioritizes fewer shared centers and regular gaps, checks
+Fulfillment's compact candidate reduces straight connection length from 6069
+to 4176 and occupied geometry from 1206 × 972 to 762 × 644. Compared with the
+partial manual reference, the three processing branches run in the opposite
+column order and Carrier sits below Warehouse. This alternative needs no
+native route controls; the compact reference-style branch ordering needs a
+shaped lookup curve. Neither semantic node names nor reference coordinates
+participate in candidate generation.
+
+The local alignment pass prioritizes fewer shared centers and regular gaps, checks
 safety before accepting a grid, and keeps source/sink positions in that grid.
 Only recognizable ranked, ungrouped diagrams with at most 24 nodes and 48
 edges enter the bounded search. The grouped and nonplanar examples retain
-their prior placement. An expanded footprint is accepted only for improved
+their prior placement. A second bounded search can fold a deep single-source
+unary entrance and swap nodes across a smaller grid; it is limited to 20 nodes
+and 32 edges, 240,000 cheap geometry estimates, and four fully checked finalists.
+Telemetry and cases 01, 02, 05 and 06 are unchanged by this refinement. An expanded footprint is accepted only for improved
 alignment within the footprint guards, never merely to reach a screen ratio.
 
 Shape preference never overrides collision safety or fewer crossing pairs.

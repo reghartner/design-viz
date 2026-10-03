@@ -637,98 +637,98 @@
             {
               "id": "buyer",
               "side": "below",
-              "x": 912,
+              "x": 324,
               "y": 100
             },
             {
               "id": "storefront",
               "side": "below",
-              "x": 912,
-              "y": 216
+              "x": 528,
+              "y": 100
             },
             {
               "id": "gateway",
               "side": "below",
-              "x": 912,
-              "y": 332
+              "x": 732,
+              "y": 100
             },
             {
               "id": "cart",
               "side": "below",
-              "x": 912,
-              "y": 448
+              "x": 732,
+              "y": 220
             },
             {
               "id": "checkout",
               "side": "below",
-              "x": 648,
-              "y": 448
+              "x": 528,
+              "y": 220
             },
             {
               "id": "payment",
               "side": "below",
               "x": 120,
-              "y": 564
+              "y": 340
             },
             {
               "id": "risk",
               "side": "below",
-              "x": 384,
-              "y": 564
+              "x": 324,
+              "y": 340
             },
             {
               "id": "inventory",
               "side": "below",
-              "x": 648,
-              "y": 564
+              "x": 528,
+              "y": 340
             },
             {
               "id": "order",
               "side": "below",
-              "x": 912,
-              "y": 680
+              "x": 528,
+              "y": 460
             },
             {
               "id": "events",
               "side": "below",
-              "x": 648,
-              "y": 796
+              "x": 324,
+              "y": 460
             },
             {
               "id": "warehouse",
               "side": "below",
               "x": 120,
-              "y": 912
+              "y": 460
             },
             {
               "id": "carrier",
               "side": "below",
               "x": 120,
-              "y": 1028
+              "y": 580
             },
             {
               "id": "notify",
               "side": "below",
-              "x": 384,
-              "y": 912
+              "x": 324,
+              "y": 580
             },
             {
               "id": "mail",
               "side": "below",
-              "x": 384,
-              "y": 1028
+              "x": 324,
+              "y": 700
             },
             {
               "id": "analytics",
               "side": "below",
-              "x": 912,
-              "y": 912
+              "x": 528,
+              "y": 580
             },
             {
               "id": "ops",
               "side": "below",
-              "x": 1176,
-              "y": 1028
+              "x": 732,
+              "y": 580
             }
           ]
         }

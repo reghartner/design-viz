@@ -234,8 +234,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       // promotion can both change bounds after panel DOM has been created.
       windows.forEach(function(w){var saved=savedWindowRect(w);if(saved && saved.w)Object.assign(w.state,absolute(saved));});
       if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
-      windows.forEach(sizeAutomaticWindow);
     }
+    // State changes can replace panel content without changing the viewport.
+    // Reveal before measuring so a panel hidden during the last paint can use
+    // its current content and the current stage bounds.
+    windows.forEach(function(w){if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
@@ -322,6 +325,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,r,true);
+    else w.state.automatic=false;
     gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
     handle.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
@@ -340,6 +344,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     ev.preventDefault();ev.stopPropagation();raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,w.rect,true);
+    else w.state.automatic=false;
     var n=ev.shiftKey?24:8;
     if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
     else Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true),{stacked:false});
@@ -375,6 +380,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(gesture)finish(true);paint();}):null;
   if(observer)observer.observe(stage);
+  // Panel renderers replace body children after step/state changes. Observe
+  // those replacements and card visibility; paint only changes outer-window
+  // styles, so this callback cannot observe itself.
   var visibilityObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
   var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
   var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
@@ -391,7 +399,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // dashes stay identical to Standard. The move anchors restore them on leave.
     legendMenu.hidden=false;
     board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
-    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
+    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});});
     if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});

@@ -189,7 +189,8 @@ function layout(spec){
                      w:170, h:CARD_H, row:r, flow:i, stack:true};
         });
       } else {
-        pos[s] = {cx: xs[i], cy: center, w:150, h:CARD_H, row:r, flow:i, stack:false};
+        /* Supported lane rows have at most five cards, 240px apart. */
+        pos[s] = {cx: xs[i], cy: center, w:lanes ? 190 : 150, h:CARD_H, row:r, flow:i, stack:false};
       }
     });
     rowsMeta.push({top:top, center:center, height:rowH, slots:slots, k:k});

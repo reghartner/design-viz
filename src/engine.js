@@ -805,11 +805,11 @@ function fitLaneNodeTitle(node, title, width){
     text.textContent = value;
     return text.getComputedTextLength() <= available;
   }
-  function take(value, available, ellipsis){
+  function take(value, available, ellipsis, suffix){
     var chars = Array.from(value), low = 0, high = chars.length;
     while (low < high){
       var mid = Math.ceil((low + high) / 2);
-      if (fits(chars.slice(0,mid).join('') + (ellipsis ? '…' : ''), available)) low = mid;
+      if (fits(chars.slice(0,mid).join('') + (ellipsis ? '…' : '') + (suffix || ''), available)) low = mid;
       else high = mid - 1;
     }
     return chars.slice(0,low).join('');
@@ -824,7 +824,8 @@ function fitLaneNodeTitle(node, title, width){
     return;
   }
   if (fits(title, firstRight - 46)) return;
-  var first = take(title, firstRight - 46, false), split = first.lastIndexOf(' ');
+  /* The separator remains in textContent, so reserve its painted width too. */
+  var first = take(title, firstRight - 46, false, ' '), split = first.lastIndexOf(' ');
   if (split > 0) first = first.slice(0,split);
   var rest = title.slice(first.length).trimStart();
   var second = fits(rest, secondRight - 46) ? rest : take(rest, secondRight - 46, true).trimEnd() + '…';

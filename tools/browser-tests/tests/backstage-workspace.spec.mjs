@@ -19,7 +19,7 @@ async function canvasCamera(dialog){
   });
 }
 
-test('expanded Explore owns the full browser and returns to the same curated viewer',async({page,server},info)=>{
+test('expanded canvas owns the full browser and returns to the same curated viewer',async({page,server},info)=>{
   await page.setViewportSize({width:1600,height:1000});await page.addInitScript(trackResources);
   await page.goto(server.origin+'/native/index.html#company-route');await page.waitForFunction(()=>!!window.__host);
   const baseline=await resources(page);
@@ -27,14 +27,14 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   const alpha=page.locator('#alpha');
   await expect(alpha.locator('.preadout')).toHaveText('Success');
   const original=await alpha.locator('[data-flowview-native]').elementHandle();
-  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Explore alpha',exact:true});
+  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   await expect(dialog).toBeVisible();
   const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
   const board=await dialog.locator('.explore-board').boundingBox();
   expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
   expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
-  await expect(dialog.getByRole('link',{name:'Edit in workbench',exact:true})).toBeInViewport();
+  await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   expect(desktop.actions.y).toBe(desktop.nav.y);expect(overlaps(desktop.actions,desktop.nav)).toBe(false);
   expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
   const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
@@ -49,7 +49,7 @@ test('expanded Explore owns the full browser and returns to the same curated vie
   await page.setViewportSize({width:480,height:800});const narrow=await expandedGeometry(dialog);
   expect(narrow.nav.y).toBeGreaterThanOrEqual(narrow.actions.y+narrow.actions.height);
   expect(narrow.row.y).toBe(narrow.nav.y+narrow.nav.height);expect(narrow.stage.y).toBe(narrow.row.y+narrow.row.height);
-  await expect(dialog.getByRole('link',{name:'Edit in workbench',exact:true})).toBeInViewport();
+  await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   expect(narrow.controls.every(control=>!overlaps(narrow.actions,control))).toBe(true);
   await expect(dialog.getByRole('img',{name:'flow diagram'})).toBeVisible();
   await info.attach('backstage-expanded-narrow',{body:await page.screenshot(),contentType:'image/png'});
@@ -65,8 +65,8 @@ test('expanded Explore owns the full browser and returns to the same curated vie
     node.style.getPropertyValue('--flowview-host-actions-inline-offset'),
     node.style.getPropertyValue('--flowview-host-actions-block-offset')
   ])).toEqual(['','']);
-  await expect(alpha.getByRole('button',{name:'Explore canvas',exact:true})).toBeFocused();
-  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
+  await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();
+  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
   const reopened=await expandedGeometry(dialog);expect(reopened.actions.y).toBe(reopened.nav.y);expect(overlaps(reopened.actions,reopened.nav)).toBe(false);
   expect(reopened.controls.every(control=>!overlaps(reopened.actions,control))).toBe(true);
   await page.evaluate(()=>__host.left(false));await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -163,11 +163,11 @@ test('an unavailable Build target fails visibly before replacing the saved draft
 
 test('visible host Edit opens the exact Explore chapter and step in the Canon reader then Workbench',async({page,server},info)=>{
   await page.goto(server.origin+'/backstage/index.html');await page.getByRole('button',{name:'Service flow',exact:true}).click();
-  await page.getByRole('button',{name:'Explore canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:/^Explore /});
+  await page.getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:/^Canvas: /});
   await dialog.getByRole('button',{name:'Next step',exact:true}).click();
   const source=await page.evaluate(()=>__backstage.spec);
   for(const width of [1440,768,390]){
-    await page.setViewportSize({width,height:1000});const edit=dialog.getByRole('link',{name:'Edit in workbench',exact:true});
+    await page.setViewportSize({width,height:1000});const edit=dialog.getByRole('link',{name:'Edit in Workbench',exact:true});
     await expect(edit).toBeInViewport();await expect(dialog.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
     await expect.poll(()=>dialog.locator('.explore-navigation-actions').evaluate(el=>Array.from(el.querySelectorAll('button,summary')).filter(control=>control.checkVisibility()).map(control=>{const r=control.getBoundingClientRect();return {name:control.textContent,left:r.left,right:r.right};}).filter(r=>r.left<0 || r.right>innerWidth))).toEqual([]);
     const geometry=await expandedGeometry(dialog);expect(geometry.controls.every(control=>!overlaps(geometry.actions,control))).toBe(true);
@@ -194,8 +194,8 @@ test('Home and Data flow retain live step controls across Explore switches and r
   await alpha.getByRole('button',{name:'Next step',exact:true}).click();
   await expect(alpha.locator('.stepid')).toHaveText('detect');
   const original=await alpha.locator('.termbar').elementHandle();
-  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
-  const dialog=page.getByRole('dialog',{name:'Explore alpha',exact:true});
+  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   for(const name of ['Data flow','Home','Data flow']){
     await dialog.getByRole('button',{name,exact:true}).click();
     await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
@@ -216,7 +216,7 @@ test('Home and Data flow retain live step controls across Explore switches and r
   await expect(alpha.locator('.stepid')).toHaveText('persist');
   await alpha.getByRole('button',{name:'Home',exact:true}).click();
   await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
-  await alpha.getByRole('button',{name:'Explore canvas',exact:true}).click();
+  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
   await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
   await expect(dialog.locator('.stepid')).toHaveText('persist');
   await dialog.getByRole('button',{name:'Data flow',exact:true}).click();

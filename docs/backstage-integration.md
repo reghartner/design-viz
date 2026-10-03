@@ -48,17 +48,17 @@ for a **Diagrams** tab on Component and API pages, or mount the mock portal as a
 development preview. The package's `/backend` entry derives associations from
 `nodes.*.binding.entityRef` and explicit API bindings across every section/tab.
 The tab renders canonical flows and HLD designs inline with jumps to relevant happy
-and alternate steps, and refreshes automatically. Explore canvas expands the same
+and alternate steps, and refreshes automatically. **Expand canvas** opens the same
 live viewer to fill the browser, with floating panels and a return to the entity.
-Editing stays external: Edit in workbench and Build with Claude carry the selected
+Editing stays external: Edit in Workbench and Build with Claude carry the selected
 story revision and root section/view/path/step to the hosted workbench. The workbench
 checks its own published snapshot before opening a local draft. Build with Claude
-goes straight to the canvas and a centered connection guide; Edit in workbench
+goes straight to the canvas and a centered connection guide; Edit in Workbench
 keeps the read-only checkpoint. Before a direct Build replaces an existing draft,
 the editor saves an exact recovery copy under Home → Earlier drafts. If that copy
 cannot be saved, Build stops without replacing the draft. Folder access and the
 visible paste into Claude remain separate user actions. See the
-[handoff contract](../apps/backstage/README.md#explore-and-build-with-claude).
+[handoff contract](../apps/backstage/README.md#expand-canvas-and-build-with-claude).
 The
 company plugin reads spec JSON from GitHub and passes inert data to its statically
 bundled native renderer. Each viewer owns a ShadowRoot; no

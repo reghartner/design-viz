@@ -17,8 +17,10 @@ curve control and updates it when nodes move. Existing viewers need the
 
 Directed chains, including grouped chains, use at most four cards per row and reverse each
 successive row, so a six-card chain reads left to right across three cards, then
-right to left across three. Rows are balanced and spaced toward a 3:2 occupied
-footprint without reducing the minimum card gap. Long chains also expand
+right to left across three. Chains of up to 12 cards use 204 logical units
+between centers in both directions; they do not add empty space to reach a
+screen aspect ratio. Longer chains balance rows toward a 3:2 occupied
+footprint without reducing the minimum card gap, and also expand
 column spacing once minimum row clearance determines their height. Detection follows edge
 topology rather than node or edge declaration order. Cycles, forks and disconnected graphs use the
 general candidate search. The snake is accepted only after collision and route
@@ -48,14 +50,26 @@ edge distance and occupied area break ties. Each edge contributes its Euclidean 
 edges; self edges contribute zero. Curve arc length does not affect this score.
 Sampled curves still determine card hits, crossings and occupied bounds.
 The footprint encloses cards, groups and sampled routes,
-excluding the viewer's minimum-width canvas and label boxes. Long chains
-prioritize the four-card row limit and minimum clearance when those
+excluding the viewer's minimum-width canvas and label boxes.
+
+After choosing the structural layout, ungrouped diagrams with at most 12 nodes
+and 24 edges may receive one local compaction attempt. A terminal sink with
+exactly one incident edge can move beside its neighbor if the new position
+shrinks the card footprint and keeps the card gap. The rest of the selected
+layout stays in place, preserving the spacing of forks and joins. The candidate
+is rerouted and must pass the same card/group and route safety checks. It
+compares crossings first, then shape, then occupied diagonal
+(`hypot(width, height)`) before edge distance for this local comparison. Blocked or unsafe tucks leave the structural layout
+unchanged. Larger or denser diagrams receive no extra attempt.
+
+Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less
 compact shape, and target spacing can introduce whitespace. There are at most
-seven attempts for small diagrams (a snake plus six general candidates). Above
+eight attempts for small diagrams (a snake, six general candidates and one
+local leaf refinement). Successful snakes return immediately. Above
 24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
 and, for ungrouped graphs, two stress candidates); grouped graphs use only
 the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges
@@ -99,5 +113,6 @@ monoliths and direct/back couplings, and a deliberately nonplanar K₃,₃.
 Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
 `auto-arranged.spec.json` using the production algorithm and print occupied
 geometry/crossing metrics. The focused tests verify these outputs exactly,
-including the 3+3 snake, semantic preservation, collision safety and the square
-to 16:9 footprint of all six diagrams.
+including the compact 3+3 snake, a terminal-leaf tuck that preserves its fork,
+semantic preservation and collision safety. The short chain deliberately
+exceeds 16:9; the five remaining baselines stay between square and 16:9.

@@ -2,6 +2,8 @@
    also exercised against the final viewer geometry in Node tests. */
 var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
+var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
+function autoArrangeSmall(d){return Object.keys(d.nodes || {}).length<=AUTO_ARRANGE_SMALL_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_SMALL_LIMITS.edges;}
 var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
 function autoArrangeInput(d){
   var ids=Object.keys(d.nodes || {}),edges=d.edges || [];
@@ -134,23 +136,54 @@ function autoArrangeChainPositions(d){
   if(order.length!==ids.length)return null;
   var rows=Math.ceil(ids.length/4),columns=Math.ceil(ids.length/rows);
   var width=150+(columns-1)*(150+AUTO_ARRANGE_CARD_GAP);
-  var rowGap=rows>1?Math.max(44+AUTO_ARRANGE_RANK_GAP,(width/1.5-44)/(rows-1)):0;
+  var small=autoArrangeSmall(d);
+  var rowGap=rows>1?(small?150+AUTO_ARRANGE_CARD_GAP:Math.max(44+AUTO_ARRANGE_RANK_GAP,(width/1.5-44)/(rows-1))):0;
   // Longer paths also need horizontal room once minimum row clearance sets
   // their height. Expand column spacing instead of squeezing cards together.
-  var columnGap=columns>1?Math.max(150+AUTO_ARRANGE_CARD_GAP,((44+(rows-1)*rowGap)*1.5-150)/(columns-1)):0;
+  var columnGap=columns>1?(small?150+AUTO_ARRANGE_CARD_GAP:Math.max(150+AUTO_ARRANGE_CARD_GAP,((44+(rows-1)*rowGap)*1.5-150)/(columns-1))):0;
   var positions=Object.create(null);
   order.forEach(function(id,i){var row=Math.floor(i/columns),column=row%2?columns-1-i%columns:i%columns;
     positions[id]={x:column*columnGap,y:row*rowGap};
   });return positions;
 }
-function autoArrangeCompare(a,b){
-  return a.score.crossings-b.score.crossings || a.score.shape-b.score.shape || a.score.length-b.score.length || a.score.area-b.score.area;
+function autoArrangeCompare(a,b,compact){
+  var size=compact?Math.hypot(a.score.width,a.score.height)-Math.hypot(b.score.width,b.score.height):0;
+  return a.score.crossings-b.score.crossings || a.score.shape-b.score.shape || size || a.score.length-b.score.length || a.score.area-b.score.area;
+}
+function autoArrangeLeafPositions(d,result){
+  var ids=Object.keys(d.nodes),degree=Object.create(null),positions=Object.create(null);
+  ids.forEach(function(id){degree[id]=0;});
+  (d.edges || []).forEach(function(e){degree[e.from]++;degree[e.to]++;});
+  result.positions.forEach(function(p){positions[p.id]={x:p.x,y:p.y};});
+  function diagonal(placed){
+    var xs=ids.map(function(id){return placed[id].x;}),ys=ids.map(function(id){return placed[id].y;});
+    return Math.hypot(Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,Math.max.apply(null,ys)-Math.min.apply(null,ys)+44);
+  }
+  var best=null,bestSize=diagonal(positions),bestLength=Infinity;
+  // One bounded tuck per seed: terminal sinks may share their parent's row or
+  // column when that shrinks the card footprint. Native rerouting and scoring
+  // still decide whether the placement is safe and has fewer crossings.
+  (d.edges || []).forEach(function(e){
+    if(degree[e.to]!==1)return;
+    var parent=positions[e.from];
+    [[150+AUTO_ARRANGE_CARD_GAP,0],[-150-AUTO_ARRANGE_CARD_GAP,0],[0,44+AUTO_ARRANGE_RANK_GAP],[0,-44-AUTO_ARRANGE_RANK_GAP]].forEach(function(offset){
+      var point={x:parent.x+offset[0],y:parent.y+offset[1]};
+      if(ids.some(function(id){
+        if(id===e.to)return false;
+        var p=positions[id],dx=Math.max(0,Math.abs(p.x-point.x)-150),dy=Math.max(0,Math.abs(p.y-point.y)-44);
+        return Math.hypot(dx,dy)<AUTO_ARRANGE_CARD_GAP-.1;
+      }))return;
+      var placed=Object.assign(Object.create(null),positions);placed[e.to]=point;
+      var size=diagonal(placed),length=Math.hypot(offset[0],offset[1]);
+      if(size<bestSize-.1 || best && Math.abs(size-bestSize)<.1 && length<bestLength){best=placed;bestSize=size;bestLength=length;}
+    });
+  });return best;
 }
 function autoArrangeCandidates(d,viz,cola){
-  var ids=autoArrangeInput(d),candidates=[];
+  var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
     try{var result=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,direction,positions,aspect),{engine:positions?'nop2':'dot'}));
-      result.score=autoArrangeScore(d,result);if(!result.score.overlaps && !result.score.hits)candidates.push(result);
+      result.score=autoArrangeScore(d,result);if(!result.score.overlaps && !result.score.hits){candidates.push(result);return result;}
     }catch(ex){/* An alternative layout may still produce a usable route. */}
   }
   // A directed path has an unambiguous reading order. Preserve it in rows of
@@ -174,5 +207,12 @@ function autoArrangeCandidates(d,viz,cola){
   }
   candidates.sort(autoArrangeCompare);
   if(!candidates.length)throw new Error('Could not find a layout with clear cards and connections. The diagram is unchanged.');
-  return candidates[0];
+  var chosen=candidates[0];
+  // Preserve the selected structural layout. Compact only a terminal sink,
+  // rather than narrowing every branch to chase a smaller bounding box.
+  if(small && !ids.some(function(id){return d.nodes[id].group;})){
+    var positions=autoArrangeLeafPositions(d,chosen),refined=positions && attempt('LR',positions);
+    if(refined && autoArrangeCompare(refined,chosen,true)<0)chosen=refined;
+  }
+  return chosen;
 }

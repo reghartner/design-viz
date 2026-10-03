@@ -18,8 +18,8 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 
 | Section | Nodes | Edges | Shape | Crossings | Occupied width × height | Ratio |
 | --- | ---: | ---: | --- | ---: | ---: | ---: |
-| 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 558 × 372 | 1.50 |
-| 02 Document approval | 9 | 10 | Three-way fork and join | 0 | 962 × 740 | 1.30 |
+| 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 558 × 248 | 2.25 |
+| 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 962 × 624 | 1.54 |
 | 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 746 × 624 | 1.20 |
 | 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 1411 × 1088 | 1.30 |
 | 05 Media platform | 20 | 24 | Five groups, legacy publishing, direct catalog write and upload retry | 0 | 1307 × 1162 | 1.12 |
@@ -28,8 +28,18 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 All saved layouts have zero overlapping cards or groups and zero routes through
 unrelated cards according to `autoArrangeScore`. Dimensions enclose cards,
 groups and sampled routes, excluding labels and the viewer's minimum canvas
-width. All six layouts fall between square and 16:9 landscape. The simple chain
-balances its rows within the four-card limit and alternates reading direction.
+width. The simple chain balances its rows within the four-card limit and
+alternates reading direction, using equal 204-unit center spacing rather than
+adding empty space to reach a screen ratio. Its 2.25 ratio is intentional.
+The five other layouts fall between square and 16:9 landscape.
+
+The approval layout preserves its fork and join positions, moving only the
+terminal Archive card beside Publisher. Small ungrouped diagrams (at most
+12 nodes and 24 edges) get at most one such refinement after structural layout
+selection. It must preserve card clearance and pass rerouting, collision and
+crossing checks; occupied diagonal then takes precedence over edge length
+when crossings and shape tie. The three larger systems retain their existing
+shape preference and geometry.
 
 Sections 01–05 retain zero-crossing layouts even with the added coupling.
 Section 06 is intentionally nonplanar: each of three event streams connects to

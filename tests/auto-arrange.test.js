@@ -145,7 +145,7 @@ test('native geometry roundtrips, resets both representations, validates shape, 
 });
 
 test('directed paths follow topology in balanced snake rows with at most four cards',()=>{
-  for(const count of [1,4,5,6,9]){
+  for(const count of [1,4,5,6,9,12,13]){
     const ids=Array.from({length:count},(_,i)=>'n'+i);
     // Neither declaration nor edge order supplies the traversal order.
     const d={nodes:Object.fromEntries(ids.slice().reverse().map(id=>[id,{title:id}])),rows:[ids],
@@ -160,7 +160,11 @@ test('directed paths follow topology in balanced snake rows with at most four ca
     assert.deepEqual([...rows.values()].map(row=>row.length),Array.from({length:Math.ceil(count/4)},(_,i)=>Math.min(columns,count-i*columns)));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
     if(count>1)assert.ok(minimumCardGap(result)>=48);
-    if(count>4)assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9);
+    if(count>4 && count<=12){
+      const rowYs=[...rows.keys()];assert.equal(rowYs[1]-rowYs[0],204,'short chains do not add empty rows to chase screen aspect');
+      assert.equal(Math.abs(byId[ids[1]].x-byId[ids[0]].x),204);
+    }
+    if(count>12)assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9);
     if(count===6)assert.deepEqual([...rows.values()].map(row=>row.length),[3,3]);
   }
   assert.equal(C.autoArrangeChainPositions(simple()),null,'cycles do not become chains');
@@ -179,6 +183,43 @@ test('candidate ordering minimizes crossings before footprint, then center dista
   assert.equal(score(250,181).aspect,16/9);assert.equal(score(250,181).shape,0);
   assert.ok(score(0,256).shape>0);assert.ok(score(600,100).shape>0);
   assert.equal(score(150,256).area,300*300,'minimum viewer width is excluded');
+});
+
+test('small-diagram leaf refinement preserves the selected fork and improves compactness before edge length',()=>{
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
+  const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));seed.score=C.autoArrangeScore(d,seed);
+  let attempts=0;const result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);
+  const before=Object.fromEntries(seed.positions.map(p=>[p.id,p])),after=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+  for(const id of Object.keys(d.nodes).filter(id=>id!=='archive'))assert.deepEqual(plain(after[id]),plain(before[id]),'the fork retains '+id);
+  assert.equal(after.archive.y,after.publish.y);assert.equal(after.archive.x-after.publish.x,204);
+  assert.equal(result.score.width,962);assert.equal(result.score.height,624);
+  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+  assert.ok(minimumCardGap(result)>=48);assertAutoPorts(result.edges);
+  assert.ok(result.score.length>seed.score.length,'tucking a leaf can shorten the footprint despite a longer connection');
+  assert.ok(C.autoArrangeCompare(result,seed,true)<0);assert.ok(C.autoArrangeCompare(result,seed)>0);
+  assert.equal(attempts,7,'only one extra routing attempt refines the chosen structural seed');
+  assert.equal(C.autoArrangeSmall({nodes:Object.fromEntries(Array.from({length:13},(_,i)=>[i,{}])),edges:[]}),false);
+  assert.equal(C.autoArrangeSmall({nodes:{a:{},b:{}},edges:Array(25).fill({from:'a',to:'b'})}),false);
+});
+
+test('terminal-leaf refinement skips blocked card positions and rejects unsafe rerouting',()=>{
+  const positions=[{id:'parent',x:0,y:0},{id:'leaf',x:0,y:800},{id:'right',x:204,y:0},
+    {id:'left',x:-204,y:0},{id:'below',x:0,y:116},{id:'above',x:0,y:-116}];
+  const blocked={nodes:Object.fromEntries(positions.map(p=>[p.id,{}])),edges:[{from:'parent',to:'leaf'}]};
+  assert.equal(C.autoArrangeLeafPositions(blocked,{positions}),null,'every adjacent position is occupied');
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
+  const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));
+  let refinements=0;
+  const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+    const json=viz.renderJSON(source,options);
+    if(options.engine==='nop2'){
+      refinements++;const nodes=json.objects.filter(n=>/^n\d+$/.test(n.name));nodes[1].pos=nodes[0].pos;
+      assert.ok(C.autoArrangeScore(d,C.autoArrangeRead(d,json)).overlaps>0);
+    }
+    return json;
+  }},null);
+  assert.equal(refinements,1);assert.deepEqual(plain(result.positions),plain(seed.positions));
+  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
 });
 
 test('unsafe candidate geometry is rejected even when every attempt returns it',()=>{
@@ -201,7 +242,8 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
     assert.ok(minimumCardGap(result)>=48,block.id+' gap '+minimumCardGap(result));
-    assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);
+    if(i===0){assert.equal(result.score.width,558);assert.equal(result.score.height,248);}
+    else{assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);}
     assert.equal(result.score.crossings,i===5?3:0,block.id);
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
   });

@@ -328,7 +328,13 @@ test('all row routing modes expose sizing without changing the drawing or requir
     const pan=group.querySelector('[aria-label="Horizontal diagram scroll"]');assert.ok(pan);assert.equal(pan.hidden,true);
     // jsdom has no layout; supply an overflowing viewport to exercise the
     // shipped Forge controls without treating scroll arrows as size modes.
-    Object.defineProperties(board,{clientWidth:{value:500},scrollWidth:{value:1180}});
+    let scrollLeft=0;
+    Object.defineProperties(board,{clientWidth:{value:500},scrollWidth:{value:1180},
+      // Native browsers clamp endpoint requests, including deliberate overshoot
+      // used to reach fractional scroll limits under CSS zoom.
+      scrollLeft:{get:()=>scrollLeft,set:value=>{
+        scrollLeft=Math.max(0,Math.min(board.scrollWidth-board.clientWidth,value));
+      }}});
     buttons[2].click();assert.equal(pan.hidden,false);assert.equal(board.scrollLeft,340);
     const position=pan.querySelector('input[type="range"]');position.value='100';position.dispatchEvent(new s.win.Event('input'));
     assert.equal(board.scrollLeft,680);assert.equal(pan.querySelector('[aria-label="Scroll diagram right"]').disabled,true);

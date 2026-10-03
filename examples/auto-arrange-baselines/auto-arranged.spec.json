@@ -1,0 +1,1338 @@
+{
+  "page": {
+    "title": "Auto arrange shape baselines",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "request-path",
+        "heading": "01 · Webhook delivery · 6 nodes",
+        "text": "A single request path, balanced into two rows of three cards. The second row reads right to left.",
+        "diagram": {
+          "title": "01 · Webhook delivery · 6 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "sender": {
+              "title": "Sender",
+              "icon": "terminal"
+            },
+            "edge": {
+              "title": "Edge API",
+              "icon": "router"
+            },
+            "verify": {
+              "title": "Verifier",
+              "icon": "shield"
+            },
+            "queue": {
+              "title": "Delivery queue",
+              "icon": "package"
+            },
+            "worker": {
+              "title": "Worker",
+              "icon": "server"
+            },
+            "partner": {
+              "title": "Partner API",
+              "icon": "cloud"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "sender",
+              "to": "edge"
+            },
+            {
+              "from": "edge",
+              "to": "verify"
+            },
+            {
+              "from": "verify",
+              "to": "queue"
+            },
+            {
+              "from": "queue",
+              "to": "worker"
+            },
+            {
+              "from": "worker",
+              "to": "partner"
+            }
+          ],
+          "floats": [
+            {
+              "id": "sender",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "edge",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "verify",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "queue",
+              "side": "below",
+              "x": 528,
+              "y": 304
+            },
+            {
+              "id": "worker",
+              "side": "below",
+              "x": 324,
+              "y": 304
+            },
+            {
+              "id": "partner",
+              "side": "below",
+              "x": 120,
+              "y": 304
+            }
+          ]
+        }
+      },
+      {
+        "id": "approval-diamond",
+        "heading": "02 · Document approval · 9 nodes",
+        "text": "A three-branch review that rejoins before publication. All branches are logically parallel.",
+        "diagram": {
+          "title": "02 · Document approval · 9 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "uploader": {
+              "title": "Uploader",
+              "icon": "terminal"
+            },
+            "api": {
+              "title": "Upload API",
+              "icon": "cloud"
+            },
+            "store": {
+              "title": "File store",
+              "icon": "db"
+            },
+            "scan": {
+              "title": "Malware scan",
+              "icon": "shield"
+            },
+            "policy": {
+              "title": "Policy check",
+              "icon": "shield"
+            },
+            "review": {
+              "title": "Review queue",
+              "icon": "gear"
+            },
+            "reviewer": {
+              "title": "Reviewer",
+              "icon": "gear"
+            },
+            "publish": {
+              "title": "Publisher",
+              "icon": "cloud"
+            },
+            "archive": {
+              "title": "Archive",
+              "icon": "db"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "uploader",
+              "to": "api"
+            },
+            {
+              "from": "api",
+              "to": "store"
+            },
+            {
+              "from": "api",
+              "to": "scan"
+            },
+            {
+              "from": "api",
+              "to": "policy"
+            },
+            {
+              "from": "store",
+              "to": "review"
+            },
+            {
+              "from": "scan",
+              "to": "review"
+            },
+            {
+              "from": "policy",
+              "to": "review"
+            },
+            {
+              "from": "review",
+              "to": "reviewer"
+            },
+            {
+              "from": "reviewer",
+              "to": "publish"
+            },
+            {
+              "from": "publish",
+              "to": "archive"
+            }
+          ],
+          "floats": [
+            {
+              "id": "uploader",
+              "side": "below",
+              "x": 526,
+              "y": 100
+            },
+            {
+              "id": "api",
+              "side": "below",
+              "x": 526,
+              "y": 216
+            },
+            {
+              "id": "store",
+              "side": "below",
+              "x": 120,
+              "y": 332
+            },
+            {
+              "id": "scan",
+              "side": "below",
+              "x": 526,
+              "y": 332
+            },
+            {
+              "id": "policy",
+              "side": "below",
+              "x": 932,
+              "y": 332
+            },
+            {
+              "id": "review",
+              "side": "below",
+              "x": 526,
+              "y": 448
+            },
+            {
+              "id": "reviewer",
+              "side": "below",
+              "x": 526,
+              "y": 564
+            },
+            {
+              "id": "publish",
+              "side": "below",
+              "x": 526,
+              "y": 680
+            },
+            {
+              "id": "archive",
+              "side": "below",
+              "x": 730,
+              "y": 680
+            }
+          ]
+        }
+      },
+      {
+        "id": "telemetry-fan",
+        "heading": "03 · Telemetry pipeline · 13 nodes",
+        "text": "Three producers feed three signal lanes around a legacy observability monolith. The app still writes logs directly, and alerts call back into legacy configuration.",
+        "diagram": {
+          "title": "03 · Telemetry pipeline · 13 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "app": {
+              "title": "Web app",
+              "icon": "terminal"
+            },
+            "jobs": {
+              "title": "Job runner",
+              "icon": "server"
+            },
+            "edge": {
+              "title": "Edge gateway",
+              "icon": "router"
+            },
+            "collector": {
+              "title": "Collector",
+              "icon": "server"
+            },
+            "router": {
+              "title": "Legacy observability",
+              "icon": "router"
+            },
+            "metrics": {
+              "title": "Metrics job",
+              "icon": "server"
+            },
+            "logs": {
+              "title": "Logs job",
+              "icon": "server"
+            },
+            "traces": {
+              "title": "Traces job",
+              "icon": "server"
+            },
+            "metricdb": {
+              "title": "Metrics store",
+              "icon": "db"
+            },
+            "logdb": {
+              "title": "Logs store",
+              "icon": "db"
+            },
+            "tracedb": {
+              "title": "Trace store",
+              "icon": "db"
+            },
+            "dashboard": {
+              "title": "Dashboard",
+              "icon": "gear"
+            },
+            "alerts": {
+              "title": "Alert manager",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "app",
+              "to": "collector"
+            },
+            {
+              "from": "jobs",
+              "to": "collector"
+            },
+            {
+              "from": "edge",
+              "to": "collector"
+            },
+            {
+              "from": "collector",
+              "to": "router"
+            },
+            {
+              "from": "router",
+              "to": "metrics"
+            },
+            {
+              "from": "router",
+              "to": "logs"
+            },
+            {
+              "from": "router",
+              "to": "traces"
+            },
+            {
+              "from": "metrics",
+              "to": "metricdb"
+            },
+            {
+              "from": "logs",
+              "to": "logdb"
+            },
+            {
+              "from": "traces",
+              "to": "tracedb"
+            },
+            {
+              "from": "metricdb",
+              "to": "dashboard"
+            },
+            {
+              "from": "logdb",
+              "to": "dashboard"
+            },
+            {
+              "from": "tracedb",
+              "to": "dashboard"
+            },
+            {
+              "from": "metricdb",
+              "to": "alerts"
+            },
+            {
+              "from": "app",
+              "to": "logs",
+              "label": "direct logs"
+            },
+            {
+              "from": "alerts",
+              "to": "router",
+              "label": "reconfigure"
+            },
+            {
+              "from": "router",
+              "to": "logdb",
+              "label": "legacy query"
+            }
+          ],
+          "floats": [
+            {
+              "id": "app",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "jobs",
+              "side": "below",
+              "x": 600,
+              "y": 100
+            },
+            {
+              "id": "edge",
+              "side": "below",
+              "x": 360,
+              "y": 100
+            },
+            {
+              "id": "collector",
+              "side": "below",
+              "x": 360,
+              "y": 216
+            },
+            {
+              "id": "router",
+              "side": "below",
+              "x": 360,
+              "y": 332
+            },
+            {
+              "id": "metrics",
+              "side": "below",
+              "x": 600,
+              "y": 448
+            },
+            {
+              "id": "logs",
+              "side": "below",
+              "x": 120,
+              "y": 332
+            },
+            {
+              "id": "traces",
+              "side": "below",
+              "x": 360,
+              "y": 448
+            },
+            {
+              "id": "metricdb",
+              "side": "below",
+              "x": 840,
+              "y": 448
+            },
+            {
+              "id": "logdb",
+              "side": "below",
+              "x": 120,
+              "y": 448
+            },
+            {
+              "id": "tracedb",
+              "side": "below",
+              "x": 360,
+              "y": 564
+            },
+            {
+              "id": "dashboard",
+              "side": "below",
+              "x": 360,
+              "y": 680
+            },
+            {
+              "id": "alerts",
+              "side": "below",
+              "x": 840,
+              "y": 332
+            }
+          ]
+        }
+      },
+      {
+        "id": "fulfillment",
+        "heading": "04 · Order fulfillment · 16 nodes",
+        "text": "A legacy commerce monolith joins three checks and emits fulfillment events. Cart lookups bypass checkout, reservations retry backward, and operations patch orders directly.",
+        "diagram": {
+          "title": "04 · Order fulfillment · 16 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "buyer": {
+              "title": "Buyer",
+              "icon": "terminal"
+            },
+            "storefront": {
+              "title": "Storefront",
+              "icon": "db"
+            },
+            "gateway": {
+              "title": "Gateway",
+              "icon": "router"
+            },
+            "cart": {
+              "title": "Cart service",
+              "icon": "gear"
+            },
+            "checkout": {
+              "title": "Checkout",
+              "icon": "gear"
+            },
+            "payment": {
+              "title": "Payments",
+              "icon": "gear"
+            },
+            "risk": {
+              "title": "Risk check",
+              "icon": "shield"
+            },
+            "inventory": {
+              "title": "Inventory",
+              "icon": "gear"
+            },
+            "order": {
+              "title": "Legacy commerce",
+              "icon": "gear"
+            },
+            "events": {
+              "title": "Event bus",
+              "icon": "router"
+            },
+            "warehouse": {
+              "title": "Warehouse",
+              "icon": "package"
+            },
+            "carrier": {
+              "title": "Carrier",
+              "icon": "package"
+            },
+            "notify": {
+              "title": "Notifier",
+              "icon": "phone"
+            },
+            "mail": {
+              "title": "Email service",
+              "icon": "gear"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear"
+            },
+            "ops": {
+              "title": "Ops dashboard",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "buyer",
+              "to": "storefront"
+            },
+            {
+              "from": "storefront",
+              "to": "gateway"
+            },
+            {
+              "from": "gateway",
+              "to": "cart"
+            },
+            {
+              "from": "cart",
+              "to": "checkout"
+            },
+            {
+              "from": "checkout",
+              "to": "payment"
+            },
+            {
+              "from": "checkout",
+              "to": "risk"
+            },
+            {
+              "from": "checkout",
+              "to": "inventory"
+            },
+            {
+              "from": "payment",
+              "to": "order"
+            },
+            {
+              "from": "risk",
+              "to": "order"
+            },
+            {
+              "from": "inventory",
+              "to": "order"
+            },
+            {
+              "from": "order",
+              "to": "events"
+            },
+            {
+              "from": "events",
+              "to": "warehouse"
+            },
+            {
+              "from": "warehouse",
+              "to": "carrier"
+            },
+            {
+              "from": "events",
+              "to": "notify"
+            },
+            {
+              "from": "notify",
+              "to": "mail"
+            },
+            {
+              "from": "events",
+              "to": "analytics"
+            },
+            {
+              "from": "analytics",
+              "to": "ops"
+            },
+            {
+              "from": "cart",
+              "to": "order",
+              "label": "lookup"
+            },
+            {
+              "from": "order",
+              "to": "inventory",
+              "label": "redo"
+            },
+            {
+              "from": "ops",
+              "to": "order",
+              "label": "manual patch"
+            }
+          ],
+          "floats": [
+            {
+              "id": "buyer",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "storefront",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "gateway",
+              "side": "below",
+              "x": 732,
+              "y": 100
+            },
+            {
+              "id": "cart",
+              "side": "below",
+              "x": 732,
+              "y": 220
+            },
+            {
+              "id": "checkout",
+              "side": "below",
+              "x": 528,
+              "y": 220
+            },
+            {
+              "id": "payment",
+              "side": "below",
+              "x": 120,
+              "y": 340
+            },
+            {
+              "id": "risk",
+              "side": "below",
+              "x": 324,
+              "y": 340
+            },
+            {
+              "id": "inventory",
+              "side": "below",
+              "x": 528,
+              "y": 340
+            },
+            {
+              "id": "order",
+              "side": "below",
+              "x": 528,
+              "y": 460
+            },
+            {
+              "id": "events",
+              "side": "below",
+              "x": 324,
+              "y": 460
+            },
+            {
+              "id": "warehouse",
+              "side": "below",
+              "x": 120,
+              "y": 460
+            },
+            {
+              "id": "carrier",
+              "side": "below",
+              "x": 120,
+              "y": 580
+            },
+            {
+              "id": "notify",
+              "side": "below",
+              "x": 324,
+              "y": 580
+            },
+            {
+              "id": "mail",
+              "side": "below",
+              "x": 324,
+              "y": 700
+            },
+            {
+              "id": "analytics",
+              "side": "below",
+              "x": 528,
+              "y": 580
+            },
+            {
+              "id": "ops",
+              "side": "below",
+              "x": 732,
+              "y": 580
+            }
+          ]
+        }
+      },
+      {
+        "id": "media-platform",
+        "heading": "05 · Media platform · 20 nodes",
+        "text": "Five groups surround a legacy media monolith and three processing lanes. Publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
+        "diagram": {
+          "title": "05 · Media platform · 20 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "camera",
+              "group": "sources"
+            },
+            "mobile": {
+              "title": "Mobile app",
+              "icon": "phone",
+              "group": "sources"
+            },
+            "upload": {
+              "title": "Upload API",
+              "icon": "cloud",
+              "group": "ingest"
+            },
+            "auth": {
+              "title": "Identity",
+              "icon": "shield",
+              "group": "ingest"
+            },
+            "queue": {
+              "title": "Upload queue",
+              "icon": "gear",
+              "group": "ingest"
+            },
+            "metadata": {
+              "title": "Metadata DB",
+              "icon": "db",
+              "group": "ingest"
+            },
+            "object": {
+              "title": "Object store",
+              "icon": "db",
+              "group": "ingest"
+            },
+            "splitter": {
+              "title": "Job splitter",
+              "icon": "server",
+              "group": "process"
+            },
+            "thumbnail": {
+              "title": "Thumbnail job",
+              "icon": "server",
+              "group": "process"
+            },
+            "transcoder": {
+              "title": "Transcoder",
+              "icon": "server",
+              "group": "process"
+            },
+            "captions": {
+              "title": "Caption job",
+              "icon": "server",
+              "group": "process"
+            },
+            "thumbstore": {
+              "title": "Image store",
+              "icon": "db",
+              "group": "data"
+            },
+            "videostore": {
+              "title": "Video store",
+              "icon": "db",
+              "group": "data"
+            },
+            "textindex": {
+              "title": "Text index",
+              "icon": "db",
+              "group": "data"
+            },
+            "publish": {
+              "title": "Legacy media core",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "cdn": {
+              "title": "CDN",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "search": {
+              "title": "Search API",
+              "icon": "cloud",
+              "group": "delivery"
+            },
+            "notify": {
+              "title": "Notifications",
+              "icon": "phone",
+              "group": "delivery"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear",
+              "group": "delivery"
+            },
+            "monitor": {
+              "title": "Monitoring",
+              "icon": "gear",
+              "group": "delivery"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "upload"
+            },
+            {
+              "from": "mobile",
+              "to": "upload"
+            },
+            {
+              "from": "upload",
+              "to": "auth"
+            },
+            {
+              "from": "auth",
+              "to": "queue"
+            },
+            {
+              "from": "upload",
+              "to": "metadata",
+              "curveControls": [
+                {
+                  "t": 0.08333333333333333,
+                  "dx": -38.7,
+                  "dy": -38.9
+                },
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -61.2,
+                  "dy": -91.1
+                },
+                {
+                  "t": 0.25,
+                  "dx": -74,
+                  "dy": -142.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -100.3,
+                  "dy": -164.9
+                },
+                {
+                  "t": 0.4166666666666667,
+                  "dx": -102,
+                  "dy": -225.1
+                },
+                {
+                  "t": 0.5,
+                  "dx": -102,
+                  "dy": -241.8
+                },
+                {
+                  "t": 0.5833333333333334,
+                  "dx": -102,
+                  "dy": -320.6
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -102,
+                  "dy": -399.4
+                },
+                {
+                  "t": 0.75,
+                  "dx": -102,
+                  "dy": -3.4
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -102,
+                  "dy": 4.1
+                },
+                {
+                  "t": 0.9166666666666666,
+                  "dx": -44.9,
+                  "dy": 16.1
+                }
+              ]
+            },
+            {
+              "from": "queue",
+              "to": "object"
+            },
+            {
+              "from": "object",
+              "to": "splitter"
+            },
+            {
+              "from": "splitter",
+              "to": "thumbnail"
+            },
+            {
+              "from": "splitter",
+              "to": "transcoder"
+            },
+            {
+              "from": "splitter",
+              "to": "captions"
+            },
+            {
+              "from": "thumbnail",
+              "to": "thumbstore"
+            },
+            {
+              "from": "transcoder",
+              "to": "videostore"
+            },
+            {
+              "from": "captions",
+              "to": "textindex"
+            },
+            {
+              "from": "thumbstore",
+              "to": "publish"
+            },
+            {
+              "from": "videostore",
+              "to": "publish"
+            },
+            {
+              "from": "textindex",
+              "to": "publish"
+            },
+            {
+              "from": "publish",
+              "to": "cdn"
+            },
+            {
+              "from": "publish",
+              "to": "search"
+            },
+            {
+              "from": "publish",
+              "to": "notify"
+            },
+            {
+              "from": "publish",
+              "to": "analytics"
+            },
+            {
+              "from": "publish",
+              "to": "monitor"
+            },
+            {
+              "from": "publish",
+              "to": "metadata",
+              "label": "catalog write"
+            },
+            {
+              "from": "transcoder",
+              "to": "object",
+              "label": "read",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 44.2,
+                  "dy": -23.6
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 56.6,
+                  "dy": -70.9
+                },
+                {
+                  "t": 0.5,
+                  "dx": 64,
+                  "dy": -70.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 114.3,
+                  "dy": -53.2
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 65.5,
+                  "dy": -27.3
+                }
+              ],
+              "labelDx": -25.17850898099107,
+              "labelDy": 1.7389332584831436
+            },
+            {
+              "from": "monitor",
+              "to": "queue",
+              "label": "retry upload",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 57.3,
+                  "dy": 17.4
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 101.1,
+                  "dy": 8.1
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 214.7,
+                  "dy": -1.9
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 328.2,
+                  "dy": -165.4
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 441.8,
+                  "dy": -86.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 555.3,
+                  "dy": -6.9
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 668.9,
+                  "dy": -96.5
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 177.4,
+                  "dy": -63.8
+                }
+              ],
+              "labelDx": 107.21699488433887,
+              "labelDy": 157.85351857081957
+            }
+          ],
+          "groups": {
+            "sources": {
+              "title": "Sources"
+            },
+            "ingest": {
+              "title": "Ingestion"
+            },
+            "process": {
+              "title": "Processing"
+            },
+            "data": {
+              "title": "Output stores"
+            },
+            "delivery": {
+              "title": "Delivery"
+            }
+          },
+          "floats": [
+            {
+              "id": "camera",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "mobile",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "upload",
+              "side": "below",
+              "x": 199,
+              "y": 224.80000000000007
+            },
+            {
+              "id": "auth",
+              "side": "below",
+              "x": 227,
+              "y": 340.80000000000007
+            },
+            {
+              "id": "queue",
+              "side": "below",
+              "x": 227,
+              "y": 456.80000000000007
+            },
+            {
+              "id": "metadata",
+              "side": "below",
+              "x": 199,
+              "y": 1170.4
+            },
+            {
+              "id": "object",
+              "side": "below",
+              "x": 227,
+              "y": 572.8000000000001
+            },
+            {
+              "id": "splitter",
+              "side": "below",
+              "x": 496,
+              "y": 688.8000000000001
+            },
+            {
+              "id": "thumbnail",
+              "side": "below",
+              "x": 433,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "transcoder",
+              "side": "below",
+              "x": 841,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "captions",
+              "side": "below",
+              "x": 637,
+              "y": 804.8000000000001
+            },
+            {
+              "id": "thumbstore",
+              "side": "below",
+              "x": 433,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "videostore",
+              "side": "below",
+              "x": 841,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "textindex",
+              "side": "below",
+              "x": 637,
+              "y": 929.6000000000001
+            },
+            {
+              "id": "publish",
+              "side": "below",
+              "x": 637,
+              "y": 1054.4
+            },
+            {
+              "id": "cdn",
+              "side": "below",
+              "x": 433,
+              "y": 1170.4
+            },
+            {
+              "id": "search",
+              "side": "below",
+              "x": 637,
+              "y": 1170.4
+            },
+            {
+              "id": "notify",
+              "side": "below",
+              "x": 841,
+              "y": 1170.4
+            },
+            {
+              "id": "analytics",
+              "side": "below",
+              "x": 1045,
+              "y": 1170.4
+            },
+            {
+              "id": "monitor",
+              "side": "below",
+              "x": 1249,
+              "y": 1170.4
+            }
+          ]
+        }
+      },
+      {
+        "id": "subscription-matrix",
+        "heading": "06 · Subscription matrix · forced crossing",
+        "text": "Each of three event streams feeds each of three consumers. These nine direct edges form K₃,₃, so at least one crossing is unavoidable.",
+        "diagram": {
+          "title": "06 · Subscription matrix · forced crossing",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "orders": {
+              "title": "Order events",
+              "icon": "gear"
+            },
+            "returns": {
+              "title": "Return events",
+              "icon": "gear"
+            },
+            "stock": {
+              "title": "Stock events",
+              "icon": "gear"
+            },
+            "audit": {
+              "title": "Audit sink",
+              "icon": "db"
+            },
+            "metrics": {
+              "title": "Metrics sink",
+              "icon": "db"
+            },
+            "risk": {
+              "title": "Risk sink",
+              "icon": "shield"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "orders",
+              "to": "audit"
+            },
+            {
+              "from": "orders",
+              "to": "metrics"
+            },
+            {
+              "from": "orders",
+              "to": "risk"
+            },
+            {
+              "from": "returns",
+              "to": "audit"
+            },
+            {
+              "from": "returns",
+              "to": "metrics"
+            },
+            {
+              "from": "returns",
+              "to": "risk"
+            },
+            {
+              "from": "stock",
+              "to": "audit"
+            },
+            {
+              "from": "stock",
+              "to": "metrics"
+            },
+            {
+              "from": "stock",
+              "to": "risk"
+            }
+          ],
+          "floats": [
+            {
+              "id": "orders",
+              "side": "below",
+              "x": 358.67999999999995,
+              "y": 326.99
+            },
+            {
+              "id": "returns",
+              "side": "below",
+              "x": 438.56999999999994,
+              "y": 100
+            },
+            {
+              "id": "stock",
+              "side": "below",
+              "x": 338.6,
+              "y": 566.79
+            },
+            {
+              "id": "audit",
+              "side": "below",
+              "x": 637.2099999999999,
+              "y": 281.4
+            },
+            {
+              "id": "metrics",
+              "side": "below",
+              "x": 594.12,
+              "y": 482.65000000000003
+            },
+            {
+              "id": "risk",
+              "side": "below",
+              "x": 120,
+              "y": 275.87
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

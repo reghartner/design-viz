@@ -51,7 +51,7 @@ test('fresh desktop entry leaves Standard and Explore controls clear until selec
     await expectCenterHit(story.locator('.ptitle').filter({hasText:'Resident app'}),'Standard Resident app at '+width);
     if(width===1280)await testInfo.attach('fresh-standard-1280',{body:await page.screenshot(),contentType:'image/png'});
 
-    await fresh(width);await page.locator('#docview').getByRole('button',{name:'Explore',exact:true}).first().click();
+    await fresh(width);await page.locator('#docview [data-view-layout][data-layout-id="explore"]').filter({visible:true}).click();
     const controls=page.locator('.explore-player').filter({visible:true}),device=page.locator('.explore-window').filter({has:page.locator('.pt-deviceapp'),visible:true}),app=page.locator('.explore-window').filter({has:page.locator('.pt-appscreens'),visible:true});
     await expectCenterHit(controls,'Explore story controls at '+width);
     await expectCenterHit(device,'Explore Camera details at '+width);

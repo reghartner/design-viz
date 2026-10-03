@@ -104,7 +104,7 @@ function initWorkbenchWorkspace(){
   var names=['agent','brief','inspect','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
   var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false,history=null;
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
-  var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0;
+  var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0,revealFreshInspect=!hasSaved;
   document.body.classList.add('workspace-canvas');
   document.querySelector('.workbench-header').addEventListener('keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){var detail=ev.target.closest('details[open]');if(detail){ev.preventDefault();detail.open=false;detail.querySelector('summary').focus();}}});
   document.addEventListener('toggle',function(ev){
@@ -137,6 +137,7 @@ function initWorkbenchWorkspace(){
   function focusTab(name){tabs[name].focus({preventScroll:true});tabs[name].scrollIntoView({block:'nearest',inline:'nearest'});}
   function showTool(name,options){
     if(!windows[name])return false;
+    revealFreshInspect=false;
     if(hidden)setHidden(false);
     if(name==='agent' && document.getElementById('guide').hidden){prefs.windows.inspect.open=false;paint('inspect');}
     prefs.windows[name].open=true;front(name);paint(name);
@@ -145,6 +146,10 @@ function initWorkbenchWorkspace(){
     persist();return true;
   }
   function close(name){prefs.windows[name].open=false;paint(name);persist();focusTab(name);}
+  function inspectSelection(){
+    if(!revealFreshInspect)return false;
+    revealFreshInspect=false;return showTool('inspect');
+  }
   function geometry(name){var value=prefs.windows[name],out={};['x','y','w','h'].forEach(function(k){out[k]=value[k];});return out;}
   function remember(name,before){
     if(!history || JSON.stringify(boundRect(before))===JSON.stringify(rect(name)))return;
@@ -218,7 +223,8 @@ function initWorkbenchWorkspace(){
   });
   window.addEventListener('keydown',function(ev){if(ev.key==='Escape' && gesture){ev.preventDefault();ev.stopPropagation();finish(true);}},true);
   window.addEventListener('blur',function(){finish(true);});window.addEventListener('resize',function(){finish(true);paintAll();});
-  if(!hasSaved)prefs.windows[prefs.tool].open=true;
+  // A fresh editor has no selection, so keep the authored controls and panels
+  // available until the user chooses a tool. Saved open windows still restore.
   front(prefs.tool);paintAll();
   var canvas=initWorkbenchCanvas();
   var controls=document.getElementById('workspace-canvas-controls');
@@ -241,5 +247,5 @@ function initWorkbenchWorkspace(){
   }
   if(preset)preset.addEventListener('change',function(){applyPreset(preset.value);});
 
-  return {setHistory:function(value){finish(true);history=value;canvas.setHistory(value);},showTool:showTool,hideTool:close,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
+  return {setHistory:function(value){finish(true);history=value;canvas.setHistory(value);},showTool:showTool,hideTool:close,inspectSelection:inspectSelection,applyPreset:applyPreset,tool:function(){return prefs.tool;},isOpen:function(name){return !!prefs.windows[name] && prefs.windows[name].open && !hidden;},canvas:canvas};
 }

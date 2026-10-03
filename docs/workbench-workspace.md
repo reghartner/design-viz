@@ -141,6 +141,11 @@ move it, drag its corner to resize, or use arrow keys on those handles (Shift
 moves farther). Close a window with × and reopen it from the rail. Existing
 forms, drafts, selection and disclosure state remain intact.
 
+A fresh editor leaves these windows closed so the chapter controls and authored
+panels are available immediately. The first object selection opens **Inspect**
+with its fields. A saved browser workspace restores its previous open windows and
+geometry.
+
 **Hide tools** clears editor windows; **Show tools** restores them. Data-panel
 visibility uses the diagram's **Panels** menu. **File → Workspace preferences →
 Reset panel layout** restores initial positions and sizes. Geometry and open

@@ -491,6 +491,7 @@ PanelRegistry.extend('screen', {
   since: '0.1.0',
   layout: {
     height: 8,
+    canvasSizing: { mode: 'fixed-aspect', aspect: 16 / 9, resizeAxis: 'width' },
   },
 });
 

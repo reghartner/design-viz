@@ -89,6 +89,9 @@ PanelRegistry.extend('orbit', {
   order: 7,
   label: 'Orbit',
   since: '0.1.0',
+  layout: {
+    canvasSizing: { mode: 'fixed-aspect', aspect: 220 / 156, resizeAxis: 'width' },
+  },
 });
 
 PanelRegistry.extend('orbit', {
@@ -100,6 +103,7 @@ PanelRegistry.extend('orbit', {
     {
       order: 610,
       css: String.raw`.orbit{display:block; width:100%; max-width:280px; margin:0 auto; height:auto;}
+.explore-canvas-objects>.explore-window[data-explore-canvas-sizing] .orbit{max-width:none;}
 .oring{fill:none; stroke-dasharray:3 5; stroke-width:1.4;}
 .sk-aurora .oring{stroke:#25364F;}
 .sk-daylight .oring{stroke:#D8D3C6;}

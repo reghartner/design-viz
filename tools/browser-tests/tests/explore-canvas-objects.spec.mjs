@@ -11,6 +11,19 @@ function fixture(canvas=true){
  {panel:'home',x:-380,y:20,w:340,h:300},{panel:'clip',x:500,y:450,w:340,h:280},{panel:'outcome',x:900,y:20,w:300,h:240}],prose:{x:900,y:310,w:300,h:180}}};
  return raw;
 }
+function intrinsicFixture(){
+ const raw=fixture(),d=raw.page.sections[0].diagram,view=d.layouts[1],pixel='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';
+ d.panels.push(
+  {id:'radar',type:'radar',title:'Porch radar',initial:{subject:{x:132,y:108}}},
+  {id:'zones',type:'zoneframe',title:'Camera zones',zones:[{id:'porch',label:'Porch',points:[[20,30],[150,22],[145,150],[28,145]]}],initial:{zones:[{id:'porch',state:'armed'}],subject:{x:90,y:92}}},
+  {id:'reference',type:'image',title:'Reference',src:pixel,alt:'One pixel test image',caption:'Embedded reference caption',link:'https://example.com/reference'},
+  {id:'orbit',type:'orbit',title:'Lifecycle',states:['IDLE','ACTIVE','DONE'],initial:{state:'IDLE'}}
+ );
+ ['radar','zones','reference','orbit'].forEach((panel,i)=>view.sectionLayout.default.push({panel,x:(i%2)*4,y:44+Math.floor(i/2)*8,w:4,h:8}));
+ const panels=view.exploreLayout.canvas.panels;panels.find(p=>p.panel==='home').x=-360;panels.find(p=>p.panel==='home').y=0;panels.find(p=>p.panel==='clip').x=500;panels.find(p=>p.panel==='clip').y=0;panels.find(p=>p.panel==='outcome').x=900;panels.find(p=>p.panel==='outcome').y=0;
+ panels.push({panel:'radar',x:-360,y:310,w:320,h:900},{panel:'zones',x:0,y:310,w:320,h:900},{panel:'reference',x:360,y:310,w:260,h:900},{panel:'orbit',x:660,y:310,w:320,h:900});
+ return raw;
+}
 async function build(server,raw,name='canvas-objects'){
  const input=path.join(server.root,name+'.json'),output=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(raw));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);return server.origin+'/'+name+'.html';
@@ -27,6 +40,7 @@ async function open(page,server,raw,host){
 }
 const home=page=>page.locator('[data-explore-panel=home]');
 const outcome=page=>page.locator('[data-explore-panel=outcome]');
+const clip=page=>page.locator('[data-explore-panel=clip]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
@@ -47,7 +61,7 @@ async function emptyCanvasPoint(page){return board(page).evaluate(el=>{const r=e
 for(const host of ['reader','workbench','backstage'])test(host+': canvas objects pan and zoom with the graph, Fit recovers all objects at desktop sizes',async({page,server},info)=>{
  for(const [width,height] of [[1280,800],[1440,900],[1920,1200]]){
   await page.setViewportSize({width,height});await open(page,server,fixture(),host);await page.evaluate(()=>document.fonts.ready);await fit(page,host);
-  expect((await compactMetrics(home(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(outcome(page))).gap).toBeLessThanOrEqual(2);
+  expect((await compactMetrics(home(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(outcome(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(clip(page))).gap).toBeLessThanOrEqual(2);
   const stage=await page.locator('.explore-stage').boundingBox();
   for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-window:visible').all()]){const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.y).toBeGreaterThanOrEqual(stage.y-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height+2);}
   const player=await page.locator('.explore-player').boundingBox(),before=await home(page).boundingBox();
@@ -115,18 +129,29 @@ test('compact canvas policies follow content, captions, long chips and themed bo
  }
  const raw=fixture(),d=raw.page.sections[0].diagram,canvas=d.layouts[1].exploreLayout.canvas;
  canvas.panels.find(p=>p.panel==='home').w=140;canvas.panels.find(p=>p.panel==='home').h=9000;
+ canvas.panels.find(p=>p.panel==='clip').h=9000;
  const stateRect=canvas.panels.find(p=>p.panel==='outcome');stateRect.w=150;stateRect.h=9000;
  const state=d.panels.find(p=>p.id==='outcome');state.states=Array.from({length:36},(_,i)=>'Long status '+String(i+1).padStart(2,'0'));state.initial.state=state.states[0];
  d.steps[1].panels.home.cam={state:'detect',audio:{connection:'connected',microphone:'listening',output:'speech',text:'Please leave the package beside the blue door.',source:'Resident'}};
  await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);await fit(page,'reader');
- const initialHome=await compactMetrics(home(page)),longState=await compactMetrics(outcome(page));
- expect(initialHome.width).toBe(140);expect(initialHome.gap).toBeLessThanOrEqual(2);expect(longState.outer).toBe(320);expect(longState.overflow).toBeGreaterThan(0);expect(longState.scrollable).toBe(true);
+ const initialHome=await compactMetrics(home(page)),initialClip=await compactMetrics(clip(page)),longState=await compactMetrics(outcome(page));
+ expect(initialHome.width).toBe(140);expect(initialHome.gap).toBeLessThanOrEqual(2);expect(initialClip.outer).toBeLessThan(280);expect(initialClip.gap).toBeLessThanOrEqual(2);expect(longState.outer).toBe(320);expect(longState.overflow).toBeGreaterThan(0);expect(longState.scrollable).toBe(true);
  expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(.25);
  await page.screenshot({path:'/tmp/explore-compact-before-caption.png'});await info.attach('compact home and capped long state before caption',{body:await page.screenshot(),contentType:'image/png'});
  await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(home(page).locator('.hmaudio-captions')).toBeVisible();
- const captioned=await compactMetrics(home(page));expect(captioned.outer).toBeGreaterThan(initialHome.outer);expect(captioned.gap).toBeLessThanOrEqual(2);
+ const captioned=await compactMetrics(home(page)),activeClip=await compactMetrics(clip(page));expect(captioned.outer).toBeGreaterThan(initialHome.outer);expect(captioned.gap).toBeLessThanOrEqual(2);expect(activeClip.outer).toBe(initialClip.outer);expect(activeClip.gap).toBeLessThanOrEqual(2);
  await page.screenshot({path:'/tmp/explore-compact-after-caption.png'});await info.attach('compact home after audio caption',{body:await page.screenshot(),contentType:'image/png'});
  await page.getByRole('button',{name:'Previous step',exact:true}).click();await expect.poll(async()=>(await compactMetrics(home(page))).outer).toBe(initialHome.outer);
+});
+
+test('intrinsic visual canvas panels fit their rendered shapes across step updates',async({page,server},info)=>{
+ await page.setViewportSize({width:1280,height:800});await open(page,server,intrinsicFixture(),'reader');await page.evaluate(()=>document.fonts.ready);
+ const ids=['home','clip','outcome','radar','zones','reference','orbit'];await expect(page.locator('[data-explore-panel=reference] img')).toHaveJSProperty('complete',true);
+ await expect.poll(async()=>Math.max(...await Promise.all(ids.map(async id=>(await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap)))).toBeLessThanOrEqual(2);
+ for(const id of ids)expect((await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap).toBeLessThanOrEqual(2);
+ const orbitPanel=page.locator('[data-explore-panel=orbit]');expect(await orbitPanel.locator('.orbit').evaluate(el=>el.clientWidth/el.clientHeight)).toBeCloseTo(220/156,2);expect(await orbitPanel.locator('.orbit').evaluate(el=>el.clientWidth)).toBeGreaterThan(280);
+ await fit(page,'reader');await page.screenshot({path:'/tmp/explore-compact-intrinsic-mixed-1280x800.png'});await info.attach('intrinsic visual panels 1280x800',{body:await page.screenshot(),contentType:'image/png'});
+ await page.getByRole('button',{name:'Next step',exact:true}).click();for(const id of ['clip','radar','zones','reference','orbit'])expect((await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap).toBeLessThanOrEqual(2);
 });
 
 test('Workbench compact resize persists canonical geometry as one Undo action',async({page,server,context},info)=>{
@@ -145,6 +170,10 @@ test('Workbench compact resize persists canonical geometry as one Undo action',a
  const stateSource=await source(page),stateSaved=JSON.parse(stateSource).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='outcome'),stateMetrics=await compactMetrics(outcome(page));
  expect(stateSource).not.toBe(beforeState);expect(stateSaved.w).toBeGreaterThan(300);expect(stateSaved.h).toBeCloseTo(stateMetrics.outer,0);expect(stateMetrics.gap).toBeLessThanOrEqual(2);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeState);
+ const beforeClip=await source(page),oldClip=JSON.parse(beforeClip).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip');expect(oldClip.h).toBe(280);expect((await compactMetrics(clip(page))).outer).toBeLessThan(oldClip.h);
+ await selectCanvas(clip(page));await expect(clip(page).locator('.explore-window-resize')).toHaveAttribute('aria-label',/proportions stay locked; width determines height/);await drag(page,clip(page).locator('.explore-window-resize'),24,0);
+ const clipSource=await source(page),savedClip=JSON.parse(clipSource).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip'),clipMetrics=await compactMetrics(clip(page));expect(savedClip.w).toBeGreaterThan(oldClip.w);expect(savedClip.h).toBeCloseTo(clipMetrics.outer,0);expect(clipMetrics.gap).toBeLessThanOrEqual(2);
+ await page.screenshot({path:'/tmp/explore-compact-screen-after-resize.png'});await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeClip);
  const reader=await context.newPage();await reader.goto(await build(server,saved,'compact-canonical-reload'));expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).width))).toBeCloseTo(savedHome.w,1);expect((await compactMetrics(home(reader))).outer).toBeCloseTo(savedHome.h,0);await reader.close();
  await page.screenshot({path:'/tmp/explore-compact-after-resize.png'});await info.attach('explicit proportional home resize',{body:await page.screenshot(),contentType:'image/png'});
 });
@@ -189,7 +218,6 @@ function mixedFixture(){
  layout.overlayScale=.8;layout.canvas.controlsScale=.6;
  return raw;
 }
-const clip=page=>page.locator('[data-explore-panel=clip]');
 async function panelPlacement(page,label,value){
  const menu=page.locator('.explore-panel-menu');if(!await menu.evaluate(el=>el.open))await menu.locator('summary').click();
  await page.getByLabel('Placement for '+label,{exact:true}).selectOption(value);await page.keyboard.press('Escape');

@@ -63,6 +63,7 @@ function createBuilderInteractions(opts){
     if (t.kind === 'tab') return document.getElementById('tab-' + t.block + '-' + t.tab);
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
+    if(t.kind==='panel' && t.id){var panel=Array.from(secEl.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.getAttribute('data-explore-panel')===t.id;});if(panel)return panel;}
     if (t.kind === 'section') return secEl;
     if (t.kind === 'prose') return secEl.querySelector('[data-explore-content="prose"]') || secEl.querySelector('.sec-prose');
     if (t.kind === 'step-controls') return secEl.querySelector('.explore-player[data-explore-layout="' + cssQuote(t.layoutId) + '"]');
@@ -197,14 +198,14 @@ function createBuilderInteractions(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
-  function compatibleKinds(a,b){return a===b || (['node','edge'].indexOf(a)>=0 && ['node','edge'].indexOf(b)>=0);}
+  function compatibleKinds(a,b){return (['node','panel'].indexOf(a)>=0 && ['node','panel'].indexOf(b)>=0) || a===b || (['node','edge'].indexOf(a)>=0 && ['node','edge'].indexOf(b)>=0);}
   function selectionEdgeKey(t){
     if(t.kind!=='edge')return undefined;
     var snap=parseEditor();if(snap.error || (snap.renderedText!=null && snap.renderedText!==snap.text))return undefined;
     try{var raw=session.resolve(snap.raw),rec=specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),edge=d && (d.edges || [])[t.index];return edge && builderEdgeKey(edge);}catch(ex){return undefined;}
   }
   function multiIdent(t){
-    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
+    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + ((t.kind === 'node' || t.kind==='panel' && t.id) ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
   }
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
@@ -297,6 +298,21 @@ function createBuilderInteractions(opts){
     }
   }
 
+  function selectSpatial(targets){
+    if(targets.length)pausePreview();
+    clearMultiSelect();setSelected(null);session.target=null;
+    if(!targets.length){dropMultiUI();return;}
+    if(targets.length===1){selectTarget(targets[0],false,true);return;}
+    multiSel=targets;multiSel.forEach(function(t){t.el.classList.add('dv-sel');});
+    session.insertSection=targets[0].section;if(opts.selectionChanged)opts.selectionChanged();renderMultiInspector();
+  }
+  var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
+    targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
+    select:selectSpatial,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
+    inspect:function(){if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});if(multiSel.length)renderMultiInspector();else renderInspector();}
+  });
+  life.own(function(){spatial.destroy();});
+
   /* ================= selection ================= */
 
   function targetFromEvent(ev){
@@ -350,6 +366,8 @@ function createBuilderInteractions(opts){
         layoutId:controlsPlayer.getAttribute('data-explore-layout'),el:controlsPlayer
       };
     }
+    var spatialPanel=ev.target.closest('.explore-canvas-objects [data-explore-panel]');
+    if(spatialPanel && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable]') || ev.target.closest('.explore-window-grip,.explore-window-resize'))){var panelTarget=spatial.target(spatialPanel);if(panelTarget)return panelTarget;}
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
     /* In Explore, the caption is part of the authorable controls surface.
        Standard view keeps the legacy shortcut to the current step. */
@@ -1454,6 +1472,7 @@ function createBuilderInteractions(opts){
 
 
   function cancelGestures(){
+    if(spatial)spatial.clear();
     curveEditor.cancel();
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}

@@ -2237,7 +2237,7 @@ function renderMultiInspector(multiSel){
     function applyBulkField(key,value){return applyPlan(planBulkSetField(session.text(),multiSel,key,value));}
     if (!guide || multiSel.length < 2) return;
     var previous=beginForm(multiIdentity(multiSel));
-    var homogeneous=multiSel.every(function(t){return t.kind===multiSel[0].kind;}),kind=homogeneous?multiSel[0].kind:'topology item';
+    var homogeneous=multiSel.every(function(t){return t.kind===multiSel[0].kind;}),kind=homogeneous?multiSel[0].kind:multiSel.every(function(t){return t.kind==='node' || t.kind==='panel';})?'object':'topology item';
     var head = document.createElement('b');
     head.textContent = multiSel.length + ' ' + kind + 's selected';
     guide.appendChild(head);
@@ -2249,7 +2249,7 @@ function renderMultiInspector(multiSel){
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
     var exportForm=multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})?topologyExportForm(multiSel):null;
-    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);finishForm(previous);return;}
+    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}finishForm(previous);return;}
     var form = document.createElement('div');
     form.className = 'iform';
     /* every control writes the SAME value to every selected element;
@@ -2315,6 +2315,8 @@ function renderMultiInspector(multiSel){
           return applyPlan(planTransformFloats(snapshot.text,snapshot.raw,multiSel,{type:direction}),null,snapshot);
         });
         button.title='Set the same '+(direction==='horizontal'?'Y':'X')+' center as the first selected float';
+        var snap=parseEditor(),eligible=snap.error?{error:snap.error}:builderSelectedFloats(snap.text,snap.raw,multiSel);
+        if(eligible.error){button.disabled=true;button.title=eligible.error;}
         acts.appendChild(button);
       });
       acts.appendChild(actionButton('Create domain from selected nodes',function(){

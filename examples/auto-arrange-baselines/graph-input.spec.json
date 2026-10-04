@@ -512,7 +512,7 @@
       {
         "id": "media-platform",
         "heading": "05 · Media platform · 20 nodes",
-        "text": "Five groups surround a legacy media monolith and three processing lanes. Publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
+        "text": "Node colors mark sources in green, ingestion in blue, processing in amber, output stores in purple, and delivery in pink, without group boxes. A legacy media core connects three processing lanes; publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
         "diagram": {
           "title": "05 · Media platform · 20 nodes",
           "view": "ambient",
@@ -521,102 +521,102 @@
             "camera": {
               "title": "Camera",
               "icon": "camera",
-              "group": "sources"
+              "tint": "dev"
             },
             "mobile": {
               "title": "Mobile app",
               "icon": "phone",
-              "group": "sources"
+              "tint": "dev"
             },
             "upload": {
               "title": "Upload API",
               "icon": "cloud",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "auth": {
               "title": "Identity",
               "icon": "shield",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "queue": {
               "title": "Upload queue",
               "icon": "gear",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "metadata": {
               "title": "Metadata DB",
               "icon": "db",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "object": {
               "title": "Object store",
               "icon": "db",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "splitter": {
               "title": "Job splitter",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "thumbnail": {
               "title": "Thumbnail job",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "transcoder": {
               "title": "Transcoder",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "captions": {
               "title": "Caption job",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "thumbstore": {
               "title": "Image store",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "videostore": {
               "title": "Video store",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "textindex": {
               "title": "Text index",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "publish": {
               "title": "Legacy media core",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "cdn": {
               "title": "CDN",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "search": {
               "title": "Search API",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "notify": {
               "title": "Notifications",
               "icon": "phone",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "analytics": {
               "title": "Analytics",
               "icon": "gear",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "monitor": {
               "title": "Monitoring",
               "icon": "gear",
-              "group": "delivery"
+              "tint": "mqtt"
             }
           },
           "rows": [
@@ -743,24 +743,7 @@
               "to": "queue",
               "label": "retry upload"
             }
-          ],
-          "groups": {
-            "sources": {
-              "title": "Sources"
-            },
-            "ingest": {
-              "title": "Ingestion"
-            },
-            "process": {
-              "title": "Processing"
-            },
-            "data": {
-              "title": "Output stores"
-            },
-            "delivery": {
-              "title": "Delivery"
-            }
-          }
+          ]
         }
       },
       {

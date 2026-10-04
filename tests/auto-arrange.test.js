@@ -133,9 +133,14 @@ test('safe automatic routes have natural labels, dynamic attachments and editabl
 });
 
 test('natural route selection and scoring use the same avoidance geometry as the viewer',()=>{
-  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[4].diagram;
-  const result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result),L=C.layout(out);
-  const index=out.edges.findIndex(e=>e.from==='publish' && e.to==='analytics'),edge=out.edges[index];assert.equal(edge.curveControls,undefined);
+  const d={nodes:{a:{},b:{},obstacle:{},outlet:{}},edges:[{from:'a',to:'b'},{from:'obstacle',to:'outlet'}]};
+  // The obstacle lies directly between a and b; its own edge goes right, leaving
+  // a clear automatic bow to the left. Fixed positions isolate viewer routing.
+  const positions={a:{x:100,y:100},b:{x:100,y:500},obstacle:{x:100,y:300},outlet:{x:500,y:300}};
+  const native=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR',positions),{engine:'nop2'}));
+  const result=C.autoArrangeNaturalRoutes(d,plain(native)),out=C.autoArrangeDiagram(d,result),L=C.layout(out);
+  const index=0,edge=out.edges[index];assert.equal(edge.curveControls,undefined);
+  assert.deepEqual(plain(result.edges),[{},{}],'both routes use shared automatic geometry');
   const rects=Object.entries(L.pos).filter(([id])=>id!==edge.from && id!==edge.to).map(([,p])=>({x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h}));
   const adjustments=C.resolveEdgeAvoidance(out.edges,L,C.edgeAutoAdjust(out.edges,L));
   assert.ok(C.countPathRectHits(C.samplePathD(C.edgePath(edge,L)),rects)>0,'the unadjusted route would hit a card');
@@ -144,7 +149,6 @@ test('natural route selection and scoring use the same avoidance geometry as the
   const original=C.autoArrangeScore;let scores=0;
   C.autoArrangeScore=(...args)=>{scores++;return original(...args);};
   try{
-    const native=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));
     C.autoArrangeNaturalRoutes(d,native);assert.equal(scores,1,'selection scores the final layout once, not once per edge');
   }finally{C.autoArrangeScore=original;}
 });
@@ -274,7 +278,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
     assertAutoPorts(result.edges);assertAutoPorts(out.edges);
     const retained=out.edges.filter(e=>e.curveControls);
-    assert.equal(retained.length,[0,0,0,0,3,0][i],block.id+' retains only needed curves');
+    assert.equal(retained.length,[0,0,0,0,2,0][i],block.id+' retains only needed curves');
     assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),retained.length>0);
     out.edges.forEach((edge,index)=>{
       if(!edge.curveControls){assert.equal(edge.labelDx,undefined);assert.equal(edge.labelDy,undefined);return;}

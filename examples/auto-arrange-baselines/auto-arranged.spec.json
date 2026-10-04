@@ -736,7 +736,7 @@
       {
         "id": "media-platform",
         "heading": "05 · Media platform · 20 nodes",
-        "text": "Five groups surround a legacy media monolith and three processing lanes. Publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
+        "text": "Node colors mark sources in green, ingestion in blue, processing in amber, output stores in purple, and delivery in pink, without group boxes. A legacy media core connects three processing lanes; publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
         "diagram": {
           "title": "05 · Media platform · 20 nodes",
           "view": "ambient",
@@ -745,102 +745,102 @@
             "camera": {
               "title": "Camera",
               "icon": "camera",
-              "group": "sources"
+              "tint": "dev"
             },
             "mobile": {
               "title": "Mobile app",
               "icon": "phone",
-              "group": "sources"
+              "tint": "dev"
             },
             "upload": {
               "title": "Upload API",
               "icon": "cloud",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "auth": {
               "title": "Identity",
               "icon": "shield",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "queue": {
               "title": "Upload queue",
               "icon": "gear",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "metadata": {
               "title": "Metadata DB",
               "icon": "db",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "object": {
               "title": "Object store",
               "icon": "db",
-              "group": "ingest"
+              "tint": "cmd"
             },
             "splitter": {
               "title": "Job splitter",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "thumbnail": {
               "title": "Thumbnail job",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "transcoder": {
               "title": "Transcoder",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "captions": {
               "title": "Caption job",
               "icon": "server",
-              "group": "process"
+              "tint": "auth"
             },
             "thumbstore": {
               "title": "Image store",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "videostore": {
               "title": "Video store",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "textindex": {
               "title": "Text index",
               "icon": "db",
-              "group": "data"
+              "tint": "data"
             },
             "publish": {
               "title": "Legacy media core",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "cdn": {
               "title": "CDN",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "search": {
               "title": "Search API",
               "icon": "cloud",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "notify": {
               "title": "Notifications",
               "icon": "phone",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "analytics": {
               "title": "Analytics",
               "icon": "gear",
-              "group": "delivery"
+              "tint": "mqtt"
             },
             "monitor": {
               "title": "Monitoring",
               "icon": "gear",
-              "group": "delivery"
+              "tint": "mqtt"
             }
           },
           "rows": [
@@ -868,59 +868,29 @@
               "to": "metadata",
               "curveControls": [
                 {
-                  "t": 0.08333333333333333,
-                  "dx": -38.7,
-                  "dy": -38.9
-                },
-                {
                   "t": 0.16666666666666666,
-                  "dx": -61.2,
-                  "dy": -91.1
-                },
-                {
-                  "t": 0.25,
-                  "dx": -74,
-                  "dy": -142.4
+                  "dx": -78.5,
+                  "dy": -95
                 },
                 {
                   "t": 0.3333333333333333,
-                  "dx": -100.3,
-                  "dy": -164.9
-                },
-                {
-                  "t": 0.4166666666666667,
-                  "dx": -102,
-                  "dy": -225.1
+                  "dx": -169.3,
+                  "dy": -203.8
                 },
                 {
                   "t": 0.5,
-                  "dx": -102,
-                  "dy": -241.8
-                },
-                {
-                  "t": 0.5833333333333334,
-                  "dx": -102,
-                  "dy": -320.6
+                  "dx": -263.3,
+                  "dy": -315.7
                 },
                 {
                   "t": 0.6666666666666666,
-                  "dx": -102,
-                  "dy": -399.4
-                },
-                {
-                  "t": 0.75,
-                  "dx": -102,
-                  "dy": -3.4
+                  "dx": -143.2,
+                  "dy": -177.3
                 },
                 {
                   "t": 0.8333333333333334,
-                  "dx": -102,
-                  "dy": 4.1
-                },
-                {
-                  "t": 0.9166666666666666,
-                  "dx": -44.9,
-                  "dy": 16.1
+                  "dx": 22.1,
+                  "dy": 24.3
                 }
               ]
             },
@@ -991,229 +961,168 @@
             {
               "from": "publish",
               "to": "metadata",
-              "label": "catalog write"
+              "label": "catalog write",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 60.5,
+                  "dy": 2.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 207.7,
+                  "dy": 15.2
+                },
+                {
+                  "t": 0.5,
+                  "dx": 306.7,
+                  "dy": 32.3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 178.8,
+                  "dy": 16.5
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 53,
+                  "dy": 1.5
+                }
+              ],
+              "labelDx": -32.43165816419753,
+              "labelDy": 6.655747725139349
             },
             {
               "from": "transcoder",
               "to": "object",
-              "label": "read",
-              "curveControls": [
-                {
-                  "t": 0.16666666666666666,
-                  "dx": 44.2,
-                  "dy": -23.6
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 56.6,
-                  "dy": -70.9
-                },
-                {
-                  "t": 0.5,
-                  "dx": 64,
-                  "dy": -70.8
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 114.3,
-                  "dy": -53.2
-                },
-                {
-                  "t": 0.8333333333333334,
-                  "dx": 65.5,
-                  "dy": -27.3
-                }
-              ],
-              "labelDx": -25.17850898099107,
-              "labelDy": 1.7389332584831436
+              "label": "read"
             },
             {
               "from": "monitor",
               "to": "queue",
-              "label": "retry upload",
-              "curveControls": [
-                {
-                  "t": 0.1111111111111111,
-                  "dx": 57.3,
-                  "dy": 17.4
-                },
-                {
-                  "t": 0.2222222222222222,
-                  "dx": 101.1,
-                  "dy": 8.1
-                },
-                {
-                  "t": 0.3333333333333333,
-                  "dx": 214.7,
-                  "dy": -1.9
-                },
-                {
-                  "t": 0.4444444444444444,
-                  "dx": 328.2,
-                  "dy": -165.4
-                },
-                {
-                  "t": 0.5555555555555556,
-                  "dx": 441.8,
-                  "dy": -86.2
-                },
-                {
-                  "t": 0.6666666666666666,
-                  "dx": 555.3,
-                  "dy": -6.9
-                },
-                {
-                  "t": 0.7777777777777778,
-                  "dx": 668.9,
-                  "dy": -96.5
-                },
-                {
-                  "t": 0.8888888888888888,
-                  "dx": 177.4,
-                  "dy": -63.8
-                }
-              ],
-              "labelDx": 107.21699488433887,
-              "labelDy": 157.85351857081957
+              "label": "retry upload"
             }
           ],
-          "groups": {
-            "sources": {
-              "title": "Sources"
-            },
-            "ingest": {
-              "title": "Ingestion"
-            },
-            "process": {
-              "title": "Processing"
-            },
-            "data": {
-              "title": "Output stores"
-            },
-            "delivery": {
-              "title": "Delivery"
-            }
-          },
           "floats": [
             {
               "id": "camera",
               "side": "below",
-              "x": 120,
+              "x": 804,
               "y": 100
             },
             {
               "id": "mobile",
               "side": "below",
-              "x": 324,
+              "x": 1032,
               "y": 100
             },
             {
               "id": "upload",
               "side": "below",
-              "x": 199,
-              "y": 224.80000000000007
+              "x": 804,
+              "y": 216
             },
             {
               "id": "auth",
               "side": "below",
-              "x": 227,
-              "y": 340.80000000000007
+              "x": 804,
+              "y": 332
             },
             {
               "id": "queue",
               "side": "below",
-              "x": 227,
-              "y": 456.80000000000007
+              "x": 576,
+              "y": 332
             },
             {
               "id": "metadata",
               "side": "below",
-              "x": 199,
-              "y": 1170.4
+              "x": 1488,
+              "y": 1028
             },
             {
               "id": "object",
               "side": "below",
-              "x": 227,
-              "y": 572.8000000000001
+              "x": 804,
+              "y": 448
             },
             {
               "id": "splitter",
               "side": "below",
-              "x": 496,
-              "y": 688.8000000000001
+              "x": 576,
+              "y": 564
             },
             {
               "id": "thumbnail",
               "side": "below",
-              "x": 433,
-              "y": 804.8000000000001
+              "x": 348,
+              "y": 680
             },
             {
               "id": "transcoder",
               "side": "below",
-              "x": 841,
-              "y": 804.8000000000001
+              "x": 1032,
+              "y": 680
             },
             {
               "id": "captions",
               "side": "below",
-              "x": 637,
-              "y": 804.8000000000001
+              "x": 576,
+              "y": 680
             },
             {
               "id": "thumbstore",
               "side": "below",
-              "x": 433,
-              "y": 929.6000000000001
+              "x": 348,
+              "y": 796
             },
             {
               "id": "videostore",
               "side": "below",
-              "x": 841,
-              "y": 929.6000000000001
+              "x": 1032,
+              "y": 796
             },
             {
               "id": "textindex",
               "side": "below",
-              "x": 637,
-              "y": 929.6000000000001
+              "x": 576,
+              "y": 796
             },
             {
               "id": "publish",
               "side": "below",
-              "x": 637,
-              "y": 1054.4
+              "x": 576,
+              "y": 912
             },
             {
               "id": "cdn",
               "side": "below",
-              "x": 433,
-              "y": 1170.4
+              "x": 804,
+              "y": 1028
             },
             {
               "id": "search",
               "side": "below",
-              "x": 637,
-              "y": 1170.4
+              "x": 1260,
+              "y": 1028
             },
             {
               "id": "notify",
               "side": "below",
-              "x": 841,
-              "y": 1170.4
+              "x": 348,
+              "y": 1028
             },
             {
               "id": "analytics",
               "side": "below",
-              "x": 1045,
-              "y": 1170.4
+              "x": 576,
+              "y": 1028
             },
             {
               "id": "monitor",
               "side": "below",
-              "x": 1249,
-              "y": 1170.4
+              "x": 120,
+              "y": 1028
             }
           ]
         }

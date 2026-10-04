@@ -689,8 +689,30 @@ function autoArrangeConnectedMotifs(d){
   var blockCoreNodes=new Set(),blockHubNodes=new Set();blocks.forEach(function(block){var attached=chains.filter(function(chain){return chain.ids.length>=2 && block.indexOf(chain.anchor)>=0 && chain.ids.every(function(i){return block.indexOf(i)>=0;}) && links.some(function(e){return e[0]===chain.anchor && e[1]===chain.ids[0];});});if(attached.length)block.forEach(function(i){if(!corridorNodes.has(i))blockCoreNodes.add(i);if(adj[i].length>=4)blockHubNodes.add(i);});});
   return {links:links,adj:adj,chains:chains,blocks:blocks.slice(0,AUTO_ARRANGE_GEOMETRY_LIMITS.blocks),corridorNodes:corridorNodes,fanNodes:fanNodes,blockCoreNodes:blockCoreNodes,blockHubNodes:blockHubNodes};
 }
+// A narrow angle between two neighboring branches predicts a bundled fan.
+// Use topology and center rays only; full viewer paths still decide safety.
+// One card width converts angular crowding into a comparable distance cost.
+function autoArrangeFanCrowding(points,adj){
+  var penalty=0;
+  adj.forEach(function(neighbors,i){if(neighbors.length<3)return;neighbors.forEach(function(j,k){neighbors.slice(k+1).forEach(function(l){
+    var a=points[j],b=points[l],o=points[i],length=Math.hypot(a.x-o.x,a.y-o.y)*Math.hypot(b.x-o.x,b.y-o.y);
+    if(!length)return;var cosine=((a.x-o.x)*(b.x-o.x)+(a.y-o.y)*(b.y-o.y))/length;
+    penalty+=150*Math.max(0,Math.PI/6-Math.acos(Math.max(-1,Math.min(1,cosine))));
+  });});});return penalty;
+}
+// A preferred card silhouette may lose one occupied lattice column. Its
+// shortfall from square is bounded by that one column pitch, rather than an
+// aspect threshold affected by incidental routing bows.
+function autoArrangeCompactColumnTrade(candidate,source,routeLength,sourceRouteLength){
+  function cards(positions){var xs=positions.map(function(p){return p.x;}),ys=positions.map(function(p){return p.y;});return {columns:new Set(xs.map(function(x){return Math.round(x*1000)/1000;})).size,width:Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,height:Math.max.apply(null,ys)-Math.min.apply(null,ys)+44};}
+  var a=candidate.score,b=source.score,p=cards(candidate.positions),q=cards(source.positions),pitch=150+AUTO_ARRANGE_CARD_GAP;
+  return q.width>=q.height && q.width<=q.height*16/9 && p.columns===q.columns-1 &&
+    p.width>=q.width-pitch-.1 && p.height<=q.height+.1 && p.width>=p.height-pitch-.1 && p.width<=p.height*16/9 &&
+    a.width<=b.width+.1 && a.height<=b.height+.1 && a.area<=b.area*.85 && a.length<=b.length*.98 && routeLength<sourceRouteLength;
+}
 // Temporary motif compositions may need space before a later move shortens
-// their routes. Only final preferred-band, shared-lattice improvements publish.
+// their routes. Final shared-lattice results favor the preferred aspect band;
+// local polishing may trade it for a substantially smaller, shorter drawing.
 function autoArrangeMotifGeometry(d,result,viz){
   var ids=Object.keys(d.nodes),edges=d.edges || [],n=ids.length;
   if(n<=AUTO_ARRANGE_GRID_LIMITS.nodes || n>AUTO_ARRANGE_GEOMETRY_LIMITS.nodes || edges.length>AUTO_ARRANGE_GEOMETRY_LIMITS.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
@@ -781,20 +803,28 @@ function autoArrangeMotifGeometry(d,result,viz){
   }
   // Row compaction changes the route geometry. Revisit a bounded shortlist of
   // nearby free slots after it, keeping composed hubs and terminal paths intact.
-  var polishBudget=Math.min(AUTO_ARRANGE_GEOMETRY_LIMITS.polishing,Math.floor(AUTO_ARRANGE_GEOMETRY_LIMITS.polishWork*32/(n*n*Math.max(1,edges.length)))),polished=0;
-  for(var pass=0;pass<4 && polished<polishBudget;pass++){
-    var source=best,xs=Array.from(new Set(source.positions.map(function(p){return p.x;}))).sort(function(a,b){return a-b;}),ys=Array.from(new Set(source.positions.map(function(p){return p.y;}))).sort(function(a,b){return a-b;}),choices=[];
+  // Branch nodes may use diagonal slots. Center-ray crowding breaks close route
+  // choices. With equal crossing counts, sampled length can grow at most 1%
+  // per accepted move and never beyond the pre-polish drawing. Spare checks
+  // may finish a later pass.
+  var polishBudget=Math.min(AUTO_ARRANGE_GEOMETRY_LIMITS.polishing,Math.floor(AUTO_ARRANGE_GEOMETRY_LIMITS.polishWork*32/(n*n*Math.max(1,edges.length)))),polished=0,polishInitial=best;
+  function crowding(positions){return autoArrangeFanCrowding(ids.map(function(id){return positions.find(function(p){return p.id===id;});}),adj);}
+  for(var pass=0;pass<6 && polished<polishBudget;pass++){
+    var source=best,xs=Array.from(new Set(source.positions.map(function(p){return p.x;}))).sort(function(a,b){return a-b;}),ys=Array.from(new Set(source.positions.map(function(p){return p.y;}))).sort(function(a,b){return a-b;}),choices=[],sourceCrowding=crowding(source.positions);
     source.positions.forEach(function(p,i){var index=ids.indexOf(p.id);if(fanNodes.has(index) || corridorNodes.has(index) || blockHubNodes.has(index))return;
-      var x=xs.indexOf(p.x),y=ys.indexOf(p.y);[[x-1,y],[x+1,y],[x,y-1],[x,y+1]].forEach(function(cell){if(xs[cell[0]]===undefined || ys[cell[1]]===undefined)return;
+      var x=xs.indexOf(p.x),y=ys.indexOf(p.y);[[x-1,y],[x+1,y],[x,y-1],[x,y+1]].concat(adj[index].length>=3?[[x-1,y-1],[x+1,y-1],[x-1,y+1],[x+1,y+1]]:[]).forEach(function(cell){if(xs[cell[0]]===undefined || ys[cell[1]]===undefined)return;
         var positions=source.positions.map(function(q,j){return i===j?{id:q.id,x:xs[cell[0]],y:ys[cell[1]]}:q;});if(!clear(positions))return;
         var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=edges.reduce(function(sum,e){return sum+Math.hypot(byId[e.from].x-byId[e.to].x,byId[e.from].y-byId[e.to].y);},0);
-        if(length<source.score.length-.1)choices.push({positions:positions,length:length});
+        var fan=crowding(positions);if(length<=source.score.length*1.015 && length+fan<source.score.length+sourceCrowding-.1)choices.push({positions:positions,length:length,fan:fan});
       });
-    });choices.sort(function(a,b){return a.length-b.length;});
+    });choices.sort(function(a,b){return a.length+a.fan-b.length-b.fan;});
     var limit=Math.min(polishBudget,polished+Math.ceil(polishBudget/4));
     for(var i=0;i<choices.length && polished<limit;i++){
       polished++;try{var placed=Object.create(null);choices[i].positions.forEach(function(p){placed[p.id]=p;});var candidate=natural(autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'}))),a=candidate.score,b=best.score;
-      if(publish(a) && lattice(candidate.positions) && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.area<=b.area*1.01 && (a.crossings<b.crossings || a.incidentCrossings<b.incidentCrossings || routeLengths.get(a)<routeLengths.get(b)-.1))best=candidate;}catch(ex){}
+      // Losing an occupied outer column may be preferable to keeping long
+      // branch edges solely to fill a square footprint.
+      var compact=autoArrangeCompactColumnTrade(candidate,polishInitial,routeLengths.get(a),routeLengths.get(polishInitial.score));
+      if((publish(a) || compact && feasible(a)) && lattice(candidate.positions) && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.area<=b.area*1.01 && (a.crossings<b.crossings || a.incidentCrossings<b.incidentCrossings || routeLengths.get(a)<=routeLengths.get(polishInitial.score) && routeLengths.get(a)<=routeLengths.get(b)*1.01 && routeLengths.get(a)+crowding(candidate.positions)<routeLengths.get(b)+crowding(best.positions)-.1))best=candidate;}catch(ex){}
     }
     if(best===source)break;
   }

@@ -616,7 +616,9 @@ test('global composition creates reproducible safe shared axes and a square frei
       assert.ok(tail);const tailPoints=tail.ids.map(i=>positions[ids[i]]);
       assert.equal(new Set(tailPoints.map(p=>p.y)).size,1,'terminal tail docks as a shared bottom row');
       assert.ok(tailPoints.every(p=>p.y>positions[ids[tail.anchor]].y));
-      assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
+      assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');const cardWidth=axes('x').at(-1)-axes('x')[0]+150,cardHeight=axes('y').at(-1)-axes('y')[0]+44;
+      assert.ok(cardWidth>=cardHeight-204,'incident falls short of square by at most one global column pitch');
+      assert.ok(result.score.area<afterFold.score.area*.85,'portrait exception materially reduces occupied area');}
     if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
     if(i===2){
       assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,'freight fits square to landscape without padding');
@@ -766,4 +768,72 @@ test('compound motif search retains its source on unsafe routing and bounds all 
     delete d.nodes.n0.group;for(let i=21;i<49;i++)d.nodes['n'+i]={};
     assert.equal(C.autoArrangeMotifGeometry(d,result,failingViz),result);assert.equal(calls,0);
   }finally{C.autoArrangeScore=score;}
+});
+
+
+test('local fan polishing accepts a diagonal shared-grid slot using actual routes',()=>{
+  const coordinates=[[324,296],[528,296],[528,492],[324,492],[936,394],[120,296],[324,394]];
+  for(const y of [100,198,688,786])for(const x of [120,324,528,732,936])if(coordinates.length<21)coordinates.push([x,y]);
+  const d={nodes:Object.fromEntries(coordinates.map((_,i)=>['n'+i,{}])),edges:[{from:'n1',to:'n0'},{from:'n2',to:'n0'},{from:'n0',to:'n3'}]};
+  const source={positions:coordinates.map(([x,y],i)=>({id:'n'+i,x,y})),edges:d.edges.map(()=>({}))};source.score=C.autoArrangeScore(d,source);
+  const limits=C.AUTO_ARRANGE_GEOMETRY_LIMITS,attempts=limits.attempts,finishing=limits.finishing,polishing=limits.polishing;
+  try{
+    // Isolate the existing polishing budget: neither block search nor global
+    // finishing can create the diagonal placement exercised here. All four
+    // cardinal hub slots are occupied, and one proposal cannot take two steps.
+    limits.attempts=0;limits.finishing=0;limits.polishing=1;
+    const result=C.autoArrangeMotifGeometry(d,source,viz),hub=result.positions.find(p=>p.id==='n0');
+    assert.equal(hub.x,528);assert.equal(hub.y,394);
+    assert.equal(result.score.crossings,0);assert.equal(result.score.incidentCrossings,0);assert.equal(result.score.hits,0);assert.equal(result.score.overlaps,0);
+    assert.ok(minimumCardGap(result)>=53.9);assert.ok(result.score.length<source.score.length*.7);assert.equal(result.score.shape,0);assertAutoPorts(result.edges);
+    assert.deepEqual(plain(source.positions),coordinates.map(([x,y],i)=>({id:'n'+i,x,y})),'source remains unchanged');
+    const renamed={nodes:Object.fromEntries(coordinates.map((_,i)=>['v'+i,{title:'Different',tint:'data'}])),edges:d.edges.map(e=>({from:e.from.replace('n','v'),to:e.to.replace('n','v')}))};
+    const other={positions:source.positions.map(p=>({...p,id:p.id.replace('n','v')})),edges:source.edges,score:source.score};
+    const equivalent=C.autoArrangeMotifGeometry(renamed,other,viz);
+    assert.deepEqual(plain(equivalent.positions.map(p=>[p.x,p.y])),plain(result.positions.map(p=>[p.x,p.y])),'labels and IDs do not affect refinement');
+  }finally{limits.attempts=attempts;limits.finishing=finishing;limits.polishing=polishing;}
+});
+
+test('fan crowding penalizes nearly parallel branches without a direction preference',()=>{
+  const adj=[[1,2,3],[0],[0],[0]],narrow=[{x:0,y:0},{x:200,y:0},{x:200,y:30},{x:200,y:-30}],wide=[{x:0,y:0},{x:200,y:0},{x:0,y:200},{x:-200,y:0}];
+  assert.ok(C.autoArrangeFanCrowding(narrow,adj)>100);assert.equal(C.autoArrangeFanCrowding(wide,adj),0);
+  const rotated=narrow.map(p=>({x:100-p.y,y:70+p.x}));
+  assert.ok(Math.abs(C.autoArrangeFanCrowding(rotated,adj)-C.autoArrangeFanCrowding(narrow,adj))<1e-9);
+});
+
+test('final incident controls are necessary even when naturalized in combinations',()=>{
+  const d=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json').page.blocks[0].diagram;
+  const result={positions:plain(d.floats),edges:plain(d.edges)},score=C.autoArrangeScore(d,result),controlled=d.edges.map((e,i)=>e.curveControls?i:-1).filter(i=>i>=0);
+  assert.equal(controlled.length,3);assert.equal(score.hits,0);assert.equal(score.crossings,0);assert.equal(score.incidentCrossings,0);
+  assertAutoPorts(d.edges);d.edges.forEach(e=>{assert.equal(e.labelDx,undefined);assert.equal(e.labelDy,undefined);});
+  for(let mask=1;mask<(1<<controlled.length);mask++){
+    const naturalized={positions:result.positions,edges:result.edges.map((e,i)=>controlled.some((index,k)=>index===i && (mask&(1<<k)))?{}:e)},s=C.autoArrangeScore(d,naturalized);
+    assert.ok(s.hits>0 || s.crossings>score.crossings || s.incidentCrossings>score.incidentCrossings,'control-removal subset '+mask+' must avoid a real obstruction');
+  }
+  const cleaned=C.autoArrangeNaturalRoutes(d,plain(result),true);
+  assert.deepEqual(plain(C.autoArrangeDiagram(d,cleaned)),d,'final automatic-route cleanup is stable');
+});
+
+test('a collinear skip connection cannot hide a hit on its intervening card',()=>{
+  const d={nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'c'}]},positions=[{id:'a',x:120,y:100},{id:'b',x:324,y:100},{id:'c',x:528,y:100}];
+  for(const edges of [[{}],[{curveControls:[{t:1/3,dx:0,dy:0},{t:2/3,dx:0,dy:0}]}]])assert.equal(C.autoArrangeScore(d,{positions,edges}).hits,1);
+});
+
+
+test('compact column exception rejects weak gains, larger bounds and excessive shape loss',()=>{
+  const source={positions:[0,1,2,3,4].map((x,i)=>({id:'n'+i,x:120+x*204,y:i===4?900:100})),score:{width:1000,height:900,area:900000,length:1000}};
+  const candidate={positions:source.positions.map(p=>({...p,x:Math.min(p.x,732)})),score:{width:800,height:900,area:720000,length:970}};
+  const accepts=(c=candidate,s=source,r=900,sr=1000)=>C.autoArrangeCompactColumnTrade(c,s,r,sr);
+  assert.equal(accepts(),true);
+  for(const [key,value] of [['area',765001],['length',980.01],['width',1000.2],['height',900.2]])assert.equal(accepts({...candidate,score:{...candidate.score,[key]:value}}),false,key);
+  assert.equal(accepts(candidate,source,1000,1000),false,'sampled routes must strictly shorten');
+  assert.equal(accepts({...candidate,positions:source.positions}),false,'must remove one populated column');
+  assert.equal(accepts({...candidate,positions:candidate.positions.map(p=>({...p,x:Math.min(p.x,528)}))}),false,'cannot remove two columns');
+  assert.equal(accepts({...candidate,positions:candidate.positions.map(p=>({...p,x:120+(p.x-120)*.8}))}),false,'cannot squeeze card width beyond one pitch');
+  assert.equal(accepts({...candidate,positions:candidate.positions.map(p=>({...p,y:p.y===900?1200:p.y}))}),false,'card height cannot grow');
+  assert.equal(accepts({...candidate,positions:candidate.positions.map(p=>({...p,y:p.y===900?300:p.y}))}),false,'cannot become excessively landscape');
+  const tall={...source,positions:source.positions.map(p=>({...p,y:p.y===900?1200:p.y}))};
+  assert.equal(accepts(candidate,tall),false,'source card silhouette must be preferred before losing a column');
+  const routeBulge={...candidate,score:{...candidate.score,width:850,area:765000}};
+  assert.equal(accepts(routeBulge),true,'a safe route bulge does not define card aspect');
 });

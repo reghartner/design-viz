@@ -473,6 +473,9 @@ PanelRegistry.extend('radar', {
   order: 15,
   label: 'Radar',
   since: '0.1.0',
+  layout: {
+    canvasSizing: { mode: 'fixed-aspect', aspect: 320 / 180, resizeAxis: 'width' },
+  },
 });
 
 PanelRegistry.extend('radar', {

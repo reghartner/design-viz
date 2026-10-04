@@ -198,6 +198,19 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 /* Canvas objects share graph units and its scroll origin. Scale the whole window,
    including its header and widget, while playback remains a stage sibling. */
 .explore-canvas-objects{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;--explore-overlay-scale:1;}
+@media screen{
+ .explore-canvas-objects>.explore-window{overflow:visible;border-color:var(--explore-border);background:transparent;box-shadow:none;}
+ .explore-canvas-objects>.explore-window>.explore-window-header{display:none;position:absolute;left:-1px;right:-1px;bottom:100%;z-index:3;box-sizing:border-box;background:var(--explore-bg);border:1px solid var(--explore-border);border-bottom:0;border-radius:10px 10px 0 0;}
+ .explore-canvas-objects>.explore-window>.explore-window-body{position:absolute;inset:0;width:auto;height:auto;transform:none;border-radius:10px;background:var(--explore-bg);}
+ body .docview .explore-canvas-objects>.explore-window[data-explore-canvas-sizing]>.explore-window-body>.pwidget{min-height:0;}
+ .explore-canvas-objects>.explore-window>.explore-window-resize{display:none;}
+ .explore-canvas-objects>.explore-window[data-explore-canvas-sizing]>.explore-window-resize{cursor:ew-resize;}
+ .explore-canvas-objects>.explore-window.explore-canvas-selected{border-color:var(--explore-border);outline:3px solid color-mix(in srgb,var(--acc) 72%,#fff);outline-offset:3px;box-shadow:0 7px 24px #1424422e;}
+ .explore-canvas-objects>.explore-window.explore-canvas-selected>.explore-window-header{display:flex;}
+ .explore-canvas-objects>.explore-window.explore-canvas-selected>.explore-window-resize{display:block;}
+ .explore-canvas-objects>.explore-window.explore-canvas-selected:focus-visible{outline:3px solid var(--acc);outline-offset:3px;}
+ .explore-canvas-objects>.explore-prose-window>.explore-window-body{background:var(--explore-bg);}
+}
 .explore-placement{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .explore-placement select{font:inherit;color:inherit;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:6px;padding:6px;}
 @media print{.explore-canvas-objects{position:static;width:auto;height:auto;transform:none!important;}}

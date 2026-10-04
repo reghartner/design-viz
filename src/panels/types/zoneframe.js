@@ -109,6 +109,9 @@ PanelRegistry.extend('zoneframe', {
   order: 8,
   label: 'Zone frame',
   since: '0.1.0',
+  layout: {
+    canvasSizing: { mode: 'fixed-aspect', aspect: 320 / 180, resizeAxis: 'width' },
+  },
 });
 
 PanelRegistry.extend('zoneframe', {

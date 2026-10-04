@@ -4,8 +4,9 @@ This set keeps four realistic architecture graphs large enough to expose layout
 tradeoffs that the smaller shape baselines do not. The saved arrangement is a
 reproducible machine result. A bounded cleanup shares nearby rank coordinates
 and straightens safe one-link branches. A second pass composes local motifs
-from topology, then removes surplus spacing. Remaining crossings and wide
-service fans still expose tradeoffs for future layout work.
+from topology, then removes surplus spacing. A final bounded search composes
+those placements onto shared graph-wide columns and rows when actual routes
+remain safe. Remaining crossings still expose tradeoffs for future layout work.
 
 ## Files and regeneration
 
@@ -37,13 +38,13 @@ routes that share an endpoint; ordinary crossings exclude those pairs.
 
 | Section ID | Diagram | Nodes | Edges | Planarity | Crossings | Incident crossings | Overlaps | Card hits | Occupied width × height | Aspect |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 4 | 0 | 0 | 1998 × 1784 | 1.12 |
-| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 11 | 2 | 0 | 0 | 2855 × 1853 | 1.54 |
-| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 1711 × 1506 | 1.14 |
-| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 2 | 0 | 0 | 0 | 1833 × 1714 | 1.07 |
+| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 1 | 0 | 0 | 1204 × 1088 | 1.11 |
+| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 10 | 2 | 0 | 0 | 1374 × 1088 | 1.26 |
+| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 1725 × 1506 | 1.15 |
+| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 2 | 0 | 0 | 0 | 1811 × 1714 | 1.06 |
 
-On a local regeneration run, candidate generation took 1.96 s,
-1.69 s, 6.12 s and 5.94 s respectively. All remain well inside the workbench's
+On a local regeneration run, candidate generation took 4.17 s,
+2.53 s, 7.91 s and 9.05 s respectively. All remain well inside the workbench's
 20 second worker deadline.
 
 ## Alignment cleanup
@@ -104,16 +105,71 @@ square-to-16:9 remains within that preferred aspect band. The six approved small
 
 Freight trades about 7% more total link distance and a larger occupied area for
 a square composition with 39% less height and 11% less occupied diagonal.
-Incident and billing improve through safe compaction; their tested motif
-rearrangements did not pass the crossing/shape gates. They remain less compact
-than the separately saved human reference. Data gains a shorter, clearer
-composition with fewer crossings. Retained native-curve counts are 2, 0, 7 and
-7 respectively. All four outputs were visually inspected in the rendered viewer.
+Data gains a shorter, clearer composition with fewer crossings. The motif-stage
+metrics above precede the final graph-wide lattice search described below.
+
+## Shared graph-wide columns and rows
+
+The final pass runs after motif composition, so a subsequent motif layout cannot
+undo its shared axes. It applies to ungrouped graphs with 21–48 nodes and at most
+80 edges. Twenty deterministic grid proposals preserve the composed layout's
+relative positions, resolve occupied cells, and use at least 204 px horizontal
+and 116 px vertical center spacing. Nearby motifs can share rows and columns;
+their spacing is no longer independently preserved as a fixed rectangle.
+
+Natural routes are tried first, followed by full fixed-position spline routing
+and safe natural-route simplification. When rounding introduces crossings, a
+bounded repair tries moving or swapping crossing endpoints on those same axes.
+At most two seeds and two repair passes share a cap of 160 proposals, further
+reduced by node × edge count. No reference file, node name, role or tint is read.
+
+A published grid must have zero overlaps and unrelated-card hits, preserve both
+original crossing ceilings and the preferred aspect band, reduce occupied area
+by at least 2%, and never increase occupied diagonal. Center distance may grow
+by at most 5% when footprint improves; both accepted examples instead shorten
+substantially. Among safe grids, smaller occupied area wins, then shorter links.
+Temporary repair candidates never bypass the final safety gates.
+
+If both-axis compaction fails, a column-only fallback preserves the composed
+rows and rounds every x coordinate onto the same 204 px lattice. Three phase
+shifts supply bounded alternatives. Actual geometry checks try retained native
+control offsets and full rerouting; a single repair round can move crossing
+endpoints by one or two columns along their existing row. Both searches share
+one attempt counter, with a separately capped reserve of at most 80 additional
+proposals scaled by node × edge count (at most 240 combined). A fallback must cut
+column count by at least 40%, use at most twice the rounded-up square root of
+node count, retain 54 px card clearance, and preserve both crossing ceilings
+and shape. The explicit alignment tradeoff permits at most 3% extra area and
+occupied diagonal and 5% extra center distance. Unsafe attempts retain the
+previous safe layout.
+
+| Section | Before → after columns / rows | Before → after occupied area | Before → after center distance | Before → after crossings (ordinary / incident) |
+| --- | --- | ---: | ---: | --- |
+| Incident response | 11 / 16 → 6 / 10 | 3,564,432 → 1,310,305 | 11,802 → 8,777 | 0 / 4 → 0 / 1 |
+| Regional billing | 18 / 23 → 7 / 10 | 5,289,154 → 1,494,912 | 17,271 → 10,796 | 11 / 2 → 10 / 2 |
+| Freight operations | 25 / 15 → 8 / 15 | 2,576,157 → 2,597,612 | 13,403 → 13,795 | 1 / 0 → 1 / 0 |
+| Data platform | 30 / 17 → 9 / 17 | 3,142,495 → 3,104,098 | 14,625 → 15,016 | 2 / 0 → 2 / 0 |
+
+Column and row counts use distinct node-center coordinates. All four outputs
+now use regular graph-wide columns with at least 54 px card clearance. Freight
+and data retain their useful composed rows. Freight's column alignment costs
+0.8% area and 2.9% center distance; data saves 1.2% area for 2.7% extra center
+distance. The six approved small outputs remain byte-identical.
+
+Retained native-curve counts are 5, 11, 7 and 11 respectively, with automatic
+attachments throughout. Removing all retained controls at the new incident and
+billing positions produces three and five unrelated-card hits respectively;
+these curves are required for the accepted placement. All four outputs were
+visually inspected in the rendered viewer. Billing's top dense mesh still has
+crossed arrows: its ten ordinary crossings exceed the separate human reference's
+seven, even though its area and link distance are smaller. The reference remains
+read-only and does not participate in generation.
 
 Real ungrouped 80-node/144-edge ladder and layered stress graphs completed in
 2.92 s and 7.74 s respectively, with zero overlaps and unrelated-card hits.
-The full 80-node/160-edge layered regression completed in 9.81 s with the same
-safety checks after long-motif windowing was added.
+The full 80-node/160-edge layered regression completed in 11.86 s with the same
+safety checks after adding the final global-lattice pass (which skips graphs
+above its 48-node bound).
 The search is bounded, not an exhaustive embedding solver: dense cores and
 long feedback structures may retain irregular spacing or a tall silhouette. Freight's
 remaining ordinary crossing is carrier-portal → dispatch-board against

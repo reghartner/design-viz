@@ -509,8 +509,8 @@ test('incident route scoring detects fan-out weaving beyond a shared port and cl
 
 test('large cleanup straightens branches and shares ranks without worsening final route safety',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json');
-  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates;
-  C.autoArrangeMotifCandidates=(d,result)=>result;
+  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice;
+  C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;
   try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
@@ -540,7 +540,7 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
-  }finally{C.autoArrangeMotifCandidates=motifs;}
+  }finally{C.autoArrangeMotifCandidates=motifs;C.autoArrangeGlobalLattice=global;}
 });
 
 test('large alignment refuses unsafe proposals and bounds geometry checks at the maximum graph size',()=>{
@@ -570,13 +570,13 @@ test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
   assert.deepEqual(plain(C.autoArrangeMotifScaffolds(renamed)),ranks);
 });
 
-test('motif composition creates reproducible safe large layouts and a square freight scaffold',()=>{
+test('global composition creates reproducible safe shared axes and a square freight scaffold',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
-  const motif=C.autoArrangeMotifCandidates;
+  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice;
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeMotifCandidates=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeMotifCandidates=motif;}
+    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;}
     const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
     assert.ok(performance.now()-started<20000,block.id+' worker deadline');
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' deterministic generated output');
@@ -586,15 +586,28 @@ test('motif composition creates reproducible safe large layouts and a square fre
     assert.ok(minimumCardGap(result)>=53.9,block.id+' retains normal card clearance');
     assertAutoPorts(result.edges);assert.deepEqual(out.nodes,d.nodes);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
+    const axes=axis=>[...new Set(result.positions.map(p=>Math.round(p[axis]*10)/10))].sort((a,b)=>a-b);
+    assert.ok(axes('x').length<=[6,7,8,9][i],block.id+' uses shared graph-wide columns');
+    for(const value of axes('x'))assert.ok(Math.abs((value-axes('x')[0])/204-Math.round((value-axes('x')[0])/204))<.001,block.id+' all composed motifs share the same x lattice');
+    if(i<2){
+      assert.ok(axes('y').length<=10,block.id+' reuses shared rows');
+      for(const axis of ['x','y']){
+        const values=axes(axis),step=axis==='x'?204:116;
+        for(const value of values)assert.ok(Math.abs((value-values[0])/step-Math.round((value-values[0])/step))<.001,block.id+' every node remains on the global '+axis+' lattice');
+      }
+      assert.ok(result.score.area<before.score.area*.5,block.id+' materially smaller footprint');
+      assert.ok(result.score.length<before.score.length*.8,block.id+' shorter center distances');
+    }
     if(i===0){assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
     if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
     if(i===2){
       assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,'freight fits square to landscape without padding');
       assert.ok(result.score.height<before.score.height*.65);assert.ok(result.score.length<before.score.length*1.1);
+      assert.ok(axes('y').length<=15,'freight preserves composed rows');
       const rows=new Map();result.positions.forEach(p=>rows.set(p.y,(rows.get(p.y)||0)+1));
       assert.ok([...rows.values()].some(n=>n>=5),'several connected local motifs share an expanded row');
     }
-    if(i===3){assert.ok(result.score.crossings<=2);assert.equal(result.score.incidentCrossings,0);assert.ok(result.score.length<before.score.length*.75);}
+    if(i===3){assert.ok(axes('y').length<=17,'data preserves composed rows');assert.ok(result.score.crossings<=2);assert.equal(result.score.incidentCrossings,0);assert.ok(result.score.length<before.score.length*.75);}
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
 });
@@ -667,4 +680,21 @@ test('motif compaction cannot squeeze a preferred-band source into portrait shap
     assert.equal(C.autoArrangeMotifCandidates(d,original,{}),original,'smaller portrait proposals cannot leave the preferred band');
     assert.ok(checks>0);
   }finally{C.autoArrangeMotifScaffolds=scaffolds;C.autoArrangeNaturalRoutes=routes;}
+});
+
+test('global lattice rejects unsafe proposals, bounds rerouting, and skips unsupported sizes before geometry work',()=>{
+  const nodes=Object.fromEntries(Array.from({length:32},(_,i)=>['n'+i,{}]));
+  const d={nodes,edges:Array.from({length:31},(_,i)=>({from:'n'+i,to:'n'+(i+1)}))};
+  const result={positions:Object.keys(nodes).map((id,i)=>({id,x:120+(i%8)*240,y:100+Math.floor(i/8)*160})),edges:d.edges.map(()=>({})),score:{overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:10000,width:2000,height:1800,area:3600000,shape:0}};
+  const before=plain(result),score=C.autoArrangeScore;let calls=0,checks=0;
+  try{
+    C.autoArrangeScore=()=>{checks++;return {...result.score,hits:1};};
+    assert.equal(C.autoArrangeGlobalLattice(d,result,{renderJSON(){calls++;throw Error('Unsafe route');}}),result);
+    assert.ok(calls>0);assert.ok(calls<=C.AUTO_ARRANGE_GLOBAL_LIMITS.attempts+C.AUTO_ARRANGE_GLOBAL_LIMITS.columnAttempts);assert.deepEqual(plain(result),before);
+    d.nodes.n0.group='group';calls=checks=0;
+    assert.equal(C.autoArrangeGlobalLattice(d,result,{}),result);assert.equal(checks,0);assert.equal(calls,0);
+    delete d.nodes.n0.group;
+    for(let i=32;i<49;i++)d.nodes['n'+i]={};
+    assert.equal(C.autoArrangeGlobalLattice(d,result,{}),result);assert.equal(checks,0,'large graphs retain the preceding bounded motif layout');
+  }finally{C.autoArrangeScore=score;}
 });

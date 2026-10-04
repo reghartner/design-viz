@@ -278,3 +278,10 @@ test('Explore canvas geometry declares its compatibility requirement even when F
   view.exploreLayout={panelPlacement:'floating',canvas:{panels:[]}};assert.ok(C.detect(raw).includes('layout.explore-canvas'));
   delete view.exploreLayout.canvas;assert.ok(!C.detect(raw).includes('layout.explore-canvas'));
 });
+
+test('per-panel Explore placement exports require the independent-placement capability even without geometry',()=>{
+ const raw={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[{id:'eng',presentation:'explore',exploreLayout:{panelPlacements:[{panel:'home',placement:'canvas'}]}}]}}]}};
+ assert.ok(C.detect(raw).includes('layout.explore-panel-placement'));
+ const available={...C.features};delete available['layout.explore-panel-placement'];
+ assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-panel-placement'));
+});

@@ -201,3 +201,11 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 .explore-placement{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .explore-placement select{font:inherit;color:inherit;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:6px;padding:6px;}
 @media print{.explore-canvas-objects{position:static;width:auto;height:auto;transform:none!important;}}
+
+.explore-panel-choice{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:0;border-bottom:1px solid var(--explore-border);}
+.explore-panel-choices .explore-panel-choice>.explore-placement{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;padding:0 0 10px 23px;font-size:11px;cursor:default;}
+.explore-panel-choice .explore-placement select{max-width:105px;font-size:12px;}
+.explore-panel-choice>label:first-child{min-width:0;overflow-wrap:anywhere;}
+
+.explore-panel-body>.explore-placement{flex-wrap:wrap;}
+.explore-placement-hint{flex-basis:100%;font-size:11px;line-height:1.4;color:var(--dfaint);}

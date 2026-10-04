@@ -28,7 +28,7 @@ async function open(page,server,raw,host){
 const home=page=>page.locator('[data-explore-panel=home]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
-async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
+async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
 async function fit(page,host){await page.locator(host==='workbench'?'#workspace-fit':'.explore-diagram-zoom button').filter(host==='workbench'?{}:{hasText:'Fit canvas'}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
 async function drag(page,locator,dx,dy){const r=await locator.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:5});await page.mouse.up();}
@@ -86,7 +86,7 @@ test('Fit recovers a far-away canvas panel and Floating retains its normal zoom 
 });
 
 test('canvas widget buttons, keyboard handles, step content and visibility retain their interactions',async({page,server})=>{
- const raw=fixture(),d=raw.page.sections[0].diagram,app=structuredClone(JSON.parse(await readFile(path.join(repo,'src/starters/device-app-sources.json'),'utf8')).page.sections[0].diagram.panels[0]);
+ const raw=mixedFixture(),d=raw.page.sections[0].diagram,app=structuredClone(JSON.parse(await readFile(path.join(repo,'src/starters/device-app-sources.json'),'utf8')).page.sections[0].diagram.panels[0]);
  app.id='app';app.sources=[{id:'telemetry',label:'Device telemetry',node:'camera'}];app.fields.forEach(f=>f.source='telemetry');app.showSources=true;
  d.panels.push(app);d.layouts[1].sectionLayout.default.push({panel:'app',x:8,y:36,w:4,h:12});d.layouts[1].exploreLayout.canvas.panels.push({panel:'app',x:-380,y:360,w:340,h:720});
  d.steps[1].panels.app={battery:{value:42,status:'ready'}};d.steps[1].panelVisibility={outcome:false};
@@ -116,4 +116,91 @@ test('inline Explore keeps far-below canvas objects inside its scrollable bounds
   const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(fitted.x-2);expect(r.y).toBeGreaterThanOrEqual(fitted.y-2);expect(r.x+r.width).toBeLessThanOrEqual(fitted.x+fitted.width+2);expect(r.y+r.height).toBeLessThanOrEqual(Math.min(fitted.y+fitted.height,player.y-10)+2);
  }
  await expect(far).toHaveCSS('top','9000px');
+});
+
+function mixedFixture(){
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
+ layout.panelPlacements=[{panel:'clip',placement:'floating'}];
+ layout.panels.push({panel:'clip',x:.75,y:.03,w:.22,h:.32,stacked:false});
+ layout.overlayScale=.8;layout.canvas.controlsScale=.6;
+ return raw;
+}
+const clip=page=>page.locator('[data-explore-panel=clip]');
+async function panelPlacement(page,label,value){
+ const menu=page.locator('.explore-panel-menu');if(!await menu.evaluate(el=>el.open))await menu.locator('summary').click();
+ await page.getByLabel('Placement for '+label,{exact:true}).selectOption(value);await page.keyboard.press('Escape');
+}
+function overlaps(a,b){return a.x<b.x+b.width-1 && a.x+a.width>b.x+1 && a.y<b.y+b.height-1 && a.y+a.height>b.y+1;}
+for(const host of ['reader','workbench','backstage','inline'])test(host+': mixed panel placement keeps floating windows anchored and fits around them',async({page,server},info)=>{
+ for(const [width,height] of [[1280,800],[1440,900],[1920,1200]]){
+  await page.setViewportSize({width,height});await open(page,server,mixedFixture(),host);await page.evaluate(()=>document.fonts.ready);await fit(page,host);
+  expect(await clip(page).evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+  const floating=await clip(page).boundingBox(),player=await page.locator('.explore-player').boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
+  expect(floating.width).toBeCloseTo(stage.width*.22*.8,0);
+  for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-canvas-objects .explore-window:visible').all()]){
+   const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.y).toBeGreaterThanOrEqual(stage.y-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height+2);expect(overlaps(r,floating)).toBe(false);expect(overlaps(r,player)).toBe(false);
+  }
+  const before=await home(page).boundingBox();await board(page).evaluate(el=>{el.scrollLeft+=70;el.scrollTop+=45;});
+  const after=await home(page).boundingBox();expect(after.x-before.x).toBeCloseTo(-70,0);expect(after.y-before.y).toBeCloseTo(-45,0);expect(await clip(page).boundingBox()).toEqual(floating);expect(await page.locator('.explore-player').boundingBox()).toEqual(player);
+  const pointer={x:stage.x+stage.width*.4,y:stage.y+stage.height*.4},point=await graphPoint(page,pointer);
+  await board(page).dispatchEvent('wheel',{clientX:pointer.x,clientY:pointer.y,deltaY:-50,ctrlKey:true,bubbles:true,cancelable:true});
+  const next=await graphPoint(page,pointer);expect(Math.abs(next.x-point.x)).toBeLessThan(2);expect(Math.abs(next.y-point.y)).toBeLessThan(2);expect((await home(page).boundingBox()).width/after.width).toBeCloseTo(next.scale/point.scale,2);expect(await clip(page).boundingBox()).toEqual(floating);
+  await fit(page,host);await page.screenshot({path:'/tmp/explore-mixed-'+host+'-'+width+'x'+height+'-closed.png'});await info.attach(host+' mixed closed '+width,{body:await page.screenshot(),contentType:'image/png'});await page.locator('.explore-panel-menu summary').click();
+  await expect(page.getByLabel('Placement for The home',{exact:true})).toHaveValue('canvas');await expect(page.getByLabel('Placement for Porch camera · simulated clip',{exact:true})).toHaveValue('floating');await expect(page.getByLabel('Default panel placement')).toHaveValue('canvas');
+  await page.screenshot({path:'/tmp/explore-mixed-'+host+'-'+width+'x'+height+'.png'});await info.attach(host+' mixed '+width,{body:await page.screenshot(),contentType:'image/png'});
+ }
+});
+
+test('reader per-panel toggles preserve both geometries, hidden state, notes fallback and reload isolation',async({page,server})=>{
+ const raw=mixedFixture();await open(page,server,raw,'reader');await fit(page,'reader');const floatingBefore=await clip(page).boundingBox();
+ await drag(page,home(page).locator('.explore-window-grip'),30,20);await drag(page,home(page).locator('.explore-window-resize'),20,15);
+ const canvasStyle=await home(page).getAttribute('style');
+ await page.getByRole('button',{name:'Next step',exact:true}).click();const hash=await page.evaluate(()=>location.hash);
+ await panelPlacement(page,'The home','floating');const floatStyle=await home(page).getAttribute('style');expect(await clip(page).boundingBox()).toEqual(floatingBefore);expect(await page.locator('[data-explore-content=prose]').evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
+ await panelPlacement(page,'The home','canvas');expect(await home(page).getAttribute('style')).toBe(canvasStyle);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+ await panelPlacement(page,'The home','floating');expect(await home(page).getAttribute('style')).toBe(floatStyle);
+ await home(page).locator('.explore-window-hide').click();await panelPlacement(page,'The home','canvas');await expect(home(page)).toBeHidden();
+ await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-choices label').filter({hasText:'The home'}).locator('input').check();await page.keyboard.press('Escape');await expect(home(page)).toBeVisible();
+ await selectPlacement(page,'floating');expect(await home(page).evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');expect(await page.locator('[data-explore-content=prose]').evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+ await page.reload();await expect(home(page)).toHaveCSS('left','-380px');await expect(home(page)).toHaveCSS('width','340px');expect(await clip(page).evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+});
+
+test('Workbench per-panel placement and gestures each undo once and export a mixed chapter',async({page,server,context})=>{
+ const raw=mixedFixture();await open(page,server,raw,'workbench');const initial=await source(page),canvas=raw.page.sections[0].diagram.layouts[1].exploreLayout.canvas;
+ await panelPlacement(page,'The home','floating');const toggled=await source(page);expect(toggled).not.toBe(initial);
+ let layout=JSON.parse(toggled).page.sections[0].diagram.layouts[1].exploreLayout;expect(layout.panelPlacements).toEqual([{panel:'clip',placement:'floating'},{panel:'home',placement:'floating'}]);expect(layout.canvas).toEqual(canvas);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(page.locator('.explore-canvas-objects [data-explore-panel=home]')).toBeVisible();
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(toggled);expect(await home(page).evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+ await home(page).locator('.explore-window-grip').focus();await page.keyboard.press('ArrowLeft');const moved=await source(page);expect(moved).not.toBe(toggled);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(toggled);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
+ await panelPlacement(page,'The home','canvas');const saved=JSON.parse(await source(page));layout=saved.page.sections[0].diagram.layouts[1].exploreLayout;expect(layout.canvas).toEqual(canvas);expect(layout.panels.find(p=>p.panel==='home')).not.toEqual(raw.page.sections[0].diagram.layouts[1].exploreLayout.panels[0]);
+ const reader=await context.newPage();await reader.goto(await build(server,saved,'mixed-export'));await expect(reader.locator('.explore-canvas-objects [data-explore-panel=home]')).toBeVisible();expect(await clip(reader).evaluate(el=>el.parentElement.className)).toBe('explore-stage');await expect(home(reader)).toHaveCSS('left','-380px');await expect(home(reader)).toHaveCSS('width','340px');await reader.close();
+});
+
+test('mixed floating default remains responsive when another panel uses independently scaled canvas geometry',async({page,server})=>{
+ const raw=fixture(false),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;delete layout.panels;layout.panelPlacements=[{panel:'home',placement:'canvas'}];layout.canvas.controlsScale=.5;layout.prose={hidden:true};
+ await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);
+ const r1=await clip(page).boundingBox();expect(await clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('0.8');
+ await page.setViewportSize({width:1440,height:900});await expect.poll(async()=>clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('1');
+ expect((await clip(page).boundingBox()).width/r1.width).toBeCloseTo(1.25,2);await expect(home(page)).toHaveCSS('width','340px');
+});
+
+test('hidden canvas objects are excluded from mixed Fit and stale invalid author source rejects placement edits',async({page,server})=>{
+ const raw=mixedFixture();raw.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels[0].x=9000;
+ await open(page,server,raw,'workbench');await fit(page,'workbench');const far=(await graphPoint(page,{x:0,y:0})).scale;
+ await home(page).locator('.explore-window-hide').click();await fit(page,'workbench');expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(far*2);
+ const invalid=(await source(page))+'!';await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},invalid);
+ await panelPlacement(page,'The home','floating');await expect(page.locator('#src')).toHaveValue(invalid);expect(await home(page).evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
+ await page.locator('.explore-panel-menu summary').click();await expect(page.getByLabel('Placement for The home',{exact:true})).toHaveValue('canvas');
+});
+
+test('mixed Fit can use a narrow free region beside a large floating panel',async({page,server})=>{
+ const raw=mixedFixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.overlayScale=1;layout.panels.find(p=>p.panel==='clip').x=.1;layout.panels.find(p=>p.panel==='clip').y=0;layout.panels.find(p=>p.panel==='clip').w=.85;layout.panels.find(p=>p.panel==='clip').h=.9;
+ await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'reader');await fit(page,'reader');
+ const floating=await clip(page).boundingBox(),player=await page.locator('.explore-player').boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
+ for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-canvas-objects .explore-window:visible').all()]){
+  const r=await loc.boundingBox();expect(overlaps(r,floating)).toBe(false);expect(overlaps(r,player)).toBe(false);expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);
+ }
+ const fitted=(await graphPoint(page,{x:0,y:0})).scale;expect(fitted).toBeLessThan(.1);
+ await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.getByRole('button',{name:'Zoom out',exact:true}).click();expect((await graphPoint(page,{x:0,y:0})).scale).toBeCloseTo(fitted,2);
 });

@@ -4,6 +4,7 @@ var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
 var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
+var AUTO_ARRANGE_GRID_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 var AUTO_ARRANGE_FOLD_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 function autoArrangeSmall(d){return Object.keys(d.nodes || {}).length<=AUTO_ARRANGE_SMALL_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_SMALL_LIMITS.edges;}
 var AUTO_ARRANGE_CARD_GAP=54,AUTO_ARRANGE_RANK_GAP=72,AUTO_ARRANGE_LINK_DISTANCE=300;
@@ -79,23 +80,32 @@ function autoArrangeRead(d,json){
 function autoArrangePathGeometry(path){
   var left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   path.forEach(function(p){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);});
-  return {path:path,bounds:{x:left,y:top,w:right-left,h:bottom-top}};
+  var segments=[];
+  for(var i=1;i<path.length;i++){
+    var a=path[i-1],b=path[i];
+    segments.push({a:a,b:b,dx:b.x-a.x,dy:b.y-a.y,left:Math.min(a.x,b.x),right:Math.max(a.x,b.x),top:Math.min(a.y,b.y),bottom:Math.max(a.y,b.y)});
+  }
+  return {path:path,bounds:{x:left,y:top,w:right-left,h:bottom-top},segments:segments};
 }
 function autoArrangeIncident(e,f){return e.from===f.from || e.from===f.to || e.to===f.from || e.to===f.to;}
 function autoArrangePathsCross(a,b){
   var ar=a.bounds,br=b.bounds;
   if(ar.x+ar.w<br.x || br.x+br.w<ar.x || ar.y+ar.h<br.y || br.y+br.h<ar.y)return false;
-  function intersects(a,b,c,d){
-    if(Math.max(a.x,b.x)<Math.min(c.x,d.x) || Math.max(c.x,d.x)<Math.min(a.x,b.x) || Math.max(a.y,b.y)<Math.min(c.y,d.y) || Math.max(c.y,d.y)<Math.min(a.y,b.y))return false;
-    function side(p,q,r){return (q.x-p.x)*(r.y-p.y)-(q.y-p.y)*(r.x-p.x);}
-    return side(a,b,c)*side(a,b,d)<-1e-8 && side(c,d,a)*side(c,d,b)<-1e-8;
+  // A sampled path participates in many pair checks. Reuse segment bounds
+  // and deltas while preserving the same strict intersection predicate.
+  for(var ai=0;ai<a.segments.length;ai++)for(var bi=0;bi<b.segments.length;bi++){
+    var p=a.segments[ai],q=b.segments[bi];
+    if(p.right<q.left || q.right<p.left || p.bottom<q.top || q.bottom<p.top)continue;
+    var s=p.dx*(q.a.y-p.a.y)-p.dy*(q.a.x-p.a.x),t=p.dx*(q.b.y-p.a.y)-p.dy*(q.b.x-p.a.x);
+    if(s*t>=-1e-8)continue;
+    var u=q.dx*(p.a.y-q.a.y)-q.dy*(p.a.x-q.a.x),v=q.dx*(p.b.y-q.a.y)-q.dy*(p.b.x-q.a.x);
+    if(u*v<-1e-8)return true;
   }
-  for(var ai=1;ai<a.path.length;ai++)for(var bi=1;bi<b.path.length;bi++)if(intersects(a.path[ai-1],a.path[ai],b.path[bi-1],b.path[bi]))return true;
   return false;
 }
 function autoArrangeAdjust(d,L){return resolveEdgeAvoidance(d.edges,L,edgeAutoAdjust(d.edges,L));}
 function autoArrangeScore(d,result){
-  var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),overlaps=0,hits=0,crossings=0,length=0;
+  var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),overlaps=0,hits=0,crossings=0,incidentCrossings=0,length=0;
   function rect(p){return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};}
   function overlap(a,b){return a.x<b.x+b.w-.1 && b.x<a.x+a.w-.1 && a.y<b.y+b.h-.1 && b.y<a.y+a.h-.1;}
   ids.forEach(function(id,i){ids.slice(i+1).forEach(function(other){if(overlap(rect(L.pos[id]),rect(L.pos[other])))overlaps++;});});
@@ -113,7 +123,7 @@ function autoArrangeScore(d,result){
     return autoArrangePathGeometry(path);
   });
   paths.forEach(function(a,i){paths.slice(i+1).forEach(function(b,k){
-    if(!autoArrangeIncident(arranged.edges[i],arranged.edges[i+k+1]) && autoArrangePathsCross(a,b))crossings++;
+    if(autoArrangePathsCross(a,b)){if(autoArrangeIncident(arranged.edges[i],arranged.edges[i+k+1]))incidentCrossings++;else crossings++;}
   });});
   var pathBounds=paths.map(function(p){return p.bounds;});
   // Score the occupied geometry, not the viewer's minimum-width canvas.
@@ -123,7 +133,7 @@ function autoArrangeScore(d,result){
   var width=right-left,height=bottom-top,aspect=width/height;
   // Every shape from square to a landscape monitor is equally preferred.
   var shape=aspect<1?Math.log(1/aspect):aspect>16/9?Math.log(aspect/(16/9)):0;
-  return {overlaps:overlaps,hits:hits,crossings:crossings,length:length,area:width*height,width:width,height:height,aspect:aspect,shape:shape};
+  return {overlaps:overlaps,hits:hits,crossings:crossings,incidentCrossings:incidentCrossings,length:length,area:width*height,width:width,height:height,aspect:aspect,shape:shape};
 }
 function autoArrangeNaturalRoutes(d,result){
   var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),count=arranged.edges.length;
@@ -378,6 +388,98 @@ function autoArrangeFoldedPositions(d,result){
     ids.forEach(function(id,i){var cell=finalist.cells[i];positions[id]={x:120+usedColumns.indexOf(cell%columns)*dx,y:100+usedRows.indexOf(Math.floor(cell/columns))*dy};});return positions;
   });
 }
+function autoArrangeGridPositions(d,result){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
+  // Spend this optional budget only on unresolved routing. Already natural,
+  // crossing-free layouts keep their approved structure and exact positions.
+  if(count<4 || count>AUTO_ARRANGE_GRID_LIMITS.nodes || edges.length>AUTO_ARRANGE_GRID_LIMITS.edges ||
+    ids.some(function(id){return d.nodes[id].group;}) || edges.some(function(e){return e.from===e.to;}) ||
+    !result.score.crossings && !result.edges.some(function(e){return hasCubicCurve(e);}))return [];
+  var old=Object.create(null);result.positions.forEach(function(p){old[p.id]=p;});
+  var links=edges.map(function(e){return [ids.indexOf(e.from),ids.indexOf(e.to)];});
+  var forward=edges.map(function(e){return old[e.to].y>=old[e.from].y;}),peers=[];
+  // Keep recognizable shared ranks when connected branches already share a
+  // parent or join. Forward flow is a strong preference, feedback is exempt.
+  for(var a=0;a<count;a++)for(var b=a+1;b<count;b++){
+    if(old[ids[a]].y!==old[ids[b]].y)continue;
+    if(links.some(function(e){return e[0]===a && links.some(function(f){return f[0]===b && f[1]===e[1];});}) ||
+      links.some(function(e){return e[1]===a && links.some(function(f){return f[1]===b && f[0]===e[0];});}))peers.push([a,b]);
+  }
+  var columns=Math.ceil(Math.sqrt(count)),rows=Math.ceil(count*1.65/columns),size=columns*rows;
+  var dx=150+AUTO_ARRANGE_CARD_GAP,dy=Math.ceil((44+AUTO_ARRANGE_RANK_GAP)/12)*12;
+  var cells=[],paths=[],lookup=new Int32Array(size*size),distance=[],hitLow=[],hitHigh=[];
+  for(var i=0;i<size;i++)cells.push({cx:(i%columns)*dx,cy:Math.floor(i/columns)*dy,w:150,h:44,free:true,float:true});
+  // Unadjusted automatic curves depend only on the two occupied cells. Cache
+  // their hits with the viewer's avoidance margin. Two masks cover <=35 cells.
+  // A six-point crossing estimate keeps search cheap; finalists are checked
+  // with the full viewer sampler, avoidance, overlaps and occupied bounds.
+  for(var a=0;a<size;a++)for(var b=a+1;b<size;b++){
+    var path=samplePathD(edgePath({from:'a',to:'b'},{pos:{a:cells[a],b:cells[b]}})),index=paths.length,low=0,high=0;
+    lookup[a*size+b]=lookup[b*size+a]=index;
+    var coarse=path.filter(function(p,i){return i%5===0 || i===path.length-1;}),segments=[];
+    for(var j=1;j<coarse.length;j++){
+      var p=coarse[j-1],q=coarse[j];segments.push({x:p.x,y:p.y,dx:q.x-p.x,dy:q.y-p.y,left:Math.min(p.x,q.x),right:Math.max(p.x,q.x),top:Math.min(p.y,q.y),bottom:Math.max(p.y,q.y)});
+    }
+    paths.push(segments);
+    distance[index]=Math.hypot(cells[a].cx-cells[b].cx,cells[a].cy-cells[b].cy);
+    for(var c=0;c<size;c++)if(c!==a && c!==b && countPathRectHits(path,[{x:cells[c].cx-75-AVOID_MARGIN,y:cells[c].cy-22-AVOID_MARGIN,w:150+2*AVOID_MARGIN,h:44+2*AVOID_MARGIN}])){
+      if(c<32)low|=1<<c;else high|=1<<(c-32);
+    }
+    hitLow.push(low);hitHigh.push(high);
+  }
+  var cache=new Uint8Array(paths.length*paths.length),pairs=[];
+  edges.forEach(function(e,i){edges.slice(i+1).forEach(function(f,j){pairs.push([i,i+j+1]);});});
+  function cross(a,b){
+    var key=a*paths.length+b;if(cache[key])return cache[key]-1;
+    // Segment bounds and deltas are reused across every candidate. Avoid
+    // repeating the full geometry sampler in this inner search loop.
+    var first=paths[a],second=paths[b];
+    for(var i=0;i<first.length;i++)for(var j=0;j<second.length;j++){
+      var p=first[i],q=second[j];
+      if(p.right<q.left || q.right<p.left || p.bottom<q.top || q.bottom<p.top)continue;
+      var x=q.x-p.x,y=q.y-p.y,s=p.dx*y-p.dy*x,t=q.dx*y-q.dy*x;
+      if(s*(s+p.dx*q.dy-p.dy*q.dx)<-1e-8 && t*(t+q.dy*p.dx-q.dx*p.dy)<-1e-8){cache[key]=2;return 1;}
+    }
+    cache[key]=1;return 0;
+  }
+  function score(placed){
+    var low=0,high=0,value=0,routes=[];
+    for(var i=0;i<count;i++){if(placed[i]<32)low|=1<<placed[i];else high|=1<<(placed[i]-32);}
+    for(var i=0;i<links.length;i++){
+      var e=links[i],a=placed[e[0]],b=placed[e[1]],route=lookup[a*size+b];routes.push(route);value+=distance[route];
+      var drop=cells[a].cy-cells[b].cy;if(forward[i] && drop>0)value+=40*drop;
+      var blocked=hitLow[route]&low;while(blocked){value+=4000;blocked&=blocked-1;}
+      blocked=hitHigh[route]&high;while(blocked){value+=4000;blocked&=blocked-1;}
+    }
+    for(var i=0;i<pairs.length;i++)value+=4000*cross(routes[pairs[i][0]],routes[pairs[i][1]]);
+    for(var i=0;i<peers.length;i++)value+=4*Math.abs(cells[placed[peers[i][0]]].cy-cells[placed[peers[i][1]]].cy);
+    return value;
+  }
+  var state=1,finalists=[];
+  function random(){state=(1664525*state+1013904223)>>>0;return state/4294967296;}
+  for(var run=0;run<AUTO_ARRANGE_GRID_LIMITS.runs;run++){
+    var available=[];for(var i=0;i<size;i++)available.push(i);
+    for(var i=size-1;i>0;i--){var j=Math.floor(random()*(i+1)),swap=available[i];available[i]=available[j];available[j]=swap;}
+    var placed=available.slice(0,count),value=score(placed),best=placed.slice(),bestValue=value;
+    for(var step=0;step<AUTO_ARRANGE_GRID_LIMITS.steps;step++){
+      var index=Math.floor(random()*count),cell=Math.floor(random()*size),other=placed.indexOf(cell),next=placed.slice();
+      next[index]=cell;if(other>=0)next[other]=placed[index];
+      var cost=score(next),temperature=2500*Math.pow(.002,step/AUTO_ARRANGE_GRID_LIMITS.steps);
+      if(cost<value || random()<Math.exp((value-cost)/temperature)){placed=next;value=cost;}
+      if(cost<bestValue){best=next;bestValue=cost;}
+    }
+    var key=best.join(',');if(!finalists.some(function(f){return f.key===key;}))finalists.push({key:key,cost:bestValue,cells:best});
+  }
+  finalists.sort(function(a,b){return a.cost-b.cost;});
+  return finalists.slice(0,AUTO_ARRANGE_GRID_LIMITS.finalists).map(function(finalist){
+    var xs=finalist.cells.map(function(cell){return cells[cell].cx;}),ys=finalist.cells.map(function(cell){return cells[cell].cy;});
+    var width=Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,height=Math.max.apply(null,ys)-Math.min.apply(null,ys)+44,gap=dy;
+    // A compact candidate may occupy fewer rows than the search grid. Restore
+    // a readable aspect with regular spacing, then recheck actual curves.
+    if(width/height>16/9 && height>44)gap=Math.ceil((width/1.5-44)/(height-44)*dy/12)*12;
+    return {positions:ids.map(function(id,i){var p=cells[finalist.cells[i]];return {id:id,x:120+p.cx,y:100+p.cy/dy*gap};}),edges:edges.map(function(){return {};})};
+  });
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -429,5 +531,15 @@ function autoArrangeCandidates(d,viz,cola){
     if(result.score.overlaps || result.score.hits || result.score.crossings>chosen.score.crossings)result=attempt('LR',positions);
     if(result && result.score.crossings<=chosen.score.crossings && autoArrangeAlignmentFits(result.score,chosen.score) && Math.hypot(result.score.width,result.score.height)<=Math.hypot(chosen.score.width,chosen.score.height) && result.score.length<chosen.score.length)chosen=result;
   });
-  return autoArrangeNaturalRoutes(d,chosen);
+  chosen=autoArrangeNaturalRoutes(d,chosen);
+  var grids=autoArrangeGridPositions(d,chosen);
+  for(var i=0;i<grids.length;i++){
+    var grid=grids[i];grid.score=autoArrangeScore(d,grid);
+    // The search score is only a proposal. Require actual natural curves to
+    // preserve safety, shape and footprint, and shorten center distances.
+    if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
+      grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return grid;
+  }
+  return chosen;
 }

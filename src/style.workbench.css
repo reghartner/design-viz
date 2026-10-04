@@ -1340,6 +1340,14 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 
 .workspace-change-dialog{width:min(650px,calc(100vw - 40px));max-height:75dvh;overflow:auto;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:22px;}
 .workspace-change-dialog p{white-space:pre-wrap;overflow-wrap:anywhere;}
+#auto-arrange-dialog{box-sizing:border-box;}
+#auto-arrange-dialog [data-arrange-confirm]:disabled{opacity:.45;cursor:default;filter:none;}
+.auto-arrange-activity{display:flex;align-items:center;gap:18px;min-height:112px;margin:20px 0;padding:20px;box-sizing:border-box;border:1px solid var(--accent);border-radius:10px;background:var(--selglow);font-size:20px;line-height:1.4;}
+.auto-arrange-activity[hidden]{display:none;}
+.auto-arrange-spinner{flex:none;width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:auto-arrange-spin .9s linear infinite;}
+@keyframes auto-arrange-spin{to{transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.auto-arrange-spinner{animation:none;}}
+
 @media(max-width:1100px){.workspace-provenance{display:none;}}
 @media(max-width:700px){.workspace-diagram:not(.welcome-active) .workbench-diagram-canvas{top:var(--workspace-content-top);}}
 

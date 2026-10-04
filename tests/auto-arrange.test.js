@@ -278,7 +278,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces exactly');
     assertAutoPorts(result.edges);assertAutoPorts(out.edges);
     const retained=out.edges.filter(e=>e.curveControls);
-    assert.equal(retained.length,[0,0,0,0,2,0][i],block.id+' retains only needed curves');
+    assert.equal(retained.length,[0,0,0,0,0,0][i],block.id+' retains only needed curves');
     assert.equal(C.FlowviewCompatibility.detect(out).includes('layout.cubic-curves'),retained.length>0);
     out.edges.forEach((edge,index)=>{
       if(!edge.curveControls){assert.equal(edge.labelDx,undefined);assert.equal(edge.labelDy,undefined);return;}
@@ -292,7 +292,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.ok(minimumCardGap(result)>=48,block.id+' gap '+minimumCardGap(result));
     if(i===0){assert.equal(result.score.width,558);assert.equal(result.score.height,248);}
     else{assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);}
-    assert.equal(result.score.crossings,i===5?3:0,block.id);
+    assert.equal(result.score.crossings,i===5?1:0,block.id);
     if(i===2 || i===3){
       for(const axis of ['x','y']){
         const values=[...new Set(result.positions.map(p=>p[axis]))].sort((a,b)=>a-b),gap=values[1]-values[0];
@@ -314,6 +314,15 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
         for(const [from,to] of [['warehouse','carrier'],['notify','mail']])assert.equal(byId[from].x,byId[to].x,'terminal chain stays in its column');
       }
     }
+    if(i===4){
+      assert.ok(result.score.width<=1200 && result.score.height<=900);assert.ok(result.score.length<7000);
+      for(const axis of ['x','y']){
+        const values=[...new Set(result.positions.map(p=>p[axis]))].sort((a,b)=>a-b),gap=values[1]-values[0];
+        values.slice(1).forEach((value,j)=>assert.equal((value-values[j])%gap,0,'media uses a regular '+axis+' grid'));
+      }
+    }
+    if(i>=4)assert.equal(result.score.incidentCrossings,0,'fan-in and fan-out curves do not weave after their shared endpoint');
+    if(i===5)assert.ok(result.score.length<2600,'nonplanar graph keeps compact center distances');
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
   });
 });
@@ -435,4 +444,56 @@ test('grouped snakes with overlapping group boxes fall back to safe clustered ca
   let attempts=0;const result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);
   assert.ok(attempts>1);assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
   assert.deepEqual(plain(C.autoArrangeDiagram(d,result).groups),d.groups);
+});
+
+
+test('natural grid search is deterministic and independent of IDs, titles and tints on synthetic bipartite graphs',()=>{
+  const ids=['p0','p1','p2','q0','q1','q2'];
+  const d={nodes:Object.fromEntries(ids.map(id=>[id,{title:id}])),edges:ids.slice(0,3).flatMap(from=>ids.slice(3).map(to=>({from,to}))),rows:[ids]};
+  const result=C.autoArrangeCandidates(d,viz,cola);
+  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,1);
+  assert.ok(result.score.length<2600);assert.equal(result.score.shape,0);assert.ok(result.edges.every(e=>!e.curveControls));
+  const names=Object.fromEntries(ids.map((id,i)=>[id,'different_'+(19-i)]));
+  const renamed={nodes:Object.fromEntries(ids.map(id=>[names[id],{title:'Unrelated text',tint:'auth'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]})),rows:[ids.map(id=>names[id])]};
+  const again=C.autoArrangeCandidates(renamed,viz,cola);
+  assert.deepEqual(plain(again.positions),plain(result.positions.map(p=>({...p,id:names[p.id]}))));
+  assert.deepEqual(plain(again.score),plain(result.score));
+});
+
+test('optional natural grid proposals cannot regress final viewer safety, crossings, shape or length',()=>{
+  const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[5].diagram,grid=C.autoArrangeGridPositions;
+  try{
+    C.autoArrangeGridPositions=()=>[];const expected=C.autoArrangeCandidates(d,viz,cola);
+    const overlap=plain(expected);overlap.positions[1]={...overlap.positions[0],id:overlap.positions[1].id};
+    const longer=plain(expected);longer.positions.forEach(p=>{p.x*=2;p.y*=2;});
+    const tall=plain(expected);tall.positions.forEach(p=>{p.y*=2;});
+    const crossed={positions:Object.keys(d.nodes).map((id,i)=>({id,x:120+(i%3)*204+(i>=3?13:0),y:100+Math.floor(i/3)*240+i*7})),edges:d.edges.map(()=>({}))};
+    assert.ok(C.autoArrangeScore(d,overlap).overlaps>0);
+    assert.ok(C.autoArrangeScore(d,crossed).crossings>expected.score.crossings);
+    C.autoArrangeGridPositions=()=>[overlap,longer,tall,crossed];
+    assert.deepEqual(plain(C.autoArrangeCandidates(d,viz,cola)),plain(expected));
+  }finally{C.autoArrangeGridPositions=grid;}
+});
+
+test('natural grid search skips resolved, grouped, self-loop and over-budget graphs before building cell geometry',()=>{
+  const pending={score:{crossings:1},edges:[]},resolved={score:{crossings:0},edges:[]};
+  const sized=(nodes,edges)=>({nodes:Object.fromEntries(Array.from({length:nodes},(_,i)=>['v'+i,{}])),edges:Array.from({length:edges},()=>({from:'v0',to:'v1'}))});
+  for(const d of [sized(21,1),sized(20,33),sized(80,144),{...sized(6,9),nodes:{a:{group:'g'}}},{...sized(6,0),edges:[{from:'v0',to:'v0'}]}]){
+    assert.deepEqual(plain(C.autoArrangeGridPositions(d,pending)),[]);
+  }
+  assert.deepEqual(plain(C.autoArrangeGridPositions(sized(20,24),resolved)),[]);
+});
+
+
+test('incident route scoring detects fan-out weaving beyond a shared port and clears a distributed fan',()=>{
+  const ids=Array.from({length:6},(_,i)=>'v'+i),d={nodes:Object.fromEntries(ids.map(id=>[id,{}])),rows:[[]],edges:ids.slice(1).map(to=>({from:ids[0],to}))};
+  const positions=[{id:ids[0],x:528,y:300},...ids.slice(1).map((id,i)=>({id,x:120+i*204,y:420}))];
+  const crowded={positions,edges:d.edges.map(()=>({}))},score=C.autoArrangeScore(d,crowded);
+  assert.equal(score.overlaps,0);assert.equal(score.hits,0);assert.equal(score.crossings,0);
+  assert.equal(score.incidentCrossings,2,'automatic curves overshoot the nearby sink row and weave');
+  const distributed=plain(crowded);distributed.positions[1].y=300;distributed.positions[5].y=300;
+  const clear=C.autoArrangeScore(d,distributed);
+  assert.equal(clear.overlaps,0);assert.equal(clear.hits,0);assert.equal(clear.crossings,0);assert.equal(clear.incidentCrossings,0);
+  const reversed={...d,edges:d.edges.map(e=>({from:e.to,to:e.from}))};
+  assert.equal(C.autoArrangeScore(reversed,crowded).incidentCrossings,2,'fan-in receives the same geometric check');
 });

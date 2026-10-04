@@ -22,8 +22,8 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 | 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 962 × 624 | 1.54 |
 | 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 870 × 624 | 1.39 |
 | 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 762 × 644 | 1.18 |
-| 05 Media platform | 20 | 24 | Five node colors without group boxes, legacy publishing, direct catalog write and upload retry | 0 | 1518 × 972 | 1.56 |
-| 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 3 | 667 × 511 | 1.31 |
+| 05 Media platform | 20 | 24 | Five node colors without group boxes, legacy publishing, direct catalog write and upload retry | 0 | 966 × 764 | 1.26 |
+| 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 1 | 567 × 380 | 1.49 |
 
 All saved layouts have zero overlapping cards or groups and zero routes through
 unrelated cards according to `autoArrangeScore`. Dimensions enclose cards,
@@ -44,12 +44,11 @@ described below; the ungrouped media example receives local grid alignment.
 Sections 01–05 retain zero-crossing layouts even with the added coupling.
 Section 06 is intentionally nonplanar: each of three event streams connects to
 each of three consumers, so at least one crossing is unavoidable. The bounded
-search currently finds three crossing pairs; it does not promise the optimum.
+search finds one crossing pair in this fixture, reaching that lower bound.
 
 All saved edges use automatic attachments, with no `fromPort` or `toPort`.
-Cases 01–04 and 06 use natural automatic curves throughout; case 05 retains
-two native curves. Removing any retained
-curve would cause an unrelated-card hit or increase crossings. Automatic
+All six cases use natural automatic curves throughout, with no saved curve
+controls. Automatic
 routes use the viewer's avoidance and have no saved label nudges. Moving cards
 updates their routes and attachment sides; retained native curves remain
 editable. Length tie-breaking uses straight center-to-center distances;
@@ -88,18 +87,19 @@ The pastel skin displays the five supported tint categories as follows:
 | data | Output stores | `data` | Purple |
 | delivery | Delivery | `mqtt` | Pink |
 
-Removing the boxes lets the current algorithm use a shared grid, but the result
-is still broad: 1518 × 972, versus the grouped layout's 1307 × 1162. Metadata
-remains far from ingestion and the delivery row spreads across the bottom.
-There are zero overlaps, card hits or crossings; 22 edges use natural curves
-and two retain native controls. This is a baseline change for comparison, with
-no new layout algorithm or manually positioned nodes.
+The media grid occupies 966 × 764 and reduces center-to-center connection
+length from 8190 to 5854. It has five columns spaced 204 units apart and seven
+rows spaced 120 units apart, including an empty row for route clearance. The
+three processing branches and their stores each share a row. Near publication,
+one delivery sink shares its row and three are below it, reducing the number
+of curves leaving the same side. This layout has zero ordinary crossings and
+zero intersections between curves sharing a source or destination, beyond
+their common endpoint. All 24 edges use natural curves.
 
 The local alignment pass prioritizes fewer shared centers and regular gaps, checks
 safety before accepting a grid, and keeps source/sink positions in that grid.
 Only recognizable ranked, ungrouped diagrams with at most 24 nodes and 48
-edges enter the bounded search. The nonplanar example retains its prior
-placement. A second bounded search can fold a deep single-source
+edges enter the bounded search. A second bounded search can fold a deep single-source
 unary entrance and swap nodes across a smaller grid; it is limited to 20 nodes
 and 32 edges, 240,000 cheap geometry estimates, and four fully checked finalists.
 The single-source folding pass leaves the multi-source telemetry and media
@@ -110,3 +110,33 @@ Shape preference never overrides collision safety or fewer crossing pairs.
 Graphviz's target-ratio candidates can add whitespace, and labels, symmetry,
 alignment and the overall silhouette still need human judgment. These files
 are algorithm output for that comparison, not manually polished target layouts.
+
+A final optional grid search runs only when the selected layout still has
+crossings or native curve controls. It lets all nodes move, including sources
+and sinks, while strongly preferring the selected layout's forward flow and
+shared branch ranks. This is a soft preference: feedback and an occasional
+local forward edge can point upward when that clears the fan-out. At most 20 nodes and 32
+edges enter 12 deterministic runs of 20,000 cell moves, followed by at most four
+full viewer checks. Cached automatic curves use a coarse crossing estimate
+during search; the final safety check uses full sampled geometry and automatic
+avoidance. A candidate must have no overlaps or card hits, no added ordinary or incident crossings,
+no worse shape or occupied diagonal, and shorter center distances. This pass
+changes only cases 05 and 06 here; cases 01–04 remain exactly unchanged. The
+matrix shrinks from 667 × 511 to 567 × 380 and center distance from 2900 to 2350.
+The search uses topology and previous layout geometry, never node names,
+titles, tints, section IDs, or reference positions. It skips larger stress graphs.
+
+The incident-crossing metric also inspects curves sharing a source or
+destination, because they can weave beyond a common automatic attachment.
+The former media proposal had three such crossings despite scoring zero
+ordinary crossings; the current output and latest human target both have zero.
+The grid search penalizes both kinds. This pass deliberately preserves the
+approved cases 01–04; it does not reopen an already natural layout solely for
+incident crossings, so case 04 retains its two existing incident crossings.
+
+Incident crossings use the same sampled-path test as ordinary crossings. A
+proper intersection requires the segments to pass across each other, so a
+shared endpoint alone is excluded. Collinear shared segments and near-parallel
+bundling are not counted by this metric. The clearer fan trades some local
+flow order and a longer upload-to-metadata connection along the left side for
+fewer crowded routes around publication.

@@ -125,7 +125,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     w.el.classList.toggle('explore-canvas-selected',selected);
     if(mode){w.el.tabIndex=0;w.el.setAttribute('aria-label',canvasWindowLabel(w,selected));}
     else{w.el.removeAttribute('tabindex');w.el.setAttribute('aria-label',w.label);}
-    w.resize.title=sizing && sizing.mode==='fixed-aspect'?'Drag vertically or horizontally; proportions stay locked and width determines height':sizing?'Drag vertically or horizontally; height fits content from its width':'Drag to resize; arrow keys to resize';
+    w.resize.title=sizing && sizing.mode==='fixed-aspect'?'Drag vertically or horizontally; visual proportions stay fixed and panel height fits content':sizing?'Drag vertically or horizontally; height fits content from its width':'Drag to resize; arrow keys to resize';
     if(selected)w.el.setAttribute('aria-current','true');else w.el.removeAttribute('aria-current');
   }
   function selectCanvasWindow(w){
@@ -321,7 +321,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
     w.el.classList.toggle('explore-stacked',w.state.stacked);
-    var sizing=canvasSizing(w),instruction=sizing && sizing.mode==='fixed-aspect'?'; proportions stay locked; width determines height':sizing?'; height fits content from its width':'';
+    var sizing=canvasSizing(w),instruction=sizing && sizing.mode==='fixed-aspect'?'; visual proportions stay fixed; panel height fits content':sizing?'; height fits content from its width':'';
     w.resize.setAttribute('aria-label','Resize '+w.label+instruction+'; use arrow keys');
   }
   function fittedCanvasRect(w,r){

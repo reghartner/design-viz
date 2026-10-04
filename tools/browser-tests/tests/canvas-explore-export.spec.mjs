@@ -39,9 +39,15 @@ async function camera(page){
   });
 }
 async function expectSavedGeometry(page,layout){
-  for(const [locator,saved] of [[panel(page),layout.panels.find(p=>p.panel==='home')],[controls(page),layout.controls]]){
+  const scale=layout.overlayScale ?? 1;
+  for(const [locator,saved,isControls] of [[panel(page),layout.panels.find(p=>p.panel==='home'),false],[controls(page),layout.controls,true]]){
     await expect.poll(async()=>{
-      const actual=await rectangle(locator);return Math.max(...['x','y','w','h'].map(k=>Math.abs(actual[k]-saved[k])));
+      const actual=await rectangle(locator),expected=await locator.evaluate((el,args)=>{
+        const height=el.closest('.explore-stage').getBoundingClientRect().height;
+        return {x:args.saved.x,y:args.saved.y,w:args.isControls?args.saved.w:args.saved.w*args.scale,
+          h:args.isControls?args.saved.h*args.scale:(32+(args.saved.h*height-32)*args.scale)/height};
+      },{saved,scale,isControls});
+      return Math.max(...['x','y','w','h'].map(k=>Math.abs(actual[k]-expected[k])));
     },{message:'Rendered normalized rectangle matches authored Explore layout'}).toBeLessThan(.003);
   }
   if(layout.camera)await expect.poll(async()=>{
@@ -66,6 +72,10 @@ test('main canvas Explore gestures author one history entry each and survive sta
   ];
   await expect(page.locator('#undo-builder')).toBeDisabled();
   for(const [handle,dx,dy] of gestures){
+    // Each completed gesture selects its Explore surface and may open Inspect
+    // in a fresh workspace. Keep that editor chrome out of the next gesture's
+    // hit area; its persisted position is not part of this geometry contract.
+    await closeTools(page);
     const before=states.at(-1);await drag(page,handle(),dx,dy);
     await expect.poll(async()=>await source(page)!==before,{message:'The canvas gesture must update exportable authored layout'}).toBe(true);
     const changed=await source(page);states.push(changed);

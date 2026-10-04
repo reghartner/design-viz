@@ -33,7 +33,7 @@ test('menu covers panel body border and header, modifiers preserve selection, Es
  await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
  await node(page).click({modifiers:['Alt']});await expect(page.locator('.dv-connect-hint')).toBeVisible();await page.keyboard.press('Escape');
 });
-test('marquee intersection follows zoom, Escape and source replacement retire transient state',async({page,server})=>{
+test('marquee follows zoom; source handwriting retires the menu and view actions clear selection',async({page,server})=>{
  await open(page,server);const original=await source(page);
  for(const delta of [0,150,-250]){
   if(delta)await page.locator('.explore-board').dispatchEvent('wheel',{clientX:430,clientY:400,deltaY:delta,ctrlKey:true,bubbles:true,cancelable:true});
@@ -41,7 +41,7 @@ test('marquee intersection follows zoom, Escape and source replacement retire tr
   await expect(node(page)).toHaveClass(/dv-sel/);await expect(page.locator('.dv-sel')).toHaveCount(1);expect(await source(page)).toBe(original);await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
  }
  await page.locator('#workspace-fit').click();await marquee(page,true);await page.keyboard.press('Escape');await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
- await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
+ await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(node(page)).toHaveClass(/dv-sel/);await page.locator('[data-view-layout]').first().click();await expect(page.locator('.dv-sel')).toHaveCount(0);
 });
 
 test('Explore editing chrome follows shared light and dark theme colors',async({page,server},info)=>{

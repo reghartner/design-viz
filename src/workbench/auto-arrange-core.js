@@ -603,7 +603,68 @@ function autoArrangeGlobalLattice(d,result,viz){
   }
   return result;
 }
-function autoArrangeFoldedPositions(d,result){
+// Terminal corridors can occupy any clear part of the shared lattice. Their
+// arrow direction is irrelevant: evaluate upward, downward and sideways folds.
+function autoArrangeTerminalFolds(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
+  if(count<=20 || count>48 || edges.length>80 || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var adjacent=Object.create(null);ids.forEach(function(id){adjacent[id]=[];});
+  edges.forEach(function(e){if(e.from!==e.to){if(adjacent[e.from].indexOf(e.to)<0)adjacent[e.from].push(e.to);if(adjacent[e.to].indexOf(e.from)<0)adjacent[e.to].push(e.from);}});
+  var chains=[];
+  ids.forEach(function(id){
+    if(adjacent[id].length!==1)return;
+    var chain=[id],previous=id,current=adjacent[id][0];
+    while(adjacent[current].length===2 && chain.indexOf(current)<0 && chain.length<6){
+      chain.push(current);var next=adjacent[current].filter(function(id){return id!==previous;})[0];previous=current;current=next;
+    }
+    if(chain.length>=2 && adjacent[current].length>2)chains.push({anchor:current,ids:chain.reverse()});
+  });
+  var best=result,attempts=0,budget=Math.min(64,Math.floor(120000/(count*Math.max(1,edges.length))));
+  function improve(a,b){return a.area<b.area*.99 && a.length<=result.score.length*1.03 || a.length<b.length*.97 && a.area<=b.area;}
+  function safe(a){var b=best.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=result.score.shape+1e-9 &&
+    a.length<=result.score.length*1.03 && Math.hypot(a.width,a.height)<=Math.hypot(b.width,b.height) && improve(a,b);}
+  for(var pass=0;pass<2 && attempts<budget;pass++){
+    var source=best,points=Object.create(null);source.positions.forEach(function(p){points[p.id]=p;});
+    var xs=Array.from(new Set(source.positions.map(function(p){return p.x;}))).sort(function(a,b){return a-b;}),ys=Array.from(new Set(source.positions.map(function(p){return p.y;}))).sort(function(a,b){return a-b;}),proposals=[],seen=new Set();
+    var enumerated=0;
+    chains.forEach(function(chain){
+      if(chain.ids.length>4)return;
+      var fixed=source.positions.filter(function(p){return chain.ids.indexOf(p.id)<0;}),free=new Set();
+      for(var x=0;x<xs.length;x++)for(var y=0;y<ys.length;y++)if(!fixed.some(function(p){return p.x===xs[x] && p.y===ys[y];}))free.add(x+','+y);
+      function add(cells){
+        if(enumerated>=12000)return;
+        if(cells.length<chain.ids.length){
+          [[0,-1],[-1,0],[1,0],[0,1]].forEach(function(step){var last=cells[cells.length-1],cell=[last[0]+step[0],last[1]+step[1]];
+            if(free.has(cell.join(',')) && !cells.some(function(p){return p[0]===cell[0] && p[1]===cell[1];}))add(cells.concat([cell]));});return;
+        }
+        enumerated++;
+        var placed=Object.create(null);chain.ids.forEach(function(id,i){placed[id]={id:id,x:xs[cells[i][0]],y:ys[cells[i][1]]};});
+        var positions=source.positions.map(function(p){return placed[p.id] || p;}),key=positions.map(function(p){return p.x+','+p.y;}).join(';');
+        if(seen.has(key))return;seen.add(key);
+        if(positions.some(function(a,i){return positions.slice(i+1).some(function(b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44))<AUTO_ARRANGE_CARD_GAP-.1;});}))return;
+        var byId=Object.create(null);positions.forEach(function(p){byId[p.id]=p;});
+        var length=edges.reduce(function(sum,e){return sum+Math.hypot(byId[e.from].x-byId[e.to].x,byId[e.from].y-byId[e.to].y);},0);
+        var area=(Math.max.apply(null,positions.map(function(p){return p.x;}))-Math.min.apply(null,positions.map(function(p){return p.x;}))+150)*(Math.max.apply(null,positions.map(function(p){return p.y;}))-Math.min.apply(null,positions.map(function(p){return p.y;}))+44);
+        if(length<=result.score.length*1.03 && area<source.score.area*.99)proposals.push({positions:positions,moved:new Set(chain.ids),length:length,area:area});
+      }
+      free.forEach(function(key){add([key.split(',').map(Number)]);});
+    });
+    proposals.sort(function(a,b){return a.area-b.area || a.length-b.length;});
+    var passLimit=Math.min(budget,attempts+Math.ceil(budget/2));
+    for(var i=0;i<proposals.length && attempts<passLimit;i++){
+      var p=proposals[i];attempts++;
+      var candidate={positions:p.positions,edges:source.edges.map(function(e,j){return p.moved.has(edges[j].from) || p.moved.has(edges[j].to)?{}:e;})};
+      candidate=autoArrangeNaturalRoutes(d,candidate,true);
+      if(!safe(candidate.score)){
+        try{var placed=Object.create(null);p.positions.forEach(function(p){placed[p.id]=p;});candidate=autoArrangeNaturalRoutes(d,autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'})),true);}catch(ex){continue;}
+      }
+      if(safe(candidate.score))best=candidate;
+    }
+    if(best===source)break;
+  }
+  return best;
+}
+function autoArrangeFoldedPositions(d,result,preserveSeedOrder){
   var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
   // Folding is only useful for a deep ranked graph with a unary entrance.
   // Keep already compact, multi-source, grouped and large diagrams untouched.
@@ -622,7 +683,7 @@ function autoArrangeFoldedPositions(d,result){
   // Parallel two-hop branches retain a common processing row. Other branches
   // can turn sideways or share their parent's row to shorten the deep spine.
   outgoing.forEach(function(children){children.forEach(function(a,i){children.slice(i+1).forEach(function(b){
-    if(outgoing[a].some(function(join){return outgoing[b].indexOf(join)>=0 && old[ids[join]].y>Math.max(old[ids[a]].y,old[ids[b]].y);}))siblings.push([a,b]);
+    if(outgoing[a].some(function(join){return outgoing[b].indexOf(join)>=0 && (preserveSeedOrder===false || old[ids[join]].y>Math.max(old[ids[a]].y,old[ids[b]].y));}))siblings.push([a,b]);
   });});});
   var dx=150+AUTO_ARRANGE_CARD_GAP,dy=Math.ceil((44+AUTO_ARRANGE_RANK_GAP)/12)*12,size=columns*rows,slots=size*size;
   // At the 20-node cap there are at most 30 cells: card occupancy fits a
@@ -650,7 +711,7 @@ function autoArrangeFoldedPositions(d,result){
     var occupied=0,value=0,routes=[];cells.forEach(function(cell){occupied|=1<<cell;});
     links.forEach(function(e,i){
       var a=cells[e[0]],b=cells[e[1]],route=a*size+b;routes.push(route);value+=distance[route];
-      if(forward[i] && ys[b]<ys[a])value+=10000;
+      if(preserveSeedOrder!==false && forward[i] && ys[b]<ys[a])value+=10000;
       var blocked=hits[route]&occupied;while(blocked){value+=1500;blocked&=blocked-1;}
     });
     pairs.forEach(function(p){value+=1500*crossings[routes[p[0]]*slots+routes[p[1]]];});
@@ -672,8 +733,9 @@ function autoArrangeFoldedPositions(d,result){
       if(cost<value || random()<Math.exp((value-cost)/temperature)){cells=next;value=cost;}
       if(cost<bestValue){best=next;bestValue=cost;}
     }
-    // Direction and fork rows are structural requirements, not routing hints.
-    if(links.some(function(e,i){return forward[i] && ys[best[e[1]]]<ys[best[e[0]]];}) || siblings.some(function(p){return ys[best[p[0]]]!==ys[best[p[1]]];}))continue;
+    // Retain the old ordered seed alongside the direction-free alternatives.
+    if(preserveSeedOrder!==false && links.some(function(e,i){return forward[i] && ys[best[e[1]]]<ys[best[e[0]]];}))continue;
+    if(siblings.some(function(p){return ys[best[p[0]]]!==ys[best[p[1]]];}))continue;
     var key=best.join(',');if(finalists.some(function(f){return f.key===key;}))continue;
     finalists.push({key:key,cost:bestValue,cells:best});
   }
@@ -686,7 +748,7 @@ function autoArrangeFoldedPositions(d,result){
     ids.forEach(function(id,i){var cell=finalist.cells[i];positions[id]={x:120+usedColumns.indexOf(cell%columns)*dx,y:100+usedRows.indexOf(Math.floor(cell/columns))*dy};});return positions;
   });
 }
-function autoArrangeGridPositions(d,result){
+function autoArrangeGridPositions(d,result,preserveSeedOrder){
   var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
   // Spend this optional budget only on unresolved routing. Already natural,
   // crossing-free layouts keep their approved structure and exact positions.
@@ -697,7 +759,7 @@ function autoArrangeGridPositions(d,result){
   var links=edges.map(function(e){return [ids.indexOf(e.from),ids.indexOf(e.to)];});
   var forward=edges.map(function(e){return old[e.to].y>=old[e.from].y;}),peers=[];
   // Keep recognizable shared ranks when connected branches already share a
-  // parent or join. Forward flow is a strong preference, feedback is exempt.
+  // parent or join. Arrow direction does not constrain relative row order.
   for(var a=0;a<count;a++)for(var b=a+1;b<count;b++){
     if(old[ids[a]].y!==old[ids[b]].y)continue;
     if(links.some(function(e){return e[0]===a && links.some(function(f){return f[0]===b && f[1]===e[1];});}) ||
@@ -745,7 +807,7 @@ function autoArrangeGridPositions(d,result){
     for(var i=0;i<count;i++){if(placed[i]<32)low|=1<<placed[i];else high|=1<<(placed[i]-32);}
     for(var i=0;i<links.length;i++){
       var e=links[i],a=placed[e[0]],b=placed[e[1]],route=lookup[a*size+b];routes.push(route);value+=distance[route];
-      var drop=cells[a].cy-cells[b].cy;if(forward[i] && drop>0)value+=40*drop;
+      var drop=cells[a].cy-cells[b].cy;if(preserveSeedOrder!==false && forward[i] && drop>0)value+=40*drop;
       var blocked=hitLow[route]&low;while(blocked){value+=4000;blocked&=blocked-1;}
       blocked=hitHigh[route]&high;while(blocked){value+=4000;blocked&=blocked-1;}
     }
@@ -839,5 +901,17 @@ function autoArrangeCandidates(d,viz,cola){
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
       Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return grid;
   }
-  return autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz);
+  // Ordered layouts are reproducible seeds, not a constraint on accepted
+  // geometry. Unresolved small layouts also try direction-free searches.
+  if(ids.length<=AUTO_ARRANGE_GRID_LIMITS.nodes && (chosen.score.crossings || chosen.edges.some(function(e){return hasCubicCurve(e);}))) {
+    var unrestricted=autoArrangeGridPositions(d,chosen,false);
+    autoArrangeFoldedPositions(d,chosen,false).forEach(function(positions){
+      unrestricted.push({positions:ids.map(function(id){return {id:id,x:positions[id].x,y:positions[id].y};}),edges:(d.edges || []).map(function(){return {};})});
+    });
+    unrestricted.forEach(function(candidate){
+      candidate.score=autoArrangeScore(d,candidate);var a=candidate.score,b=chosen.score;
+      if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
+    });
+  }
+  return autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz);
 }

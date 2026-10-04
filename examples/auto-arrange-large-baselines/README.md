@@ -38,13 +38,13 @@ routes that share an endpoint; ordinary crossings exclude those pairs.
 
 | Section ID | Diagram | Nodes | Edges | Planarity | Crossings | Incident crossings | Overlaps | Card hits | Occupied width × height | Aspect |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 1 | 0 | 0 | 1204 × 1088 | 1.11 |
+| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 1 | 0 | 0 | 1204 × 749 | 1.61 |
 | `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 10 | 2 | 0 | 0 | 1374 × 1088 | 1.26 |
 | `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 1725 × 1506 | 1.15 |
 | `data-platform` | 04 · Data platform | 48 | 60 | Planar | 2 | 0 | 0 | 0 | 1811 × 1714 | 1.06 |
 
-On a local regeneration run, candidate generation took 4.17 s,
-2.53 s, 7.91 s and 9.05 s respectively. All remain well inside the workbench's
+On a local regeneration run, candidate generation took 4.91 s,
+2.02 s, 5.53 s and 9.89 s respectively. All remain well inside the workbench's
 20 second worker deadline.
 
 ## Alignment cleanup
@@ -156,7 +156,7 @@ and data retain their useful composed rows. Freight's column alignment costs
 0.8% area and 2.9% center distance; data saves 1.2% area for 2.7% extra center
 distance. The six approved small outputs remain byte-identical.
 
-Retained native-curve counts are 5, 11, 7 and 11 respectively, with automatic
+Retained native-curve counts are 6, 11, 7 and 11 respectively, with automatic
 attachments throughout. Removing all retained controls at the new incident and
 billing positions produces three and five unrelated-card hits respectively;
 these curves are required for the accepted placement. All four outputs were
@@ -165,9 +165,42 @@ crossed arrows: its ten ordinary crossings exceed the separate human reference's
 seven, even though its area and link distance are smaller. The reference remains
 read-only and does not participate in generation.
 
+## Direction-free terminal folding
+
+Arrow direction does not constrain final placement. The existing downward-flow
+small searches remain reproducible initial candidates; unresolved small layouts
+also run the same folded/grid searches without forward penalties or upward-edge
+rejection, accepting fully natural alternatives only when they improve actual
+geometry. Graphviz's top-to-bottom ranks likewise supply a starting placement,
+not an acceptance rule.
+
+After the shared-axis pass, a bounded search on ungrouped 21–48-node graphs
+finds terminal corridors using unique undirected neighbors. Corridors of two to
+four nodes can start in any free existing grid cell and continue up, down, left
+or right. This permits a terminal chain to fill space above its fixed branch
+anchor. All coordinates reuse existing columns and rows. The search checks at
+most 12,000 cheap proposals per pass and 64 fully routed proposals total, scaled
+down by node × edge count, across two passes. Per-pass allocation leaves room
+for a second corridor to use space released by the first.
+
+Every accepted fold preserves zero overlaps/card hits, at least 54 px card
+clearance, both crossing counts and the preferred aspect band. Occupied diagonal
+cannot grow; center distance is bounded by 3% over the original pre-fold layout.
+The allowance stays anchored to that original layout across both passes, so a
+short intermediate result does not exclude a safer, smaller final arrangement.
+
+Incident's recovery/postmortem/knowledge/archive tail now points upward in the
+left column, while its source corridor fills an existing top row. This removes
+three rows: 6 columns × 10 rows becomes 6 × 7, occupied height 1088 → 749, and
+area 1,310,305 → 902,059 (31.2% smaller). Center distance rises from 8,777 to
+8,973 (2.23%), with ordinary/incident crossings unchanged at 0/1. The shared-axis
+table above describes the preceding stage. Billing, freight and data retain
+their preceding arrangements byte-identically because no direction-free fold
+passed all improvement and safety gates. All six small baselines remain exact.
+
 Real ungrouped 80-node/144-edge ladder and layered stress graphs completed in
 2.92 s and 7.74 s respectively, with zero overlaps and unrelated-card hits.
-The full 80-node/160-edge layered regression completed in 11.86 s with the same
+The full 80-node/160-edge layered regression completed in 8.68 s with the same
 safety checks after adding the final global-lattice pass (which skips graphs
 above its 48-node bound).
 The search is bounded, not an exhaustive embedding solver: dense cores and

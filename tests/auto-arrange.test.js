@@ -509,8 +509,8 @@ test('incident route scoring detects fan-out weaving beyond a shared port and cl
 
 test('large cleanup straightens branches and shares ranks without worsening final route safety',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json');
-  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice;
-  C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;
+  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds;
+  C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;
   try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
@@ -540,7 +540,7 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
-  }finally{C.autoArrangeMotifCandidates=motifs;C.autoArrangeGlobalLattice=global;}
+  }finally{C.autoArrangeMotifCandidates=motifs;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;}
 });
 
 test('large alignment refuses unsafe proposals and bounds geometry checks at the maximum graph size',()=>{
@@ -572,12 +572,15 @@ test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
 
 test('global composition creates reproducible safe shared axes and a square freight scaffold',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
-  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice;
+  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds;
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;}
-    const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;}
+    const started=performance.now();let beforeFold,result;
+    try{C.autoArrangeTerminalFolds=(d,r,v)=>{beforeFold=r;return terminal(d,r,v);};result=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeTerminalFolds=terminal;}
+    const out=plain(C.autoArrangeDiagram(d,result));
     assert.ok(performance.now()-started<20000,block.id+' worker deadline');
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' deterministic generated output');
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
@@ -598,7 +601,14 @@ test('global composition creates reproducible safe shared axes and a square frei
       assert.ok(result.score.area<before.score.area*.5,block.id+' materially smaller footprint');
       assert.ok(result.score.length<before.score.length*.8,block.id+' shorter center distances');
     }
-    if(i===0){assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
+    if(i===0){
+      const original=Object.fromEntries(beforeFold.positions.map(p=>[p.id,p])),folded=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+      assert.ok(d.edges.some(e=>original[e.to].y>original[e.from].y && folded[e.to].y<folded[e.from].y),'an originally downward edge is accepted pointing upward');
+      assert.ok(axes('y').length<=7,'terminal corridors reuse interior rows');
+      assert.ok(result.score.area<beforeFold.score.area*.7,'upward fold removes more than thirty percent of footprint');
+      assert.ok(result.score.length<=beforeFold.score.length*1.03,'upward folding keeps the original length allowance');
+      assert.equal(result.score.crossings,beforeFold.score.crossings);assert.equal(result.score.incidentCrossings,beforeFold.score.incidentCrossings);
+      assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
     if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
     if(i===2){
       assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,'freight fits square to landscape without padding');
@@ -696,5 +706,23 @@ test('global lattice rejects unsafe proposals, bounds rerouting, and skips unsup
     delete d.nodes.n0.group;
     for(let i=32;i<49;i++)d.nodes['n'+i]={};
     assert.equal(C.autoArrangeGlobalLattice(d,result,{}),result);assert.equal(checks,0,'large graphs retain the preceding bounded motif layout');
+  }finally{C.autoArrangeScore=score;}
+});
+
+
+test('terminal folding rejects failed routes, caps proposals and skips groups and oversized graphs',()=>{
+  const nodes=Object.fromEntries(Array.from({length:21},(_,i)=>['n'+i,{}]));
+  const d={nodes,edges:[[0,1],[1,2],[2,3],[0,4],[0,5]].map(([a,b])=>({from:'n'+a,to:'n'+b}))};
+  const result={positions:Object.keys(nodes).map((id,i)=>({id,x:120+(i%6)*204,y:100+Math.floor(i/6)*116})),edges:d.edges.map(()=>({})),score:{overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:100000,area:10000000,width:4000,height:2500,shape:0}};
+  for(let i=0;i<4;i++){result.positions[i].x=120;result.positions[i].y=680+i*116;}
+  const original=plain(result),score=C.autoArrangeScore;let calls=0;
+  try{
+    C.autoArrangeScore=()=>({...result.score,hits:1});
+    const failingViz={renderJSON(){calls++;throw Error('No safe route');}};
+    assert.equal(C.autoArrangeTerminalFolds(d,result,failingViz),result);
+    assert.ok(calls>0 && calls<=64);assert.deepEqual(plain(result),original);
+    calls=0;d.nodes.n0.group='group';assert.equal(C.autoArrangeTerminalFolds(d,result,failingViz),result);assert.equal(calls,0);
+    delete d.nodes.n0.group;for(let i=21;i<49;i++)d.nodes['n'+i]={};
+    assert.equal(C.autoArrangeTerminalFolds(d,result,failingViz),result);assert.equal(calls,0);
   }finally{C.autoArrangeScore=score;}
 });

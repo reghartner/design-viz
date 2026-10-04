@@ -4,6 +4,7 @@ var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
 var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
+var AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS={checks:240,work:700000,passes:2};
 var AUTO_ARRANGE_GRID_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 var AUTO_ARRANGE_FOLD_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 function autoArrangeSmall(d){return Object.keys(d.nodes || {}).length<=AUTO_ARRANGE_SMALL_LIMITS.nodes && (d.edges || []).length<=AUTO_ARRANGE_SMALL_LIMITS.edges;}
@@ -305,6 +306,104 @@ function autoArrangeAlignedPositions(d,result){
   if(usedColumns.size+usedRows.size>centers || !autoArrangeAlignmentFits(aligned.score,result.score))return null;
   return aligned;
 }
+// Larger ranked layouts need local cleanup, without the combinatorial cell
+// search used for small graphs. Keep every accepted change safe in viewer geometry.
+function autoArrangeLargeAligned(d,result){
+  var ids=Object.keys(d.nodes),edges=d.edges || [];
+  if(ids.length<=AUTO_ARRANGE_GRID_LIMITS.nodes || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var best=result,checks=0,budget=Math.min(AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS.checks,Math.floor(AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS.work/(ids.length*Math.max(1,edges.length))));
+  var degree=Object.create(null);ids.forEach(function(id){degree[id]=0;});
+  edges.forEach(function(e){degree[e.from]++;degree[e.to]++;});
+  function accept(positions,moved,retain){
+    if(checks++>=budget)return false;
+    var before=Object.create(null),after=Object.create(null);
+    best.positions.forEach(function(p){before[p.id]=p;});positions=positions.map(function(p){var q={id:p.id,x:p.x,y:p.y};after[p.id]=q;return q;});
+    // Preserve straight branches as a unit when their common line moves.
+    for(var i=0;i<edges.length;i++){
+      var e=edges[i];if(degree[e.from]!==1 && degree[e.to]!==1)continue;
+      var a=before[e.from],b=before[e.to],c=after[e.from],f=after[e.to];
+      for(var k=0;k<2;k++){
+        var axis=k?'y':'x';if(Math.abs(a[axis]-b[axis])>=.1)continue;
+        if(Math.abs(c[axis]-f[axis])<.1)continue;
+        if(Math.abs(c[axis]-a[axis])>.1 && Math.abs(f[axis]-b[axis])>.1)return false;
+        if(Math.abs(c[axis]-a[axis])>.1){f[axis]=c[axis];moved.add(e.to);}else{c[axis]=f[axis];moved.add(e.from);}
+      }
+    }
+    if(edges.some(function(e){
+      if(degree[e.from]!==1 && degree[e.to]!==1)return false;
+      var a=before[e.from],b=before[e.to],c=after[e.from],f=after[e.to];
+      return (Math.abs(a.x-b.x)<.1 || Math.abs(a.y-b.y)<.1) && Math.abs(c.x-f.x)>.1 && Math.abs(c.y-f.y)>.1;
+    }))return false;
+    // Prefer natural routing at moved endpoints. The existing controls are
+    // a fallback for rank moves only, and must pass the same geometry checks.
+    var candidate={positions:positions,edges:best.edges.map(function(e,i){return moved.has(edges[i].from) || moved.has(edges[i].to)?{}:e;})};
+    candidate.score=autoArrangeScore(d,candidate);
+    function safe(a){var b=best.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings &&
+      a.length<=Math.min(b.length*1.01,result.score.length*1.03) && Math.hypot(a.width,a.height)<=Math.hypot(b.width,b.height)+.1;}
+    if(!safe(candidate.score) && retain && checks<budget){
+      checks++;candidate.edges=best.edges;candidate.score=autoArrangeScore(d,candidate);
+    }
+    if(!safe(candidate.score))return false;
+    best=candidate;return true;
+  }
+  // Collapse near coordinates into shared lines, then distribute those lines
+  // evenly within their existing span. Preserve order and do not expand the
+  // footprint merely to fit a grid. Each axis is independently optional.
+  ['x','y'].forEach(function(axis){
+    var minimum=axis==='x'?150+AUTO_ARRANGE_CARD_GAP:44+AUTO_ARRANGE_CARD_GAP;
+    var tolerance=axis==='x'?150:44;
+    var groups=[];
+    best.positions.slice().sort(function(a,b){return a[axis]-b[axis];}).forEach(function(p){
+      var last=groups[groups.length-1];if(!last || p[axis]-last[0][axis]>tolerance)groups.push(last=[]);last.push(p);
+    });
+    if(groups.length<2)return;
+    var low=groups[0][0][axis],high=groups[groups.length-1].slice(-1)[0][axis],gap=Math.max(minimum,(high-low)/(groups.length-1));
+    var targets=Object.create(null);groups.forEach(function(g,i){g.forEach(function(p){targets[p.id]=low+i*gap;});});
+    var moved=new Set(),positions=best.positions.map(function(p){var q={id:p.id,x:p.x,y:p.y};q[axis]=targets[p.id];if(Math.abs(q[axis]-p[axis])>.1)moved.add(p.id);return q;});
+    if(moved.size && accept(positions,moved,true))return;
+    // A full grid may change route order. Snap one shared line at a time;
+    // if the line cannot move safely, try its individual cards instead.
+    groups.forEach(function(group){
+      var line=new Set(group.map(function(p){return p.id;}));
+      function snapped(selection){return best.positions.map(function(p){var q={id:p.id,x:p.x,y:p.y};if(selection.has(p.id))q[axis]=targets[p.id];return q;});}
+      if(group.every(function(p){return Math.abs(p[axis]-targets[p.id])<.1;}))return;
+      if(!accept(snapped(line),line,true) && group.length>1)group.forEach(function(p){var one=new Set([p.id]);accept(snapped(one),one,true);});
+    });
+  });
+  // Both source and sink leaves can line up with their only neighbor. Try
+  // projection first, followed by the nearest clear cardinal slots. Two
+  // sweeps allow an earlier safe tuck to free a later branch's preferred slot.
+  for(var pass=0;pass<AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS.passes && checks<budget;pass++){
+    var changed=false;
+    for(var i=0;i<ids.length && checks<budget;i++){
+      var id=ids[i];if(degree[id]!==1)continue;
+      var edge=edges.find(function(e){return e.from===id || e.to===id;}),other=edge.from===id?edge.to:edge.from;
+      var p=best.positions.find(function(p){return p.id===id;}),parent=best.positions.find(function(p){return p.id===other;});
+      if(Math.abs(p.x-parent.x)<.1 || Math.abs(p.y-parent.y)<.1)continue;
+      var points=[{x:parent.x,y:p.y},{x:p.x,y:parent.y},
+        {x:parent.x+150+AUTO_ARRANGE_CARD_GAP,y:parent.y},{x:parent.x-150-AUTO_ARRANGE_CARD_GAP,y:parent.y},
+        {x:parent.x,y:parent.y+44+AUTO_ARRANGE_RANK_GAP},{x:parent.x,y:parent.y-44-AUTO_ARRANGE_RANK_GAP}];
+      points.sort(function(a,b){return Math.hypot(a.x-p.x,a.y-p.y)-Math.hypot(b.x-p.x,b.y-p.y);});
+      var straightened=false;
+      for(var j=0;j<points.length && checks<budget;j++){
+        var point=points[j];
+        if(best.positions.some(function(q){return q.id!==id && Math.hypot(Math.max(0,Math.abs(q.x-point.x)-150),Math.max(0,Math.abs(q.y-point.y)-44))<AUTO_ARRANGE_CARD_GAP-.1;}))continue;
+        var positions=best.positions.map(function(q){return q.id===id?{id:id,x:point.x,y:point.y}:q;});
+        if(accept(positions,new Set([id]))){changed=true;straightened=true;break;}
+      }
+      // A crowded leaf row may have no clear slot. Its neighbor can sometimes
+      // meet that row/column safely with a shorter move instead.
+      if(!straightened)for(var axis of ['x','y']){
+        var point={x:parent.x,y:parent.y};point[axis]=p[axis];
+        if(best.positions.some(function(q){return q.id!==other && Math.hypot(Math.max(0,Math.abs(q.x-point.x)-150),Math.max(0,Math.abs(q.y-point.y)-44))<AUTO_ARRANGE_CARD_GAP-.1;}))continue;
+        var positions=best.positions.map(function(q){return q.id===other?{id:other,x:point.x,y:point.y}:q;});
+        if(accept(positions,new Set([other]))){changed=true;break;}
+      }
+    }
+    if(!changed)break;
+  }
+  return best;
+}
 function autoArrangeFoldedPositions(d,result){
   var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
   // Folding is only useful for a deep ranked graph with a unary entrance.
@@ -541,5 +640,5 @@ function autoArrangeCandidates(d,viz,cola){
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
       Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return grid;
   }
-  return chosen;
+  return autoArrangeLargeAligned(d,chosen);
 }

@@ -1,10 +1,10 @@
 # Large auto-arrange architecture baselines
 
 This set keeps four realistic architecture graphs large enough to expose layout
-tradeoffs that the smaller shape baselines do not. The saved arrangement is an
-unpolished machine result: tall freight flow, crossings, shared-edge weaving and
-wide service fans are intentional evaluation signals for a later auto-arrange
-pass.
+tradeoffs that the smaller shape baselines do not. The saved arrangement is a
+reproducible machine result. A bounded cleanup shares nearby rank coordinates
+and straightens safe one-link branches. Tall freight flow, remaining crossings
+and wide service fans still expose tradeoffs for future layout work.
 
 ## Files and regeneration
 
@@ -37,13 +37,49 @@ routes that share an endpoint; ordinary crossings exclude those pairs.
 | Section ID | Diagram | Nodes | Edges | Planarity | Crossings | Incident crossings | Overlaps | Card hits | Occupied width × height | Aspect |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 4 | 0 | 0 | 2460 × 1784 | 1.38 |
-| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 11 | 7 | 0 | 0 | 2855 × 2054 | 1.39 |
-| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 2 | 0 | 0 | 717 × 2480 | 0.29 |
-| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 5 | 4 | 0 | 0 | 1849 × 2132 | 0.87 |
+| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 11 | 2 | 0 | 0 | 2855 × 2054 | 1.39 |
+| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 694 × 2480 | 0.28 |
+| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 5 | 3 | 0 | 0 | 1819 × 2132 | 0.85 |
 
-On the final deterministic-regeneration run, candidate generation took 1.65 s,
-0.48 s, 0.59 s and 0.83 s respectively. All remain well inside the workbench's
+On a local regeneration run, candidate generation took 1.08 s,
+0.74 s, 0.78 s and 1.20 s respectively. All remain well inside the workbench's
 20 second worker deadline.
+
+## Alignment cleanup
+
+The cleanup applies only to ungrouped graphs above the 20-node grid-search
+range. It tries evenly spaced rank lines, then smaller line/card changes when a
+whole-axis move is unsafe. It preserves already aligned leaves and tries row or
+column projections and clear cardinal slots for both source and sink leaves.
+An adjacent node may move to meet a crowded leaf when that is safe. No graph
+names, roles, node IDs or example coordinates participate in the algorithm.
+
+Every accepted move has zero card overlaps and unrelated-card hits, no increase
+in ordinary or incident crossings, and no increase in occupied diagonal. Total
+center distance can grow by at most 3% over the selected layout. Natural curves
+are tried first; existing native curves are retained only when needed to make a
+rank adjustment safe. Full geometry checks are capped at 240 and scaled down by
+node × edge count. The six smaller approved baselines remain byte-identical.
+
+| Section | Diagonal degree-1 nodes before → after | Distinct x coordinates before → after | Distinct y coordinates before → after |
+| --- | ---: | ---: | ---: |
+| Incident response | 1/3 → 0/3 | 15 → 11 | 16 → 16 |
+| Regional billing | 6/6 → 0/6 | 32 → 18 | 32 → 23 |
+| Freight operations | 5/7 → 1/7 | 22 → 13 | 22 → 22 |
+| Data platform | 9/12 → 3/12 | 32 → 27 | 19 → 19 |
+
+Coordinates within 0.1 px count as one line. Lower counts show more shared rows
+and columns; they do not claim a perfect grid. Incident, freight and data retain
+their regular 116 px row spacing. Billing gains shared rows and columns while
+retaining safe irregular positions in its dense core. Ordinary crossings stay
+at 0, 11, 1 and 5; incident crossings fall from 4, 7, 2 and 4 to 4, 2, 0 and 3.
+
+The remaining diagonal leaves are `booking-portal` in freight and `orders-db`,
+`iot-gateway`, and `mobile-events` in data. All tested local straightening proposals
+for these four leaves fail card clearance: freight slots overlap existing cards,
+and the data slots overlap or leave only 3–24 px between cards (below the 54 px
+branch-placement clearance). These crowded source rows retain their safe placement. All four outputs were visually checked in the
+rendered viewer; the cleanup preserves the broader graph silhouettes.
 
 ## Topology intent
 

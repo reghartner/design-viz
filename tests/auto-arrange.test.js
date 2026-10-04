@@ -3,6 +3,15 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const {entrypoint}=require('../tools/source-loader.cjs');
 const C={URL};vm.runInNewContext(entrypoint('workbench').body,C);
 const plain=v=>JSON.parse(JSON.stringify(v));
+function largeLeafDiagonals(d,result){
+  const points=Object.fromEntries(result.positions.map(p=>[p.id,p])),degree=Object.fromEntries(Object.keys(d.nodes).map(id=>[id,0]));
+  d.edges.forEach(e=>{degree[e.from]++;degree[e.to]++;});
+  return Object.keys(degree).filter(id=>{
+    if(degree[id]!==1)return false;
+    const e=d.edges.find(e=>e.from===id || e.to===id),a=points[e.from],b=points[e.to];
+    return Math.abs(a.x-b.x)>.1 && Math.abs(a.y-b.y)>.1;
+  });
+}
 const fixture=require('./fixtures/auto-arrange-grouped.json');
 const Viz=require('../src/workbench/vendor/viz-3.31.0.js'),cola=require('../src/workbench/vendor/webcola-3.4.0.js');
 let viz;test.before(async()=>{viz=await Viz.instance();});
@@ -496,4 +505,54 @@ test('incident route scoring detects fan-out weaving beyond a shared port and cl
   assert.equal(clear.overlaps,0);assert.equal(clear.hits,0);assert.equal(clear.crossings,0);assert.equal(clear.incidentCrossings,0);
   const reversed={...d,edges:d.edges.map(e=>({from:e.to,to:e.from}))};
   assert.equal(C.autoArrangeScore(reversed,crowded).incidentCrossings,2,'fan-in receives the same geometric check');
+});
+
+test('large cleanup straightens branches and shares ranks without worsening final route safety',()=>{
+  const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json');
+  const saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
+  const refine=C.autoArrangeLargeAligned;
+  for(const [i,block] of input.page.blocks.entries()){
+    const d=block.diagram;let before;
+    try{C.autoArrangeLargeAligned=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeLargeAligned=refine;}
+    const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    assert.ok(performance.now()-started<20000,block.id+' stays inside worker deadline');
+    assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces saved output');
+    assert.deepEqual(plain(refine(d,before)),plain(result),block.id+' cleanup is deterministic');
+    if(i===1){
+      const names=Object.fromEntries(Object.keys(d.nodes).map((id,j)=>[id,'renamed-'+j]));
+      const renamed={nodes:Object.fromEntries(Object.keys(d.nodes).map(id=>[names[id],{title:'Different label',tint:'data'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]}))};
+      const seed={positions:before.positions.map(p=>({...p,id:names[p.id]})),edges:before.edges,score:before.score};
+      const renamedResult=refine(renamed,seed);
+      assert.deepEqual(plain(renamedResult.positions.map(({x,y})=>({x,y}))),plain(result.positions.map(({x,y})=>({x,y}))),'alignment ignores IDs, labels and tints');
+    }
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
+    assert.ok(result.score.crossings<=before.score.crossings,block.id+' ordinary crossings');
+    assert.ok(result.score.incidentCrossings<=before.score.incidentCrossings,block.id+' incident crossings');
+    assert.ok(Math.hypot(result.score.width,result.score.height)<=Math.hypot(before.score.width,before.score.height)+.1,block.id+' footprint');
+    assert.ok(result.score.length<=before.score.length*1.03,block.id+' center distance stays bounded');
+    assert.ok(largeLeafDiagonals(d,result).length<largeLeafDiagonals(d,before).length,block.id+' fewer diagonal leaves');
+    assert.ok(largeLeafDiagonals(d,result).length<=[0,0,1,3][i],block.id+' safe branch alignment');
+    const lines=r=>['x','y'].reduce((n,axis)=>n+new Set(r.positions.map(p=>Math.round(p[axis]*10))).size,0);
+    assert.ok(lines(result)<lines(before),block.id+' more shared row/column coordinates');
+    assert.ok(result.edges.filter(e=>e.curveControls).length<=before.edges.filter(e=>e.curveControls).length);
+    assertAutoPorts(out.edges);assert.deepEqual(out.nodes,d.nodes);
+    assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
+    assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
+  }
+});
+
+test('large alignment refuses unsafe proposals and bounds geometry checks at the maximum graph size',()=>{
+  const d={nodes:{},edges:[]},positions=[];
+  for(let i=0;i<80;i++){const id='node'+i;d.nodes[id]={};positions.push({id,x:120+(i%10)*211+(i%3)*13,y:100+Math.floor(i/10)*117});}
+  for(let i=0;i<160;i++)d.edges.push({from:'node'+(i%80),to:'node'+((i+1+(i>=80?7:0))%80)});
+  const original={positions,edges:d.edges.map(()=>({})),score:{overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:1e6,width:2200,height:1000}};
+  const score=C.autoArrangeScore;let checks=0;
+  try{
+    C.autoArrangeScore=()=>{checks++;return {...original.score,hits:1};};
+    assert.equal(C.autoArrangeLargeAligned(d,original),original,'all unsafe changes retain the selected candidate');
+    assert.ok(checks>0);assert.ok(checks<=Math.floor(C.AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS.work/(80*160)),checks+' bounded full-geometry checks');
+    d.nodes.node0.group='group';checks=0;
+    assert.equal(C.autoArrangeLargeAligned(d,original),original);assert.equal(checks,0,'grouped layouts are outside this pass');
+  }finally{C.autoArrangeScore=score;}
 });

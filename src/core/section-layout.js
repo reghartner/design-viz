@@ -75,6 +75,18 @@ function sectionExploreLayout(d,value,warnings,path){
     if(['floating','canvas'].indexOf(value.panelPlacement)<0)warn(path+'.panelPlacement','use floating or canvas');
     else out.panelPlacement=value.panelPlacement;
   }
+  if(value.panelPlacements!==undefined){
+    if(!Array.isArray(value.panelPlacements))warn(path+'.panelPlacements','expected an array');
+    else{
+      var placementUsed=Object.create(null);
+      out.panelPlacements=value.panelPlacements.reduce(function(list,v,i){
+        var at=path+'.panelPlacements['+i+']';
+        if(!object(v) || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || placementUsed[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
+        if(['floating','canvas'].indexOf(v.placement)<0){warn(at+'.placement','use floating or canvas');return list;}
+        placementUsed[v.panel]=true;list.push({panel:v.panel,placement:v.placement});return list;
+      },[]);
+    }
+  }
   if(value.canvas!==undefined){
     var canvas=value.canvas,canvasOut={},canvasUsed=Object.create(null);
     function graphRect(v,at){
@@ -134,7 +146,7 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
-    var c=value.camera,canvasCamera=out.panelPlacement==='canvas' || out.canvas,minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
+    var c=value.camera,canvasCamera=out.panelPlacement==='canvas' || out.canvas || (out.panelPlacements || []).some(function(p){return p.placement==='canvas';}),minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
     if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<minZoom || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=maxCenter;}))warn(path+'.camera','use zoom '+minZoom+'–4 and finite x/y SVG center coordinates between -'+maxCenter+' and '+maxCenter);
     else out.camera={zoom:c.zoom,x:c.x,y:c.y};
   }

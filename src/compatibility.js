@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'layout.explore-panel-placement':['Independent placement of Explore panels','0.2.0'],
     'layout.cubic-curves':['Editable native cubic arrow routes','0.2.0'],
     'layout.edge-curves':['Editable smooth arrow curves','0.2.0'],
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
@@ -132,6 +133,7 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && (v.exploreLayout.panelPlacement==='canvas' || v.exploreLayout.canvas!=null);}))used['layout.explore-canvas']=true;
+        if(d.layouts.some(function(v){return v && object(v.exploreLayout) && Array.isArray(v.exploreLayout.panelPlacements) && v.exploreLayout.panelPlacements.length;}))used['layout.explore-panel-placement']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.prose!=null;}))used['layout.explore-prose']=true;
       }
     }

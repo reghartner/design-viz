@@ -594,3 +594,20 @@ test('canvas coordinate bounds and camera normalization recover malformed entrie
  for(const scale of [0,.49,1.26,'1',null]){const issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,{canvas:{controlsScale:scale,prose:rect}},issues)),{canvas:{prose:rect}});assert.match(issues[0],/controlsScale/);}
  const dormant={panelPlacement:'floating',canvas:valid.canvas,camera:valid.camera};assert.deepEqual(plain(ctx.sectionExploreLayout(d,dormant)),dormant);
 });
+
+test('per-panel Explore placements validate independently and survive chapter and panel lifecycle',()=>{
+ const d=diagram(),value={panelPlacement:'canvas',panelPlacements:[{panel:'home',placement:'floating'}],panels:[{panel:'home',x:.5,y:.1,w:.3,h:.4,stacked:false}],canvas:{panels:[{panel:'home',x:-380,y:20,w:340,h:300}]}};
+ const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+ d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+ const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+ const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+ const renamed=ctx.planRenamePanel(text,raw,0,0,'house'),layout=JSON.parse(renamed.text).page.sections[0].diagram.layouts[0].exploreLayout;
+ assert.deepEqual(layout.panelPlacements,[{panel:'house',placement:'floating'}]);assert.equal(layout.panels[0].panel,'house');assert.equal(layout.canvas.panels[0].panel,'house');
+ const deleted=ctx.planDeletePanel(text,raw,0,0);assert.deepEqual(JSON.parse(deleted.text).page.sections[0].diagram.layouts[0].exploreLayout.panelPlacements,[]);
+ const camera={zoom:.001,x:500,y:-500},mixed={panelPlacements:[{panel:'home',placement:'canvas'}],camera};assert.deepEqual(plain(ctx.sectionExploreLayout(d,mixed)),mixed);
+ for(const bad of [null,{},'canvas',[null,[],{panel:'missing',placement:'canvas'},{panel:'home',placement:'screen'}],[value.panelPlacements[0],value.panelPlacements[0]]]){
+  const input={...value,panelPlacements:bad},before=JSON.stringify(input),issues=[];ctx.sectionExploreLayout(d,input,issues);assert.ok(issues.length);assert.equal(JSON.stringify(input),before);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);
+ }
+ const issues=[],partial={...value,panelPlacements:[{panel:'home',placement:'screen'},value.panelPlacements[0],{panel:'unknown',placement:'canvas'}]};
+ assert.deepEqual(plain(ctx.sectionExploreLayout(d,partial,issues)),value);assert.equal(issues.length,2);
+});

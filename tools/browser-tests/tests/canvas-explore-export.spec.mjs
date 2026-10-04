@@ -66,6 +66,10 @@ test('main canvas Explore gestures author one history entry each and survive sta
   ];
   await expect(page.locator('#undo-builder')).toBeDisabled();
   for(const [handle,dx,dy] of gestures){
+    // Each completed gesture selects its Explore surface and may open Inspect
+    // in a fresh workspace. Keep that editor chrome out of the next gesture's
+    // hit area; its persisted position is not part of this geometry contract.
+    await closeTools(page);
     const before=states.at(-1);await drag(page,handle(),dx,dy);
     await expect.poll(async()=>await source(page)!==before,{message:'The canvas gesture must update exportable authored layout'}).toBe(true);
     const changed=await source(page);states.push(changed);

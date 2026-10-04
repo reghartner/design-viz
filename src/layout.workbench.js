@@ -322,7 +322,7 @@ function initSectionLayoutEditor(opts){
             if(token.label)life.delay(function(){
               if(activeLayout(index)!==id)return;
               var sec=view.querySelector('[data-dv-section="'+index+'"]');if(!sec)return;
-              if(token.panelMenu){var menu=sec.querySelector('.explore-panel-menu');if(menu){menu.open=true;syncNavigationPopover(menu);var control=Array.prototype.find.call(menu.querySelectorAll('button'),function(b){return b.getAttribute('aria-label')===token.label;});if(control)control.focus({preventScroll:true});}return;}
+              if(token.panelMenu){var menu=sec.querySelector('.explore-panel-menu');if(menu){menu.open=true;syncNavigationPopover(menu);var control=Array.prototype.find.call(menu.querySelectorAll('button,select'),function(b){return b.getAttribute('aria-label')===token.label;});if(control)control.focus({preventScroll:true});}return;}
               var hosts=Array.prototype.slice.call(sec.querySelectorAll('.explore-window,.explore-player'));
               var host=hosts.find(function(h){return token.player?h.classList.contains('explore-player'):token.content?h.getAttribute('data-explore-content')===token.content:h.getAttribute('data-explore-panel')===token.panel;});
               var button=host && Array.prototype.find.call(host.querySelectorAll('button'),function(b){return b.getAttribute('aria-label')===token.label;});

@@ -145,7 +145,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function changePlacement(value){
     if(!active || retired || (onCanvas()?'canvas':'floating')===value)return;
-    finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false)return;
+    finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false){placement.value=onCanvas()?'canvas':'floating';return;}
     var firstCanvas=value==='canvas' && !memory.canvasPanels;
     memory.layout.panelPlacement=value;mountWindows();paint();sizeGraph(true);if(firstCanvas)fitCanvas();
     if(onCanvas())windows.forEach(rememberRect);

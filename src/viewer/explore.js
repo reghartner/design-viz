@@ -106,6 +106,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function relative(r){var b=bounds(),out={};['x','y','w','h'].forEach(function(k){out[k]=Math.round(clamp(r[k]/(k==='x'||k==='w'?b.w:b.h),0,1)*1000000)/1000000;});return out;}
   function absolute(r){var b=bounds();return {x:r.x*b.w,y:r.y*b.h,w:r.w*b.w,h:r.h*b.h};}
   function rememberRect(w){
+    // Geometry is stored at 100% logical size. Preserve the effective scale
+    // that was visible when a responsive default first becomes authored or a
+    // reader session first customizes it, so the gesture cannot change size.
+    latchOverlayScale();
     var r=relative(w.state);
     if(w===playerWindow)memory.layout.controls=r;
     else if(w.prose)memory.layout.prose=Object.assign({},memory.layout.prose || {},r,{stacked:w.state.stacked===true});
@@ -171,7 +175,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     /* Portrait screens can become much narrower than charts and maps. */
     return w===playerWindow?300:w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
   }
-  function overlayScale(){return memory && memory.layout.overlayScale || 1;}
+  function savedOverlayGeometry(layout){
+    return !!(layout && (layout.controls && layout.controls.w || layout.prose && layout.prose.w || layout.panels && layout.panels.length));
+  }
+  function responsiveOverlayScale(){
+    var width=bounds().w;
+    return width?Math.round((.8+.2*clamp((width-1280)/160,0,1))*100)/100:1;
+  }
+  function overlayScale(){
+    if(!memory)return 1;
+    if(memory.layout.overlayScale!==undefined)return memory.layout.overlayScale;
+    return savedOverlayGeometry(memory.layout)?1:responsiveOverlayScale();
+  }
+  function latchOverlayScale(){if(memory.layout.overlayScale===undefined && !savedOverlayGeometry(memory.layout))memory.layout.overlayScale=overlayScale();}
   // Panel dimensions and control height describe the size at 100%. Controls
   // retain their chosen horizontal span so smaller text exposes more steps.
   // Positions stay in viewport coordinates; the diagram camera is independent.
@@ -181,9 +197,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function changeOverlayScale(value){
     if(!active || retired || !Number.isFinite(value))return;
-    value=Math.round(clamp(value,.5,1.25)*100)/100;if(value===overlayScale())return;
+    value=Math.round(clamp(value,.5,1.25)*100)/100;if(value===overlayScale() && memory.layout.overlayScale===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false)return;
-    if(value===1)delete memory.layout.overlayScale;else memory.layout.overlayScale=value;
+    memory.layout.overlayScale=value;
     paint();publish(token);paint();
     if(!retired && active)shell.dispatchEvent(new CustomEvent('explore-overlay-scale',{bubbles:true}));
   }

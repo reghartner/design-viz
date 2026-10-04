@@ -16,6 +16,7 @@ function fixture(scale){
   d.steps[1].panelVisibility={clip:false};d.steps[2].panelVisibility={clip:true};
   return spec;
 }
+function pristineFixture(){const spec=fixture();spec.page.sections[0].diagram.layouts[1].exploreLayout={};return spec;}
 async function build(server,spec,name='scale'){
   const input=path.join(server.root,name+'.json'),out=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(spec));
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),out]);
@@ -26,7 +27,7 @@ const panel=page=>page.locator('[data-explore-panel=outcome]');
 const player=page=>page.locator('.explore-player');
 const size=async loc=>{const r=await loc.boundingBox();return {w:r.width,h:r.height};};
 test('reader scale is separate from diagram zoom, scales content, packs panels and keeps the full-width step row',async({page,server})=>{
-  await page.goto(await build(server,fixture()));await page.evaluate(()=>document.fonts.ready);
+  await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,fixture()));await page.evaluate(()=>document.fonts.ready);
   const startGraph=await graph(page).boundingBox(),start=await size(panel(page)),steps=await size(player(page));
   await panelsOptions(page);const zoom=page.locator('.explore-overlay-zoom');await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
   await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
@@ -44,6 +45,28 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   await zoom.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();expect((await size(panel(page))).w).toBeCloseTo(start.w,0);
   for(let n=0;n<5;n++)await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(zoom.getByRole('button',{name:'Shrink panels and controls',exact:true})).toBeDisabled();
   await page.reload();await panelsOptions(page);await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
+});
+test('pristine layouts respond to stage width while reset and first geometry save latch an explicit scale',async({page,server})=>{
+  const spec=pristineFixture();await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,spec,'responsive-scale'));await page.evaluate(()=>document.fonts.ready);
+  await panelsOptions(page);let readout=page.locator('.explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
+  expect((await size(panel(page))).w).toBeCloseTo(240,0);
+  await page.setViewportSize({width:1360,height:800});await expect(readout).toHaveText('90%');expect((await size(panel(page))).w).toBeCloseTo(270,0);
+  await page.setViewportSize({width:1440,height:900});await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
+  await page.setViewportSize({width:1280,height:800});await expect(readout).toHaveText('80%');
+  await readout.click();await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
+  await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');
+  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Service flow',exact:true}).click();await panelsOptions(page);await expect(readout).toHaveText('100%');
+
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));await panelsOptions(page);
+  readout=page.locator('#docview .explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
+  const source=page.locator('#src'),original=await source.inputValue(),before=await size(panel(page));
+  await panel(page).locator('.explore-window-grip').press('ArrowLeft');await expect(readout).toHaveText('80%');expect(await size(panel(page))).toEqual(before);
+  const saved=JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[1].exploreLayout;expect(saved.overlayScale).toBe(.8);expect(saved.panels).toHaveLength(1);
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);await panelsOptions(page);await expect(readout).toHaveText('80%');
+  await page.locator('#redo-builder').click();await panelsOptions(page);await expect(readout).toHaveText('80%');
+  await panelsOptions(page);await readout.click();await expect(readout).toHaveText('100%');
+  expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(1);
+  await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');
 });
 test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view switches and HTML export',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(.75),null,2));

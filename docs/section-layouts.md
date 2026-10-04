@@ -207,7 +207,10 @@ releases it for free placement, including at the top and right edges. A panel
 without a saved rectangle opens at a compact width chosen by panel type and a
 height that follows its rendered content; these automatic panels wrap into right-edge
 columns as the lane fills. Exceptionally tall automatic content is capped at the
-usable lane height and scrolls inside its panel. An authored or manually resized
+usable lane height and scrolls inside its panel. When the view has no saved
+panel, notes or step-control rectangles and no saved panel scale, this automatic
+stack uses 80% scale through 1280px-wide stages and grows smoothly to 100% at
+1440px. An authored or manually resized
 panel taller than the available stack lane stays full-size and top-aligned, with
 the next panel starting a column to its left. **Expand**
 opens a larger view, using browser fullscreen when available and an expanded
@@ -419,9 +422,14 @@ grid. Positions and dimensions use fractions of the Explore viewport. Panel
 width/height and control height describe their size at 100% content scale;
 control width is its horizontal span and does not change with content scale.
 Optional `overlayScale`
-(0.5–1.25, default 1) scales all floating panels and step controls together,
+(0.5–1.25) scales all floating panels and step controls together,
 independently of diagram zoom. The **Panels & controls** minus/plus buttons
-change this scale; clicking its percentage resets it to 100%. Panel headers and
+change this scale; clicking its percentage saves an explicit 100% reset. A layout
+with saved panel, notes or controls geometry and no `overlayScale` uses 100% for
+backward compatibility. A pristine layout with neither geometry nor an explicit
+scale responds to stage width: 80% at and below 1280px, increasing smoothly to
+100% at 1440px. The first drag or resize saves the effective scale with the new
+geometry, so the window does not jump in size. Panel headers and
 drag/resize targets remain usable. Right-docked panels stay at the edge. Step
 controls shrink vertically while keeping their width: automatic bars fill the
 available space; manually sized bars retain their chosen span. Camera

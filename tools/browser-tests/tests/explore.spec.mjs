@@ -31,6 +31,7 @@ async function buildDynamic(server){
 const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
 const overlaps=(a,b)=>Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1 && Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1;
+const responsiveScale=width=>Math.round((.8+.2*Math.max(0,Math.min(1,(width-1280)/160)))*100)/100;
 test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -84,21 +85,25 @@ test('right and top-right remain free placement; Stack at edge preserves size an
 });
 test('automatic Explore panels open at readable content size across desktop viewports and Workbench',async({page,server},info)=>{
  const url=await build(server);
- for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1440,900]]){
+ for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1440,900]]){
   await page.setViewportSize({width,height});
   if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
-  else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
+  else{await page.goto(url);await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
   await page.evaluate(()=>document.fonts.ready);
+  const stage=await rect(page.locator('.explore-stage')),scale=responsiveScale(stage.width);
+  await expect(page.locator('.explore-overlay-value')).toHaveText(Math.round(scale*100)+'%');
   const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
   expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
   for(const win of windows){
-   expect(win.width,win.id).toBeGreaterThanOrEqual(299);expect(win.width,win.id).toBeLessThanOrEqual(341);
+   const preferred={clip:340,home:340,outcome:300,prose:320,queue:300}[win.id];expect(win.width,win.id).toBeCloseTo(preferred*scale,0);
    expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
   }
+  if(width===1280)expect(stage.x+stage.width-12-Math.min(...windows.map(win=>win.x)),surface+' panel footprint').toBeLessThanOrEqual(540);
   for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
   const controls=await rect(page.locator('.explore-player'));
   for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
   await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
+  if(width===1280)await page.screenshot({path:'/tmp/explore-'+surface+'-1280x800-responsive.png'});
  }
 });
 test('automatic panels remeasure when a late font changes rendered content metrics',async({page,server})=>{

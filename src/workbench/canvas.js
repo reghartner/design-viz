@@ -107,9 +107,11 @@ function initWorkbenchCanvas(){
     view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:rec.number-1}));
     select(rec.number-1);
   });
+  surface.addEventListener('explore-placement-change',function(){paintZoom();});
   function paintZoom(){
     var vp=viewport(),value=vp && vp.canvasZoom();
-    document.getElementById('workspace-zoom').textContent=Math.round((value || 1)*100)+'%';
+    var percent=(value || 1)*100;document.getElementById('workspace-zoom').textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
+    document.getElementById('workspace-fit').textContent=vp && vp.panelPlacement()==='canvas'?'Fit canvas':'Fit diagram';
   }
   function fit(){
     var vp=viewport();if(!diagramMode() || !vp)return;

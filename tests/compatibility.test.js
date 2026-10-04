@@ -268,3 +268,13 @@ test('independent camera sirens advertise compatibility in initial and transient
     assert.ok(!C.detect(raw).includes('media.camera-siren'));
   }
 });
+
+test('Explore canvas geometry declares its compatibility requirement even when Floating is selected',()=>{
+  const view={id:'engineering',presentation:'explore',exploreLayout:{panelPlacement:'canvas'}};
+  const raw={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[view]}}]}};
+  assert.ok(C.detect(raw).includes('layout.explore-canvas'));
+  const available={...C.features};delete available['layout.explore-canvas'];
+  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-canvas'));
+  view.exploreLayout={panelPlacement:'floating',canvas:{panels:[]}};assert.ok(C.detect(raw).includes('layout.explore-canvas'));
+  delete view.exploreLayout.canvas;assert.ok(!C.detect(raw).includes('layout.explore-canvas'));
+});

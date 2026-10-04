@@ -71,6 +71,34 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value===undefined)return out;
   if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.panelPlacement!==undefined){
+    if(['floating','canvas'].indexOf(value.panelPlacement)<0)warn(path+'.panelPlacement','use floating or canvas');
+    else out.panelPlacement=value.panelPlacement;
+  }
+  if(value.canvas!==undefined){
+    var canvas=value.canvas,canvasOut={},canvasUsed=Object.create(null);
+    function graphRect(v,at){
+      if(!object(v) || !['x','y','w','h'].every(function(k){return Number.isFinite(v[k]) && Math.abs(v[k])<=10000;}) || v.w<=0 || v.h<=0){warn(at,'use finite graph coordinates from -10000 to 10000 and positive width/height');return null;}
+      return {x:v.x,y:v.y,w:v.w,h:v.h};
+    }
+    if(!object(canvas))warn(path+'.canvas','expected an object with panels and/or prose');
+    else{
+      if(canvas.controlsScale!==undefined){
+        if(!Number.isFinite(canvas.controlsScale) || canvas.controlsScale<.5 || canvas.controlsScale>1.25)warn(path+'.canvas.controlsScale','use a scale from 0.5 to 1.25 for step controls');
+        else canvasOut.controlsScale=canvas.controlsScale;
+      }
+      if(canvas.panels!==undefined){
+        if(!Array.isArray(canvas.panels))warn(path+'.canvas.panels','expected an array');
+        else canvasOut.panels=canvas.panels.reduce(function(list,v,i){
+          var at=path+'.canvas.panels['+i+']',r=graphRect(v,at);
+          if(!v || typeof v.panel!=='string' || !(d.panels || []).some(function(p){return p.id===v.panel;}) || canvasUsed[v.panel]){warn(at+'.panel','use a unique existing panel ID');return list;}
+          canvasUsed[v.panel]=true;if(r)list.push(Object.assign({panel:v.panel},r));return list;
+        },[]);
+      }
+      if(canvas.prose!==undefined){var cr=graphRect(canvas.prose,path+'.canvas.prose');if(cr)canvasOut.prose=cr;}
+      out.canvas=canvasOut;
+    }
+  }
   if(value.overlayScale!==undefined){
     if(!Number.isFinite(value.overlayScale) || value.overlayScale<.5 || value.overlayScale>1.25)warn(path+'.overlayScale','use a scale from 0.5 to 1.25 for panels and step controls');
     else out.overlayScale=value.overlayScale;
@@ -106,8 +134,8 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
-    var c=value.camera;
-    if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<.15 || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=100;}))warn(path+'.camera','use zoom 0.15–4 and finite x/y SVG center coordinates between -100 and 100');
+    var c=value.camera,canvasCamera=out.panelPlacement==='canvas' || out.canvas,minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
+    if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<minZoom || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=maxCenter;}))warn(path+'.camera','use zoom '+minZoom+'–4 and finite x/y SVG center coordinates between -'+maxCenter+' and '+maxCenter);
     else out.camera={zoom:c.zoom,x:c.x,y:c.y};
   }
   return out;

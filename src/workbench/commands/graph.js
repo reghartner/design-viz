@@ -422,7 +422,7 @@ function planRenamePanel(text, raw, sectionIdx, panelIdx, newId){
     d.panels[panelIdx].id = newId;
     if (d.primaryPanel === oldId) d.primaryPanel = newId;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
-      if(v && v.exploreLayout && Array.isArray(v.exploreLayout.panels))v.exploreLayout.panels.forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});
+      if(v && v.exploreLayout)[v.exploreLayout,v.exploreLayout.canvas].forEach(function(layout){if(layout && Array.isArray(layout.panels))layout.panels.forEach(function(it){if(it && it.panel===oldId)it.panel=newId;});});
       if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
         if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target].forEach(function(it){if(it && it.panel===oldId)it.panel=newId;if(it && it.attachTo==='panel:'+oldId)it.attachTo='panel:'+newId;});
       });
@@ -516,7 +516,7 @@ function planDeletePanel(text, raw, sectionIdx, panelIdx){
   return builderRewrite(text, raw, got.path, function(d){
     if (d.primaryPanel === id) delete d.primaryPanel;
     [d].concat(Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
-      if(v && v.exploreLayout && Array.isArray(v.exploreLayout.panels))v.exploreLayout.panels=v.exploreLayout.panels.filter(function(it){return !it || it.panel!==id;});
+      if(v && v.exploreLayout)[v.exploreLayout,v.exploreLayout.canvas].forEach(function(layout){if(layout && Array.isArray(layout.panels))layout.panels=layout.panels.filter(function(it){return !it || it.panel!==id;});});
       if(v && v.sectionLayout)Object.keys(v.sectionLayout).forEach(function(target){
         if(Array.isArray(v.sectionLayout[target]))v.sectionLayout[target]=v.sectionLayout[target].filter(function(it){return !it || it.panel!==id;}).map(function(it){if(it && it.attachTo==='panel:'+id)delete it.attachTo;return it;});
       });

@@ -455,6 +455,49 @@ Invalid optional entries warn and fall back independently.
 }
 ```
 
+Explore's **Panels → Panel placement** chooses **Floating** (the default) or
+**On canvas** for each chapter. The same choice is available in the Workbench
+and reader. Floating panels keep the viewport rectangles above. On canvas panels
+and Section notes share the graph's pan and zoom: the whole window, including
+its header and contents, scales with the diagram. Playback stays on screen.
+**Fit canvas** includes the diagram and every currently visible panel and notes
+window. Ctrl/Command-wheel or trackpad pinch keeps the point under the pointer
+stable. Drag a window header to move it; drag its corner to resize. Focus either
+handle and use arrow keys for the same actions (Shift for larger increments).
+
+`exploreLayout.panelPlacement` accepts `"floating"` or `"canvas"`; omission means
+Floating. Independent `exploreLayout.canvas.panels` and `.prose` rectangles use
+graph units measured from the upper-left of the SVG viewBox. Coordinates may be
+negative; all values must be finite and within ±10000, with positive `w` and `h`.
+The normal zoom floor is 15%. On canvas extends it only as far as needed to
+recover the visible objects with Fit; Floating always retains its 15% floor.
+Canvas-capable layouts can save camera zoom down to 0.001 and SVG-relative
+centers within ±10000, with the rendered zoom clamped to the active mode's range.
+The canvas geometry does not use `overlayScale`: diagram zoom scales the entire
+object. While On canvas is selected, the independent size control is labeled
+**Controls** and changes playback only, storing optional `canvas.controlsScale`
+(0.5–1.25). It inherits the Floating scale until explicitly changed, preserving
+the Floating panel scale when returning to that mode. Notes visibility remains in
+`exploreLayout.prose.hidden` and panel visibility remains in the chapter's grid
+items. Hidden objects are excluded from Fit.
+
+```json
+"exploreLayout": {
+  "panelPlacement": "canvas",
+  "canvas": {
+    "panels": [{"panel":"outcome","x":1200,"y":40,"w":320,"h":240}],
+    "prose": {"x":-380,"y":40,"w":320,"h":260}
+  }
+}
+```
+
+Missing canvas rectangles start beside the diagram. Switching placement keeps
+both arrangements and the current step/path. Reader changes last only for the
+session. In the Workbench, switching placement or completing a move/resize is
+one Undo/Redo action and is included in exports. Panel rename/delete updates both
+arrangements; duplicate chapter copies them. Saved canvas geometry advertises
+`layout.explore-canvas` compatibility, including when Floating is selected.
+
 `exploreLayout.steps.textPosition` places the current-step caption `below`,
 `above`, `left` or `right` of the path controls; omission means `below`. In the
 workbench, click the Explore caption or empty step-control surface to open its

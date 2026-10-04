@@ -113,7 +113,8 @@ function initWorkbenchCanvas(){
     var percent=(value || 1)*100;document.getElementById('workspace-zoom').textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
     document.getElementById('workspace-fit').textContent=vp && vp.panelPlacement()==='canvas'?'Fit canvas':'Fit diagram';
   }
-  function fit(){
+  function fit(selection){
+    if(!selection || !Number.isFinite(selection.w))selection=null;
     var vp=viewport();if(!diagramMode() || !vp)return;
     var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=24,width=bounds?bounds.width:innerWidth;
     var player=current() && current().sectionEl.querySelector('.explore-player'),playerRect=player && !player.hidden && player.getBoundingClientRect();
@@ -122,7 +123,13 @@ function initWorkbenchCanvas(){
       var r=win.getBoundingClientRect();if(r.left<innerWidth/2)left=Math.max(left,Math.min(width*.4,r.right-(bounds?bounds.left:0)+16));else right=Math.max(right,Math.min(width*.4,(bounds?bounds.right:innerWidth)-r.left+16));
     });
     if(width-left-right<350){left=20;right=24;}
-    vp.fitCanvas({left:left,right:right,top:top,bottom:bottom});paintZoom();
+    var insets={left:left,right:right,top:top,bottom:bottom};
+    if(selection){
+      var obstacles=[];
+      document.querySelectorAll('.workspace-window:not([hidden]),.workspace-canvas-controls').forEach(function(el){var r=el.getBoundingClientRect();if(bounds && r.width && r.height)obstacles.push({x:r.left-bounds.left,y:r.top-bounds.top,w:r.width,h:r.height});});
+      vp.fitSelection(selection,{left:24,right:24,top:24,bottom:24},obstacles);
+    }else vp.fitCanvas(insets);
+    paintZoom();
   }
   function cancelFit(){cancelAnimationFrame(fitPending);fitPending=0;fitObserver.disconnect();}
   function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(autoFit);}
@@ -290,6 +297,7 @@ function initWorkbenchCanvas(){
   document.getElementById('workspace-zoom-out').addEventListener('click',function(){setZoom(viewport().canvasZoom()/1.2);});
   document.getElementById('workspace-zoom').addEventListener('click',function(){setZoom(1);});
   document.getElementById('workspace-fit').addEventListener('click',fit);
+  view.addEventListener('workbench-fit-selection',function(event){fit(event.detail);});
   new MutationObserver(function(changes){if(changes.some(function(m){return m.target.nodeType===1 && m.target.matches('.explore-zoom');}))paintZoom();}).observe(view,{childList:true,subtree:true});
   return {setHistory:function(value){history=value;},bind:function(controller,page){getController=controller;getPage=page;},select:select,capture:capture,rendered:rendered,
     reset:function(){cancelFit();if(navigation)navigation.restore();fitRequests.clear();skipCapture=true;saved=null;savedDetail=null;activeDetail=null;detailStates=[];section=0;selectionKey=null;},fit:fit};

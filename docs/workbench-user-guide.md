@@ -39,7 +39,7 @@ welcome navigation. Browser Find and normal text copying remain available.
 
 Workbench Explore supports Alt/Option-drag marquee selection of nodes and
 on-canvas panels, plus a shared right-click action menu. The Nodes & connections
-chapter explains mixed selection, alignment centers, Free placement, and Undo.
+chapter explains mixed selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap distribution, Fit selection, Free placement, and Undo.
 
 ## Maintaining the guide
 

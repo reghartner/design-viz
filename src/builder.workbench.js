@@ -501,6 +501,7 @@ function initWorkbenchBuilder(opts){
   var inspector=createBuilderInspector({
     document:document,guide:guide,session:session,apply:applyPlan,catalog:opts.catalog,
     replacePanelType:function(target){changePanelType(target);},
+    spatialActions:function(host,lifetime){if(interactions)interactions.spatialActions(host,lifetime);},
     download:function(name,text,mime){return io && io.download(name,text,mime);},
     schedule:function(fn,ms){return life.delay(fn,ms);},cancel:function(timer){life.cancelDelay(timer);},
     surface:{reveal:revealInspector,hideDiff:hideDiff,

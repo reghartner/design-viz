@@ -74,6 +74,19 @@ floating panels. The editor displays the selected type just as the exported
 HTML does. Use the shared **Tabs**, **Chapters**, and optional **Diagrams** buttons to select the visible context. A small screen icon marks Explore on chapter and tab chips.
 
 In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
+**Fit selection** beside Fit diagram frames the selected nodes and on-canvas panels
+inside the free viewport around Inspect, floating panels, and navigation controls.
+It preserves selection and source. The same action is in Inspect and the object menu.
+Tab to a node or canvas panel, then Enter to select it or Shift+Enter to add/remove
+it. Arrow keys nudge the selection by 10 graph units; Shift+Arrow uses 50, independent
+of zoom. Repeated arrows are one Undo action when all held arrows are released;
+Escape cancels the held movement. Row nodes explain that Free placement is required.
+Text fields, panel widgets, playback and resize handles retain their own shortcuts.
+Inspect and the shared object menu offer **Distribute horizontally/vertically** for
+three or more free objects. They equalize rendered edge-to-edge gaps, preserving
+outer bounds, dimensions and the other axis, with one Undo action. Disabled controls
+explain too few objects, row placement or insufficient space.
+
 Moving or resizing a data panel or the step controls saves that Chapter's floating
 defaults in the source, so the placement survives HTML export. Standard keeps
 its panels in the authored page arrangement; use **Chapter → Arrange chapter and saved visibility…** to edit

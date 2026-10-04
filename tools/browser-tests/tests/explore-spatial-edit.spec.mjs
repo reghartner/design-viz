@@ -2,7 +2,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
-import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
 function fixture(row=false){return {page:{title:'Spatial edit',skin:'pastel',sections:[{heading:'Explore objects',diagram:{autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Second'}},rows:row?[['a','b']]:[[]],floats:row?[]:[{id:'a',x:180,y:100},{id:'b',x:500,y:320}],edges:[{from:'a',to:'b'}],panels:[{id:'p',type:'state',title:'Canvas status',states:['Ready'],initial:{state:'Ready'}},{id:'q',type:'state',title:'Floating status',states:['Ready'],initial:{state:'Ready'}}],layouts:[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{panel:'p',x:8,y:0,w:4,h:4},{panel:'q',x:8,y:4,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',panelPlacements:[{panel:'q',placement:'floating'}],canvas:{panels:[{panel:'p',x:700,y:80,w:240,h:400}]}}}]}}]}};}
 async function open(page,server,row=false,skin='pastel'){await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');const raw=fixture(row);raw.page.skin=skin;await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await page.locator('#workspace-fit').click();await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
 const node=page=>page.locator('[data-dv-node=a]');
@@ -61,7 +61,29 @@ test('Reader and Backstage keep native context menus and have no marquee editing
   }else{
    await writeFile(path.join(server.root,'spatial-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'spatial-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./spatial-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/spatial-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);viewer.setCanvas(true);},raw);
   }
-  await expect(panel(page)).toBeVisible();await page.evaluate(()=>document.addEventListener('contextmenu',e=>{window.contextPrevented=e.defaultPrevented;}));await node(page).click({button:'right'});expect(await page.evaluate(()=>window.contextPrevented)).toBe(false);await expect(menu(page)).toHaveCount(0);
+  await expect(panel(page)).toBeVisible();await expect(node(page)).not.toHaveAttribute('tabindex','0');await expect(node(page)).not.toHaveAttribute('data-dv-object-menu','');await page.evaluate(()=>document.addEventListener('contextmenu',e=>{window.contextPrevented=e.defaultPrevented;}));await node(page).click({button:'right'});expect(await page.evaluate(()=>window.contextPrevented)).toBe(false);await expect(menu(page)).toHaveCount(0);
   const r=await page.locator('.explore-board').boundingBox();await page.keyboard.down('Alt');await page.mouse.move(r.x+20,r.y+20);await page.mouse.down();await page.mouse.move(r.x+100,r.y+80,{steps:5});await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-sel')).toHaveCount(0);
  }
+});
+
+test('plain Explore nodes expose a keyboard entry point and return focus after menu dismissal',async({page,server})=>{
+ await open(page,server);const original=await source(page),anchor=node(page);
+ await expect(anchor).toHaveAttribute('tabindex','0');await expect(anchor).toHaveAttribute('role','group');await expect(anchor).toHaveAccessibleName('Anchor node');
+ await page.locator('#diagram-add').focus();
+ let reached=false;
+ for(let i=0;i<60;i++){await page.keyboard.press('Tab');if(await anchor.evaluate(el=>el===document.activeElement)){reached=true;break;}}
+ expect(reached).toBe(true);await expect(anchor).toBeFocused();
+ expect(await anchor.locator('.card').evaluate(el=>getComputedStyle(el).strokeWidth)).toBe('4px');expect(await source(page)).toBe(original);await page.screenshot({path:'/tmp/explore-node-keyboard-focus-1280.png'});
+ await page.keyboard.press('Shift+F10');await expect(menu(page)).toBeVisible();await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();await expect(anchor).toHaveClass(/dv-sel/);await page.screenshot({path:'/tmp/explore-node-keyboard-menu-1280.png'});
+ await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Delete',exact:true})).toBeFocused();await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);await expect(anchor).toBeFocused();
+ await page.keyboard.press('ContextMenu');await expect(menu(page)).toBeVisible();await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Duplicate',exact:true})).toBeFocused();await page.keyboard.press('Enter');
+ await expect(menu(page)).toHaveCount(0);const duplicated=await source(page);expect(Object.keys(JSON.parse(duplicated).page.sections[0].diagram.nodes)).toHaveLength(3);await history(page,original,duplicated);
+ await expect(node(page)).toHaveAttribute('tabindex','0');
+});
+
+test('Explore keyboard decorations and an open object menu retire across builder remount',async({page,server})=>{
+ await page.goto(server.origin+'/lifetime/index.html');await pastePage(page,JSON.stringify(fixture()));await closeTools(page);
+ const anchor=node(page);await expect(anchor).toHaveAttribute('tabindex','0');await anchor.focus();await page.keyboard.press('Shift+F10');await expect(menu(page)).toBeVisible();
+ await page.evaluate(()=>__editorTest.builder.destroy());await expect(menu(page)).toHaveCount(0);await expect(anchor).not.toHaveAttribute('tabindex','0');await expect(anchor).not.toHaveAttribute('aria-haspopup','menu');await expect(anchor).not.toHaveAttribute('role','group');
+ await page.evaluate(()=>__editorTest.remount());await expect(anchor).toHaveAttribute('tabindex','0');await anchor.focus();await page.keyboard.press('Shift+F10');await expect(menu(page)).toHaveCount(1);await page.keyboard.press('Escape');await expect(anchor).toBeFocused();
 });

@@ -920,6 +920,7 @@ function createBuilderInteractions(opts){
   }
   function applyRowGrabs(){
     opts.refreshLayout();
+    spatial.refresh();
     applyPanelEditorControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).

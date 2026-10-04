@@ -1,7 +1,7 @@
 /* Workbench-only Explore gestures. Viewer panels and graph nodes share authored
    selection; this owner keeps all menus, capture and marquee DOM transient. */
 function createBuilderSpatialSelection(opts){
-  var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false;
+  var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false,focusNodes=[];
   function active(){return !opts.isActive || opts.isActive();}
   function surface(el){return el && el.closest && el.closest('.viewport-explore');}
   function snapshot(){var s=opts.session.snapshot();return !s.error && (s.renderedText==null || s.renderedText===s.text)?s:null;}
@@ -13,6 +13,26 @@ function createBuilderSpatialSelection(opts){
     if(panel){var id=panel.getAttribute('data-explore-panel'),index=(got.d.panels || []).findIndex(function(p){return p.id===id;});return index<0?null:{kind:'panel',id:id,index:index,section:section,el:panel};}
     var node=el.closest('[data-dv-node]');if(node && Object.prototype.hasOwnProperty.call(got.d.nodes || {},node.getAttribute('data-dv-node')))return {kind:'node',id:node.getAttribute('data-dv-node'),section:section,el:node};
     var existing=opts.targetFromEvent({target:el});return existing && ['edge','group'].indexOf(existing.kind)>=0?existing:null;
+  }
+  function restoreFocusNodes(){
+    focusNodes.forEach(function(record){Object.keys(record.attrs).forEach(function(name){var value=record.attrs[name];if(value===null)record.el.removeAttribute(name);else record.el.setAttribute(name,value);});});
+    focusNodes=[];
+  }
+  function refresh(){
+    restoreFocusNodes();
+    // Render decoration runs before the session publishes its fresh preview
+    // identity and before welcome reveals the editor. Mutation still uses the
+    // stricter snapshot()/active() checks when the menu is actually invoked.
+    var s=opts.session.snapshot();if(s.error)return;
+    Array.from(view.querySelectorAll('.viewport-explore .boardcanvas g.node[data-dv-node]')).forEach(function(el){
+      var section=el.closest('.doc-sec'),id=el.getAttribute('data-dv-node');
+      if(!section || el.closest('[data-dv-detail-preview]'))return;
+      var got=builderDiagram(s.text,s.raw,Number(section.getAttribute('data-dv-section')));
+      if(got.error || !Object.prototype.hasOwnProperty.call(got.d.nodes || {},id))return;
+      var attrs={},values={tabindex:'0',role:'group','aria-label':((got.d.nodes[id] || {}).title || id)+' node','aria-haspopup':'menu','aria-keyshortcuts':'Shift+F10','data-dv-object-menu':''};
+      Object.keys(values).forEach(function(name){attrs[name]=el.getAttribute(name);el.setAttribute(name,values[name]);});
+      focusNodes.push({el:el,attrs:attrs});
+    });
   }
   function candidates(shell){return Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel]')).map(target).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;});}
   function layoutId(shell){var p=shell.querySelector('[data-explore-layout]');return p && p.getAttribute('data-explore-layout');}
@@ -57,6 +77,11 @@ function createBuilderSpatialSelection(opts){
     menuLife.listen(shell,'scroll',function(e){if(e.target===board && (board.scrollLeft!==scrollLeft || board.scrollTop!==scrollTop))close(false);},true);
   }
   life.listen(view,'contextmenu',open,true);
+  life.listen(view,'keydown',function(ev){
+    if(ev.key!=='ContextMenu' && !(ev.key==='F10' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey))return;
+    var node=ev.target.closest && ev.target.closest('g.node[data-dv-object-menu]');
+    if(node===ev.target)open(ev);
+  },true);
   life.listen(view,'pointerdown',function(ev){
     if(!active() || opts.busy() || ev.button!==0 || !ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey)return;
     var board=ev.target.closest('.explore-board'),shell=surface(ev.target);if(!board || !shell || !snapshot())return;
@@ -82,5 +107,5 @@ function createBuilderSpatialSelection(opts){
   life.listen(opts.src,'input',function(){clear();opts.select([]);});
   life.listen(view,'click',function(ev){if(ev.target.closest('[data-view-layout]')){clear();opts.select([]);}},true);
   life.listen(view,'dv:pathchange',clear);
-  return {target:target,clear:clear,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();}};
+  return {target:target,clear:clear,refresh:refresh,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
 }

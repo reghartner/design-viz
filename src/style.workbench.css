@@ -1477,3 +1477,5 @@ body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-pre
 
 /* Keep authored selection above skin-specific node strokes. */
 body .docview .viewport-explore .boardcanvas g.node.dv-sel .card{stroke:var(--accent);stroke-width:3.5;}
+
+body .docview .viewport-explore .boardcanvas g.node[data-dv-object-menu]:focus-visible .card{stroke:var(--accent);stroke-width:4;stroke-dasharray:3 3;}

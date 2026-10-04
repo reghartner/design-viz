@@ -46,7 +46,8 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   for(const name of ['Auto','Fit width','Readable']){
    const button=row.getByRole('button',{name,exact:true});await button.focus();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(button).toBeInViewport();
   }
-  const panel=row.getByRole('button',{name:'Shrink panels and controls',exact:true});await panel.focus();await panel.click();await expect(panel).toBeInViewport();await expect(row.locator('.explore-overlay-value')).toHaveText('90%');
+  const panel=row.getByRole('button',{name:'Shrink panels and controls',exact:true}),overlayValue=row.locator('.explore-overlay-value');
+  const initialScale=Number((await overlayValue.textContent()).replace('%',''));await panel.focus();await panel.click();await expect(panel).toBeInViewport();await expect(overlayValue).toHaveText((initialScale-10)+'%');
   await row.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();
   await row.getByRole('button',{name:'Fit diagram',exact:true}).click();
   await row.getByRole('button',{name:'Auto',exact:true}).focus();

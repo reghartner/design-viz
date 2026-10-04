@@ -52,6 +52,7 @@ test('pristine layouts respond to stage width while reset and first geometry sav
   expect((await size(panel(page))).w).toBeCloseTo(240,0);
   await page.setViewportSize({width:1360,height:800});await expect(readout).toHaveText('90%');expect((await size(panel(page))).w).toBeCloseTo(270,0);
   await page.setViewportSize({width:1440,height:900});await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
+  await page.setViewportSize({width:390,height:800});await expect(readout).toHaveText('100%');await expect(player(page).locator('.stepline')).toBeInViewport();
   await page.setViewportSize({width:1280,height:800});await expect(readout).toHaveText('80%');
   await readout.click();await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
   await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');

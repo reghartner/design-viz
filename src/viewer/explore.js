@@ -180,7 +180,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function responsiveOverlayScale(){
     var width=bounds().w;
-    return width?Math.round((.8+.2*clamp((width-1280)/160,0,1))*100)/100:1;
+    // Compact stages need the controls' full logical height; scaling their
+    // outer dock can otherwise clip the step text below the transport rows.
+    if(!width || width<800)return 1;
+    return Math.round((.8+.2*clamp((width-1280)/160,0,1))*100)/100;
   }
   function overlayScale(){
     if(!memory)return 1;

@@ -209,8 +209,9 @@ height that follows its rendered content; these automatic panels wrap into right
 columns as the lane fills. Exceptionally tall automatic content is capped at the
 usable lane height and scrolls inside its panel. When the view has no saved
 panel, notes or step-control rectangles and no saved panel scale, this automatic
-stack uses 80% scale through 1280px-wide stages and grows smoothly to 100% at
-1440px. An authored or manually resized
+stack uses 80% scale on desktop stages through 1280px wide and grows smoothly
+to 100% at 1440px. Stages narrower than 800px retain 100% so the compact
+playback controls remain readable. An authored or manually resized
 panel taller than the available stack lane stays full-size and top-aligned, with
 the next panel starting a column to its left. **Expand**
 opens a larger view, using browser fullscreen when available and an expanded
@@ -427,8 +428,9 @@ independently of diagram zoom. The **Panels & controls** minus/plus buttons
 change this scale; clicking its percentage saves an explicit 100% reset. A layout
 with saved panel, notes or controls geometry and no `overlayScale` uses 100% for
 backward compatibility. A pristine layout with neither geometry nor an explicit
-scale responds to stage width: 80% at and below 1280px, increasing smoothly to
-100% at 1440px. The first drag or resize saves the effective scale with the new
+scale responds to desktop stage width: 80% from 800px through 1280px,
+increasing smoothly to 100% at 1440px. Narrower stages retain 100% so the
+compact playback controls remain readable. The first drag or resize saves the effective scale with the new
 geometry, so the window does not jump in size. Panel headers and
 drag/resize targets remain usable. Right-docked panels stay at the edge. Step
 controls shrink vertically while keeping their width: automatic bars fill the

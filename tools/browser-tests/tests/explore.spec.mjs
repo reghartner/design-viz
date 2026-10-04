@@ -31,7 +31,7 @@ async function buildDynamic(server){
 const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
 const overlaps=(a,b)=>Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1 && Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1;
-const responsiveScale=width=>Math.round((.8+.2*Math.max(0,Math.min(1,(width-1280)/160)))*100)/100;
+const responsiveScale=width=>width<800?1:Math.round((.8+.2*Math.max(0,Math.min(1,(width-1280)/160)))*100)/100;
 test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');

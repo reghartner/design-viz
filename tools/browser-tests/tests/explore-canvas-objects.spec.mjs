@@ -17,11 +17,11 @@ async function build(server,raw,name='canvas-objects'){
 }
 async function open(page,server,raw,host){
  if(host==='workbench'){await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);}
- else if(host==='backstage'){
+ else if(host==='backstage' || host==='inline'){
   await writeFile(path.join(server.root,'objects-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
   await writeFile(path.join(server.root,'objects-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./objects-native.js";window.mount=mountNativeViewer;</script>');
   await page.goto(server.origin+'/objects-native.html');await page.waitForFunction(()=>!!window.mount);
-  await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);viewer.setCanvas(true);},raw);
+  await page.evaluate(({raw,expanded})=>{window.viewer=mount(document.querySelector('#host'),raw);if(expanded)viewer.setCanvas(true);},{raw,expanded:host==='backstage'});
  }else await page.goto(await build(server,raw));
  await expect(page.locator('.explore-canvas-objects [data-explore-panel=home]')).toBeVisible();
 }
@@ -97,4 +97,23 @@ test('canvas widget buttons, keyboard handles, step content and visibility retai
  await h.locator('.explore-window-resize').focus();await page.keyboard.press('ArrowDown');expect((await h.boundingBox()).height-moved.height).toBeCloseTo(8,0);
  await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(widget.locator('[data-da-field=battery] .da-value')).toHaveText('42%');await expect(page.locator('[data-explore-panel=outcome]')).toBeHidden();
  await page.getByRole('button',{name:'Previous step',exact:true}).click();await expect(page.locator('[data-explore-panel=outcome]')).toBeVisible();
+});
+
+
+test('inline Explore keeps far-below canvas objects inside its scrollable bounds and Fit recovers them',async({page,server})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.canvas.panels[0].x=500;layout.canvas.panels[0].y=9000;
+ await page.setViewportSize({width:1440,height:900});await open(page,server,raw,'inline');await page.evaluate(()=>document.fonts.ready);
+ await expect(page.locator('.viewer-diagram-canvas,.workbench-diagram-canvas')).toHaveCount(0);
+ const canvas=page.locator('.boardcanvas'),far=home(page),initial=await far.boundingBox(),container=await canvas.boundingBox();
+ const margin=await board(page).evaluate(el=>parseFloat(el.style.getPropertyValue('--explore-margin-y')));
+ // Absolute objects must have the same trailing scroll margin as the graph,
+ // including before Fit, when the saved object is well outside the viewport.
+ expect(container.y+container.height).toBeGreaterThanOrEqual(initial.y+initial.height+margin-2);
+ const view=await board(page).boundingBox();await board(page).evaluate((el,delta)=>{el.scrollTop+=delta;},initial.y+initial.height/2-view.y-view.height/2);
+ const centered=await far.boundingBox();expect(centered.y+centered.height/2).toBeCloseTo(view.y+view.height/2,0);
+ await fit(page,'inline');const fitted=await board(page).boundingBox(),player=await page.locator('.explore-player').boundingBox();
+ for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-window:visible').all()]){
+  const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(fitted.x-2);expect(r.y).toBeGreaterThanOrEqual(fitted.y-2);expect(r.x+r.width).toBeLessThanOrEqual(fitted.x+fitted.width+2);expect(r.y+r.height).toBeLessThanOrEqual(Math.min(fitted.y+fitted.height,player.y-10)+2);
+ }
+ await expect(far).toHaveCSS('top','9000px');
 });

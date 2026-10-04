@@ -570,3 +570,27 @@ test('Explore step captions accept view-local relative positions and reject unkn
     assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'eng',input).error);
   }
 });
+
+test('Explore canvas placement validates graph rectangles separately and preserves both layouts through panel lifecycle',()=>{
+  const d=diagram(),value={panelPlacement:'canvas',panels:[{panel:'home',x:.6,y:.1,w:.3,h:.4,stacked:false}],canvas:{controlsScale:.7,panels:[{panel:'home',x:-380,y:20,w:340,h:300}],prose:{x:900,y:200,w:300,h:180}}};
+  const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+  const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',value);assert.ok(!plan.error,plan.error);
+  const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+  const renamed=ctx.planRenamePanel(text,raw,0,0,'house'),renamedLayout=JSON.parse(renamed.text).page.sections[0].diagram.layouts[0].exploreLayout;
+  assert.equal(renamedLayout.panels[0].panel,'house');assert.equal(renamedLayout.canvas.panels[0].panel,'house');
+  const removed=ctx.planDeletePanel(text,raw,0,0),removedLayout=JSON.parse(removed.text).page.sections[0].diagram.layouts[0].exploreLayout;
+  assert.deepEqual(removedLayout.panels,[]);assert.deepEqual(removedLayout.canvas.panels,[]);assert.deepEqual(removedLayout.canvas.prose,value.canvas.prose);
+  const malformed={...value,panelPlacement:'screen',canvas:{panels:[value.canvas.panels[0],value.canvas.panels[0],{panel:'phone',x:0,y:0,w:-1,h:10},{panel:'q',x:Infinity,y:0,w:20,h:20}],prose:{x:0,y:0,w:10,h:0}}},before=JSON.stringify(malformed),issues=[];
+  const result=plain(ctx.sectionExploreLayout(d,malformed,issues));assert.equal(result.panelPlacement,undefined);assert.deepEqual(result.canvas,{panels:[value.canvas.panels[0]]});assert.deepEqual(result.panels,value.panels);assert.ok(issues.length>=5);assert.equal(JSON.stringify(malformed),before);
+});
+
+test('canvas coordinate bounds and camera normalization recover malformed entries independently',()=>{
+ const d=diagram(),rect={x:-10000,y:10000,w:10000,h:1},valid={panelPlacement:'canvas',canvas:{prose:rect},camera:{zoom:.001,x:500,y:-500}};
+ const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,valid,warnings)),valid);assert.deepEqual(warnings,[]);
+ for(const field of ['x','y','w','h']){const issues=[],input={canvas:{prose:{...rect,[field]:10001}}};assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{canvas:{}});assert.match(issues[0],/graph coordinates/);}
+ const oldWarnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,{camera:valid.camera},oldWarnings)),{});assert.equal(oldWarnings.length,1);
+ for(const scale of [0,.49,1.26,'1',null]){const issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,{canvas:{controlsScale:scale,prose:rect}},issues)),{canvas:{prose:rect}});assert.match(issues[0],/controlsScale/);}
+ const dormant={panelPlacement:'floating',canvas:valid.canvas,camera:valid.camera};assert.deepEqual(plain(ctx.sectionExploreLayout(d,dormant)),dormant);
+});

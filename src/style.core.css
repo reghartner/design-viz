@@ -117,14 +117,16 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .board.stepmode:has(+ .termbar:not([hidden])),
 .boardgrid:has(+ .termbar:not([hidden]))>.board.stepmode{border-bottom-left-radius:0; border-bottom-right-radius:0;}
 .boardcanvas{position:relative;}
-.board svg{display:block; min-width:980px; width:100%; height:auto;}
+/* Graph rules exclude SVG widgets inside canvas objects; :where keeps the
+   existing specificity so section layout sizing still takes precedence. */
+.board :where(.boardcanvas)>svg{display:block; min-width:980px; width:100%; height:auto;}
 /* when a panel column shares the row the board is only ~670-860px wide, so the
    980px floor would force a horizontal scrollbar; let the svg scale to fit
    (panels move below it when the section no longer has room for both). */
-.boardgrid.haspanels .board svg{min-width:0;}
+.boardgrid.haspanels .board :where(.boardcanvas)>svg{min-width:0;}
 .diagramcol{container-type:inline-size;}
-.board.board-size-readable .boardcanvas svg{min-width:1180px;}
-.board.board-size-fit .boardcanvas svg,.board.board-size-auto .boardcanvas svg{min-width:0;}
+.board.board-size-readable .boardcanvas>svg{min-width:1180px;}
+.board.board-size-fit .boardcanvas>svg,.board.board-size-auto .boardcanvas>svg{min-width:0;}
 .board-size{display:flex;flex-wrap:wrap;align-items:center;gap:5px;flex-basis:100%;font:11px 'IBM Plex Mono',monospace;color:var(--dtext);}
 .board-size>span:first-child{margin-right:3px;}
 .board-pan{display:flex;flex-basis:100%;align-items:center;gap:8px;min-width:0;}
@@ -155,7 +157,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
   .board.board-zoomed:not(.explore-board) .boardcanvas>svg{width:var(--board-zoom-width);min-width:0;max-width:none;margin:0 auto;}
 }
 @media print{
-  .board.board-size-readable .boardcanvas svg{min-width:0;}
+  .board.board-size-readable .boardcanvas>svg{min-width:0;}
 }
 @media print{
   .board-size{display:none;}
@@ -747,13 +749,13 @@ body.sk-aurora:not(.sk-pastel):not(.sk-editorial) .delta-popover-label,body.sk-t
   .board{--dv-board-ground:#FFFFFF !important; border-color:#CCCCCC; overflow:visible;}
 }
 @media print{
-  .board svg{min-width:0;}
+  .board :where(.boardcanvas)>svg{min-width:0;}
 }
 @media print{
-  .board svg > rect:first-of-type{fill:#FFFFFF;}
+  .board :where(.boardcanvas)>svg > rect:first-of-type{fill:#FFFFFF;}
 }
 @media print{
-  .board svg > rect[fill^="url"]{display:none;}
+  .board :where(.boardcanvas)>svg > rect[fill^="url"]{display:none;}
 }
 @media print{
   .lg{background:#FFFFFF; border-bottom-color:#DDDDDD;}
@@ -1051,7 +1053,7 @@ body.sk-editorial .board{
   background:var(--ed-sheet);
   box-shadow:none;
 }
-body.sk-editorial .board svg > rect:nth-of-type(2){opacity:.075;}
+body.sk-editorial .board :where(.boardcanvas)>svg > rect:nth-of-type(2){opacity:.075;}
 body.sk-editorial .lg,
 body.sk-editorial .sk-aurora .lg,
 body.sk-editorial .sk-daylight .lg{
@@ -1384,10 +1386,10 @@ body.sk-editorial .errbox{
   body.sk-editorial .sk-daylight .ctcard{background:#FFFFFF; border-color:#B8B8B8;}
 }
 @media print{
-  body.sk-editorial .board svg > rect:first-of-type{fill:#FFFFFF;}
+  body.sk-editorial .board :where(.boardcanvas)>svg > rect:first-of-type{fill:#FFFFFF;}
 }
 @media print{
-  body.sk-editorial .board svg > rect:nth-of-type(2){display:none;}
+  body.sk-editorial .board :where(.boardcanvas)>svg > rect:nth-of-type(2){display:none;}
 }
 /* @panel-style-order:1500 */
 /* ---------- terminal skin (Aurora overlay) ---------- */
@@ -2234,7 +2236,7 @@ body.sk-editorial .errbox{
   }
 }
 @media screen {
-  body.sk-pastel .board svg pattern circle { fill:#D9E2F0; opacity:.58; }
+  body.sk-pastel .board :where(.boardcanvas)>svg pattern circle { fill:#D9E2F0; opacity:.58; }
 }
 @media screen {
   body.sk-pastel .edge,
@@ -2252,7 +2254,7 @@ body.sk-editorial .errbox{
      applied explicitly to stay color-matched to the line they belong to */
 }
 @media screen {
-  body.sk-pastel .board svg marker path { filter:saturate(.70) brightness(.82); }
+  body.sk-pastel .board :where(.boardcanvas)>svg marker path { filter:saturate(.70) brightness(.82); }
 }
 @media screen {
   body.sk-pastel .pkt { filter:saturate(.70) brightness(.82) !important; }
@@ -3011,7 +3013,7 @@ body.sk-editorial .errbox{
   }
 }
 @media screen {
-  body.sk-blueprint .board svg > rect[fill^="url"]{opacity:.7;}
+  body.sk-blueprint .board :where(.boardcanvas)>svg > rect[fill^="url"]{opacity:.7;}
 }
 @media screen {
   body.sk-blueprint .lg{

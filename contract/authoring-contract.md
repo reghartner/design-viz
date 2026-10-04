@@ -1350,6 +1350,23 @@ perspectives" of one timeline). Types:
   viewport coordinates. The **Panels & controls** zoom saves this value
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
+
+  An Explore chapter can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
+  or `"floating"` (default). Preserve the separate Floating rectangles when authoring
+  canvas placement. Store graph rectangles in `exploreLayout.canvas.panels` as
+  `{panel,x,y,w,h}` and notes in `.canvas.prose` as `{x,y,w,h}`. Graph coordinates
+  are relative to the SVG viewBox's upper-left; negative x/y are valid, all values
+  must be finite within ±10000, and w/h must be positive. Canvas rectangles have
+  no `stacked` flag. Diagram zoom scales their entire contents; `overlayScale`
+  continues to affect Floating objects and viewport playback only. Optional
+  `canvas.controlsScale` (0.5–1.25) independently sizes playback while On canvas
+  is active; omission inherits the Floating scale. Panel visibility
+  uses the chapter's sectionLayout items; notes visibility uses
+  `exploreLayout.prose.hidden`. Fit includes visible canvas objects. Playback stays
+  viewport pinned. Author each completed move/resize or placement change as one
+  layout edit, preserving the current path/step and the other mode's rectangles.
+  Reader changes remain temporary. See [section layouts](../docs/section-layouts.md).
+
   `layouts[].exploreLayout.steps.textPosition` optionally places the current-step
   caption `below`, `above`, `left` or `right` of the path controls. Omission means
   `below`; overflowing path tracks remain scrollable.

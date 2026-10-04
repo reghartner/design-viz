@@ -194,3 +194,10 @@ body .docview .explore-player>.termbar{flex:1;min-height:0;height:auto;}
 .section-layout-tile[data-layout-key="steps"]{display:flex;flex-direction:column;}
 .section-layout-tile[data-layout-key="steps"]>.playback-mode-rail{flex:none;}
 body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-height:0;height:auto;}
+
+/* Canvas objects share graph units and its scroll origin. Scale the whole window,
+   including its header and widget, while playback remains a stage sibling. */
+.explore-canvas-objects{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;--explore-overlay-scale:1;}
+.explore-placement{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-placement select{font:inherit;color:inherit;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:6px;padding:6px;}
+@media print{.explore-canvas-objects{position:static;width:auto;height:auto;transform:none!important;}}

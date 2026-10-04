@@ -83,6 +83,7 @@
     "workbench/auto-arrange-core.js",
     "workbench/auto-arrange.js",
     "workbench/edge-curves.js",
+    "workbench/spatial-selection.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
     "workbench/catalog-picker.js",

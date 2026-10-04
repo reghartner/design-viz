@@ -615,3 +615,67 @@ function planAutoArrange(text,raw,section,result){
     return planReplaceValue(text,raw,got.path,JSON.stringify(autoArrangeDiagram(got.d,clean),null,2));
   }catch(error){return {error:error.message};}
 }
+
+/* Spatial object actions operate on one authored diagram. Measurements are
+   effective graph-space rectangles supplied by the interaction owner. */
+function builderSpatialTargets(text,raw,targets){
+  if(!targets || !targets.length)return {error:'Select nodes or canvas panels.'};
+  var section=targets[0].section,got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(targets.some(function(t){return t.section!==section || ['node','panel'].indexOf(t.kind)<0;}))return {error:'Choose nodes and canvas panels from one section.'};
+  for(var i=0;i<targets.length;i++){
+    var t=targets[i],value=t.kind==='node'?(got.d.nodes || {})[t.id]:(got.d.panels || []).find(function(p){return p.id===t.id;});
+    if(!value)return {error:'An object changed. Render and select it again.'};
+  }
+  return got;
+}
+function planAlignSpatial(text,raw,targets,layoutId,direction,rects){
+  var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+  if(targets.length<2)return {error:'Select at least two objects to align.'};
+  if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose an alignment direction.'};
+  if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Use Free placement for every selected node before aligning.'};
+  var view=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
+  if(targets.some(function(t){return t.kind==='panel';}) && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
+  if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    var anchor=rects[0],cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h/2;
+    var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
+    for(var i=0;i<targets.length;i++){
+      var t=targets[i],r=rects[i],x=direction==='vertical'?cx:r.x+r.w/2,y=direction==='horizontal'?cy:r.y+r.h/2;
+      if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
+      if(t.kind==='node'){
+        var f=d.floats.find(function(f){return f.id===t.id;});f.x=x;f.y=y;delete f.dx;delete f.dy;
+      }else{
+        var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),panels=canvas.panels || (canvas.panels=[]);
+        var p=panels.find(function(p){return p.panel===t.id;});if(!p){p={panel:t.id};panels.push(p);}
+        Object.assign(p,{x:x-r.w/2,y:y-r.h/2,w:r.w,h:r.h});
+      }
+    }
+  });
+}
+function planDuplicateSpatial(text,raw,targets,layoutId,rects){
+  var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+  return builderRewrite(text,raw,got.path,function(d){
+    var nodeMap=Object.create(null),panelMap=Object.create(null),used=Object.assign(Object.create(null),d.nodes),usedPanels=Object.create(null);
+    (d.panels || []).forEach(function(p){usedPanels[p.id]=true;});
+    targets.forEach(function(t,i){
+      if(t.kind==='node'){
+        var id=builderUniqueKey(used,t.id);used[id]=true;nodeMap[t.id]=id;d.nodes[id]=builderClone(d.nodes[t.id]);
+        var f=(d.floats || []).find(function(f){return f.id===t.id;});
+        if(f){var copy=builderClone(f);copy.id=id;if(rects && rects[i]){copy.x=rects[i].x+rects[i].w/2+24;copy.y=rects[i].y+rects[i].h/2+24;delete copy.dx;delete copy.dy;}d.floats.push(copy);}
+        else (d.rows || []).forEach(function(row){for(var j=0;j<row.length;j++){if(row[j]===t.id){row.splice(j+1,0,id);j++;}else if(Array.isArray(row[j])){var k=row[j].indexOf(t.id);if(k>=0)row[j].splice(k+1,0,id);}}});
+      }else{
+        var original=d.panels.find(function(p){return p.id===t.id;}),copy=builderClone(original),id=builderUniqueKey(usedPanels,t.id);usedPanels[id]=true;panelMap[t.id]=id;copy.id=id;d.panels.push(copy);
+      }
+    });
+    (d.edges || []).slice().forEach(function(e){if(nodeMap[e.from] && nodeMap[e.to]){var copy=builderClone(e);copy.from=nodeMap[e.from];copy.to=nodeMap[e.to];d.edges.push(copy);}});
+    Object.keys(panelMap).forEach(function(id){var p=d.panels.find(function(p){return p.id===panelMap[id];});panelRemapReferences(p,'nodes',nodeMap);});
+    [d].concat(d.layouts || []).forEach(function(v){
+      var layouts=v.sectionLayout;if(layouts)Object.keys(layouts).forEach(function(key){if(!Array.isArray(layouts[key]))return;layouts[key].slice().forEach(function(tile){if(panelMap[tile.panel]){var c=builderClone(tile);c.panel=panelMap[tile.panel];layouts[key].push(c);}});});
+      var explore=v.exploreLayout;if(explore){[explore,explore.canvas].forEach(function(place){if(place && place.panels)place.panels.slice().forEach(function(p){if(panelMap[p.panel]){var c=builderClone(p);c.panel=panelMap[p.panel];if(place===explore.canvas){c.x+=24;c.y+=24;}place.panels.push(c);}});});
+        if(explore.panelPlacements)explore.panelPlacements.slice().forEach(function(p){if(panelMap[p.panel])explore.panelPlacements.push(Object.assign({},p,{panel:panelMap[p.panel]}));});
+      }
+    });
+    var active=(d.layouts || []).find(function(v){return v.id===layoutId;});
+    if(active)targets.forEach(function(t,i){if(t.kind!=='panel' || !rects || !rects[i])return;var ex=active.exploreLayout || (active.exploreLayout={}),canvas=ex.canvas || (ex.canvas={}),panels=canvas.panels || (canvas.panels=[]),id=panelMap[t.id],p=panels.find(function(p){return p.panel===id;});if(!p){p={panel:id};panels.push(p);}Object.assign(p,rects[i],{x:rects[i].x+24,y:rects[i].y+24});var placements=ex.panelPlacements || (ex.panelPlacements=[]);var placement=placements.find(function(p){return p.panel===id;});if(!placement){placement={panel:id};placements.push(placement);}placement.placement='canvas';});
+  });
+}

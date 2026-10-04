@@ -77,8 +77,9 @@ test('row and mixed-section selections refuse group arrangement without a partia
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));
   for(const id of ['row','other']){
     await node(page,'a').click();await node(page,id).click({modifiers:['Shift']});const before=await source(page);
-    await page.getByRole('button',{name:'Align horizontal',exact:true}).click();await expect(page.locator('#src')).toHaveValue(before);
-    await expect(page.locator('#guide')).toContainText(id==='row'?'Use Free placement':'single section');
+    const align=page.getByRole('button',{name:'Align horizontal',exact:true}),reason=id==='row'?'Use Free placement':'single section';
+    await expect(align).toBeDisabled();await expect(align).toHaveAttribute('title',new RegExp(reason));await expect(page.locator('#src')).toHaveValue(before);
+    await expect(page.locator('#guide')).toContainText(reason);
     await drag(page,'a',30,45);await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);
   }
 });
@@ -94,6 +95,6 @@ test('group alignment and dragging work in Explore and refuse stale source align
   await history(page,aligned,await source(page));await select(page);
   const edited=(await source(page)).replace('Align and move','Handwritten source');
   await page.evaluate(text=>{const src=document.querySelector('#src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));},edited);
-  await page.getByRole('button',{name:'Align vertical',exact:true}).click();await expect(page.locator('#src')).toHaveValue(edited);
+  const align=page.getByRole('button',{name:'Align vertical',exact:true});await expect(align).toBeDisabled();await expect(align).toHaveAttribute('title',/Render it before aligning/);await expect(page.locator('#src')).toHaveValue(edited);
   await expect(page.locator('#guide')).toContainText('Render it before aligning');
 });

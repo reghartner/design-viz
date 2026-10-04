@@ -325,6 +325,14 @@ the view filter or change the viewer's refusal to play an empty visible route.
 
 ## Interaction and builder lifetime
 
+`workbench/spatial-selection.js` owns the Workbench Explore context menu and
+Alt/Option-drag marquee, composed by `createBuilderInteractions()`. It uses
+authored node/panel identities and graph-space measurements of fitted panels;
+`planAlignSpatial` and `planDuplicateSpatial` publish through one ordinary session
+transaction. Source handwriting closes menus and cancels gestures while preserving
+Inspector selection with stale-source feedback. View changes and preview
+replacement retain their existing selection-retirement policy.
+
 `createBuilderInteractions()` owns board hit testing, single/multiple selection
 rings, step-member markers, ADD TO STEP and connect state, graph label/node/group/
 row gestures and their temporary SVG elements. It receives the live session,

@@ -18,6 +18,10 @@ async function helper(t){
 }
 test('local helper publishes source/selection and delivers file proposals exactly once after acknowledgement',async t=>{
   const h=await helper(t),selection=[{kind:'node',section:0,id:'camera'}];
+  const readme=await fs.readFile(path.join(h.server.scratch,'README.md'),'utf8');
+  assert.match(readme,/Preserve existing layout, edge routes and unrelated content/);
+  assert.match(readme,/auto-arrange-spec\.cjs.*--section <zero-based section> <draft spec> <different arranged spec>/);
+  assert.match(readme,/no browser control/);
   assert.equal((await h.send({snapshot:{...h.snapshot,selection}})).status,200);
   const state=await h.read('state.json');assert.deepEqual(state.selection,selection);assert.equal(state.connected,true);
   assert.equal(state.source,h.snapshot.source);assert.ok(!JSON.stringify(state).includes(h.server.token));

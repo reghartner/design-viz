@@ -123,8 +123,8 @@ only as last resort). Re-walk ONLY the rows the hunks touch — match by HLD
 anchors against the hunk's removed AND added lines, falling back to the
 row's fact and context when the anchor itself changed. A changed passage
 VOIDS any amendment that answered a question about it (mark `voided:`;
-re-ask if the gap remains). New material takes the normal steps; batch questions that block an honest depiction; continue independent work. Unchanged rows and authoring
-geometry stay untouched. One ledger write at the end (rows updated,
+re-ask if the gap remains). New material takes the normal steps; batch questions that block an honest depiction; continue independent work. Unchanged node placement,
+row membership, float coordinates, edge ports and route geometry stay untouched. One ledger write at the end (rows updated,
 statuses current, header bumped). Refresh `page.generatedFrom` only for a
 supplied HTTP(S) source URL; otherwise refresh the ledger and visible source
 identification. Build with

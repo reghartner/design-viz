@@ -18,8 +18,11 @@ def folder_agent_kit(root, runtime):
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
+                 'tools/auto-arrange-spec.cjs',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
+    for name in ['viz-3.31.0.js', 'webcola-3.4.0.js']:
+        files['tools/auto-arrange/vendor/' + name] = (root / 'src/workbench/vendor' / name).read_text()
     # Build from these sources; never depend on an existing generated file.
     files['tools/canon/generated-runtime.cjs'] = runtime
     raw = json.dumps({'files': files}, sort_keys=True, ensure_ascii=True).encode()

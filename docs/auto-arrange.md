@@ -31,6 +31,22 @@ the source. Freshness is checked again before the atomic session transaction.
 Native paths are stored in the spec, so opening or exporting never recomputes
 layout. Moving nodes deforms their authored routes without running a layout.
 
+## Headless authoring
+
+Agents without browser control can run the same production arranger with:
+
+```sh
+node tools/auto-arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
+```
+
+Repeat `--section` for each new diagram, using its zero-based rendered section
+index. Use `--all` only when every diagram in the input is new. A one-diagram
+input needs no selector. The input and output paths must differ. The command
+validates first, arranges every selected diagram in memory, validates the full
+result, and writes the output atomically; a failure leaves both files unchanged.
+Use it for new diagrams. Existing diagrams retain their authored placement and
+routes unless the user explicitly requests a whole-diagram re-layout.
+
 ## Distribution and maintenance
 
 The workbench embeds Viz.js 3.31.0 (1,329,882 bytes) and WebCola 3.4.0

@@ -92,7 +92,8 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(), packed['sha256'])
         files = json.loads(raw)['files']
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'docs/folder-agent-session.md',
-                     'docs/folder-agent-existing-edit.md', 'tools/canon/generated-runtime.cjs']:
+                     'docs/folder-agent-existing-edit.md', 'tools/canon/generated-runtime.cjs',
+                     'tools/auto-arrange-spec.cjs']:
             self.assertEqual(files[name], (ROOT / name).read_text())
         # The short entry guide stays short and its relative links resolve inside the kit.
         guide = files['docs/folder-agent-existing-edit.md']
@@ -129,6 +130,20 @@ class BuildTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             folded = json.loads(result.stdout)
             self.assertTrue(folded)
+            draft = root / 'draft.spec.json'
+            arranged = root / 'arranged.spec.json'
+            draft.write_text(json.dumps({'nodes': {'a': {'title': 'A'}, 'b': {'title': 'B'}},
+                                         'rows': [[]],
+                                         'floats': [{'id': 'a', 'side': 'below'},
+                                                    {'id': 'b', 'side': 'below'}],
+                                         'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}]}))
+            result = subprocess.run(['node', 'tools/auto-arrange-spec.cjs', str(draft), str(arranged)],
+                                    cwd=root, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            output = json.loads(arranged.read_text())
+            self.assertEqual(output['edges'][0]['label'], 'send')
+            self.assertTrue(all('x' in item and 'y' in item for item in output['floats']))
+            self.assertIn('curveControls', output['edges'][0])
 
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)

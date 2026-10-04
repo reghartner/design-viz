@@ -101,6 +101,20 @@ test('automatic Explore panels open at readable content size across desktop view
   await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
  }
 });
+test('automatic panels remeasure when a late font changes rendered content metrics',async({page,server})=>{
+ const fontName='explore-late-font.woff2';
+ await writeFile(path.join(server.root,fontName),await readFile(path.join(repo,'src/fonts/ibm-plex-mono-latin-400-normal.woff2')));
+ await page.setViewportSize({width:1280,height:800});await page.goto(await build(server)+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ await page.evaluate(()=>document.fonts.ready);
+ const outcome=page.locator('[data-explore-panel=outcome]'),before=await rect(outcome);
+ await page.evaluate(async font=>{
+  const style=document.createElement('style');
+  style.textContent='@font-face{font-family:"Explore late metric";src:url("/'+font+'") format("woff2")} [data-explore-panel="outcome"] .pchip{font:20px/32px "Explore late metric",monospace}';
+  document.head.appendChild(style);await document.fonts.load('20px "Explore late metric"');await document.fonts.ready;
+ },fontName);
+ await expect.poll(()=>outcome.locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight),{message:'Late font metrics trigger an automatic panel remeasure'}).toBeLessThanOrEqual(2);
+ expect((await rect(outcome)).height).toBeGreaterThan(before.height+10);
+});
 test('automatic panels follow richer step content while authored and manual geometry stay fixed',async({page,server},info)=>{
  await page.setViewportSize({width:1440,height:900});await page.goto(await buildDynamic(server));await page.evaluate(()=>document.fonts.ready);
  const dynamic=page.locator('[data-explore-panel=dynamic]'),revealed=page.locator('[data-explore-panel=revealed]');

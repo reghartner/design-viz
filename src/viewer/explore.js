@@ -386,6 +386,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var visibilityObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
   var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
   var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
+  // Font metrics can settle after the first rendered measurement without a
+  // DOM mutation or stage resize. Remeasure automatic windows once the active
+  // font set is ready and after later font loads; authored/manual sizes ignore
+  // this paint because their automatic flag is false.
+  var fontSet=document.fonts;
+  function fontsSettled(){if(active && !retired)paint();}
+  function settleFonts(){if(fontSet && fontSet.ready)fontSet.ready.then(fontsSettled);}
+  if(fontSet && fontSet.addEventListener)fontSet.addEventListener('loadingdone',fontsSettled);
   function enter(){
     if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
     if(boardSize && boardSize.suspend)boardSize.suspend();
@@ -405,7 +413,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
     if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
-    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);
+    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
     // A reader view can enter at page size before becoming full-browser. Restore the
     // graph-relative center; raw scroll offsets describe the old viewport.
     if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
@@ -568,6 +576,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

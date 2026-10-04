@@ -116,14 +116,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return override?override.placement:memory.layout.panelPlacement || 'floating';
   }
   function canvasWindow(w){return w!==playerWindow && windowPlacement(w)==='canvas';}
+  function canvasSizing(w){return canvasWindow(w) && !w.prose?w.canvasSizing:null;}
   function onCanvas(){return windows.some(canvasWindow);}
   function hasFloating(){return windows.some(function(w){return !canvasWindow(w);});}
   function canvasWindowLabel(w,selected){return selected?w.label+' canvas panel, selected':'Select '+w.label+' canvas panel';}
   function syncCanvasWindow(w){
-    var mode=canvasWindow(w),selected=mode && selectedCanvasWindow===w;
+    var mode=canvasWindow(w),selected=mode && selectedCanvasWindow===w,sizing=mode && w.canvasSizing;
     w.el.classList.toggle('explore-canvas-selected',selected);
     if(mode){w.el.tabIndex=0;w.el.setAttribute('aria-label',canvasWindowLabel(w,selected));}
     else{w.el.removeAttribute('tabindex');w.el.setAttribute('aria-label',w.label);}
+    w.resize.title=sizing && sizing.mode==='fixed-aspect'?'Drag vertically or horizontally; proportions stay locked and width determines height':sizing?'Drag vertically or horizontally; height fits content from its width':'Drag to resize; arrow keys to resize';
     if(selected)w.el.setAttribute('aria-current','true');else w.el.removeAttribute('aria-current');
   }
   function selectCanvasWindow(w){
@@ -317,7 +319,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
     w.el.classList.toggle('explore-stacked',w.state.stacked);
-    w.resize.setAttribute('aria-label','Resize '+w.label+'; use arrow keys');
+    var sizing=canvasSizing(w),instruction=sizing && sizing.mode==='fixed-aspect'?'; proportions stay locked; width determines height':sizing?'; height fits content from its width':'';
+    w.resize.setAttribute('aria-label','Resize '+w.label+instruction+'; use arrow keys');
+  }
+  function fittedCanvasRect(w,r){
+    var sizing=canvasSizing(w);if(!sizing)return r;
+    // Probe at the authored width. Fitted cards opt out of the usual 100%
+    // minimum height, so scrollHeight is intrinsic rendered content rather
+    // than the stale saved rectangle.
+    apply(w,r);
+    var height=Math.ceil(w.card.scrollHeight);
+    if(!Number.isFinite(height) || height<=0)return r;
+    return {x:r.x,y:r.y,w:r.w,h:clamp(height,72,Number.isFinite(sizing.maxHeight)?Math.max(72,sizing.maxHeight):10000)};
   }
   function sizeAutomaticWindow(w){
     if(!w.state.automatic)return;
@@ -356,7 +369,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
     windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:floatingOverlayScale()));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
-    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8;
+    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
@@ -373,7 +386,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
       w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
       if(!shown)return;
-      var scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
+      var previous=w.rect,scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
+      if(canvasWindow(w))r=fittedCanvasRect(w,r);
+      if(canvasWindow(w) && previous && ['x','y','w','h'].some(function(key){return Math.abs(previous[key]-r[key])>.01;}))canvasGeometryChanged=true;
       apply(w,r);
     });
     var chips=bar && bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
@@ -393,6 +408,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
     if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
+    else if(canvasGeometryChanged && graphPixels && !gesture)sizeGraph(true);
   }
   function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
   function sizeGraph(preserve){
@@ -454,9 +470,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var dx=(ev.clientX-g.startX)/(scale || 1),dy=(ev.clientY-g.startY)/(scale || 1);g.changed=g.changed || Math.abs(dx)+Math.abs(dy)>2;
     if(g.kind==='pan'){board.scrollLeft=g.left-dx;board.scrollTop=g.top-dy;return;}
     if(canvasWindow(g.w)){dx/=graphScale();dy/=graphScale();}
-    if(g.kind==='move')Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true),{stacked:false});
-    else Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}),true));
+    var sizing=canvasSizing(g.w);
+    if(g.kind==='move'){
+      var moved=scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true);if(sizing)moved.h=g.before.h;
+      Object.assign(g.w.state,moved,{stacked:false});
+    }
+    else if(sizing && sizing.resizeAxis==='width'){
+      var vertical=dy*(Number.isFinite(sizing.aspect) && sizing.aspect>0?sizing.aspect:1),delta=Math.abs(dx)>=Math.abs(vertical)?dx:vertical;
+      Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+delta,h:g.rect.h}),true));
+    }else Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}),true));
     paint();
+    if(g.kind==='resize' && sizing)g.w.state.h=g.w.rect.h;
   }
   function keyboard(ev,w,kind){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
@@ -466,9 +490,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,w.rect,true);
     else w.state.automatic=false;
     var n=(ev.shiftKey?24:8)/(canvasWindow(w)?graphScale():1);
-    if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
-    else Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true),{stacked:false});
+    var sizing=canvasSizing(w);
+    if(kind==='resize' && sizing && sizing.resizeAxis==='width'){
+      var delta=(dir[0] || dir[1]*(Number.isFinite(sizing.aspect) && sizing.aspect>0?sizing.aspect:1))*n;
+      Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+delta,h:r.h}),true));
+    }else if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
+    else{
+      var moved=scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true);if(sizing)moved.h=before.h;
+      Object.assign(w.state,moved,{stacked:false});
+    }
     paint();
+    if(kind==='resize' && sizing)w.state.h=w.rect.h;
     if(['x','y','w','h'].every(function(key){return Math.abs(w.rect[key]-r[key])<.01;})){
       Object.assign(w.state,before);if(automatic)memory.controls=null;paint();return;
     }
@@ -488,10 +520,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var grip=button(label,function(){},header,'explore-window-grip');grip.title='Drag to move; arrow keys to move';grip.setAttribute('aria-label','Move '+label+'; use arrow keys');
     var hide=button('×',function(){selectCanvasWindow(null);setWindowHidden(w,true);paint();summary.focus();},header,'explore-window-hide');hide.setAttribute('aria-label','Hide '+label);
     var body=document.createElement('div');body.className='explore-window-body';el.appendChild(body);move(card,body);
+    var sizing=!notes && panelCapability(panel.type,'canvasSizing',null);
     var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
     var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
-    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
+    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden,canvasSizing:sizing};
+    if(sizing)el.setAttribute('data-explore-canvas-sizing',sizing.mode);
     if(!notes){
       var row=document.createElement('div');row.className='explore-panel-choice';choice.replaceWith(row);row.appendChild(choice);
       var placementLabel=document.createElement('label');placementLabel.className='explore-placement';placementLabel.textContent='Placement';
@@ -621,7 +655,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function canvasExtent(){
     var svg=board.querySelector('.boardcanvas>svg'),height=svg && svg.viewBox.baseVal.height || 800;
     var x=0,y=0,right=graphWidth(),bottom=height;
-    windows.filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
+    windows.filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=w.rect || constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
   function fitCanvas(insets){

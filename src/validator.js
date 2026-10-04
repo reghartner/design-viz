@@ -329,9 +329,9 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
   if (d.routing != null && d.routing !== 'lanes' && d.routing !== 'curves')
     warnings.push(DP + '.routing: expected "lanes" or "curves" — using curves');
   if (d.routing === 'lanes'){
-    if ((d.floats || []).length || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
+    if ((d.floats || []).some(function(f){return !f || !f.noSpread || !positionedFloat(f);}) || d.rows.some(function(row){ return !Array.isArray(row) || !row.length || row.length>5 || row.some(Array.isArray); }) ||
         (d.edges || []).some(function(e){ return e.from === e.to; }))
-      warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no floats or self-loops — using curves');
+      warnings.push(DP + '.routing: lanes requires 1–5 unstacked cards per row, no automatically spaced floats or self-loops — using curves');
     else if ((d.edges || []).some(function(e){ return e.bend && !validEdgePort(e.fromPort) && !validEdgePort(e.toPort); }))
       warnings.push(DP + '.routing: lanes computes its own routes; authored edge bends are ignored');
   }

@@ -20,6 +20,17 @@ test('saved Explore scale declares a capability so older viewers can report it',
   assert.ok(!C.detect(raw).includes('layout.explore-scale'));
 });
 
+test('Workbench-inserted floats declare stable placement for older viewers',()=>{
+  const raw={page:{sections:[{diagram:{nodes:{a:{},b:{}},rows:[['b']],
+    floats:[{id:'a',side:'below',x:1400,y:90,noSpread:true}],edges:[]}}]}};
+  const stamped=C.stamp(raw),features=stamped.page.flowview.features;
+  assert.ok(features.includes('layout.inserted-floats'));
+  const older={...C.features};delete older['layout.inserted-floats'];
+  const result=C.check(stamped,{version:C.version,contract:'1',features:older});
+  assert.ok(result.missingFeatures.includes('layout.inserted-floats'));
+  assert.match(result.messages.join(' '),/Stable placement of Workbench-inserted nodes/);
+});
+
 test('semver compares numeric components, prereleases and metadata without lexical mistakes',()=>{
   for(const [a,b] of [['1.9.0','1.10.0'],['1.0.0-alpha','1.0.0-alpha.1'],['1.0.0-beta.2','1.0.0-beta.11'],
     ['1.0.0-9','1.0.0-alpha'],['1.0.0-rc.1','1.0.0'],['2.0.0','10.0.0']]){

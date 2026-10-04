@@ -32,7 +32,7 @@ topology, notification or outcome without evidence.
 | Confluence export | [integrations](integrations.md) → Confluence |
 | Renderer version requirements | `docs/runtime-compatibility.md` |
 | Handing a diagram to a human editor: Starting state controls, notification composer, carry vs this-step-only (`enterOnce`), panel visibility, drilldown mappings, fragment visibility by path position, bullet and prose editing, custom protocols | [authoring details](authoring-details.md) → Human handoff in the workbench; the workbench User guide |
-| Free node placement, edge ports, Home layout editing, other mechanics | [authoring details](authoring-details.md) |
+| Auto arrange and graph placement; Home layout editing, other mechanics | [authoring details](authoring-details.md) |
 | Source changed; paired source/spec fix | [evidence and updates](evidence-and-updates.md) |
 
 ## Presentation defaults
@@ -42,8 +42,9 @@ topology, notification or outcome without evidence.
 - `diagram.primaryPanel` makes a panel (often the `homemap`) the centerpiece.
 - Use panel `visible: false` plus step `panelVisibility` to show a panel only
   when it matters; this is different from device-app card `visible`.
-- Keep layout stable between beats. Rows are in visual left-to-right order.
-  Omit `diagram.routing` (curves) unless lanes are requested.
+- Keep layout stable between beats. Use Auto arrange for a new graph's initial
+  placement; leave existing layout untouched on edits. Omit `diagram.routing`
+  unless lanes are requested.
 - `diagram.brand` shares a company name/mark across phone, device app, camera
   and security panels. Use only an approved mark or a library icon; never
   invent a company's identity.

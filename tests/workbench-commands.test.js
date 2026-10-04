@@ -189,19 +189,35 @@ test('planAddNode skips ids already taken and reports diagram-less sections plai
   assert.match(bad.error, /no diagram/);
 });
 
-test('new free nodes avoid automatic floats after insertion changes their spacing', () => {
+test('new free nodes avoid existing cards without moving automatic floats', () => {
   const raw = {nodes:{a:{},f:{},g:{},h:{},i:{}},rows:[['a']],
     floats:[{id:'f',side:'below',dx:-150,dy:-94},...['g','h','i'].map(id=>({id,side:'below'}))]};
+  const priorPositions = plain(B.layout(raw).pos);
   const before = JSON.stringify(raw), plan = B.planAddNode(before, raw, 0);
   assert.ok(!plan.error, plan.error);
   const next = JSON.parse(plan.text), positions = B.layout(next).pos, added = positions[plan.id];
   for (const id of Object.keys(raw.nodes)){
     const p = positions[id];
+    assert.deepStrictEqual(plain(p), priorPositions[id], 'existing node '+id+' stays put');
     assert.ok(Math.abs(added.cx - p.cx) >= (added.w + p.w) / 2 + 24 ||
       Math.abs(added.cy - p.cy) >= (added.h + p.h) / 2 + 24, 'overlap with ' + id);
   }
   assert.deepStrictEqual(next.floats.slice(0, -1), raw.floats);
   assert.equal(JSON.stringify(raw), before);
+});
+
+test('adding a node keeps lane rows and existing lane routes', () => {
+  const raw={nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],routing:'lanes',
+    edges:[{from:'a',to:'b',kind:'int',label:'call'}]};
+  const prior=plain(B.layout(raw).pos), route=B.laneRoutes(raw,B.layout(raw))[0].path;
+  const plan=B.planAddNode(JSON.stringify(raw),raw,0);
+  assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text), placed=B.layout(next);
+  assert.equal(placed.routing,'lanes');
+  for(const id of Object.keys(raw.nodes))assert.deepStrictEqual(plain(placed.pos[id]),prior[id]);
+  assert.equal(B.laneRoutes(next,placed)[0].path,route);
+  assert.ok(next.floats[0].noSpread && B.positionedFloat(next.floats[0]));
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).warnings),[]);
 });
 
 test('planAddEdge avoids duplicate from->to keys and creates edges when missing', () => {

@@ -238,34 +238,23 @@ new arithmetic, no new attributions.
   each gets its own numbered circle. Keep `edges` in true firing order; an
   overflowing edge label gets shortened, not nudged.
 
-## Row placement
+## Graph placement
 
-Author every `rows` array in visual left-to-right order. A stack occupies one
-slot, with its members in top-to-bottom order. Each row retains its authored
-horizontal order when other rows are added, moved, or removed. Cross-row edges
-follow their endpoint positions; steps and edges define the story order.
+For a new diagram, supply semantic `nodes`, `edges`, optional `groups`, steps
+and paths, with `rows:[[]]` as the required temporary schema field. Do not
+author floats, row positions, edge ports, bends, curve controls, label nudges
+or other edge geometry. Apply Workbench **Auto arrange** once the raw graph is
+ready. The product computes and saves the initial placement and routes; see
+`docs/auto-arrange.md`. If the agent has no browser access, hand off the raw
+proposal and tell Chuck to press **Auto arrange** in Workbench.
 
-## Free node placement and edge ports
-
-Use `floats:[{id,side:"below",x:430,y:220}]` for freely placed cards. X/Y are
-the center in diagram units, not screen pixels; Y increases downward. Fixed
-positions override automatic placement and nudges. Preserve an existing float's
-side when pinning it so the row headroom stays stable. All-free diagrams use
-`rows:[[]]`. Row layout and order remain automatic. Do not duplicate placement
-of one node in both rows and floats.
-
-Use optional `edges[].fromPort` / `toPort` objects to pin exit/entry:
-`{side:"right",offset:0.25}`. Offset is 0–1 along the side, starting at its left
-or top. These edges use curves, including in lane diagrams; other edges retain
-their routing. Neither pinning nor manual placement guarantees no overlaps.
-Inspect the rendered result and use bends/label nudges if needed. Workbench
-controls are **float → Free placement**, **Float X/Y**, and **Exit / Entry side**
-with **position (%)**. See `docs/free-node-placement.md` and the executable
-`examples/free-placement/free-placement.spec.json` example.
-Shift-select floats in one section and use **Align horizontal** (same Y) or
-**Align vertical** (same X), anchored to the first selected node. Drag any member
-to move the selection together; each alignment or group drag is one Undo action.
-Row nodes must first be switched to Free placement.
+For an existing diagram, use Workbench **Add to diagram → Node** to create the
+node. Its placement command computes the new free position and leaves prior
+nodes in place. Edit the node's definition and connections as raw semantics;
+never author its `x`/`y` or edit existing graph geometry. In a connected
+file-only session, have Chuck add the node with that button before the agent
+edits the current candidate. Offer **Auto arrange** as an optional whole-diagram
+rearrangement; do not run it unasked.
 
 ## Human handoff in the workbench
 

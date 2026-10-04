@@ -204,7 +204,10 @@ function layout(spec){
   ['above', 'below'].forEach(function(side){
     var group = floats.filter(function(f){ return f && (f.side === 'below' ? side === 'below' : side === 'above'); });
     if (!group.length) return;
-    var xs = group.map(function(f){
+    /* Newly inserted pinned cards opt out of spreading, preserving the
+       positions of pre-existing floats. Older mixed layouts are unchanged. */
+    var spreadGroup = group.filter(function(f){ return !(f.noSpread && positionedFloat(f)); });
+    var xs = spreadGroup.map(function(f){
       var touching = [];
       (spec.edges || []).forEach(function(e){
         if (e.from === f.id && pos[e.to]) touching.push(pos[e.to].cx);
@@ -214,10 +217,11 @@ function layout(spec){
     });
     xs = spreadPositions(xs, 150 + 24, 75 + 10, W - 75 - 10);
     var fy = side === 'above' ? rowsMeta[0].top - 45 - FLOAT_H/2 : belowY;
-    group.forEach(function(f, i){
+    var spreadIndex = 0;
+    group.forEach(function(f){
       /* optional manual nudge (like edge bend/labelDx): dy<0 raises a below
          float up into the inter-row gap; dx shifts it sideways */
-      var cx = xs[i] + (typeof f.dx === 'number' ? f.dx : 0);
+      var cx = f.noSpread && positionedFloat(f) ? f.x : xs[spreadIndex++] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
       if(positionedFloat(f)){cx=f.x;cy=f.y;}
       pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
@@ -290,7 +294,7 @@ function layout(spec){
 /* Reserved horizontal tracks plus obstacle-free vertical channels. Keep
    this opt-in: authored stacks, floats and self-loops retain classic curves. */
 function laneRoutingSupported(d){
-  return !(d.floats || []).length && d.rows.every(function(row){
+  return !(d.floats || []).some(function(f){return !f || !f.noSpread || !positionedFloat(f);}) && d.rows.every(function(row){
     return row.length > 0 && row.length <= 5 && row.every(function(id){ return typeof id === 'string'; });
   }) && !(d.edges || []).some(function(e){ return e.from === e.to; });
 }
@@ -331,6 +335,8 @@ function laneConflict(a,b){
 }
 function laneRoutes(d,L){
   var endpoints=laneEndpoints(d), faces=new Map(), gaps=new Map(), ends=[];
+  var separate=Object.create(null);
+  (d.floats || []).forEach(function(f){if(f && f.noSpread && positionedFloat(f))separate[f.id]=true;});
   endpoints.forEach(function(p){
     var key=p.id+':'+p.side;
     if (!faces.has(key)) faces.set(key,[]); faces.get(key).push(p);
@@ -362,6 +368,7 @@ function laneRoutes(d,L){
         var s=segs[si];
         // End stubs may touch their own card; every other segment must clear it.
         var blocked=Object.keys(L.pos).some(function(id){
+          if(separate[id])return false;
           if ((si===0 && id===e.from) || (si===segs.length-1 && id===e.to)) return false;
           return laneSegmentHits(s,L.pos[id],3);
         });

@@ -550,7 +550,8 @@ specs retain their explicit routing when opened or rebuilt.
 Optional `diagram.routing: "lanes"` routes connectors along reserved tracks
 between rows and channels around cards. It spreads ports and scores crossings
 and coincident segments; dense graphs can still cross, with visual breaks at
-intersections. Supports 1–5 unstacked cards per row, no floats or self-loops.
+intersections. Supports 1–5 unstacked cards per row and no self-loops;
+Workbench-created pinned `noSpread` floats are the only supported floats.
 Unsupported layouts fall back to curves with a warning. Authored edge bends
 are ignored in lanes mode; label offsets remain available. Omit routing or use
 `"curves"` for curved connectors. Honeycomb imports generate dependency rows
@@ -598,6 +599,10 @@ The side still controls the reserved above-row band; preserve it when moving
 an existing float so the rows stay in place. New free placements use `below`.
 Pinned nodes do not move when their connections or rows change, and may overlap
 if authored that way. A diagram with every node in floats uses `rows:[[]]`.
+Workbench-created new nodes can have `noSpread:true` on their pinned float.
+This product-generated field keeps that insertion out of existing automatic
+float spacing; agents should not author it or its coordinates by hand. It
+requires the `layout.inserted-floats` viewer capability.
 
 In the workbench, select **float → Free placement** or drag any floating node
 to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to

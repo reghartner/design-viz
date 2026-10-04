@@ -12,9 +12,9 @@ batch in memory. Publish/save authored references only; readers and Workbench
 resolve providers on open and freeze them until reload/reopen. Never write generated
 `topologyProvenance` over authored import declarations. Use the canon publisher
 for full-batch validation; standalone validation expects a resolved in-memory value.
-Imports default to floating child blocks. Set optional `position: {x,y}` on the
-import for a stable diagram-unit origin, or drag any imported node in Workbench
-to move the whole block. Never copy nodes to place them. Optional import `nodes`
+Imports default to floating child blocks. Leave their origin automatic when
+authoring; preserve an existing import position when editing. Never copy nodes
+to place them. Optional import `nodes`
 and `edges` arrays select provider-local identities inside the named export;
 omission imports the full corresponding set. Selected edges require both selected
 endpoints. The human **Add to diagram → Referenced topology** picker uses this same
@@ -360,10 +360,30 @@ docs for your panels together: `python3 <VIZ>/tools/widget_doc.py <types>`.
 Start from the closest cookbook example and replace its facts with yours. The
 [routing table](references/recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
-Confluence, named views, free placement). For manually shaped arrows, use
-`edges[].curvePoints` from the authoring contract and `cookbook/adjustments.md`:
-these are smooth through-points that override automatic routing. The workbench
-can author them by dragging the arrow; check the rendered curve for collisions.
+Confluence and named views).
+
+For a **new diagram**, define the nodes, edges, groups and story semantics as
+raw graph input. Use `rows:[[]]` only as the schema-required placeholder until
+the product's **Auto arrange** pipeline places the graph. Do not carry graph
+placement fields from a cookbook example. Open each new diagram in Workbench and apply
+**Auto arrange** for its initial placement; the product writes node positions,
+ports, routes and label offsets. Never manually place nodes or hand-author edge
+ports, bends, curve points/controls, label offsets or other edge geometry. If
+the connected folder or local session has no browser access, submit the raw
+graph through its normal proposal flow and tell Chuck to apply **Auto arrange**
+with the Workbench button before treating placement as finished; do not invent
+geometry to compensate. The raw proposal may have temporary unplaced-node
+warnings; require the normal clean build only after Auto arrange is applied.
+
+For an **existing diagram**, preserve its authored layout and edge geometry.
+Use Workbench **Add to diagram → Node** to allocate a visible new node: its
+product placement command chooses the new position while retaining the current
+nodes' positions. Then edit that node's definition and semantic connections
+as raw data; do not hand-author or adjust its coordinates. In a connected
+file-only session, ask Chuck to use **Add to diagram → Node** first, then
+continue from the updated candidate; the agent has no access to that UI.
+Tell Chuck he can re-apply **Auto arrange** with the button if he wants a new
+whole-diagram layout. Do not run it on the existing diagram unless he asks.
 
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths
@@ -387,7 +407,8 @@ Translation is mechanical once the worksheet is done:
 - Binding rows become `nodes.<id>.binding`; code rows become `codeRefs`.
 - Captions (`text`) state the time when the time matters ("6:20 PM. ...").
 
-Keep `rows` in visual left-to-right order. Default to no lanes. Open guided
+For new graphs, leave `rows:[[]]` until Auto arrange runs. Preserve existing
+rows and floats on edits. Default to no lanes. Open guided
 stories paused (`view: "step"`); set `autoplay: true` only when asked. Stamp the
 spec before publishing:
 `node <VIZ>/tools/compatibility.js --stamp <spec.json> > <stamped.spec.json>`
@@ -518,7 +539,7 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   your notes. Submit one atomic `proposal.json` with the matching base
   revision and wait for `result.json`. Rebase rejected stale proposals on the
   latest source. Do not write OUT files or build unless the user asks.
-- **Small edits.** A small edit the user fully specified (rename, move, fix
+- **Small edits.** A small edit the user fully specified (rename, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
   the self-audit for the affected paths.

@@ -204,8 +204,12 @@ panels** clears the graph; **Restore panels** brings the available panels back.
 **Stack at edge** puts them at full size in a column along the right side, adding
 more columns to the left when the first one is full. Dragging a panel always
 releases it for free placement, including at the top and right edges. A panel
-taller than the available stack lane stays full-size and top-aligned, with the
-next panel starting a column to its left. **Expand**
+without a saved rectangle opens at a compact width chosen by panel type and a
+height that follows its rendered content; these automatic panels wrap into right-edge
+columns as the lane fills. Exceptionally tall automatic content is capped at the
+usable lane height and scrolls inside its panel. An authored or manually resized
+panel taller than the available stack lane stays full-size and top-aligned, with
+the next panel starting a column to its left. **Expand**
 opens a larger view, using browser fullscreen when available and an expanded
 in-page view otherwise; **Exit expanded view** returns to the page.
 
@@ -423,7 +427,9 @@ controls shrink vertically while keeping their width: automatic bars fill the
 available space; manually sized bars retain their chosen span. Camera
 `x`/`y` describe its center as fractions of the SVG viewBox width/height, and
 `zoom` is the rendered scale (0.15–4). Omitted entries use automatic placement.
-The renderer clamps windows to the available viewport and practical minimum sizes.
+An omitted panel rectangle uses the panel type's compact width, a height based
+on rendered content, and the wrapped right-edge columns described above. The
+renderer clamps windows to the available viewport and practical minimum sizes.
 Invalid optional entries warn and fall back independently.
 
 ```json

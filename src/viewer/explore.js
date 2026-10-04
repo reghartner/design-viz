@@ -44,7 +44,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
   var panelBody=document.createElement('div');panelBody.className='explore-panel-body';menu.appendChild(panelBody);panelBody.appendChild(choices);
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
-  var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(available).forEach(function(w){w.state.stacked=true;w.state.hidden=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
+  var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(available).forEach(function(w){w.state.stacked=true;w.state.hidden=false;w.state.automatic=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
   var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
   function zoomGroup(label,cls){
@@ -194,10 +194,30 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-24,maxH)));
     return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-12)),w:width,h:height};
   }
+  function stackInsets(){
+    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getBoundingClientRect();
+    return {top:12,bottom:workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):12};
+  }
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
     w.el.classList.toggle('explore-stacked',w.state.stacked);
     w.resize.setAttribute('aria-label','Resize '+w.label+'; use arrow keys');
+  }
+  function sizeAutomaticWindow(w){
+    if(!w.state.automatic)return;
+    var b=bounds(),scale=overlayScale(),type=w.prose?'prose':w.panel.type;
+    var preferred=/^(screen|homemap|image)$/.test(type)?340:/^(prose|phone|deviceapp)$/.test(type)?320:300;
+    var logicalWidth=Math.min(preferred,Math.max(96,(b.w-24)/scale));
+    // Probe at the preferred width so the default follows rendered content.
+    // A short second pass absorbs scrollbar wrapping and font rounding.
+    w.state.w=logicalWidth;w.state.h=72;
+    apply(w,constrain(w,scaledRect(w,w.state)));
+    var contentHeight=Math.ceil(w.body.scrollHeight),insets=stackInsets(),laneHeight=Math.max(72,b.h-insets.top-insets.bottom);
+    var logicalMax=32+Math.max(40,laneHeight-32)/scale;
+    w.state.h=Math.min(logicalMax,Math.max(72,44+contentHeight));
+    apply(w,constrain(w,scaledRect(w,w.state)));
+    var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
+    if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
   }
   function paint(){
     if(!active || retired)return;
@@ -215,9 +235,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       windows.forEach(function(w){var saved=savedWindowRect(w);if(saved && saved.w)Object.assign(w.state,absolute(saved));});
       if(memory.layout.controls)memory.controls=absolute(memory.layout.controls);
     }
+    // State changes can replace panel content without changing the viewport.
+    // Reveal before measuring so a panel hidden during the last paint can use
+    // its current content and the current stage bounds.
+    windows.forEach(function(w){if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return visible(w) && w.state.stacked;}),gap=8;
-    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getBoundingClientRect();
-    var insetTop=12,insetBottom=workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):12;
+    var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
     stacked.forEach(function(w){
@@ -290,7 +313,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     shell.classList.remove('viewport-gesturing');
     if(!cancel && g.changed){
       if(g.kind==='pan')saveCamera(g.token);
-      else{rememberRect(g.w);if(!publish(g.token)){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;paint();}}
+      else{g.w.state.automatic=false;rememberRect(g.w);if(!publish(g.token)){Object.assign(g.w.state,g.before);if(g.w===playerWindow && g.automatic)memory.controls=null;paint();}}
     }
   }
   function begin(ev,w,kind,handle){
@@ -302,6 +325,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,r,true);
+    else w.state.automatic=false;
     gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
     handle.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
@@ -320,6 +344,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     ev.preventDefault();ev.stopPropagation();raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,w.rect,true);
+    else w.state.automatic=false;
     var n=ev.shiftKey?24:8;
     if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
     else Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true),{stacked:false});
@@ -327,14 +352,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(['x','y','w','h'].every(function(key){return Math.abs(w.rect[key]-r[key])<.01;})){
       Object.assign(w.state,before);if(automatic)memory.controls=null;paint();return;
     }
-    rememberRect(w);publish(token);
+    w.state.automatic=false;rememberRect(w);publish(token);
   }
   function floatingWindow(card,panel,it,notes){
     var label=notes?'Section notes':panel.title || panel.id;
     var saved=notes?memory.layout.prose:(memory.layout.panels || []).find(function(p){return p.panel===panel.id;});
     var state=notes?memory.prose:memory.panels[panel.id];
     if(!state){
-      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false}):{x:12,y:12,w:notes?320:220,h:notes?280:panel.type==='homemap'?250:220,stacked:!(saved && saved.stacked===false),hidden:false};
+      state=saved && saved.w?Object.assign(absolute(saved),{stacked:saved.stacked===true,hidden:false,automatic:false}):{x:12,y:12,w:300,h:72,stacked:!(saved && saved.stacked===false),hidden:false,automatic:true};
       if(notes)memory.prose=state;else memory.panels[panel.id]=state;
     }
     var el=document.createElement('article');el.className='explore-window'+(notes?' explore-prose-window':'');
@@ -346,7 +371,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
     var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
-    var w={el:el,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
+    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
     check.addEventListener('change',function(){state.hidden=!check.checked;if(check.checked)memory.focus=false;paint();});
     grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});
     grip.addEventListener('keydown',function(ev){keyboard(ev,w,'move');});resize.addEventListener('keydown',function(ev){keyboard(ev,w,'resize');});
@@ -355,9 +380,20 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(gesture)finish(true);paint();}):null;
   if(observer)observer.observe(stage);
+  // Panel renderers replace body children after step/state changes. Observe
+  // those replacements and card visibility; paint only changes outer-window
+  // styles, so this callback cannot observe itself.
   var visibilityObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
   var graphObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){sizeGraph(true);}):null;
   var tracksObserver=typeof MutationObserver!=='undefined'?new MutationObserver(function(){paint();}):null;
+  // Font metrics can settle after the first rendered measurement without a
+  // DOM mutation or stage resize. Remeasure automatic windows once the active
+  // font set is ready and after later font loads; authored/manual sizes ignore
+  // this paint because their automatic flag is false.
+  var fontSet=document.fonts;
+  function fontsSettled(){if(active && !retired)paint();}
+  function settleFonts(){if(fontSet && fontSet.ready)fontSet.ready.then(fontsSettled);}
+  if(fontSet && fontSet.addEventListener)fontSet.addEventListener('loadingdone',fontsSettled);
   function enter(){
     if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
     if(boardSize && boardSize.suspend)boardSize.suspend();
@@ -371,13 +407,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // dashes stay identical to Standard. The move anchors restore them on leave.
     legendMenu.hidden=false;
     board.classList.add('explore-board');if(workbenchCanvas)board.hidden=false;fitHeight();
-    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class']});});
+    cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});});
     if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
     if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
-    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);
+    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
     // A reader view can enter at page size before becoming full-browser. Restore the
     // graph-relative center; raw scroll offsets describe the old viewport.
     if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
@@ -540,6 +576,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

@@ -17,8 +17,20 @@ async function build(server,{unstacked=false,oversized=false}={}){
  const input=path.join(server.root,'explore.json'),output=path.join(server.root,'explore.html');await writeFile(input,JSON.stringify(spec));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);return server.origin+'/explore.html';
 }
+async function buildDynamic(server){
+ const columns=[{id:'event',label:'Event'},{id:'status',label:'Status'}];
+ const panel=id=>({id,type:'table',title:id[0].toUpperCase()+id.slice(1),columns,initial:{rows:[{id:'ready',cells:{event:'Ready',status:'Waiting'}}]}});
+ const rich=Array.from({length:6},(_,index)=>({id:'event-'+index,cells:{event:'Event '+(index+1),status:index<5?'Processed':'Ready'}}));
+ const raw={page:{title:'Dynamic Explore panels',sections:[{id:'dynamic',heading:'Dynamic panels',diagram:{autoplay:false,view:'step',defaultLayout:'flow',nodes:{service:{title:'Service'}},rows:[['service']],panels:['dynamic','revealed','authored','manual'].map(panel),steps:[
+  {id:'short',text:'Panels begin with one row.',panelVisibility:{revealed:false}},
+  {id:'rich',text:'Panels gain a moderate event history.',panelVisibility:{revealed:true},panels:{dynamic:{rows:rich},revealed:{rows:rich},authored:{rows:rich},manual:{rows:rich}}}
+ ],layouts:[{id:'flow',name:'Flow',presentation:'explore',exploreLayout:{panels:[{panel:'authored',x:.73,y:.02,w:.25,h:.15,stacked:true}]},sectionLayout:{default:[{x:0,y:0,w:8,h:18},{controls:'steps',x:0,y:18,w:8,h:6},{panel:'dynamic',x:8,y:0,w:4,h:6},{panel:'revealed',x:8,y:6,w:4,h:6},{panel:'authored',x:8,y:12,w:4,h:6},{panel:'manual',x:8,y:18,w:4,h:6}]}}]}}]}};
+ const input=path.join(server.root,'dynamic-explore.json'),output=path.join(server.root,'dynamic-explore.html');await writeFile(input,JSON.stringify(raw));
+ execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);return server.origin+'/dynamic-explore.html#d=dynamic&v=flow&m=step&s=short';
+}
 const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
+const overlaps=(a,b)=>Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1 && Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1;
 test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
  const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -70,6 +82,56 @@ test('right and top-right remain free placement; Stack at edge preserves size an
   column.rects.forEach((r,index)=>{expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height-10);if(index)expect(r.y-column.rects[index-1].y-column.rects[index-1].height).toBeCloseTo(8,0);});
  }
 });
+test('automatic Explore panels open at readable content size across desktop viewports and Workbench',async({page,server},info)=>{
+ const url=await build(server);
+ for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1440,900]]){
+  await page.setViewportSize({width,height});
+  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+  else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
+  await page.evaluate(()=>document.fonts.ready);
+  const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
+  expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
+  for(const win of windows){
+   expect(win.width,win.id).toBeGreaterThanOrEqual(299);expect(win.width,win.id).toBeLessThanOrEqual(341);
+   expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
+  }
+  for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
+  const controls=await rect(page.locator('.explore-player'));
+  for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
+  await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
+ }
+});
+test('automatic panels remeasure when a late font changes rendered content metrics',async({page,server})=>{
+ const fontName='explore-late-font.woff2';
+ await writeFile(path.join(server.root,fontName),await readFile(path.join(repo,'src/fonts/ibm-plex-mono-latin-400-normal.woff2')));
+ await page.setViewportSize({width:1280,height:800});await page.goto(await build(server)+'#d=doorbell&v=service-flow&m=step&s=quiet');
+ await page.evaluate(()=>document.fonts.ready);
+ const outcome=page.locator('[data-explore-panel=outcome]'),before=await rect(outcome);
+ await page.evaluate(async font=>{
+  const style=document.createElement('style');
+  style.textContent='@font-face{font-family:"Explore late metric";src:url("/'+font+'") format("woff2")} [data-explore-panel="outcome"] .pchip{font:20px/32px "Explore late metric",monospace}';
+  document.head.appendChild(style);await document.fonts.load('20px "Explore late metric"');await document.fonts.ready;
+ },fontName);
+ await expect.poll(()=>outcome.locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight),{message:'Late font metrics trigger an automatic panel remeasure'}).toBeLessThanOrEqual(2);
+ expect((await rect(outcome)).height).toBeGreaterThan(before.height+10);
+});
+test('automatic panels follow richer step content while authored and manual geometry stay fixed',async({page,server},info)=>{
+ await page.setViewportSize({width:1440,height:900});await page.goto(await buildDynamic(server));await page.evaluate(()=>document.fonts.ready);
+ const dynamic=page.locator('[data-explore-panel=dynamic]'),revealed=page.locator('[data-explore-panel=revealed]');
+ const authored=page.locator('[data-explore-panel=authored]'),manual=page.locator('[data-explore-panel=manual]');
+ await expect(revealed).toBeHidden();await manual.locator('.explore-window-resize').press('ArrowDown');
+ await page.setViewportSize({width:1280,height:800});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const before={dynamic:await rect(dynamic),authored:await rect(authored),manual:await rect(manual)};
+ await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(revealed).toBeVisible();
+ await expect.poll(async()=>(await rect(dynamic)).height).toBeGreaterThan(before.dynamic.height+40);
+ const after={dynamic:await rect(dynamic),revealed:await rect(revealed),authored:await rect(authored),manual:await rect(manual)};
+ for(const key of ['authored','manual']){expect(after[key].width).toBeCloseTo(before[key].width,0);expect(after[key].height).toBeCloseTo(before[key].height,0);}
+ for(const panel of [dynamic,revealed])expect(await panel.locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(2);
+ const visible=[after.dynamic,after.revealed,after.authored,after.manual];
+ for(let a=0;a<visible.length;a++)for(let b=a+1;b<visible.length;b++)expect(overlaps(visible[a],visible[b])).toBe(false);
+ const controls=await rect(page.locator('.explore-player'));for(const panel of visible)expect(overlaps(panel,controls)).toBe(false);
+ await info.attach('dynamic-panels-1280x800',{body:await page.screenshot(),contentType:'image/png'});
+});
 for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and sends the following panel left',async({page,server})=>{
  const url=await build(server,{unstacked:true,oversized:true});
  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -92,7 +154,7 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  const home=page.locator('[data-explore-panel=home]'),handle=home.locator('.explore-window-resize');
- let r=await rect(handle);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+100,r.y+15,{steps:5});await page.mouse.up();
+ const initial=await rect(home);let r=await rect(handle);await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+initial.width-145,r.y+15,{steps:5});await page.mouse.up();
  expect((await rect(home)).width).toBeLessThan(160);const narrow=await rect(home);
  const grip=home.locator('.explore-window-grip');await grip.focus();await page.keyboard.press('ArrowLeft');await expect(home).not.toHaveClass(/explore-stacked/);
  const detached=await rect(home);await grip.press('ArrowLeft');expect((await rect(home)).x).toBeLessThan(detached.x);

@@ -509,15 +509,15 @@ test('incident route scoring detects fan-out weaving beyond a shared port and cl
 
 test('large cleanup straightens branches and shares ranks without worsening final route safety',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json');
-  const saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
-  const refine=C.autoArrangeLargeAligned;
+  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates;
+  C.autoArrangeMotifCandidates=(d,result)=>result;
+  try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
     try{C.autoArrangeLargeAligned=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
     finally{C.autoArrangeLargeAligned=refine;}
     const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
     assert.ok(performance.now()-started<20000,block.id+' stays inside worker deadline');
-    assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' reproduces saved output');
     assert.deepEqual(plain(refine(d,before)),plain(result),block.id+' cleanup is deterministic');
     if(i===1){
       const names=Object.fromEntries(Object.keys(d.nodes).map((id,j)=>[id,'renamed-'+j]));
@@ -540,6 +540,7 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
+  }finally{C.autoArrangeMotifCandidates=motifs;}
 });
 
 test('large alignment refuses unsafe proposals and bounds geometry checks at the maximum graph size',()=>{
@@ -555,4 +556,115 @@ test('large alignment refuses unsafe proposals and bounds geometry checks at the
     d.nodes.node0.group='group';checks=0;
     assert.equal(C.autoArrangeLargeAligned(d,original),original);assert.equal(checks,0,'grouped layouts are outside this pass');
   }finally{C.autoArrangeScore=score;}
+});
+
+test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
+  const nodes=Object.fromEntries(['a','b','c','d','e','f','g','h'].map(id=>[id,{title:'Ignored',tint:'auth'}]));
+  const d={nodes,edges:[['a','b'],['b','c'],['c','d'],['c','e'],['d','f'],['e','f'],['f','g'],['g','c'],['f','h']].map(([from,to])=>({from,to}))};
+  const ranks=plain(C.autoArrangeMotifScaffolds(d));
+  assert.ok(ranks.some(r=>r.join(',')==='0,1,2'),'entry corridor');
+  assert.ok(ranks.some(r=>r.includes(3)&&r.includes(4)),'split/rejoin siblings');
+  assert.ok(ranks.some(r=>r.join(',')==='5,6,2'),'feedback corridor');
+  const ids=Object.keys(nodes),names=Object.fromEntries(ids.map((id,i)=>[id,'changed-'+i]));
+  const renamed={nodes:Object.fromEntries(ids.map(id=>[names[id],{}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]}))};
+  assert.deepEqual(plain(C.autoArrangeMotifScaffolds(renamed)),ranks);
+});
+
+test('motif composition creates reproducible safe large layouts and a square freight scaffold',()=>{
+  const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
+  const motif=C.autoArrangeMotifCandidates;
+  for(const [i,block] of input.page.blocks.entries()){
+    const d=block.diagram;let before;
+    try{C.autoArrangeMotifCandidates=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeMotifCandidates=motif;}
+    const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    assert.ok(performance.now()-started<20000,block.id+' worker deadline');
+    assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' deterministic generated output');
+    assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
+    assert.ok(result.score.crossings<=before.score.crossings);assert.ok(result.score.incidentCrossings<=before.score.incidentCrossings);
+    assert.ok(Math.hypot(result.score.width,result.score.height)<Math.hypot(before.score.width,before.score.height));
+    assert.ok(minimumCardGap(result)>=53.9,block.id+' retains normal card clearance');
+    assertAutoPorts(result.edges);assert.deepEqual(out.nodes,d.nodes);
+    assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
+    if(i===0){assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
+    if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
+    if(i===2){
+      assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,'freight fits square to landscape without padding');
+      assert.ok(result.score.height<before.score.height*.65);assert.ok(result.score.length<before.score.length*1.1);
+      const rows=new Map();result.positions.forEach(p=>rows.set(p.y,(rows.get(p.y)||0)+1));
+      assert.ok([...rows.values()].some(n=>n>=5),'several connected local motifs share an expanded row');
+    }
+    if(i===3){assert.ok(result.score.crossings<=2);assert.equal(result.score.incidentCrossings,0);assert.ok(result.score.length<before.score.length*.75);}
+    assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
+  }
+});
+
+test('motif composition keeps unsafe layouts out and bounds routing attempts',()=>{
+  const d={nodes:{},edges:[]},positions=[];
+  for(let i=0;i<80;i++){d.nodes['n'+i]={};positions.push({id:'n'+i,x:120+(i%10)*240,y:100+Math.floor(i/10)*160});}
+  for(let i=0;i<79;i++)d.edges.push({from:'n'+i,to:'n'+(i+1)});
+  for(let i=0;i<65;i++)d.edges.push({from:'n'+i,to:'n'+(i+8)});
+  const result={positions,edges:d.edges.map(()=>({})),score:{overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:1e5,width:2400,height:1400,shape:0}};
+  const routes=C.autoArrangeNaturalRoutes;let calls=0;
+  try{
+    C.autoArrangeNaturalRoutes=(d,r)=>({...r,score:{...result.score,hits:1}});
+    assert.equal(C.autoArrangeMotifCandidates(d,result,{renderJSON(){calls++;throw Error('No route');}}),result);
+    assert.ok(calls>0);assert.ok(calls<=Math.floor(C.AUTO_ARRANGE_MOTIF_LIMITS.work/(80*144)));
+    d.nodes.n0.group='group';calls=0;
+    assert.equal(C.autoArrangeMotifCandidates(d,result,{renderJSON(){calls++;}}),result);assert.equal(calls,0);
+  }finally{C.autoArrangeNaturalRoutes=routes;}
+});
+
+test('real ungrouped 80-node 160-edge composition stays inside the worker deadline',()=>{
+  const d={nodes:{},rows:[[]],edges:[]};
+  for(let i=0;i<80;i++){d.nodes['n'+i]={title:'Node '+i};d.rows[0].push('n'+i);}
+  for(let i=0;i<79;i++)d.edges.push({from:'n'+i,to:'n'+(i+1)});
+  for(let i=0;i<65;i++)d.edges.push({from:'n'+i,to:'n'+(i+8)});
+  for(let i=0;i<16;i++)d.edges.push({from:'n'+i,to:'n'+(i+16)});
+  const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola);
+  assert.ok(performance.now()-started<20000);assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
+  assert.equal(result.positions.length,80);assert.equal(result.edges.length,160);assertAutoPorts(result.edges);
+});
+
+test('a better motif shape cannot add incident crossings to the current best',()=>{
+  const d={nodes:Object.fromEntries(Array.from({length:21},(_,i)=>['n'+i,{}])),edges:[]};
+  const positions=Object.keys(d.nodes).map((id,i)=>({id,x:120+i*204,y:100}));
+  const score={overlaps:0,hits:0,crossings:0,incidentCrossings:2,length:10000,width:2000,height:2000,shape:1};
+  const original={positions,edges:[],score},scaffolds=C.autoArrangeMotifScaffolds,read=C.autoArrangeRead,routes=C.autoArrangeNaturalRoutes;
+  let calls=0,first;
+  try{
+    C.autoArrangeMotifScaffolds=()=>[[0,1],[2,3]];
+    C.autoArrangeRead=()=>{const candidate={positions,edges:[],score:{...score,incidentCrossings:calls===1?0:1,shape:calls===1?.5:0}};if(calls===1)first=candidate;return candidate;};
+    C.autoArrangeNaturalRoutes=(d,r)=>r.score?r:{...r,score:{...score,hits:1}};
+    const result=C.autoArrangeMotifCandidates(d,original,{renderJSON(){calls++;return {};}});
+    assert.equal(result,first);assert.equal(result.score.incidentCrossings,0);
+  }finally{C.autoArrangeMotifScaffolds=scaffolds;C.autoArrangeRead=read;C.autoArrangeNaturalRoutes=routes;}
+});
+
+test('long corridor and fan motifs retain their local edges in bounded overlapping windows',()=>{
+  const nodes=Object.fromEntries(Array.from({length:21},(_,i)=>['v'+i,{}]));
+  const corridor={nodes,edges:Array.from({length:10},(_,i)=>({from:'v'+i,to:'v'+(i+1)})).concat([{from:'v0',to:'v11'}])};
+  const ranks=plain(C.autoArrangeMotifScaffolds(corridor));
+  for(let i=0;i<10;i++)assert.ok(ranks.some(r=>r.includes(i)&&r.includes(i+1)),'corridor edge '+i+' survives windowing');
+  assert.ok(ranks.every(r=>r.length>=2&&r.length<=C.AUTO_ARRANGE_MOTIF_LIMITS.span));
+  assert.deepEqual(plain(C.autoArrangeMotifScaffolds(corridor)),ranks,'corridor windows are deterministic');
+  const fan={nodes,edges:Array.from({length:13},(_,i)=>({from:'v0',to:'v'+(i+1)}))};
+  const fanRanks=plain(C.autoArrangeMotifScaffolds(fan));
+  assert.ok(fanRanks.every(r=>r.length>=2&&r.length<=C.AUTO_ARRANGE_MOTIF_LIMITS.span));
+  for(let i=1;i<=13;i++)assert.ok(fanRanks.some(r=>r.includes(i)),'fan attachment '+i+' survives windowing');
+  assert.equal(fanRanks.length,3,'fan partition grows linearly instead of enumerating subsets');
+  assert.deepEqual(plain(C.autoArrangeMotifScaffolds(fan)),fanRanks,'fan windows are deterministic');
+});
+
+test('motif compaction cannot squeeze a preferred-band source into portrait shape',()=>{
+  const d={nodes:Object.fromEntries(Array.from({length:21},(_,i)=>['n'+i,{}])),edges:[]};
+  const positions=Object.keys(d.nodes).map((id,i)=>({id,x:120+i*300,y:100}));
+  const score={overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:10000,width:1200,height:1000,shape:0};
+  const original={positions,edges:[],score},scaffolds=C.autoArrangeMotifScaffolds,routes=C.autoArrangeNaturalRoutes;let checks=0;
+  try{
+    C.autoArrangeMotifScaffolds=()=>[];
+    C.autoArrangeNaturalRoutes=(d,r)=>{checks++;return {...r,score:{...score,length:8000,width:900,height:1000,shape:Math.log(1000/900)}};};
+    assert.equal(C.autoArrangeMotifCandidates(d,original,{}),original,'smaller portrait proposals cannot leave the preferred band');
+    assert.ok(checks>0);
+  }finally{C.autoArrangeMotifScaffolds=scaffolds;C.autoArrangeNaturalRoutes=routes;}
 });

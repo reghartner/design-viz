@@ -4,6 +4,7 @@ var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
 var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
+var AUTO_ARRANGE_MOTIF_LIMITS={attempts:240,work:600000,passes:5,span:6};
 var AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS={checks:240,work:700000,passes:2};
 var AUTO_ARRANGE_GRID_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
 var AUTO_ARRANGE_FOLD_LIMITS={nodes:20,edges:32,runs:12,steps:20000,finalists:4};
@@ -136,7 +137,7 @@ function autoArrangeScore(d,result){
   var shape=aspect<1?Math.log(1/aspect):aspect>16/9?Math.log(aspect/(16/9)):0;
   return {overlaps:overlaps,hits:hits,crossings:crossings,incidentCrossings:incidentCrossings,length:length,area:width*height,width:width,height:height,aspect:aspect,shape:shape};
 }
-function autoArrangeNaturalRoutes(d,result){
+function autoArrangeNaturalRoutes(d,result,preserveIncident){
   var arranged=autoArrangeDiagram(d,result),L=layout(arranged),ids=Object.keys(L.pos),count=arranged.edges.length;
   var automatic=autoArrangeDiagram(d,{positions:result.positions,edges:result.edges.map(function(){return {};})});
   var adjust=autoArrangeAdjust(automatic,L),paths=[],hits=[],cache=[],selected=result.edges.map(function(){return 0;});
@@ -149,25 +150,29 @@ function autoArrangeNaturalRoutes(d,result){
   // Cache each native/automatic pair once, including mixed-route comparisons.
   function cross(i,vi,j,vj){
     if(i>j)return cross(j,vj,i,vi);
-    if(autoArrangeIncident(arranged.edges[i],arranged.edges[j]))return 0;
+    if(!preserveIncident && autoArrangeIncident(arranged.edges[i],arranged.edges[j]))return 0;
     var key=(i*count+j)*4+vi*2+vj;
     if(cache[key]===undefined)cache[key]=autoArrangePathsCross(paths[i][vi],paths[j][vj])?1:0;
     return cache[key];
   }
-  var nativeCrossings=0,automaticCrossings=0;
+  var nativeCrossings=0,automaticCrossings=0,nativeIncident=0,automaticIncident=0;
   for(var i=0;i<count;i++)for(var j=i+1;j<count;j++){
-    nativeCrossings+=cross(i,0,j,0);automaticCrossings+=cross(i,1,j,1);
+    if(preserveIncident && autoArrangeIncident(arranged.edges[i],arranged.edges[j])){nativeIncident+=cross(i,0,j,0);automaticIncident+=cross(i,1,j,1);}
+    else {nativeCrossings+=cross(i,0,j,0);automaticCrossings+=cross(i,1,j,1);}
   }
-  if(!hits.some(function(hit){return hit;}) && automaticCrossings<=nativeCrossings)selected.fill(1);
+  if(!hits.some(function(hit){return hit;}) && automaticCrossings<=nativeCrossings && automaticIncident<=nativeIncident)selected.fill(1);
   else {
-    var crossings=nativeCrossings,changed=true;
+    var crossings=nativeCrossings,incident=nativeIncident,changed=true;
     while(changed){
       changed=false;
       for(var i=0;i<count;i++){
         if(selected[i] || hits[i])continue;
-        var delta=0;
-        for(var j=0;j<count;j++)if(j!==i)delta+=cross(i,1,j,selected[j])-cross(i,0,j,selected[j]);
-        if(crossings+delta<=nativeCrossings){selected[i]=1;crossings+=delta;changed=true;}
+        var delta=0,incidentDelta=0;
+        for(var j=0;j<count;j++)if(j!==i){
+          var change=cross(i,1,j,selected[j])-cross(i,0,j,selected[j]);
+          if(preserveIncident && autoArrangeIncident(arranged.edges[i],arranged.edges[j]))incidentDelta+=change;else delta+=change;
+        }
+        if(crossings+delta<=nativeCrossings && incident+incidentDelta<=nativeIncident){selected[i]=1;crossings+=delta;incident+=incidentDelta;changed=true;}
       }
     }
   }
@@ -402,6 +407,82 @@ function autoArrangeLargeAligned(d,result){
     }
     if(!changed)break;
   }
+  return best;
+}
+// Structural scaffolds constrain shared ranks, not enclosing rectangles. The
+// full layout can insert another motif into their gaps and expand those gaps.
+function autoArrangeMotifScaffolds(d){
+  var ids=Object.keys(d.nodes),incoming=ids.map(function(){return [];}),outgoing=ids.map(function(){return [];}),choices=[],seen=new Set();
+  (d.edges || []).forEach(function(e){var a=ids.indexOf(e.from),b=ids.indexOf(e.to);if(a===b)return;if(outgoing[a].indexOf(b)<0){outgoing[a].push(b);incoming[b].push(a);}});
+  function add(run){
+    if(run.length<2)return;
+    // Share the boundary node between windows so every corridor edge and fan
+    // attachment participates even when the full motif exceeds the local span.
+    var span=AUTO_ARRANGE_MOTIF_LIMITS.span;
+    for(var start=0;start<run.length-1;start+=span-1){
+      var window=run.slice(start,start+span),key=window.slice().sort(function(a,b){return a-b;}).join(',');
+      if(!seen.has(key)){seen.add(key);choices.push(window);}
+    }
+  }
+  // Maximal degree-two corridors include branches between a split and rejoin,
+  // terminal chains, and return paths around a feedback loop. Their endpoints
+  // can remain outside the local row when adjacent motifs need insertion space.
+  ids.forEach(function(id,i){
+    if(outgoing[i].length===1 && incoming[i].length===1)return;
+    outgoing[i].forEach(function(next){
+      var chain=[i],node=next;
+      while(chain.indexOf(node)<0){chain.push(node);if(outgoing[node].length!==1 || incoming[node].length!==1)break;node=outgoing[node][0];}
+      if(chain.length<3)return;
+      [chain,chain.slice(1),chain.slice(0,-1),chain.slice(1,-1)].forEach(add);
+    });
+  });
+  // Sibling input/output sets describe fans, split/rejoin branches and shared
+  // sides of a dense mesh. Directly connected siblings keep their own corridor.
+  outgoing.concat(incoming).forEach(function(peers){
+    if(!peers.some(function(a){return outgoing[a].some(function(b){return peers.indexOf(b)>=0;});}))add(peers);
+  });
+  return choices;
+}
+function autoArrangeMotifCandidates(d,result,viz){
+  var count=Object.keys(d.nodes).length,edges=d.edges || [];
+  if(count<=AUTO_ARRANGE_GRID_LIMITS.nodes || Object.keys(d.nodes).some(function(id){return d.nodes[id].group;}))return result;
+  var choices=autoArrangeMotifScaffolds(d),ranks=[],best=result,attempts=0;
+  var budget=Math.min(AUTO_ARRANGE_MOTIF_LIMITS.attempts,Math.floor(AUTO_ARRANGE_MOTIF_LIMITS.work/(count*Math.max(1,edges.length)))),seen=new Set();
+  function safe(score){return !score.overlaps && !score.hits && score.crossings<=result.score.crossings && score.incidentCrossings<=result.score.incidentCrossings &&
+    Math.hypot(score.width,score.height)<=Math.hypot(result.score.width,result.score.height)*1.03 && score.length<=result.score.length*1.15;}
+  function better(a,b){return a.crossings<b.crossings || a.crossings===b.crossings && (a.shape<b.shape-.001 || Math.abs(a.shape-b.shape)<.001 && Math.hypot(a.width,a.height)<Math.hypot(b.width,b.height)-.1);}
+  for(var pass=0;pass<AUTO_ARRANGE_MOTIF_LIMITS.passes && attempts<budget;pass++){
+    var next=null;
+    for(var i=0;i<choices.length && attempts<budget;i++){
+      var proposed=ranks.concat([choices[i]]),key=proposed.map(function(r){return r.slice().sort(function(a,b){return a-b;}).join(',');}).sort().join(';');
+      if(seen.has(key))continue;seen.add(key);attempts++;
+      var dot=autoArrangeDot(d,'TB');dot=dot.slice(0,-1)+proposed.map(function(r){return '{rank=same;'+r.map(function(n){return 'n'+n;}).join(';')+';}';}).join('')+'}';
+      try{
+        var candidate=autoArrangeRead(d,viz.renderJSON(dot,{engine:'dot'}));
+        candidate=autoArrangeNaturalRoutes(d,candidate,true);
+        if(safe(candidate.score) && candidate.score.incidentCrossings<=(next?next.result.score:best.score).incidentCrossings && better(candidate.score,next?next.result.score:best.score))next={result:candidate,ranks:proposed,index:i};
+      }catch(ex){/* A motif constraint may have no usable full-graph routing. */}
+    }
+    if(!next)break;best=next.result;ranks=next.ranks;choices.splice(next.index,1);
+  }
+  // Remove surplus rank spacing only after composition. Scale actual cards'
+  // centers and retained control offsets, check clearance and every final route,
+  // and retain the uncompressed candidate whenever squeezing changes topology.
+  var source=best;
+  [1,.9,.8,.7,.6].forEach(function(sx){[1,.9,.8,.7,.6].forEach(function(sy){
+    if(sx===1 && sy===1)return;
+    var positions=source.positions.map(function(p){return {id:p.id,x:120+(p.x-120)*sx,y:100+(p.y-100)*sy};});
+    if(positions.some(function(a,i){return positions.slice(i+1).some(function(b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44))<AUTO_ARRANGE_CARD_GAP-.1;});}))return;
+    var candidate={positions:positions,edges:source.edges.map(function(e){
+      if(!e.curveControls)return {};
+      var copy=Object.assign({},e);copy.curveControls=e.curveControls.map(function(p){return {t:p.t,dx:p.dx*sx,dy:p.dy*sy};});
+      if(copy.labelDx!=null)copy.labelDx*=sx;if(copy.labelDy!=null)copy.labelDy*=sy;return copy;
+    })};
+    candidate=autoArrangeNaturalRoutes(d,candidate,true);
+    var a=candidate.score,b=best.score;
+    if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.length<=b.length &&
+      a.shape<=source.score.shape+1e-9 && Math.hypot(a.width,a.height)*(1+a.shape*.12)<Math.hypot(b.width,b.height)*(1+b.shape*.12)-.1)best=candidate;
+  });});
   return best;
 }
 function autoArrangeFoldedPositions(d,result){
@@ -640,5 +721,5 @@ function autoArrangeCandidates(d,viz,cola){
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
       Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return grid;
   }
-  return autoArrangeLargeAligned(d,chosen);
+  return autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz);
 }

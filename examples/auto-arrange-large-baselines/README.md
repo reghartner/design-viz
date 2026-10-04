@@ -3,8 +3,9 @@
 This set keeps four realistic architecture graphs large enough to expose layout
 tradeoffs that the smaller shape baselines do not. The saved arrangement is a
 reproducible machine result. A bounded cleanup shares nearby rank coordinates
-and straightens safe one-link branches. Tall freight flow, remaining crossings
-and wide service fans still expose tradeoffs for future layout work.
+and straightens safe one-link branches. A second pass composes local motifs
+from topology, then removes surplus spacing. Remaining crossings and wide
+service fans still expose tradeoffs for future layout work.
 
 ## Files and regeneration
 
@@ -36,13 +37,13 @@ routes that share an endpoint; ordinary crossings exclude those pairs.
 
 | Section ID | Diagram | Nodes | Edges | Planarity | Crossings | Incident crossings | Overlaps | Card hits | Occupied width × height | Aspect |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 4 | 0 | 0 | 2460 × 1784 | 1.38 |
-| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 11 | 2 | 0 | 0 | 2855 × 2054 | 1.39 |
-| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 694 × 2480 | 0.28 |
-| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 5 | 3 | 0 | 0 | 1819 × 2132 | 0.85 |
+| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 4 | 0 | 0 | 1998 × 1784 | 1.12 |
+| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 11 | 2 | 0 | 0 | 2855 × 1853 | 1.54 |
+| `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 1711 × 1506 | 1.14 |
+| `data-platform` | 04 · Data platform | 48 | 60 | Planar | 2 | 0 | 0 | 0 | 1833 × 1714 | 1.07 |
 
-On a local regeneration run, candidate generation took 1.08 s,
-0.74 s, 0.78 s and 1.20 s respectively. All remain well inside the workbench's
+On a local regeneration run, candidate generation took 1.96 s,
+1.69 s, 6.12 s and 5.94 s respectively. All remain well inside the workbench's
 20 second worker deadline.
 
 ## Alignment cleanup
@@ -61,25 +62,63 @@ are tried first; existing native curves are retained only when needed to make a
 rank adjustment safe. Full geometry checks are capped at 240 and scaled down by
 node × edge count. The six smaller approved baselines remain byte-identical.
 
-| Section | Diagonal degree-1 nodes before → after | Distinct x coordinates before → after | Distinct y coordinates before → after |
-| --- | ---: | ---: | ---: |
-| Incident response | 1/3 → 0/3 | 15 → 11 | 16 → 16 |
-| Regional billing | 6/6 → 0/6 | 32 → 18 | 32 → 23 |
-| Freight operations | 5/7 → 1/7 | 22 → 13 | 22 → 22 |
-| Data platform | 9/12 → 3/12 | 32 → 27 | 19 → 19 |
+## Motif composition
 
-Coordinates within 0.1 px count as one line. Lower counts show more shared rows
-and columns; they do not claim a perfect grid. Incident, freight and data retain
-their regular 116 px row spacing. Billing gains shared rows and columns while
-retaining safe irregular positions in its dense core. Ordinary crossings stay
-at 0, 11, 1 and 5; incident crossings fall from 4, 7, 2 and 4 to 4, 2, 0 and 3.
+The additional candidate pass detects maximal degree-two corridors and shared
+input/output sets using adjacency alone. These cover chains, split/rejoin
+branches, fans, shared sides of dense meshes, and corridors returning around
+feedback loops. No names, roles, tints, reference files or target coordinates
+participate in detection or placement. Corridors and fan sets longer than six
+nodes are partitioned into deterministic windows of at most six nodes, sharing
+one boundary node so every local corridor edge and fan attachment remains
+represented. Candidate counts grow linearly; the routing-attempt cap is unchanged.
 
-The remaining diagonal leaves are `booking-portal` in freight and `orders-db`,
-`iot-gateway`, and `mobile-events` in data. All tested local straightening proposals
-for these four leaves fail card clearance: freight slots overlap existing cards,
-and the data slots overlap or leave only 3–24 px between cards (below the 54 px
-branch-placement clearance). These crowded source rows retain their safe placement. All four outputs were visually checked in the
-rendered viewer; the cleanup preserves the broader graph silhouettes.
+A motif is a shared-rank scaffold rather than a fixed rectangle. Candidate
+scaffolds can overlap at endpoints; full-graph layout expands their spacing and
+places other branches in the gaps. Freight's driver/yard/dock/scan corridor and
+status/ETA/exception/operations corridor become horizontal. Customs, warehouse
+and delivery branches occupy the surrounding interior. This changes structure
+instead of widening an otherwise unchanged tall graph with empty margins.
+
+The deterministic search accepts up to five successive scaffold additions,
+with at most 240 routing attempts, scaled down by node × edge count. Every
+accepted layout has zero card overlaps and unrelated-card hits. Ordinary and
+incident crossings cannot increase as a better shape is selected. The search
+allows up to 3% extra occupied diagonal and 15% extra center distance while
+looking for a better aspect; all four saved outputs have smaller occupied
+diagonals than before. Natural-route simplification also preserves incident
+crossings, retaining native curves where necessary. Ports remain automatic.
+
+After composition, a bounded set of scale candidates removes surplus gaps.
+Each must retain at least 54 px card clearance and pass the same final-path
+safety checks. Compression never increases center distance or either crossing
+count, and cannot worsen the source shape penalty. A source already within
+square-to-16:9 remains within that preferred aspect band. The six approved small outputs remain byte-identical.
+
+| Section | Before → after occupied dimensions | Before → after center distance | Before → after occupied diagonal | Before → after crossings (ordinary / incident) |
+| --- | --- | ---: | ---: | --- |
+| Incident response | 2460 × 1784 → 1998 × 1784 | 13,777 → 11,802 | 3,039 → 2,679 | 0 / 4 → 0 / 4 |
+| Regional billing | 2855 × 2054 → 2855 × 1853 | 18,064 → 17,271 | 3,517 → 3,403 | 11 / 2 → 11 / 2 |
+| Freight operations | 694 × 2480 → 1711 × 1506 | 12,546 → 13,403 | 2,575 → 2,279 | 1 / 0 → 1 / 0 |
+| Data platform | 1819 × 2132 → 1833 × 1714 | 20,335 → 14,625 | 2,803 → 2,510 | 5 / 3 → 2 / 0 |
+
+Freight trades about 7% more total link distance and a larger occupied area for
+a square composition with 39% less height and 11% less occupied diagonal.
+Incident and billing improve through safe compaction; their tested motif
+rearrangements did not pass the crossing/shape gates. They remain less compact
+than the separately saved human reference. Data gains a shorter, clearer
+composition with fewer crossings. Retained native-curve counts are 2, 0, 7 and
+7 respectively. All four outputs were visually inspected in the rendered viewer.
+
+Real ungrouped 80-node/144-edge ladder and layered stress graphs completed in
+2.92 s and 7.74 s respectively, with zero overlaps and unrelated-card hits.
+The full 80-node/160-edge layered regression completed in 9.81 s with the same
+safety checks after long-motif windowing was added.
+The search is bounded, not an exhaustive embedding solver: dense cores and
+long feedback structures may retain irregular spacing or a tall silhouette. Freight's
+remaining ordinary crossing is carrier-portal → dispatch-board against
+carrier-api → retry-queue. The tender fan also retains close parallel curves;
+zero incident intersections does not imply generous route-to-route clearance.
 
 ## Topology intent
 
@@ -101,5 +140,5 @@ that core.
 
 Across the set, `dev`, `mqtt`, `cmd`, `auth` and `data` mark role categories.
 They are node tints only; no enclosing group boxes influence layout. The four
-systems intentionally vary in depth and silhouette, from a wide incident fan to
-the narrow freight lifecycle and the deeper platform mesh.
+systems intentionally vary in depth and silhouette, from the incident fan to
+the composed freight lifecycle and the deeper platform mesh.

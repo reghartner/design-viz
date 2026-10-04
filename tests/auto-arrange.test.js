@@ -509,8 +509,8 @@ test('incident route scoring detects fan-out weaving beyond a shared port and cl
 
 test('large cleanup straightens branches and shares ranks without worsening final route safety',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json');
-  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds;
-  C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;
+  const refine=C.autoArrangeLargeAligned,motifs=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds,geometry=C.autoArrangeMotifGeometry;
+  C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;C.autoArrangeMotifGeometry=(d,result)=>result;
   try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
@@ -540,7 +540,7 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
-  }finally{C.autoArrangeMotifCandidates=motifs;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;}
+  }finally{C.autoArrangeMotifCandidates=motifs;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;C.autoArrangeMotifGeometry=geometry;}
 });
 
 test('large alignment refuses unsafe proposals and bounds geometry checks at the maximum graph size',()=>{
@@ -572,13 +572,13 @@ test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
 
 test('global composition creates reproducible safe shared axes and a square freight scaffold',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
-  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds;
+  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds,geometry=C.autoArrangeMotifGeometry;
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;}
-    const started=performance.now();let beforeFold,result;
-    try{C.autoArrangeTerminalFolds=(d,r,v)=>{beforeFold=r;return terminal(d,r,v);};result=C.autoArrangeCandidates(d,viz,cola);}
+    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;C.autoArrangeMotifGeometry=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;C.autoArrangeMotifGeometry=geometry;}
+    const started=performance.now();let beforeFold,afterFold,result;
+    try{C.autoArrangeTerminalFolds=(d,r,v)=>{beforeFold=r;afterFold=terminal(d,r,v);return afterFold;};result=C.autoArrangeCandidates(d,viz,cola);}
     finally{C.autoArrangeTerminalFolds=terminal;}
     const out=plain(C.autoArrangeDiagram(d,result));
     assert.ok(performance.now()-started<20000,block.id+' worker deadline');
@@ -595,19 +595,27 @@ test('global composition creates reproducible safe shared axes and a square frei
     if(i<2){
       assert.ok(axes('y').length<=10,block.id+' reuses shared rows');
       for(const axis of ['x','y']){
-        const values=axes(axis),step=axis==='x'?204:116;
+        const values=axes(axis),step=axis==='x'?204:98;
         for(const value of values)assert.ok(Math.abs((value-values[0])/step-Math.round((value-values[0])/step))<.001,block.id+' every node remains on the global '+axis+' lattice');
       }
       assert.ok(result.score.area<before.score.area*.5,block.id+' materially smaller footprint');
       assert.ok(result.score.length<before.score.length*.8,block.id+' shorter center distances');
     }
     if(i===0){
-      const original=Object.fromEntries(beforeFold.positions.map(p=>[p.id,p])),folded=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+      const original=Object.fromEntries(beforeFold.positions.map(p=>[p.id,p])),folded=Object.fromEntries(afterFold.positions.map(p=>[p.id,p]));
       assert.ok(d.edges.some(e=>original[e.to].y>original[e.from].y && folded[e.to].y<folded[e.from].y),'an originally downward edge is accepted pointing upward');
-      assert.ok(axes('y').length<=7,'terminal corridors reuse interior rows');
-      assert.ok(result.score.area<beforeFold.score.area*.7,'upward fold removes more than thirty percent of footprint');
-      assert.ok(result.score.length<=beforeFold.score.length*1.03,'upward folding keeps the original length allowance');
-      assert.equal(result.score.crossings,beforeFold.score.crossings);assert.equal(result.score.incidentCrossings,beforeFold.score.incidentCrossings);
+      assert.ok(new Set(afterFold.positions.map(p=>p.y)).size<=7,'terminal corridors reuse interior rows');
+      assert.ok(afterFold.score.area<beforeFold.score.area*.7,'upward fold removes more than thirty percent of footprint');
+      assert.ok(afterFold.score.length<=beforeFold.score.length*1.03,'upward folding keeps the original length allowance');
+      assert.equal(afterFold.score.crossings,beforeFold.score.crossings);assert.equal(afterFold.score.incidentCrossings,beforeFold.score.incidentCrossings);
+      assert.equal(result.score.crossings,0);assert.equal(result.score.incidentCrossings,0,'compound motif moves remove the remaining fan intersection');
+      assert.ok(result.score.length<afterFold.score.length*.8,'compound composition shortens links by more than twenty percent');
+      assert.ok(result.score.area<=afterFold.score.area*1.03,'clarity improvement stays near the old occupied area');
+      const motifs=C.autoArrangeConnectedMotifs(d),positions=Object.fromEntries(result.positions.map(p=>[p.id,p])),ids=Object.keys(d.nodes);
+      const tail=motifs.chains.find(chain=>chain.ids.length===3 && d.edges.some(e=>e.from===ids[chain.anchor] && e.to===ids[chain.ids[0]]));
+      assert.ok(tail);const tailPoints=tail.ids.map(i=>positions[ids[i]]);
+      assert.equal(new Set(tailPoints.map(p=>p.y)).size,1,'terminal tail docks as a shared bottom row');
+      assert.ok(tailPoints.every(p=>p.y>positions[ids[tail.anchor]].y));
       assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');assert.equal(result.score.shape,0,'incident stays in the preferred aspect band');}
     if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
     if(i===2){
@@ -724,5 +732,38 @@ test('terminal folding rejects failed routes, caps proposals and skips groups an
     calls=0;d.nodes.n0.group='group';assert.equal(C.autoArrangeTerminalFolds(d,result,failingViz),result);assert.equal(calls,0);
     delete d.nodes.n0.group;for(let i=21;i<49;i++)d.nodes['n'+i]={};
     assert.equal(C.autoArrangeTerminalFolds(d,result,failingViz),result);assert.equal(calls,0);
+  }finally{C.autoArrangeScore=score;}
+});
+
+test('connected motifs derive source fans, terminal docks and two-boundary blocks from topology alone',()=>{
+  const nodes=Object.fromEntries(Array.from({length:15},(_,i)=>['n'+i,{}]));
+  const pairs=[[0,1],[1,2],[3,2],[2,4],[4,5],[5,6],[5,7],[6,7],[6,8],[7,8],[8,5],[5,9],[9,2],[8,10],[10,11],[11,12]];
+  const d={nodes,edges:pairs.map(([a,b])=>({from:'n'+a,to:'n'+b}))},motifs=C.autoArrangeConnectedMotifs(d);
+  assert.ok(motifs.chains.some(chain=>chain.anchor===2 && chain.ids.join(',')==='1,0'));
+  assert.ok(motifs.chains.some(chain=>chain.anchor===8 && chain.ids.join(',')==='10,11,12'));
+  assert.ok(motifs.blocks.some(block=>block.join(',')==='5,6,7,8,10,11,12'),'two boundary links expose the block and its attached tail');
+  assert.deepEqual([...motifs.fanNodes].sort((a,b)=>a-b),[0,1,2,3]);
+  assert.ok(motifs.blocks.length<=C.AUTO_ARRANGE_GEOMETRY_LIMITS.blocks);
+  const renamed={nodes:Object.fromEntries(Object.keys(nodes).map((_,i)=>['renamed'+i,{title:'Unrelated text',tint:'data'}])),edges:pairs.map(([a,b])=>({from:'renamed'+a,to:'renamed'+b}))};
+  const shape=m=>plain({chains:m.chains,blocks:m.blocks,fans:[...m.fanNodes],core:[...m.blockCoreNodes],hubs:[...m.blockHubNodes]});
+  assert.deepEqual(shape(C.autoArrangeConnectedMotifs(renamed)),shape(motifs));
+  d.edges.push({...d.edges[0]});assert.deepEqual(plain(C.autoArrangeConnectedMotifs(d).chains),plain(motifs.chains),'parallel routes do not change terminal node degree');
+});
+
+test('compound motif search retains its source on unsafe routing and bounds all optional passes',()=>{
+  const nodes=Object.fromEntries(Array.from({length:21},(_,i)=>['n'+i,{}]));
+  const pairs=[[0,2],[1,2],[2,3],[3,4],[4,5],[5,6],[6,7],[7,8],[8,5],[5,9],[9,10],[10,11]];
+  const d={nodes,edges:pairs.map(([a,b])=>({from:'n'+a,to:'n'+b}))};
+  const result={positions:Object.keys(nodes).map((id,i)=>({id,x:120+(i%4)*204,y:100+Math.floor(i/4)*116})),edges:d.edges.map(()=>({})),score:{overlaps:0,hits:0,crossings:0,incidentCrossings:0,length:100000,area:10000000,width:4000,height:2500,shape:0}};
+  const original=plain(result),score=C.autoArrangeScore;let calls=0;
+  try{
+    C.autoArrangeScore=()=>({...result.score,hits:1});
+    const failingViz={renderJSON(){calls++;throw Error('No safe route');}};
+    assert.equal(C.autoArrangeMotifGeometry(d,result,failingViz),result);
+    const limit=C.AUTO_ARRANGE_GEOMETRY_LIMITS;
+    assert.ok(calls>0 && calls<=limit.attempts+limit.finishing+limit.polishing);assert.deepEqual(plain(result),original);
+    calls=0;d.nodes.n0.group='group';assert.equal(C.autoArrangeMotifGeometry(d,result,failingViz),result);assert.equal(calls,0);
+    delete d.nodes.n0.group;for(let i=21;i<49;i++)d.nodes['n'+i]={};
+    assert.equal(C.autoArrangeMotifGeometry(d,result,failingViz),result);assert.equal(calls,0);
   }finally{C.autoArrangeScore=score;}
 });

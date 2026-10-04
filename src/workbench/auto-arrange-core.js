@@ -4,6 +4,7 @@ var AUTO_ARRANGE_LIMITS={nodes:80,edges:160};
 var AUTO_ARRANGE_COMPACT_LIMITS={nodes:24,edges:48};
 var AUTO_ARRANGE_SMALL_LIMITS={nodes:12,edges:24};
 var AUTO_ARRANGE_ALIGNMENT_LIMITS={checks:900,work:200000,passes:8};
+var AUTO_ARRANGE_GEOMETRY_LIMITS={nodes:48,edges:80,blocks:24,proposals:4000,attempts:144,work:210000,passes:6,finishing:24,finishWork:36000,polishing:32,polishWork:50000};
 var AUTO_ARRANGE_GLOBAL_LIMITS={nodes:48,edges:80,attempts:160,work:240000,seeds:2,passes:2,columnAttempts:80,columnWork:180000};
 var AUTO_ARRANGE_MOTIF_LIMITS={attempts:240,work:600000,passes:5,span:6};
 var AUTO_ARRANGE_LARGE_ALIGNMENT_LIMITS={checks:240,work:700000,passes:2};
@@ -664,6 +665,141 @@ function autoArrangeTerminalFolds(d,result,viz){
   }
   return best;
 }
+// Partition weakly attached connected blocks independently of titles or roles.
+// Terminal paths stay separate so their dock can rotate when the core moves.
+function autoArrangeConnectedMotifs(d){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],n=ids.length;
+  var links=edges.map(function(e){return [ids.indexOf(e.from),ids.indexOf(e.to)];}),adj=ids.map(function(){return [];});
+  links.forEach(function(e){if(e[0]!==e[1]){if(adj[e[0]].indexOf(e[1])<0)adj[e[0]].push(e[1]);if(adj[e[1]].indexOf(e[0])<0)adj[e[1]].push(e[0]);}});
+  var chains=[];adj.forEach(function(neighbors,i){if(neighbors.length!==1)return;var path=[i],prev=i,cur=neighbors[0];while(adj[cur].length===2 && path.length<5 && path.indexOf(cur)<0){path.push(cur);var next=adj[cur].filter(function(j){return j!==prev;})[0];prev=cur;cur=next;}if(adj[cur].length>2 && path.length<=4)chains.push({anchor:cur,ids:path.reverse()});});
+  var corridorNodes=new Set();chains.forEach(function(chain){if(chain.ids.length>=2)chain.ids.forEach(function(i){corridorNodes.add(i);});});
+  var fanNodes=new Set();
+  chains.forEach(function(chain){if(chain.ids.length<2 || !links.some(function(e){return e[0]===chain.ids[0] && e[1]===chain.anchor;}))return;
+    chains.forEach(function(single){if(single.anchor===chain.anchor && single.ids.length===1 && links.some(function(e){return e[0]===single.ids[0] && e[1]===single.anchor;})){fanNodes.add(chain.anchor);chain.ids.concat(single.ids).forEach(function(i){fanNodes.add(i);});}});
+  });
+  var blocks=[],blockSeen=new Set();
+  for(var a=0;a<links.length;a++)for(var b=a;b<links.length;b++){
+    var visited=new Set();
+    for(var start=0;start<n;start++){
+      if(visited.has(start))continue;var todo=[start],part=[];visited.add(start);
+      while(todo.length){var node=todo.pop();part.push(node);links.forEach(function(e,k){if(k===a || k===b)return;var next=e[0]===node?e[1]:e[1]===node?e[0]:-1;if(next>=0 && !visited.has(next)){visited.add(next);todo.push(next);}});}
+      if(part.length<4 || part.length>n*.6)continue;part.sort(function(a,b){return a-b;});var key=part.join(',');if(!blockSeen.has(key)){blockSeen.add(key);blocks.push(part);}
+    }
+  }
+  var blockCoreNodes=new Set(),blockHubNodes=new Set();blocks.forEach(function(block){var attached=chains.filter(function(chain){return chain.ids.length>=2 && block.indexOf(chain.anchor)>=0 && chain.ids.every(function(i){return block.indexOf(i)>=0;}) && links.some(function(e){return e[0]===chain.anchor && e[1]===chain.ids[0];});});if(attached.length)block.forEach(function(i){if(!corridorNodes.has(i))blockCoreNodes.add(i);if(adj[i].length>=4)blockHubNodes.add(i);});});
+  return {links:links,adj:adj,chains:chains,blocks:blocks.slice(0,AUTO_ARRANGE_GEOMETRY_LIMITS.blocks),corridorNodes:corridorNodes,fanNodes:fanNodes,blockCoreNodes:blockCoreNodes,blockHubNodes:blockHubNodes};
+}
+// Temporary motif compositions may need space before a later move shortens
+// their routes. Only final preferred-band, shared-lattice improvements publish.
+function autoArrangeMotifGeometry(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],n=ids.length;
+  if(n<=AUTO_ARRANGE_GRID_LIMITS.nodes || n>AUTO_ARRANGE_GEOMETRY_LIMITS.nodes || edges.length>AUTO_ARRANGE_GEOMETRY_LIMITS.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var motifs=autoArrangeConnectedMotifs(d),links=motifs.links,adj=motifs.adj,chains=motifs.chains,blocks=motifs.blocks;
+  var corridorNodes=motifs.corridorNodes,fanNodes=motifs.fanNodes,blockCoreNodes=motifs.blockCoreNodes,blockHubNodes=motifs.blockHubNodes;
+  var initial=result,current=result,best=result,checks=0,budget=Math.min(AUTO_ARRANGE_GEOMETRY_LIMITS.attempts,Math.floor(AUTO_ARRANGE_GEOMETRY_LIMITS.work*32/(n*n*Math.max(1,edges.length)))),dx=150+AUTO_ARRANGE_CARD_GAP,dy=44+AUTO_ARRANGE_RANK_GAP;
+  var routeLengths=new Map();
+  function recordRoutes(candidate){var arranged=autoArrangeDiagram(d,candidate),L=layout(arranged),adjust=autoArrangeAdjust(arranged,L),length=0;
+    arranged.edges.forEach(function(e,i){var path=samplePathD(edgePath(e,L,adjust[i]));for(var j=1;j<path.length;j++)length+=Math.hypot(path[j].x-path[j-1].x,path[j].y-path[j-1].y);});routeLengths.set(candidate.score,length);return candidate;
+  }
+  function natural(candidate){return recordRoutes(autoArrangeNaturalRoutes(d,candidate,true));}
+  recordRoutes(initial);
+  function clear(p){return !p.some(function(a,i){return p.slice(i+1).some(function(b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44))<AUTO_ARRANGE_CARD_GAP-.1;});});}
+  function quality(a,b){return a.crossings-b.crossings || a.incidentCrossings-b.incidentCrossings || (a.length+Math.hypot(a.width,a.height))-(b.length+Math.hypot(b.width,b.height));}
+  function feasible(s){var b=initial.score;return !s.overlaps && !s.hits && s.crossings<=b.crossings && s.incidentCrossings<=b.incidentCrossings && s.shape<=Math.max(.4,b.shape)+1e-9 && s.area<=b.area*1.5 && s.length<=b.length*1.03;}
+  function detours(positions){var p=ids.map(function(id){return positions.find(function(p){return p.id===id;});});return p.map(function(point,i){if(adj[i].length!==2 || corridorNodes.has(i))return 0;var a=p[adj[i][0]],b=p[adj[i][1]];return Math.hypot(Math.max(0,Math.min(a.x,b.x)-point.x,point.x-Math.max(a.x,b.x)),Math.max(0,Math.min(a.y,b.y)-point.y,point.y-Math.max(a.y,b.y)));});}
+  var originalDetours=detours(initial.positions);
+  function lattice(positions){var xs=Array.from(new Set(positions.map(function(p){return Math.round(p.x*1000)/1000;}))).sort(function(a,b){return a-b;});return detours(positions).every(function(v,i){return v<=originalDetours[i]+.1;}) && xs.length<=new Set(initial.positions.map(function(p){return p.x;})).size && xs.every(function(x,i){return !i || Math.abs(x-xs[i-1]-dx)<.01;});}
+  function publish(s){var b=initial.score;return feasible(s) && s.shape<=b.shape+1e-9 && (s.area<=b.area*1.03 && s.length<b.length*.98 || (s.crossings<b.crossings || s.incidentCrossings<b.incidentCrossings) && s.length<=b.length*.95);}
+  for(var pass=0;pass<AUTO_ARRANGE_GEOMETRY_LIMITS.passes && checks<budget;pass++){
+    var points=ids.map(function(id){return current.positions.find(function(p){return p.id===id;});}),queues={fan:[],slot:[],block:[],pair:[]},seen=new Set(),proposed=0,oldColumns=new Set(points.map(function(p){return p.x;})).size;
+    function propose(changes,type){
+      if(proposed++>=AUTO_ARRANGE_GEOMETRY_LIMITS.proposals)return;
+      var placed=points.map(function(p,i){return changes[i]?{id:p.id,x:changes[i].x,y:changes[i].y}:p;}),key=placed.map(function(p){return p.x+','+p.y;}).join(';');
+      if(seen.has(key) || !clear(placed))return;seen.add(key);
+      if(new Set(placed.map(function(p){return p.x;})).size>oldColumns)return;
+      var length=links.reduce(function(sum,e){return sum+Math.hypot(placed[e[0]].x-placed[e[1]].x,placed[e[0]].y-placed[e[1]].y);},0);
+      var w=Math.max.apply(null,placed.map(function(p){return p.x;}))-Math.min.apply(null,placed.map(function(p){return p.x;}))+150,h=Math.max.apply(null,placed.map(function(p){return p.y;}))-Math.min.apply(null,placed.map(function(p){return p.y;}))+44;
+      if(length>initial.score.length*1.03 || w*h>initial.score.area*1.5 || w/h<.65 || w/h>1.8)return;
+      var center=points.reduce(function(sum,p){return sum+p.x;},0)/n,balance=placed.reduce(function(sum,p){return sum+Math.abs(p.x-center);},0);
+      queues[type].push({positions:placed,length:length,balance:balance,moved:new Set(Object.keys(changes).map(Number))});
+    }
+    // Short source corridors occupy one side of their shared input hub; a
+    // separate terminal input uses a perpendicular side.
+    chains.forEach(function(chain){if(chain.ids.length<2 || !links.some(function(e){return e[0]===chain.ids[0] && e[1]===chain.anchor;}))return;
+      var outward=links.filter(function(e){return e[0]===chain.anchor;}).reduce(function(sum,e){return sum+points[e[1]].y-points[chain.anchor].y;},0);
+      var singles=chains.filter(function(other){return other.anchor===chain.anchor && other.ids.length===1 && links.some(function(e){return e[0]===other.ids[0] && e[1]===other.anchor;});});
+      singles.forEach(function(single){[[1,0],[-1,0]].forEach(function(dir){[-1,1].forEach(function(side){if(outward*dir[0]*side>0)return;var changes={},anchor=points[chain.anchor];chain.ids.forEach(function(id,i){changes[id]={x:anchor.x+dir[0]*dx*(i+1),y:anchor.y+dir[1]*dy*(i+1)};});changes[single.ids[0]]={x:anchor.x-dir[1]*side*dx,y:anchor.y+dir[0]*side*dy};propose(changes,'fan');});});});
+    });
+    ids.forEach(function(id,i){if(fanNodes.has(i) || corridorNodes.has(i) || blockHubNodes.has(i))return;adj[i].forEach(function(j){var p=points[i],q=points[j];[{x:q.x,y:p.y},{x:p.x,y:q.y}].forEach(function(point){var changes={};changes[i]=point;propose(changes,'slot');});});});
+    ids.forEach(function(id,i){if(fanNodes.has(i) || corridorNodes.has(i) || blockHubNodes.has(i))return;[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(step){var changes={};changes[i]={x:points[i].x+step[0]*dx,y:points[i].y+step[1]*dy};propose(changes,'slot');});});
+    links.forEach(function(link){if(link.some(function(i){return fanNodes.has(i) || corridorNodes.has(i) || blockHubNodes.has(i);}))return;if(points[link[0]].x!==points[link[1]].x && points[link[0]].y!==points[link[1]].y)return;
+      [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(step){var changes={};link.forEach(function(i){changes[i]={x:points[i].x+step[0]*dx,y:points[i].y+step[1]*dy};});propose(changes,'pair');
+        var collisions=points.map(function(p,i){return i;}).filter(function(i){return link.indexOf(i)<0 && link.some(function(j){return Math.hypot(Math.max(0,Math.abs(points[i].x-changes[j].x)-150),Math.max(0,Math.abs(points[i].y-changes[j].y)-44))<AUTO_ARRANGE_CARD_GAP-.1;});});
+        if(collisions.length===1){var i=collisions[0];if(!fanNodes.has(i) && !corridorNodes.has(i) && !blockHubNodes.has(i))[[0,-1],[0,1],[-1,0],[1,0]].forEach(function(move){var placed=Object.assign({},changes);placed[i]={x:points[i].x+move[0]*dx,y:points[i].y+move[1]*dy};propose(placed,'pair');});}
+});
+    });
+    blocks.forEach(function(block){var attached=chains.filter(function(chain){return chain.ids.length>=2 && block.indexOf(chain.anchor)>=0 && chain.ids.every(function(i){return block.indexOf(i)>=0;});});if(!attached.length)return;
+      var tails=new Set();attached.forEach(function(chain){chain.ids.forEach(function(i){tails.add(i);});});var core=block.filter(function(i){return !tails.has(i);});if(core.length<4)return;
+      for(var sx=-2;sx<=2;sx++)for(var sy=-1;sy<=1;sy++){
+        if(!sx && !sy)continue;
+        var changes={};core.forEach(function(i){changes[i]={x:points[i].x+sx*dx,y:points[i].y+sy*dy};});
+        // A two-link connector can stay between its old outer neighbor and the
+        // translated block. Try alignment with the translated inner endpoint.
+        var connectors=[];core.forEach(function(i){adj[i].forEach(function(j){if(block.indexOf(j)<0 && adj[j].length===2 && connectors.indexOf(j)<0)connectors.push(j);});});
+        connectors.forEach(function(j){var inner=adj[j].find(function(i){return core.indexOf(i)>=0;});changes[j]={x:changes[inner].x,y:points[j].y};});
+        attached.forEach(function(chain){var anchor=changes[chain.anchor];[[0,1],[0,-1]].forEach(function(first){[[1,0],[-1,0]].forEach(function(rest){if(first[0]*rest[0]+first[1]*rest[1]!==0)return;var placed=Object.assign({},changes);chain.ids.forEach(function(id,i){placed[id]={x:anchor.x+first[0]*dx+rest[0]*dx*i,y:anchor.y+first[1]*dy+rest[1]*dy*i};});propose(placed,'block');});});});
+      }
+    });
+    Object.keys(queues).forEach(function(type){queues[type].sort(function(a,b){return Math.abs(a.length-b.length)>.01?a.length-b.length:a.balance-b.balance;});});
+    var proposals=[];for(var i=0;i<12;i++)['fan','slot','block','pair'].forEach(function(type){if(queues[type][i])proposals.push(queues[type][i]);});
+    var next=current,limit=Math.min(budget,checks+Math.ceil(budget/AUTO_ARRANGE_GEOMETRY_LIMITS.passes));
+    for(var i=0;i<proposals.length && checks<limit;i++){
+      var p=proposals[i];checks++;var candidate={positions:p.positions,edges:current.edges.map(function(e,j){return p.moved.has(links[j][0]) || p.moved.has(links[j][1])?{}:e;})};candidate=natural(candidate);
+      if(!feasible(candidate.score) || quality(candidate.score,next.score)>=0){try{var placed=Object.create(null);p.positions.forEach(function(p){placed[p.id]=p;});candidate=natural(autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'})));}catch(ex){continue;}}
+      if(feasible(candidate.score) && quality(candidate.score,next.score)<0)next=candidate;
+      if(publish(candidate.score) && lattice(candidate.positions) && candidate.score.crossings<=best.score.crossings && candidate.score.incidentCrossings<=best.score.incidentCrossings && quality(candidate.score,best.score)<0)best=candidate;
+    }
+    if(next===current)break;current=next;
+  }
+  // Reuse the normal clearance floor to compact composed rows. If a private
+  // candidate is narrow, test a meaningful outer branch move before compaction.
+  var finishing=[current],basePoints=current.positions,outer=[];
+  basePoints.forEach(function(p,i){if(fanNodes.has(ids.indexOf(p.id)) || corridorNodes.has(ids.indexOf(p.id)) || blockCoreNodes.has(ids.indexOf(p.id)))return;[-1,1].forEach(function(sign){var positions=basePoints.map(function(q,j){return {id:q.id,x:q.x+(i===j?sign*dx:0),y:q.y};});if(clear(positions))outer.push({positions:positions,edges:current.edges});});});
+  links.forEach(function(link){if(link.some(function(i){return fanNodes.has(i) || corridorNodes.has(i) || blockCoreNodes.has(i);}))return;[-1,1].forEach(function(sign){var positions=basePoints.map(function(p){return {id:p.id,x:p.x+(link.indexOf(ids.indexOf(p.id))>=0?sign*dx:0),y:p.y};});if(clear(positions))outer.push({positions:positions,edges:current.edges});});});
+  finishing=finishing.concat(outer);
+  var finishProposals=[];
+  finishing.forEach(function(candidate){[1,(44+AUTO_ARRANGE_CARD_GAP+6)/dy,(44+AUTO_ARRANGE_CARD_GAP)/dy].forEach(function(scale){
+    var top=Math.min.apply(null,candidate.positions.map(function(p){return p.y;})),positions=candidate.positions.map(function(p){return {id:p.id,x:p.x,y:top+(p.y-top)*scale};});if(!clear(positions))return;
+    var w=Math.max.apply(null,positions.map(function(p){return p.x;}))-Math.min.apply(null,positions.map(function(p){return p.x;}))+150,h=Math.max.apply(null,positions.map(function(p){return p.y;}))-top+44;
+    if(w/h<1 || w/h>16/9 || w*h>initial.score.area*1.5)return;
+    var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=edges.reduce(function(sum,e){return sum+Math.hypot(byId[e.from].x-byId[e.to].x,byId[e.from].y-byId[e.to].y);},0);
+    if(length<=initial.score.length*.95)finishProposals.push({positions:positions,length:length});
+  });});
+  finishProposals.sort(function(a,b){return a.length-b.length;});
+  for(var i=0;i<Math.min(AUTO_ARRANGE_GEOMETRY_LIMITS.finishing,Math.floor(AUTO_ARRANGE_GEOMETRY_LIMITS.finishWork*32/(n*n*Math.max(1,edges.length))),finishProposals.length);i++){
+    try{var placed=Object.create(null);finishProposals[i].positions.forEach(function(p){placed[p.id]=p;});var candidate=natural(autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'})));if(publish(candidate.score) && lattice(candidate.positions) && candidate.score.crossings<=best.score.crossings && candidate.score.incidentCrossings<=best.score.incidentCrossings && quality(candidate.score,best.score)<0)best=candidate;}catch(ex){}
+  }
+  // Row compaction changes the route geometry. Revisit a bounded shortlist of
+  // nearby free slots after it, keeping composed hubs and terminal paths intact.
+  var polishBudget=Math.min(AUTO_ARRANGE_GEOMETRY_LIMITS.polishing,Math.floor(AUTO_ARRANGE_GEOMETRY_LIMITS.polishWork*32/(n*n*Math.max(1,edges.length)))),polished=0;
+  for(var pass=0;pass<4 && polished<polishBudget;pass++){
+    var source=best,xs=Array.from(new Set(source.positions.map(function(p){return p.x;}))).sort(function(a,b){return a-b;}),ys=Array.from(new Set(source.positions.map(function(p){return p.y;}))).sort(function(a,b){return a-b;}),choices=[];
+    source.positions.forEach(function(p,i){var index=ids.indexOf(p.id);if(fanNodes.has(index) || corridorNodes.has(index) || blockHubNodes.has(index))return;
+      var x=xs.indexOf(p.x),y=ys.indexOf(p.y);[[x-1,y],[x+1,y],[x,y-1],[x,y+1]].forEach(function(cell){if(xs[cell[0]]===undefined || ys[cell[1]]===undefined)return;
+        var positions=source.positions.map(function(q,j){return i===j?{id:q.id,x:xs[cell[0]],y:ys[cell[1]]}:q;});if(!clear(positions))return;
+        var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=edges.reduce(function(sum,e){return sum+Math.hypot(byId[e.from].x-byId[e.to].x,byId[e.from].y-byId[e.to].y);},0);
+        if(length<source.score.length-.1)choices.push({positions:positions,length:length});
+      });
+    });choices.sort(function(a,b){return a.length-b.length;});
+    var limit=Math.min(polishBudget,polished+Math.ceil(polishBudget/4));
+    for(var i=0;i<choices.length && polished<limit;i++){
+      polished++;try{var placed=Object.create(null);choices[i].positions.forEach(function(p){placed[p.id]=p;});var candidate=natural(autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'}))),a=candidate.score,b=best.score;
+      if(publish(a) && lattice(candidate.positions) && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.area<=b.area*1.01 && (a.crossings<b.crossings || a.incidentCrossings<b.incidentCrossings || routeLengths.get(a)<routeLengths.get(b)-.1))best=candidate;}catch(ex){}
+    }
+    if(best===source)break;
+  }
+  return best;
+}
 function autoArrangeFoldedPositions(d,result,preserveSeedOrder){
   var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
   // Folding is only useful for a deep ranked graph with a unary entrance.
@@ -913,5 +1049,5 @@ function autoArrangeCandidates(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz);
+  return autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz);
 }

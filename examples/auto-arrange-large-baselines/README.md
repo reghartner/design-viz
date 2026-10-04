@@ -38,13 +38,13 @@ routes that share an endpoint; ordinary crossings exclude those pairs.
 
 | Section ID | Diagram | Nodes | Edges | Planarity | Crossings | Incident crossings | Overlaps | Card hits | Occupied width × height | Aspect |
 | --- | --- | ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 1 | 0 | 0 | 1204 × 749 | 1.61 |
-| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 10 | 2 | 0 | 0 | 1374 × 1088 | 1.26 |
+| `incident-response` | 01 · Incident response | 24 | 33 | Planar | 0 | 0 | 0 | 0 | 1000 × 926 | 1.08 |
+| `regional-billing` | 02 · Regional billing | 32 | 48 | Nonplanar (K3,3) | 10 | 0 | 0 | 0 | 1170 × 926 | 1.26 |
 | `freight-operations` | 03 · Freight operations | 40 | 50 | Planar | 1 | 0 | 0 | 0 | 1725 × 1506 | 1.15 |
 | `data-platform` | 04 · Data platform | 48 | 60 | Planar | 2 | 0 | 0 | 0 | 1811 × 1714 | 1.06 |
 
-On a local regeneration run, candidate generation took 4.91 s,
-2.02 s, 5.53 s and 9.89 s respectively. All remain well inside the workbench's
+On a local regeneration run, candidate generation took 9.44 s,
+8.75 s, 8.40 s and 13.44 s respectively. All remain well inside the workbench's
 20 second worker deadline.
 
 ## Alignment cleanup
@@ -156,9 +156,9 @@ and data retain their useful composed rows. Freight's column alignment costs
 0.8% area and 2.9% center distance; data saves 1.2% area for 2.7% extra center
 distance. The six approved small outputs remain byte-identical.
 
-Retained native-curve counts are 6, 11, 7 and 11 respectively, with automatic
+Retained native-curve counts are 5, 11, 7 and 11 respectively, with automatic
 attachments throughout. Removing all retained controls at the new incident and
-billing positions produces three and five unrelated-card hits respectively;
+billing positions produces three and seven unrelated-card hits respectively;
 these curves are required for the accepted placement. All four outputs were
 visually inspected in the rendered viewer. Billing's top dense mesh still has
 crossed arrows: its ten ordinary crossings exceed the separate human reference's
@@ -189,7 +189,7 @@ cannot grow; center distance is bounded by 3% over the original pre-fold layout.
 The allowance stays anchored to that original layout across both passes, so a
 short intermediate result does not exclude a safer, smaller final arrangement.
 
-Incident's recovery/postmortem/knowledge/archive tail now points upward in the
+At this intermediate stage, incident's recovery/postmortem/knowledge/archive tail points upward in the
 left column, while its source corridor fills an existing top row. This removes
 three rows: 6 columns × 10 rows becomes 6 × 7, occupied height 1088 → 749, and
 area 1,310,305 → 902,059 (31.2% smaller). Center distance rises from 8,777 to
@@ -198,9 +198,65 @@ table above describes the preceding stage. Billing, freight and data retain
 their preceding arrangements byte-identically because no direction-free fold
 passed all improvement and safety gates. All six small baselines remain exact.
 
+## Connected motif geometry
+
+A final topology-only search can translate a weakly attached connected block
+and rotate its terminal corridor together. It detects components separated by
+one or two links, treats terminal paths as movable local motifs, and protects
+source fans and block hubs from later individual-node moves. A short input
+corridor can share a horizontal row beside its hub; a separate terminal input
+uses the side opposite the hub's outgoing connections. Connected row/column
+pairs can also move together, relocating one obstructing card into a nearby
+free slot when necessary. These are geometry operators, without graph IDs,
+labels, tints, reference files or target coordinates in their conditions.
+
+Private intermediate candidates may make room before another move improves
+routing. Published results always have zero overlaps/unrelated-card hits,
+at least 54 px clearance, automatic ports, no increase in either crossing
+count, the original preferred aspect band, and populated contiguous shared
+columns. Nodes with two neighbors cannot be pushed farther outside their
+neighbors' bounding box merely to widen the picture. Up to 3% extra occupied
+area requires at least 2% shorter links. Larger area trades, capped at 50%,
+require a strict crossing reduction and at least 5% shorter links.
+
+Six rounds share at most 144 routed proposals; deterministic work scaling
+reduces the budget with node-count squared × edge count. Each round constructs
+at most 4,000 cheap proposals from at most 24 connected blocks. At most 24
+finishing proposals try actual outer-branch positions with row pitches of
+116, 104 or 98 px; 32 further proposals revisit nearby free slots using sampled
+route length. Those budgets scale down by the same graph-size rule. Both
+stages retain the card-clearance floor and re-score actual viewer curves.
+Natural paths are preferred, with native curves retained only as required for
+safe automatic routing. Graphs above 48 nodes or 80 edges skip this pass.
+
+| Section | Before → after columns / rows | Before → after occupied area | Before → after center distance | Before → after crossings (ordinary / incident) |
+| --- | --- | ---: | ---: | --- |
+| Incident response | 6 / 7 → 5 / 10 | 902,059 → 926,301 | 8,973 → 6,938 | 0 / 1 → 0 / 0 |
+| Regional billing | 7 / 10 → 6 / 10 | 1,494,912 → 1,083,420 | 10,796 → 9,780 | 10 / 2 → 10 / 0 |
+| Freight operations | unchanged | unchanged | unchanged | 1 / 0 → 1 / 0 |
+| Data platform | unchanged | unchanged | unchanged | 2 / 0 → 2 / 0 |
+
+Incident trades 2.69% extra area for 22.69% shorter links and no intersections.
+Total sampled route length falls from 6,887 to 4,853 px (29.5%); center
+distance and routed length remain separate measurements. Its source chain sits beside the input hub, the separate input is above it,
+and the terminal chain shares a bottom row below the response block. The two
+middle linked pairs align with neighboring columns; the connector and vendor
+use the available interior slots. Billing removes its two incident crossings
+and 27.53% of its area while shortening links by 9.41%. Freight/data remain
+byte-identical, and all six approved small outputs remain exact.
+
+The result does not reproduce every suggested cell: the side feedback hub
+lands on the incident-store/pager row instead of one row lower, and symmetric
+split/join nodes keep a different left/center order. Their wiring alone does
+not distinguish their labels. The lower response core is a K4 mesh; its
+skipping and feedback edges still need bowed paths around intervening cards.
+Sampled-route polishing did not remove that close bundle while preserving the
+composed motifs, clearance and zero crossings. Zero intersections therefore
+does not guarantee generous separation between nearby parallel routes.
+
 Real ungrouped 80-node/144-edge ladder and layered stress graphs completed in
 2.92 s and 7.74 s respectively, with zero overlaps and unrelated-card hits.
-The full 80-node/160-edge layered regression completed in 8.68 s with the same
+The full 80-node/160-edge layered regression completed in 9.22 s with the same
 safety checks after adding the final global-lattice pass (which skips graphs
 above its 48-node bound).
 The search is bounded, not an exhaustive embedding solver: dense cores and

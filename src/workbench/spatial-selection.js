@@ -2,7 +2,7 @@
    selection; this owner keeps all menus, capture and marquee DOM transient. */
 function createBuilderSpatialSelection(opts){
   var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false,focusNodes=[],nudge=null,status=null;
-  var fitButton=doc.getElementById('workspace-fit-selection');
+  var fitButton=doc.getElementById?doc.getElementById('workspace-fit-selection'):null;
   function active(){return !opts.isActive || opts.isActive();}
   function surface(el){return el && el.closest && el.closest('.viewport-explore');}
   function snapshot(){var s=opts.session.snapshot();return !s.error && (s.renderedText==null || s.renderedText===s.text)?s:null;}

@@ -95,7 +95,11 @@ test('Fit recovers a far-away canvas panel and Floating retains its normal zoom 
 });
 
 test('canvas selection is transient across Explore view teardown and rebuild',async({page,server})=>{
- await open(page,server,fixture(),'reader');await selectCanvas(home(page));await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
+ await open(page,server,fixture(),'reader');const panel=home(page);await expectCanvasChrome(panel,false);
+ await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();
+ for(let i=0;i<40 && !(await panel.getAttribute('aria-current'));i++)await page.keyboard.press('Tab');
+ await expect(panel).toBeFocused();await expectCanvasChrome(panel,true);await page.keyboard.press('Escape');await expectCanvasChrome(panel,false);
+ await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-canvas-selected')).toHaveCount(0);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(home(page)).toBeVisible();await expectCanvasChrome(home(page),false);
 });

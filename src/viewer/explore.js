@@ -589,6 +589,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else if(legendMenu.open){ev.preventDefault();ev.stopPropagation();legendMenu.open=false;legendSummary.focus();}
     else if(menu.open){ev.preventDefault();ev.stopPropagation();menu.open=false;summary.focus();}
     else if(expanded){ev.preventDefault();ev.stopPropagation();exitExpanded();}
+    else if(selectedCanvasWindow){ev.preventDefault();ev.stopPropagation();selectCanvasWindow(null);}
   }
   function scrollKey(ev){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0 && ev.target===board)scrollIntent();}
   function cancel(){finish(true);}

@@ -1,6 +1,8 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),cp=require('node:child_process'),vm=require('node:vm');
+const {entrypoint}=require('../tools/source-loader.cjs');
 const cli=path.resolve(__dirname,'../tools/auto-arrange-spec.cjs');
+const viewer={URL};vm.runInNewContext(entrypoint('workbench').body,viewer);
 
 function diagram(prefix){
   return {nodes:{[prefix+'a']:{title:'A',binding:{entityRef:'component:default/a'}},[prefix+'b']:{title:'B'},[prefix+'c']:{title:'C'}},
@@ -9,6 +11,15 @@ function diagram(prefix){
     panels:[{id:'notes',type:'checks',title:'Keep panel',results:[]}],steps:[{id:'send',text:'Keep step',edge:prefix+'a->'+prefix+'b'}]};
 }
 function run(input,output,options=[]){return cp.spawnSync(process.execPath,[cli,...options,input,output],{encoding:'utf8'});}
+function assertRenderableRoutes(diagram){
+  const L=viewer.layout(diagram);
+  diagram.edges.forEach(edge=>{
+    if(edge.fromPort!=null)assert.ok(viewer.validEdgePort(edge.fromPort));
+    if(edge.toPort!=null)assert.ok(viewer.validEdgePort(edge.toPort));
+    if(edge.curveControls!=null)assert.ok(viewer.validCurveControls(edge.curveControls));
+    const route=viewer.edgePath(edge,L);assert.ok(route.length);assert.doesNotMatch(route,/NaN|Infinity/);
+  });
+}
 
 test('CLI arranges every diagram with production geometry while preserving semantic content and other sections',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-arrange-cli-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
@@ -26,7 +37,7 @@ test('CLI arranges every diagram with production geometry while preserving seman
     assert.ok(after.floats.every(item=>Number.isFinite(item.x)&&Number.isFinite(item.y)));
     assert.deepEqual(after.edges.map(edge=>({from:edge.from,to:edge.to,label:edge.label,kind:edge.kind,ret:edge.ret})),
       before.edges.map(edge=>({from:edge.from,to:edge.to,label:edge.label,kind:edge.kind,ret:edge.ret})));
-    assert.ok(after.edges.every(edge=>edge.fromPort&&edge.toPort&&Array.isArray(edge.curveControls)));
+    assertRenderableRoutes(after);
     assert.equal(after.edges[0].bend,undefined);assert.notEqual(after.edges[0].labelDx,9999);
   }
 });

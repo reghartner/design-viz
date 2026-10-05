@@ -1,4 +1,4 @@
-import {test,expect,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -142,6 +142,36 @@ test('a brand-new local diagram explicitly connects to the repository catalog an
   expect(recovered.topologyContext.ephemeral).toBe(true);expect(recovered.topologyContext.id).toMatch(/^workbench-draft/);
   await page.reload();await prepareEditorSurface(page);await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
   expect(JSON.parse(await page.locator('#src').inputValue()).page.canon).toBeUndefined();
+});
+
+for(const settlement of ['resolve','reject'])test('a stale local catalog '+settlement+' cannot corrupt a reopened reference picker or clear its selection',async({page,server})=>{
+  const fixture=await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Simple service flow'}).click();await prepareEditorSurface(page);
+  const selected=page.locator('#docview g.node[data-dv-node]').first();await inspectPageElement(page,selected.locator('.t1'));
+  const title=page.locator('#guide').getByLabel('title',{exact:true}),before=await page.locator('#src').inputValue();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+  function deferred(){let release;return {promise:new Promise(resolve=>release=resolve),release};}
+  const attempts=[0,1].map(()=>({gate:deferred(),seen:deferred(),done:deferred()}));let request=0;
+  const catalogURL=new URL('diagrams.json',fixture.url).href,catalog=await readFile(path.join(fixture.root,'workbench/diagrams.json'),'utf8');
+  await page.route(catalogURL,async route=>{
+    const index=request++,attempt=attempts[index];attempt.seen.release();await attempt.gate.promise;
+    await route.fulfill({status:200,contentType:'application/json',body:index===0 && settlement==='reject'?'{':catalog});attempt.done.release();
+  });
+  await openTopology(page);await page.locator('#topology-connect').click();await attempts[0].seen.promise;
+  await expect(page.locator('#topology-connect')).toBeDisabled();await page.locator('#topology-cancel').click();
+  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.locator('#topology-connect').click();await attempts[1].seen.promise;await expect(page.locator('#topology-connect')).toBeDisabled();
+  attempts[0].gate.release();await attempts[0].done.promise;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(page.locator('#topology-connect')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('Connecting to the deployed repository catalog');
+  await page.locator('#topology-cancel').click();await openTopology(page);
+  await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.keyboard.press('Escape');await expect(page.locator('#topology-picker')).not.toBeVisible();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+  attempts[1].gate.release();await attempts[1].done.promise;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.keyboard.press('Escape');await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
 });
 
 test('reference picker cancels stale async work and leaves source/history untouched',async({page,server})=>{

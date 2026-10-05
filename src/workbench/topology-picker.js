@@ -75,9 +75,9 @@ function initTopologyPicker(opts){
     if(Array.from(provider.options).some(function(option){return option.value===old;}))provider.value=old;
     chooseProvider();
   }
-  function close(focus){generation++;if(dialog.open)dialog.close();snapshot=null;loaded=null;plan=null;if(focus!==false)doc.getElementById('diagram-add').focus({preventScroll:true});}
+  function close(focus){generation++;if(dialog.open)dialog.close();snapshot=null;loaded=null;plan=null;el('connect').disabled=false;if(focus!==false)doc.getElementById('diagram-add').focus({preventScroll:true});}
   function open(){
-    close(false);snapshot=opts.context();invalid=false;el('contents').hidden=true;el('add').disabled=true;el('owner').textContent='';
+    close(false);snapshot=opts.context();invalid=false;el('contents').hidden=true;el('add').disabled=true;el('connect').disabled=false;el('owner').textContent='';
     options(destination,(snapshot.sections || []).filter(function(item){var rec=specSectionPaths(snapshot.raw)[item.section];return !!specValueAt(snapshot.raw,rec.diagram);}).map(function(item){return {value:String(item.section),label:item.label};}));
     destination.value=String(snapshot.section);el('search').value='';options(provider,[]);options(section,[]);options(exportChoice,[]);
     if(opts.pause)opts.pause();dialog.showModal();el('search').focus();
@@ -104,13 +104,14 @@ function initTopologyPicker(opts){
     if(!snapshot || invalid || !same() || typeof opts.connect!=='function')return;
     var token=++generation;el('connect').disabled=true;message('Connecting to the deployed repository catalog…');
     try{
-      catalogContext=await opts.connect(snapshot.raw);
+      var nextContext=await opts.connect(snapshot.raw);
       if(!life.alive() || token!==generation || !dialog.open)return;
       if(!same()){invalid=true;refresh();return;}
+      catalogContext=nextContext;
       loaderKey=JSON.stringify([snapshot.project,'local-draft']);
       loader=createTopologyCatalogLoader(catalogContext);el('connect').hidden=true;el('search').disabled=false;provider.disabled=false;el('search').focus();browse();
     }catch(ex){if(life.alive() && token===generation && dialog.open)message(ex.message);}
-    finally{if(life.alive())el('connect').disabled=false;}
+    finally{if(life.alive() && token===generation && dialog.open)el('connect').disabled=false;}
   });
   life.listen(el('search'),'input',function(){if(loader)browse();});
   life.listen(provider,'change',chooseProvider);life.listen(section,'change',chooseSection);life.listen(exportChoice,'change',chooseExport);

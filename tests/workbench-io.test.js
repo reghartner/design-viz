@@ -5,7 +5,7 @@ const C={URL,TextEncoder};
 for(const name of ['document','window','navigator','FileReader','fetch'])
   Object.defineProperty(C,name,{get(){throw new Error('I/O owner used ambient '+name);}});
 vm.createContext(C);
-for(const name of ['validator','confluence','trace-import','workbench/persistence','workbench/session','workbench/io-model','workbench/io'])
+for(const name of ['canon','validator','confluence','trace-import','workbench/persistence','workbench/session','workbench/io-model','workbench/io'])
   vm.runInContext(readSource(name+'.js'),C);
 const INITIAL=' {"page":{"title":"Original","sections":[{"diagram":{"nodes":{"a":{}},"rows":[["a"]]}}]}}\n';
 const TEMPLATE='<!doctype html>\n<title>Old</title>\n<script type="application/json" id="flowspec">\n{}\n</script>\n<main></main>';
@@ -234,6 +234,61 @@ test('directory failures abort opened streams and report only current failures; 
   assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html']);
   const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes[0][1],INITIAL);assert.ok(writes[1][1].includes(INITIAL.trim()));
   assert.equal(d.events.filter(e=>e[0]==='close').length,2);assert.match(h.messages.at(-1),/exported original/);
+});
+
+function topologyFixture(nested=false){
+  const spec=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram}]}});
+  const provider=spec('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],
+    edges:[{from:'api',to:'store',kind:'https'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const consumer=spec('consumer',{topologyImports:[{spec:nested?'middle':'provider',export:'core',as:'shared'}]});
+  const specs=[consumer,provider];
+  if(nested)specs.push(spec('middle',{topologyImports:[{spec:'provider',export:'core',as:'base'}],
+    topologyExports:{core:{nodes:['base::api','base::store'],edges:['base::api->base::store']}}}));
+  return {consumer,provider,context:{version:1,id:'consumer',specs}};
+}
+function htmlSpec(html){return JSON.parse(html.split('id="flowspec">\n')[1].split('\n</script>')[0]);}
+function assertPageOnly(raw){
+  assert.doesNotMatch(JSON.stringify(raw),/"topology(?:Imports|Exports|Provenance)"/);
+}
+
+test('local exports without Canon context write authored JSON and a page-only HTML snapshot',async()=>{
+  const h=harness(),{provider}=topologyFixture();delete provider.page.canon;
+  const original=JSON.stringify(provider,null,3)+'\n';h.session.replaceProject(original);
+  h.click('file-export');h.requests[0].resolve(response());await settle();
+  assert.equal(h.downloads.length,2);assert.equal(h.blobs.get(h.downloads[0].url).text,original);
+  const html=h.blobs.get(h.downloads[1].url).text,snapshot=htmlSpec(html);assertPageOnly(snapshot);
+  assert.doesNotMatch(html,/flowview-topology/);assert.deepEqual(snapshot.page.sections[0].diagram.nodes,provider.page.sections[0].diagram.nodes);
+  assert.equal(h.text,original);
+});
+
+test('direct and nested imports freeze the stamped click revision and safely escape provider script closes',async()=>{
+  const compatibility={};vm.runInNewContext(readSource('compatibility.js'),compatibility);
+  C.FlowviewCompatibility=compatibility.FlowviewCompatibility;
+  try{for(const nested of [false,true]){
+    const d=directory(),h=harness({pickDirectory:()=>Promise.resolve(d.dir)}),fixture=topologyFixture(nested);
+    fixture.provider.page.sections[0].diagram.nodes.api.title='API </ScRiPt><script>injected()</script>';
+    const original=JSON.stringify(fixture.consumer,null,3)+'\n';h.session.replaceProject(original,null,{topologyContext:fixture.context});
+    const expected=C.FlowviewCompatibility.stampText(original);
+    h.click('file-export');await settle();
+    h.session.resolve=()=>{throw Error('must not resolve after click');};h.type('src','later unfinished handwriting');
+    h.requests[0].resolve(response());await settle();
+    const writes=d.events.filter(e=>e[0]==='write');assert.equal(writes.length,2);assert.equal(writes[0][1],expected);
+    const html=writes[1][1],snapshot=htmlSpec(html);assertPageOnly(snapshot);assert.doesNotMatch(html,/flowview-topology|<\/ScRiPt>/);
+    const prefix=nested?'shared::base::':'shared::';
+    assert.equal(snapshot.page.sections[0].diagram.nodes[prefix+'api'].title,fixture.provider.page.sections[0].diagram.nodes.api.title);
+    assert.deepEqual(snapshot.page.flowview,JSON.parse(expected).page.flowview);
+    assert.equal(h.text,'later unfinished handwriting');
+  }}finally{delete C.FlowviewCompatibility;}
+});
+
+test('missing or broken frozen providers refuse both export modes before any writes or template fetch',()=>{
+  for(const directoryMode of [false,true])for(const broken of [false,true]){
+    const d=directory(),h=harness(directoryMode?{pickDirectory:()=>{throw Error('picker must not open');}}:{}),fixture=topologyFixture();
+    if(broken)fixture.provider.page.sections[0].diagram.rows=[['api']];
+    h.session.replaceProject(JSON.stringify(fixture.consumer),null,broken?{topologyContext:fixture.context}:null);
+    h.click('file-export');assert.deepEqual(d.events,[]);assert.equal(h.requests.length,0);assert.equal(h.downloads.length,0);
+    assert.match(h.messages.at(-1),broken?/placement/:/open this authored spec from Canon/);
+  }
 });
 
 

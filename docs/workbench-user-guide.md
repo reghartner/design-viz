@@ -23,6 +23,14 @@ skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 
+**File → export…** keeps the stamped authored JSON and creates a separate
+read-only HTML snapshot of the current page. Shared topology stays referenced
+in JSON; the HTML contains the visible resolved nodes and edges with no provider
+context or topology declarations/provenance. Local providers can export offline
+once the viewer template is available. Imported consumers require their approved
+frozen providers already loaded in Workbench; reopen from Canon to acquire them.
+The exported HTML then opens without those sources and never refreshes itself.
+
 **Work with an agent** walks through the Recommended copy/paste and Beta Monitor
 choices, opening or creating a diagram folder, pasting setup, choosing message
 context, previewing the proposed diagram and ledger, and preparing the accepted

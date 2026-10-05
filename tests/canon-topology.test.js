@@ -309,7 +309,9 @@ test('authored editor sessions resolve a frozen closure while preserving source,
   const invalid=structuredClone(edited);diagram(invalid).steps[1].edge='platform::gone->platform::store';
   assert.equal(session.accept({text:JSON.stringify(invalid)}),false);assert.deepEqual(JSON.parse(text),edited);
   const template='<title>Example</title>\n<script type="application/json" id="flowspec">\n{}\n</script>';
-  const html=context.buildExportHtml(template,text,session.topologyContext()).html;
-  assert.ok(html.includes('flowview-topology'));assert.ok(html.includes('topologyImports'));assert.ok(!html.includes('topologyProvenance'));
+  const exported=context.prepareExportSnapshot(text,session.resolve);
+  const html=context.buildExportHtml(template,exported.text).html;
+  assert.ok(!html.includes('flowview-topology'));assert.ok(!html.includes('topologyImports'));assert.ok(!html.includes('topologyProvenance'));
+  assert.ok(html.includes('platform::api'));assert.deepEqual(JSON.parse(text),edited);
   assert.equal(session.undo(),true);assert.equal(text,original);
 });

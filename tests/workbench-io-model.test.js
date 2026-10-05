@@ -181,3 +181,22 @@ test('buildExportHtml leaves the title alone when the spec has none', () => {
   assert.ok(!out.error);
   assert.ok(out.html.includes('<title>Old Title</title>'));
 });
+
+test('HTML snapshot preparation removes topology metadata across wrapped, bare and tabbed diagrams without changing source',()=>{
+  const context={};vm.createContext(context);
+  for(const file of ['canon.js','validator.js','workbench/io-model.js'])vm.runInContext(readSource(file),context);
+  const diagram=name=>({nodes:{[name]:{title:name}},rows:[[name]],topologyExports:{[name]:{nodes:[name],edges:[]}}});
+  const shapes=[diagram('bare'),{sections:[{diagram:diagram('barepage')}]},
+    {page:{blocks:[{diagram:diagram('first')},{tabs:[{sections:[{diagram:diagram('second')}]}]}]}}];
+  for(const source of shapes){
+    const text=JSON.stringify(source),before=plain(source);
+    const prepared=context.prepareExportSnapshot(text,raw=>context.FlowTopology.resolveSource(raw));
+    assert.ok(!prepared.error,prepared.error);
+    assert.doesNotMatch(prepared.text,/"topology(?:Imports|Exports|Provenance)"/);
+    assert.deepEqual(source,before);assert.equal(JSON.stringify(source),text);
+    assert.deepEqual(plain(context.validate(context.normalize(JSON.parse(prepared.text)))).errors,[]);
+  }
+  const generated={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],topologyProvenance:{version:1,imports:[]}}}]}};
+  const original=JSON.stringify(generated),prepared=context.prepareExportSnapshot(original,raw=>raw);
+  assert.doesNotMatch(prepared.text,/topologyProvenance/);assert.equal(JSON.stringify(generated),original);
+});

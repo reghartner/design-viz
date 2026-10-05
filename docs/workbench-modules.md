@@ -461,7 +461,9 @@ builder's closure or duplicate session history. The returned API is
 Neither method is a claim that the whole editor or page has been torn down.
 
 `io-model.js` retains the existing `mermaidToSpec()`, `specFileName()`,
-`exportTemplateOpeners()` and `buildExportHtml()` entrypoints. It loads alone,
+`exportTemplateOpeners()` and `buildExportHtml()` entrypoints. `prepareExportSnapshot()`
+uses the session's supplied resolver and shared Canon diagram traversal to strip
+topology metadata from the HTML copy. The model loads alone,
 without DOM, session, inspector or renderer code. Shared trace conversion and
 Confluence validation remain in `trace-import.js` and `confluence.js`. The model
 continues to enforce the same HTML injection marker/closing-tag and filename
@@ -499,6 +501,10 @@ Publication policies stay distinct:
 - **HTML export** captures matching JSON/HTML text at the initiating click. Normal
   source typing does not change that authorized snapshot. Retirement or a newer
   export blocks later template results, follow-on files and stale status messages.
+  JSON retains stamped authored references. HTML resolves the current frozen
+  session immediately and strips declarations/provenance from every diagram,
+  without embedding provider context. Resolution errors stop before file writes;
+  provider-derived text is escaped before embedding. Local exports need no context.
 - **Confluence handoff** keeps the same validated compact JSON for copy and file
   download. It is a manual handoff, not a publishing request.
 

@@ -25,7 +25,10 @@ test('briefs preserve user sources and audience and route each task to the autho
     assert.match(prompt,/small, fully specified edit, ask only about what blocks it/);assert.match(prompt,/storyboard worksheet/);
     assert.match(prompt,/story time span and each step’s time/);assert.match(prompt,/do not set per-panel clocks/);
     assert.match(prompt,/battery drain and charge rates from the sources/);assert.doesNotMatch(prompt,/time table for clocks/);
-    assert.match(prompt,/Backstage catalog/);assert.match(prompt,/full commit SHAs/);assert.match(prompt,/walk script/);
+    assert.match(prompt,/Backstage catalog/);assert.match(prompt,/full commit SHAs/);assert.match(prompt,/applicable self-audit/);
+    assert.match(prompt,/complete Canon validation\/publication path/);
+    assert.match(prompt,/do not run tools\/page_build\.py on these maintained diagrams/);
+    assert.match(prompt,/tools\/page_build\.py only when I explicitly request a standalone-output workflow/);
   }
   assert.match(context.welcomeAgentPrompt('code','','Engineers',repo),/cite the implementation/);
   assert.match(context.welcomeAgentPrompt('design','','Business readers',repo,'business'),/Technical level: story\. .*Do not ask me technical questions.*Decisions I made/);

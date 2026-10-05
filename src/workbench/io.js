@@ -194,6 +194,8 @@ function createBuilderIO(opts){
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
     var exportText = typeof FlowviewCompatibility !== 'undefined' ? FlowviewCompatibility.stampText(session.text()) : session.text();
+    var snapshot = prepareExportSnapshot(exportText,session.resolve);
+    if(snapshot.error){inspectorMessage(snapshot.error);return;}
     var jsonName = specFileName(parsed.raw);
     var htmlName = jsonName.replace(/\.spec\.json$/, '') + '.html';
     /* the folder picker needs the click's transient activation, which a
@@ -208,7 +210,7 @@ function createBuilderIO(opts){
         fetchExportTemplate(run,function(err, tplText){
           if(!exportCurrent(run))return;
           if (err){ inspectorMessage(err); return; }
-          var built = buildExportHtml(tplText, exportText.trim(),session.topologyContext?session.topologyContext():null);
+          var built = buildExportHtml(tplText, snapshot.text.trim());
           if (built.error){ inspectorMessage(built.error); return; }
           writeIntoDirectory(dir,jsonName,exportText,run)
             .then(function(){ return writeIntoDirectory(dir,htmlName,built.html,run); })
@@ -228,7 +230,7 @@ function createBuilderIO(opts){
       fetchExportTemplate(run,function(err, tplText){
           if(!exportCurrent(run))return;
         if (err){ inspectorMessage(err); return; }
-        var built = buildExportHtml(tplText, exportText.trim(),session.topologyContext?session.topologyContext():null);
+        var built = buildExportHtml(tplText, snapshot.text.trim());
         if (built.error){ inspectorMessage(built.error); return; }
         try{
           downloadTextFile(jsonName, exportText, 'application/json');

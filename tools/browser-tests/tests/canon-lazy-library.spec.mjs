@@ -131,6 +131,7 @@ test('a brand-new local diagram explicitly connects to the repository catalog an
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
   const before=JSON.parse(await page.locator('#src').inputValue());expect(before.page.canon).toBeUndefined();
   await openTopology(page);await expect(page.locator('#topology-connect')).toBeVisible();await expect(page.locator('#topology-search')).toBeDisabled();
+  await expect(page.locator('#topology-connect')).toBeFocused();
   await page.locator('#topology-connect').click();await expect(page.locator('#topology-connect')).toBeHidden();await expect(page.locator('#topology-add')).toBeEnabled();
   await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
   const authored=JSON.parse(await page.locator('#src').inputValue()),d=authored.page.blocks[0].diagram;

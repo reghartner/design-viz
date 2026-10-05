@@ -89,7 +89,13 @@ function initTopologyPicker(opts){
       el('connect').hidden=!!catalogContext;
       el('search').disabled=!catalogContext;
       provider.disabled=!catalogContext;
-      if(!catalogContext){message('Referenced topology is unavailable for this local draft until you connect the repository catalog. Connect explicitly to pin the current approved provider revision for this editing session.');return;}
+      if(!catalogContext){
+        message('Referenced topology is unavailable for this local draft until you connect the repository catalog. Connect explicitly to pin the current approved provider revision for this editing session.');
+        // Disabling the initially focused search field moves focus outside the
+        // modal in Chromium. Keep Escape owned by this dialog so closing the
+        // picker cannot also clear the Workbench's current selection.
+        el('connect').focus({preventScroll:true});return;
+      }
       if(!loader)loader=createTopologyCatalogLoader(catalogContext);
       browse();
     }catch(ex){message(ex.message);}

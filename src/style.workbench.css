@@ -1467,7 +1467,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-preview-active>#agent-update-banner{display:none!important;}
 
 /* Explore editing surfaces share the viewport's theme and stay above panels. */
-.dv-object-menu{position:fixed;z-index:1200;min-width:220px;max-width:min(310px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:6px;border:1px solid var(--explore-border,#aaa);border-radius:10px;background:var(--explore-bg,#fff);color:var(--dtext,#222);box-shadow:0 8px 28px #0003}
+.dv-object-menu{position:fixed;inset:auto;margin:0;z-index:1200;min-width:220px;max-width:min(310px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;padding:6px;border:1px solid var(--explore-border,#aaa);border-radius:10px;background:var(--explore-bg,#fff);color:var(--dtext,#222);box-shadow:0 8px 28px #0003}
 .dv-object-menu button{display:block;width:100%;border:0;background:transparent;color:inherit;text-align:left;padding:9px 12px;border-radius:5px;font:inherit;cursor:pointer}
 .dv-object-menu button:focus-visible,.dv-object-menu button:hover{outline:2px solid var(--accent,#5875db);outline-offset:-2px;background:color-mix(in srgb,var(--accent,#5875db) 12%,transparent)}
 .dv-object-menu button[aria-disabled=true]{opacity:.55;cursor:default}
@@ -1479,3 +1479,7 @@ body.workbench-reader-preview-active>.workbench-header,body.workbench-reader-pre
 body .docview .viewport-explore .boardcanvas g.node.dv-sel .card{stroke:var(--accent);stroke-width:3.5;}
 
 body .docview .viewport-explore .boardcanvas g.node[data-dv-object-menu]:focus-visible .card{stroke:var(--accent);stroke-width:4;stroke-dasharray:3 3;}
+
+body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:focus-visible{outline:3px dashed var(--accent);outline-offset:4px}
+.dv-spatial-status{position:absolute;z-index:1100;left:24px;bottom:84px;max-width:420px;padding:10px 14px;border:1px solid var(--explore-border);border-radius:8px;background:var(--explore-bg);color:var(--dtext);box-shadow:0 4px 16px #0002}
+.dv-spatial-actions .fnote{flex-basis:100%}

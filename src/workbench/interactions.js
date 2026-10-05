@@ -26,12 +26,13 @@ function createBuilderInteractions(opts){
       session.target={section:section,kind:'edge',index:index};rehighlight();renderInspector();
     }});
   life.own(function(){curveEditor.destroy();});
+  function selectionChanged(){if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
     if (selectedEl) selectedEl.classList.add('dv-sel');
     curveEditor.refresh(selectedEl);
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
   }
 
   function updateTargetLabel(raw){
@@ -171,7 +172,7 @@ function createBuilderInteractions(opts){
       return [clipboardHomeTarget.target];
     return session.target ? [session.target] : [];
   }
-  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};if(opts.selectionChanged)opts.selectionChanged();}
+  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};selectionChanged();}
   function clipboardDestination(targets){
     var selected=targets && targets[0] || clipboardSelection()[0];
     return {section:selected ? selected.section : session.insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
@@ -210,7 +211,7 @@ function createBuilderInteractions(opts){
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
     multiSel = [];
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
   }
   function dropMultiUI(){
     if (guide) guide.hidden = true;
@@ -286,7 +287,7 @@ function createBuilderInteractions(opts){
                     index: only.index, card:only.card, bulletPath:only.bulletPath, el: only.el}, false, true);
       return;
     }
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
     renderMultiInspector();
   }
   function bulkDeleteSelected(){
@@ -304,11 +305,11 @@ function createBuilderInteractions(opts){
     if(!targets.length){dropMultiUI();return;}
     if(targets.length===1){selectTarget(targets[0],false,true);return;}
     multiSel=targets;multiSel.forEach(function(t){t.el.classList.add('dv-sel');});
-    session.insertSection=targets[0].section;if(opts.selectionChanged)opts.selectionChanged();renderMultiInspector();
+    session.insertSection=targets[0].section;selectionChanged();renderMultiInspector();
   }
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
-    select:selectSpatial,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
+    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
     inspect:function(){if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});if(multiSel.length)renderMultiInspector();else renderInspector();}
   });
   life.own(function(){spatial.destroy();});
@@ -1523,6 +1524,7 @@ function createBuilderInteractions(opts){
     clearHome:life.guard(function(){clipboardHomeTarget=null;}),
     adding:function(){return life.alive()?addToStep:null;},connecting:function(){return life.alive()?connect:null;},
     selection:function(){return life.alive()?multiSel:[];},
+    spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
     busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),

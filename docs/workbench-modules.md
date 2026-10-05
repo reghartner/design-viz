@@ -326,11 +326,19 @@ the view filter or change the viewer's refusal to play an empty visible route.
 ## Interaction and builder lifetime
 
 `workbench/spatial-selection.js` owns the Workbench Explore context menu and
-Alt/Option-drag marquee, composed by `createBuilderInteractions()`. It uses
-authored node/panel identities and graph-space measurements of fitted panels;
-`planAlignSpatial` and `planDuplicateSpatial` publish through one ordinary session
-transaction. Source handwriting closes menus and cancels gestures while preserving
-Inspector selection with stale-source feedback. View changes and preview
+Alt/Option-drag marquee, object keyboard focus, and held-arrow movement, composed
+by `createBuilderInteractions()`. It uses authored node/panel identities and graph-space measurements of fitted panels;
+`planAlignSpatial`, `planDuplicateSpatial`, `planDistributeSpatial`, and
+`planNudgeSpatial` publish through one ordinary session transaction. Held arrows
+preview DOM translations and commit once on final key release; Escape, blur,
+source input, focus departure and preview retirement cancel the preview. Object
+menus use the browser popover layer while inheriting their section theme. Inspect
+mounts the same selection actions with its form lifetime. Fit selection sends only
+measured bounds to the Workbench canvas owner, which shares the viewer's existing
+fit-region calculation and subtracts editor windows and navigation controls. No
+Fit selection control is mounted in Reader or Backstage. Source handwriting closes
+menus and cancels gestures while preserving Inspector selection with stale-source
+feedback. View changes and preview
 replacement retain their existing selection-retirement policy.
 
 `createBuilderInteractions()` owns board hit testing, single/multiple selection

@@ -2248,6 +2248,7 @@ function renderMultiInspector(multiSel){
     var err = document.createElement('div');
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
+    if(opts.spatialActions)opts.spatialActions(guide,formLife);
     var exportForm=multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})?topologyExportForm(multiSel):null;
     if(!homogeneous){if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}finishForm(previous);return;}
     var form = document.createElement('div');
@@ -2384,6 +2385,7 @@ function renderInspector(){
     head.textContent = g.title;
     guide.appendChild(head);
 
+    if(opts.spatialActions)opts.spatialActions(guide,formLife);
     var parsed = parseEditor();
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
     var loc = path ? jsonLocate(session.text(), path) : null;

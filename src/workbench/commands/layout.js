@@ -652,6 +652,53 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects){
     }
   });
 }
+/* Shared placement validation for measured selection actions. */
+function builderMovableSpatial(text,raw,targets,layoutId,rects){
+  var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+  if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Row nodes follow the row layout. Use Free placement for every selected node to move or distribute them.'};
+  var definition=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
+  if(targets.some(function(t){return t.kind==='panel';}) && (!definition || definition.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};
+  if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before moving them.'};
+  return got;
+}
+function builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas){
+  var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
+  if(deltas.every(function(delta){return Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001;}))return {error:'The selected objects are already in position.'};
+  return builderRewrite(text,raw,got.path,function(d){
+    var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
+    for(var i=0;i<targets.length;i++){
+      var t=targets[i],r=rects[i],delta=deltas[i],x=r.x+delta.x,y=r.y+delta.y;
+      if(!floatCoordinate(x) || !floatCoordinate(y) || !floatCoordinate(x+r.w/2) || !floatCoordinate(y+r.h/2))return {error:'Movement is outside the supported canvas coordinates.'};
+      if(Math.abs(delta.x)<.00001 && Math.abs(delta.y)<.00001)continue;
+      if(t.kind==='node'){
+        var f=d.floats.find(function(f){return f.id===t.id;});
+        if(delta.x){f.x=x+r.w/2;delete f.dx;}
+        if(delta.y){f.y=y+r.h/2;delete f.dy;}
+      }else{
+        var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),panels=canvas.panels || (canvas.panels=[]);
+        var p=panels.find(function(p){return p.panel===t.id;});if(!p){p=Object.assign({panel:t.id},r);panels.push(p);}
+        if(delta.x)p.x=x;if(delta.y)p.y=y;
+      }
+    }
+  });
+}
+function planNudgeSpatial(text,raw,targets,layoutId,rects,dx,dy){
+  if(!Number.isFinite(dx) || !Number.isFinite(dy))return {error:'Choose a finite movement.'};
+  return builderSpatialDeltas(text,raw,targets,layoutId,rects,targets.map(function(){return {x:dx,y:dy};}));
+}
+function planDistributeSpatial(text,raw,targets,layoutId,direction,rects){
+  var got=builderMovableSpatial(text,raw,targets,layoutId,rects);if(got.error)return got;
+  if(targets.length<3)return {error:'Select at least three objects to distribute.'};
+  if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose a distribution direction.'};
+  var axis=direction==='horizontal'?'x':'y',size=direction==='horizontal'?'w':'h';
+  var order=rects.map(function(r,i){return {r:r,i:i};}).sort(function(a,b){return a.r[axis]-b.r[axis] || a.i-b.i;});
+  var first=order[0].r,last=order[order.length-1].r,end=Math.max.apply(null,rects.map(function(r){return r[axis]+r[size];}));
+  var gap=(end-first[axis]-rects.reduce(function(sum,r){return sum+r[size];},0))/(targets.length-1);
+  if(gap<=.00001 || Math.abs(last[axis]+last[size]-end)>.00001)return {error:'The selected bounds overlap or have insufficient room for positive gaps.'};
+  var cursor=first[axis],deltas=targets.map(function(){return {x:0,y:0};});
+  order.forEach(function(item,index){if(index>0 && index<order.length-1)deltas[item.i][axis]=cursor-item.r[axis];cursor+=item.r[size]+gap;});
+  return builderSpatialDeltas(text,raw,targets,layoutId,rects,deltas);
+}
 function planDuplicateSpatial(text,raw,targets,layoutId,rects){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
   return builderRewrite(text,raw,got.path,function(d){

@@ -20,15 +20,22 @@ async function geometry(root){
       following:rect(grid.closest('.doc-sec').nextElementSibling),section:rect(grid.closest('.doc-sec'))};
   });
 }
+async function settledGeometry(root,width){
+  let actual;
+  // Auto width can match the host before ResizeObserver applies canvas zoom.
+  await expect.poll(async()=>{
+    actual=await geometry(root);
+    return {width:actual.grid.w,zoom:actual.zoom};
+  }).toEqual({width:expect.closeTo(width,0),zoom:expect.closeTo(Math.min(1,width/1000),4)});
+  return actual;
+}
 async function verifyResize(root){
   const section=root.locator('.doc-sec').first();
   await section.evaluate(el=>{el.style.width='1000px';el.style.boxSizing='content-box';});
-  await expect.poll(async()=>(await geometry(root)).grid.w).toBeCloseTo(1000,0);
-  const base=await geometry(root);
+  const base=await settledGeometry(root,1000);
   for(const width of [800,640,400,720,1000,1100]){
     await section.evaluate((el,width)=>{el.style.width=width+'px';},width);
-    await expect.poll(async()=>(await geometry(root)).grid.w).toBeCloseTo(width,0);
-    const actual=await geometry(root),scale=Math.min(1,width/1000);
+    const actual=await settledGeometry(root,width),scale=Math.min(1,width/1000);
     expect(actual.zoom).toBeCloseTo(scale,4);
     expect(actual.grid.h).toBeCloseTo(base.grid.h*scale,0);
     expect(actual.controls.h).toBeCloseTo(base.controls.h*scale,0);

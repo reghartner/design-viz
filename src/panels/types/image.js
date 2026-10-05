@@ -40,6 +40,9 @@ PanelRegistry.extend('image', {
   order: 5,
   label: 'Embedded image',
   since: '0.1.0',
+  layout: {
+    canvasSizing: { mode: 'content-fit', maxHeight: 640, resizeAxis: 'width' },
+  },
 });
 
 PanelRegistry.extend('image', {

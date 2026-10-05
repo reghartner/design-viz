@@ -202,9 +202,9 @@ function planDeleteListItem(text, raw, containerPath, index){
 }
 
 /* ---------------- multi-select: bulk planners ----------------
-   A multi-selection is HOMOGENEOUS (one kind) — mixed-kind bulk deletes
-   interact with cascades (a node delete prunes edges/steps) in ways that
-   silently invalidate sibling targets. Deletes apply highest-index-first
+   Node/panel selections can be mixed because node cascades do not remove
+   panels. Other mixed-kind deletes can invalidate sibling targets through
+   cascades (a node delete prunes edges/steps). Deletes apply highest-index-first
    per section so earlier deletions cannot shift later targets. */
 var BUILDER_MULTI_KINDS = ['node', 'edge', 'step', 'panel', 'bullet', 'crow'];
 
@@ -256,7 +256,7 @@ function planBulkSetField(text, targets, key, valueTextOrNull){
 }
 
 function planBulkDelete(text, targets){
-  if(targets.length && targets.some(function(t){return t.kind!==targets[0].kind;}))return {error:'Mixed topology selections support export authoring only. Select one kind to delete.'};
+  if(targets.length && targets.some(function(t){return t.kind!==targets[0].kind;}) && !targets.every(function(t){return t.kind==='node' || t.kind==='panel';}))return {error:'Mixed topology selections support export authoring only. Select one kind to delete.'};
   if(targets.some(function(t){return t.kind==='bullet' && !builderBulletIndices(t);}))return {error:'Invalid bullet selection.'};
   var list = targets.filter(function(t,i){
     if(t.kind!=='bullet')return true;
@@ -280,7 +280,9 @@ function planBulkDelete(text, targets){
     var raw;
     try { raw = JSON.parse(cur); }
     catch (ex){ return {error: 'bulk stopped: the JSON no longer parses (' + ex.message + ')'}; }
-    var plan = builderDeletePlan(cur, raw, list[i]);
+    var target=list[i];
+    if(target.kind==='panel' && target.id){var got=builderDiagram(cur,raw,target.section),index=got.error?-1:(got.d.panels || []).findIndex(function(p){return p.id===target.id;});if(index<0)return {error:'Selected panel no longer exists.'};target=Object.assign({},target,{index:index});}
+    var plan = builderDeletePlan(cur, raw, target);
     if (plan.error) return {error: 'selection ' + (i + 1) + ': ' + plan.error};
     cur = plan.text;
   }

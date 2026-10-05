@@ -271,7 +271,12 @@ with **position (%)**. See `docs/free-node-placement.md` and the executable
 Shift-select floats in one section and use **Align horizontal** (same Y) or
 **Align vertical** (same X), anchored to the first selected node. Drag any member
 to move the selection together; each alignment or group drag is one Undo action.
-Row nodes must first be switched to Free placement.
+Row nodes must first be switched to Free placement. In Workbench Explore,
+Alt/Option-drag empty canvas to select intersecting nodes and canvas panels.
+Right-click a selected member for Inspect, Delete, Duplicate, or alignment.
+Mixed alignment uses visible centers (horizontal = same Y, vertical = same X),
+anchored to the first selection; each edit is one Undo action. Floating panels,
+prose and playback controls are excluded from marquee selection.
 
 ## Human handoff in the workbench
 

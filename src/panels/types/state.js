@@ -25,6 +25,9 @@ PanelRegistry.extend('state', {
   order: 0,
   label: 'State',
   since: '0.1.0',
+  layout: {
+    canvasSizing: { mode: 'content-fit', maxHeight: 320, resizeAxis: 'width' },
+  },
 });
 
 PanelRegistry.extend('state', {

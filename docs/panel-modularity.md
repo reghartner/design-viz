@@ -38,9 +38,14 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `styles`, `editorStyles` | Panel-only CSS; shared themes and reusable primitives remain shared |
 
 `layout` supports `focusByDefault`, `focusLabel`, `attachControls`, `large`,
-`height`, `supporting` and `fallbackHeight`. A preferred size never overrides a
-saved size or hidden choice. `fallbackHeight` is used when appending a panel to
-an existing layout.
+`height`, `supporting`, `fallbackHeight` and `canvasSizing`. A preferred size
+never overrides a saved size or hidden choice. `fallbackHeight` is used when
+appending a panel to an existing layout. `canvasSizing` is an opt-in Explore
+canvas policy. `mode: 'fixed-aspect'` fits the rendered content and uses the
+declared `aspect` to translate vertical resize input; `mode: 'content-fit'`
+tracks intrinsic content height and may declare `maxHeight` for scrolling.
+`resizeAxis: 'width'` keeps width canonical for either policy. These policies
+change only displayed canvas geometry until the user explicitly resizes.
 
 Reference paths visit own properties; `*` visits array elements or object values.
 The shared remapper mutates a caller-owned clone. Missing mappings preserve a

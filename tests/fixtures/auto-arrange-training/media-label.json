@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-05",
+  "user_statement": "I favor A",
+  "graph": "media-platform",
+  "preferred": "A: practice-media-topology",
+  "alternative": "B: practice-media-visual",
+  "scope": "Pairwise preference for the two displayed layouts; not blanket approval of A or proof of any single causal objective.",
+  "candidates": {
+    "A": {
+      "spec": "/Users/chuck/flowview-bench/auto-arrange-human-target-2026-10-04/agents/practice-media-topology/candidate.spec.json",
+      "sha256": "751efa9c553fd689e671668f17420e137244a019eb114a74736bcd70dd839eff"
+    },
+    "B": {
+      "spec": "/Users/chuck/flowview-bench/auto-arrange-human-target-2026-10-04/agents/practice-media-visual/candidate.spec.json",
+      "sha256": "48faf4d3026d728a430fb88151e4773eda36a204e813bb20895cccc11cc86a64"
+    }
+  }
+}

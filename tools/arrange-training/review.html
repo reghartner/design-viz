@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Layout comparisons</title>
+<style>
+:root{color-scheme:light;--ink:#15212c;--accent:#175bd3;--line:#cbd5df}*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:var(--ink);font:16px/1.45 system-ui,sans-serif}button,input,label{font:inherit}button{cursor:pointer;min-height:44px;padding:9px 15px;border:1px solid var(--line);border-radius:9px;background:white;color:var(--ink)}button:focus-visible,a:focus-visible,label:has(input:focus-visible){outline:3px solid #f39b22;outline-offset:3px}button:disabled{opacity:.55;cursor:default}header{position:sticky;top:0;z-index:2;background:#fffef9f5;backdrop-filter:blur(8px);border-bottom:1px solid var(--line);padding:12px max(16px,calc((100vw - 1440px)/2))}h1{font-size:21px;margin:0 0 5px}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.toolbar .spacer{flex:1}#submit{background:var(--accent);color:white;border-color:var(--accent);font-weight:650}#state{margin:8px 0 0;font-size:14px}#state.saved{color:#176b38}#state.error{color:#a12a20}#notice{margin:4px 0 0;font-size:13px;color:#6a4700}main{max-width:1440px;margin:auto;padding:16px}#intro{margin:0 0 18px;color:#455364}.pair{background:white;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:22px;scroll-margin-top:190px}.pair h2{margin:0 0 3px;font-size:20px}.count{color:#596777;font-size:14px}.previews{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:14px 0}.preview{min-width:0;border:2px solid #e0e6ed;border-radius:10px;overflow:hidden}.preview.chosen{border-color:var(--accent);background:#f0f5ff}.preview-head{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f7f9fc}.badge{font-size:20px;font-weight:750}.preview img{display:block;width:100%;height:auto;cursor:zoom-in}.choices{display:flex;gap:8px;flex-wrap:wrap;align-items:center;border:0;padding:0;margin:12px 0 0}.choices legend{font-weight:650;margin-bottom:8px}.vote{display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border:2px solid var(--line);border-radius:10px;min-height:48px;cursor:pointer}.vote:has(input:checked){border-color:var(--accent);background:#e7efff;color:#103c88;font-weight:700}.vote input{width:19px;height:19px;accent-color:var(--accent);margin:0}.clear{margin-left:auto;font-size:14px}.bottom{display:flex;justify-content:space-between;margin:16px 0 32px}.empty{padding:40px;background:white;border-radius:12px}dialog{max-width:98vw;width:1400px;height:95vh;max-height:95vh;border:1px solid var(--line);border-radius:12px;padding:0}dialog::backdrop{background:#102030bb}.modalbar{display:flex;align-items:center;gap:10px;padding:10px;position:sticky;top:0;background:white;border-bottom:1px solid var(--line)}.modalbar strong{flex:1}.image-scroll{height:calc(100% - 67px);overflow:auto;background:#eef2f6;padding:8px}.image-scroll img{display:block;width:100%;height:auto;max-width:none}.image-scroll.zoom img{width:auto}.help{font-size:13px;color:#596777;margin-top:8px}@media(max-width:650px){header{padding:10px 12px}h1{font-size:18px}main{padding:10px}.pair{padding:12px;scroll-margin-top:210px}.previews{grid-template-columns:1fr;gap:12px}.toolbar{gap:6px}.toolbar button{padding:8px 10px}.vote{flex:1;justify-content:center;padding:11px 12px}.clear{margin-left:0}.pair h2{font-size:18px}.toolbar .spacer{display:none}#progress{width:100%;font-size:14px}dialog{width:98vw}.help{display:none}}
+</style></head><body>
+<header><h1 id="title">Layout comparisons</h1><div class="toolbar"><button id="prev" aria-label="Previous batch">←</button><strong id="batch">Loading…</strong><button id="next" aria-label="Next batch">→</button><span id="progress"></span><span class="spacer"></span><button id="backup">Download backup</button><button id="submit" disabled>Submit choices</button></div><p id="state" role="status" aria-live="polite">Loading the comparison set…</p><p id="notice"></p></header>
+<main><p id="intro">Choose A, B, Tie (equally good), or Neither (both need work). You can skip any graph. Enlarge a diagram to inspect it; viewing never casts a vote. Submit saves your selections to the server.</p><div id="pairs"></div><div class="bottom"><button id="bottomPrev">← Previous batch</button><button id="bottomNext">Next batch →</button></div></main>
+<dialog id="zoom"><div class="modalbar"><strong id="zoomTitle"></strong><button id="zoomToggle">Zoom to full size</button><button id="zoomClose">Close</button></div><div class="image-scroll" id="imageScroll"><img id="zoomImage" alt="Enlarged diagram"></div></dialog>
+<script>
+'use strict';
+const $=id=>document.getElementById(id), state={manifest:null,batches:[],batch:0,choices:Object.create(null),receipt:null,reviewerId:null,key:null,pending:false,storage:true};
+const identity=pair=>({A:{id:pair.A.id,sha256:pair.A.sha256},B:{id:pair.B.id,sha256:pair.B.sha256}});
+const selected=()=>state.manifest.pairs.filter(p=>state.choices[p.id]).map(p=>({pairId:p.id,choice:state.choices[p.id].choice,...identity(p)}));
+const signature=()=>JSON.stringify({manifestSha256:state.manifest.manifestSha256,choices:selected()});
+function persist(){try{localStorage.setItem(state.key,JSON.stringify({reviewerId:state.reviewerId,choices:state.choices,receipt:state.receipt,batch:state.batch}));}catch{state.storage=false;$('notice').textContent='This browser cannot save drafts locally. Keep this tab open, submit now, or download a backup.';}}
+function status(message,error=false){$('state').textContent=message;$('state').className=error?'error':'';}
+function update(){
+ const count=selected().length,saved=state.receipt&&state.receipt.signature===signature();
+ $('progress').textContent=`${count} of ${state.manifest.pairs.length} selected`;
+ $('submit').disabled=state.pending||count===0;$('submit').textContent=state.pending?'Saving…':`Submit ${count} choice${count===1?'':'s'}`;
+ $('batch').textContent=`Batch ${state.batch+1} of ${state.batches.length}`;
+ $('prev').disabled=$('bottomPrev').disabled=state.batch===0;$('next').disabled=$('bottomNext').disabled=state.batch===state.batches.length-1;
+ if(state.pending)status('Saving to the server… Keep this page open.');
+ else if(saved){status(`Saved to server: ${state.receipt.count} choices · revision ${state.receipt.revision} · ${new Date(state.receipt.submittedAt).toLocaleString()}`);$('state').className='saved';}
+ else status(`${count?`${count} selected · `:''}Unsent draft${state.storage?' saved on this device':''}.${state.receipt?' Earlier submitted choices are preserved.':''}`);
+}
+function choose(id,choice){
+ const pair=state.manifest.pairs.find(p=>p.id===id);
+ if(choice)state.choices[id]={choice,...identity(pair)};else delete state.choices[id];
+ const article=document.querySelector(`[data-pair-id="${id}"]`);
+ if(article){article.querySelectorAll('input').forEach(input=>input.checked=input.value===choice);article.querySelectorAll('.preview').forEach(card=>card.classList.toggle('chosen',card.dataset.label===choice));}
+ persist();update();
+}
+function enlarge(pair,label){$('zoomTitle').textContent=`${pair.title || pair.id} · ${label}`;$('zoomImage').src=asset(pair[label].png);$('imageScroll').classList.remove('zoom');$('zoomToggle').textContent='Zoom to full size';$('zoom').showModal();}
+function asset(name){return '/files/'+name.split('/').map(encodeURIComponent).join('/');}
+function element(tag,text,className){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(className)e.className=className;return e;}
+function render(){
+ const container=$('pairs');container.replaceChildren();const pairs=state.batches[state.batch];
+ pairs.forEach(pair=>{
+  const article=element('article',undefined,'pair');article.dataset.pairId=pair.id;article.tabIndex=-1;
+  article.append(element('h2',`${state.manifest.pairs.indexOf(pair)+1}. ${pair.title || pair.id}`));
+  article.append(element('div',`${pair.nodeCount??''} nodes · ${pair.edgeCount??''} connections`,'count'));
+  const previews=element('div',undefined,'previews');
+  for(const label of ['A','B']){
+   const card=element('div',undefined,'preview');card.dataset.label=label;card.classList.toggle('chosen',state.choices[pair.id]?.choice===label);
+   const head=element('div',undefined,'preview-head');head.append(element('span',label,'badge'));
+   const zoom=element('button',`Enlarge ${label}`);zoom.addEventListener('click',()=>enlarge(pair,label));head.append(zoom);card.append(head);
+   const img=element('img');img.src=asset(pair[label].png);img.alt=`${pair.title || pair.id}, layout ${label}`;img.loading='lazy';img.addEventListener('click',()=>enlarge(pair,label));card.append(img);previews.append(card);
+  }
+  article.append(previews);const choices=element('fieldset',undefined,'choices');choices.append(element('legend','Your preference'));
+  for(const choice of ['A','B','Tie','Neither']){const label=element('label',undefined,'vote'),input=element('input');input.type='radio';input.name=pair.id;input.value=choice;input.checked=state.choices[pair.id]?.choice===choice;input.addEventListener('change',()=>choose(pair.id,choice));label.append(input,document.createTextNode(choice));choices.append(label);}
+  const clear=element('button','Clear selection','clear');clear.addEventListener('click',()=>choose(pair.id,null));choices.append(clear);article.append(choices);container.append(article);
+ });
+ update();
+}
+function navigate(delta){const batch=Math.min(state.batches.length-1,Math.max(0,state.batch+delta));if(batch===state.batch)return;state.batch=batch;persist();render();window.scrollTo({top:0,behavior:'smooth'});}
+$('prev').onclick=$('bottomPrev').onclick=()=>navigate(-1);$('next').onclick=$('bottomNext').onclick=()=>navigate(1);
+$('zoomClose').onclick=()=>$('zoom').close();$('zoomToggle').onclick=()=>{const zoom=$('imageScroll').classList.toggle('zoom');$('zoomToggle').textContent=zoom?'Fit to screen':'Zoom to full size';};
+$('backup').onclick=()=>{if(!state.manifest)return;const data={source:'unsent-browser-backup',datasetId:state.manifest.datasetId,datasetVersion:state.manifest.datasetVersion,manifestSha256:state.manifest.manifestSha256,reviewerId:state.reviewerId,choices:selected(),lastReceipt:state.receipt};const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const link=element('a');link.href=url;link.download=state.manifest.datasetId+'-draft.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+$('submit').onclick=async()=>{
+ if(!state.manifest||state.pending||!selected().length)return;
+ const submittedSignature=signature(),payload={datasetId:state.manifest.datasetId,datasetVersion:state.manifest.datasetVersion,manifestSha256:state.manifest.manifestSha256,reviewerId:state.reviewerId,choices:selected()};
+ state.pending=true;update();const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),15000);
+ try{const response=await fetch('/api/submissions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:controller.signal});const result=await response.json();if(!response.ok||result.saved!==true)throw Error(result.error||'The server did not confirm the save.');state.receipt={...result,signature:submittedSignature};persist();state.pending=false;update();}
+ catch(error){state.pending=false;update();status(`Not confirmed saved. Your draft is retained. ${error.name==='AbortError'?'The request timed out; reconnect and retry.':error.message} You can also download a backup.`,true);}
+ finally{clearTimeout(timeout);}
+};
+(async()=>{
+ try{
+  const response=await fetch('/api/manifest');if(!response.ok)throw Error('Could not load comparison manifest.');const m=state.manifest=await response.json();$('title').textContent=m.title||'Layout comparisons';document.title=$('title').textContent;
+  state.key=`arrange-review:${m.datasetId}:${m.datasetVersion}`;let saved={};try{saved=JSON.parse(localStorage.getItem(state.key)||'{}');if(!saved||typeof saved!=='object')saved={};}catch{state.storage=false;}
+  state.reviewerId=saved.reviewerId||('browser-'+(globalThis.crypto?.randomUUID?crypto.randomUUID():Array.from({length:24},()=>Math.floor(Math.random()*16).toString(16)).join('')));
+  let stale=0;for(const pair of m.pairs){const old=saved.choices?.[pair.id];if(!old)continue;if(['A','B','Tie','Neither'].includes(old.choice)&&JSON.stringify({A:old.A,B:old.B})===JSON.stringify(identity(pair)))state.choices[pair.id]=old;else stale++;}
+  state.receipt=saved.receipt||null;const batches=[...new Set(m.pairs.map(p=>p.batch||1))].sort((a,b)=>a-b);state.batches=batches.map(batch=>m.pairs.filter(p=>(p.batch||1)===batch));state.batch=Math.min(state.batches.length-1,Math.max(0,saved.batch||0));
+  if(stale)$('notice').textContent=`${stale} draft selections were cleared because those candidates changed. Other selections were restored.`;
+  persist();render();
+ }catch(error){status(error.message+' Reload this page after checking the server connection.',true);$('pairs').append(element('div','The comparison set could not be loaded.','empty'));}
+})();
+</script></body></html>

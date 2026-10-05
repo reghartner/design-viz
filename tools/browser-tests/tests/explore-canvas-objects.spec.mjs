@@ -11,6 +11,19 @@ function fixture(canvas=true){
  {panel:'home',x:-380,y:20,w:340,h:300},{panel:'clip',x:500,y:450,w:340,h:280},{panel:'outcome',x:900,y:20,w:300,h:240}],prose:{x:900,y:310,w:300,h:180}}};
  return raw;
 }
+function intrinsicFixture(){
+ const raw=fixture(),d=raw.page.sections[0].diagram,view=d.layouts[1],pixel='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z4UYAAAAASUVORK5CYII=';
+ d.panels.push(
+  {id:'radar',type:'radar',title:'Porch radar',initial:{subject:{x:132,y:108}}},
+  {id:'zones',type:'zoneframe',title:'Camera zones',zones:[{id:'porch',label:'Porch',points:[[20,30],[150,22],[145,150],[28,145]]}],initial:{zones:[{id:'porch',state:'armed'}],subject:{x:90,y:92}}},
+  {id:'reference',type:'image',title:'Reference',src:pixel,alt:'One pixel test image',caption:'Embedded reference caption',link:'https://example.com/reference'},
+  {id:'orbit',type:'orbit',title:'Lifecycle',states:['IDLE','ACTIVE','DONE'],initial:{state:'IDLE'}}
+ );
+ ['radar','zones','reference','orbit'].forEach((panel,i)=>view.sectionLayout.default.push({panel,x:(i%2)*4,y:44+Math.floor(i/2)*8,w:4,h:8}));
+ const panels=view.exploreLayout.canvas.panels;panels.find(p=>p.panel==='home').x=-360;panels.find(p=>p.panel==='home').y=0;panels.find(p=>p.panel==='clip').x=500;panels.find(p=>p.panel==='clip').y=0;panels.find(p=>p.panel==='outcome').x=900;panels.find(p=>p.panel==='outcome').y=0;
+ panels.push({panel:'radar',x:-360,y:310,w:320,h:900},{panel:'zones',x:0,y:310,w:320,h:900},{panel:'reference',x:360,y:310,w:260,h:900},{panel:'orbit',x:660,y:310,w:320,h:900});
+ return raw;
+}
 async function build(server,raw,name='canvas-objects'){
  const input=path.join(server.root,name+'.json'),output=path.join(server.root,name+'.html');await writeFile(input,JSON.stringify(raw));
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);return server.origin+'/'+name+'.html';
@@ -26,15 +39,29 @@ async function open(page,server,raw,host){
  await expect(page.locator('.explore-canvas-objects [data-explore-panel=home]')).toBeVisible();
 }
 const home=page=>page.locator('[data-explore-panel=home]');
+const outcome=page=>page.locator('[data-explore-panel=outcome]');
+const clip=page=>page.locator('[data-explore-panel=clip]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
 async function fit(page,host){await page.locator(host==='workbench'?'#workspace-fit':'.explore-diagram-zoom button').filter(host==='workbench'?{}:{hasText:'Fit canvas'}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
 async function drag(page,locator,dx,dy){const r=await locator.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:5});await page.mouse.up();}
+async function selectCanvas(locator){await locator.focus();await expect(locator).toHaveAttribute('aria-current','true');}
+async function expectCanvasChrome(locator,selected){
+ const border=await locator.evaluate(el=>{const style=getComputedStyle(el),viewport=el.closest('.section-viewport');return {color:style.borderTopColor,width:style.borderTopWidth,theme:getComputedStyle(viewport).getPropertyValue('--explore-border').trim()};});
+ expect(border.width).toBe('1px');expect(border.color).toBe(await locator.evaluate((el,value)=>{const probe=document.createElement('i');probe.style.color=value;el.appendChild(probe);const color=getComputedStyle(probe).color;probe.remove();return color;},border.theme));
+ await expect(locator.locator('.explore-window-header')).toHaveCSS('display',selected?'flex':'none');
+ await expect(locator.locator('.explore-window-resize')).toHaveCSS('display',selected?'block':'none');
+ if(selected){await expect(locator).toHaveClass(/explore-canvas-selected/);expect(await locator.evaluate(el=>getComputedStyle(el).outlineStyle)).toBe('solid');}
+ else{await expect(locator).not.toHaveClass(/explore-canvas-selected/);await expect(locator).not.toHaveAttribute('aria-current','true');await expect(locator).toHaveCSS('box-shadow','none');}
+}
+async function compactMetrics(locator){return locator.evaluate(el=>{const body=el.querySelector('.explore-window-body'),card=body.firstElementChild;return {outer:el.offsetHeight,body:body.clientHeight,content:card.scrollHeight,gap:body.clientHeight-card.scrollHeight,overflow:card.scrollHeight-body.clientHeight,width:el.offsetWidth,scrollable:body.scrollHeight>body.clientHeight};});}
+async function emptyCanvasPoint(page){return board(page).evaluate(el=>{const r=el.getBoundingClientRect(),occupied='.explore-window,.explore-player,.explore-tools,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]';for(let y=r.top+80;y<r.bottom-80;y+=30)for(let x=r.left+30;x<r.right-60;x+=30){const hit=document.elementFromPoint(x,y);if(hit && !hit.closest(occupied))return {x,y};}throw Error('No empty canvas point');});}
 for(const host of ['reader','workbench','backstage'])test(host+': canvas objects pan and zoom with the graph, Fit recovers all objects at desktop sizes',async({page,server},info)=>{
  for(const [width,height] of [[1280,800],[1440,900],[1920,1200]]){
   await page.setViewportSize({width,height});await open(page,server,fixture(),host);await page.evaluate(()=>document.fonts.ready);await fit(page,host);
+  expect((await compactMetrics(home(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(outcome(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(clip(page))).gap).toBeLessThanOrEqual(2);
   const stage=await page.locator('.explore-stage').boundingBox();
   for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-window:visible').all()]){const r=await loc.boundingBox();expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.y).toBeGreaterThanOrEqual(stage.y-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height+2);}
   const player=await page.locator('.explore-player').boundingBox(),before=await home(page).boundingBox();
@@ -50,18 +77,18 @@ for(const host of ['reader','workbench','backstage'])test(host+': canvas objects
 test('reader mode switching preserves independent layouts, story state, widget access and session isolation',async({page,server})=>{
  const raw=fixture();await open(page,server,raw,'reader');await fit(page,'reader');
  await page.getByRole('button',{name:'Next step',exact:true}).click();const hash=await page.evaluate(()=>location.hash);
- const h=home(page);await drag(page,h.locator('.explore-window-grip'),60,40);const moved=await h.getAttribute('style');
+ const h=home(page);await selectCanvas(h);await drag(page,h.locator('.explore-window-grip'),60,40);const moved=await h.getAttribute('style');
  await drag(page,h.locator('.explore-window-resize'),30,20);const resized=await h.getAttribute('style');expect(resized).not.toBe(moved);
- await selectPlacement(page,'floating');expect(await page.evaluate(()=>location.hash)).toBe(hash);expect(await h.evaluate(el=>el.parentElement.className)).toBe('explore-stage');const floating=await h.getAttribute('style');
- await selectPlacement(page,'canvas');expect(await h.getAttribute('style')).toBe(resized);expect(await page.evaluate(()=>location.hash)).toBe(hash);
+ await selectPlacement(page,'floating');expect(await page.evaluate(()=>location.hash)).toBe(hash);expect(await h.evaluate(el=>el.parentElement.className)).toBe('explore-stage');await expect(page.locator('.explore-canvas-selected')).toHaveCount(0);const floating=await h.getAttribute('style');
+ await selectPlacement(page,'canvas');expect(await h.getAttribute('style')).toBe(resized);expect(await page.evaluate(()=>location.hash)).toBe(hash);await expectCanvasChrome(h,false);
  await selectPlacement(page,'floating');expect(await h.getAttribute('style')).toBe(floating);
- await selectPlacement(page,'canvas');await fit(page,'reader');await h.locator('.explore-window-hide').click();await expect(h).toBeHidden();
+ await selectPlacement(page,'canvas');await fit(page,'reader');await selectCanvas(h);await h.locator('.explore-window-hide').click();await expect(h).toBeHidden();
  await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-choices label').filter({hasText:'The home'}).locator('input').check();await page.keyboard.press('Escape');await expect(h).toBeVisible();
  await page.reload();await expect(h).toHaveCSS('left','-380px');await expect(h).toHaveCSS('width','340px');
 });
 test('Workbench canvas mode and object gestures save one Undo action, preserve the other layout, and export',async({page,server,context})=>{
  const raw=fixture(false);await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);const states=[await source(page)];
- for(const action of [()=>selectPlacement(page,'canvas'),()=>drag(page,home(page).locator('.explore-window-grip'),50,30),()=>drag(page,home(page).locator('.explore-window-resize'),30,25),()=>drag(page,page.locator('[data-explore-content=prose] .explore-window-grip'),20,15),async()=>{await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Shrink controls',exact:true}).click();await page.keyboard.press('Escape');}]){
+ for(const action of [()=>selectPlacement(page,'canvas'),async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-grip'),50,30);},async()=>{await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-resize'),30,25);},async()=>{const notes=page.locator('[data-explore-content=prose]');await selectCanvas(notes);await drag(page,notes.locator('.explore-window-grip'),20,15);},async()=>{await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Shrink controls',exact:true}).click();await page.keyboard.press('Escape');}]){
   await closeTools(page);if(states.length>1)await fit(page,'workbench');await action();await expect.poll(async()=>await source(page)!==states.at(-1)).toBe(true);const next=await source(page);states.push(next);
   expect(JSON.parse(next).page.sections[0].diagram.layouts[1].exploreLayout.panels).toEqual(raw.page.sections[0].diagram.layouts[1].exploreLayout.panels);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(states.at(-2));await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(next);
@@ -85,6 +112,72 @@ test('Fit recovers a far-away canvas panel and Floating retains its normal zoom 
  await selectPlacement(page,'canvas');await fit(page,'reader');await expect(home(page)).toHaveCSS('left','9000px');
 });
 
+test('canvas selection is transient across Explore view teardown and rebuild',async({page,server})=>{
+ await open(page,server,fixture(),'reader');const panel=home(page);await expectCanvasChrome(panel,false);
+ await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();
+ for(let i=0;i<40 && !(await panel.getAttribute('aria-current'));i++)await page.keyboard.press('Tab');
+ await expect(panel).toBeFocused();await expectCanvasChrome(panel,true);await page.keyboard.press('Escape');await expectCanvasChrome(panel,false);
+ await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-canvas-selected')).toHaveCount(0);
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(home(page)).toBeVisible();await expectCanvasChrome(home(page),false);
+});
+
+test('compact canvas policies follow content, captions, long chips and themed borders',async({page,server},info)=>{
+ for(const skin of ['pastel','aurora','editorial','terminal','blueprint']){
+  const raw=fixture();raw.page.skin=skin;await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);
+  await expectCanvasChrome(home(page),false);await expectCanvasChrome(outcome(page),false);
+ }
+ const raw=fixture(),d=raw.page.sections[0].diagram,canvas=d.layouts[1].exploreLayout.canvas;
+ canvas.panels.find(p=>p.panel==='home').w=140;canvas.panels.find(p=>p.panel==='home').h=9000;
+ canvas.panels.find(p=>p.panel==='clip').h=9000;
+ const stateRect=canvas.panels.find(p=>p.panel==='outcome');stateRect.w=150;stateRect.h=9000;
+ const state=d.panels.find(p=>p.id==='outcome');state.states=Array.from({length:36},(_,i)=>'Long status '+String(i+1).padStart(2,'0'));state.initial.state=state.states[0];
+ d.steps[1].panels.home.cam={state:'detect',audio:{connection:'connected',microphone:'listening',output:'speech',text:'Please leave the package beside the blue door.',source:'Resident'}};
+ await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);await fit(page,'reader');
+ const initialHome=await compactMetrics(home(page)),initialClip=await compactMetrics(clip(page)),longState=await compactMetrics(outcome(page));
+ expect(initialHome.width).toBe(140);expect(initialHome.gap).toBeLessThanOrEqual(2);expect(initialClip.outer).toBeLessThan(280);expect(initialClip.gap).toBeLessThanOrEqual(2);expect(longState.outer).toBe(320);expect(longState.overflow).toBeGreaterThan(0);expect(longState.scrollable).toBe(true);
+ expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(.25);
+ await page.screenshot({path:'/tmp/explore-compact-before-caption.png'});await info.attach('compact home and capped long state before caption',{body:await page.screenshot(),contentType:'image/png'});
+ await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(home(page).locator('.hmaudio-captions')).toBeVisible();
+ const captioned=await compactMetrics(home(page)),activeClip=await compactMetrics(clip(page));expect(captioned.outer).toBeGreaterThan(initialHome.outer);expect(captioned.gap).toBeLessThanOrEqual(2);expect(activeClip.outer).toBe(initialClip.outer);expect(activeClip.gap).toBeLessThanOrEqual(2);
+ await page.screenshot({path:'/tmp/explore-compact-after-caption.png'});await info.attach('compact home after audio caption',{body:await page.screenshot(),contentType:'image/png'});
+ await page.getByRole('button',{name:'Previous step',exact:true}).click();await expect.poll(async()=>(await compactMetrics(home(page))).outer).toBe(initialHome.outer);
+});
+
+test('intrinsic visual canvas panels fit their rendered shapes across step updates',async({page,server},info)=>{
+ await page.setViewportSize({width:1280,height:800});await open(page,server,intrinsicFixture(),'reader');await page.evaluate(()=>document.fonts.ready);
+ const ids=['home','clip','outcome','radar','zones','reference','orbit'];await expect(page.locator('[data-explore-panel=reference] img')).toHaveJSProperty('complete',true);
+ await expect.poll(async()=>Math.max(...await Promise.all(ids.map(async id=>(await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap)))).toBeLessThanOrEqual(2);
+ for(const id of ids)expect((await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap).toBeLessThanOrEqual(2);
+ const orbitPanel=page.locator('[data-explore-panel=orbit]');expect(await orbitPanel.locator('.orbit').evaluate(el=>el.clientWidth/el.clientHeight)).toBeCloseTo(220/156,2);expect(await orbitPanel.locator('.orbit').evaluate(el=>el.clientWidth)).toBeGreaterThan(280);
+ await fit(page,'reader');await page.screenshot({path:'/tmp/explore-compact-intrinsic-mixed-1280x800.png'});await info.attach('intrinsic visual panels 1280x800',{body:await page.screenshot(),contentType:'image/png'});
+ await page.getByRole('button',{name:'Next step',exact:true}).click();for(const id of ['clip','radar','zones','reference','orbit'])expect((await compactMetrics(page.locator('[data-explore-panel='+id+']'))).gap).toBeLessThanOrEqual(2);
+});
+
+test('Workbench compact resize persists canonical geometry as one Undo action',async({page,server,context},info)=>{
+ const raw=fixture();await open(page,server,raw,'workbench');await page.evaluate(()=>document.fonts.ready);await fit(page,'workbench');
+ const initial=await source(page),initialHome=await compactMetrics(home(page));await expect(page.locator('#undo-builder')).toBeDisabled();
+ expect(JSON.parse(initial).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='home').h).toBe(300);expect(initialHome.outer).toBeLessThan(300);
+ await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-grip'),24,16);const moved=await source(page),movedHome=JSON.parse(moved).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='home');
+ expect(movedHome.h).toBe(300);expect((await compactMetrics(home(page))).outer).toBe(initialHome.outer);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await selectCanvas(home(page));await expect(home(page).locator('.explore-window-resize')).toHaveAttribute('aria-label',/visual proportions stay fixed; panel height fits content/);
+ await page.screenshot({path:'/tmp/explore-compact-old-saved-snug.png'});await info.attach('old saved home rectangle displayed snugly',{body:await page.screenshot(),contentType:'image/png'});
+ await drag(page,home(page).locator('.explore-window-resize'),0,28);const resized=await source(page),saved=JSON.parse(resized),savedHome=saved.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='home'),homeMetrics=await compactMetrics(home(page));
+ expect(resized).not.toBe(initial);expect(savedHome.w).toBeGreaterThan(340);expect(savedHome.h).toBeCloseTo(homeMetrics.outer,0);expect(homeMetrics.gap).toBeLessThanOrEqual(2);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await expect(page.locator('#undo-builder')).toBeDisabled();expect((await compactMetrics(home(page))).outer).toBe(initialHome.outer);
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);
+ const beforeState=await source(page);await selectCanvas(outcome(page));await expect(outcome(page).locator('.explore-window-resize')).toHaveAttribute('aria-label',/height fits content from its width/);await outcome(page).locator('.explore-window-resize').focus();await page.keyboard.press('ArrowDown');
+ const stateSource=await source(page),stateSaved=JSON.parse(stateSource).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='outcome'),stateMetrics=await compactMetrics(outcome(page));
+ expect(stateSource).not.toBe(beforeState);expect(stateSaved.w).toBeGreaterThan(300);expect(stateSaved.h).toBeCloseTo(stateMetrics.outer,0);expect(stateMetrics.gap).toBeLessThanOrEqual(2);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeState);
+ const beforeClip=await source(page),oldClip=JSON.parse(beforeClip).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip');expect(oldClip.h).toBe(280);expect((await compactMetrics(clip(page))).outer).toBeLessThan(oldClip.h);
+ await selectCanvas(clip(page));await expect(clip(page).locator('.explore-window-resize')).toHaveAttribute('aria-label',/visual proportions stay fixed; panel height fits content/);await drag(page,clip(page).locator('.explore-window-resize'),24,0);
+ const clipSource=await source(page),savedClip=JSON.parse(clipSource).page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels.find(p=>p.panel==='clip'),clipMetrics=await compactMetrics(clip(page));expect(savedClip.w).toBeGreaterThan(oldClip.w);expect(savedClip.h).toBeCloseTo(clipMetrics.outer,0);expect(clipMetrics.gap).toBeLessThanOrEqual(2);
+ await page.screenshot({path:'/tmp/explore-compact-screen-after-resize.png'});await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeClip);
+ const reader=await context.newPage();await reader.goto(await build(server,saved,'compact-canonical-reload'));expect(await home(reader).evaluate(el=>parseFloat(getComputedStyle(el).width))).toBeCloseTo(savedHome.w,1);expect((await compactMetrics(home(reader))).outer).toBeCloseTo(savedHome.h,0);await reader.close();
+ await page.screenshot({path:'/tmp/explore-compact-after-resize.png'});await info.attach('explicit proportional home resize',{body:await page.screenshot(),contentType:'image/png'});
+});
+
 test('canvas widget buttons, keyboard handles, step content and visibility retain their interactions',async({page,server})=>{
  const raw=mixedFixture(),d=raw.page.sections[0].diagram,app=structuredClone(JSON.parse(await readFile(path.join(repo,'src/starters/device-app-sources.json'),'utf8')).page.sections[0].diagram.panels[0]);
  app.id='app';app.sources=[{id:'telemetry',label:'Device telemetry',node:'camera'}];app.fields.forEach(f=>f.source='telemetry');app.showSources=true;
@@ -92,8 +185,8 @@ test('canvas widget buttons, keyboard handles, step content and visibility retai
  d.steps[1].panels.app={battery:{value:42,status:'ready'}};d.steps[1].panelVisibility={outcome:false};
  await open(page,server,raw,'reader');await fit(page,'reader');const widget=page.locator('[data-explore-panel=app]'),button=widget.locator('[data-da-field=battery]');
  const target=await button.boundingBox();await board(page).dispatchEvent('wheel',{clientX:target.x+target.width/2,clientY:target.y+target.height/2,deltaY:-100,ctrlKey:true,bubbles:true,cancelable:true});
- const before=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));await button.click();await expect(page.locator('.boardcanvas>svg [data-dv-node=camera]')).toHaveClass(/da-node-focus/);expect(await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(before);
- await fit(page,'reader');const h=home(page),r=await h.boundingBox();await h.locator('.explore-window-grip').focus();await page.keyboard.press('ArrowRight');const moved=await h.boundingBox();expect(moved.x-r.x).toBeCloseTo(8,0);
+ const before=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));await button.click();await expect(page.locator('.boardcanvas>svg [data-dv-node=camera]')).toHaveClass(/da-node-focus/);expect(await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(before);await expect(widget).toHaveAttribute('aria-current','true');
+ await fit(page,'reader');const h=home(page),r=await h.boundingBox();await selectCanvas(h);await h.locator('.explore-window-grip').focus();await page.keyboard.press('ArrowRight');const moved=await h.boundingBox();expect(moved.x-r.x).toBeCloseTo(8,0);
  await h.locator('.explore-window-resize').focus();await page.keyboard.press('ArrowDown');expect((await h.boundingBox()).height-moved.height).toBeCloseTo(8,0);
  await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(widget.locator('[data-da-field=battery] .da-value')).toHaveText('42%');await expect(page.locator('[data-explore-panel=outcome]')).toBeHidden();
  await page.getByRole('button',{name:'Previous step',exact:true}).click();await expect(page.locator('[data-explore-panel=outcome]')).toBeVisible();
@@ -125,7 +218,6 @@ function mixedFixture(){
  layout.overlayScale=.8;layout.canvas.controlsScale=.6;
  return raw;
 }
-const clip=page=>page.locator('[data-explore-panel=clip]');
 async function panelPlacement(page,label,value){
  const menu=page.locator('.explore-panel-menu');if(!await menu.evaluate(el=>el.open))await menu.locator('summary').click();
  await page.getByLabel('Placement for '+label,{exact:true}).selectOption(value);await page.keyboard.press('Escape');
@@ -134,7 +226,17 @@ function overlaps(a,b){return a.x<b.x+b.width-1 && a.x+a.width>b.x+1 && a.y<b.y+
 for(const host of ['reader','workbench','backstage','inline'])test(host+': mixed panel placement keeps floating windows anchored and fits around them',async({page,server},info)=>{
  for(const [width,height] of [[1280,800],[1440,900],[1920,1200]]){
   await page.setViewportSize({width,height});await open(page,server,mixedFixture(),host);await page.evaluate(()=>document.fonts.ready);await fit(page,host);
+  expect((await compactMetrics(home(page))).gap).toBeLessThanOrEqual(2);expect((await compactMetrics(outcome(page))).gap).toBeLessThanOrEqual(2);
   expect(await clip(page).evaluate(el=>el.parentElement.className)).toBe('explore-stage');
+  const original=host==='workbench'?await source(page):null,canvasPanel=home(page),notes=page.locator('[data-explore-content=prose]');
+  await expectCanvasChrome(canvasPanel,false);await expectCanvasChrome(notes,false);
+  await expect(clip(page).locator('.explore-window-header')).toHaveCSS('display','flex');await expect(clip(page).locator('.explore-window-resize')).toHaveCSS('display','block');
+  const panelRect=await canvasPanel.boundingBox();await page.mouse.click(panelRect.x+4,panelRect.y+4);await expectCanvasChrome(canvasPanel,true);
+  await info.attach(host+' selected canvas chrome '+width,{body:await page.screenshot(),contentType:'image/png'});
+  const empty=await emptyCanvasPoint(page);await page.mouse.click(empty.x,empty.y);await expectCanvasChrome(canvasPanel,false);
+  await notes.focus();await expectCanvasChrome(notes,true);await expect(notes.locator('.sec-prose')).toHaveCSS('color',/./);
+  await page.mouse.click(empty.x,empty.y);await expectCanvasChrome(notes,false);
+  if(host==='workbench'){await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();}
   const floating=await clip(page).boundingBox(),player=await page.locator('.explore-player').boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
   expect(floating.width).toBeCloseTo(stage.width*.22*.8,0);
   for(const loc of [page.locator('.boardcanvas>svg'),...await page.locator('.explore-canvas-objects .explore-window:visible').all()]){
@@ -153,7 +255,7 @@ for(const host of ['reader','workbench','backstage','inline'])test(host+': mixed
 
 test('reader per-panel toggles preserve both geometries, hidden state, notes fallback and reload isolation',async({page,server})=>{
  const raw=mixedFixture();await open(page,server,raw,'reader');await fit(page,'reader');const floatingBefore=await clip(page).boundingBox();
- await drag(page,home(page).locator('.explore-window-grip'),30,20);await drag(page,home(page).locator('.explore-window-resize'),20,15);
+ await selectCanvas(home(page));await drag(page,home(page).locator('.explore-window-grip'),30,20);await drag(page,home(page).locator('.explore-window-resize'),20,15);
  const canvasStyle=await home(page).getAttribute('style');
  await page.getByRole('button',{name:'Next step',exact:true}).click();const hash=await page.evaluate(()=>location.hash);
  await panelPlacement(page,'The home','floating');const floatStyle=await home(page).getAttribute('style');expect(await clip(page).boundingBox()).toEqual(floatingBefore);expect(await page.locator('[data-explore-content=prose]').evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
@@ -188,7 +290,7 @@ test('mixed floating default remains responsive when another panel uses independ
 test('hidden canvas objects are excluded from mixed Fit and stale invalid author source rejects placement edits',async({page,server})=>{
  const raw=mixedFixture();raw.page.sections[0].diagram.layouts[1].exploreLayout.canvas.panels[0].x=9000;
  await open(page,server,raw,'workbench');await fit(page,'workbench');const far=(await graphPoint(page,{x:0,y:0})).scale;
- await home(page).locator('.explore-window-hide').click();await fit(page,'workbench');expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(far*2);
+ await selectCanvas(home(page));await home(page).locator('.explore-window-hide').click();await fit(page,'workbench');expect((await graphPoint(page,{x:0,y:0})).scale).toBeGreaterThan(far*2);
  const invalid=(await source(page))+'!';await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},invalid);
  await panelPlacement(page,'The home','floating');await expect(page.locator('#src')).toHaveValue(invalid);expect(await home(page).evaluate(el=>el.parentElement.className)).toBe('explore-canvas-objects');
  await page.locator('.explore-panel-menu summary').click();await expect(page.getByLabel('Placement for The home',{exact:true})).toHaveValue('canvas');

@@ -37,6 +37,10 @@ Choose a chapter to jump within the guide. **Close** or Escape returns to your
 previous work. Reading does not change the spec, selection, undo history, or
 welcome navigation. Browser Find and normal text copying remain available.
 
+Workbench Explore supports Alt/Option-drag marquee selection of nodes and
+on-canvas panels, plus a shared right-click action menu. The Nodes & connections
+chapter explains mixed selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap distribution, Fit selection, Free placement, and Undo.
+
 ## Maintaining the guide
 
 The single content source is `src/workbench/human-guide.html`; its small dialog

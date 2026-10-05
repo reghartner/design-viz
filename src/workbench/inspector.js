@@ -2,12 +2,12 @@
    read models remain shared leaves; source/history publication belongs to session. */
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
-  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null;
+  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
-  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -2237,7 +2237,7 @@ function renderMultiInspector(multiSel){
     function applyBulkField(key,value){return applyPlan(planBulkSetField(session.text(),multiSel,key,value));}
     if (!guide || multiSel.length < 2) return;
     var previous=beginForm(multiIdentity(multiSel));
-    var homogeneous=multiSel.every(function(t){return t.kind===multiSel[0].kind;}),kind=homogeneous?multiSel[0].kind:'topology item';
+    var homogeneous=multiSel.every(function(t){return t.kind===multiSel[0].kind;}),kind=homogeneous?multiSel[0].kind:multiSel.every(function(t){return t.kind==='node' || t.kind==='panel';})?'object':'topology item';
     var head = document.createElement('b');
     head.textContent = multiSel.length + ' ' + kind + 's selected';
     guide.appendChild(head);
@@ -2248,8 +2248,9 @@ function renderMultiInspector(multiSel){
     var err = document.createElement('div');
     err.className = 'gerr ierr'; err.hidden = true;
     guide.appendChild(err);
+    if(opts.spatialActions)opts.spatialActions(guide,formLife);
     var exportForm=multiSel.every(function(t){return t.kind==='node' || t.kind==='edge';})?topologyExportForm(multiSel):null;
-    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);finishForm(previous);return;}
+    if(!homogeneous){if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}finishForm(previous);return;}
     var form = document.createElement('div');
     form.className = 'iform';
     /* every control writes the SAME value to every selected element;
@@ -2305,6 +2306,7 @@ function renderMultiInspector(multiSel){
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
     }
     if (kind === 'node'){
+      var alignmentButtons=[],alignmentHelp=document.createElement('p');alignmentHelp.className='fnote';alignmentHelp.setAttribute('role','status');
       ['horizontal','vertical'].forEach(function(direction){
         var button=actionButton('Align '+direction,function(){
           var snapshot=parseEditor();
@@ -2315,8 +2317,14 @@ function renderMultiInspector(multiSel){
           return applyPlan(planTransformFloats(snapshot.text,snapshot.raw,multiSel,{type:direction}),null,snapshot);
         });
         button.title='Set the same '+(direction==='horizontal'?'Y':'X')+' center as the first selected float';
-        acts.appendChild(button);
+        alignmentButtons.push({button:button,title:button.title});acts.appendChild(button);
       });
+      invalidateAlignment=function(){
+        var snap=parseEditor(),reason=snap.error || (snap.renderedText!=null && snap.renderedText!==snap.text?'The JSON changed since the preview. Render it before aligning nodes.':builderSelectedFloats(snap.text,snap.raw,multiSel).error);
+        alignmentButtons.forEach(function(item){item.button.disabled=!!reason;item.button.title=reason || item.title;});
+        alignmentHelp.textContent=reason || '';alignmentHelp.hidden=!reason;
+      };
+      invalidateAlignment();acts.appendChild(alignmentHelp);
       acts.appendChild(actionButton('Create domain from selected nodes',function(){
         if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
           formError('Choose nodes from a single section to create a domain.');return;
@@ -2377,6 +2385,7 @@ function renderInspector(){
     head.textContent = g.title;
     guide.appendChild(head);
 
+    if(opts.spatialActions)opts.spatialActions(guide,formLife);
     var parsed = parseEditor();
     var path = parsed.error ? null : builderTargetPath(parsed.raw, t);
     var loc = path ? jsonLocate(session.text(), path) : null;
@@ -2626,7 +2635,7 @@ function renderInspector(){
 
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
-    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();if(invalidateAlignment)invalidateAlignment();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},

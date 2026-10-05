@@ -26,12 +26,13 @@ function createBuilderInteractions(opts){
       session.target={section:section,kind:'edge',index:index};rehighlight();renderInspector();
     }});
   life.own(function(){curveEditor.destroy();});
+  function selectionChanged(){if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
     if (selectedEl) selectedEl.classList.add('dv-sel');
     curveEditor.refresh(selectedEl);
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
   }
 
   function updateTargetLabel(raw){
@@ -63,6 +64,7 @@ function createBuilderInteractions(opts){
     if (t.kind === 'tab') return document.getElementById('tab-' + t.block + '-' + t.tab);
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!secEl) return null;
+    if(t.kind==='panel' && t.id){var panel=Array.from(secEl.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.getAttribute('data-explore-panel')===t.id;});if(panel)return panel;}
     if (t.kind === 'section') return secEl;
     if (t.kind === 'prose') return secEl.querySelector('[data-explore-content="prose"]') || secEl.querySelector('.sec-prose');
     if (t.kind === 'step-controls') return secEl.querySelector('.explore-player[data-explore-layout="' + cssQuote(t.layoutId) + '"]');
@@ -170,7 +172,7 @@ function createBuilderInteractions(opts){
       return [clipboardHomeTarget.target];
     return session.target ? [session.target] : [];
   }
-  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};if(opts.selectionChanged)opts.selectionChanged();}
+  function homeClipboardSelect(target){clipboardHomeTarget={text:session.text(),target:target};selectionChanged();}
   function clipboardDestination(targets){
     var selected=targets && targets[0] || clipboardSelection()[0];
     return {section:selected ? selected.section : session.insertSection,index:selected && ['panel','home'].indexOf(selected.kind)>=0 ? selected.index : undefined};
@@ -197,19 +199,19 @@ function createBuilderInteractions(opts){
 
   /* ================= multi-select (shift/ctrl/cmd-click) ================= */
   var multiSel = [];
-  function compatibleKinds(a,b){return a===b || (['node','edge'].indexOf(a)>=0 && ['node','edge'].indexOf(b)>=0);}
+  function compatibleKinds(a,b){return (['node','panel'].indexOf(a)>=0 && ['node','panel'].indexOf(b)>=0) || a===b || (['node','edge'].indexOf(a)>=0 && ['node','edge'].indexOf(b)>=0);}
   function selectionEdgeKey(t){
     if(t.kind!=='edge')return undefined;
     var snap=parseEditor();if(snap.error || (snap.renderedText!=null && snap.renderedText!==snap.text))return undefined;
     try{var raw=session.resolve(snap.raw),rec=specSectionPaths(raw)[t.section],d=rec && specValueAt(raw,rec.diagram),edge=d && (d.edges || [])[t.index];return edge && builderEdgeKey(edge);}catch(ex){return undefined;}
   }
   function multiIdent(t){
-    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + (t.kind === 'node' ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
+    return t.section + '|' + t.kind + '|' + (t.card==null?'legacy':t.card) + '|' + ((t.kind === 'node' || t.kind==='panel' && t.id) ? t.id : t.kind==='bullet' ? (builderBulletIndices(t) || []).join('.') : t.index);
   }
   function clearMultiSelect(){
     multiSel.forEach(function(t){ if (t.el && t.el.classList) t.el.classList.remove('dv-sel'); });
     multiSel = [];
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
   }
   function dropMultiUI(){
     if (guide) guide.hidden = true;
@@ -285,7 +287,7 @@ function createBuilderInteractions(opts){
                     index: only.index, card:only.card, bulletPath:only.bulletPath, el: only.el}, false, true);
       return;
     }
-    if(opts.selectionChanged)opts.selectionChanged();
+    selectionChanged();
     renderMultiInspector();
   }
   function bulkDeleteSelected(){
@@ -296,6 +298,21 @@ function createBuilderInteractions(opts){
       inspectorMessage(n + ' ' + kind + (n > 1 ? 's' : '') + ' deleted — undo restores them');
     }
   }
+
+  function selectSpatial(targets){
+    if(targets.length)pausePreview();
+    clearMultiSelect();setSelected(null);session.target=null;
+    if(!targets.length){dropMultiUI();return;}
+    if(targets.length===1){selectTarget(targets[0],false,true);return;}
+    multiSel=targets;multiSel.forEach(function(t){t.el.classList.add('dv-sel');});
+    session.insertSection=targets[0].section;selectionChanged();renderMultiInspector();
+  }
+  var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
+    targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
+    select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
+    inspect:function(){if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});if(multiSel.length)renderMultiInspector();else renderInspector();}
+  });
+  life.own(function(){spatial.destroy();});
 
   /* ================= selection ================= */
 
@@ -350,6 +367,8 @@ function createBuilderInteractions(opts){
         layoutId:controlsPlayer.getAttribute('data-explore-layout'),el:controlsPlayer
       };
     }
+    var spatialPanel=ev.target.closest('.explore-canvas-objects [data-explore-panel]');
+    if(spatialPanel && (!ev.target.closest('a,button,summary,[role="button"],input,select,textarea,[contenteditable]') || ev.target.closest('.explore-window-grip,.explore-window-resize'))){var panelTarget=spatial.target(spatialPanel);if(panelTarget)return panelTarget;}
     if (ev.target.closest('a, button, summary, [role="button"], input, select, textarea')) return null;
     /* In Explore, the caption is part of the authorable controls surface.
        Standard view keeps the legacy shortcut to the current step. */
@@ -902,6 +921,7 @@ function createBuilderInteractions(opts){
   }
   function applyRowGrabs(){
     opts.refreshLayout();
+    spatial.refresh();
     applyPanelEditorControls();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
@@ -1454,6 +1474,7 @@ function createBuilderInteractions(opts){
 
 
   function cancelGestures(){
+    if(spatial)spatial.clear();
     curveEditor.cancel();
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();
     if(drag){drag.lbl.removeAttribute('transform');drag=null;}
@@ -1503,6 +1524,7 @@ function createBuilderInteractions(opts){
     clearHome:life.guard(function(){clipboardHomeTarget=null;}),
     adding:function(){return life.alive()?addToStep:null;},connecting:function(){return life.alive()?connect:null;},
     selection:function(){return life.alive()?multiSel:[];},
+    spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
     busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),

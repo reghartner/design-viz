@@ -27,7 +27,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
-  var moved=[], windows=[], gesture=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0;
+  var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
   var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
@@ -116,12 +116,29 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return override?override.placement:memory.layout.panelPlacement || 'floating';
   }
   function canvasWindow(w){return w!==playerWindow && windowPlacement(w)==='canvas';}
+  function canvasSizing(w){return canvasWindow(w) && !w.prose?w.canvasSizing:null;}
   function onCanvas(){return windows.some(canvasWindow);}
   function hasFloating(){return windows.some(function(w){return !canvasWindow(w);});}
+  function canvasWindowLabel(w,selected){return selected?w.label+' canvas panel, selected':'Select '+w.label+' canvas panel';}
+  function syncCanvasWindow(w){
+    var mode=canvasWindow(w),selected=mode && selectedCanvasWindow===w,sizing=mode && w.canvasSizing;
+    w.el.classList.toggle('explore-canvas-selected',selected);
+    if(mode){w.el.tabIndex=0;w.el.setAttribute('aria-label',canvasWindowLabel(w,selected));}
+    else{w.el.removeAttribute('tabindex');w.el.setAttribute('aria-label',w.label);}
+    w.resize.title=sizing && sizing.mode==='fixed-aspect'?'Drag vertically or horizontally; visual proportions stay fixed and panel height fits content':sizing?'Drag vertically or horizontally; height fits content from its width':'Drag to resize; arrow keys to resize';
+    if(selected)w.el.setAttribute('aria-current','true');else w.el.removeAttribute('aria-current');
+  }
+  function selectCanvasWindow(w){
+    if(w && (!active || !canvasWindow(w) || !visible(w)))w=null;
+    if(selectedCanvasWindow===w)return;
+    var previous=selectedCanvasWindow;selectedCanvasWindow=w;
+    if(previous)syncCanvasWindow(previous);
+    if(w){syncCanvasWindow(w);raise(w);}
+  }
   // Dormant canvas controls sizing must never resize floating panel content.
   function windowScale(w){return w===playerWindow?overlayScale():floatingOverlayScale();}
   function zoomFloor(){
-    if(!onCanvas())return .15;
+    if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
     var extent=canvasExtent();return Math.min(.15,200/Math.max(1,extent.w),200/Math.max(1,extent.h),fitFloor===null?4:fitFloor);
   }
   function graphScale(){return graphPixels/graphWidth() || 1;}
@@ -140,12 +157,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var canvas=memory.canvasPanels && memory.canvasPanels[w.prose?'prose':'panel:'+w.panel.id];if(canvas)canvas.hidden=value;
   }
   function mountWindows(){
+    selectCanvasWindow(null);
+    if(contentObserver)contentObserver.disconnect();
     windows.forEach(function(w,index){
       var mode=canvasWindow(w);
       w.state=mode?canvasState(w,index):(w.prose?memory.prose:memory.panels[w.panel.id]);
       if(!mode){var saved=savedWindowRect(w);if(saved && saved.w)Object.assign(w.state,absolute(saved));}
       (mode?objectLayer:stage).appendChild(w.el);
       if(w.placement)w.placement.value=mode?'canvas':'floating';
+      syncCanvasWindow(w);
+      if(contentObserver && mode && w.canvasSizing)contentObserver.observe(w.card);
     });
     var mode=onCanvas(),controlsOnly=mode && !hasFloating();
     placement.value=memory.layout.panelPlacement || 'floating';placementLabel.hidden=false;stack.hidden=!hasFloating();
@@ -157,7 +178,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function changePlacement(value,w){
     if(!active || retired || (w?windowPlacement(w):memory.layout.panelPlacement || 'floating')===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false){mountWindows();return;}
-    var firstCanvas=value==='canvas' && !onCanvas();
+    selectCanvasWindow(null);var firstCanvas=value==='canvas' && !onCanvas();
     if(w){
       var placements=memory.layout.panelPlacements || (memory.layout.panelPlacements=[]),index=placements.findIndex(function(p){return p.panel===w.panel.id;}),entry={panel:w.panel.id,placement:value};
       if(index<0)placements.push(entry);else placements[index]=entry;
@@ -300,7 +321,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
     w.el.classList.toggle('explore-stacked',w.state.stacked);
-    w.resize.setAttribute('aria-label','Resize '+w.label+'; use arrow keys');
+    var sizing=canvasSizing(w),instruction=sizing && sizing.mode==='fixed-aspect'?'; visual proportions stay fixed; panel height fits content':sizing?'; height fits content from its width':'';
+    w.resize.setAttribute('aria-label','Resize '+w.label+instruction+'; use arrow keys');
+  }
+  function fittedCanvasRect(w,r){
+    var sizing=canvasSizing(w);if(!sizing)return r;
+    // Probe at the authored width. Fitted cards opt out of the usual 100%
+    // minimum height, so scrollHeight is intrinsic rendered content rather
+    // than the stale saved rectangle.
+    apply(w,r);
+    var height=Math.ceil(w.card.scrollHeight);
+    if(!Number.isFinite(height) || height<=0)return r;
+    return {x:r.x,y:r.y,w:r.w,h:clamp(height,72,Number.isFinite(sizing.maxHeight)?Math.max(72,sizing.maxHeight):10000)};
   }
   function sizeAutomaticWindow(w){
     if(!w.state.automatic)return;
@@ -321,6 +353,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function paint(){
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
+    if(selectedCanvasWindow && (!canvasWindow(selectedCanvasWindow) || !visible(selectedCanvasWindow)))selectCanvasWindow(null);
     var contentScale=overlayScale();stage.style.setProperty('--explore-overlay-scale',String(contentScale));
     var textPosition=memory.layout.steps && memory.layout.steps.textPosition || 'below';
     player.setAttribute('data-step-text-position',textPosition);
@@ -338,7 +371,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
     windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:floatingOverlayScale()));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
-    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8;
+    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
@@ -355,7 +388,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var can=available(w),shown=visible(w);w.el.hidden=!shown;w.check.disabled=!can;w.check.checked=shown;
       w.note.textContent=w.authoredHidden?'Hidden in this view':!can?'Hidden at this step':'';
       if(!shown)return;
-      var scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
+      var previous=w.rect,scaled=scaledRect(w,w.state),r=w.state.stacked?stackRects.get(w):constrain(w,scaled);
+      if(canvasWindow(w))r=fittedCanvasRect(w,r);
+      if(canvasWindow(w) && previous && ['x','y','w','h'].some(function(key){return Math.abs(previous[key]-r[key])>.01;}))canvasGeometryChanged=true;
       apply(w,r);
     });
     var chips=bar && bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
@@ -375,6 +410,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
     if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
+    else if(canvasGeometryChanged && graphPixels && !gesture)sizeGraph(true);
   }
   function graphWidth(){var svg=board.querySelector('.boardcanvas>svg');return svg && svg.viewBox && svg.viewBox.baseVal.width || 1180;}
   function sizeGraph(preserve){
@@ -436,9 +472,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var dx=(ev.clientX-g.startX)/(scale || 1),dy=(ev.clientY-g.startY)/(scale || 1);g.changed=g.changed || Math.abs(dx)+Math.abs(dy)>2;
     if(g.kind==='pan'){board.scrollLeft=g.left-dx;board.scrollTop=g.top-dy;return;}
     if(canvasWindow(g.w)){dx/=graphScale();dy/=graphScale();}
-    if(g.kind==='move')Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true),{stacked:false});
-    else Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}),true));
+    var sizing=canvasSizing(g.w);
+    if(g.kind==='move'){
+      var moved=scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true);if(sizing)moved.h=g.before.h;
+      Object.assign(g.w.state,moved,{stacked:false});
+    }
+    else if(sizing && sizing.resizeAxis==='width'){
+      var vertical=dy*(Number.isFinite(sizing.aspect) && sizing.aspect>0?sizing.aspect:1),delta=Math.abs(dx)>=Math.abs(vertical)?dx:vertical;
+      Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+delta,h:g.rect.h}),true));
+    }else Object.assign(g.w.state,scaledRect(g.w,constrain(g.w,{x:g.rect.x,y:g.rect.y,w:g.rect.w+(g.before.stacked?-dx:dx),h:g.rect.h+dy}),true));
     paint();
+    if(g.kind==='resize' && sizing)g.w.state.h=g.w.rect.h;
   }
   function keyboard(ev,w,kind){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
@@ -448,9 +492,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(w===playerWindow)memory.controls=w.state=scaledRect(w,w.rect,true);
     else w.state.automatic=false;
     var n=(ev.shiftKey?24:8)/(canvasWindow(w)?graphScale():1);
-    if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
-    else Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true),{stacked:false});
+    var sizing=canvasSizing(w);
+    if(kind==='resize' && sizing && sizing.resizeAxis==='width'){
+      var delta=(dir[0] || dir[1]*(Number.isFinite(sizing.aspect) && sizing.aspect>0?sizing.aspect:1))*n;
+      Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+delta,h:r.h}),true));
+    }else if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
+    else{
+      var moved=scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true);if(sizing)moved.h=before.h;
+      Object.assign(w.state,moved,{stacked:false});
+    }
     paint();
+    if(kind==='resize' && sizing)w.state.h=w.rect.h;
     if(['x','y','w','h'].every(function(key){return Math.abs(w.rect[key]-r[key])<.01;})){
       Object.assign(w.state,before);if(automatic)memory.controls=null;paint();return;
     }
@@ -468,12 +520,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     el.setAttribute(notes?'data-explore-content':'data-explore-panel',notes?'prose':panel.id);el.setAttribute('aria-label',label);
     var header=document.createElement('div');header.className='explore-window-header';el.appendChild(header);
     var grip=button(label,function(){},header,'explore-window-grip');grip.title='Drag to move; arrow keys to move';grip.setAttribute('aria-label','Move '+label+'; use arrow keys');
-    var hide=button('×',function(){setWindowHidden(w,true);paint();summary.focus();},header,'explore-window-hide');hide.setAttribute('aria-label','Hide '+label);
+    var hide=button('×',function(){selectCanvasWindow(null);setWindowHidden(w,true);paint();summary.focus();},header,'explore-window-hide');hide.setAttribute('aria-label','Hide '+label);
     var body=document.createElement('div');body.className='explore-window-body';el.appendChild(body);move(card,body);
+    var sizing=!notes && panelCapability(panel.type,'canvasSizing',null);
     var resize=button('◢',function(){},el,'explore-window-resize');resize.title='Drag to resize; arrow keys to resize';stage.appendChild(el);
     var choice=document.createElement('label'),check=document.createElement('input'),text=document.createElement('span'),note=document.createElement('small');
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
-    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden};
+    var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden,canvasSizing:sizing};
+    if(sizing)el.setAttribute('data-explore-canvas-sizing',sizing.mode);
     if(!notes){
       var row=document.createElement('div');row.className='explore-panel-choice';choice.replaceWith(row);row.appendChild(choice);
       var placementLabel=document.createElement('label');placementLabel.className='explore-placement';placementLabel.textContent='Placement';
@@ -485,10 +539,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     check.addEventListener('change',function(){setWindowHidden(w,!check.checked);if(check.checked)memory.focus=false;paint();});
     grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});
     grip.addEventListener('keydown',function(ev){keyboard(ev,w,'move');});resize.addEventListener('keydown',function(ev){keyboard(ev,w,'resize');});
-    el.addEventListener('pointerdown',function(){raise(w);});el.addEventListener('focusin',function(){raise(w);});
+    el.addEventListener('pointerdown',function(){if(canvasWindow(w))selectCanvasWindow(w);else raise(w);});
+    el.addEventListener('focusin',function(){if(canvasWindow(w))selectCanvasWindow(w);else raise(w);});
     windows.push(w);
   }
   var observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(gesture)finish(true);paint();}):null;
+  var contentObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(){if(active && !gesture)paint();}):null;
   if(observer)observer.observe(stage);
   // Panel renderers replace body children after step/state changes. Observe
   // those replacements and card visibility; paint only changes outer-window
@@ -536,9 +592,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Composition temporarily reparents the board through hidden grids. Keep
     // the regular camera suspended until the destination layout is mounted.
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
-    if(!active)return;clearScrollEdit();finish(true);
+    if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
     if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
-    if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();
+    if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
     objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
@@ -570,6 +626,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     else if(legendMenu.open){ev.preventDefault();ev.stopPropagation();legendMenu.open=false;legendSummary.focus();}
     else if(menu.open){ev.preventDefault();ev.stopPropagation();menu.open=false;summary.focus();}
     else if(expanded){ev.preventDefault();ev.stopPropagation();exitExpanded();}
+    else if(selectedCanvasWindow){ev.preventDefault();ev.stopPropagation();selectCanvasWindow(null);}
   }
   function scrollKey(ev){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(ev.key)>=0 && ev.target===board)scrollIntent();}
   function cancel(){finish(true);}
@@ -588,24 +645,31 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     clearScrollEdit();var token=beginEdit();if(token===false)return;
     ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
+  function clearCanvasSelection(ev){
+    if(!selectedCanvasWindow || ev.button!==0)return;
+    var r=board.getBoundingClientRect();
+    if(ev.clientX<r.left || ev.clientX>r.right || ev.clientY<r.top || ev.clientY>r.bottom)return;
+    if(!ev.target.closest('.explore-window,.explore-player,.explore-tools,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))selectCanvasWindow(null);
+  }
   shell.addEventListener('pointermove',pointerMove);shell.addEventListener('pointerup',pointerEnd);shell.addEventListener('pointercancel',pointerCancel);shell.addEventListener('lostpointercapture',captureLost);shell.addEventListener('keydown',keydown);
   window.addEventListener('pointerup',pointerEnd,true);
   board.addEventListener('wheel',wheel,{passive:false});board.addEventListener('keydown',scrollKey);
-  board.addEventListener('pointerdown',panStart);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
+  board.addEventListener('pointerdown',panStart);document.addEventListener('pointerdown',clearCanvasSelection,true);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
   function canvasExtent(){
     var svg=board.querySelector('.boardcanvas>svg'),height=svg && svg.viewBox.baseVal.height || 800;
     var x=0,y=0,right=graphWidth(),bottom=height;
-    windows.filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
+    windows.filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=w.rect || constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
-  function fitCanvas(insets){
+  function fitCanvas(insets,selection,extraObstacles){
       if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:180}:{left:24,right:windows.length?260:24,top:108,bottom:180});
       insets=Object.assign({},insets);
-      if(onCanvas())insets.right=24;
+      if(onCanvas() && !selection)insets.right=24;
       // Subtract fixed overlays into free rectangles, then choose the rectangle
       // that fits the entire graph/object extent at the largest scale.
       var regions=[{x:insets.left,y:insets.top,w:Math.max(1,board.clientWidth-insets.left-insets.right),h:Math.max(1,board.clientHeight-insets.top-insets.bottom)}];
       var obstacles=windows.filter(function(w){return !canvasWindow(w) && visible(w);}).map(function(w){return w.rect;});
+      if(extraObstacles)obstacles=obstacles.concat(extraObstacles);
       if(!player.hidden)obstacles.push(playerWindow.rect);
       obstacles.filter(Boolean).forEach(function(r){
         var next=[],o={x:r.x-16,y:r.y-16,right:r.x+r.w+16,bottom:r.y+r.h+16};
@@ -619,12 +683,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
         });
         if(next.length)regions=next;
       });
-      var fitExtent=canvasExtent();regions.sort(function(a,b){return Math.min(b.w/fitExtent.w,b.h/fitExtent.h)-Math.min(a.w/fitExtent.w,a.h/fitExtent.h);});
+      var fitExtent=selection || canvasExtent();regions.sort(function(a,b){return Math.min(b.w/fitExtent.w,b.h/fitExtent.h)-Math.min(a.w/fitExtent.w,a.h/fitExtent.h);});
       var region=regions[0],w=region.w,h=region.h;insets.left=region.x;insets.top=region.y;
-      var extent=canvasExtent();
+      var extent=selection || canvasExtent();
       // A narrow free region may need a lower floor than the usual 200px
       // canvas extent. Keep that reachable through subsequent zoom gestures.
-      fitFloor=onCanvas()?Math.max(.001,Math.min(w/extent.w,h/extent.h)):null;
+      fitFloor=(selection || onCanvas())?Math.max(.001,Math.min(w/extent.w,h/extent.h)):null;
       zoom=clamp(Math.min(w/extent.w,h/extent.h,1.5),zoomFloor(),4);sizeGraph(false);
       board.scrollLeft=marginX+(extent.x+extent.w/2)*graphScale()-(insets.left+w/2);board.scrollTop=marginY+(extent.y+extent.h/2)*graphScale()-(insets.top+h/2);
   }
@@ -654,6 +718,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
+    fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},
     restoreInitialCamera:function(force){
       if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
       sizeGraph(false);positionCamera(memory.layout.camera);return true;
@@ -713,6 +778,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

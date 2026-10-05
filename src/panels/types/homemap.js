@@ -1139,6 +1139,7 @@ PanelRegistry.extend('homemap', {
     attachControls: true,
     large: true,
     supporting: false,
+    canvasSizing: { mode: 'fixed-aspect', aspect: 320 / 216, resizeAxis: 'width' },
   },
 });
 

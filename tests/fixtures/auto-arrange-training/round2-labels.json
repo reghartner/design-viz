@@ -1,0 +1,80 @@
+{
+  "round": "agent-training-round-2-2026-10-05",
+  "recordedAt": "2026-10-05T12:33:54.754824+00:00",
+  "source": "Explicit user message in the training conversation",
+  "verbatimUserMessage": "B b a",
+  "interpretation": [
+    "1B",
+    "2B",
+    "3A"
+  ],
+  "scope": "Pairwise preferences among the displayed candidates; not a claim that selected coordinates are optimal or that any single metric caused preference.",
+  "graphs": [
+    {
+      "number": 1,
+      "graphId": "equipment-lending",
+      "choice": "B",
+      "selectedAgentVariant": "b",
+      "A": {
+        "agentVariant": "a",
+        "id": "round2-equipment-lending-a",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-equipment-lending-a.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-equipment-lending-a.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-1-a.png",
+        "sha256": "97f713c08502c275716bc45933bbff9079a99bf3ef1c69e790ab0752cf7b197f"
+      },
+      "B": {
+        "agentVariant": "b",
+        "id": "round2-equipment-lending-b",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-equipment-lending-b.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-equipment-lending-b.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-1-b.png",
+        "sha256": "e5924aa3f5716b7998e54a87cb45ec8f934c548cf4f7902ee9593044c1ff7dfb"
+      }
+    },
+    {
+      "number": 2,
+      "graphId": "signage-distribution",
+      "choice": "B",
+      "selectedAgentVariant": "a",
+      "A": {
+        "agentVariant": "b",
+        "id": "round2-signage-distribution-a",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-signage-distribution-a.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-signage-distribution-a.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-2-a.png",
+        "sha256": "7d0713f49639d22f9e2bb831ca21e7334fff594c833f81051d65b0f443736911"
+      },
+      "B": {
+        "agentVariant": "a",
+        "id": "round2-signage-distribution-b",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-signage-distribution-b.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-signage-distribution-b.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-2-b.png",
+        "sha256": "08fc747bcda1dec55a5a303ebfa756d9131a9e80405e65ab0284bb825f1c63cc"
+      }
+    },
+    {
+      "number": 3,
+      "graphId": "research-compute-federation",
+      "choice": "A",
+      "selectedAgentVariant": "a",
+      "A": {
+        "agentVariant": "a",
+        "id": "round2-research-compute-federation-a",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-research-compute-federation-a.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-research-compute-federation-a.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-3-a.png",
+        "sha256": "6cc5d801bd4b4a409602afbaf3ae714002fa87ea6388be624893043b8d164cdb"
+      },
+      "B": {
+        "agentVariant": "b",
+        "id": "round2-research-compute-federation-b",
+        "spec": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-research-compute-federation-b.spec.json",
+        "html": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/examples/auto-arrange-agent-round-2/round2-research-compute-federation-b.html",
+        "png": "/Users/chuck/flowview-bench/auto-arrange-baselines-remote-2026-10-03/round-2/graph-3-b.png",
+        "sha256": "96549f462bd9bbcc15456e786f6c2f6a3985bd00214a755788e6f6bf8911ba08"
+      }
+    }
+  ]
+}

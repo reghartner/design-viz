@@ -19,26 +19,47 @@ test('one button confirms, arranges offline, permits control and node drags, and
  await openAutoArrange(page);await expect(page.locator('#auto-arrange-dialog')).toContainText('one Undo');
  await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(before);
  await arrange(page);const arranged=await source(page);expect(arranged).not.toBe(before);
- expect((await diagram(page)).edges.every(e=>e.curveControls)).toBe(true);
+ for(const e of (await diagram(page)).edges){
+  for(const field of ['curveControls','curvePoints','fromPort','toPort','labelDx','labelDy'])expect(e[field]).toBeUndefined();
+ }
+ const naturalRoute=await edge(page).getAttribute('d');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Existing curve handles move native controls through the ordinary editor.
- const q=await edgePoint(page);await page.mouse.click(q.x,q.y);
- const handle=page.locator('[data-curve-point="0"]'),box=await handle.boundingBox();
- await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+35,box.y+box.height/2+25,{steps:10});await page.mouse.up();
- const edited=await source(page);expect(edited).not.toBe(arranged);expect((await diagram(page)).edges[0].curveControls).toBeTruthy();
+ // An automatic edge exposes one unshaped handle; dragging authors a through-point.
+ const q=await edgePoint(page,.15);await page.mouse.click(q.x,q.y);
+ const handle=page.locator('[data-curve-point="-1"]');await expect(handle).toHaveCount(1);
+ const box=await handle.boundingBox();
+ await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+15,box.y+box.height/2+75,{steps:10});await page.mouse.up();
+ await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(1);
+ const edited=await source(page);expect(edited).not.toBe(arranged);expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
+ await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Inserting on a native segment adds one cubic join, and Reset clears it.
- const initialCount=(await diagram(page)).edges[1].curveControls.length,insert=await page.locator('#docview path.edge[data-dv-edge="1"]').evaluate(e=>{const p=e.getPointAtLength(e.getTotalLength()*.5),m=e.getScreenCTM();return {x:m.a*p.x+m.c*p.y+m.e,y:m.b*p.x+m.d*p.y+m.f};});
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
+ // Drag another part of the authored curve to add one point, then Reset both forms.
+ const insert=await edgePoint(page,.8);
  await page.mouse.move(insert.x,insert.y);await page.mouse.down();await page.mouse.move(insert.x+15,insert.y-30,{steps:10});await page.mouse.up();
- expect((await diagram(page)).edges[1].curveControls.length).toBe(initialCount+3);
- await page.locator('#guide').getByRole('button',{name:'Reset curve',exact:true}).click();expect((await diagram(page)).edges[1].curveControls).toBeUndefined();
- await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Move a freely placed card; authored control geometry stays and attachments move.
- const card=page.locator('#docview g.node[data-dv-node="a"] .card'),b=await card.boundingBox(),old=(await diagram(page)).floats.find(f=>f.id==='a');
- await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+50,b.y+b.height/2+30,{steps:10});await page.mouse.up();
- const moved=await source(page);expect((await diagram(page)).floats.find(f=>f.id==='a').x).not.toBe(old.x);
- expect((await diagram(page)).edges[0].curveControls).toEqual(JSON.parse(arranged).page.blocks[0].diagram.edges[0].curveControls);
+ await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(2);
+ const twoPoints=await source(page);
+ await page.locator('#guide').getByRole('button',{name:'Reset curve',exact:true}).click();
+ expect((await diagram(page)).edges[0].curvePoints).toBeUndefined();expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
+ await expect(edge(page)).toHaveAttribute('d',naturalRoute);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(twoPoints);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
+ // Move Source below Service: the natural attachment changes from right to top.
+ const node=page.locator('#docview g.node[data-dv-node="a"]'),card=node.locator('.card');await node.hover();
+ const b=await card.boundingBox(),placed=(await diagram(page)).floats,old=placed.find(f=>f.id==='a'),destination=placed.find(f=>f.id==='b');
+ const scale=await card.evaluate(el=>{const m=el.getScreenCTM();return {x:m.a,y:m.d};});
+ const initialStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
+ expect(initialStart.x).toBeCloseTo(old.x+75,3);expect(initialStart.y).toBeCloseTo(old.y,3);
+ await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
+ await page.mouse.move(b.x+b.width/2+(destination.x-old.x)*scale.x,b.y+b.height/2+(destination.y+170-old.y)*scale.y,{steps:12});await page.mouse.up();
+ const moved=await source(page),movedDiagram=await diagram(page),position=movedDiagram.floats.find(f=>f.id==='a');
+ expect(position.y).toBeGreaterThan(destination.y+100);
+ for(const field of ['curveControls','curvePoints','fromPort','toPort'])expect(movedDiagram.edges[0][field]).toBeUndefined();
+ const movedStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
+ expect(movedStart.x).toBeCloseTo(position.x,3);expect(movedStart.y).toBeCloseTo(position.y-22,3);
+ await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
  const route=await edge(page).getAttribute('d');
  await page.reload();await expect(page.locator('#src')).toHaveValue(arranged);await expect(edge(page)).toHaveAttribute('d',route);
@@ -48,7 +69,35 @@ test('one button confirms, arranges offline, permits control and node drags, and
  await expect(exported.locator('text.lbl').first()).toBeVisible();expect(moved).not.toBe(arranged);
 });
 
-test('research fixture renders final native splines and retry label with no node collisions',async({page,server})=>{
+test('calculation status is prominent before a held worker completes and clears on success or cancel',async({page,server})=>{
+ await open(page,server);const before=await source(page);
+ // Hold actual worker dispatch until the test releases it. Completion cannot
+ // race the assertions that the dialog has rendered its calculation state.
+ await page.evaluate(()=>{const Real=window.Worker;window.Worker=class extends Real{postMessage(data){window.__releaseArrange=()=>super.postMessage(data);}};});
+ await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
+ const activity=page.locator('[data-arrange-activity]');
+ await expect(activity).toBeVisible();await expect(activity).toHaveText('Calculating optimal node placement');
+ await expect(activity).toHaveAttribute('role','status');await expect(activity).toHaveAttribute('aria-live','polite');
+ await expect(activity.locator('.auto-arrange-spinner')).toBeVisible();
+ expect((await activity.boundingBox()).height).toBeGreaterThanOrEqual(112);
+ await expect(page.locator('[data-arrange-confirm]')).toBeDisabled();await expect(page.locator('[data-arrange-cancel]')).toBeEnabled();
+ await expect(page.locator('#src')).toHaveValue(before);
+ await page.setViewportSize({width:390,height:844});await expect(activity).toBeVisible();
+ const modalBox=await page.locator('#auto-arrange-dialog').boundingBox();
+ expect(modalBox.x).toBeGreaterThanOrEqual(0);expect(modalBox.x+modalBox.width).toBeLessThanOrEqual(390);
+ await expect(page.locator('[data-arrange-cancel]')).toBeInViewport();
+ await mkdir(path.join(repo,'.local'),{recursive:true});await page.screenshot({path:path.join(repo,'.local/auto-arrange-calculating-phone.png')});
+ await page.setViewportSize({width:1800,height:1200});
+ await page.evaluate(()=>window.__releaseArrange());
+ await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();await expect(activity).toBeHidden();
+ await expect(page.locator('#src')).not.toHaveValue(before);
+ const arranged=await source(page);
+ await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();await expect(activity).toBeVisible();
+ await page.locator('[data-arrange-cancel]').click();await expect(activity).toBeHidden();await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();
+ await expect(page.locator('#src')).toHaveValue(arranged);await expect(page.locator('#auto-arrange')).toBeEnabled();
+});
+
+test('research fixture renders natural and retained routes and retry label with no node collisions',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await pasteDiagram(page,JSON.stringify(grouped,null,2));await arrange(page);
  const paths=await page.locator('#docview path.edge').evaluateAll(edges=>edges.map(e=>e.getAttribute('d')));expect(paths).toHaveLength(36);
  const hits=await page.locator('#docview svg').first().evaluate(svg=>{
@@ -72,12 +121,12 @@ test('stale source and worker failure never publish geometry',async({page,server
  await page.evaluate(()=>{const Real=window.Worker;window.__RealWorker=Real;window.Worker=class extends Real{postMessage(data){setTimeout(()=>super.postMessage(data),600);}};});
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
  await page.locator('#src').evaluate(el=>{el.value+='\n';el.dispatchEvent(new Event('input',{bubbles:true}));});
- await expect(page.locator('[data-arrange-status]')).toContainText(/changed|cancelled/);await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(current+'\n');
+ await expect(page.locator('[data-arrange-activity]')).toBeHidden();await expect(page.locator('[data-arrange-status]')).toContainText(/changed|cancelled/);await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(current+'\n');
  await page.evaluate(()=>{window.Worker=window.__RealWorker;});
  await open(page,server);
  await page.evaluate(()=>{window.Worker=class{constructor(){throw Error('Unavailable');}};});
  const stable=await source(page);await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
- await expect(page.locator('[data-arrange-status]')).toContainText('unavailable');await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(stable);
+ await expect(page.locator('[data-arrange-activity]')).toBeHidden();await expect(page.locator('[data-arrange-status]')).toContainText('unavailable');await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(stable);
 });
 
 test('active-section switch and project replacement retire pending arrangements',async({page,server})=>{
@@ -87,10 +136,10 @@ test('active-section switch and project replacement retire pending arrangements'
  await page.evaluate(()=>{const Real=window.Worker;window.__RealWorker=Real;window.Worker=class extends Real{postMessage(data){setTimeout(()=>super.postMessage(data),700);}};});
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
  await page.locator('#docview').evaluate(el=>el.dispatchEvent(new CustomEvent('workbench-view-section',{detail:1})));
- await expect(page.locator('[data-arrange-status]')).toContainText(/changed|cancelled/);await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(original);
+ await expect(page.locator('[data-arrange-activity]')).toBeHidden();await expect(page.locator('[data-arrange-status]')).toContainText(/changed|cancelled/);await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(original);
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
  await page.evaluate(raw=>__editorTest.builder.loadSpec(raw),simple);
- await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();const replaced=await source(page);
+ await expect(page.locator('#auto-arrange-dialog')).not.toBeVisible();await expect(page.locator('[data-arrange-activity]')).toBeHidden();const replaced=await source(page);
  await expect(page.locator('#undo-builder')).toBeDisabled();await expect(page.locator('#auto-arrange')).toBeEnabled();
  // Teardown also cancels a running worker and disposes its temporary dialog.
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();

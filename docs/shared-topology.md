@@ -195,8 +195,8 @@ same v3 index/revision lock captured on Canon entry. It never reloads that index
 or refreshes existing providers. Browsing caches successful fetches for this
 session; only successful insertion extends persisted provider context. Undo
 removes the import but retains the frozen cache for Redo. Recovery carries that
-context and catalog; JSON downloads contain references only, while offline HTML
-exports also embed the frozen authored context. Offline, legacy v1/v2 and backend
+context and catalog; JSON downloads contain authored references, while offline HTML
+exports contain a read-only page snapshot without provider context. Offline, legacy v1/v2 and backend
 sessions without a v3 authored-source catalog show an unavailable explanation,
 without guessing network paths. Reopen Canon to use a later deployment.
 
@@ -223,11 +223,28 @@ Consumer narrative and local node-to-imported-node edges remain editable. Edit
 shared structure in the provider; drag any imported node to place its whole block.
 Opening from Canon must load/validate the entire
 closure before replacing a current draft. Recovery stores that authored closure
-as auxiliary session context. Offline HTML export embeds the authored consumer
-and frozen authored provider context, resolving only in memory on open.
+as auxiliary session context.
+
+Workbench **File → export…** writes two different artifacts from the same stamped
+source revision. The `.spec.json` retains authored imports and exports, without
+materialized hardcopy or generated provenance. The `.html` is a read-only,
+page-only snapshot: the current session resolves the consumer before export,
+then removes `topologyImports`, `topologyExports`, and `topologyProvenance` from
+every diagram in the HTML copy. Visible imported nodes and edges remain in that
+copy, but provider documents and the `flowview-topology` context block do not.
+The HTML opens offline and cannot pick up later provider changes.
+
+Local export-only providers need no Canon context to export. Imported consumers
+need the valid frozen closure already loaded in Workbench from the repository/
+Canon source; export never discovers or fetches providers. Missing or broken
+references stop export before either file is written. Keep the authored JSON
+for editing and reopen Canon to obtain a later approved provider revision.
+Maintained Canon/reference-backed diagrams use complete Canon validation and
+Workbench. Reserve `tools/page_build.py` for explicitly requested standalone
+workflows with ordinary local specs; it does not resolve authored topology.
 
 The earlier generated-snapshot/copy-changes-back workflow is superseded: **do not
-edit or download a flattened snapshot**. Review and commit the authored consumer
+edit or publish a flattened snapshot as source**. Review and commit the authored consumer
 directly, preserving `topologyImports`. Provider changes require a rebuild and
 explicit reload/reopen; an already-open consumer never updates automatically.
 

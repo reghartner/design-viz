@@ -1313,6 +1313,7 @@ function initWorkbenchBuilder(opts){
   var handoffRequests=new Set();life.own(function(){handoffRequests.forEach(function(request){request.abort();});});
   async function handoffHtml(source){
     var findings=session.validate(JSON.parse(source));if(findings.errors.length)throw Error('Repair the story before preparing a viewable handoff: '+findings.errors.join('\n'));
+    var snapshot=prepareExportSnapshot(source.replace(/</g,'\\u003c'),session.resolve);if(snapshot.error)throw Error(snapshot.error);
     var request=new AbortController();handoffRequests.add(request);
     try{
       var paths=['../template/flowview.html','template/flowview.html','flowview.html'];
@@ -1321,7 +1322,7 @@ function initWorkbenchBuilder(opts){
         try{
           var response=await fetch(paths[i],{cache:'no-store',signal:request.signal});if(!response.ok)continue;
           var template=await response.text();if(exportTemplateOpeners(template)!==1)continue;
-          var built=buildExportHtml(template,source.replace(/</g,'\\u003c'),session.topologyContext());if(built.error)throw Error(built.error);return built.html;
+          var built=buildExportHtml(template,snapshot.text);if(built.error)throw Error(built.error);return built.html;
         }catch(error){if(request.signal.aborted)throw error;}
       }
       throw Error('The viewer template is unavailable. Open the hosted workbench, or serve it alongside template/flowview.html, then prepare review again.');

@@ -112,7 +112,31 @@ function exportTemplateOpeners(templateText){
   return (templateText.match(openRe) || []).length;
 }
 
-function buildExportHtml(templateText, specText,topologyContext){
+function prepareExportSnapshot(specText, resolve){
+  // Preserve the authored download; only the HTML copy is resolved/stripped.
+  // Run synchronously at the click so source and frozen providers cannot drift
+  // while the directory picker or template request is pending.
+  if (/<\/script/i.test(specText))
+    return {error: 'the spec contains a literal "</scr' + 'ipt" — escape it as "<\\/scr' + 'ipt" first'};
+  try {
+    var source=JSON.parse(specText), resolved=resolve(source);
+    var snapshot=JSON.parse(JSON.stringify(resolved)), changed=JSON.stringify(snapshot)!==JSON.stringify(source);
+    var diagrams=FlowCanon.sections(snapshot).map(function(section){return section.diagram;});
+    if(snapshot && snapshot.nodes && snapshot.rows && !snapshot.page && !snapshot.blocks && !snapshot.sections)diagrams.push(snapshot);
+    diagrams.forEach(function(diagram){
+      ['topologyImports','topologyExports','topologyProvenance'].forEach(function(key){
+        if(Object.prototype.hasOwnProperty.call(diagram,key)){delete diagram[key];changed=true;}
+      });
+    });
+    // Provider values can contain HTML closing tags even when the consumer's
+    // source is safe. Escaping every '<' keeps the snapshot inert JSON.
+    return {text:changed?JSON.stringify(snapshot,null,2).replace(/</g,'\\u003c'):specText};
+  } catch(ex){
+    return {error:'could not prepare the HTML snapshot: '+ex.message};
+  }
+}
+
+function buildExportHtml(templateText, specText){
   /* the close-tag scan is case-insensitive — HTML tag names are, so
      "</SCRIPT" would break out of the JSON block just as surely */
   if (/<\/script/i.test(specText))
@@ -130,9 +154,6 @@ function buildExportHtml(templateText, specText,topologyContext){
   if (end < 0) return {error: 'the page template’s flowspec block never closes'};
   var out = templateText.slice(0, bodyFrom) + '\n' + specText.trim() +
             templateText.slice(end);
-  if(topologyContext){
-    out=out.slice(0,start)+'<scr'+'ipt type="application/json" id="flowview-topology">'+JSON.stringify(topologyContext).replace(/</g,'\\u003c')+'</scr'+'ipt>\n'+out.slice(start);
-  }
   var page = spec && spec.page ? spec.page : spec;
   var title = page && typeof page.title === 'string' ? page.title : '';
   if (title){

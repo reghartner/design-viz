@@ -11,7 +11,11 @@ and namespaced imports, keep narrative local, and validate the complete canon
 batch in memory. Publish/save authored references only; readers and Workbench
 resolve providers on open and freeze them until reload/reopen. Never write generated
 `topologyProvenance` over authored import declarations. Use the canon publisher
-for full-batch validation; standalone validation expects a resolved in-memory value.
+for full-batch validation and Workbench for preview/export. Do not run
+`page_build.py` or generic `validate.js` on maintained specs with unresolved
+topology declarations. Workbench File export keeps authored references in JSON
+and creates a separate read-only, page-only HTML snapshot from its current
+resolved session; it does not export provider context or editable hardcopy.
 Imports default to floating child blocks. Leave `position` unset so automatic
 placement or Auto arrange owns the block. Set `position: {x,y}` only when the
 user explicitly asks for fixed placement, or drag any imported node in Workbench
@@ -58,9 +62,14 @@ below: no `QUESTIONS.md`, OUT folder or build.
 Deliverables, side by side in OUT:
 - `QUESTIONS.md` (or the questions file the request names): your question
   batch, written first, before any worksheet or JSON
-- `<name>.spec.json` (stamped, built with zero errors and zero warnings)
+- `<name>.spec.json` (stamped, validated with zero errors and zero warnings)
 - `<name>.ledger.md` (coverage ledger + the filled worksheet + operator answers)
-- the built `<name>.html` and manifest (created by the builder)
+- HTML/manifest outputs only for an explicitly requested standalone-output workflow
+
+Maintained Canon/reference-backed diagrams stay in their repository diagram
+folder and use complete Canon validation/publication plus Workbench. The source
+spec and ledger are the deliverables; standalone HTML is an optional reader
+snapshot, never the next authoring source.
 
 Names used below: **SOURCE** is the document or evidence. **VIZ** is the
 checkout that contains `tools/page_build.py` (read-only for you; never edit the
@@ -72,8 +81,8 @@ before running validators or exporting pages. It creates the local viewer/workbe
 HTML and static backend. These and Backstage runtime bundles are ignored build
 outputs; commit their authored inputs only. Downloaded folder-agent kits already
 contain their static backend and need no source checkout or build. Authored spec/page outputs follow the chosen
-diagram folder workflow. `tools/page_build.py` also generates missing
-prerequisites before validating a page.
+diagram folder workflow. Reserve `tools/page_build.py` for explicitly requested
+standalone-output workflows with ordinary local specs.
 
 ## The rules that matter most
 
@@ -411,14 +420,39 @@ spec before publishing:
 `node <VIZ>/tools/compatibility.js --stamp <spec.json> > <stamped.spec.json>`
 (input and output must be different files; use the stamped file as final).
 
-## Phase 5: Build
+## Phase 5: Validate and preview
+
+For maintained Canon/reference-backed diagrams, preserve authored imports and
+exports and use the complete repository snapshot. From the repository root,
+the documented Canon publisher validates the full registered provider/consumer
+batch before writing its metadata index:
+
+```sh
+node <VIZ>/tools/canon/library.mjs --registry <project>/canon.json \
+  --out <project>/workbench/diagrams.json
+```
+
+Follow the project's existing publication authorization. For validation-only
+work, point `--out` at a temporary index outside the diagram source folders;
+do not enroll new folders or deploy without authorization. The index references
+authored JSON; no flattened specs are written. Open the published Canon entry
+in Workbench so its approved provider closure is loaded. See
+[shared topology](../../../docs/shared-topology.md) for registry examples.
+
+For an ordinary local spec, use `node <VIZ>/tools/validate.js <spec.json>` and
+open the authored file in Workbench. Generic validation intentionally rejects
+unresolved topology declarations. A local export-only provider can be opened
+and exported from Workbench without Canon context.
+
+Only when the user explicitly requests a standalone-output workflow for an
+ordinary local spec, run:
 
 ```sh
 python3 <VIZ>/tools/page_build.py <spec.json> <name> --root <OUT> \
   --desc "<one sentence>" --tags <comma,separated>
 ```
 
-Use an absolute OUT. Require **zero errors and zero warnings**; do not pass
+Use an absolute OUT for that workflow. Require **zero errors and zero warnings**; do not pass
 `--allow-warnings` without authorization. Fix defects with
 `cookbook/adjustments.md` and rebuild. A clean build proves the JSON is valid,
 not that the story is right. That is the next phase.
@@ -428,6 +462,12 @@ not that the story is right. That is the next phase.
 ## Phase 6: Self-audit against the worksheet
 
 Follow [self-audit](references/self-audit.md). In short:
+
+For reference-backed topology, use the resolved Canon/Workbench preview for
+the path/state audit below. The standalone walk script expects resolved input;
+do not feed it unresolved declarations or save a flattened spec to satisfy it.
+Record that script limitation and verify the worksheet against every resolved
+path in Workbench. Ordinary local specs use the script as shown.
 
 1. Run the walk script from this skill's `scripts/` folder:
    ```sh
@@ -461,8 +501,8 @@ Follow [self-audit](references/self-audit.md). In short:
 
 ## Phase 7: Deliver
 
-Report the spec, HTML and ledger paths; the paths and views to look at; the
-build result; which checks you ran; illustrative values; unbound services and
+Report the spec and ledger paths, and HTML only when requested; the Canon entry
+or file to open and the paths/views to inspect; the validation result; which checks you ran; illustrative values; unbound services and
 other gaps; and anything out of scope. Do not commit, publish, edit the source
 document, or enroll the page in `canon.json` without authorization. For an
 actual framework defect use [framework bugs](references/framework-bugs.md).

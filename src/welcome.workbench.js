@@ -40,8 +40,9 @@ function welcomeAgentPrompt(kind, brief, audience, repository, level){
     'Fill the skill’s storyboard worksheet before writing JSON: the story for this audience, what each panel shows, a time table that sets the story time span and each step’s time (panels take their clock and date from the step, so do not set per-panel clocks) and battery drain and charge rates from the sources, every edge each step uses, every panel on every step, and icons that follow state. Ground actors, steps, state changes, failures, and numbers in the sources. Label illustrative values and hypothetical behavior.',
     'Bind services to my Backstage catalog and attach code references with full commit SHAs. Use only identities and code I provide or you can verify, and list any gaps.',
     'Use the pastel skin and target a readable desktop experience. Keep shared events on one timeline when showing multiple perspectives.', '',
-    'Deliver a .spec.json file and a .ledger.md coverage ledger in my project. Validate with the toolkit’s tools/validate.js, build the standalone page with tools/page_build.py, run the skill’s walk script, and inspect the result as the skill directs. Keep the toolkit itself unchanged.',
-    'Tell me which .spec.json to open in Flowview Workbench. If you cannot access the skill or run a check, say so clearly rather than claiming it passed.'
+    'Deliver an authored .spec.json file and a .ledger.md coverage ledger in my project. For maintained Canon or reference-backed diagrams, follow the skill’s complete Canon validation/publication path and open the reviewed source in Workbench with its approved provider closure. Preserve authored topology references; do not run tools/page_build.py on these maintained diagrams. For ordinary local specs, validate with tools/validate.js. Run the applicable self-audit and inspect the result as the skill directs. Keep the toolkit itself unchanged.',
+    'Use tools/page_build.py only when I explicitly request a standalone-output workflow. Workbench File export can produce a read-only HTML snapshot alongside the authored JSON; the HTML is not an editable provider source.',
+    'Tell me which .spec.json or Canon entry to open in Flowview Workbench. If you cannot access the skill or run a check, say so clearly rather than claiming it passed.'
   ].join('\n');
 }
 

@@ -12,8 +12,9 @@ batch in memory. Publish/save authored references only; readers and Workbench
 resolve providers on open and freeze them until reload/reopen. Never write generated
 `topologyProvenance` over authored import declarations. Use the canon publisher
 for full-batch validation; standalone validation expects a resolved in-memory value.
-Imports default to floating child blocks. Set optional `position: {x,y}` on the
-import for a stable diagram-unit origin, or drag any imported node in Workbench
+Imports default to floating child blocks. Leave `position` unset so automatic
+placement or Auto arrange owns the block. Set `position: {x,y}` only when the
+user explicitly asks for fixed placement, or drag any imported node in Workbench
 to move the whole block. Never copy nodes to place them. Optional import `nodes`
 and `edges` arrays select provider-local identities inside the named export;
 omission imports the full corresponding set. Selected edges require both selected
@@ -178,6 +179,23 @@ prerequisites before validating a page.
     diagrams: each diagram resets to its initial state. Separate diagrams are
     fine when they are independent: an overview and its drilldown details, or
     unrelated scenarios.
+12. **Auto arrange owns new topology.** For a new diagram, author the semantic
+    graph first: nodes, groups and edges. Use `rows: [[]]` plus unpositioned
+    `floats` (`id` and `side` only), and omit manual X/Y positions and edge
+    geometry (`fromPort`, `toPort`, bends, curve points/controls and label
+    nudges). Connections route automatically until arrangement. Then run
+    `node <VIZ>/tools/auto-arrange-spec.cjs --section <zero-based-section> <input.spec.json> <different-output.spec.json>` for each new diagram in a
+    mixed page, or `--all` only when every diagram is new. It applies the same arranger as the
+    Workbench **Auto arrange** button. In a browser-capable Workbench you may
+    instead activate each new diagram and use that button. Never claim either
+    action without actually completing it. When adding a node to an existing
+    diagram, append an unpositioned
+    `{id:"<new-node-id>",side:"below",noSpread:true}` float with its semantic
+    edges. The marker keeps existing automatic floats and lane routes stable;
+    do not add coordinates or edge geometry. Tell the user they can press
+    **Auto arrange** to re-layout the whole diagram if desired. Do not re-run
+    arrangement for other existing-diagram edits. Manual placement or route
+    controls are an explicit user-directed exception.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -360,10 +378,10 @@ docs for your panels together: `python3 <VIZ>/tools/widget_doc.py <types>`.
 Start from the closest cookbook example and replace its facts with yours. The
 [routing table](references/recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
-Confluence, named views, free placement). For manually shaped arrows, use
-`edges[].curvePoints` from the authoring contract and `cookbook/adjustments.md`:
-these are smooth through-points that override automatic routing. The workbench
-can author them by dragging the arrow; check the rendered curve for collisions.
+Confluence, named views, and explicit manual-placement requests). Follow rule 12
+for node placement and connection routing. The schema's manual floats, ports,
+bends and curve fields are reference material for user-directed exceptions and
+for preserving an existing diagram; they are not ordinary authoring defaults.
 
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths
@@ -387,8 +405,8 @@ Translation is mechanical once the worksheet is done:
 - Binding rows become `nodes.<id>.binding`; code rows become `codeRefs`.
 - Captions (`text`) state the time when the time matters ("6:20 PM. ...").
 
-Keep `rows` in visual left-to-right order. Default to no lanes. Open guided
-stories paused (`view: "step"`); set `autoplay: true` only when asked. Stamp the
+Default to no lanes. Open guided stories paused (`view: "step"`); set
+`autoplay: true` only when asked. Stamp the
 spec before publishing:
 `node <VIZ>/tools/compatibility.js --stamp <spec.json> > <stamped.spec.json>`
 (input and output must be different files; use the stamped file as final).
@@ -506,8 +524,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   the conversation and progress feed, so periodic helper progress is unnecessary.
   Wait for the proposal result before completion `reply`. Copy/paste uses no
   Monitor; direct Send and the explicitly selected Beta conversation require it.
-  The bundled `authoring/` directory is VIZ; run validator and state-walk tools
-  without an OUT build. Browser access is unavailable; never claim visual QA.
+  The bundled `authoring/` directory is VIZ; run validator, state-walk and the
+  production Auto Arrange CLI there without an OUT build. Browser access is
+  unavailable; never claim visual QA or a Workbench button click.
 - **Local workbench session.** When the user supplies a local session scratch
   directory, read its `README.md` and the
   [file-session protocol](../../../docs/local-agent-session.md). Read the
@@ -518,7 +537,7 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   your notes. Submit one atomic `proposal.json` with the matching base
   revision and wait for `result.json`. Rebase rejected stale proposals on the
   latest source. Do not write OUT files or build unless the user asks.
-- **Small edits.** A small edit the user fully specified (rename, move, fix
+- **Small edits.** A small edit the user fully specified (rename, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
   the self-audit for the affected paths.

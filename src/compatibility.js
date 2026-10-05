@@ -19,6 +19,7 @@ var FlowviewCompatibility = (function(){
   var released={
     'layout.explore-controls-placement':['Independent placement of Explore step controls','0.2.0'],
     'layout.explore-panel-placement':['Independent placement of Explore panels','0.2.0'],
+    'layout.inserted-floats':['Stable placement of inserted nodes','0.2.0'],
     'layout.cubic-curves':['Editable native cubic arrow routes','0.2.0'],
     'layout.edge-curves':['Editable smooth arrow curves','0.2.0'],
     'media.camera-siren':['Independent camera alarm siren','0.2.0'],
@@ -65,6 +66,7 @@ var FlowviewCompatibility = (function(){
       }
       icons(d,false);
       if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && (f.x!=null || f.y!=null);}))used['layout.free-nodes']=true;
+      if((Array.isArray(d.floats)?d.floats:[]).some(function(f){return f && f.noSpread===true;}))used['layout.inserted-floats']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && (e.fromPort!=null || e.toPort!=null);}))used['layout.edge-ports']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && Array.isArray(e.curveControls) && e.curveControls.length;}))used['layout.cubic-curves']=true;
       if((Array.isArray(d.edges)?d.edges:[]).some(function(e){return e && Array.isArray(e.curvePoints) && e.curvePoints.length;}))used['layout.edge-curves']=true;

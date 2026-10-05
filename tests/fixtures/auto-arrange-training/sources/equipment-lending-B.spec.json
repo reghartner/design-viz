@@ -1,0 +1,305 @@
+{
+  "page": {
+    "title": "Round 2 \u00b7 1B \u00b7 Equipment lending",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "equipment-lending",
+        "heading": "01 \u00b7 Equipment lending \u00b7 18 nodes",
+        "text": "Requests from several channels become reservations and equipment handoffs. Membership checks and inventory are shared inputs; a direct inspection path and a separate loan record preserve operational shortcuts.",
+        "diagram": {
+          "title": "Equipment lending",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "lend-request-app": {
+              "title": "Request app",
+              "icon": "server"
+            },
+            "lend-desk": {
+              "title": "Desk console",
+              "icon": "server"
+            },
+            "lend-partner": {
+              "title": "Partner API",
+              "icon": "server"
+            },
+            "lend-gateway": {
+              "title": "Request gateway",
+              "icon": "server"
+            },
+            "lend-identity": {
+              "title": "Identity check",
+              "icon": "server"
+            },
+            "lend-registry": {
+              "title": "Member registry",
+              "icon": "server"
+            },
+            "lend-eligibility": {
+              "title": "Eligibility rules",
+              "icon": "server"
+            },
+            "lend-inventory": {
+              "title": "Inventory view",
+              "icon": "server"
+            },
+            "lend-availability": {
+              "title": "Availability check",
+              "icon": "server"
+            },
+            "lend-reservation": {
+              "title": "Reservation service",
+              "icon": "server"
+            },
+            "lend-record": {
+              "title": "Loan record",
+              "icon": "server"
+            },
+            "lend-pick": {
+              "title": "Pick list",
+              "icon": "server"
+            },
+            "lend-inspection": {
+              "title": "Kit inspection",
+              "icon": "server"
+            },
+            "lend-handoff": {
+              "title": "Handoff service",
+              "icon": "server"
+            },
+            "lend-locker": {
+              "title": "Locker station",
+              "icon": "server"
+            },
+            "lend-courier": {
+              "title": "Courier adapter",
+              "icon": "server"
+            },
+            "lend-receipt": {
+              "title": "Receipt collector",
+              "icon": "server"
+            },
+            "lend-audit": {
+              "title": "Audit archive",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "lend-request-app",
+              "to": "lend-gateway"
+            },
+            {
+              "from": "lend-desk",
+              "to": "lend-gateway"
+            },
+            {
+              "from": "lend-partner",
+              "to": "lend-gateway"
+            },
+            {
+              "from": "lend-gateway",
+              "to": "lend-identity"
+            },
+            {
+              "from": "lend-registry",
+              "to": "lend-identity"
+            },
+            {
+              "from": "lend-identity",
+              "to": "lend-eligibility"
+            },
+            {
+              "from": "lend-gateway",
+              "to": "lend-eligibility"
+            },
+            {
+              "from": "lend-eligibility",
+              "to": "lend-availability"
+            },
+            {
+              "from": "lend-inventory",
+              "to": "lend-availability"
+            },
+            {
+              "from": "lend-gateway",
+              "to": "lend-availability"
+            },
+            {
+              "from": "lend-availability",
+              "to": "lend-reservation"
+            },
+            {
+              "from": "lend-reservation",
+              "to": "lend-record"
+            },
+            {
+              "from": "lend-reservation",
+              "to": "lend-pick"
+            },
+            {
+              "from": "lend-pick",
+              "to": "lend-inspection"
+            },
+            {
+              "from": "lend-reservation",
+              "to": "lend-inspection"
+            },
+            {
+              "from": "lend-inspection",
+              "to": "lend-handoff"
+            },
+            {
+              "from": "lend-handoff",
+              "to": "lend-record"
+            },
+            {
+              "from": "lend-handoff",
+              "to": "lend-locker"
+            },
+            {
+              "from": "lend-handoff",
+              "to": "lend-courier"
+            },
+            {
+              "from": "lend-locker",
+              "to": "lend-receipt"
+            },
+            {
+              "from": "lend-courier",
+              "to": "lend-receipt"
+            },
+            {
+              "from": "lend-receipt",
+              "to": "lend-audit"
+            },
+            {
+              "from": "lend-record",
+              "to": "lend-audit"
+            }
+          ],
+          "floats": [
+            {
+              "id": "lend-request-app",
+              "side": "below",
+              "x": -204,
+              "y": 120
+            },
+            {
+              "id": "lend-desk",
+              "side": "below",
+              "x": 0,
+              "y": 0
+            },
+            {
+              "id": "lend-partner",
+              "side": "below",
+              "x": 204,
+              "y": 0
+            },
+            {
+              "id": "lend-gateway",
+              "side": "below",
+              "x": 0,
+              "y": 120
+            },
+            {
+              "id": "lend-identity",
+              "side": "below",
+              "x": 204,
+              "y": 120
+            },
+            {
+              "id": "lend-registry",
+              "side": "below",
+              "x": 408,
+              "y": 120
+            },
+            {
+              "id": "lend-eligibility",
+              "side": "below",
+              "x": 204,
+              "y": 240
+            },
+            {
+              "id": "lend-inventory",
+              "side": "below",
+              "x": -204,
+              "y": 240
+            },
+            {
+              "id": "lend-availability",
+              "side": "below",
+              "x": 0,
+              "y": 240
+            },
+            {
+              "id": "lend-reservation",
+              "side": "below",
+              "x": 0,
+              "y": 360
+            },
+            {
+              "id": "lend-record",
+              "side": "below",
+              "x": -204,
+              "y": 480
+            },
+            {
+              "id": "lend-pick",
+              "side": "below",
+              "x": 204,
+              "y": 360
+            },
+            {
+              "id": "lend-inspection",
+              "side": "below",
+              "x": 204,
+              "y": 480
+            },
+            {
+              "id": "lend-handoff",
+              "side": "below",
+              "x": 0,
+              "y": 480
+            },
+            {
+              "id": "lend-locker",
+              "side": "below",
+              "x": 0,
+              "y": 600
+            },
+            {
+              "id": "lend-courier",
+              "side": "below",
+              "x": 204,
+              "y": 600
+            },
+            {
+              "id": "lend-receipt",
+              "side": "below",
+              "x": 0,
+              "y": 720
+            },
+            {
+              "id": "lend-audit",
+              "side": "below",
+              "x": -204,
+              "y": 720
+            }
+          ]
+        }
+      }
+    ],
+    "canon": {
+      "version": 1,
+      "id": "round2-equipment-lending-b",
+      "kind": "design",
+      "owner": "group:default/auto-arrange-study"
+    }
+  }
+}

@@ -1,0 +1,557 @@
+{
+  "page": {
+    "title": "Round 2 \u00b7 3A \u00b7 Research compute federation",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "research-compute-federation",
+        "heading": "03 \u00b7 Research compute federation \u00b7 34 nodes",
+        "text": "Research clients and instruments submit work to three compute clusters. Every cluster reports to result, telemetry and cost indexes. Validation/replay, fleet repair, allocation accounting and a legacy batch bridge remain connected.",
+        "diagram": {
+          "title": "Research compute federation",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "compute-notebook": {
+              "title": "Notebook client",
+              "icon": "server"
+            },
+            "compute-cli": {
+              "title": "Command line client",
+              "icon": "server"
+            },
+            "compute-workflow": {
+              "title": "Workflow runner",
+              "icon": "server"
+            },
+            "compute-submission": {
+              "title": "Submission API",
+              "icon": "server"
+            },
+            "compute-identity": {
+              "title": "Identity service",
+              "icon": "server"
+            },
+            "compute-directory": {
+              "title": "Research directory",
+              "icon": "server"
+            },
+            "compute-quota": {
+              "title": "Quota checker",
+              "icon": "server"
+            },
+            "compute-planner": {
+              "title": "Job planner",
+              "icon": "server"
+            },
+            "compute-registry": {
+              "title": "Artifact registry",
+              "icon": "server"
+            },
+            "compute-staging": {
+              "title": "Input staging",
+              "icon": "server"
+            },
+            "compute-scheduler": {
+              "title": "Federation scheduler",
+              "icon": "server"
+            },
+            "compute-cpu": {
+              "title": "CPU cluster",
+              "icon": "server"
+            },
+            "compute-gpu": {
+              "title": "GPU cluster",
+              "icon": "server"
+            },
+            "compute-batch": {
+              "title": "Batch cluster",
+              "icon": "server"
+            },
+            "compute-results": {
+              "title": "Result index",
+              "icon": "server"
+            },
+            "compute-telemetry": {
+              "title": "Telemetry index",
+              "icon": "server"
+            },
+            "compute-costs": {
+              "title": "Cost index",
+              "icon": "server"
+            },
+            "compute-object": {
+              "title": "Output object store",
+              "icon": "server"
+            },
+            "compute-validator": {
+              "title": "Result validator",
+              "icon": "server"
+            },
+            "compute-quarantine": {
+              "title": "Quarantine store",
+              "icon": "server"
+            },
+            "compute-replay": {
+              "title": "Replay queue",
+              "icon": "server"
+            },
+            "compute-catalog": {
+              "title": "Dataset catalog",
+              "icon": "server"
+            },
+            "compute-download": {
+              "title": "Download API",
+              "icon": "server"
+            },
+            "compute-portal": {
+              "title": "Research portal",
+              "icon": "server"
+            },
+            "compute-archive": {
+              "title": "Cold archive",
+              "icon": "server"
+            },
+            "compute-dashboard": {
+              "title": "Operations dashboard",
+              "icon": "server"
+            },
+            "compute-alert": {
+              "title": "Alert dispatcher",
+              "icon": "server"
+            },
+            "compute-repair": {
+              "title": "Cluster repair",
+              "icon": "server"
+            },
+            "compute-budget": {
+              "title": "Budget reconciler",
+              "icon": "server"
+            },
+            "compute-allocation": {
+              "title": "Allocation ledger",
+              "icon": "server"
+            },
+            "compute-export": {
+              "title": "Sponsor export",
+              "icon": "server"
+            },
+            "compute-audit": {
+              "title": "Audit archive",
+              "icon": "server"
+            },
+            "compute-legacy": {
+              "title": "Legacy batch bridge",
+              "icon": "server"
+            },
+            "compute-instrument": {
+              "title": "Instrument gateway",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "compute-notebook",
+              "to": "compute-submission"
+            },
+            {
+              "from": "compute-cli",
+              "to": "compute-submission"
+            },
+            {
+              "from": "compute-workflow",
+              "to": "compute-submission"
+            },
+            {
+              "from": "compute-submission",
+              "to": "compute-identity"
+            },
+            {
+              "from": "compute-directory",
+              "to": "compute-identity"
+            },
+            {
+              "from": "compute-identity",
+              "to": "compute-quota"
+            },
+            {
+              "from": "compute-quota",
+              "to": "compute-planner"
+            },
+            {
+              "from": "compute-registry",
+              "to": "compute-planner"
+            },
+            {
+              "from": "compute-submission",
+              "to": "compute-staging"
+            },
+            {
+              "from": "compute-staging",
+              "to": "compute-scheduler"
+            },
+            {
+              "from": "compute-planner",
+              "to": "compute-scheduler"
+            },
+            {
+              "from": "compute-instrument",
+              "to": "compute-staging"
+            },
+            {
+              "from": "compute-instrument",
+              "to": "compute-legacy"
+            },
+            {
+              "from": "compute-legacy",
+              "to": "compute-batch"
+            },
+            {
+              "from": "compute-scheduler",
+              "to": "compute-cpu"
+            },
+            {
+              "from": "compute-scheduler",
+              "to": "compute-gpu"
+            },
+            {
+              "from": "compute-scheduler",
+              "to": "compute-batch"
+            },
+            {
+              "from": "compute-cpu",
+              "to": "compute-results"
+            },
+            {
+              "from": "compute-cpu",
+              "to": "compute-telemetry"
+            },
+            {
+              "from": "compute-cpu",
+              "to": "compute-costs"
+            },
+            {
+              "from": "compute-gpu",
+              "to": "compute-results"
+            },
+            {
+              "from": "compute-gpu",
+              "to": "compute-telemetry"
+            },
+            {
+              "from": "compute-gpu",
+              "to": "compute-costs"
+            },
+            {
+              "from": "compute-batch",
+              "to": "compute-results"
+            },
+            {
+              "from": "compute-batch",
+              "to": "compute-telemetry"
+            },
+            {
+              "from": "compute-batch",
+              "to": "compute-costs"
+            },
+            {
+              "from": "compute-results",
+              "to": "compute-object"
+            },
+            {
+              "from": "compute-object",
+              "to": "compute-validator"
+            },
+            {
+              "from": "compute-validator",
+              "to": "compute-quarantine"
+            },
+            {
+              "from": "compute-quarantine",
+              "to": "compute-replay"
+            },
+            {
+              "from": "compute-replay",
+              "to": "compute-scheduler"
+            },
+            {
+              "from": "compute-validator",
+              "to": "compute-catalog"
+            },
+            {
+              "from": "compute-catalog",
+              "to": "compute-download"
+            },
+            {
+              "from": "compute-download",
+              "to": "compute-portal"
+            },
+            {
+              "from": "compute-catalog",
+              "to": "compute-archive"
+            },
+            {
+              "from": "compute-telemetry",
+              "to": "compute-dashboard"
+            },
+            {
+              "from": "compute-dashboard",
+              "to": "compute-alert"
+            },
+            {
+              "from": "compute-alert",
+              "to": "compute-repair"
+            },
+            {
+              "from": "compute-repair",
+              "to": "compute-scheduler"
+            },
+            {
+              "from": "compute-costs",
+              "to": "compute-budget"
+            },
+            {
+              "from": "compute-budget",
+              "to": "compute-allocation"
+            },
+            {
+              "from": "compute-allocation",
+              "to": "compute-quota"
+            },
+            {
+              "from": "compute-budget",
+              "to": "compute-export"
+            },
+            {
+              "from": "compute-export",
+              "to": "compute-audit"
+            },
+            {
+              "from": "compute-archive",
+              "to": "compute-audit"
+            },
+            {
+              "from": "compute-legacy",
+              "to": "compute-results"
+            }
+          ],
+          "floats": [
+            {
+              "id": "compute-notebook",
+              "side": "below",
+              "x": 528,
+              "y": 220
+            },
+            {
+              "id": "compute-cli",
+              "side": "below",
+              "x": 732,
+              "y": 100
+            },
+            {
+              "id": "compute-workflow",
+              "side": "below",
+              "x": 936,
+              "y": 220
+            },
+            {
+              "id": "compute-submission",
+              "side": "below",
+              "x": 732,
+              "y": 220
+            },
+            {
+              "id": "compute-identity",
+              "side": "below",
+              "x": 936,
+              "y": 340
+            },
+            {
+              "id": "compute-directory",
+              "side": "below",
+              "x": 1140,
+              "y": 340
+            },
+            {
+              "id": "compute-quota",
+              "side": "below",
+              "x": 936,
+              "y": 460
+            },
+            {
+              "id": "compute-planner",
+              "side": "below",
+              "x": 732,
+              "y": 460
+            },
+            {
+              "id": "compute-registry",
+              "side": "below",
+              "x": 732,
+              "y": 340
+            },
+            {
+              "id": "compute-staging",
+              "side": "below",
+              "x": 528,
+              "y": 340
+            },
+            {
+              "id": "compute-scheduler",
+              "side": "below",
+              "x": 732,
+              "y": 580
+            },
+            {
+              "id": "compute-cpu",
+              "side": "below",
+              "x": 732,
+              "y": 700
+            },
+            {
+              "id": "compute-gpu",
+              "side": "below",
+              "x": 936,
+              "y": 700
+            },
+            {
+              "id": "compute-batch",
+              "side": "below",
+              "x": 528,
+              "y": 700
+            },
+            {
+              "id": "compute-results",
+              "side": "below",
+              "x": 324,
+              "y": 820
+            },
+            {
+              "id": "compute-telemetry",
+              "side": "below",
+              "x": 732,
+              "y": 1060
+            },
+            {
+              "id": "compute-costs",
+              "side": "below",
+              "x": 1140,
+              "y": 820
+            },
+            {
+              "id": "compute-object",
+              "side": "below",
+              "x": 324,
+              "y": 940
+            },
+            {
+              "id": "compute-validator",
+              "side": "below",
+              "x": 324,
+              "y": 1060
+            },
+            {
+              "id": "compute-quarantine",
+              "side": "below",
+              "x": 120,
+              "y": 1060
+            },
+            {
+              "id": "compute-replay",
+              "side": "below",
+              "x": -84,
+              "y": 580
+            },
+            {
+              "id": "compute-catalog",
+              "side": "below",
+              "x": 324,
+              "y": 1180
+            },
+            {
+              "id": "compute-download",
+              "side": "below",
+              "x": 528,
+              "y": 1180
+            },
+            {
+              "id": "compute-portal",
+              "side": "below",
+              "x": 732,
+              "y": 1180
+            },
+            {
+              "id": "compute-archive",
+              "side": "below",
+              "x": 324,
+              "y": 1300
+            },
+            {
+              "id": "compute-dashboard",
+              "side": "below",
+              "x": 1344,
+              "y": 1180
+            },
+            {
+              "id": "compute-alert",
+              "side": "below",
+              "x": 1548,
+              "y": 1180
+            },
+            {
+              "id": "compute-repair",
+              "side": "below",
+              "x": 1548,
+              "y": 580
+            },
+            {
+              "id": "compute-budget",
+              "side": "below",
+              "x": 1140,
+              "y": 940
+            },
+            {
+              "id": "compute-allocation",
+              "side": "below",
+              "x": 1344,
+              "y": 940
+            },
+            {
+              "id": "compute-export",
+              "side": "below",
+              "x": 1140,
+              "y": 1300
+            },
+            {
+              "id": "compute-audit",
+              "side": "below",
+              "x": 936,
+              "y": 1300
+            },
+            {
+              "id": "compute-legacy",
+              "side": "below",
+              "x": 120,
+              "y": 700
+            },
+            {
+              "id": "compute-instrument",
+              "side": "below",
+              "x": 120,
+              "y": 220
+            }
+          ]
+        }
+      }
+    ],
+    "canon": {
+      "version": 1,
+      "id": "round2-research-compute-federation-a",
+      "kind": "design",
+      "owner": "group:default/auto-arrange-study"
+    }
+  }
+}

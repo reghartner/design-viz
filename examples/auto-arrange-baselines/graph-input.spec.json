@@ -1,0 +1,835 @@
+{
+  "page": {
+    "title": "Auto arrange shape baselines",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "request-path",
+        "heading": "01 · Webhook delivery · 6 nodes",
+        "text": "A single request path, balanced into two rows of three cards. The second row reads right to left.",
+        "diagram": {
+          "title": "01 · Webhook delivery · 6 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "sender": {
+              "title": "Sender",
+              "icon": "terminal"
+            },
+            "edge": {
+              "title": "Edge API",
+              "icon": "router"
+            },
+            "verify": {
+              "title": "Verifier",
+              "icon": "shield"
+            },
+            "queue": {
+              "title": "Delivery queue",
+              "icon": "package"
+            },
+            "worker": {
+              "title": "Worker",
+              "icon": "server"
+            },
+            "partner": {
+              "title": "Partner API",
+              "icon": "cloud"
+            }
+          },
+          "rows": [
+            [
+              "sender",
+              "edge",
+              "verify",
+              "queue",
+              "worker",
+              "partner"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "sender",
+              "to": "edge"
+            },
+            {
+              "from": "edge",
+              "to": "verify"
+            },
+            {
+              "from": "verify",
+              "to": "queue"
+            },
+            {
+              "from": "queue",
+              "to": "worker"
+            },
+            {
+              "from": "worker",
+              "to": "partner"
+            }
+          ]
+        }
+      },
+      {
+        "id": "approval-diamond",
+        "heading": "02 · Document approval · 9 nodes",
+        "text": "A three-branch review that rejoins before publication. All branches are logically parallel.",
+        "diagram": {
+          "title": "02 · Document approval · 9 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "uploader": {
+              "title": "Uploader",
+              "icon": "terminal"
+            },
+            "api": {
+              "title": "Upload API",
+              "icon": "cloud"
+            },
+            "store": {
+              "title": "File store",
+              "icon": "db"
+            },
+            "scan": {
+              "title": "Malware scan",
+              "icon": "shield"
+            },
+            "policy": {
+              "title": "Policy check",
+              "icon": "shield"
+            },
+            "review": {
+              "title": "Review queue",
+              "icon": "gear"
+            },
+            "reviewer": {
+              "title": "Reviewer",
+              "icon": "gear"
+            },
+            "publish": {
+              "title": "Publisher",
+              "icon": "cloud"
+            },
+            "archive": {
+              "title": "Archive",
+              "icon": "db"
+            }
+          },
+          "rows": [
+            [
+              "uploader",
+              "api",
+              "store",
+              "scan",
+              "policy",
+              "review",
+              "reviewer",
+              "publish",
+              "archive"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "uploader",
+              "to": "api"
+            },
+            {
+              "from": "api",
+              "to": "store"
+            },
+            {
+              "from": "api",
+              "to": "scan"
+            },
+            {
+              "from": "api",
+              "to": "policy"
+            },
+            {
+              "from": "store",
+              "to": "review"
+            },
+            {
+              "from": "scan",
+              "to": "review"
+            },
+            {
+              "from": "policy",
+              "to": "review"
+            },
+            {
+              "from": "review",
+              "to": "reviewer"
+            },
+            {
+              "from": "reviewer",
+              "to": "publish"
+            },
+            {
+              "from": "publish",
+              "to": "archive"
+            }
+          ]
+        }
+      },
+      {
+        "id": "telemetry-fan",
+        "heading": "03 · Telemetry pipeline · 13 nodes",
+        "text": "Three producers feed three signal lanes around a legacy observability monolith. The app still writes logs directly, and alerts call back into legacy configuration.",
+        "diagram": {
+          "title": "03 · Telemetry pipeline · 13 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "app": {
+              "title": "Web app",
+              "icon": "terminal"
+            },
+            "jobs": {
+              "title": "Job runner",
+              "icon": "server"
+            },
+            "edge": {
+              "title": "Edge gateway",
+              "icon": "router"
+            },
+            "collector": {
+              "title": "Collector",
+              "icon": "server"
+            },
+            "router": {
+              "title": "Legacy observability",
+              "icon": "router"
+            },
+            "metrics": {
+              "title": "Metrics job",
+              "icon": "server"
+            },
+            "logs": {
+              "title": "Logs job",
+              "icon": "server"
+            },
+            "traces": {
+              "title": "Traces job",
+              "icon": "server"
+            },
+            "metricdb": {
+              "title": "Metrics store",
+              "icon": "db"
+            },
+            "logdb": {
+              "title": "Logs store",
+              "icon": "db"
+            },
+            "tracedb": {
+              "title": "Trace store",
+              "icon": "db"
+            },
+            "dashboard": {
+              "title": "Dashboard",
+              "icon": "gear"
+            },
+            "alerts": {
+              "title": "Alert manager",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            [
+              "app",
+              "jobs",
+              "edge",
+              "collector",
+              "router",
+              "metrics",
+              "logs",
+              "traces",
+              "metricdb",
+              "logdb",
+              "tracedb",
+              "dashboard",
+              "alerts"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "app",
+              "to": "collector"
+            },
+            {
+              "from": "jobs",
+              "to": "collector"
+            },
+            {
+              "from": "edge",
+              "to": "collector"
+            },
+            {
+              "from": "collector",
+              "to": "router"
+            },
+            {
+              "from": "router",
+              "to": "metrics"
+            },
+            {
+              "from": "router",
+              "to": "logs"
+            },
+            {
+              "from": "router",
+              "to": "traces"
+            },
+            {
+              "from": "metrics",
+              "to": "metricdb"
+            },
+            {
+              "from": "logs",
+              "to": "logdb"
+            },
+            {
+              "from": "traces",
+              "to": "tracedb"
+            },
+            {
+              "from": "metricdb",
+              "to": "dashboard"
+            },
+            {
+              "from": "logdb",
+              "to": "dashboard"
+            },
+            {
+              "from": "tracedb",
+              "to": "dashboard"
+            },
+            {
+              "from": "metricdb",
+              "to": "alerts"
+            },
+            {
+              "from": "app",
+              "to": "logs",
+              "label": "direct logs"
+            },
+            {
+              "from": "alerts",
+              "to": "router",
+              "label": "reconfigure"
+            },
+            {
+              "from": "router",
+              "to": "logdb",
+              "label": "legacy query"
+            }
+          ]
+        }
+      },
+      {
+        "id": "fulfillment",
+        "heading": "04 · Order fulfillment · 16 nodes",
+        "text": "A legacy commerce monolith joins three checks and emits fulfillment events. Cart lookups bypass checkout, reservations retry backward, and operations patch orders directly.",
+        "diagram": {
+          "title": "04 · Order fulfillment · 16 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "buyer": {
+              "title": "Buyer",
+              "icon": "terminal"
+            },
+            "storefront": {
+              "title": "Storefront",
+              "icon": "db"
+            },
+            "gateway": {
+              "title": "Gateway",
+              "icon": "router"
+            },
+            "cart": {
+              "title": "Cart service",
+              "icon": "gear"
+            },
+            "checkout": {
+              "title": "Checkout",
+              "icon": "gear"
+            },
+            "payment": {
+              "title": "Payments",
+              "icon": "gear"
+            },
+            "risk": {
+              "title": "Risk check",
+              "icon": "shield"
+            },
+            "inventory": {
+              "title": "Inventory",
+              "icon": "gear"
+            },
+            "order": {
+              "title": "Legacy commerce",
+              "icon": "gear"
+            },
+            "events": {
+              "title": "Event bus",
+              "icon": "router"
+            },
+            "warehouse": {
+              "title": "Warehouse",
+              "icon": "package"
+            },
+            "carrier": {
+              "title": "Carrier",
+              "icon": "package"
+            },
+            "notify": {
+              "title": "Notifier",
+              "icon": "phone"
+            },
+            "mail": {
+              "title": "Email service",
+              "icon": "gear"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear"
+            },
+            "ops": {
+              "title": "Ops dashboard",
+              "icon": "gear"
+            }
+          },
+          "rows": [
+            [
+              "buyer",
+              "storefront",
+              "gateway",
+              "cart",
+              "checkout",
+              "payment",
+              "risk",
+              "inventory",
+              "order",
+              "events",
+              "warehouse",
+              "carrier",
+              "notify",
+              "mail",
+              "analytics",
+              "ops"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "buyer",
+              "to": "storefront"
+            },
+            {
+              "from": "storefront",
+              "to": "gateway"
+            },
+            {
+              "from": "gateway",
+              "to": "cart"
+            },
+            {
+              "from": "cart",
+              "to": "checkout"
+            },
+            {
+              "from": "checkout",
+              "to": "payment"
+            },
+            {
+              "from": "checkout",
+              "to": "risk"
+            },
+            {
+              "from": "checkout",
+              "to": "inventory"
+            },
+            {
+              "from": "payment",
+              "to": "order"
+            },
+            {
+              "from": "risk",
+              "to": "order"
+            },
+            {
+              "from": "inventory",
+              "to": "order"
+            },
+            {
+              "from": "order",
+              "to": "events"
+            },
+            {
+              "from": "events",
+              "to": "warehouse"
+            },
+            {
+              "from": "warehouse",
+              "to": "carrier"
+            },
+            {
+              "from": "events",
+              "to": "notify"
+            },
+            {
+              "from": "notify",
+              "to": "mail"
+            },
+            {
+              "from": "events",
+              "to": "analytics"
+            },
+            {
+              "from": "analytics",
+              "to": "ops"
+            },
+            {
+              "from": "cart",
+              "to": "order",
+              "label": "lookup"
+            },
+            {
+              "from": "order",
+              "to": "inventory",
+              "label": "redo"
+            },
+            {
+              "from": "ops",
+              "to": "order",
+              "label": "manual patch"
+            }
+          ]
+        }
+      },
+      {
+        "id": "media-platform",
+        "heading": "05 · Media platform · 20 nodes",
+        "text": "Node colors mark sources in green, ingestion in blue, processing in amber, output stores in purple, and delivery in pink, without group boxes. A legacy media core connects three processing lanes; publishing still writes ingest metadata, transcoding reads the original objects, and monitoring retries the upload queue directly.",
+        "diagram": {
+          "title": "05 · Media platform · 20 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "camera": {
+              "title": "Camera",
+              "icon": "camera",
+              "tint": "dev"
+            },
+            "mobile": {
+              "title": "Mobile app",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "upload": {
+              "title": "Upload API",
+              "icon": "cloud",
+              "tint": "cmd"
+            },
+            "auth": {
+              "title": "Identity",
+              "icon": "shield",
+              "tint": "cmd"
+            },
+            "queue": {
+              "title": "Upload queue",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "metadata": {
+              "title": "Metadata DB",
+              "icon": "db",
+              "tint": "cmd"
+            },
+            "object": {
+              "title": "Object store",
+              "icon": "db",
+              "tint": "cmd"
+            },
+            "splitter": {
+              "title": "Job splitter",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "thumbnail": {
+              "title": "Thumbnail job",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "transcoder": {
+              "title": "Transcoder",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "captions": {
+              "title": "Caption job",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "thumbstore": {
+              "title": "Image store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "videostore": {
+              "title": "Video store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "textindex": {
+              "title": "Text index",
+              "icon": "db",
+              "tint": "data"
+            },
+            "publish": {
+              "title": "Legacy media core",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "cdn": {
+              "title": "CDN",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "search": {
+              "title": "Search API",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "notify": {
+              "title": "Notifications",
+              "icon": "phone",
+              "tint": "mqtt"
+            },
+            "analytics": {
+              "title": "Analytics",
+              "icon": "gear",
+              "tint": "mqtt"
+            },
+            "monitor": {
+              "title": "Monitoring",
+              "icon": "gear",
+              "tint": "mqtt"
+            }
+          },
+          "rows": [
+            [
+              "camera",
+              "mobile",
+              "upload",
+              "auth",
+              "queue",
+              "metadata",
+              "object",
+              "splitter",
+              "thumbnail",
+              "transcoder",
+              "captions",
+              "thumbstore",
+              "videostore",
+              "textindex",
+              "publish",
+              "cdn",
+              "search",
+              "notify",
+              "analytics",
+              "monitor"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "camera",
+              "to": "upload"
+            },
+            {
+              "from": "mobile",
+              "to": "upload"
+            },
+            {
+              "from": "upload",
+              "to": "auth"
+            },
+            {
+              "from": "auth",
+              "to": "queue"
+            },
+            {
+              "from": "upload",
+              "to": "metadata"
+            },
+            {
+              "from": "queue",
+              "to": "object"
+            },
+            {
+              "from": "object",
+              "to": "splitter"
+            },
+            {
+              "from": "splitter",
+              "to": "thumbnail"
+            },
+            {
+              "from": "splitter",
+              "to": "transcoder"
+            },
+            {
+              "from": "splitter",
+              "to": "captions"
+            },
+            {
+              "from": "thumbnail",
+              "to": "thumbstore"
+            },
+            {
+              "from": "transcoder",
+              "to": "videostore"
+            },
+            {
+              "from": "captions",
+              "to": "textindex"
+            },
+            {
+              "from": "thumbstore",
+              "to": "publish"
+            },
+            {
+              "from": "videostore",
+              "to": "publish"
+            },
+            {
+              "from": "textindex",
+              "to": "publish"
+            },
+            {
+              "from": "publish",
+              "to": "cdn"
+            },
+            {
+              "from": "publish",
+              "to": "search"
+            },
+            {
+              "from": "publish",
+              "to": "notify"
+            },
+            {
+              "from": "publish",
+              "to": "analytics"
+            },
+            {
+              "from": "publish",
+              "to": "monitor"
+            },
+            {
+              "from": "publish",
+              "to": "metadata",
+              "label": "catalog write"
+            },
+            {
+              "from": "transcoder",
+              "to": "object",
+              "label": "read"
+            },
+            {
+              "from": "monitor",
+              "to": "queue",
+              "label": "retry upload"
+            }
+          ]
+        }
+      },
+      {
+        "id": "subscription-matrix",
+        "heading": "06 · Subscription matrix · forced crossing",
+        "text": "Each of three event streams feeds each of three consumers. These nine direct edges form K₃,₃, so at least one crossing is unavoidable.",
+        "diagram": {
+          "title": "06 · Subscription matrix · forced crossing",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "orders": {
+              "title": "Order events",
+              "icon": "gear"
+            },
+            "returns": {
+              "title": "Return events",
+              "icon": "gear"
+            },
+            "stock": {
+              "title": "Stock events",
+              "icon": "gear"
+            },
+            "audit": {
+              "title": "Audit sink",
+              "icon": "db"
+            },
+            "metrics": {
+              "title": "Metrics sink",
+              "icon": "db"
+            },
+            "risk": {
+              "title": "Risk sink",
+              "icon": "shield"
+            }
+          },
+          "rows": [
+            [
+              "orders",
+              "returns",
+              "stock",
+              "audit",
+              "metrics",
+              "risk"
+            ]
+          ],
+          "edges": [
+            {
+              "from": "orders",
+              "to": "audit"
+            },
+            {
+              "from": "orders",
+              "to": "metrics"
+            },
+            {
+              "from": "orders",
+              "to": "risk"
+            },
+            {
+              "from": "returns",
+              "to": "audit"
+            },
+            {
+              "from": "returns",
+              "to": "metrics"
+            },
+            {
+              "from": "returns",
+              "to": "risk"
+            },
+            {
+              "from": "stock",
+              "to": "audit"
+            },
+            {
+              "from": "stock",
+              "to": "metrics"
+            },
+            {
+              "from": "stock",
+              "to": "risk"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

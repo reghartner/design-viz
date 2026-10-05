@@ -1,0 +1,425 @@
+{
+  "page": {
+    "title": "Round 2 \u00b7 2B \u00b7 Signage distribution",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "signage-distribution",
+        "heading": "02 \u00b7 Signage distribution \u00b7 26 nodes",
+        "text": "A central scheduling monolith feeds a distributed display fleet. Release checks, cached playback, receipts and a repair loop interact with reporting; the monolith retains a direct rollout path.",
+        "diagram": {
+          "title": "Signage distribution",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "sign-editor": {
+              "title": "Content editor",
+              "icon": "server"
+            },
+            "sign-bulk": {
+              "title": "Bulk importer",
+              "icon": "server"
+            },
+            "sign-partner": {
+              "title": "Partner feed",
+              "icon": "server"
+            },
+            "sign-campaign": {
+              "title": "Campaign API",
+              "icon": "server"
+            },
+            "sign-legacy": {
+              "title": "Legacy scheduler",
+              "icon": "server"
+            },
+            "sign-assets": {
+              "title": "Asset store",
+              "icon": "server"
+            },
+            "sign-manifest": {
+              "title": "Manifest builder",
+              "icon": "server"
+            },
+            "sign-policy": {
+              "title": "Policy checker",
+              "icon": "server"
+            },
+            "sign-approval": {
+              "title": "Approval desk",
+              "icon": "server"
+            },
+            "sign-release": {
+              "title": "Release store",
+              "icon": "server"
+            },
+            "sign-rollout": {
+              "title": "Rollout controller",
+              "icon": "server"
+            },
+            "sign-broker": {
+              "title": "Edge broker",
+              "icon": "server"
+            },
+            "sign-relay": {
+              "title": "District relay",
+              "icon": "server"
+            },
+            "sign-display": {
+              "title": "Display agent",
+              "icon": "server"
+            },
+            "sign-cache": {
+              "title": "Local cache",
+              "icon": "server"
+            },
+            "sign-probe": {
+              "title": "Playback probe",
+              "icon": "server"
+            },
+            "sign-receipt": {
+              "title": "Receipt ingest",
+              "icon": "server"
+            },
+            "sign-health": {
+              "title": "Fleet health store",
+              "icon": "server"
+            },
+            "sign-retry": {
+              "title": "Retry queue",
+              "icon": "server"
+            },
+            "sign-repair": {
+              "title": "Repair worker",
+              "icon": "server"
+            },
+            "sign-console": {
+              "title": "Fleet console",
+              "icon": "server"
+            },
+            "sign-directory": {
+              "title": "Tenant directory",
+              "icon": "server"
+            },
+            "sign-billing": {
+              "title": "Usage export",
+              "icon": "server"
+            },
+            "sign-audit": {
+              "title": "Audit archive",
+              "icon": "server"
+            },
+            "sign-report": {
+              "title": "Report builder",
+              "icon": "server"
+            },
+            "sign-warehouse": {
+              "title": "Reporting warehouse",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "sign-editor",
+              "to": "sign-campaign"
+            },
+            {
+              "from": "sign-bulk",
+              "to": "sign-campaign"
+            },
+            {
+              "from": "sign-partner",
+              "to": "sign-legacy"
+            },
+            {
+              "from": "sign-campaign",
+              "to": "sign-legacy"
+            },
+            {
+              "from": "sign-campaign",
+              "to": "sign-assets"
+            },
+            {
+              "from": "sign-assets",
+              "to": "sign-manifest"
+            },
+            {
+              "from": "sign-legacy",
+              "to": "sign-manifest"
+            },
+            {
+              "from": "sign-manifest",
+              "to": "sign-policy"
+            },
+            {
+              "from": "sign-directory",
+              "to": "sign-policy"
+            },
+            {
+              "from": "sign-policy",
+              "to": "sign-approval"
+            },
+            {
+              "from": "sign-approval",
+              "to": "sign-release"
+            },
+            {
+              "from": "sign-manifest",
+              "to": "sign-release"
+            },
+            {
+              "from": "sign-release",
+              "to": "sign-rollout"
+            },
+            {
+              "from": "sign-legacy",
+              "to": "sign-rollout"
+            },
+            {
+              "from": "sign-rollout",
+              "to": "sign-broker"
+            },
+            {
+              "from": "sign-broker",
+              "to": "sign-relay"
+            },
+            {
+              "from": "sign-relay",
+              "to": "sign-display"
+            },
+            {
+              "from": "sign-display",
+              "to": "sign-cache"
+            },
+            {
+              "from": "sign-cache",
+              "to": "sign-display"
+            },
+            {
+              "from": "sign-display",
+              "to": "sign-probe"
+            },
+            {
+              "from": "sign-probe",
+              "to": "sign-receipt"
+            },
+            {
+              "from": "sign-receipt",
+              "to": "sign-health"
+            },
+            {
+              "from": "sign-health",
+              "to": "sign-retry"
+            },
+            {
+              "from": "sign-retry",
+              "to": "sign-repair"
+            },
+            {
+              "from": "sign-repair",
+              "to": "sign-rollout"
+            },
+            {
+              "from": "sign-health",
+              "to": "sign-console"
+            },
+            {
+              "from": "sign-console",
+              "to": "sign-repair"
+            },
+            {
+              "from": "sign-receipt",
+              "to": "sign-report"
+            },
+            {
+              "from": "sign-report",
+              "to": "sign-warehouse"
+            },
+            {
+              "from": "sign-health",
+              "to": "sign-billing"
+            },
+            {
+              "from": "sign-billing",
+              "to": "sign-warehouse"
+            },
+            {
+              "from": "sign-release",
+              "to": "sign-audit"
+            },
+            {
+              "from": "sign-warehouse",
+              "to": "sign-audit"
+            }
+          ],
+          "floats": [
+            {
+              "id": "sign-editor",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "sign-bulk",
+              "side": "below",
+              "x": 732,
+              "y": 100
+            },
+            {
+              "id": "sign-partner",
+              "side": "below",
+              "x": 120,
+              "y": 220
+            },
+            {
+              "id": "sign-campaign",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "sign-legacy",
+              "side": "below",
+              "x": 324,
+              "y": 220
+            },
+            {
+              "id": "sign-assets",
+              "side": "below",
+              "x": 528,
+              "y": 220
+            },
+            {
+              "id": "sign-manifest",
+              "side": "below",
+              "x": 528,
+              "y": 340
+            },
+            {
+              "id": "sign-policy",
+              "side": "below",
+              "x": 732,
+              "y": 340
+            },
+            {
+              "id": "sign-approval",
+              "side": "below",
+              "x": 936,
+              "y": 340
+            },
+            {
+              "id": "sign-release",
+              "side": "below",
+              "x": 732,
+              "y": 460
+            },
+            {
+              "id": "sign-rollout",
+              "side": "below",
+              "x": 324,
+              "y": 460
+            },
+            {
+              "id": "sign-broker",
+              "side": "below",
+              "x": 120,
+              "y": 460
+            },
+            {
+              "id": "sign-relay",
+              "side": "below",
+              "x": 120,
+              "y": 580
+            },
+            {
+              "id": "sign-display",
+              "side": "below",
+              "x": 120,
+              "y": 700
+            },
+            {
+              "id": "sign-cache",
+              "side": "below",
+              "x": 120,
+              "y": 820
+            },
+            {
+              "id": "sign-probe",
+              "side": "below",
+              "x": 324,
+              "y": 700
+            },
+            {
+              "id": "sign-receipt",
+              "side": "below",
+              "x": 528,
+              "y": 820
+            },
+            {
+              "id": "sign-health",
+              "side": "below",
+              "x": 732,
+              "y": 700
+            },
+            {
+              "id": "sign-retry",
+              "side": "below",
+              "x": 528,
+              "y": 700
+            },
+            {
+              "id": "sign-repair",
+              "side": "below",
+              "x": 528,
+              "y": 580
+            },
+            {
+              "id": "sign-console",
+              "side": "below",
+              "x": 732,
+              "y": 580
+            },
+            {
+              "id": "sign-directory",
+              "side": "below",
+              "x": 732,
+              "y": 220
+            },
+            {
+              "id": "sign-billing",
+              "side": "below",
+              "x": 936,
+              "y": 700
+            },
+            {
+              "id": "sign-audit",
+              "side": "below",
+              "x": 1140,
+              "y": 460
+            },
+            {
+              "id": "sign-report",
+              "side": "below",
+              "x": 936,
+              "y": 820
+            },
+            {
+              "id": "sign-warehouse",
+              "side": "below",
+              "x": 1140,
+              "y": 700
+            }
+          ]
+        }
+      }
+    ],
+    "canon": {
+      "version": 1,
+      "id": "round2-signage-distribution-b",
+      "kind": "design",
+      "owner": "group:default/auto-arrange-study"
+    }
+  }
+}

@@ -36,7 +36,7 @@ test('persistent Add entry targets tab sections and preserves one-change Undo/Re
   const inserted=await spec(page),diagram=inserted.page.blocks[1].tabs[1].sections[0].diagram;
   expect(Object.values(diagram.nodes).map(n=>n.title)).toEqual(['Cloud','Service']);
   expect(diagram.rows).toEqual([['y']]);
-  expect(diagram.floats).toEqual([{id:'gear1',side:'below',x:expect.any(Number),y:expect.any(Number)}]);
+  expect(diagram.floats).toEqual([{id:'gear1',side:'below',x:expect.any(Number),y:expect.any(Number),noSpread:true}]);
   expect(inserted.page.blocks[0]).toEqual(raw.page.blocks[0]);
   expect(inserted.page.blocks[1].tabs[0]).toEqual(raw.page.blocks[1].tabs[0]);
   const after=await text(page);

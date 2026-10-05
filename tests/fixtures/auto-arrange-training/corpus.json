@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "scope": "Four human pairwise preferences, not optimal layouts. Media source files retain unscored blocks solely to verify original byte hashes. Only designated blocks are read as examples.",
+  "evidenceHashes": {
+    "round2-labels.json": "b01b2de00789d2e17551d364cd01c2b79f4e6e970f404875c8afec39756104ef",
+    "media-label.json": "9f9a052a64d5f191bc222ee9d071da55bd84a509ca418c1d6b31d60b6709407f"
+  },
+  "pairs": [
+    {
+      "id": "equipment-lending",
+      "choice": "B",
+      "evidence": "round2-labels.json",
+      "record": 0,
+      "candidates": {
+        "A": {
+          "file": "sources/equipment-lending-A.spec.json",
+          "sha256": "97f713c08502c275716bc45933bbff9079a99bf3ef1c69e790ab0752cf7b197f",
+          "block": 0,
+          "agentVariant": "a",
+          "blockId": "equipment-lending"
+        },
+        "B": {
+          "file": "sources/equipment-lending-B.spec.json",
+          "sha256": "e5924aa3f5716b7998e54a87cb45ec8f934c548cf4f7902ee9593044c1ff7dfb",
+          "block": 0,
+          "agentVariant": "b",
+          "blockId": "equipment-lending"
+        }
+      }
+    },
+    {
+      "id": "signage-distribution",
+      "choice": "B",
+      "evidence": "round2-labels.json",
+      "record": 1,
+      "candidates": {
+        "A": {
+          "file": "sources/signage-distribution-A.spec.json",
+          "sha256": "7d0713f49639d22f9e2bb831ca21e7334fff594c833f81051d65b0f443736911",
+          "block": 0,
+          "agentVariant": "b",
+          "blockId": "signage-distribution"
+        },
+        "B": {
+          "file": "sources/signage-distribution-B.spec.json",
+          "sha256": "08fc747bcda1dec55a5a303ebfa756d9131a9e80405e65ab0284bb825f1c63cc",
+          "block": 0,
+          "agentVariant": "a",
+          "blockId": "signage-distribution"
+        }
+      }
+    },
+    {
+      "id": "research-compute-federation",
+      "choice": "A",
+      "evidence": "round2-labels.json",
+      "record": 2,
+      "candidates": {
+        "A": {
+          "file": "sources/research-compute-federation-A.spec.json",
+          "sha256": "6cc5d801bd4b4a409602afbaf3ae714002fa87ea6388be624893043b8d164cdb",
+          "block": 0,
+          "agentVariant": "a",
+          "blockId": "research-compute-federation"
+        },
+        "B": {
+          "file": "sources/research-compute-federation-B.spec.json",
+          "sha256": "96549f462bd9bbcc15456e786f6c2f6a3985bd00214a755788e6f6bf8911ba08",
+          "block": 0,
+          "agentVariant": "b",
+          "blockId": "research-compute-federation"
+        }
+      }
+    },
+    {
+      "id": "media-platform",
+      "choice": "A",
+      "evidence": "media-label.json",
+      "candidates": {
+        "A": {
+          "file": "sources/media-platform-A.spec.json",
+          "sha256": "751efa9c553fd689e671668f17420e137244a019eb114a74736bcd70dd839eff",
+          "block": 4,
+          "blockId": "media-platform"
+        },
+        "B": {
+          "file": "sources/media-platform-B.spec.json",
+          "sha256": "48faf4d3026d728a430fb88151e4773eda36a204e813bb20895cccc11cc86a64",
+          "block": 4,
+          "blockId": "media-platform"
+        }
+      }
+    }
+  ]
+}

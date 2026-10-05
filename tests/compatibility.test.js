@@ -285,3 +285,12 @@ test('per-panel Explore placement exports require the independent-placement capa
  const available={...C.features};delete available['layout.explore-panel-placement'];
  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-panel-placement'));
 });
+
+test('canvas step controls declare placement capability even with dormant graph geometry',()=>{
+ for(const exploreLayout of [{controlsPlacement:'canvas'},{controlsPlacement:'floating',canvas:{controls:{x:0,y:900,w:720,h:220}}}]){
+  const raw={page:{sections:[{diagram:{layouts:[{id:'story',presentation:'explore',exploreLayout}]}}]}};
+  assert.ok(C.detect(raw).includes('layout.explore-controls-placement'));
+  const available={...C.features};delete available['layout.explore-controls-placement'];
+  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-controls-placement'));
+ }
+});

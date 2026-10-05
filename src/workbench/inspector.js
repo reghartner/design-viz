@@ -2353,6 +2353,17 @@ function renderMultiInspector(multiSel){
 
   function stepControlsForm(val){
     var target=Object.assign({},session.target),layout=val.exploreLayout && typeof val.exploreLayout==='object' && !Array.isArray(val.exploreLayout)?val.exploreLayout:{};
+    var placement=selectControl(['floating','canvas'],layout.controlsPlacement || 'floating',function(value){
+      return commitCascade(function(raw){
+        var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
+        var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
+        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
+        var next=JSON.parse(JSON.stringify(view.exploreLayout || {}));next.controlsPlacement=value;
+        return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);
+      },{exploreLayout:{section:target.section,id:target.layoutId},after:refreshFormSoon});
+    });
+    placement.setAttribute('aria-label','Step controls placement');
+    Array.prototype.forEach.call(placement.options,function(option){option.textContent=option.value==='canvas'?'On canvas':'Floating';});
     var current=layout.steps && layout.steps.textPosition || 'below';
     var position=selectControl(['below','above','left','right'],current,function(value){
       return commitCascade(function(raw){
@@ -2366,8 +2377,8 @@ function renderMultiInspector(multiSel){
     });
     position.setAttribute('aria-label','Caption position');
     Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
-    var note=document.createElement('p');note.className='fnote';note.textContent='Resize the floating controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
-    return [frow('Caption position',position),note];
+    var note=document.createElement('p');note.className='fnote';note.textContent='Resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
+    return [frow('Placement',placement),frow('Caption position',position),note];
   }
 
 function renderInspector(){

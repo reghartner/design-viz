@@ -1335,7 +1335,8 @@ perspectives" of one timeline). Types:
   Optional `layouts[].presentation` is `"standard"` (the default when omitted)
   or `"explore"`. Standard retains the authored arrangement. Explore provides a
   full-height graph with independently draggable, resizable, hideable floating
-  panels and pinned step controls. Section paragraphs and nested bullets share
+  panels and step controls that default to viewport-pinned Floating placement.
+  Each chapter can instead place the controls On canvas. Section paragraphs and nested bullets share
   one floating **Section notes** window; it contains only prose, while the graph
   stays the full Explore canvas. `layouts[].exploreLayout.prose` optionally saves
   its `x/y/w/h` viewport fractions, `stacked` flag and `hidden` flag. Supply all four
@@ -1346,8 +1347,8 @@ perspectives" of one timeline). Types:
   `layouts[].exploreLayout.overlayScale` optionally
   sets their content size from 0.5 to 1.25 (default 1), independently of diagram
   zoom. Panel width/height and control height describe the size at 100%; control
-  width keeps its chosen horizontal span at every scale. Positions stay in
-  viewport coordinates. The **Panels & controls** zoom saves this value
+  width keeps its chosen horizontal span at every scale. Floating positions stay
+  in viewport coordinates. The **Panels & controls** zoom saves this value
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
 
@@ -1359,11 +1360,18 @@ perspectives" of one timeline). Types:
   must be finite within ±10000, and w/h must be positive. Canvas rectangles have
   no `stacked` flag. Diagram zoom scales their entire contents; `overlayScale`
   continues to affect Floating objects and viewport playback only. Optional
-  `canvas.controlsScale` (0.5–1.25) independently sizes playback while On canvas
-  is active; omission inherits the Floating scale. Panel visibility
+  `canvas.controlsScale` (0.5–1.25) independently sizes Floating playback while
+  canvas objects are present; omission inherits the Floating scale. Panel visibility
   uses the chapter's sectionLayout items; notes visibility uses
-  `exploreLayout.prose.hidden`. Fit includes visible canvas objects. Playback stays
-  viewport pinned. Author each completed move/resize or placement change as one
+  `exploreLayout.prose.hidden`. Independently set `exploreLayout.controlsPlacement`
+  to `"floating"` (default, viewport pinned) or `"canvas"`. The Panels menu and
+  step-controls inspector expose this per-chapter choice. Keep the Floating
+  rectangle in `exploreLayout.controls` as viewport fractions and store a separate
+  `{x,y,w,h}` graph rectangle in `exploreLayout.canvas.controls`, using the bounds
+  above. Preserve both rectangles across placement changes. On-canvas controls
+  pan and zoom with the graph, and show move/resize handles when selected.
+  Fit includes visible canvas controls; only Floating playback reserves viewport
+  space. Author each completed move/resize or placement change as one
   layout edit, preserving the current path/step and the other mode's rectangles.
   Reader changes remain temporary. See [section layouts](../docs/section-layouts.md).
 

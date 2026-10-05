@@ -196,7 +196,7 @@ body .docview .explore-player>.termbar{flex:1;min-height:0;height:auto;}
 body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-height:0;height:auto;}
 
 /* Canvas objects share graph units and its scroll origin. Scale the whole window,
-   including its header and widget, while playback remains a stage sibling. */
+   including its header and widget. Playback can share this graph space. */
 .explore-canvas-objects{position:absolute;left:0;top:0;width:0;height:0;transform-origin:0 0;--explore-overlay-scale:1;}
 @media screen{
  .explore-canvas-objects>.explore-window{overflow:visible;border-color:var(--explore-border);background:transparent;box-shadow:none;}
@@ -222,3 +222,13 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 
 .explore-panel-body>.explore-placement{flex-wrap:wrap;}
 .explore-placement-hint{flex-basis:100%;font-size:11px;line-height:1.4;color:var(--dfaint);}
+
+/* Canvas playback keeps its usable surface; editing handles appear on selection. */
+@media screen{
+ .explore-canvas-objects>.explore-player{box-shadow:none;}
+ .explore-canvas-objects>.explore-player>.explore-player-grip,
+ .explore-canvas-objects>.explore-player>.explore-window-resize{visibility:hidden;}
+ .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel){outline:3px solid color-mix(in srgb,var(--acc) 72%,#fff);outline-offset:3px;box-shadow:0 7px 24px #1424422e;}
+ .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel)>.explore-player-grip,
+ .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel)>.explore-window-resize{visibility:visible;}
+}

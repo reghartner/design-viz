@@ -2,8 +2,10 @@
 
 Each named **Chapter** has one saved **Viewing mode**: **Standard** preserves the
 authored tile arrangement; **Explore** gives the graph a full-height workspace
-with independent floating panels and pinned step controls. Omitted settings use
-Standard, so existing diagrams keep their presentation.
+with independently placed panels and step controls that default to viewport-pinned
+**Floating** placement. Each Explore Chapter can instead choose **On canvas**
+for controls that move and zoom with the graph. Omitted Viewing mode settings
+use Standard, so existing diagrams keep their presentation.
 
 In the workbench, select a section and a Chapter using the
 buttons above the graph. **Viewing mode** chooses Standard or Explore for
@@ -111,8 +113,8 @@ Use **Open file** with
 to try **Home story** and **Service flow**.
 Home story opens in Standard with a shorter resident-facing sequence and controls
 attached to Home. Service flow uses Explore for every technical stop, with the
-graph filling the workspace, panels floating at its edges, and playback pinned
-in view. Both share the same step definitions, panels and execution paths.
+graph filling the workspace, panels floating at its edges, and the default
+Floating playback pinned in view. Its Step controls placement can also be On canvas. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
@@ -174,8 +176,11 @@ The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** 
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
 use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
-controls stay pinned and available as you inspect the graph. Playback and step
-markers share the top row, with the caption below. Move the controls using the
+controls default to **Floating**, pinned to the viewport. Choose **Panels →
+Step controls → On canvas**, or **Placement** in their inspector, to move and
+zoom them with the graph. Each Chapter remembers both placements separately;
+switching back restores its Floating geometry. Select on-canvas controls to
+reveal their handles. Playback and step markers share the top row, with the caption below. Move the controls using the
 small grip on the left; resize their corner. Drag empty canvas to pan, including
 a quarter-screen beyond each edge to uncover content behind panels. The workspace
 height follows the viewport and does not depend on page scroll. Content-sized
@@ -467,6 +472,27 @@ or `"canvas"`. Omitted entries use the legacy `exploreLayout.panelPlacement`,
 which still accepts `"floating"` or `"canvas"` and defaults to Floating.
 Section notes continue to use that chapter default.
 
+The **Step controls** placement selector in Panels, also available in the step
+controls inspector, independently saves `exploreLayout.controlsPlacement` as
+`"floating"` (the default) or `"canvas"`. Existing files keep floating playback.
+`exploreLayout.controls` retains its viewport-fraction rectangle;
+`exploreLayout.canvas.controls` stores a separate `{x,y,w,h}` graph rectangle
+with the same coordinate bounds as canvas panels. Both survive placement changes,
+chapter changes, preview rebuilds and host-profile changes. Missing canvas geometry
+starts below the diagram and switching to it fits the canvas to reveal it.
+
+On-canvas controls pan and zoom with the diagram and participate in Fit canvas.
+They do not reserve a viewport overlay area. Click or focus the controls to reveal
+move and resize handles; both handles accept arrow keys and Shift for larger moves.
+Playback remains usable in either placement. Workbench placement, drag and resize
+save one Undo action apiece; reader changes remain temporary. Canvas controls use
+graph zoom for sizing; the panel-size control applies to floating content.
+In Workbench, Alt marquee and the object menu support selecting, inspecting and
+fitting canvas controls. Duplicate, delete, group movement and alignment remain
+limited to nodes and panels; use the controls' handles for movement and resizing.
+Saved placement or canvas-control geometry advertises the
+`layout.explore-controls-placement` compatibility capability.
+
 Floating rectangles remain in `exploreLayout.panels`. Independent
 `exploreLayout.canvas.panels` and `.prose` rectangles use graph units measured
 from the upper-left of the SVG viewBox. Coordinates may be negative; all values
@@ -474,10 +500,11 @@ must be finite and within ±10000, with positive `w` and `h`. Toggling a panel
 preserves both rectangles, visibility, and the current step/path. The whole
 canvas window scales with diagram zoom, including its header and contents.
 Floating panels retain their responsive or authored `overlayScale`; optional
-`canvas.controlsScale` (0.5–1.25) independently preserves playback sizing when
-canvas objects are present. With mixed placement, **Floating panels & controls**
-sizes floating panels and playback together. With all windows on canvas,
-**Controls** changes playback only.
+`canvas.controlsScale` (0.5–1.25) independently preserves floating playback sizing
+when canvas objects are present. With mixed panel placement and floating playback,
+**Floating panels & controls** sizes both together. With all panels on canvas and
+playback floating, **Controls** changes playback only. With playback on canvas,
+**Floating panels** sizes the remaining floating panels.
 
 **Fit canvas** includes the diagram and currently visible on-canvas objects,
 and reserves space for visible floating panels and fixed playback. Hidden

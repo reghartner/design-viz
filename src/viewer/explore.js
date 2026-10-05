@@ -16,7 +16,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
   if(value.canvasPanels)saved.canvasPanels=JSON.parse(JSON.stringify(value.canvasPanels));else delete saved.canvasPanels;
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
   if(value.layout){
-    ['panels','prose','controls','overlayScale','panelPlacement','panelPlacements','canvas'].forEach(function(key){
+    ['panels','prose','controls','overlayScale','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
       if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
     });
   }
@@ -35,7 +35,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var objectLayer=document.createElement('div');objectLayer.className='explore-canvas-objects';
   var tools=document.createElement('div');tools.className='explore-tools';tools.setAttribute('role','group');tools.setAttribute('aria-label','Explore sizing and zoom');stage.appendChild(tools);
   var player=document.createElement('div');player.className='explore-player';stage.appendChild(player);
-  player.setAttribute('data-dv-step-controls','');
+  player.setAttribute('data-dv-step-controls','');player.setAttribute('role','group');
   var actions=document.createElement('div');actions.className='viewport-actions';toolbar.appendChild(actions);
   function button(text,action,host,cls){var b=document.createElement('button');b.type='button';b.className=cls || 'mbtn';b.textContent=text;b.addEventListener('click',action);(host || actions).appendChild(b);return b;}
   var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=false;
@@ -73,6 +73,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
   var playerResize=button('◢',function(){},player,'explore-window-resize');
   var playerWindow={el:player,panel:{type:'controls'},label:'step controls',resize:playerResize};
+  var controlsPlacementLabel=document.createElement('label');controlsPlacementLabel.className='explore-placement';controlsPlacementLabel.textContent='Step controls';controlsPlacementLabel.hidden=true;
+  var controlsPlacement=document.createElement('select');controlsPlacement.setAttribute('aria-label','Step controls placement');
+  [['floating','Floating'],['canvas','On canvas']].forEach(function(pair){var option=document.createElement('option');option.value=pair[0];option.textContent=pair[1];controlsPlacement.appendChild(option);});
+  controlsPlacementLabel.appendChild(controlsPlacement);panelBody.appendChild(controlsPlacementLabel);
+  controlsPlacement.addEventListener('change',function(){changePlacement(controlsPlacement.value,playerWindow);});
+  player.addEventListener('pointerdown',function(){if(canvasWindow(playerWindow))selectCanvasWindow(playerWindow);});
+  player.addEventListener('focusin',function(){if(canvasWindow(playerWindow))selectCanvasWindow(playerWindow);});
   playerGrip.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'move',playerGrip);});
   playerResize.addEventListener('pointerdown',function(ev){begin(ev,playerWindow,'resize',playerResize);});
   playerGrip.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'move');});
@@ -95,7 +102,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
+    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
@@ -112,14 +119,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   // Named panels override the chapter default. Notes keep the legacy fallback.
   function windowPlacement(w){
+    if(w===playerWindow)return memory.layout.controlsPlacement || 'floating';
     var override=!w.prose && (memory.layout.panelPlacements || []).find(function(p){return p.panel===w.panel.id;});
     return override?override.placement:memory.layout.panelPlacement || 'floating';
   }
-  function canvasWindow(w){return w!==playerWindow && windowPlacement(w)==='canvas';}
+  function canvasWindow(w){return windowPlacement(w)==='canvas';}
   function canvasSizing(w){return canvasWindow(w) && !w.prose?w.canvasSizing:null;}
-  function onCanvas(){return windows.some(canvasWindow);}
+  // Workbench queries placement for Standard views too, before any Explore
+  // memory exists and after a canvas view has left its player state behind.
+  function onCanvas(){return active && (canvasWindow(playerWindow) || windows.some(canvasWindow));}
   function hasFloating(){return windows.some(function(w){return !canvasWindow(w);});}
-  function canvasWindowLabel(w,selected){return selected?w.label+' canvas panel, selected':'Select '+w.label+' canvas panel';}
+  function canvasWindowLabel(w,selected){var label=w.label+(w===playerWindow?' on canvas':' canvas panel');return selected?label+', selected':'Select '+label;}
   function syncCanvasWindow(w){
     var mode=canvasWindow(w),selected=mode && selectedCanvasWindow===w,sizing=mode && w.canvasSizing;
     w.el.classList.toggle('explore-canvas-selected',selected);
@@ -144,10 +154,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function graphScale(){return graphPixels/graphWidth() || 1;}
   function graphRect(r){return {x:r.x,y:r.y,w:r.w,h:r.h};}
   function canvasState(w,index){
-    var states=memory.canvasPanels || (memory.canvasPanels=Object.create(null)),key=w.prose?'prose':'panel:'+w.panel.id;
+    var states=memory.canvasPanels || (memory.canvasPanels=Object.create(null)),key=w===playerWindow?'controls':w.prose?'prose':'panel:'+w.panel.id;
     if(!states[key]){
-      var layout=memory.layout.canvas || {},saved=w.prose?layout.prose:(layout.panels || []).find(function(p){return p.panel===w.panel.id;});
-      states[key]=Object.assign(saved?graphRect(saved):{x:Math.min(10000,graphWidth()+40+Math.floor(index/3)*380),y:(index%3)*330,w:340,h:300},{hidden:w.state.hidden,stacked:false,automatic:false});
+      var layout=memory.layout.canvas || {},saved=w===playerWindow?layout.controls:w.prose?layout.prose:(layout.panels || []).find(function(p){return p.panel===w.panel.id;});
+      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(index/3)*380),y:(index%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:false});
     }
     return states[key];
   }
@@ -168,23 +178,33 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       syncCanvasWindow(w);
       if(contentObserver && mode && w.canvasSizing)contentObserver.observe(w.card);
     });
+    var canvasControls=canvasWindow(playerWindow);
+    if(!canvasControls && memory.layout.controls)memory.controls=absolute(memory.layout.controls);
+    playerWindow.state=canvasControls?canvasState(playerWindow,0):memory.controls;
+    (canvasControls?objectLayer:stage).appendChild(player);
+    controlsPlacement.value=canvasControls?'canvas':'floating';controlsPlacementLabel.hidden=false;
+    syncCanvasWindow(playerWindow);
     var mode=onCanvas(),controlsOnly=mode && !hasFloating();
     placement.value=memory.layout.panelPlacement || 'floating';placementLabel.hidden=false;stack.hidden=!hasFloating();
     fitButton.textContent=mode?'Fit canvas':'Fit diagram';
-    overlayZoom.querySelector('.explore-zoom-title').textContent=controlsOnly?'Controls':mode?'Floating panels & controls':'Panels & controls';
-    overlayOut.setAttribute('aria-label',controlsOnly?'Shrink controls':'Shrink panels and controls');overlayIn.setAttribute('aria-label',controlsOnly?'Enlarge controls':'Enlarge panels and controls');
-    overlayLabel.setAttribute('aria-label',controlsOnly?'Reset controls size':'Reset panels and controls size');overlayLabel.title=controlsOnly?'Reset controls to 100%':'Reset panels and controls to 100%';
+    overlayZoom.hidden=canvasControls && !hasFloating();
+    overlayZoom.querySelector('.explore-zoom-title').textContent=canvasControls?'Floating panels':controlsOnly?'Controls':mode?'Floating panels & controls':'Panels & controls';
+    overlayOut.setAttribute('aria-label',canvasControls?'Shrink floating panels':controlsOnly?'Shrink controls':'Shrink panels and controls');overlayIn.setAttribute('aria-label',canvasControls?'Enlarge floating panels':controlsOnly?'Enlarge controls':'Enlarge panels and controls');
+    overlayLabel.setAttribute('aria-label',canvasControls?'Reset floating panels size':controlsOnly?'Reset controls size':'Reset panels and controls size');overlayLabel.title=canvasControls?'Reset floating panels to 100%':controlsOnly?'Reset controls to 100%':'Reset panels and controls to 100%';
   }
   function changePlacement(value,w){
     if(!active || retired || (w?windowPlacement(w):memory.layout.panelPlacement || 'floating')===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false){mountWindows();return;}
-    selectCanvasWindow(null);var firstCanvas=value==='canvas' && !onCanvas();
-    if(w){
+    selectCanvasWindow(null);var firstCanvas=value==='canvas' && (!onCanvas() || w===playerWindow && !(memory.layout.canvas && memory.layout.canvas.controls));
+    if(w===playerWindow){
+      if(!canvasWindow(w) && !memory.layout.controls)rememberRect(w);
+      memory.layout.controlsPlacement=value;
+    }else if(w){
       var placements=memory.layout.panelPlacements || (memory.layout.panelPlacements=[]),index=placements.findIndex(function(p){return p.panel===w.panel.id;}),entry={panel:w.panel.id,placement:value};
       if(index<0)placements.push(entry);else placements[index]=entry;
     }else memory.layout.panelPlacement=value;
     mountWindows();paint();sizeGraph(true);if(firstCanvas)fitCanvas();
-    windows.filter(canvasWindow).forEach(rememberRect);
+    windows.concat([playerWindow]).filter(canvasWindow).forEach(rememberRect);
     if(!publish(token)){mountWindows();paint();}
     shell.dispatchEvent(new CustomEvent('explore-placement-change',{bubbles:true}));
   }
@@ -196,7 +216,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // reader session first customizes it, so the gesture cannot change size.
     if(canvasWindow(w)){
       var layout=memory.layout.canvas || (memory.layout.canvas={}),r=graphRect(w.state);
-      if(w.prose)layout.prose=r;
+      if(w===playerWindow)layout.controls=r;
+      else if(w.prose)layout.prose=r;
       else{var panels=layout.panels || (layout.panels=[]),i=panels.findIndex(function(p){return p.panel===w.panel.id;}),value=Object.assign({panel:w.panel.id},r);if(i<0)panels.push(value);else panels[i]=value;}
       return;
     }
@@ -255,8 +276,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var anchor=document.createComment('explore position');node.parentNode.insertBefore(anchor,node);
     moved.push({node:node,anchor:anchor});host.appendChild(node);
   }
-  function available(w){return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
-  function visible(w){return available(w) && !w.state.hidden && !memory.focus;}
+  function available(w){if(w===playerWindow)return !!bar || !!player.querySelector('.playback-mode-rail');return !w.authoredHidden && !w.card.classList.contains('panel-step-hidden');}
+  function visible(w){if(w===playerWindow)return available(w);return available(w) && !w.state.hidden && !memory.focus;}
   function clamp(n,min,max){return Math.max(min,Math.min(max,n));}
   function bounds(){return {w:stage.clientWidth,h:stage.clientHeight};}
   function fitHeight(){
@@ -301,7 +322,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var explicit=onCanvas() && !hasFloating()?memory.layout.canvas && memory.layout.canvas.controlsScale:memory.layout.overlayScale;
     value=Math.round(clamp(value,.5,1.25)*100)/100;if(value===sizingScale() && value===overlayScale() && explicit===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false)return;
-    if(onCanvas()){var canvasLayout=memory.layout.canvas || (memory.layout.canvas={});canvasLayout.controlsScale=value;}
+    if(onCanvas() && !canvasWindow(playerWindow)){var canvasLayout=memory.layout.canvas || (memory.layout.canvas={});canvasLayout.controlsScale=value;}
     if(!onCanvas() || hasFloating())memory.layout.overlayScale=value;
     paint();publish(token);paint();
     if(!retired && active)shell.dispatchEvent(new CustomEvent('explore-overlay-scale',{bubbles:true}));
@@ -354,7 +375,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
     if(selectedCanvasWindow && (!canvasWindow(selectedCanvasWindow) || !visible(selectedCanvasWindow)))selectCanvasWindow(null);
-    var contentScale=overlayScale();stage.style.setProperty('--explore-overlay-scale',String(contentScale));
+    var contentScale=overlayScale();player.style.setProperty('--explore-overlay-scale',String(canvasWindow(playerWindow)?1:contentScale));stage.style.setProperty('--explore-overlay-scale',String(contentScale));
     var textPosition=memory.layout.steps && memory.layout.steps.textPosition || 'below';
     player.setAttribute('data-step-text-position',textPosition);
     player.setAttribute('data-explore-layout',definition.id);
@@ -397,13 +418,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var padding=chips?getComputedStyle(chips):null;
     var tracks=timeline?Math.min(180,Math.max(34,timeline.offsetHeight+(parseFloat(padding.paddingTop)||0)+(parseFloat(padding.paddingBottom)||0))):34;
     player.style.setProperty('--explore-tracks-height',tracks+'px');
-    var controls=memory.controls;
+    var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
     if(!controls){
       var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
       var height=Math.min((b.h-24)/contentScale,tracks+112+(Math.min(b.w-24,controlWidth*contentScale)<560?64:0));
       controls=workbenchCanvas?{x:84,y:b.h-height*contentScale-insetBottom,w:controlWidth,h:height}:{x:12,y:b.h-height*contentScale-12,w:controlWidth,h:height};
     }
-    playerWindow.state=memory.controls || Object.assign({},controls);
+    playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
     apply(playerWindow,constrain(playerWindow,scaledRect(playerWindow,controls)));
     player.hidden=!bar && !player.querySelector('.playback-mode-rail');
     player.classList.toggle('player-ambient',!!bar && bar.hidden);
@@ -460,8 +481,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(retired || !active || !handle.isConnected)return;
     clearScrollEdit();var token=beginEdit(true);if(token===false)return;
     raise(w);
-    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
-    if(w===playerWindow)memory.controls=w.state=scaledRect(w,r,true);
+    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
+    if(w===playerWindow && !canvasWindow(w))memory.controls=w.state=scaledRect(w,r,true);
     else w.state.automatic=false;
     gesture={w:w,kind:kind,handle:handle,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,rect:r,before:before,token:token,automatic:automatic};
     handle.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
@@ -488,8 +509,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
     var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
-    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !memory.controls;
-    if(w===playerWindow)memory.controls=w.state=scaledRect(w,w.rect,true);
+    var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
+    if(w===playerWindow && !canvasWindow(w))memory.controls=w.state=scaledRect(w,w.rect,true);
     else w.state.automatic=false;
     var n=(ev.shiftKey?24:8)/(canvasWindow(w)?graphScale():1);
     var sizing=canvasSizing(w);
@@ -597,7 +618,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
-    objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
+    stage.appendChild(player);controlsPlacementLabel.hidden=true;objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
     stage.hidden=true;grid.hidden=false;if(workbenchCanvas)board.hidden=canvasBoardHidden;board.classList.remove('explore-board');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
     shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
@@ -641,7 +662,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function resized(){cancel();fitHeight();paint();}
   function panStart(ev){
-    if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,.explore-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     clearScrollEdit();var token=beginEdit();if(token===false)return;
     ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
@@ -658,11 +679,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function canvasExtent(){
     var svg=board.querySelector('.boardcanvas>svg'),height=svg && svg.viewBox.baseVal.height || 800;
     var x=0,y=0,right=graphWidth(),bottom=height;
-    windows.filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=w.rect || constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
+    windows.concat([playerWindow]).filter(function(w){return canvasWindow(w) && visible(w);}).forEach(function(w){var r=w.rect || constrain(w,w.state);x=Math.min(x,r.x);y=Math.min(y,r.y);right=Math.max(right,r.x+r.w);bottom=Math.max(bottom,r.y+r.h);});
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
   function fitCanvas(insets,selection,extraObstacles){
-      if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:180}:{left:24,right:windows.length?260:24,top:108,bottom:180});
+      if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
       insets=Object.assign({},insets);
       if(onCanvas() && !selection)insets.right=24;
       // Subtract fixed overlays into free rectangles, then choose the rectangle
@@ -670,7 +691,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var regions=[{x:insets.left,y:insets.top,w:Math.max(1,board.clientWidth-insets.left-insets.right),h:Math.max(1,board.clientHeight-insets.top-insets.bottom)}];
       var obstacles=windows.filter(function(w){return !canvasWindow(w) && visible(w);}).map(function(w){return w.rect;});
       if(extraObstacles)obstacles=obstacles.concat(extraObstacles);
-      if(!player.hidden)obstacles.push(playerWindow.rect);
+      if(!player.hidden && !canvasWindow(playerWindow))obstacles.push(playerWindow.rect);
       obstacles.filter(Boolean).forEach(function(r){
         var next=[],o={x:r.x-16,y:r.y-16,right:r.x+r.w+16,bottom:r.y+r.h+16};
         regions.forEach(function(a){

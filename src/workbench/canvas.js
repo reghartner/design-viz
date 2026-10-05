@@ -117,7 +117,7 @@ function initWorkbenchCanvas(){
     if(!selection || !Number.isFinite(selection.w))selection=null;
     var vp=viewport();if(!diagramMode() || !vp)return;
     var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=24,width=bounds?bounds.width:innerWidth;
-    var player=current() && current().sectionEl.querySelector('.explore-player'),playerRect=player && !player.hidden && player.getBoundingClientRect();
+    var player=current() && current().sectionEl.querySelector('.explore-player'),playerRect=player && !player.hidden && !player.closest('.explore-canvas-objects') && player.getBoundingClientRect();
     if(bounds && playerRect)bottom=Math.max(bottom,bounds.bottom-playerRect.top+12);
     document.querySelectorAll('.workspace-window:not([hidden])').forEach(function(win){
       var r=win.getBoundingClientRect();if(r.left<innerWidth/2)left=Math.max(left,Math.min(width*.4,r.right-(bounds?bounds.left:0)+16));else right=Math.max(right,Math.min(width*.4,(bounds?bounds.right:innerWidth)-r.left+16));

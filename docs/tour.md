@@ -228,7 +228,12 @@ Per step:
 Teach chapter choice before controls. Named chapters can change the arrangement
 and the visible step stops; they need not be called “Story” and “Data flow.”
 Standard preserves the authored tiles. Explore puts the graph in a larger
-workspace with movable panels and pinned step controls. Explore chapter buttons
+workspace with movable panels and step controls that default to viewport-pinned
+Floating placement. Each chapter can choose **Panels → Step controls → On canvas**
+to move and zoom the controls with the graph. Authors save the choice as
+`exploreLayout.controlsPlacement` (`"floating"` or `"canvas"`), preserving the
+Floating rectangle in `exploreLayout.controls` and the separate graph rectangle
+in `exploreLayout.canvas.controls`. Explore chapter buttons
 carry an **EXPLORE** marker, and a document tab carries the same marker when
 its primary diagram's current chapter uses Explore viewing mode. The marker's tooltip and
 accessible description explain that the canvas can be panned and zoomed.
@@ -262,7 +267,7 @@ example, these two steps fit the named-layouts starter's `home-story` and
     "diagramState": {"view": "service-flow", "mode": "step"},
     "target": {"selector": ".explore-panel-choices", "within": "section"},
     "secondary": [
-      {"target": {"selector": ".explore-player", "within": "section"}, "note": "Step controls stay pinned here."}
+      {"target": {"selector": ".explore-player", "within": "section"}, "note": "Step controls default to Floating, pinned to the viewport. Choose Panels → Step controls → On canvas to move and zoom them with the graph."}
     ],
     "copy": {
       "heading": "Inspect the service flow",

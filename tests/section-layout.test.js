@@ -611,3 +611,16 @@ test('per-panel Explore placements validate independently and survive chapter an
  const issues=[],partial={...value,panelPlacements:[{panel:'home',placement:'screen'},value.panelPlacements[0],{panel:'unknown',placement:'canvas'}]};
  assert.deepEqual(plain(ctx.sectionExploreLayout(d,partial,issues)),value);assert.equal(issues.length,2);
 });
+
+test('step controls placement and independent graph geometry validate without changing floating defaults',()=>{
+ const d=diagram(),controls={x:.05,y:.8,w:.8,h:.15},canvasControls={x:-600,y:900,w:720,h:220};
+ const value={controlsPlacement:'canvas',controls,canvas:{controls:canvasControls},camera:{zoom:.001,x:500,y:-500}};
+ const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+ assert.deepEqual(plain(ctx.sectionExploreLayout(d,{controls})),{controls});
+ d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+ const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+ const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+ for(const placement of ['floating','canvas']){const next={...value,controlsPlacement:placement};const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',next);assert.ok(!plan.error,plan.error);assert.deepEqual(JSON.parse(plan.text).page.sections[0].diagram.layouts[0].exploreLayout,next);}
+ for(const invalid of [null,[],{},'screen']){const input={controls,controlsPlacement:invalid},issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{controls});assert.equal(issues.length,1);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);}
+ for(const rect of [null,[],{x:0,y:0,w:0,h:10},{x:10001,y:0,w:10,h:10},{x:0,y:0,w:10,h:Infinity}]){const input={controls,canvas:{controls:rect}},issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{controls,canvas:{}});assert.equal(issues.length,1);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);}
+});

@@ -71,6 +71,10 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value===undefined)return out;
   if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.controlsPlacement!==undefined){
+    if(['floating','canvas'].indexOf(value.controlsPlacement)<0)warn(path+'.controlsPlacement','use floating or canvas');
+    else out.controlsPlacement=value.controlsPlacement;
+  }
   if(value.panelPlacement!==undefined){
     if(['floating','canvas'].indexOf(value.panelPlacement)<0)warn(path+'.panelPlacement','use floating or canvas');
     else out.panelPlacement=value.panelPlacement;
@@ -93,7 +97,7 @@ function sectionExploreLayout(d,value,warnings,path){
       if(!object(v) || !['x','y','w','h'].every(function(k){return Number.isFinite(v[k]) && Math.abs(v[k])<=10000;}) || v.w<=0 || v.h<=0){warn(at,'use finite graph coordinates from -10000 to 10000 and positive width/height');return null;}
       return {x:v.x,y:v.y,w:v.w,h:v.h};
     }
-    if(!object(canvas))warn(path+'.canvas','expected an object with panels and/or prose');
+    if(!object(canvas))warn(path+'.canvas','expected an object with panels, prose and/or controls');
     else{
       if(canvas.controlsScale!==undefined){
         if(!Number.isFinite(canvas.controlsScale) || canvas.controlsScale<.5 || canvas.controlsScale>1.25)warn(path+'.canvas.controlsScale','use a scale from 0.5 to 1.25 for step controls');
@@ -107,6 +111,7 @@ function sectionExploreLayout(d,value,warnings,path){
           canvasUsed[v.panel]=true;if(r)list.push(Object.assign({panel:v.panel},r));return list;
         },[]);
       }
+      if(canvas.controls!==undefined){var controlsRect=graphRect(canvas.controls,path+'.canvas.controls');if(controlsRect)canvasOut.controls=controlsRect;}
       if(canvas.prose!==undefined){var cr=graphRect(canvas.prose,path+'.canvas.prose');if(cr)canvasOut.prose=cr;}
       out.canvas=canvasOut;
     }
@@ -146,7 +151,7 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
-    var c=value.camera,canvasCamera=out.panelPlacement==='canvas' || out.canvas || (out.panelPlacements || []).some(function(p){return p.placement==='canvas';}),minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
+    var c=value.camera,canvasCamera=out.controlsPlacement==='canvas' || out.panelPlacement==='canvas' || out.canvas || (out.panelPlacements || []).some(function(p){return p.placement==='canvas';}),minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
     if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<minZoom || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=maxCenter;}))warn(path+'.camera','use zoom '+minZoom+'–4 and finite x/y SVG center coordinates between -'+maxCenter+' and '+maxCenter);
     else out.camera={zoom:c.zoom,x:c.x,y:c.y};
   }

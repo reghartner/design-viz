@@ -125,7 +125,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function canvasWindow(w){return windowPlacement(w)==='canvas';}
   function canvasSizing(w){return canvasWindow(w) && !w.prose?w.canvasSizing:null;}
-  function onCanvas(){return canvasWindow(playerWindow) || windows.some(canvasWindow);}
+  // Workbench queries placement for Standard views too, before any Explore
+  // memory exists and after a canvas view has left its player state behind.
+  function onCanvas(){return active && (canvasWindow(playerWindow) || windows.some(canvasWindow));}
   function hasFloating(){return windows.some(function(w){return !canvasWindow(w);});}
   function canvasWindowLabel(w,selected){var label=w.label+(w===playerWindow?' on canvas':' canvas panel');return selected?label+', selected':'Select '+label;}
   function syncCanvasWindow(w){

@@ -390,3 +390,13 @@ test('step controls inspector reveals a new canvas rectangle',async({page,server
  const r=await player(page).boundingBox(),b=await page.locator('.explore-stage').boundingBox();
  expect(r.x).toBeGreaterThanOrEqual(b.x);expect(r.y).toBeGreaterThanOrEqual(b.y);expect(r.x+r.width).toBeLessThanOrEqual(b.x+b.width);expect(r.y+r.height).toBeLessThanOrEqual(b.y+b.height);
 });
+
+test('Standard chapters remain usable before and after canvas step controls activate',async({page,server})=>{
+ const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
+ await expect(page.locator('.doc-sec[data-view-id=home-story]')).toBeVisible();await expect(page.locator('.explore-stage')).toBeHidden();
+ await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');const original=await source(page);
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#workspace-fit')).toHaveText('Fit canvas');
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');
+ await expect(page.locator('#src')).toHaveValue(original);
+});

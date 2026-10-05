@@ -1,0 +1,3311 @@
+{
+  "page": {
+    "title": "Auto arrange large architecture baselines",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "id": "incident-response",
+        "heading": "01 · Incident response · 24 nodes",
+        "text": "Signals converge through correlation and triage, while a legacy NOC still pages responders and receives command-side updates. Automation, vendor escalation and public communications rejoin at verification before the learning loop closes.",
+        "diagram": {
+          "title": "01 · Incident response · 24 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "api-monitor": {
+              "title": "API monitor",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "infra-monitor": {
+              "title": "Infra monitor",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "customer-report": {
+              "title": "Customer report",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "alert-gateway": {
+              "title": "Alert gateway",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "support-portal": {
+              "title": "Support portal",
+              "icon": "terminal",
+              "tint": "mqtt"
+            },
+            "legacy-noc": {
+              "title": "Legacy NOC",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "dedupe": {
+              "title": "Deduplicator",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "correlator": {
+              "title": "Correlator",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "severity": {
+              "title": "Severity model",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "ownership": {
+              "title": "Ownership lookup",
+              "icon": "db",
+              "tint": "data"
+            },
+            "topology": {
+              "title": "Topology lookup",
+              "icon": "db",
+              "tint": "data"
+            },
+            "incident-store": {
+              "title": "Incident record",
+              "icon": "db",
+              "tint": "data"
+            },
+            "pager": {
+              "title": "Pager service",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "oncall": {
+              "title": "On-call engineer",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "incident-command": {
+              "title": "Incident command",
+              "icon": "terminal",
+              "tint": "auth"
+            },
+            "runbook": {
+              "title": "Runbook library",
+              "icon": "db",
+              "tint": "data"
+            },
+            "automation": {
+              "title": "Remediation runner",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "vendor": {
+              "title": "Vendor escalation",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "status-page": {
+              "title": "Status page",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "customer-comms": {
+              "title": "Customer comms",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "verification": {
+              "title": "Recovery checks",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "postmortem": {
+              "title": "Postmortem",
+              "icon": "terminal",
+              "tint": "auth"
+            },
+            "knowledge-base": {
+              "title": "Knowledge base",
+              "icon": "db",
+              "tint": "data"
+            },
+            "audit-archive": {
+              "title": "Audit archive",
+              "icon": "db",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "api-monitor",
+              "to": "alert-gateway"
+            },
+            {
+              "from": "infra-monitor",
+              "to": "alert-gateway"
+            },
+            {
+              "from": "customer-report",
+              "to": "support-portal"
+            },
+            {
+              "from": "support-portal",
+              "to": "alert-gateway"
+            },
+            {
+              "from": "alert-gateway",
+              "to": "dedupe"
+            },
+            {
+              "from": "dedupe",
+              "to": "correlator"
+            },
+            {
+              "from": "correlator",
+              "to": "severity"
+            },
+            {
+              "from": "correlator",
+              "to": "ownership"
+            },
+            {
+              "from": "correlator",
+              "to": "topology"
+            },
+            {
+              "from": "severity",
+              "to": "incident-store"
+            },
+            {
+              "from": "ownership",
+              "to": "incident-store"
+            },
+            {
+              "from": "topology",
+              "to": "incident-store"
+            },
+            {
+              "from": "infra-monitor",
+              "to": "legacy-noc"
+            },
+            {
+              "from": "legacy-noc",
+              "to": "incident-store"
+            },
+            {
+              "from": "incident-store",
+              "to": "pager"
+            },
+            {
+              "from": "legacy-noc",
+              "to": "pager"
+            },
+            {
+              "from": "pager",
+              "to": "oncall"
+            },
+            {
+              "from": "oncall",
+              "to": "incident-command"
+            },
+            {
+              "from": "incident-command",
+              "to": "runbook"
+            },
+            {
+              "from": "incident-command",
+              "to": "automation",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12,
+                  "dy": 5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.7,
+                  "dy": -5.6
+                }
+              ]
+            },
+            {
+              "from": "incident-command",
+              "to": "vendor"
+            },
+            {
+              "from": "incident-command",
+              "to": "status-page"
+            },
+            {
+              "from": "automation",
+              "to": "runbook"
+            },
+            {
+              "from": "runbook",
+              "to": "verification"
+            },
+            {
+              "from": "automation",
+              "to": "verification"
+            },
+            {
+              "from": "vendor",
+              "to": "verification",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12,
+                  "dy": 5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.7,
+                  "dy": -5.6
+                }
+              ]
+            },
+            {
+              "from": "status-page",
+              "to": "customer-comms"
+            },
+            {
+              "from": "customer-comms",
+              "to": "verification"
+            },
+            {
+              "from": "verification",
+              "to": "incident-command",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 18.4,
+                  "dy": -14.5
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 16.1,
+                  "dy": -11.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.7,
+                  "dy": -7
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 9.8,
+                  "dy": -7.1
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": -9.8,
+                  "dy": 7.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.7,
+                  "dy": 7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": -16.1,
+                  "dy": 11.4
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": -18.4,
+                  "dy": 14.5
+                }
+              ]
+            },
+            {
+              "from": "verification",
+              "to": "postmortem"
+            },
+            {
+              "from": "postmortem",
+              "to": "knowledge-base"
+            },
+            {
+              "from": "knowledge-base",
+              "to": "audit-archive"
+            },
+            {
+              "from": "incident-command",
+              "to": "legacy-noc"
+            }
+          ],
+          "floats": [
+            {
+              "id": "api-monitor",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "infra-monitor",
+              "side": "below",
+              "x": 732,
+              "y": 296
+            },
+            {
+              "id": "customer-report",
+              "side": "below",
+              "x": 120,
+              "y": 198
+            },
+            {
+              "id": "alert-gateway",
+              "side": "below",
+              "x": 528,
+              "y": 198
+            },
+            {
+              "id": "support-portal",
+              "side": "below",
+              "x": 324,
+              "y": 198
+            },
+            {
+              "id": "legacy-noc",
+              "side": "below",
+              "x": 732,
+              "y": 590
+            },
+            {
+              "id": "dedupe",
+              "side": "below",
+              "x": 528,
+              "y": 296
+            },
+            {
+              "id": "correlator",
+              "side": "below",
+              "x": 324,
+              "y": 296
+            },
+            {
+              "id": "severity",
+              "side": "below",
+              "x": 324,
+              "y": 394
+            },
+            {
+              "id": "ownership",
+              "side": "below",
+              "x": 120,
+              "y": 394
+            },
+            {
+              "id": "topology",
+              "side": "below",
+              "x": 528,
+              "y": 394
+            },
+            {
+              "id": "incident-store",
+              "side": "below",
+              "x": 528,
+              "y": 492
+            },
+            {
+              "id": "pager",
+              "side": "below",
+              "x": 528,
+              "y": 590
+            },
+            {
+              "id": "oncall",
+              "side": "below",
+              "x": 324,
+              "y": 590
+            },
+            {
+              "id": "incident-command",
+              "side": "below",
+              "x": 324,
+              "y": 688
+            },
+            {
+              "id": "runbook",
+              "side": "below",
+              "x": 120,
+              "y": 688
+            },
+            {
+              "id": "automation",
+              "side": "below",
+              "x": 120,
+              "y": 786
+            },
+            {
+              "id": "vendor",
+              "side": "below",
+              "x": 324,
+              "y": 786
+            },
+            {
+              "id": "status-page",
+              "side": "below",
+              "x": 528,
+              "y": 786
+            },
+            {
+              "id": "customer-comms",
+              "side": "below",
+              "x": 528,
+              "y": 884
+            },
+            {
+              "id": "verification",
+              "side": "below",
+              "x": 120,
+              "y": 884
+            },
+            {
+              "id": "postmortem",
+              "side": "below",
+              "x": 120,
+              "y": 982
+            },
+            {
+              "id": "knowledge-base",
+              "side": "below",
+              "x": 324,
+              "y": 982
+            },
+            {
+              "id": "audit-archive",
+              "side": "below",
+              "x": 528,
+              "y": 982
+            }
+          ]
+        }
+      },
+      {
+        "id": "regional-billing",
+        "heading": "02 · Regional billing · 32 nodes · nonplanar",
+        "text": "Three regional ingress services each call tax, foreign-exchange and fraud policy, forming an explicit K3,3 core. A legacy billing service still writes invoices directly, while payment retries and reconciliation feed shared ledgers and finance operations.",
+        "diagram": {
+          "title": "02 · Regional billing · 32 nodes · K3,3",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "customer-portal": {
+              "title": "Customer portal",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "batch-import": {
+              "title": "Batch import",
+              "icon": "package",
+              "tint": "dev"
+            },
+            "partner-api": {
+              "title": "Partner API",
+              "icon": "cloud",
+              "tint": "dev"
+            },
+            "us-ingress": {
+              "title": "US ingress",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "eu-ingress": {
+              "title": "EU ingress",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "apac-ingress": {
+              "title": "APAC ingress",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "tax-engine": {
+              "title": "Tax engine",
+              "icon": "gear",
+              "tint": "auth"
+            },
+            "fx-engine": {
+              "title": "FX engine",
+              "icon": "gear",
+              "tint": "auth"
+            },
+            "fraud-engine": {
+              "title": "Fraud policy",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "legacy-billing": {
+              "title": "Legacy billing",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "plan-catalog": {
+              "title": "Plan catalog",
+              "icon": "db",
+              "tint": "data"
+            },
+            "account-service": {
+              "title": "Account service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "usage-store": {
+              "title": "Usage store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "rating-service": {
+              "title": "Rating service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "discount-service": {
+              "title": "Discount service",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "invoice-builder": {
+              "title": "Invoice builder",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "invoice-store": {
+              "title": "Invoice store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "payment-orchestrator": {
+              "title": "Payment orchestrator",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "card-gateway": {
+              "title": "Card gateway",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "bank-gateway": {
+              "title": "Bank gateway",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "retry-queue": {
+              "title": "Retry queue",
+              "icon": "package",
+              "tint": "mqtt"
+            },
+            "dunning": {
+              "title": "Dunning service",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "entitlement": {
+              "title": "Entitlements",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "revenue-ledger": {
+              "title": "Revenue ledger",
+              "icon": "db",
+              "tint": "data"
+            },
+            "tax-ledger": {
+              "title": "Tax ledger",
+              "icon": "db",
+              "tint": "data"
+            },
+            "audit-log": {
+              "title": "Audit log",
+              "icon": "db",
+              "tint": "data"
+            },
+            "statements": {
+              "title": "Statement service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "email": {
+              "title": "Email delivery",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "support-console": {
+              "title": "Support console",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "reconciliation": {
+              "title": "Reconciliation",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "warehouse-export": {
+              "title": "Warehouse export",
+              "icon": "package",
+              "tint": "data"
+            },
+            "finance-ops": {
+              "title": "Finance operations",
+              "icon": "terminal",
+              "tint": "dev"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "customer-portal",
+              "to": "us-ingress"
+            },
+            {
+              "from": "batch-import",
+              "to": "eu-ingress"
+            },
+            {
+              "from": "partner-api",
+              "to": "apac-ingress"
+            },
+            {
+              "from": "us-ingress",
+              "to": "tax-engine",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 51.9,
+                  "dy": 13
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 69.8,
+                  "dy": 8.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 78.7,
+                  "dy": 7
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 87.9,
+                  "dy": 6.1
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 87.9,
+                  "dy": -6.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 78.7,
+                  "dy": -7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 69.8,
+                  "dy": -8.4
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 51.9,
+                  "dy": -13
+                }
+              ]
+            },
+            {
+              "from": "us-ingress",
+              "to": "fx-engine",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 18.4,
+                  "dy": 14.5
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 16.1,
+                  "dy": 11.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.7,
+                  "dy": 7
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 9.8,
+                  "dy": 7.1
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": -9.8,
+                  "dy": -7.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.7,
+                  "dy": -7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": -16.1,
+                  "dy": -11.4
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": -18.4,
+                  "dy": -14.5
+                }
+              ]
+            },
+            {
+              "from": "us-ingress",
+              "to": "fraud-engine"
+            },
+            {
+              "from": "eu-ingress",
+              "to": "tax-engine"
+            },
+            {
+              "from": "eu-ingress",
+              "to": "fx-engine",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 12,
+                  "dy": 5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -11.7,
+                  "dy": -5.6
+                }
+              ]
+            },
+            {
+              "from": "eu-ingress",
+              "to": "fraud-engine",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12,
+                  "dy": -5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.7,
+                  "dy": 5.6
+                }
+              ]
+            },
+            {
+              "from": "apac-ingress",
+              "to": "tax-engine",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12,
+                  "dy": 5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.7,
+                  "dy": -5.6
+                }
+              ]
+            },
+            {
+              "from": "apac-ingress",
+              "to": "fx-engine"
+            },
+            {
+              "from": "apac-ingress",
+              "to": "fraud-engine",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12.6,
+                  "dy": -3
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 12.5,
+                  "dy": 3
+                }
+              ]
+            },
+            {
+              "from": "customer-portal",
+              "to": "account-service"
+            },
+            {
+              "from": "plan-catalog",
+              "to": "rating-service"
+            },
+            {
+              "from": "usage-store",
+              "to": "rating-service"
+            },
+            {
+              "from": "rating-service",
+              "to": "discount-service"
+            },
+            {
+              "from": "discount-service",
+              "to": "invoice-builder"
+            },
+            {
+              "from": "account-service",
+              "to": "invoice-builder",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 59.2,
+                  "dy": 19.4
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 115.7,
+                  "dy": 42.2
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 146.7,
+                  "dy": 72.3
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 125.2,
+                  "dy": 59.2
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 80.9,
+                  "dy": 36.5
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 57.3,
+                  "dy": 25.7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 29.2,
+                  "dy": 10.4
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 4.3,
+                  "dy": -3.6
+                }
+              ]
+            },
+            {
+              "from": "tax-engine",
+              "to": "invoice-builder"
+            },
+            {
+              "from": "fx-engine",
+              "to": "invoice-builder"
+            },
+            {
+              "from": "fraud-engine",
+              "to": "invoice-builder",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -5.6,
+                  "dy": 14.8
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 4.5,
+                  "dy": 57.2
+                },
+                {
+                  "t": 0.5,
+                  "dx": 23.3,
+                  "dy": 74.7
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 4.1,
+                  "dy": 44.3
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -10.3,
+                  "dy": 13.4
+                }
+              ]
+            },
+            {
+              "from": "batch-import",
+              "to": "legacy-billing"
+            },
+            {
+              "from": "legacy-billing",
+              "to": "invoice-builder"
+            },
+            {
+              "from": "legacy-billing",
+              "to": "invoice-store"
+            },
+            {
+              "from": "invoice-builder",
+              "to": "invoice-store"
+            },
+            {
+              "from": "invoice-store",
+              "to": "payment-orchestrator"
+            },
+            {
+              "from": "payment-orchestrator",
+              "to": "card-gateway",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 18.4,
+                  "dy": 14.5
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 16.1,
+                  "dy": 11.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.7,
+                  "dy": 7
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 9.8,
+                  "dy": 7.1
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": -9.8,
+                  "dy": -7.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.7,
+                  "dy": -7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": -16.1,
+                  "dy": -11.4
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": -18.4,
+                  "dy": -14.5
+                }
+              ]
+            },
+            {
+              "from": "payment-orchestrator",
+              "to": "bank-gateway"
+            },
+            {
+              "from": "card-gateway",
+              "to": "reconciliation"
+            },
+            {
+              "from": "bank-gateway",
+              "to": "reconciliation"
+            },
+            {
+              "from": "card-gateway",
+              "to": "retry-queue"
+            },
+            {
+              "from": "bank-gateway",
+              "to": "retry-queue"
+            },
+            {
+              "from": "retry-queue",
+              "to": "payment-orchestrator"
+            },
+            {
+              "from": "payment-orchestrator",
+              "to": "dunning",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -12,
+                  "dy": 5.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.7,
+                  "dy": -5.6
+                }
+              ]
+            },
+            {
+              "from": "dunning",
+              "to": "entitlement"
+            },
+            {
+              "from": "payment-orchestrator",
+              "to": "revenue-ledger"
+            },
+            {
+              "from": "tax-engine",
+              "to": "tax-ledger",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 24.9,
+                  "dy": 2.6
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 21,
+                  "dy": -12.5
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.7,
+                  "dy": -25.7
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 25.3,
+                  "dy": 0.4
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": -25.3,
+                  "dy": -0.4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.7,
+                  "dy": 25.7
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": -21,
+                  "dy": 12.5
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": -24.9,
+                  "dy": -2.6
+                }
+              ]
+            },
+            {
+              "from": "invoice-builder",
+              "to": "audit-log"
+            },
+            {
+              "from": "payment-orchestrator",
+              "to": "audit-log"
+            },
+            {
+              "from": "invoice-store",
+              "to": "statements"
+            },
+            {
+              "from": "statements",
+              "to": "email"
+            },
+            {
+              "from": "invoice-store",
+              "to": "support-console"
+            },
+            {
+              "from": "reconciliation",
+              "to": "warehouse-export"
+            },
+            {
+              "from": "revenue-ledger",
+              "to": "warehouse-export"
+            },
+            {
+              "from": "tax-ledger",
+              "to": "warehouse-export"
+            },
+            {
+              "from": "audit-log",
+              "to": "warehouse-export"
+            },
+            {
+              "from": "warehouse-export",
+              "to": "finance-ops"
+            },
+            {
+              "from": "reconciliation",
+              "to": "finance-ops"
+            }
+          ],
+          "floats": [
+            {
+              "id": "customer-portal",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "batch-import",
+              "side": "below",
+              "x": 528,
+              "y": 394
+            },
+            {
+              "id": "partner-api",
+              "side": "below",
+              "x": 936,
+              "y": 198
+            },
+            {
+              "id": "us-ingress",
+              "side": "below",
+              "x": 732,
+              "y": 198
+            },
+            {
+              "id": "eu-ingress",
+              "side": "below",
+              "x": 732,
+              "y": 296
+            },
+            {
+              "id": "apac-ingress",
+              "side": "below",
+              "x": 936,
+              "y": 296
+            },
+            {
+              "id": "tax-engine",
+              "side": "below",
+              "x": 732,
+              "y": 394
+            },
+            {
+              "id": "fx-engine",
+              "side": "below",
+              "x": 936,
+              "y": 394
+            },
+            {
+              "id": "fraud-engine",
+              "side": "below",
+              "x": 528,
+              "y": 198
+            },
+            {
+              "id": "legacy-billing",
+              "side": "below",
+              "x": 528,
+              "y": 492
+            },
+            {
+              "id": "plan-catalog",
+              "side": "below",
+              "x": 1140,
+              "y": 590
+            },
+            {
+              "id": "account-service",
+              "side": "below",
+              "x": 324,
+              "y": 198
+            },
+            {
+              "id": "usage-store",
+              "side": "below",
+              "x": 1140,
+              "y": 492
+            },
+            {
+              "id": "rating-service",
+              "side": "below",
+              "x": 936,
+              "y": 590
+            },
+            {
+              "id": "discount-service",
+              "side": "below",
+              "x": 936,
+              "y": 492
+            },
+            {
+              "id": "invoice-builder",
+              "side": "below",
+              "x": 732,
+              "y": 492
+            },
+            {
+              "id": "invoice-store",
+              "side": "below",
+              "x": 528,
+              "y": 590
+            },
+            {
+              "id": "payment-orchestrator",
+              "side": "below",
+              "x": 528,
+              "y": 786
+            },
+            {
+              "id": "card-gateway",
+              "side": "below",
+              "x": 732,
+              "y": 982
+            },
+            {
+              "id": "bank-gateway",
+              "side": "below",
+              "x": 528,
+              "y": 884
+            },
+            {
+              "id": "retry-queue",
+              "side": "below",
+              "x": 528,
+              "y": 982
+            },
+            {
+              "id": "dunning",
+              "side": "below",
+              "x": 324,
+              "y": 884
+            },
+            {
+              "id": "entitlement",
+              "side": "below",
+              "x": 120,
+              "y": 884
+            },
+            {
+              "id": "revenue-ledger",
+              "side": "below",
+              "x": 732,
+              "y": 786
+            },
+            {
+              "id": "tax-ledger",
+              "side": "below",
+              "x": 936,
+              "y": 688
+            },
+            {
+              "id": "audit-log",
+              "side": "below",
+              "x": 732,
+              "y": 688
+            },
+            {
+              "id": "statements",
+              "side": "below",
+              "x": 324,
+              "y": 492
+            },
+            {
+              "id": "email",
+              "side": "below",
+              "x": 120,
+              "y": 492
+            },
+            {
+              "id": "support-console",
+              "side": "below",
+              "x": 324,
+              "y": 590
+            },
+            {
+              "id": "reconciliation",
+              "side": "below",
+              "x": 732,
+              "y": 884
+            },
+            {
+              "id": "warehouse-export",
+              "side": "below",
+              "x": 936,
+              "y": 786
+            },
+            {
+              "id": "finance-ops",
+              "side": "below",
+              "x": 936,
+              "y": 884
+            }
+          ]
+        }
+      },
+      {
+        "id": "freight-operations",
+        "heading": "03 · Freight operations · 40 nodes",
+        "text": "Quotes, bookings and tenders move through a long freight lifecycle. The legacy TMS writes orders directly, carrier tenders retry, customs and warehouse services share documents, and live tracking fans out to operations and customers.",
+        "diagram": {
+          "title": "03 · Freight operations · 40 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "booking-portal": {
+              "title": "Booking portal",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "edi-gateway": {
+              "title": "EDI gateway",
+              "icon": "router",
+              "tint": "dev"
+            },
+            "call-center": {
+              "title": "Call center",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "legacy-tms": {
+              "title": "Legacy TMS",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "quote-service": {
+              "title": "Quote service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "rate-store": {
+              "title": "Rate store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "contract-store": {
+              "title": "Contract store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "booking-service": {
+              "title": "Booking service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "order-store": {
+              "title": "Freight orders",
+              "icon": "db",
+              "tint": "data"
+            },
+            "route-planner": {
+              "title": "Route planner",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "map-service": {
+              "title": "Map service",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "capacity-service": {
+              "title": "Capacity service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "tender-service": {
+              "title": "Tender service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "carrier-portal": {
+              "title": "Carrier portal",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "carrier-api": {
+              "title": "Carrier API",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "retry-queue": {
+              "title": "Tender retry",
+              "icon": "package",
+              "tint": "mqtt"
+            },
+            "dispatch-board": {
+              "title": "Dispatch board",
+              "icon": "terminal",
+              "tint": "auth"
+            },
+            "pickup-scheduler": {
+              "title": "Pickup scheduler",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "driver-app": {
+              "title": "Driver app",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "yard-gate": {
+              "title": "Yard gate",
+              "icon": "chip",
+              "tint": "dev"
+            },
+            "dock-scheduler": {
+              "title": "Dock scheduler",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "scan-ingest": {
+              "title": "Scan ingest",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "tracking-service": {
+              "title": "Tracking service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "gps-gateway": {
+              "title": "GPS gateway",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "status-store": {
+              "title": "Status store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "eta-service": {
+              "title": "ETA service",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "exception-engine": {
+              "title": "Exception engine",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "ops-console": {
+              "title": "Operations console",
+              "icon": "terminal",
+              "tint": "auth"
+            },
+            "customer-updates": {
+              "title": "Customer updates",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "webhook-dispatch": {
+              "title": "Webhook dispatch",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "billing-trigger": {
+              "title": "Billing trigger",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "proof-store": {
+              "title": "Proof of delivery",
+              "icon": "db",
+              "tint": "data"
+            },
+            "customs-broker": {
+              "title": "Customs broker",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "customs-service": {
+              "title": "Customs service",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "document-store": {
+              "title": "Document store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "warehouse-wms": {
+              "title": "Warehouse WMS",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "linehaul-hub": {
+              "title": "Linehaul hub",
+              "icon": "package",
+              "tint": "dev"
+            },
+            "last-mile-hub": {
+              "title": "Last-mile hub",
+              "icon": "package",
+              "tint": "dev"
+            },
+            "analytics-feed": {
+              "title": "Analytics feed",
+              "icon": "db",
+              "tint": "data"
+            },
+            "audit-archive": {
+              "title": "Audit archive",
+              "icon": "db",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "rate-store",
+              "to": "quote-service"
+            },
+            {
+              "from": "contract-store",
+              "to": "quote-service"
+            },
+            {
+              "from": "booking-portal",
+              "to": "quote-service"
+            },
+            {
+              "from": "quote-service",
+              "to": "booking-service"
+            },
+            {
+              "from": "edi-gateway",
+              "to": "booking-service"
+            },
+            {
+              "from": "call-center",
+              "to": "booking-service"
+            },
+            {
+              "from": "booking-service",
+              "to": "order-store"
+            },
+            {
+              "from": "call-center",
+              "to": "legacy-tms"
+            },
+            {
+              "from": "legacy-tms",
+              "to": "order-store"
+            },
+            {
+              "from": "order-store",
+              "to": "route-planner"
+            },
+            {
+              "from": "map-service",
+              "to": "route-planner"
+            },
+            {
+              "from": "route-planner",
+              "to": "capacity-service"
+            },
+            {
+              "from": "capacity-service",
+              "to": "tender-service"
+            },
+            {
+              "from": "tender-service",
+              "to": "carrier-portal"
+            },
+            {
+              "from": "tender-service",
+              "to": "carrier-api"
+            },
+            {
+              "from": "carrier-portal",
+              "to": "dispatch-board"
+            },
+            {
+              "from": "carrier-api",
+              "to": "dispatch-board"
+            },
+            {
+              "from": "carrier-portal",
+              "to": "retry-queue"
+            },
+            {
+              "from": "carrier-api",
+              "to": "retry-queue",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -11.2,
+                  "dy": 3.69
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 11.2,
+                  "dy": -3.69
+                }
+              ]
+            },
+            {
+              "from": "retry-queue",
+              "to": "tender-service"
+            },
+            {
+              "from": "dispatch-board",
+              "to": "pickup-scheduler"
+            },
+            {
+              "from": "pickup-scheduler",
+              "to": "driver-app"
+            },
+            {
+              "from": "driver-app",
+              "to": "yard-gate"
+            },
+            {
+              "from": "yard-gate",
+              "to": "dock-scheduler"
+            },
+            {
+              "from": "dock-scheduler",
+              "to": "scan-ingest"
+            },
+            {
+              "from": "scan-ingest",
+              "to": "tracking-service"
+            },
+            {
+              "from": "gps-gateway",
+              "to": "tracking-service"
+            },
+            {
+              "from": "tracking-service",
+              "to": "status-store",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 98.2,
+                  "dy": 9
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 174.3,
+                  "dy": 20.7
+                },
+                {
+                  "t": 0.5,
+                  "dx": 178.5,
+                  "dy": 32.4
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 160.7,
+                  "dy": 2.25
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 81.1,
+                  "dy": -3.7800000000000002
+                }
+              ]
+            },
+            {
+              "from": "status-store",
+              "to": "eta-service"
+            },
+            {
+              "from": "eta-service",
+              "to": "exception-engine"
+            },
+            {
+              "from": "exception-engine",
+              "to": "ops-console"
+            },
+            {
+              "from": "exception-engine",
+              "to": "customer-updates"
+            },
+            {
+              "from": "customer-updates",
+              "to": "webhook-dispatch"
+            },
+            {
+              "from": "status-store",
+              "to": "billing-trigger",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 140.3,
+                  "dy": -1.8
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 329.3,
+                  "dy": 20.340000000000003
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 284,
+                  "dy": 33.93000000000001
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 238.7,
+                  "dy": -24.12
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 193.3,
+                  "dy": -82.08
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 148,
+                  "dy": -33.93000000000001
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": 102.7,
+                  "dy": -22.590000000000003
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 50.5,
+                  "dy": 1.53
+                }
+              ]
+            },
+            {
+              "from": "driver-app",
+              "to": "proof-store"
+            },
+            {
+              "from": "proof-store",
+              "to": "billing-trigger"
+            },
+            {
+              "from": "order-store",
+              "to": "customs-service",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -6.1,
+                  "dy": 3.7800000000000002
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 5.9,
+                  "dy": -3.6
+                }
+              ]
+            },
+            {
+              "from": "customs-broker",
+              "to": "customs-service"
+            },
+            {
+              "from": "customs-service",
+              "to": "document-store"
+            },
+            {
+              "from": "order-store",
+              "to": "document-store",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 7.1,
+                  "dy": 10.44
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 11.4,
+                  "dy": 20.88
+                },
+                {
+                  "t": 0.5,
+                  "dx": 11.5,
+                  "dy": 19.8
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 19.6,
+                  "dy": 9.72
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 19.4,
+                  "dy": -1.1700000000000002
+                }
+              ]
+            },
+            {
+              "from": "document-store",
+              "to": "warehouse-wms"
+            },
+            {
+              "from": "dispatch-board",
+              "to": "warehouse-wms"
+            },
+            {
+              "from": "warehouse-wms",
+              "to": "linehaul-hub"
+            },
+            {
+              "from": "linehaul-hub",
+              "to": "last-mile-hub"
+            },
+            {
+              "from": "last-mile-hub",
+              "to": "proof-store"
+            },
+            {
+              "from": "billing-trigger",
+              "to": "analytics-feed"
+            },
+            {
+              "from": "webhook-dispatch",
+              "to": "analytics-feed"
+            },
+            {
+              "from": "analytics-feed",
+              "to": "audit-archive",
+              "curveControls": [
+                {
+                  "t": 0.08333333333333333,
+                  "dx": 76.3,
+                  "dy": 60.21000000000001
+                },
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 130.7,
+                  "dy": 132.48
+                },
+                {
+                  "t": 0.25,
+                  "dx": 174.8,
+                  "dy": 202.5
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 236.4,
+                  "dy": 249.66
+                },
+                {
+                  "t": 0.4166666666666667,
+                  "dx": 278.3,
+                  "dy": 329.67
+                },
+                {
+                  "t": 0.5,
+                  "dx": 302.5,
+                  "dy": 366.3
+                },
+                {
+                  "t": 0.5833333333333334,
+                  "dx": 326.8,
+                  "dy": -270.63
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 351,
+                  "dy": -174.87
+                },
+                {
+                  "t": 0.75,
+                  "dx": 375.3,
+                  "dy": -79.2
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": 399.5,
+                  "dy": -132.39
+                },
+                {
+                  "t": 0.9166666666666666,
+                  "dx": 178.9,
+                  "dy": -78.57
+                }
+              ]
+            },
+            {
+              "from": "legacy-tms",
+              "to": "audit-archive"
+            },
+            {
+              "from": "ops-console",
+              "to": "dispatch-board",
+              "curveControls": [
+                {
+                  "t": 0.1111111111111111,
+                  "dx": 44.2,
+                  "dy": -32.04
+                },
+                {
+                  "t": 0.2222222222222222,
+                  "dx": 117.9,
+                  "dy": -45.99
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 193.3,
+                  "dy": -52.2
+                },
+                {
+                  "t": 0.4444444444444444,
+                  "dx": 58.3,
+                  "dy": -99
+                },
+                {
+                  "t": 0.5555555555555556,
+                  "dx": 96.9,
+                  "dy": -74.97
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -42.3,
+                  "dy": -52.2
+                },
+                {
+                  "t": 0.7777777777777778,
+                  "dx": -5,
+                  "dy": -45.72
+                },
+                {
+                  "t": 0.8888888888888888,
+                  "dx": 23.9,
+                  "dy": -30.330000000000002
+                }
+              ]
+            }
+          ],
+          "floats": [
+            {
+              "id": "booking-portal",
+              "side": "below",
+              "x": 120,
+              "y": 100
+            },
+            {
+              "id": "edi-gateway",
+              "side": "below",
+              "x": 120,
+              "y": 204.4
+            },
+            {
+              "id": "call-center",
+              "side": "below",
+              "x": 528,
+              "y": 204.4
+            },
+            {
+              "id": "legacy-tms",
+              "side": "below",
+              "x": 528,
+              "y": 308.8
+            },
+            {
+              "id": "quote-service",
+              "side": "below",
+              "x": 324,
+              "y": 204.4
+            },
+            {
+              "id": "rate-store",
+              "side": "below",
+              "x": 324,
+              "y": 100
+            },
+            {
+              "id": "contract-store",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "booking-service",
+              "side": "below",
+              "x": 324,
+              "y": 308.8
+            },
+            {
+              "id": "order-store",
+              "side": "below",
+              "x": 324,
+              "y": 413.2
+            },
+            {
+              "id": "route-planner",
+              "side": "below",
+              "x": 528,
+              "y": 517.6
+            },
+            {
+              "id": "map-service",
+              "side": "below",
+              "x": 528,
+              "y": 413.2
+            },
+            {
+              "id": "capacity-service",
+              "side": "below",
+              "x": 528,
+              "y": 622
+            },
+            {
+              "id": "tender-service",
+              "side": "below",
+              "x": 528,
+              "y": 726.4
+            },
+            {
+              "id": "carrier-portal",
+              "side": "below",
+              "x": 528,
+              "y": 830.8000000000001
+            },
+            {
+              "id": "carrier-api",
+              "side": "below",
+              "x": 732,
+              "y": 830.8000000000001
+            },
+            {
+              "id": "retry-queue",
+              "side": "below",
+              "x": 324,
+              "y": 935.2
+            },
+            {
+              "id": "dispatch-board",
+              "side": "below",
+              "x": 528,
+              "y": 935.2
+            },
+            {
+              "id": "pickup-scheduler",
+              "side": "below",
+              "x": 528,
+              "y": 1039.6
+            },
+            {
+              "id": "driver-app",
+              "side": "below",
+              "x": 324,
+              "y": 1144
+            },
+            {
+              "id": "yard-gate",
+              "side": "below",
+              "x": 528,
+              "y": 1144
+            },
+            {
+              "id": "dock-scheduler",
+              "side": "below",
+              "x": 732,
+              "y": 1144
+            },
+            {
+              "id": "scan-ingest",
+              "side": "below",
+              "x": 936,
+              "y": 1144
+            },
+            {
+              "id": "tracking-service",
+              "side": "below",
+              "x": 1140,
+              "y": 1248.4
+            },
+            {
+              "id": "gps-gateway",
+              "side": "below",
+              "x": 1140,
+              "y": 1144
+            },
+            {
+              "id": "status-store",
+              "side": "below",
+              "x": 936,
+              "y": 935.2
+            },
+            {
+              "id": "eta-service",
+              "side": "below",
+              "x": 1140,
+              "y": 935.2
+            },
+            {
+              "id": "exception-engine",
+              "side": "below",
+              "x": 1344,
+              "y": 935.2
+            },
+            {
+              "id": "ops-console",
+              "side": "below",
+              "x": 1548,
+              "y": 935.2
+            },
+            {
+              "id": "customer-updates",
+              "side": "below",
+              "x": 1548,
+              "y": 1352.8
+            },
+            {
+              "id": "webhook-dispatch",
+              "side": "below",
+              "x": 1548,
+              "y": 1457.2
+            },
+            {
+              "id": "billing-trigger",
+              "side": "below",
+              "x": 1344,
+              "y": 1457.2
+            },
+            {
+              "id": "proof-store",
+              "side": "below",
+              "x": 324,
+              "y": 1352.8
+            },
+            {
+              "id": "customs-broker",
+              "side": "below",
+              "x": 120,
+              "y": 413.2
+            },
+            {
+              "id": "customs-service",
+              "side": "below",
+              "x": 120,
+              "y": 517.6
+            },
+            {
+              "id": "document-store",
+              "side": "below",
+              "x": 120,
+              "y": 622
+            },
+            {
+              "id": "warehouse-wms",
+              "side": "below",
+              "x": 120,
+              "y": 1039.6
+            },
+            {
+              "id": "linehaul-hub",
+              "side": "below",
+              "x": 120,
+              "y": 1144
+            },
+            {
+              "id": "last-mile-hub",
+              "side": "below",
+              "x": 120,
+              "y": 1248.4
+            },
+            {
+              "id": "analytics-feed",
+              "side": "below",
+              "x": 1548,
+              "y": 1561.6000000000001
+            },
+            {
+              "id": "audit-archive",
+              "side": "below",
+              "x": 1344,
+              "y": 413.2
+            }
+          ]
+        }
+      },
+      {
+        "id": "data-platform",
+        "heading": "04 · Data platform · 48 nodes",
+        "text": "Operational sources enter through change capture, files and events, then split across quality, streaming and batch paths. A legacy warehouse still receives direct extracts, shared catalog and identity services span the platform, and failed loads loop through replay before serving products and governance sinks.",
+        "diagram": {
+          "title": "04 · Data platform · 48 nodes",
+          "view": "ambient",
+          "autoplay": false,
+          "nodes": {
+            "orders-db": {
+              "title": "Orders DB",
+              "icon": "db",
+              "tint": "dev"
+            },
+            "accounts-db": {
+              "title": "Accounts DB",
+              "icon": "db",
+              "tint": "dev"
+            },
+            "support-api": {
+              "title": "Support API",
+              "icon": "cloud",
+              "tint": "dev"
+            },
+            "mobile-events": {
+              "title": "Mobile events",
+              "icon": "phone",
+              "tint": "dev"
+            },
+            "partner-files": {
+              "title": "Partner files",
+              "icon": "package",
+              "tint": "dev"
+            },
+            "iot-gateway": {
+              "title": "IoT gateway",
+              "icon": "antenna",
+              "tint": "dev"
+            },
+            "orders-cdc": {
+              "title": "Orders CDC",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "accounts-cdc": {
+              "title": "Accounts CDC",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "api-collector": {
+              "title": "API collector",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "event-ingress": {
+              "title": "Event ingress",
+              "icon": "router",
+              "tint": "mqtt"
+            },
+            "file-landing": {
+              "title": "File landing",
+              "icon": "package",
+              "tint": "mqtt"
+            },
+            "schema-registry": {
+              "title": "Schema registry",
+              "icon": "db",
+              "tint": "data"
+            },
+            "event-bus": {
+              "title": "Event bus",
+              "icon": "antenna",
+              "tint": "mqtt"
+            },
+            "raw-store": {
+              "title": "Raw object store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "quality-gate": {
+              "title": "Quality gate",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "quarantine": {
+              "title": "Quarantine",
+              "icon": "db",
+              "tint": "data"
+            },
+            "replay-queue": {
+              "title": "Replay queue",
+              "icon": "package",
+              "tint": "mqtt"
+            },
+            "stream-router": {
+              "title": "Stream router",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "session-job": {
+              "title": "Session job",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "feature-job": {
+              "title": "Feature job",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "anomaly-job": {
+              "title": "Anomaly job",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "batch-scheduler": {
+              "title": "Batch scheduler",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "orders-model": {
+              "title": "Orders model",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "customer-model": {
+              "title": "Customer model",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "support-model": {
+              "title": "Support model",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "legacy-etl": {
+              "title": "Legacy ETL",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "legacy-warehouse": {
+              "title": "Legacy warehouse",
+              "icon": "db",
+              "tint": "auth"
+            },
+            "lakehouse": {
+              "title": "Lakehouse",
+              "icon": "db",
+              "tint": "data"
+            },
+            "feature-store": {
+              "title": "Feature store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "search-index": {
+              "title": "Search index",
+              "icon": "db",
+              "tint": "data"
+            },
+            "metrics-store": {
+              "title": "Metrics store",
+              "icon": "db",
+              "tint": "data"
+            },
+            "catalog": {
+              "title": "Data catalog",
+              "icon": "db",
+              "tint": "data"
+            },
+            "lineage-service": {
+              "title": "Lineage service",
+              "icon": "server",
+              "tint": "auth"
+            },
+            "identity-service": {
+              "title": "Identity service",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "policy-engine": {
+              "title": "Policy engine",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "semantic-layer": {
+              "title": "Semantic layer",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "warehouse-api": {
+              "title": "Warehouse API",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "notebook-gateway": {
+              "title": "Notebook gateway",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "dashboard-service": {
+              "title": "Dashboard service",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "ml-serving": {
+              "title": "ML serving",
+              "icon": "server",
+              "tint": "cmd"
+            },
+            "reverse-etl": {
+              "title": "Reverse ETL",
+              "icon": "gear",
+              "tint": "cmd"
+            },
+            "marketing-sink": {
+              "title": "Marketing sink",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "support-sink": {
+              "title": "Support sink",
+              "icon": "cloud",
+              "tint": "mqtt"
+            },
+            "finance-export": {
+              "title": "Finance export",
+              "icon": "package",
+              "tint": "mqtt"
+            },
+            "privacy-audit": {
+              "title": "Privacy audit",
+              "icon": "shield",
+              "tint": "auth"
+            },
+            "platform-console": {
+              "title": "Platform console",
+              "icon": "terminal",
+              "tint": "dev"
+            },
+            "cost-monitor": {
+              "title": "Cost monitor",
+              "icon": "gear",
+              "tint": "auth"
+            },
+            "archive": {
+              "title": "Compliance archive",
+              "icon": "db",
+              "tint": "data"
+            }
+          },
+          "rows": [
+            []
+          ],
+          "edges": [
+            {
+              "from": "orders-db",
+              "to": "orders-cdc"
+            },
+            {
+              "from": "accounts-db",
+              "to": "accounts-cdc"
+            },
+            {
+              "from": "support-api",
+              "to": "api-collector"
+            },
+            {
+              "from": "mobile-events",
+              "to": "event-ingress"
+            },
+            {
+              "from": "iot-gateway",
+              "to": "event-ingress"
+            },
+            {
+              "from": "partner-files",
+              "to": "file-landing"
+            },
+            {
+              "from": "orders-cdc",
+              "to": "event-bus"
+            },
+            {
+              "from": "accounts-cdc",
+              "to": "event-bus"
+            },
+            {
+              "from": "api-collector",
+              "to": "event-bus"
+            },
+            {
+              "from": "event-ingress",
+              "to": "event-bus"
+            },
+            {
+              "from": "schema-registry",
+              "to": "event-bus"
+            },
+            {
+              "from": "file-landing",
+              "to": "raw-store"
+            },
+            {
+              "from": "event-bus",
+              "to": "raw-store"
+            },
+            {
+              "from": "raw-store",
+              "to": "quality-gate"
+            },
+            {
+              "from": "quality-gate",
+              "to": "quarantine"
+            },
+            {
+              "from": "quarantine",
+              "to": "replay-queue"
+            },
+            {
+              "from": "replay-queue",
+              "to": "event-bus"
+            },
+            {
+              "from": "quality-gate",
+              "to": "stream-router"
+            },
+            {
+              "from": "stream-router",
+              "to": "session-job"
+            },
+            {
+              "from": "stream-router",
+              "to": "feature-job"
+            },
+            {
+              "from": "stream-router",
+              "to": "anomaly-job"
+            },
+            {
+              "from": "session-job",
+              "to": "lakehouse"
+            },
+            {
+              "from": "feature-job",
+              "to": "feature-store"
+            },
+            {
+              "from": "anomaly-job",
+              "to": "metrics-store"
+            },
+            {
+              "from": "raw-store",
+              "to": "batch-scheduler",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 13.7,
+                  "dy": -4.9
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -13.8,
+                  "dy": 19.6
+                },
+                {
+                  "t": 0.5,
+                  "dx": -23.3,
+                  "dy": 25.7
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -9.1,
+                  "dy": 15.7
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -12.5,
+                  "dy": 13.3
+                }
+              ]
+            },
+            {
+              "from": "batch-scheduler",
+              "to": "orders-model"
+            },
+            {
+              "from": "batch-scheduler",
+              "to": "customer-model"
+            },
+            {
+              "from": "batch-scheduler",
+              "to": "support-model"
+            },
+            {
+              "from": "orders-model",
+              "to": "lakehouse"
+            },
+            {
+              "from": "customer-model",
+              "to": "lakehouse",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.2,
+                  "dy": -5.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.1,
+                  "dy": 5.2
+                }
+              ]
+            },
+            {
+              "from": "support-model",
+              "to": "lakehouse",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 12.6,
+                  "dy": -3.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -12.5,
+                  "dy": 3.2
+                }
+              ]
+            },
+            {
+              "from": "file-landing",
+              "to": "legacy-etl"
+            },
+            {
+              "from": "legacy-etl",
+              "to": "legacy-warehouse",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -10.2,
+                  "dy": 5.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": 10.1,
+                  "dy": -5.2
+                }
+              ]
+            },
+            {
+              "from": "legacy-etl",
+              "to": "lakehouse",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -47.9,
+                  "dy": 7.8
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -125.9,
+                  "dy": 85.9
+                },
+                {
+                  "t": 0.5,
+                  "dx": -78.7,
+                  "dy": 130.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -69.2,
+                  "dy": 83.4
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -49.6,
+                  "dy": 33.4
+                }
+              ]
+            },
+            {
+              "from": "legacy-warehouse",
+              "to": "finance-export"
+            },
+            {
+              "from": "lakehouse",
+              "to": "search-index"
+            },
+            {
+              "from": "lakehouse",
+              "to": "catalog",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 4.3,
+                  "dy": 3.2
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -8.1,
+                  "dy": -10.1
+                },
+                {
+                  "t": 0.5,
+                  "dx": -23.3,
+                  "dy": -25.7
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -20.4,
+                  "dy": -22.9
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -12,
+                  "dy": -13.4
+                }
+              ]
+            },
+            {
+              "from": "feature-store",
+              "to": "catalog"
+            },
+            {
+              "from": "search-index",
+              "to": "catalog",
+              "curveControls": [
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 10.2,
+                  "dy": 5.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -10.1,
+                  "dy": -5.2
+                }
+              ]
+            },
+            {
+              "from": "metrics-store",
+              "to": "catalog"
+            },
+            {
+              "from": "catalog",
+              "to": "lineage-service"
+            },
+            {
+              "from": "lineage-service",
+              "to": "policy-engine"
+            },
+            {
+              "from": "identity-service",
+              "to": "policy-engine"
+            },
+            {
+              "from": "policy-engine",
+              "to": "semantic-layer"
+            },
+            {
+              "from": "lakehouse",
+              "to": "semantic-layer",
+              "curveControls": [
+                {
+                  "t": 0.08333333333333333,
+                  "dx": -49.6,
+                  "dy": -7.3
+                },
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -69.2,
+                  "dy": -31.1
+                },
+                {
+                  "t": 0.25,
+                  "dx": -78.7,
+                  "dy": -51.8
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -87.4,
+                  "dy": -74.2
+                },
+                {
+                  "t": 0.4166666666666667,
+                  "dx": -78.7,
+                  "dy": -110.2
+                },
+                {
+                  "t": 0.5,
+                  "dx": -78.7,
+                  "dy": -130.9
+                },
+                {
+                  "t": 0.5833333333333334,
+                  "dx": -78.7,
+                  "dy": -35.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -132,
+                  "dy": -33.3
+                },
+                {
+                  "t": 0.75,
+                  "dx": -78.7,
+                  "dy": 51.8
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -69.2,
+                  "dy": 31.2
+                },
+                {
+                  "t": 0.9166666666666666,
+                  "dx": -49.6,
+                  "dy": 7.3
+                }
+              ]
+            },
+            {
+              "from": "semantic-layer",
+              "to": "warehouse-api"
+            },
+            {
+              "from": "warehouse-api",
+              "to": "notebook-gateway"
+            },
+            {
+              "from": "warehouse-api",
+              "to": "dashboard-service"
+            },
+            {
+              "from": "feature-store",
+              "to": "ml-serving"
+            },
+            {
+              "from": "semantic-layer",
+              "to": "reverse-etl"
+            },
+            {
+              "from": "reverse-etl",
+              "to": "marketing-sink"
+            },
+            {
+              "from": "reverse-etl",
+              "to": "support-sink"
+            },
+            {
+              "from": "policy-engine",
+              "to": "privacy-audit"
+            },
+            {
+              "from": "lineage-service",
+              "to": "privacy-audit"
+            },
+            {
+              "from": "privacy-audit",
+              "to": "archive"
+            },
+            {
+              "from": "dashboard-service",
+              "to": "platform-console"
+            },
+            {
+              "from": "ml-serving",
+              "to": "platform-console",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": 30.8,
+                  "dy": 12.4
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -53.9,
+                  "dy": 107.4
+                },
+                {
+                  "t": 0.5,
+                  "dx": -125.3,
+                  "dy": 130.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -56.8,
+                  "dy": 90.5
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -2.5,
+                  "dy": 42.2
+                }
+              ]
+            },
+            {
+              "from": "platform-console",
+              "to": "cost-monitor"
+            },
+            {
+              "from": "cost-monitor",
+              "to": "batch-scheduler",
+              "curveControls": [
+                {
+                  "t": 0.08333333333333333,
+                  "dx": -32.2,
+                  "dy": 22.3
+                },
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -66.1,
+                  "dy": 34.7
+                },
+                {
+                  "t": 0.25,
+                  "dx": -78.7,
+                  "dy": 51.8
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": -134.8,
+                  "dy": -142.6
+                },
+                {
+                  "t": 0.4166666666666667,
+                  "dx": -78.7,
+                  "dy": -139.6
+                },
+                {
+                  "t": 0.5,
+                  "dx": -78.7,
+                  "dy": -339.7
+                },
+                {
+                  "t": 0.5833333333333334,
+                  "dx": -78.7,
+                  "dy": -284.2
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -87.4,
+                  "dy": -213.4
+                },
+                {
+                  "t": 0.75,
+                  "dx": -78.7,
+                  "dy": -156.2
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -69.2,
+                  "dy": -100.7
+                },
+                {
+                  "t": 0.9166666666666666,
+                  "dx": -49.6,
+                  "dy": -42.1
+                }
+              ]
+            },
+            {
+              "from": "support-api",
+              "to": "legacy-warehouse",
+              "curveControls": [
+                {
+                  "t": 0.16666666666666666,
+                  "dx": -10.4,
+                  "dy": -32.6
+                },
+                {
+                  "t": 0.3333333333333333,
+                  "dx": 3.1,
+                  "dy": -82
+                },
+                {
+                  "t": 0.5,
+                  "dx": 23.3,
+                  "dy": -130.1
+                },
+                {
+                  "t": 0.6666666666666666,
+                  "dx": -12.1,
+                  "dy": -91.4
+                },
+                {
+                  "t": 0.8333333333333334,
+                  "dx": -16.7,
+                  "dy": -8.8
+                }
+              ]
+            }
+          ],
+          "floats": [
+            {
+              "id": "orders-db",
+              "side": "below",
+              "x": 1344,
+              "y": 100
+            },
+            {
+              "id": "accounts-db",
+              "side": "below",
+              "x": 936,
+              "y": 100
+            },
+            {
+              "id": "support-api",
+              "side": "below",
+              "x": 528,
+              "y": 100
+            },
+            {
+              "id": "mobile-events",
+              "side": "below",
+              "x": 1752,
+              "y": 100
+            },
+            {
+              "id": "partner-files",
+              "side": "below",
+              "x": 528,
+              "y": 204.4
+            },
+            {
+              "id": "iot-gateway",
+              "side": "below",
+              "x": 1548,
+              "y": 100
+            },
+            {
+              "id": "orders-cdc",
+              "side": "below",
+              "x": 1344,
+              "y": 204.4
+            },
+            {
+              "id": "accounts-cdc",
+              "side": "below",
+              "x": 936,
+              "y": 204.4
+            },
+            {
+              "id": "api-collector",
+              "side": "below",
+              "x": 732,
+              "y": 204.4
+            },
+            {
+              "id": "event-ingress",
+              "side": "below",
+              "x": 1548,
+              "y": 204.4
+            },
+            {
+              "id": "file-landing",
+              "side": "below",
+              "x": 528,
+              "y": 308.8
+            },
+            {
+              "id": "schema-registry",
+              "side": "below",
+              "x": 1140,
+              "y": 204.4
+            },
+            {
+              "id": "event-bus",
+              "side": "below",
+              "x": 1140,
+              "y": 308.8
+            },
+            {
+              "id": "raw-store",
+              "side": "below",
+              "x": 732,
+              "y": 413.2
+            },
+            {
+              "id": "quality-gate",
+              "side": "below",
+              "x": 732,
+              "y": 517.6
+            },
+            {
+              "id": "quarantine",
+              "side": "below",
+              "x": 936,
+              "y": 622
+            },
+            {
+              "id": "replay-queue",
+              "side": "below",
+              "x": 1140,
+              "y": 726.4
+            },
+            {
+              "id": "stream-router",
+              "side": "below",
+              "x": 732,
+              "y": 622
+            },
+            {
+              "id": "session-job",
+              "side": "below",
+              "x": 528,
+              "y": 726.4
+            },
+            {
+              "id": "feature-job",
+              "side": "below",
+              "x": 936,
+              "y": 726.4
+            },
+            {
+              "id": "anomaly-job",
+              "side": "below",
+              "x": 732,
+              "y": 726.4
+            },
+            {
+              "id": "batch-scheduler",
+              "side": "below",
+              "x": 120,
+              "y": 830.8
+            },
+            {
+              "id": "orders-model",
+              "side": "below",
+              "x": 324,
+              "y": 830.8
+            },
+            {
+              "id": "customer-model",
+              "side": "below",
+              "x": 324,
+              "y": 935.2
+            },
+            {
+              "id": "support-model",
+              "side": "below",
+              "x": 120,
+              "y": 935.2
+            },
+            {
+              "id": "legacy-etl",
+              "side": "below",
+              "x": 528,
+              "y": 413.2
+            },
+            {
+              "id": "legacy-warehouse",
+              "side": "below",
+              "x": 324,
+              "y": 517.6
+            },
+            {
+              "id": "lakehouse",
+              "side": "below",
+              "x": 528,
+              "y": 830.8
+            },
+            {
+              "id": "feature-store",
+              "side": "below",
+              "x": 936,
+              "y": 935.2
+            },
+            {
+              "id": "search-index",
+              "side": "below",
+              "x": 528,
+              "y": 935.2
+            },
+            {
+              "id": "metrics-store",
+              "side": "below",
+              "x": 732,
+              "y": 830.8
+            },
+            {
+              "id": "catalog",
+              "side": "below",
+              "x": 732,
+              "y": 1039.6
+            },
+            {
+              "id": "lineage-service",
+              "side": "below",
+              "x": 732,
+              "y": 1144
+            },
+            {
+              "id": "identity-service",
+              "side": "below",
+              "x": 528,
+              "y": 1144
+            },
+            {
+              "id": "policy-engine",
+              "side": "below",
+              "x": 528,
+              "y": 1248.4
+            },
+            {
+              "id": "semantic-layer",
+              "side": "below",
+              "x": 528,
+              "y": 1352.8
+            },
+            {
+              "id": "warehouse-api",
+              "side": "below",
+              "x": 528,
+              "y": 1457.2
+            },
+            {
+              "id": "notebook-gateway",
+              "side": "below",
+              "x": 732,
+              "y": 1561.6
+            },
+            {
+              "id": "dashboard-service",
+              "side": "below",
+              "x": 528,
+              "y": 1561.6
+            },
+            {
+              "id": "ml-serving",
+              "side": "below",
+              "x": 1344,
+              "y": 1248.4
+            },
+            {
+              "id": "reverse-etl",
+              "side": "below",
+              "x": 324,
+              "y": 1457.2
+            },
+            {
+              "id": "marketing-sink",
+              "side": "below",
+              "x": 120,
+              "y": 1561.6
+            },
+            {
+              "id": "support-sink",
+              "side": "below",
+              "x": 324,
+              "y": 1561.6
+            },
+            {
+              "id": "finance-export",
+              "side": "below",
+              "x": 324,
+              "y": 622
+            },
+            {
+              "id": "privacy-audit",
+              "side": "below",
+              "x": 732,
+              "y": 1352.8
+            },
+            {
+              "id": "platform-console",
+              "side": "below",
+              "x": 528,
+              "y": 1666
+            },
+            {
+              "id": "cost-monitor",
+              "side": "below",
+              "x": 120,
+              "y": 1770.4
+            },
+            {
+              "id": "archive",
+              "side": "below",
+              "x": 732,
+              "y": 1457.2
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

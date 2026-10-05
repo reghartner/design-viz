@@ -606,12 +606,13 @@ function planAutoArrange(text,raw,section,result){
       !Array.isArray(result.edges) || result.edges.length!==(got.d.edges || []).length ||
       new Set(result.positions.map(function(p){return p.id;})).size!==ids.length ||
       result.positions.some(function(p){return ids.indexOf(p.id)<0 || !floatCoordinate(p.x) || !floatCoordinate(p.y);}) ||
-      result.edges.some(function(e){return !e || !validCurveControls(e.curveControls) || !validEdgePort(e.fromPort) || !validEdgePort(e.toPort) ||
+      result.edges.some(function(e){return !e || typeof e!=='object' || Array.isArray(e) ||
+        Object.prototype.hasOwnProperty.call(e,'curveControls') && !validCurveControls(e.curveControls) ||
         ['labelDx','labelDy'].some(function(k){return e[k]!=null && !floatCoordinate(e[k]);});}))
       return {error:'The layout returned invalid geometry. The source is unchanged.'};
     // Only a fixed geometry allowlist crosses the worker/transaction boundary.
     var clean={positions:result.positions,edges:result.edges.map(function(e){var out={};
-      ['curveControls','fromPort','toPort','labelDx','labelDy'].forEach(function(k){if(e[k]!=null)out[k]=e[k];});return out;})};
+      ['curveControls','labelDx','labelDy'].forEach(function(k){if(e[k]!=null)out[k]=e[k];});return out;})};
     return planReplaceValue(text,raw,got.path,JSON.stringify(autoArrangeDiagram(got.d,clean),null,2));
   }catch(error){return {error:error.message};}
 }

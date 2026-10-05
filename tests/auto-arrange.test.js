@@ -27,6 +27,18 @@ function minimumCardGap(result){
   }));
   return closest;
 }
+function canonicalCandidates(d,viz,cola){
+  const expand=C.autoArrangeExpandSpacing;
+  try{C.autoArrangeExpandSpacing=(diagram,selected)=>selected;return C.autoArrangeCandidates(d,viz,cola);}
+  finally{C.autoArrangeExpandSpacing=expand;}
+}
+function candidatesWithSelected(d,viz,cola){
+  const expand=C.autoArrangeExpandSpacing;let selected;
+  try{
+    C.autoArrangeExpandSpacing=(diagram,result,renderer)=>{selected=result;return expand(diagram,result,renderer);};
+    const result=C.autoArrangeCandidates(d,viz,cola);return {selected,result};
+  }finally{C.autoArrangeExpandSpacing=expand;}
+}
 
 test('approved 20-node grouped fixture retains groups and native routes with clear final viewer paths',()=>{
   const d=fixture.page.blocks[0].diagram,result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result);
@@ -199,9 +211,7 @@ test('directed paths follow topology in balanced snake rows with at most four ca
     const d={nodes:Object.fromEntries(ids.slice().reverse().map(id=>[id,{title:id}])),rows:[ids],
       edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})).reverse()};
     const columns=Math.ceil(count/Math.ceil(count/4));
-    const expand=C.autoArrangeExpandSpacing;let result;
-    try{C.autoArrangeExpandSpacing=(diagram,selected)=>selected;result=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeExpandSpacing=expand;}
+    const expand=C.autoArrangeExpandSpacing,result=canonicalCandidates(d,viz,cola);
     const expanded=expand(d,result,viz),byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
     const rows=new Map();
     ids.forEach((id,i)=>{const p=byId[id];if(!rows.has(p.y))rows.set(p.y,[]);rows.get(p.y).push(id);
@@ -304,7 +314,7 @@ test('terminal-leaf refinement skips blocked card positions and rejects unsafe r
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
   const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));
   let refinements=0;
-  const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+  const arranged=candidatesWithSelected(d,{renderJSON(source,options){
     const json=viz.renderJSON(source,options);
     if(options.engine==='nop2'){
       refinements++;const nodes=json.objects.filter(n=>/^n\d+$/.test(n.name));nodes[1].pos=nodes[0].pos;
@@ -312,8 +322,9 @@ test('terminal-leaf refinement skips blocked card positions and rejects unsafe r
     }
     return json;
   }},null);
-  assert.equal(refinements,1);assert.deepEqual(plain(result.positions),plain(seed.positions));
-  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+  assert.equal(refinements,1);assert.deepEqual(plain(arranged.selected.positions),plain(seed.positions));
+  assert.deepEqual(plain(arranged.result.positions),plain(C.autoArrangeExpandedPositions(arranged.selected).positions));
+  assert.equal(arranged.result.score.overlaps,0);assert.equal(arranged.result.score.hits,0);assert.equal(arranged.result.score.crossings,0);
 });
 
 test('unsafe candidate geometry is rejected even when every attempt returns it',()=>{
@@ -387,13 +398,13 @@ test('failed aligned rerouting retains the safe selected layout',()=>{
   const align=C.autoArrangeAlignedPositions;
   try{
     C.autoArrangeAlignedPositions=()=>null;
-    const expected=C.autoArrangeCandidates(d,viz,null);
+    const expected=canonicalCandidates(d,viz,null);
     C.autoArrangeAlignedPositions=()=>{
       const unsafe=plain(expected);unsafe.positions[1].x=unsafe.positions[0].x;unsafe.positions[1].y=unsafe.positions[0].y;
       unsafe.score=C.autoArrangeScore(d,unsafe);assert.ok(unsafe.score.overlaps>0);return unsafe;
     };
     let retries=0;
-    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+    const result=canonicalCandidates(d,{renderJSON(source,options){
       if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
       return viz.renderJSON(source,options);
     }},null);
@@ -405,7 +416,7 @@ test('failed aligned rerouting retains the safe selected layout',()=>{
 test('compact corridor search is name-independent, bounded, and cannot replace a safe layout with failed routing',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[3].diagram,fold=C.autoArrangeFoldedPositions;
   let seed;
-  try{C.autoArrangeFoldedPositions=()=>[];seed=C.autoArrangeCandidates(d,viz,null);}
+  try{C.autoArrangeFoldedPositions=()=>[];seed=canonicalCandidates(d,viz,null);}
   finally{C.autoArrangeFoldedPositions=fold;}
   const positions=fold(d,seed);assert.ok(positions.length>0 && positions.length<=4);
   const ids=Object.keys(d.nodes),names=Object.fromEntries(ids.map((id,i)=>[id,'renamed_'+i]));
@@ -418,7 +429,7 @@ test('compact corridor search is name-independent, bounded, and cannot replace a
     C.autoArrangeFoldedPositions=()=>{
       const unsafe=plain(positions[0]);unsafe[ids[1]]={...unsafe[ids[0]]};return [unsafe];
     };
-    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+    const result=canonicalCandidates(d,{renderJSON(source,options){
       if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
       return viz.renderJSON(source,options);
     }},null);
@@ -505,20 +516,25 @@ test('grouped snakes with overlapping group boxes fall back to safe clustered ca
 test('natural grid search is deterministic and independent of IDs, titles and tints on synthetic bipartite graphs',()=>{
   const ids=['p0','p1','p2','q0','q1','q2'];
   const d={nodes:Object.fromEntries(ids.map(id=>[id,{title:id}])),edges:ids.slice(0,3).flatMap(from=>ids.slice(3).map(to=>({from,to}))),rows:[ids]};
-  const result=C.autoArrangeCandidates(d,viz,cola);
+  const arranged=candidatesWithSelected(d,viz,cola),result=arranged.selected;
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,1);
   assert.ok(result.score.length<2600);assert.equal(result.score.shape,0);assert.ok(result.edges.every(e=>!e.curveControls));
   const names=Object.fromEntries(ids.map((id,i)=>[id,'different_'+(19-i)]));
   const renamed={nodes:Object.fromEntries(ids.map(id=>[names[id],{title:'Unrelated text',tint:'auth'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]})),rows:[ids.map(id=>names[id])]};
-  const again=C.autoArrangeCandidates(renamed,viz,cola);
+  const renamedArrangement=candidatesWithSelected(renamed,viz,cola),again=renamedArrangement.selected;
   assert.deepEqual(plain(again.positions),plain(result.positions.map(p=>({...p,id:names[p.id]}))));
   assert.deepEqual(plain(again.score),plain(result.score));
+  const published=arranged.result;
+  assert.deepEqual(plain(published.positions),plain(C.autoArrangeExpandedPositions(result).positions));
+  assert.deepEqual(plain(renamedArrangement.result.positions),plain(published.positions.map(p=>({...p,id:names[p.id]}))));
+  assert.deepEqual(plain(renamedArrangement.result.score),plain(published.score));
+  assert.equal(published.score.overlaps,0);assert.equal(published.score.hits,0);assert.ok(published.score.crossings<=result.score.crossings);
 });
 
 test('optional natural grid proposals cannot regress final viewer safety, crossings, shape or length',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[5].diagram,grid=C.autoArrangeGridPositions;
   try{
-    C.autoArrangeGridPositions=()=>[];const expected=C.autoArrangeCandidates(d,viz,cola);
+    C.autoArrangeGridPositions=()=>[];const expected=canonicalCandidates(d,viz,cola);
     const overlap=plain(expected);overlap.positions[1]={...overlap.positions[0],id:overlap.positions[1].id};
     const longer=plain(expected);longer.positions.forEach(p=>{p.x*=2;p.y*=2;});
     const tall=plain(expected);tall.positions.forEach(p=>{p.y*=2;});
@@ -526,7 +542,7 @@ test('optional natural grid proposals cannot regress final viewer safety, crossi
     assert.ok(C.autoArrangeScore(d,overlap).overlaps>0);
     assert.ok(C.autoArrangeScore(d,crossed).crossings>expected.score.crossings);
     C.autoArrangeGridPositions=()=>[overlap,longer,tall,crossed];
-    assert.deepEqual(plain(C.autoArrangeCandidates(d,viz,cola)),plain(expected));
+    assert.deepEqual(plain(canonicalCandidates(d,viz,cola)),plain(expected));
   }finally{C.autoArrangeGridPositions=grid;}
 });
 
@@ -560,11 +576,12 @@ test('large cleanup straightens branches and shares ranks without worsening fina
   try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeLargeAligned=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    try{C.autoArrangeLargeAligned=(d,result)=>result;before=canonicalCandidates(d,viz,cola);}
     finally{C.autoArrangeLargeAligned=refine;}
-    const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    const started=performance.now(),arranged=candidatesWithSelected(d,viz,cola),result=arranged.selected,published=arranged.result,out=plain(C.autoArrangeDiagram(d,published));
     assert.ok(performance.now()-started<20000,block.id+' stays inside worker deadline');
     assert.deepEqual(plain(refine(d,before)),plain(result),block.id+' cleanup is deterministic');
+    assert.deepEqual(plain(published.positions),plain(C.autoArrangeExpandedPositions(result).positions),block.id+' final output applies one expansion');
     if(i===1){
       const names=Object.fromEntries(Object.keys(d.nodes).map((id,j)=>[id,'renamed-'+j]));
       const renamed={nodes:Object.fromEntries(Object.keys(d.nodes).map(id=>[names[id],{title:'Different label',tint:'data'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]}))};
@@ -582,6 +599,8 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     const lines=r=>['x','y'].reduce((n,axis)=>n+new Set(r.positions.map(p=>Math.round(p[axis]*10))).size,0);
     assert.ok(lines(result)<lines(before),block.id+' more shared row/column coordinates');
     assert.ok(result.edges.filter(e=>e.curveControls).length<=before.edges.filter(e=>e.curveControls).length);
+    assert.equal(published.score.overlaps,0);assert.equal(published.score.hits,0);
+    assert.ok(published.score.crossings<=result.score.crossings);assert.ok(published.score.incidentCrossings<=result.score.incidentCrossings);
     assertAutoPorts(out.edges);assert.deepEqual(out.nodes,d.nodes);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);

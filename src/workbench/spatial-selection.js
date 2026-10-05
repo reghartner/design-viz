@@ -114,7 +114,8 @@ function createBuilderSpatialSelection(opts){
     var targets=currentTargets();if(!targets.some(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);})) {opts.select([t]);targets=currentTargets();}
     var shell=surface(t.el),s=snapshot();if(!s)return;
     var id=layoutId(shell),geometry=rects(targets,shell),spatial=targets.every(function(x){return x.kind==='node' || x.kind==='panel';});
-    var alignment=planAlignSpatial(s.text,s.raw,targets,id,'horizontal',geometry);
+    var anchorIndex=targets.findIndex(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);});
+    var alignment=planAlignSpatial(s.text,s.raw,targets,id,'horizontal',geometry,anchorIndex);
     menu=doc.createElement('div');menu.className='dv-object-menu';menu.setAttribute('popover','manual');menu.setAttribute('role','menu');menu.setAttribute('aria-label','Object actions');
     menuLife=createWorkbenchLifetime();opener=doc.activeElement;
     function item(label,action,reason){var button=doc.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=label;button.tabIndex=-1;
@@ -124,7 +125,7 @@ function createBuilderSpatialSelection(opts){
     item('Inspect',function(){opts.inspect();});
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the chapter and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},spatial?null:'Duplicate supports nodes and canvas panels.');
-    ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry),null,s);},alignment.error);});
+    ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex),null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,context()?null:'Select visible nodes, canvas panels or canvas step controls to fit.');
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;

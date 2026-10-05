@@ -25,6 +25,27 @@ test('marquee selects intersecting nodes and canvas panels without source or pan
  await closeTools(page);await page.locator('#workspace-fit').click();await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Duplicate',exact:true}).click();const duplicated=await source(page);d=JSON.parse(duplicated).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(4);expect(d.panels).toHaveLength(3);expect(d.layouts[0].exploreLayout.canvas.panels).toHaveLength(2);await history(page,aligned,duplicated);
  await closeTools(page);await page.locator('#workspace-fit').click();await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();const deleted=await source(page);d=JSON.parse(deleted).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(0);expect(d.panels.map(p=>p.id)).toEqual(['q']);await history(page,duplicated,deleted);
 });
+test('context-menu alignment keeps the nonfirst clicked panel as the visual anchor with one Undo',async({page,server})=>{
+ await open(page,server);const before=await source(page),authored=JSON.parse(before).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0];await marquee(page);
+ await expect(page.locator('.dv-sel[data-dv-node]')).toHaveCount(2);await expect(panel(page)).toHaveClass(/dv-sel/);
+ const anchorY=await panel(page).evaluate(el=>{const inverse=el.closest('.explore-board').querySelector('.boardcanvas>svg').getScreenCTM().inverse(),r=el.getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return (a.y+b.y)/2;});
+ await panel(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align horizontally',exact:true}).click();
+ const after=await source(page),diagram=JSON.parse(after).page.sections[0].diagram;expect(after).not.toBe(before);expect(diagram.layouts[0].exploreLayout.canvas.panels[0]).toEqual(authored);
+ const centers=await page.locator('.explore-board').evaluate(board=>{const inverse=board.querySelector('.boardcanvas>svg').getScreenCTM().inverse();return [...board.querySelectorAll('.boardcanvas [data-dv-node=a],.boardcanvas [data-dv-node=b],.explore-canvas-objects [data-explore-panel=p]')].map(el=>{const r=el.getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return (a.y+b.y)/2;});});
+ expect(centers).toHaveLength(3);for(const center of centers)expect(center).toBeCloseTo(anchorY,1);await expect(page.locator('.dv-sel')).toHaveCount(3);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
+});
+test('keyboard menu alignment keeps the nonfirst targeted node as the vertical visual anchor with one Undo',async({page,server})=>{
+ await open(page,server);const before=await source(page),second=page.locator('[data-dv-node=b]'),authored=JSON.parse(before).page.sections[0].diagram.floats.find(f=>f.id==='b');await marquee(page);
+ await expect(page.locator('.dv-sel')).toHaveCount(3);
+ const anchorX=await second.evaluate(el=>{const inverse=el.closest('.explore-board').querySelector('.boardcanvas>svg').getScreenCTM().inverse(),r=el.getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return (a.x+b.x)/2;});
+ await second.focus();await page.keyboard.press('Shift+F10');await expect(menu(page)).toBeVisible();await menu(page).getByRole('menuitem',{name:'Align vertically',exact:true}).click();
+ const after=await source(page),diagram=JSON.parse(after).page.sections[0].diagram;expect(after).not.toBe(before);expect(diagram.floats.find(f=>f.id==='b')).toEqual(authored);
+ const centers=await page.locator('.explore-board').evaluate(board=>{const inverse=board.querySelector('.boardcanvas>svg').getScreenCTM().inverse();return [...board.querySelectorAll('.boardcanvas [data-dv-node=a],.boardcanvas [data-dv-node=b],.explore-canvas-objects [data-explore-panel=p]')].map(el=>{const r=el.getBoundingClientRect(),a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);return (a.x+b.x)/2;});});
+ expect(centers).toHaveLength(3);for(const center of centers)expect(center).toBeCloseTo(anchorX,1);await expect(page.locator('.dv-sel')).toHaveCount(3);
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
 test('menu covers panel body border and header, modifiers preserve selection, Escape clears, row alignment explains refusal',async({page,server})=>{
  await open(page,server,true);const original=await source(page);
  await node(page).click();await panel(page).click({position:{x:4,y:4},modifiers:['Shift']});await expect(node(page)).toHaveClass(/dv-sel/);await expect(panel(page)).toHaveClass(/dv-sel/);

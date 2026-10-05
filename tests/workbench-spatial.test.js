@@ -10,6 +10,15 @@ test('mixed alignment anchors first center, canonicalizes fitted panel size, and
  assert.equal(raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].h,900);
  assert.match(B.planAlignSpatial(text,raw,[{kind:'node',section:0,id:'b'},targets[1]],'explore','horizontal',rects).error,/Free placement/);
 });
+test('mixed alignment accepts a nonfirst visual anchor without rewriting its authored placement',()=>{
+ const raw=fixture(),text=JSON.stringify(raw),authored=raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0];
+ for(const direction of ['horizontal','vertical']){
+  const plan=B.planAlignSpatial(text,raw,targets,'explore',direction,rects,1);assert.ok(!plan.error,plan.error);const d=JSON.parse(plan.text).page.sections[0].diagram;
+  assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[0],authored);
+  assert.deepEqual(d.floats[0],direction==='horizontal'?{id:'a',x:100,y:240}:{id:'a',x:420,y:80});
+ }
+ assert.match(B.planAlignSpatial(text,raw,targets,'explore','horizontal',rects,2).error,/selected object/);
+});
 test('mixed duplicate remaps IDs and placements and mixed delete resolves panel ID atomically',()=>{
  const raw=fixture(),text=JSON.stringify(raw),plan=B.planDuplicateSpatial(text,raw,targets,'explore',rects);assert.ok(!plan.error,plan.error);const d=JSON.parse(plan.text).page.sections[0].diagram;
  assert.ok(d.nodes.a1);assert.equal(d.panels[1].id,'p1');assert.deepEqual(d.floats[1],{id:'a1',x:124,y:104});assert.deepEqual(d.layouts[0].exploreLayout.canvas.panels[1],{panel:'p1',x:324,y:224,w:240,h:80});assert.equal(d.layouts[0].sectionLayout.default[1].panel,'p1');assert.equal(d.layouts[0].exploreLayout.panelPlacements[0].placement,'canvas');

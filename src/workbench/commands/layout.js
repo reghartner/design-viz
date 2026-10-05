@@ -629,7 +629,7 @@ function builderSpatialTargets(text,raw,targets){
   }
   return got;
 }
-function planAlignSpatial(text,raw,targets,layoutId,direction,rects){
+function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
   if(targets.length<2)return {error:'Select at least two objects to align.'};
   if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose an alignment direction.'};
@@ -637,10 +637,15 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects){
   var view=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
+  if(anchorIndex==null)anchorIndex=0;
+  if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
   return builderRewrite(text,raw,got.path,function(d){
-    var anchor=rects[0],cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h/2;
+    // Context-menu alignment can anchor a later selection member. Leave its
+    // authored placement intact while the other rendered centers move to it.
+    var anchor=rects[anchorIndex],cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h/2;
     var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
     for(var i=0;i<targets.length;i++){
+      if(i===anchorIndex)continue;
       var t=targets[i],r=rects[i],x=direction==='vertical'?cx:r.x+r.w/2,y=direction==='horizontal'?cy:r.y+r.h/2;
       if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
       if(t.kind==='node'){

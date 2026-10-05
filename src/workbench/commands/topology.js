@@ -25,6 +25,66 @@ function planAddTopologyImport(text,raw,section,reference,context){
   return plan;
 }
 
+function topologyImportRemovalBlockers(diagram,provenance){
+  var nodes=new Set(provenance.nodes || []),edges=new Set(provenance.edges || []),groups=[];
+  function add(group,value){if(groups.indexOf(group)<0)groups.push(group);if(group.items.indexOf(value)<0)group.items.push(value);}
+  function bucket(label){var found=groups.find(function(group){return group.label===label;});if(found)return found;found={label:label,items:[]};groups.push(found);return found;}
+  (diagram.edges || []).forEach(function(edge,index){
+    if(edge && (nodes.has(edge.from) || nodes.has(edge.to)))add(bucket('Consumer connections'),(edge.from || '?')+'->'+(edge.to || '?')+' (edge '+(index+1)+')');
+  });
+  Object.keys(diagram.nodes || {}).forEach(function(id){
+    var node=diagram.nodes[id];if(node && (provenance.groups || []).includes(node.group))add(bucket('Group references'),id+' → '+node.group);
+  });
+  Object.keys(diagram.groups || {}).forEach(function(id){
+    var group=diagram.groups[id];if(group && (provenance.groups || []).includes(group.parent))add(bucket('Group references'),id+' → '+group.parent);
+  });
+  (diagram.steps || []).forEach(function(step,index){
+    if(!step || typeof step!=='object')return;
+    var name=step.id || 'step '+(index+1);
+    stepKeys(step).forEach(function(key){if(edges.has(key))add(bucket('Story connection references'),name+' → '+key);});
+    Object.keys(stepFailures(step)).forEach(function(key){if(edges.has(key))add(bucket('Failure references'),name+' → '+key);});
+    (step.packets || []).forEach(function(packet){if(packet && edges.has(packet.edge))add(bucket('Packet references'),name+' → '+packet.edge);});
+    stepNodes(step).forEach(function(id){if(nodes.has(id))add(bucket('Step node references'),name+' → '+id);});
+    Object.keys(stepTonePatch(step) || {}).forEach(function(id){if(nodes.has(id))add(bucket('Tone patches'),name+' → '+id);});
+    (step.conditions || []).forEach(function(condition){if(condition && nodes.has(condition.nodeId))add(bucket('Conditions'),name+' → '+condition.nodeId);});
+    if(step.traceMatch && nodes.has(step.traceMatch.nodeId))add(bucket('Trace matches'),name+' → '+step.traceMatch.nodeId);
+  });
+  Object.keys(diagram.topologyExports || {}).forEach(function(name){
+    var exp=diagram.topologyExports[name] || {};
+    (exp.nodes || []).forEach(function(id){if(nodes.has(id))add(bucket('Shared topology exports'),name+' → node '+id);});
+    (exp.edges || []).forEach(function(key){if(edges.has(key))add(bucket('Shared topology exports'),name+' → connection '+key);});
+  });
+  (diagram.panels || []).forEach(function(panel,index){
+    if(typeof panelRemapReferences!=='function')return;
+    panelRemapReferences(builderClone(panel),'nodes',null,function(id){
+      if(nodes.has(id))add(bucket('Panel references'),(panel.id || 'panel '+(index+1))+' → '+id);
+      return true;
+    });
+  });
+  return groups;
+}
+function planRemoveTopologyImport(text,raw,section,namespace,context){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(!context)return {error:'Reconnect this draft to its frozen repository catalog before removing referenced topology.'};
+  if(!Array.isArray(got.d.topologyImports))return {error:'Authored topology import not found.'};
+  var matches=[];got.d.topologyImports.forEach(function(imp,index){if(imp && imp.as===namespace)matches.push(index);});
+  if(matches.length!==1)return {error:'Choose one uniquely named topology import.'};
+  var resolved,record,provenance;
+  try{
+    resolved=FlowTopology.resolveSource(raw,context);record=specSectionPaths(resolved)[section];
+    var diagram=record && specValueAt(resolved,record.diagram);
+    provenance=diagram && diagram.topologyProvenance && diagram.topologyProvenance.imports.find(function(imp){return imp.as===namespace;});
+    if(!provenance)return {error:'The referenced block is not present in the rendered repository snapshot. Render and reselect it.'};
+  }catch(ex){return {error:ex.message};}
+  var blockers=topologyImportRemovalBlockers(got.d,provenance);
+  if(blockers.length)return {error:'Cannot remove referenced topology '+namespace+' while this diagram still uses it:\n'+blockers.map(function(group){return group.label+':\n  • '+group.items.join('\n  • ');}).join('\n'),blockers:blockers};
+  var imports=got.d.topologyImports.filter(function(_,index){return index!==matches[0];});
+  var plan=planSetField(text,raw,got.path,'topologyImports',imports.length?JSON.stringify(imports,null,2):null);
+  if(plan.error)return plan;
+  try{FlowTopology.resolveSource(JSON.parse(plan.text),context);}catch(ex){return {error:ex.message};}
+  plan.kind='section';plan.section=section;plan.namespace=namespace;return plan;
+}
+
 /* Export authoring and the Inspector share this headless boundary. Edge keys
    are stable rendered identities; an optional index must still identify that
    same connection. The only persisted field is diagram.topologyExports. */

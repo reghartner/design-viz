@@ -6,6 +6,7 @@ var FlowTopology = (function(){
   function object(v){return !!v && typeof v==='object' && !Array.isArray(v);}
   function clone(v){return JSON.parse(JSON.stringify(v));}
   function token(v){return typeof v==='string' && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(v);}
+  function namespacePath(v){return typeof v==='string' && v.split('::').every(token);}
   function fail(at,message){throw new Error('Topology '+at+': '+message);}
   function shape(value,keys,at){
     if(!object(value) || Object.keys(value).some(function(k){return keys.indexOf(k)<0;}))fail(at,'expected an object with fields '+keys.join(', '));
@@ -17,6 +18,35 @@ var FlowTopology = (function(){
   function sections(spec){return FlowCanon.sections(spec);}
   function edgeKey(e){return e.from+'->'+e.to;}
   function declarations(spec){return sections(spec).some(function(s){return own(s.diagram,'topologyImports') || own(s.diagram,'topologyExports');});}
+  function stable(value){
+    if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
+    if(object(value))return '{'+Object.keys(value).sort().map(function(key){return JSON.stringify(key)+':'+stable(value[key]);}).join(',')+'}';
+    return JSON.stringify(value);
+  }
+  function sameDefinition(a,b){return stable(a)===stable(b);}
+  function importedProtocol(spec,provider,imp,kind,where){
+    var supplied=(provider.page && provider.page.protocols) || {};
+    if(!own(supplied,kind))return kind;
+    var definition=supplied[kind],consumer=spec.page.protocols || {};
+    var builtin=typeof BUILTIN_PROTOCOLS!=='undefined' && own(BUILTIN_PROTOCOLS,kind);
+    var effective=own(consumer,kind)?consumer[kind]:(builtin?BUILTIN_PROTOCOLS[kind]:undefined);
+    if(effective!==undefined && sameDefinition(effective,definition))return kind;
+    if(effective===undefined && !builtin){
+      if(spec.page.protocols==null)spec.page.protocols={};
+      Object.defineProperty(spec.page.protocols,kind,{value:clone(definition),enumerable:true,writable:true,configurable:true});
+      return kind;
+    }
+    // Derived snapshots preserve both meanings. The authored provider and
+    // consumer keep their original IDs; only imported edges use this stable
+    // import-scoped identity. Built-ins are never overwritten.
+    var clean=String(kind).replace(/[^a-zA-Z0-9_.-]/g,'-').replace(/^[^a-zA-Z0-9]+/,'') || 'protocol';
+    var base=imp.as+'-'+clean,id=base,n=2;
+    if(spec.page.protocols==null)spec.page.protocols={};
+    while(own(spec.page.protocols,id) && !sameDefinition(spec.page.protocols[id],definition))id=base+'-'+n++;
+    if(!token(id))fail(where,'cannot derive a safe protocol identity for '+kind);
+    if(!own(spec.page.protocols,id))Object.defineProperty(spec.page.protocols,id,{value:clone(definition),enumerable:true,writable:true,configurable:true});
+    return id;
+  }
 
   function materialize(specs){
     if(!Array.isArray(specs))fail('snapshot','expected an array of specs');
@@ -37,7 +67,7 @@ var FlowTopology = (function(){
             if(!object(d.topologyProvenance) || d.topologyProvenance.version!==1 || !Array.isArray(d.topologyProvenance.imports))fail(at,'invalid generated topologyProvenance');
             d.topologyProvenance.imports.forEach(function(imp){
               shape(imp,['spec','export','as','nodes','edges','groups','position'],at+' provenance');
-              if(typeof imp.spec!=='string' || !token(imp.export) || !token(imp.as))fail(at,'invalid generated import provenance');
+              if(typeof imp.spec!=='string' || !token(imp.export) || !namespacePath(imp.as))fail(at,'invalid generated import provenance');
               ['nodes','edges','groups'].forEach(function(key){list(imp[key],at+' provenance '+key);});
             });
           }
@@ -140,10 +170,7 @@ var FlowTopology = (function(){
             edge.from=prefix+edge.from;edge.to=prefix+edge.to;delete edge.revealAt;delete edge.hideAt;
             if(d.edges.some(function(e){return e && edgeKey(e)===edgeKey(edge);}))fail(where,'edge collision '+edgeKey(edge));
             d.edges.push(edge);edgeIds.push(edgeKey(edge));
-            if(edge.kind && own(spec.page.protocols || {},edge.kind) && own(byId.get(imp.spec).page.protocols || {},edge.kind) && JSON.stringify(spec.page.protocols[edge.kind])!==JSON.stringify(byId.get(imp.spec).page.protocols[edge.kind]))fail(where,'conflicting protocol '+edge.kind);
-            if(edge.kind && own(byId.get(imp.spec).page.protocols || {},edge.kind)){
-              if(spec.page.protocols==null)spec.page.protocols={};Object.defineProperty(spec.page.protocols,edge.kind,{value:clone(byId.get(imp.spec).page.protocols[edge.kind]),enumerable:true,writable:true,configurable:true});
-            }
+            if(edge.kind)edge.kind=importedProtocol(spec,byId.get(imp.spec),imp,edge.kind,where);
           });
           // Resolve row/stack and automatic-float geometry within this export,
           // then translate every center together into consumer-owned free space.
@@ -160,6 +187,16 @@ var FlowTopology = (function(){
             d.floats.push(f);
           });
           provenance.push({spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});
+          // Retain nested provenance as derived editor metadata so the
+          // Workbench can frame both the outer reference and its inner source
+          // blocks. The direct import stays first and remains the authored
+          // removal/placement owner for every member.
+          ((provider.topologyProvenance || {}).imports || []).forEach(function(nested){
+            var nestedNodes=(nested.nodes || []).map(function(key){return prefix+key;}).filter(function(key){return nodeIds.includes(key);});
+            var nestedEdges=(nested.edges || []).map(function(key){var parts=key.split('->');return prefix+parts[0]+'->'+prefix+parts[1];}).filter(function(key){return edgeIds.includes(key);});
+            var nestedGroups=(nested.groups || []).map(function(key){return prefix+key;}).filter(function(key){return own(d.groups || {},key);});
+            if(nestedNodes.length)provenance.push({spec:nested.spec,export:nested.export,as:imp.as+'::'+nested.as,position:position,nodes:nestedNodes,edges:nestedEdges,groups:nestedGroups});
+          });
         });
         if(provenance.length)d.topologyProvenance={version:1,imports:provenance};
         if(provenance.length || d.topologyProvenance)checkReferences(d,at);
@@ -251,12 +288,15 @@ var FlowTopology = (function(){
       return wrapped?result:result.page;
     }
     if(context.version!==1 || !Array.isArray(context.specs) || typeof context.id!=='string')fail('editor','invalid authored provider snapshot');
-    var candidate=clone(raw);if(!object(candidate.page))fail('editor','expected a page spec');
+    var candidate=clone(raw),bareDiagram=candidate && (own(candidate,'nodes') || own(candidate,'rows') || own(candidate,'topologyImports') || own(candidate,'topologyExports'));
+    var mode=object(candidate.page)?'wrapped':bareDiagram?'diagram':'page';
+    var input=mode==='wrapped'?candidate:mode==='diagram'?{page:{sections:[{diagram:candidate}]}}:{page:candidate};
     var original=context.specs.find(function(spec){return spec.page && spec.page.canon && spec.page.canon.id===context.id;});
     if(!original)fail('editor','consumer is missing from the authored snapshot');
-    candidate.page.canon=clone(original.page.canon);
-    var inputs=context.specs.map(function(spec){return spec.page.canon.id===context.id?candidate:spec;});
-    return materialize(inputs).find(function(spec){return spec.page.canon.id===context.id;});
+    input.page.canon=clone(original.page.canon);
+    var inputs=context.specs.map(function(spec){return spec.page.canon.id===context.id?input:spec;});
+    var result=materialize(inputs).find(function(spec){return spec.page.canon.id===context.id;});
+    return mode==='wrapped'?result:mode==='diagram'?result.page.sections[0].diagram:result.page;
   }
   return {materialize:materialize,hasDeclarations:declarations,origin:origin,editError:editError,dependencies:dependencies,resolveSource:resolveSource};
 })();

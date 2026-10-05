@@ -2412,7 +2412,16 @@ function renderInspector(){
     if(imported){
       var note=document.createElement('p');note.className='fnote';
       note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Drag any imported node to move the whole floating block. Only this import’s position is saved; internal structure stays provider-owned. Edit this consumer’s steps, paths, failures, and panels here.';
-      guide.appendChild(note);return;
+      guide.appendChild(note);
+      var importedError=document.createElement('div');importedError.className='gerr ierr';importedError.hidden=true;guide.appendChild(importedError);
+      var removeImport=actionButton('Remove referenced topology',function(){
+        var namespace=imported.as,section=t.section;
+        return commitCascade(function(raw){return planRemoveTopologyImport(session.text(),raw,section,namespace,session.topologyContext());},{after:function(){
+          opts.selection.clear();selectTarget({kind:'section',section:section,el:findTargetEl({kind:'section',section:section})},false,true);
+        }});
+      },'danger');
+      removeImport.setAttribute('aria-label','Remove referenced topology '+imported.as);
+      guide.appendChild(removeImport);return;
     }
 
     var p = document.createElement(loc ? 'button' : 'span');

@@ -727,6 +727,7 @@ function createBuilderInteractions(opts){
       if(member.ghost)member.ghost.remove();
     });
     (nd.edgeGhosts || []).forEach(function(pair){pair.source.classList.remove('dv-free-edge-source');pair.ghost.remove();});
+    (nd.topologyBoundaries || []).forEach(function(boundary){boundary.removeAttribute('transform');boundary.classList.remove('dv-topology-boundary-drag');});
     if (nd.line && nd.line.parentNode) nd.line.parentNode.removeChild(nd.line);
   }
   function cancelGroupDrag(){
@@ -778,6 +779,7 @@ function createBuilderInteractions(opts){
     var here=svgPointAt(nd.svg,inv,ev.clientX,ev.clientY),start=svgPointAt(nd.svg,inv,nd.x0,nd.y0);
     var dx=here.x-start.x,dy=here.y-start.y;if(!Number.isFinite(dx) || !Number.isFinite(dy))return;
     nd.delta={dx:dx,dy:dy};
+    (nd.topologyBoundaries || []).forEach(function(boundary){boundary.setAttribute('transform','translate('+dx+' '+dy+')');boundary.classList.add('dv-topology-boundary-drag');});
     var draft=builderClone(nd.diagram),ids=nd.members.map(function(member){return member.id;});
     nd.members.forEach(function(member){
       member.el.classList.add('dv-dragsrc');
@@ -919,10 +921,44 @@ function createBuilderInteractions(opts){
       if(editor.decoratePreview) editor.decoratePreview(card);
     });
   }
+  function applyTopologyBoundaries(){
+    Array.prototype.forEach.call(view.querySelectorAll('.dv-topology-boundary'),function(boundary){boundary.remove();});
+    var parsed=parseEditor(),resolved;
+    if(parsed.error || !session.resolve)return;
+    try{resolved=session.resolve(parsed.raw);}catch(ex){return;}
+    specSectionPaths(resolved).forEach(function(record,section){
+      var diagram=specValueAt(resolved,record.diagram),imports=((diagram || {}).topologyProvenance || {}).imports || [];
+      var secEl=view.querySelector('.doc-sec[data-dv-section="'+section+'"]');if(!secEl || inDetailPreview(secEl))return;
+      imports.forEach(function(imp){
+        var members=(imp.nodes || []).map(function(id){return secEl.querySelector('g.node[data-dv-node="'+cssQuote(id)+'"]');}).filter(Boolean);
+        if(!members.length)return;
+        var svg=members[0].ownerSVGElement,x1=Infinity,y1=Infinity,x2=-Infinity,y2=-Infinity;
+        members.forEach(function(member){
+          if(member.ownerSVGElement!==svg)return;
+          var xy=nodeTranslateXY(member),card=member.querySelector('.card');if(!xy || !card)return;
+          var w=parseFloat(card.getAttribute('width') || card.getAttribute('data-node-width')) || 0;
+          var h=parseFloat(card.getAttribute('height') || card.getAttribute('data-node-height')) || 0;
+          x1=Math.min(x1,xy.x);y1=Math.min(y1,xy.y);x2=Math.max(x2,xy.x+w);y2=Math.max(y2,xy.y+h);
+        });
+        if(!Number.isFinite(x1) || !Number.isFinite(y1))return;
+        var depth=String(imp.as).split('::').length-1,topPad=30+depth*16;
+        var g=document.createElementNS(SVG_NS,'g');g.setAttribute('class','dv-topology-boundary');g.setAttribute('data-topology-import',imp.as);
+        g.setAttribute('role','group');g.setAttribute('aria-label','Referenced topology '+imp.as+' from '+imp.spec+', export '+imp.export);
+        if(String(imp.as).indexOf('::')>=0)g.classList.add('dv-topology-boundary-nested');
+        var rect=document.createElementNS(SVG_NS,'rect');rect.setAttribute('x',String(x1-16-depth*8));rect.setAttribute('y',String(y1-topPad));
+        rect.setAttribute('width',String(x2-x1+32+depth*16));rect.setAttribute('height',String(y2-y1+topPad+16));rect.setAttribute('rx','12');g.appendChild(rect);
+        var label=document.createElementNS(SVG_NS,'text');label.setAttribute('x',String(x1-4-depth*8));label.setAttribute('y',String(y1-10-depth*16));
+        label.textContent='Referenced · '+imp.spec+' / '+imp.export+' · '+imp.as;g.appendChild(label);
+        var title=document.createElementNS(SVG_NS,'title');title.textContent='Referenced topology from '+imp.spec+' / '+imp.export+' (namespace '+imp.as+')';g.appendChild(title);
+        svg.appendChild(g);
+      });
+    });
+  }
   function applyRowGrabs(){
     opts.refreshLayout();
     spatial.refresh();
     applyPanelEditorControls();
+    applyTopologyBoundaries();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
        Handles are skipped when any row has no drawn nodes: without a
@@ -1174,6 +1210,9 @@ function createBuilderInteractions(opts){
               cancelNodeDrag();inspectorMessage('Open the authored consumer from Canon to move its imported block.');return;
             }
             startDiagram=resolvedDiagram;nodeDrag.topologyImport=imported;
+            nodeDrag.topologyBoundaries=Array.from(ndSec.querySelectorAll('.dv-topology-boundary')).filter(function(boundary){
+              var name=boundary.getAttribute('data-topology-import');return name===imported.as || name.indexOf(imported.as+'::')===0;
+            });
             var importPositions=layout(startDiagram).pos;
             nodeDrag.members=imported.nodes.map(function(id){
               var el=findTargetEl({kind:'node',section:ndGi,id:id});return {id:id,el:el,xy:el && nodeTranslateXY(el),origin:importPositions[id]};
@@ -1529,7 +1568,7 @@ function createBuilderInteractions(opts){
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),
     beforeReplace:life.guard(beforeReplace),retire:life.guard(retire),
     destroy:function(){if(!life.alive())return;life.destroy();retire();
-      Array.prototype.forEach.call(view.querySelectorAll('.dv-rowgrab,.home-layout-button'),function(el){el.remove();});
+      Array.prototype.forEach.call(view.querySelectorAll('.dv-rowgrab,.dv-topology-boundary,.home-layout-button'),function(el){el.remove();});
       Array.prototype.forEach.call(view.querySelectorAll('.dv-inserttarget'),function(el){el.classList.remove('dv-inserttarget');});
     }
   };

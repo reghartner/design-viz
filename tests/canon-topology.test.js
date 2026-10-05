@@ -134,6 +134,42 @@ test('nested providers resolve from the same batch and retain stable namespace i
   const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/team'},sections:[{diagram:{topologyImports:[{spec:'checkout',export:'story',as:'shared'}]}}]}};
   const out=resolve([outer,...specs]);assert.ok(diagram(out[0]).nodes['shared::platform::api']);
 });
+test('protocol imports dedupe identical definitions and deterministically remap real collisions without mutating sources',()=>{
+  const specs=source(),provider=specs[0],consumer=specs[1];
+  provider.page.protocols={custom:{color:'#123456',label:'Provider'}};
+  diagram(provider).edges[0].kind='custom';
+  consumer.page.protocols={custom:{label:'Consumer',color:'#654321'},same:{label:'Same',color:'#abcdef'}};
+  provider.page.protocols.same={color:'#abcdef',label:'Same'};
+  diagram(provider).edges.push({from:'store',to:'api',kind:'same'});
+  diagram(provider).topologyExports.core.edges.push('store->api');
+  const before=structuredClone(specs),first=resolve(specs),second=resolve(specs),out=diagram(first[1]);
+  assert.deepEqual(specs,before);assert.deepEqual(first,second);
+  assert.equal(out.edges.find(e=>e.from==='platform::api').kind,'platform-custom');
+  assert.equal(out.edges.find(e=>e.from==='platform::store').kind,'same');
+  assert.deepEqual(first[1].page.protocols.custom,consumer.page.protocols.custom);
+  assert.deepEqual(first[1].page.protocols['platform-custom'],provider.page.protocols.custom);
+  assert.equal(first[1].page.protocols['platform-same'],undefined);
+});
+test('multiple and nested protocol collisions remain distinct, stable, and never overwrite built-ins',()=>{
+  const specs=source(),provider=specs[0],consumer=specs[1];
+  provider.page.protocols={https:{label:'Provider HTTPS',color:'#112233'},custom:{label:'Provider custom',color:'#223344'}};
+  diagram(provider).edges[0].kind='https';
+  consumer.page.protocols={custom:{label:'Consumer custom',color:'#334455'},'platform-custom':{label:'Occupied',color:'#445566'}};
+  diagram(provider).edges.push({from:'store',to:'api',kind:'custom'});diagram(provider).topologyExports.core.edges.push('store->api');
+  diagram(consumer).topologyImports.push({spec:'platform',export:'core',as:'other'});
+  diagram(consumer).topologyExports={story:{nodes:['platform::api','platform::store'],edges:['platform::api->platform::store','platform::store->platform::api']}};
+  const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/team'},protocols:{'platform-https':{label:'Occupied nested HTTPS',color:'#556677'},'platform-custom-2':{label:'Occupied nested custom',color:'#667788'}},sections:[{diagram:{topologyImports:[{spec:'checkout',export:'story',as:'shared'}]}}]}};
+  const before=structuredClone([outer,...specs]),out=resolve([outer,...specs]),checkout=diagram(out[2]),nested=diagram(out[0]);
+  assert.deepEqual([outer,...specs],before);
+  assert.equal(checkout.edges.find(e=>e.from==='platform::api').kind,'platform-https');
+  assert.equal(checkout.edges.find(e=>e.from==='platform::store').kind,'platform-custom-2');
+  assert.equal(checkout.edges.find(e=>e.from==='other::api').kind,'other-https');
+  assert.equal(checkout.edges.find(e=>e.from==='other::store').kind,'other-custom');
+  assert.equal(nested.edges.find(e=>e.from==='shared::platform::api').kind,'shared-platform-https');
+  assert.equal(nested.edges.find(e=>e.from==='shared::platform::store').kind,'shared-platform-custom-2');
+  assert.deepEqual(out[0].page.protocols.https,undefined);
+  assert.deepEqual(out[2].page.protocols.https,undefined);
+});
 test('floating blocks preserve mixed row, stack and provider-float center geometry and saved origins',()=>{
   for(const nativeFloat of [{id:'audit',side:'below',dx:30,dy:-10},{id:'audit',x:-120,y:310}]){
     const specs=source(),provider=diagram(specs[0]),consumer=diagram(specs[1]);

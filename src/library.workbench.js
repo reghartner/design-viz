@@ -111,6 +111,25 @@ function createTopologyCatalogLoader(context){
   }};
 }
 
+/* A local draft may explicitly pin the deployed authored-source catalog.
+   Its synthetic consumer membership exists only in this auxiliary context;
+   saved JSON remains an ordinary local document with topologyImports. */
+async function connectTopologyRepository(raw){
+  if(!/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology requires the deployed repository catalog. Local provider files are not supported.');
+  var catalogURL=new URL('diagrams.json',location.href),response=await fetch(catalogURL.href,{cache:'no-cache',redirect:'error'});
+  var catalog=await readCanonLibraryJSON(response,'Repository catalog');
+  if(!catalog || catalog.version!==3)throw new Error('Referenced topology requires a version 3 authored-source repository catalog.');
+  var entries=parseCanonLibrary(catalog),ids=new Set(entries.map(function(entry){return entry.id;})),id='workbench-draft',suffix=2;
+  while(ids.has(id))id='workbench-draft-'+suffix++;
+  var value=JSON.parse(JSON.stringify(raw)),spec;
+  if(value && value.page && typeof value.page==='object' && !Array.isArray(value.page))spec=value;
+  else if(value && (value.nodes || value.rows || Object.prototype.hasOwnProperty.call(value,'topologyImports') || Object.prototype.hasOwnProperty.call(value,'topologyExports')))spec={page:{sections:[{diagram:value}]}};
+  else spec={page:value};
+  if(!spec.page || typeof spec.page!=='object' || Array.isArray(spec.page))throw new Error('Open a valid diagram before connecting the repository catalog.');
+  spec.page.canon={version:1,id:id,kind:'design',owner:'group:default/workbench-draft'};
+  return {version:1,id:id,ephemeral:true,specs:[spec],catalog:JSON.parse(JSON.stringify(catalog)),catalogURL:catalogURL.href};
+}
+
 function initWorkbenchLibrary(opts){
   var grid=document.getElementById('welcome-library-grid'),status=document.getElementById('welcome-library-status');
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');

@@ -56,6 +56,27 @@ test('headless insertion is surgical, rejects collisions and invalid candidates,
   const altered=clone(context);diagram(altered.specs[0]).nodes.a.title='Refresh';
   assert.equal(session.accept({...plan},{topologyContext:altered}),false);assert.equal(text,plan.text);
 });
+test('referenced block removal preflights every consumer-owned reference and succeeds as one undoable authored edit',()=>{
+  const c=harness(),specs=fixtures(),raw=specs[1],d=diagram(raw),context={version:1,id:'consumer',specs,catalog:{version:3,diagrams:[]}};
+  d.topologyImports=[reference];
+  d.edges=[{from:'local',to:'child::a'}];
+  d.nodes.local.group='child::g';
+  d.steps=[{id:'use-import',edge:'child::a->child::b',failures:{'child::a->child::b':'blocked'},packets:[{edge:'child::a->child::b'}],nodes:['child::a'],tone:{'child::b':'warn'},conditions:[{kind:'delivery-failed',label:'Delivery failed',nodeId:'child::a'}],traceMatch:{serviceName:'provider',operation:'send',nodeId:'child::b'}}];
+  d.topologyExports={relay:{nodes:['child::a','child::b'],edges:['child::a->child::b']}};
+  d.panels=[{id:'phone',type:'deviceapp',sources:[{id:'provider',node:'child::a'}]}];
+  const text=JSON.stringify(raw,null,2),blocked=c.planRemoveTopologyImport(text,raw,0,'child',context);
+  assert.match(blocked.error,/Cannot remove referenced topology child/);
+  assert.deepEqual(Array.from(blocked.blockers,b=>b.label),['Consumer connections','Group references','Story connection references','Failure references','Packet references','Step node references','Tone patches','Conditions','Trace matches','Shared topology exports','Panel references']);
+  assert.match(blocked.error,/local->child::a/);assert.match(blocked.error,/use-import → child::a->child::b/);assert.match(blocked.error,/relay → node child::a/);assert.match(blocked.error,/phone → child::a/);
+  assert.equal(JSON.stringify(raw,null,2),text);
+  delete d.edges;delete d.nodes.local.group;delete d.steps;delete d.topologyExports;delete d.panels;
+  const ready=JSON.stringify(raw,null,2),plan=c.planRemoveTopologyImport(ready,raw,0,'child',context);
+  assert.equal(plan.error,undefined);assert.equal(diagram(JSON.parse(plan.text)).topologyImports,undefined);
+  let current='',rendered;const session=c.createBuilderSession({source:{read:()=>current,write:value=>current=value},persistence:{read:()=>({}),preserve(){},cancel(){},save(){}},render(){rendered=session.resolve(JSON.parse(current));}});
+  session.replaceProject(ready,null,{topologyContext:context});const snapshot=session.snapshot();
+  assert.equal(session.accept(plan,{snapshot}),true);assert.equal(diagram(rendered).nodes['child::a'],undefined);
+  assert.equal(session.undo(),true);assert.ok(diagram(JSON.parse(current)).topologyImports);assert.equal(session.redo(),true);assert.equal(diagram(JSON.parse(current)).topologyImports,undefined);
+});
 test('catalog loader verifies frozen revisions, acquires only explicit closure, and never refetches a provider',async()=>{
   const {digest}=await import('../tools/canon/drift.mjs');const specs=fixtures(),hits=[];
   const catalog={version:3,diagrams:specs.map(spec=>({id:spec.page.canon.id,canon:spec.page.canon,title:spec.page.title,counts:{nodes:0,steps:0,panels:0},revision:digest(spec),specUrl:'../diagrams/'+spec.page.canon.id+'.json'}))};
@@ -68,6 +89,19 @@ test('catalog loader verifies frozen revisions, acquires only explicit closure, 
   await assert.rejects(c.createTopologyCatalogLoader(context).load('provider'),/revision mismatch/);
   await assert.rejects(client.load('missing'),/Missing authored provider/);
   assert.throws(()=>c.createTopologyCatalogLoader({version:1,specs:[]}),/unavailable/);
+});
+test('an unsaved local consumer explicitly pins repository providers without persisting its ephemeral identity',async()=>{
+  const {digest}=await import('../tools/canon/drift.mjs'),provider=fixtures()[0],raw={page:{title:'New draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']],edges:[]}}]}};
+  const catalog={version:3,diagrams:[{id:'provider',title:'Provider',canon:provider.page.canon,counts:{nodes:4,steps:0,panels:0},revision:digest(provider),specUrl:'provider.json'}]};
+  const hits=[],c=harness({fetch:async url=>{hits.push(String(url));return new Response(JSON.stringify(String(url).endsWith('diagrams.json')?catalog:provider));}});
+  const pinned=await c.connectTopologyRepository(raw);assert.equal(pinned.ephemeral,true);assert.match(pinned.id,/^workbench-draft/);assert.equal(JSON.stringify(raw).includes('canon'),false);
+  const loaded=await c.createTopologyCatalogLoader(pinned).load('provider'),text=JSON.stringify(raw,null,2),plan=c.planAddTopologyImport(text,raw,0,reference,loaded.context);
+  assert.equal(plan.error,undefined);assert.equal(JSON.stringify(JSON.parse(plan.text)).includes('workbench-draft'),false);
+  let current='',saved;const session=c.createBuilderSession({source:{read:()=>current,write:value=>current=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(value,baseline,artifacts)=>saved={value,artifacts}},render(){session.resolve(JSON.parse(current));}});
+  session.replaceProject(text);const snapshot=session.snapshot();assert.equal(session.accept(plan,{snapshot,topologyContext:loaded.context}),true);
+  const authored=JSON.parse(current);assert.deepEqual(diagram(authored).topologyImports,[reference]);assert.equal(authored.page.canon,undefined);
+  assert.equal(saved.artifacts.topologyContext.ephemeral,true);assert.deepEqual(hits.map(url=>url.split('/').pop()),['diagrams.json','provider.json']);
+  await assert.rejects(harness({location:{href:'file:///tmp/flowspec.html'}}).connectTopologyRepository(raw),/deployed repository catalog/);
 });
 test('catalog acquisition loads nested dependencies once, fails transport safely, and refuses offline or foreign catalogs',async()=>{
   const {digest}=await import('../tools/canon/drift.mjs');const specs=fixtures(),nested=clone(specs[1]);

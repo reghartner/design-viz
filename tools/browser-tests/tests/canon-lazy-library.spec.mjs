@@ -1,4 +1,4 @@
-import {test,expect,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,prepareEditorSurface,inspectPageElement} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {mkdir,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import path from 'node:path';
@@ -27,8 +27,8 @@ test.afterEach(async({server})=>{await rm(path.join(server.root,'company'),{recu
 
 async function pickerFixture(page,server){
   const fixture=await publish(server);
-  fixture.provider={page:{title:'Notification platform',sections:[
-    {id:'channels',heading:'Notification channels',diagram:{nodes:{dispatch:{title:'Dispatcher'},push:{title:'Push'},email:{title:'Email'},sms:{title:'SMS'},private:{title:'Never exported'}},rows:[['dispatch'],['push','email','sms','private']],edges:['push','email','sms'].map(to=>({from:'dispatch',to,kind:'https'})),topologyExports:{channels:{nodes:['dispatch','push','email','sms'],edges:['dispatch->push','dispatch->email','dispatch->sms']}}}},
+  fixture.provider={page:{title:'Notification platform',protocols:{delivery:{label:'Provider delivery',color:'#667788'}},sections:[
+    {id:'channels',heading:'Notification channels',diagram:{nodes:{dispatch:{title:'Dispatcher'},push:{title:'Push'},email:{title:'Email'},sms:{title:'SMS'},private:{title:'Never exported'}},rows:[['dispatch'],['push','email','sms','private']],edges:['push','email','sms'].map(to=>({from:'dispatch',to,kind:'delivery'})),topologyExports:{channels:{nodes:['dispatch','push','email','sms'],edges:['dispatch->push','dispatch->email','dispatch->sms']}}}},
     {id:'archive',heading:'Archive section',diagram:{nodes:{archive:{title:'Archive'}},rows:[['archive']],edges:[],topologyExports:{archive:{nodes:['archive'],edges:[]}}}}
   ]}};
   await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.provider));
@@ -101,6 +101,79 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#topology-cancel').click();expect(fixture.requests).toHaveLength(2);
 });
 
+test('a referenced block is visibly framed, blocked removal explains consumer references, and clean removal has one Undo',async({page,server})=>{
+  await pickerFixture(page,server);const consumer=JSON.parse(await page.locator('#src').inputValue());consumer.page.protocols={delivery:{label:'Consumer delivery',color:'#112233'}};
+  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(consumer,null,2));await page.locator('#go').click();await prepareEditorSurface(page);
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  const imported='first::dispatch',boundary=page.locator('#docview .dv-topology-boundary[data-topology-import="first"]');
+  await expect(boundary).toBeVisible();await expect(boundary).toContainText('Referenced · first / channels · first');
+  await expect(page.locator('#docview')).toContainText('Provider delivery');
+  await expect(boundary).toHaveAttribute('role','group');await expect(boundary).toHaveAttribute('aria-label',/Referenced topology first from first, export channels/);
+  const importedText=await page.locator('#src').inputValue(),raw=JSON.parse(importedText),d=raw.page.blocks[0].diagram,local=Object.keys(d.nodes)[0];
+  d.edges.push({from:local,to:imported});const blockedText=JSON.stringify(raw,null,2);
+  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(blockedText);await page.locator('#go').click();await prepareEditorSurface(page);
+  await page.locator('#docview [data-dv-node="'+imported+'"]').click();await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('button',{name:'Remove referenced topology first'}).click();
+  await expect(page.locator('#guide')).toContainText('Cannot remove referenced topology first');await expect(page.locator('#guide')).toContainText('Consumer connections');
+  await expect(page.locator('#src')).toHaveValue(blockedText);
+  d.edges.pop();const cleanText=JSON.stringify(raw,null,2);await page.locator('#editor-tab-json').click();await page.locator('#src').fill(cleanText);await page.locator('#go').click();await prepareEditorSurface(page);
+  await page.locator('#docview [data-dv-node="'+imported+'"]').click();await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('button',{name:'Remove referenced topology first'}).click();await prepareEditorSurface(page);
+  const removed=await page.locator('#src').inputValue();expect(JSON.parse(removed).page.blocks[0].diagram.topologyImports).toBeUndefined();
+  await expect(page.locator('#docview [data-dv-node="'+imported+'"]')).toHaveCount(0);await expect(boundary).toHaveCount(0);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(cleanText);await expect(page.locator('#docview [data-dv-node="'+imported+'"]')).toBeVisible();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);await expect(page.locator('#docview [data-dv-node="'+imported+'"]')).toHaveCount(0);
+});
+
+test('a brand-new local diagram explicitly connects to the repository catalog and persists only its reference',async({page,server})=>{
+  await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
+  const before=JSON.parse(await page.locator('#src').inputValue());expect(before.page.canon).toBeUndefined();
+  await openTopology(page);await expect(page.locator('#topology-connect')).toBeVisible();await expect(page.locator('#topology-search')).toBeDisabled();
+  await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.locator('#topology-connect').click();await expect(page.locator('#topology-connect')).toBeHidden();await expect(page.locator('#topology-add')).toBeEnabled();
+  await page.locator('#topology-namespace').fill('notify');await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  const authored=JSON.parse(await page.locator('#src').inputValue()),d=authored.page.blocks[0].diagram;
+  expect(authored.page.canon).toBeUndefined();expect(JSON.stringify(authored)).not.toContain('workbench-draft');
+  expect(d.topologyImports).toEqual([{spec:'first',export:'channels',as:'notify'}]);expect(d.nodes['notify::dispatch']).toBeUndefined();
+  await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));
+  expect(recovered.topologyContext.ephemeral).toBe(true);expect(recovered.topologyContext.id).toMatch(/^workbench-draft/);
+  await page.reload();await prepareEditorSurface(page);await expect(page.locator('#docview [data-dv-node="notify::dispatch"]')).toBeVisible();
+  expect(JSON.parse(await page.locator('#src').inputValue()).page.canon).toBeUndefined();
+});
+
+for(const settlement of ['resolve','reject'])test('a stale local catalog '+settlement+' cannot corrupt a reopened reference picker or clear its selection',async({page,server})=>{
+  const fixture=await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
+  await page.locator('.welcome-template-card').filter({hasText:'Simple service flow'}).click();await prepareEditorSurface(page);
+  const selected=page.locator('#docview g.node[data-dv-node]').first();await inspectPageElement(page,selected.locator('.t1'));
+  const title=page.locator('#guide').getByLabel('title',{exact:true}),before=await page.locator('#src').inputValue();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+  function deferred(){let release;return {promise:new Promise(resolve=>release=resolve),release};}
+  const attempts=[0,1].map(()=>({gate:deferred(),seen:deferred(),done:deferred()}));let request=0;
+  const catalogURL=new URL('diagrams.json',fixture.url).href,catalog=await readFile(path.join(fixture.root,'workbench/diagrams.json'),'utf8');
+  await page.route(catalogURL,async route=>{
+    const index=request++,attempt=attempts[index];attempt.seen.release();await attempt.gate.promise;
+    await route.fulfill({status:200,contentType:'application/json',body:index===0 && settlement==='reject'?'{':catalog});attempt.done.release();
+  });
+  await openTopology(page);await page.locator('#topology-connect').click();await attempts[0].seen.promise;
+  await expect(page.locator('#topology-connect')).toBeDisabled();await page.locator('#topology-cancel').click();
+  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.locator('#topology-connect').click();await attempts[1].seen.promise;await expect(page.locator('#topology-connect')).toBeDisabled();
+  attempts[0].gate.release();await attempts[0].done.promise;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await expect(page.locator('#topology-connect')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('Connecting to the deployed repository catalog');
+  await page.locator('#topology-cancel').click();await openTopology(page);
+  await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.keyboard.press('Escape');await expect(page.locator('#topology-picker')).not.toBeVisible();
+  await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();await expect(page.locator('#src')).toHaveValue(before);
+  attempts[1].gate.release();await attempts[1].done.promise;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await openTopology(page);await expect(page.locator('#topology-connect')).toBeEnabled();await expect(page.locator('#topology-connect')).toBeFocused();
+  await page.keyboard.press('Escape');await expect(selected).toHaveClass(/dv-sel/);await expect(title).toBeVisible();
+});
+
 test('reference picker cancels stale async work and leaves source/history untouched',async({page,server})=>{
   const fixture=await pickerFixture(page,server);let release;
   const held=new Promise(resolve=>release=resolve);
@@ -166,6 +239,8 @@ test('the backend workspace handoff drags a whole floating import with authored 
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
   expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
   const before=await page.locator('#src').inputValue(),root=page.locator('#docview');
+  const boundary=root.locator('.dv-topology-boundary[data-topology-import="platform"]');await expect(boundary).toBeVisible();
+  const boundaryBefore=await boundary.locator('rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
   await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeEnabled();await page.locator('#diagram-add-close').click();
   const author=await root.elementHandle();await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
   await expect(page.locator('#page-preview-view [data-dv-node="platform::api"]')).toBeVisible();
@@ -182,6 +257,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
     await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+90*scale,y+70*scale,{steps:12});
   }
   await drag();await expect(root.locator('.dv-ghost')).toHaveCount(2);
+  await expect(boundary).toHaveAttribute('transform',/translate\(/);
   await expect(root.locator('.dv-free-edge-preview')).toHaveCount(2);await page.mouse.up();
   const after=await page.locator('#src').inputValue(),moved=JSON.parse(after),d=moved.page.sections[0].diagram;
   const origin=spec.page.sections[0].diagram.topologyProvenance.imports[0].position;
@@ -192,6 +268,8 @@ test('the backend workspace handoff drags a whole floating import with authored 
   const placed=await Promise.all(['client','platform::api','platform::store'].map(center));
   expect(placed[0]).toEqual(original[0]);
   for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(90,0);expect(placed[i].y-original[i].y).toBeCloseTo(70,0);}
+  const boundaryAfter=await boundary.locator('rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
+  expect(boundaryAfter.x-boundaryBefore.x).toBeCloseTo(90,0);expect(boundaryAfter.y-boundaryBefore.y).toBeCloseTo(70,0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
@@ -208,6 +286,23 @@ test('the backend workspace handoff drags a whole floating import with authored 
   await page.reload();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
   expect(await Promise.all(['client','platform::api','platform::store'].map(center))).toEqual(placed);
   await testInfo.attach('floating-import',{body:await root.screenshot(),contentType:'image/png'});
+});
+
+test('nested repository references receive separate non-interactive Workbench boundaries',async({page,server})=>{
+  const fixture=await publish(server),sources=[];
+  for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
+  sources[1].page.sections[0].diagram.topologyExports={story:{nodes:['platform::api','platform::store'],edges:['platform::api->platform::store']}};
+  sources.push({page:{title:'Outer',canon:{version:1,id:'outer',kind:'design',owner:'group:default/test'},sections:[{id:'outer',diagram:{topologyImports:[{spec:'checkout',export:'story',as:'shared'}]}}]}});
+  const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('outer'),workspace=snapshot.loadWorkspace('outer');
+  await page.route('**/api/canon/context?*',route=>route.fulfill({json:{spec,...workspace,catalog:{version:1,services:[]}}}));
+  const handoff={version:1,id:'outer',revision:digest(spec),action:'edit'};
+  await page.goto(fixture.url+'?canon=outer#fv='+encodeURIComponent(JSON.stringify(handoff)));
+  await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
+  const boundaries=page.locator('#docview .dv-topology-boundary');
+  await expect(boundaries).toHaveCount(2);
+  await expect(page.locator('#docview .dv-topology-boundary[data-topology-import="shared"]')).toBeVisible();
+  await expect(page.locator('#docview .dv-topology-boundary[data-topology-import="shared::platform"]')).toContainText('platform / core');
+  await expect(boundaries.first()).toHaveCSS('pointer-events','none');
 });
 
 test('a published topology consumer renders and its imported node inspector is read only',async({page,server})=>{

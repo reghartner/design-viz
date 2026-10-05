@@ -91,11 +91,15 @@ function createBuilderSession(options){
       if(nextContext){
         try{
           if(nextContext!==topologyContext){
-            if(!topologyContext || nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
-            topologyContext.specs.forEach(function(spec){
-              var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
-              if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
-            });
+            if(!topologyContext){
+              if(nextContext.ephemeral!==true)throw Error('The frozen Canon session changed. Reopen the picker.');
+            }else{
+              if(nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
+              topologyContext.specs.forEach(function(spec){
+                var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
+                if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
+              });
+            }
           }
           resolve(JSON.parse(plan.text),nextContext);
         }catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}

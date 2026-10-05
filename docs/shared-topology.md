@@ -56,8 +56,11 @@ importing three edges and firing only two is still supported.
 
 Exports include selected nodes and edges, their catalog/code metadata, and the
 group ancestry required by those nodes. Group IDs and parent references receive
-the same namespace. Custom edge protocol definitions follow the export;
-conflicting consumer definitions fail. Node link, handoff, and detail fields
+the same namespace. Custom edge protocol definitions follow the export. An
+identical consumer definition is reused; a different definition with the same ID
+receives a stable import-scoped ID in the derived snapshot and imported edges are
+rewritten to it. Authored JSON and built-in protocols are never overwritten.
+Node link, handoff, and detail fields
 are copied verbatim; they are not rewritten into topology imports. Keep any
 local navigation destination valid in the consumer, or use an explicit external
 handoff destination. Provider steps, paths, panels, reveal/hide step indices,
@@ -209,6 +212,12 @@ closure/collisions before publication. UI applies this plan through the normal
 session transaction; agents can author equivalent reference JSON and validate
 the complete approved batch using the Canon publisher.
 
+A brand-new or local draft uses the same picker. Choose **Connect repository
+catalog** to explicitly pin the deployed v3 index, then browse approved providers
+normally. The Workbench gives the draft a session-only consumer identity for
+resolution; browser recovery retains it, but it is never written into the
+document. Local provider files are deliberately unsupported.
+
 Open the published consumer and choose **Edit in Workbench**. The local copy
 renders imported topology and exposes ordinary steps, paths, failures and panels.
 The provenance label names the frozen session; imported node/edge/group inspectors
@@ -221,6 +230,12 @@ repairable while the last valid preview stays visible.
 
 Consumer narrative and local node-to-imported-node edges remain editable. Edit
 shared structure in the provider; drag any imported node to place its whole block.
+Workbench draws a light labeled boundary around each direct and nested referenced
+set; this editor-only cue is not persisted or shown on published pages. Selecting
+any imported node, connection, or group exposes **Remove referenced topology**.
+Removal deletes the one authored import in one Undo action only when consumer
+connections, story references, registered panel references, and re-exports no
+longer depend on it. Blockers are listed and never cascade-deleted.
 Opening from Canon must load/validate the entire
 closure before replacing a current draft. Recovery stores that authored closure
 as auxiliary session context.

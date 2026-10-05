@@ -1089,6 +1089,7 @@ function initWorkbenchBuilder(opts){
   if(catalogBtn)life.listen(catalogBtn,'click',function(){confirmAddition(function(){if(catalogPicker)catalogPicker.open();});});
   var topologyPicker=initTopologyPicker({document:document,src:src,pause:pausePreview,
     context:function(){return Object.assign(additionContext(),{topologyContext:session.topologyContext()});},
+    connect:function(raw){return connectTopologyRepository(raw);},
     insert:function(plan,snapshot,context){
       if(!session.accept(plan,{snapshot:snapshot,topologyContext:context,beforePublish:clearMultiSelect}))return false;
       session.insertSection=plan.section;

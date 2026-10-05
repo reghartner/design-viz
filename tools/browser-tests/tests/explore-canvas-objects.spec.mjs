@@ -306,3 +306,87 @@ test('mixed Fit can use a narrow free region beside a large floating panel',asyn
  const fitted=(await graphPoint(page,{x:0,y:0})).scale;expect(fitted).toBeLessThan(.1);
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.getByRole('button',{name:'Zoom out',exact:true}).click();expect((await graphPoint(page,{x:0,y:0})).scale).toBeCloseTo(fitted,2);
 });
+
+async function controlsPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-menu').getByLabel('Step controls placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
+const player=page=>page.locator('.explore-player');
+const controlsRect=page=>player(page).evaluate(el=>Object.fromEntries(['x','y','w','h'].map(k=>[k,parseFloat(el.style.getPropertyValue('--float-'+k))])));
+for(const host of ['reader','workbench','backstage'])test(host+': canvas step controls retain playback, graph geometry, fit and independent floating placement',async({page,server})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
+ layout.controls={x:.05,y:.75,w:.75,h:.2};layout.controlsPlacement='canvas';layout.canvas.controls={x:-800,y:900,w:720,h:220};
+ await open(page,server,raw,host);await fit(page,host);
+ await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();
+ await expect(player(page).locator('.explore-player-grip')).toHaveCSS('visibility','hidden');
+ const r=await player(page).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
+ expect(r.x).toBeGreaterThanOrEqual(stage.x-2);expect(r.y).toBeGreaterThanOrEqual(stage.y-2);expect(r.x+r.width).toBeLessThanOrEqual(stage.x+stage.width+2);expect(r.y+r.height).toBeLessThanOrEqual(stage.y+stage.height+2);
+ await board(page).evaluate(el=>{el.scrollLeft+=60;el.scrollTop+=40;});
+ const moved=await player(page).boundingBox();expect(moved.x-r.x).toBeCloseTo(-60,0);expect(moved.y-r.y).toBeCloseTo(-40,0);
+ await fit(page,host);const before=await player(page).boundingBox(),point={x:stage.x+stage.width*.5,y:stage.y+stage.height*.5};
+ await board(page).dispatchEvent('wheel',{clientX:point.x,clientY:point.y,deltaY:-35,ctrlKey:true,bubbles:true,cancelable:true});
+ expect((await player(page).boundingBox()).width).toBeGreaterThan(before.width);await fit(page,host);
+ const captionBefore=await player(page).locator('.stepline').textContent();await player(page).getByRole('button',{name:'Next step',exact:true}).click();
+ await expect(player(page).locator('.stepline')).not.toHaveText(captionBefore);
+ await expect(player(page)).toHaveClass(/explore-canvas-selected/);
+ await drag(page,player(page).locator('.explore-player-grip'),40,20);const canvasRect=await controlsRect(page);
+ await controlsPlacement(page,'floating');await expect(page.locator('.explore-stage>.explore-player')).toBeVisible();const floatingRect=await controlsRect(page);
+ await controlsPlacement(page,'canvas');expect(await controlsRect(page)).toEqual(canvasRect);
+ await controlsPlacement(page,'floating');expect(await controlsRect(page)).toEqual(floatingRect);
+ if(host==='reader'){await page.reload();expect(await controlsRect(page)).toEqual(layout.canvas.controls);}
+});
+
+test('Workbench canvas step controls placement, move and resize each create one Undo and export with both rectangles',async({page,server,context})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.controls={x:.05,y:.75,w:.75,h:.2};
+ await open(page,server,raw,'workbench');const original=await source(page);let previous=original;
+ for(const action of [()=>controlsPlacement(page,'canvas'),async()=>{await fit(page,'workbench');await player(page).focus();await drag(page,player(page).locator('.explore-player-grip'),40,25);},async()=>{await fit(page,'workbench');await player(page).focus();await drag(page,player(page).locator('.explore-window-resize'),40,30);}]){
+  await action();const shown=await player(page).boundingBox(),stageBounds=await page.locator('.explore-stage').boundingBox();expect(shown.y+shown.height).toBeLessThanOrEqual(stageBounds.y+stageBounds.height+2);await expect.poll(async()=>await source(page)!==previous).toBe(true);const next=await source(page);
+  expect(JSON.parse(next).page.sections[0].diagram.layouts[1].exploreLayout.controls).toEqual(layout.controls);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(previous);
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(next);previous=next;
+ }
+ const saved=JSON.parse(previous),reader=await context.newPage();await reader.goto(await build(server,saved,'canvas-controls-export'));
+ await expect(reader.locator('.explore-canvas-objects>.explore-player')).toBeVisible();expect(await controlsRect(reader)).toEqual(saved.page.sections[0].diagram.layouts[1].exploreLayout.canvas.controls);
+ await player(reader).focus();await player(reader).locator('.explore-player-grip').press('ArrowRight');expect(await controlsRect(reader)).not.toEqual(saved.page.sections[0].diagram.layouts[1].exploreLayout.canvas.controls);
+ await reader.reload();expect(await controlsRect(reader)).toEqual(saved.page.sections[0].diagram.layouts[1].exploreLayout.canvas.controls);
+});
+
+test('canvas step controls survive chapter, profile, preview and editor reload; selection exposes supported actions',async({page,server})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.controlsPlacement='canvas';layout.canvas.controls={x:-800,y:900,w:720,h:220};
+ await open(page,server,raw,'workbench');const saved=await source(page);await fit(page,'workbench');
+ await player(page).focus();await page.keyboard.press('Enter');await expect(page.locator('#workspace-fit-selection')).toBeEnabled();
+ await player(page).focus();await page.keyboard.press('Shift+F10');const menu=page.getByRole('menu',{name:'Object actions'});
+ await expect(menu.getByRole('menuitem',{name:'Delete',exact:false})).toHaveAttribute('aria-disabled','true');
+ await expect(menu.getByRole('menuitem',{name:'Duplicate',exact:false})).toHaveAttribute('aria-disabled','true');
+ await menu.getByRole('menuitem',{name:'Fit selection',exact:true}).click();await closeTools(page);await fit(page,'workbench');
+ // Alt marquee includes the controls, and Fit selection can frame them.
+ const r=await player(page).boundingBox();await page.keyboard.down('Alt');await page.mouse.move(r.x-10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width+10,r.y+r.height+10,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
+ await expect(player(page)).toHaveClass(/dv-sel/);await expect(player(page).locator('.explore-player-grip')).toHaveCSS('visibility','visible');await expect(page.locator('#workspace-fit-selection')).toBeEnabled();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();expect(await controlsRect(page)).toEqual(layout.canvas.controls);
+ await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
+ expect(await controlsRect(page)).toEqual(layout.canvas.controls);await expect(page.locator('#src')).toHaveValue(saved);
+ if(!await page.locator('#open-page-preview').isVisible())await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
+ const preview=page.locator('#page-preview-view'),previewPlayer=preview.locator('.explore-canvas-objects>.explore-player');await expect(previewPlayer).toBeVisible();
+ await preview.getByRole('button',{name:'Fit canvas',exact:true}).click();await previewPlayer.getByRole('button',{name:'Next step',exact:true}).click();
+ await previewPlayer.focus();await previewPlayer.locator('.explore-player-grip').press('ArrowRight');await expect(page.locator('#src')).toHaveValue(saved);
+ await page.locator('#close-page-preview').click();expect(await controlsRect(page)).toEqual(layout.canvas.controls);
+ await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);expect(await controlsRect(page)).toEqual(layout.canvas.controls);
+});
+
+
+test('step controls inspector placement preserves caption and both geometries with one Undo',async({page,server})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
+ layout.controlsPlacement='canvas';layout.controls={x:.05,y:.75,w:.75,h:.2};layout.canvas.controls={x:-800,y:900,w:720,h:220};layout.steps={textPosition:'right'};
+ await open(page,server,raw,'workbench');await fit(page,'workbench');const saved=await source(page);
+ await player(page).focus();await page.keyboard.press('Enter');await player(page).focus();await page.keyboard.press('Shift+F10');await page.getByRole('menu',{name:'Object actions'}).getByRole('menuitem',{name:'Inspect',exact:true}).click();
+ await page.locator('#guide').getByLabel('Step controls placement',{exact:true}).selectOption('floating');
+ const next=await source(page),changed=JSON.parse(next).page.sections[0].diagram.layouts[1].exploreLayout;
+ expect(changed).toEqual({...layout,controlsPlacement:'floating'});await expect(page.locator('.explore-stage>.explore-player')).toBeVisible();
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();
+});
+
+test('step controls inspector reveals a new canvas rectangle',async({page,server})=>{
+ const raw=fixture();await open(page,server,raw,'workbench');
+ await player(page).locator('.stepline').click();await page.locator('#guide').getByLabel('Step controls placement',{exact:true}).selectOption('canvas');
+ await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();
+ const r=await player(page).boundingBox(),b=await page.locator('.explore-stage').boundingBox();
+ expect(r.x).toBeGreaterThanOrEqual(b.x);expect(r.y).toBeGreaterThanOrEqual(b.y);expect(r.x+r.width).toBeLessThanOrEqual(b.x+b.width);expect(r.y+r.height).toBeLessThanOrEqual(b.y+b.height);
+});

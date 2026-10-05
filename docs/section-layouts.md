@@ -467,6 +467,27 @@ or `"canvas"`. Omitted entries use the legacy `exploreLayout.panelPlacement`,
 which still accepts `"floating"` or `"canvas"` and defaults to Floating.
 Section notes continue to use that chapter default.
 
+The **Step controls** placement selector in Panels, also available in the step
+controls inspector, independently saves `exploreLayout.controlsPlacement` as
+`"floating"` (the default) or `"canvas"`. Existing files keep floating playback.
+`exploreLayout.controls` retains its viewport-fraction rectangle;
+`exploreLayout.canvas.controls` stores a separate `{x,y,w,h}` graph rectangle
+with the same coordinate bounds as canvas panels. Both survive placement changes,
+chapter changes, preview rebuilds and host-profile changes. Missing canvas geometry
+starts below the diagram and switching to it fits the canvas to reveal it.
+
+On-canvas controls pan and zoom with the diagram and participate in Fit canvas.
+They do not reserve a viewport overlay area. Click or focus the controls to reveal
+move and resize handles; both handles accept arrow keys and Shift for larger moves.
+Playback remains usable in either placement. Workbench placement, drag and resize
+save one Undo action apiece; reader changes remain temporary. Canvas controls use
+graph zoom for sizing; the panel-size control applies to floating content.
+In Workbench, Alt marquee and the object menu support selecting, inspecting and
+fitting canvas controls. Duplicate, delete, group movement and alignment remain
+limited to nodes and panels; use the controls' handles for movement and resizing.
+Saved placement or canvas-control geometry advertises the
+`layout.explore-controls-placement` compatibility capability.
+
 Floating rectangles remain in `exploreLayout.panels`. Independent
 `exploreLayout.canvas.panels` and `.prose` rectangles use graph units measured
 from the upper-left of the SVG viewBox. Coordinates may be negative; all values
@@ -474,10 +495,11 @@ must be finite and within ±10000, with positive `w` and `h`. Toggling a panel
 preserves both rectangles, visibility, and the current step/path. The whole
 canvas window scales with diagram zoom, including its header and contents.
 Floating panels retain their responsive or authored `overlayScale`; optional
-`canvas.controlsScale` (0.5–1.25) independently preserves playback sizing when
-canvas objects are present. With mixed placement, **Floating panels & controls**
-sizes floating panels and playback together. With all windows on canvas,
-**Controls** changes playback only.
+`canvas.controlsScale` (0.5–1.25) independently preserves floating playback sizing
+when canvas objects are present. With mixed panel placement and floating playback,
+**Floating panels & controls** sizes both together. With all panels on canvas and
+playback floating, **Controls** changes playback only. With playback on canvas,
+**Floating panels** sizes the remaining floating panels.
 
 **Fit canvas** includes the diagram and currently visible on-canvas objects,
 and reserves space for visible floating panels and fixed playback. Hidden

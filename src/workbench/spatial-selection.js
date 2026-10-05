@@ -12,6 +12,8 @@ function createBuilderSpatialSelection(opts){
     var got=builderDiagram(s.text,s.raw,section);if(got.error)return null;
     var panel=el.closest('.explore-canvas-objects [data-explore-panel]');
     if(panel){var id=panel.getAttribute('data-explore-panel'),index=(got.d.panels || []).findIndex(function(p){return p.id===id;});return index<0?null:{kind:'panel',id:id,index:index,section:section,el:panel};}
+    var controls=el.closest('.explore-canvas-objects .explore-player');
+    if(controls)return {kind:'step-controls',section:section,layoutId:controls.getAttribute('data-explore-layout'),el:controls};
     var node=el.closest('[data-dv-node]');if(node && Object.prototype.hasOwnProperty.call(got.d.nodes || {},node.getAttribute('data-dv-node')))return {kind:'node',id:node.getAttribute('data-dv-node'),section:section,el:node};
     var existing=opts.targetFromEvent({target:el});return existing && ['edge','group'].indexOf(existing.kind)>=0?existing:null;
   }
@@ -25,21 +27,22 @@ function createBuilderSpatialSelection(opts){
     // identity and before welcome reveals the editor. Mutation still uses the
     // stricter snapshot()/active() checks when the menu is actually invoked.
     var s=opts.session.snapshot();if(s.error)return;
-    Array.from(view.querySelectorAll('.viewport-explore .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel]')).forEach(function(el){
-      var section=el.closest('.doc-sec'),panel=el.hasAttribute('data-explore-panel'),id=el.getAttribute(panel?'data-explore-panel':'data-dv-node');
+    Array.from(view.querySelectorAll('.viewport-explore .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel],.viewport-explore .explore-canvas-objects .explore-player')).forEach(function(el){
+      var section=el.closest('.doc-sec'),controls=el.classList.contains('explore-player'),panel=el.hasAttribute('data-explore-panel'),id=el.getAttribute(panel?'data-explore-panel':'data-dv-node');
       if(!section || el.closest('[data-dv-detail-preview]'))return;
       var got=builderDiagram(s.text,s.raw,Number(section.getAttribute('data-dv-section')));
       if(got.error)return;
-      var value=panel?(got.d.panels || []).find(function(p){return p.id===id;}):(got.d.nodes || {})[id];if(!value)return;
+      var value=controls?{title:'Step controls'}:panel?(got.d.panels || []).find(function(p){return p.id===id;}):(got.d.nodes || {})[id];if(!value)return;
       var help='Enter selects; Shift+Enter adds or removes; arrows move 10 graph units, Shift+arrows 50; release arrows to commit; Escape cancels; Shift+F10 opens actions.';
-      if(!panel && !(got.d.floats || []).some(function(f){return f.id===id;}))help='Row nodes follow the row layout. Use Free placement to move this node. '+help;
-      var attrs={},values={tabindex:'0',role:'group','aria-label':(value.title || id)+(panel?' canvas panel':' node'),'aria-haspopup':'menu','aria-keyshortcuts':'Enter Shift+Enter ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10','aria-description':help,title:help,'data-dv-object-menu':''};
+      if(controls)help='Enter selects; Shift+Enter adds or removes; Shift+F10 opens actions. Select and use the move or resize handle; arrow keys on handles change geometry. Group movement and alignment support nodes and panels.';
+      if(!controls && !panel && !(got.d.floats || []).some(function(f){return f.id===id;}))help='Row nodes follow the row layout. Use Free placement to move this node. '+help;
+      var attrs={},values={tabindex:'0',role:'group','aria-label':(value.title || id)+(controls?' on canvas':panel?' canvas panel':' node'),'aria-haspopup':'menu','aria-keyshortcuts':controls?'Enter Shift+Enter Shift+F10':'Enter Shift+Enter ArrowUp ArrowDown ArrowLeft ArrowRight Shift+F10','aria-description':help,title:help,'data-dv-object-menu':''};
       Object.keys(values).forEach(function(name){attrs[name]=el.getAttribute(name);el.setAttribute(name,values[name]);});
       focusNodes.push({el:el,attrs:attrs});
     });
     sync();
   }
-  function candidates(shell){return Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel]')).map(target).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;});}
+  function candidates(shell){return Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel],.explore-canvas-objects .explore-player')).map(target).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;});}
   function layoutId(shell){var p=shell.querySelector('[data-explore-layout]');return p && p.getAttribute('data-explore-layout');}
   function rects(targets,shell){
     var svg=shell.querySelector('.boardcanvas > svg'),matrix=svg && svg.getScreenCTM();if(!matrix)return [];
@@ -51,7 +54,7 @@ function createBuilderSpatialSelection(opts){
   function currentTargets(){return opts.selection().map(function(t){if(t.kind==='panel' && t.el){var shell=surface(t.el),card=shell && Array.from(shell.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.contains(t.el);});if(card){var authored=target(card);if(authored)return authored;}}if(t.kind!=='panel' || t.id)return t;var s=snapshot(),got=s && builderDiagram(s.text,s.raw,t.section),p=got && !got.error && (got.d.panels || [])[t.index];return Object.assign({},t,{id:p && p.id});});}
   function context(){
     var targets=currentTargets(),shell=targets.length && surface(targets[0].el),s=snapshot();
-    if(!s || !shell || targets.some(function(t){return !t.el || surface(t.el)!==shell || !t.el.isConnected || !t.el.getClientRects().length || ['node','panel'].indexOf(t.kind)<0;}))return null;
+    if(!s || !shell || targets.some(function(t){return !t.el || surface(t.el)!==shell || !t.el.isConnected || !t.el.getClientRects().length || t.kind==='step-controls' && !t.el.closest('.explore-canvas-objects') || ['node','panel','step-controls'].indexOf(t.kind)<0;}))return null;
     var geometry=rects(targets,shell);if(geometry.length!==targets.length || geometry.some(function(r){return !r || r.w<=0 || r.h<=0;}))return null;
     return {targets:targets,shell:shell,s:s,id:layoutId(shell),geometry:geometry};
   }
@@ -60,7 +63,7 @@ function createBuilderSpatialSelection(opts){
     var rs=c.geometry,x=Math.min.apply(null,rs.map(function(r){return r.x;})),y=Math.min.apply(null,rs.map(function(r){return r.y;}));
     view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
-  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null;fitButton.disabled=!c;fitButton.title=c?'Frame selected nodes and canvas panels':'Select visible nodes or canvas panels to fit.';}}
+  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null;fitButton.disabled=!c;fitButton.title=c?'Frame selected canvas objects':'Select visible nodes, canvas panels or canvas step controls to fit.';}}
   function distribute(direction){var c=context();if(!active() || !c)return;opts.apply(planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry),null,c.s);}
   function actions(host,lifetime){
     var c=context();sync();if(!c)return;
@@ -87,6 +90,7 @@ function createBuilderSpatialSelection(opts){
     if(ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey){open(ev);return;}
     if(ev.ctrlKey || ev.metaKey || ev.altKey)return;
     if(ev.key==='Enter'){ev.preventDefault();ev.stopImmediatePropagation();cancelNudge();if(ev.shiftKey)opts.toggle(t);else opts.select([t]);sync();return;}
+    if(t.kind==='step-controls')return;
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
     ev.preventDefault();ev.stopImmediatePropagation();
     if(!nudge){
@@ -118,11 +122,11 @@ function createBuilderSpatialSelection(opts){
       menuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;close(false);if(opts.session.text()!==s.text)return;action();});menu.appendChild(button);return button;
     }
     item('Inspect',function(){opts.inspect();});
-    item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},!spatial && targets.length>1?'Select one kind to delete.':null);
+    item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the chapter and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},spatial?null:'Duplicate supports nodes and canvas panels.');
     ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry),null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
-    item('Fit selection',fitSelection,context()?null:'Select visible nodes or canvas panels to fit.');
+    item('Fit selection',fitSelection,context()?null:'Select visible nodes, canvas panels or canvas step controls to fit.');
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;
     menu.style.left=Math.max(8,bounds.left,Math.min(x,Math.min(win.innerWidth,bounds.right)-r.width-8))+'px';menu.style.top=Math.max(8,bounds.top,Math.min(y,Math.min(win.innerHeight,bounds.bottom)-r.height-8))+'px';
     var items=Array.from(menu.querySelectorAll('button'));items[0].tabIndex=0;items[0].focus({preventScroll:true});

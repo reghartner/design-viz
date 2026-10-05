@@ -132,6 +132,17 @@ Validate the candidate spec with the bundled authoring kit, and reconcile ledger
 claims with that spec. The helper does not grant browser access or establish
 visual QA.
 
+For a wholly new diagram, author unpositioned nodes and semantic connections,
+then run the bundled `node tools/auto-arrange-spec.cjs --section <zero-based-section> <draft> <different-output>`
+from `authoring/` and propose
+its arranged output. Repeat `--section` for multiple new diagrams; use `--all`
+only when every diagram is new. Existing
+diagrams keep their node placement and edge routes. Adding one node appends an
+unpositioned `{id,side:"below",noSpread:true}` float and automatic connections;
+the user can press **Auto
+arrange** if they want a whole-diagram re-layout. Never claim a Workbench button
+click through this browserless protocol.
+
 If the agent's file reader cannot return the long `source` or `ledger` line, it
 reads the state identity and revision, then the complete current spec and ledger
 named in `project.json`, then rereads the state identity and revision. It uses

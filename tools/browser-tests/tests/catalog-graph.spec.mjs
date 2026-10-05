@@ -62,7 +62,7 @@ test('Add seeds only the destination, reuses nodes and supports one-action undo 
   await page.locator('#catalog-add').click();
   const after=await page.locator('#src').inputValue(),raw=JSON.parse(after),d=raw.page.blocks[1].tabs[0].sections[0].diagram;
   expect(raw.page.blocks[0]).toEqual(JSON.parse(before).page.blocks[0]);expect(d.nodes.authored.title).toBe('My gateway');expect(d.panels).toEqual([{id:'q',type:'queue'}]);
-  expect(d.rows).toEqual([['authored']]);expect(d.floats).toEqual([{id:'recording-1',side:'below',x:expect.any(Number),y:expect.any(Number)}]);expect(d.edges[0].from).toBe('authored');
+  expect(d.rows).toEqual([['authored']]);expect(d.floats).toEqual([{id:'recording-1',side:'below',x:expect.any(Number),y:expect.any(Number),noSpread:true}]);expect(d.edges[0].from).toBe('authored');
   expect(d.edges[0].label).toBe('depends on; uses Recording v1, Recording v2');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);

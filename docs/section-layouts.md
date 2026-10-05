@@ -2,8 +2,10 @@
 
 Each named **Chapter** has one saved **Viewing mode**: **Standard** preserves the
 authored tile arrangement; **Explore** gives the graph a full-height workspace
-with independent floating panels and pinned step controls. Omitted settings use
-Standard, so existing diagrams keep their presentation.
+with independently placed panels and step controls that default to viewport-pinned
+**Floating** placement. Each Explore Chapter can instead choose **On canvas**
+for controls that move and zoom with the graph. Omitted Viewing mode settings
+use Standard, so existing diagrams keep their presentation.
 
 In the workbench, select a section and a Chapter using the
 buttons above the graph. **Viewing mode** chooses Standard or Explore for
@@ -111,8 +113,8 @@ Use **Open file** with
 to try **Home story** and **Service flow**.
 Home story opens in Standard with a shorter resident-facing sequence and controls
 attached to Home. Service flow uses Explore for every technical stop, with the
-graph filling the workspace, panels floating at its edges, and playback pinned
-in view. Both share the same step definitions, panels and execution paths.
+graph filling the workspace, panels floating at its edges, and the default
+Floating playback pinned in view. Its Step controls placement can also be On canvas. Both share the same step definitions, panels and execution paths.
 
 To build that from an existing arrangement:
 
@@ -174,8 +176,11 @@ The data-flow graph becomes the full-height workspace. Hold **Ctrl** or **Cmd** 
 starts in a stack at the right edge. Drag its header to move it, drag the corner
 to resize it, or use its **Hide** button. Tab to a header or resize handle and
 use arrow keys; hold Shift for larger changes. Escape cancels a drag. Step
-controls stay pinned and available as you inspect the graph. Playback and step
-markers share the top row, with the caption below. Move the controls using the
+controls default to **Floating**, pinned to the viewport. Choose **Panels →
+Step controls → On canvas**, or **Placement** in their inspector, to move and
+zoom them with the graph. Each Chapter remembers both placements separately;
+switching back restores its Floating geometry. Select on-canvas controls to
+reveal their handles. Playback and step markers share the top row, with the caption below. Move the controls using the
 small grip on the left; resize their corner. Drag empty canvas to pan, including
 a quarter-screen beyond each edge to uncover content behind panels. The workspace
 height follows the viewport and does not depend on page scroll. Content-sized

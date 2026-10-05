@@ -162,7 +162,7 @@ var TOUR_DEFAULT_CONFIG = {
          panel. A plain selector union would pick it first in DOM order. */
       target: {selector: '.explore-window:not([hidden]), .viewport-explore:not(:has(.explore-window:not([hidden]))) .explore-panel-menu', within: 'section'},
       secondary: [
-        {target: {selector: '.explore-player', within: 'section'}, note: 'The step controls stay pinned while you inspect the graph.'}
+        {target: {selector: '.explore-player', within: 'section'}, note: 'Step controls default to Floating, pinned to the viewport. Panels → Step controls → On canvas makes them move and zoom with the graph.'}
       ],
       reveal: [{selector: '.board', within: 'section'}],
       copy: {

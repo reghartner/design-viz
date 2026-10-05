@@ -115,7 +115,14 @@ story; `defaultLayout` selects the opening ID. Set `layouts[].presentation` to
 `"standard"` or `"explore"` (omitted means Standard). Use a default Standard view
 for business storytelling and an Explore view for engineering inspection:
 Explore fills the workspace with the graph, floats independent draggable,
-resizable, hideable panels at its edges, and pins step controls. A section’s
+resizable, hideable panels at its edges, and defaults step controls to viewport-pinned
+Floating placement. Each chapter can choose On canvas in Panels or the controls
+inspector. Save `exploreLayout.controlsPlacement` as `"floating"` (default) or
+`"canvas"`. Preserve the Floating viewport-fraction rectangle in
+`exploreLayout.controls` and the separate `{x,y,w,h}` graph rectangle in
+`exploreLayout.canvas.controls` (finite values within ±10000, positive sizes).
+On-canvas controls move and zoom with the graph; select them for move/resize
+handles. Fit canvas includes them without reserving viewport overlay space. A section’s
 paragraphs and nested bullets become one **Section notes** window using the same
 controls; only prose floats there, never the diagram or an entire section card.
 Keep content in `section.text`/`bullets`, not fake diagram panels. Optional
@@ -140,12 +147,12 @@ provides the contained-view arrangement controls. In an Explore view, panel and
 step-control moves and resizes save to `layouts[].exploreLayout` from either
 editor surface, with one Undo action per gesture. Full-browser panning, zooming
 and fitting remain temporary. Use **Back to page** to author the opening camera
-through pans and zoom changes in the contained Explore view. Windows use viewport fractions; `camera` uses
+through pans and zoom changes in the contained Explore view. Floating windows use viewport fractions; canvas controls use graph coordinates. `camera` uses
 `zoom` plus center `x`/`y` as fractions of the SVG viewBox. Duplicate view keeps
 these defaults. **Panels & controls** has a separate zoom for the floating content.
 Use `exploreLayout.overlayScale` from 0.5 to 1.25 (default 1); panel width/height
-and control height are 100% dimensions. Control width retains its chosen span
-at every scale. This scales panel bodies and step typography together
+and Floating control height are 100% dimensions. Floating control width retains its chosen span
+at every scale. This scales floating panel bodies and Floating step typography together
 without changing the diagram camera. Workbench adjustments save with Undo;
 click the percentage to reset to 100%. Reader overrides and temporary Hide panels remain session-only.
 See `docs/section-layouts.md` for the contract and an example.
@@ -266,11 +273,14 @@ Shift-select floats in one section and use **Align horizontal** (same Y) or
 **Align vertical** (same X), anchored to the first selected node. Drag any member
 to move the selection together; each alignment or group drag is one Undo action.
 Row nodes must first be switched to Free placement. In Workbench Explore,
-Alt/Option-drag empty canvas to select intersecting nodes and canvas panels.
+Alt/Option-drag empty canvas to select intersecting nodes, canvas panels and
+on-canvas step controls. Step controls support Inspect and Fit selection; use
+their own handles for movement and resizing. Delete, Duplicate and alignment
+remain node/panel actions.
 Right-click a selected member for Inspect, Delete, Duplicate, or alignment.
 Mixed alignment uses visible centers (horizontal = same Y, vertical = same X),
 anchored to the first selection; each edit is one Undo action. Floating panels,
-prose and playback controls are excluded from marquee selection.
+prose and Floating playback controls are excluded from marquee selection.
 
 ## Human handoff in the workbench
 

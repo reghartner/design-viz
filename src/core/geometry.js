@@ -141,10 +141,14 @@ function layout(spec){
   var laneCounts = {};
   if (lanes) laneEndpoints(spec).forEach(function(p){ laneCounts[p.gap] = (laneCounts[p.gap] || 0) + 1; });
   var floats = spec.floats || [];
-  var hasAbove = floats.some(function(f){ return f && f.side !== 'below'; });
+  var separateFloats = Object.create(null);
+  floats.forEach(function(f){if(f && f.noSpread===true)separateFloats[f.id]=true;});
+  var hasAbove = floats.some(function(f){
+    return f && f.side !== 'below' && f.noSpread!==true;
+  });
   var hasGroups = false;
   Object.keys(spec.nodes || {}).forEach(function(id){
-    if (spec.nodes[id] && spec.nodes[id].group) hasGroups = true;
+    if (spec.nodes[id] && spec.nodes[id].group && !separateFloats[id]) hasGroups = true;
   });
   var parents = sanitizedGroupParents(spec.groups), levels = Object.create(null);
   function groupLevel(key){
@@ -163,7 +167,7 @@ function layout(spec){
   floats.forEach(function(f){ if (f) placed[f.id] = true; });
   Object.keys(spec.nodes || {}).forEach(function(id){
     var g = spec.nodes[id] && spec.nodes[id].group;
-    if (g && placed[id]) maxDepth = Math.max(maxDepth, groupLevel(g) + 1);
+    if (g && placed[id] && !separateFloats[id]) maxDepth = Math.max(maxDepth, groupLevel(g) + 1);
   });
   var top = hasAbove ? 125 : 42;
   if (lanes) top = Math.max(top, 40 + (laneCounts[-1] || 0) * 8);
@@ -204,26 +208,53 @@ function layout(spec){
   ['above', 'below'].forEach(function(side){
     var group = floats.filter(function(f){ return f && (f.side === 'below' ? side === 'below' : side === 'above'); });
     if (!group.length) return;
-    var xs = group.map(function(f){
+    /* Stable insertions opt out of spreading, preserving the positions of
+       pre-existing floats. Older mixed layouts are unchanged. */
+    var spreadGroup = group.filter(function(f){ return f.noSpread!==true; });
+    var xs = spreadGroup.map(function(f){
       var touching = [];
       (spec.edges || []).forEach(function(e){
-        if (e.from === f.id && pos[e.to]) touching.push(pos[e.to].cx);
-        if (e.to === f.id && pos[e.from]) touching.push(pos[e.from].cx);
+        if (e.from === f.id && pos[e.to] && !separateFloats[e.to]) touching.push(pos[e.to].cx);
+        if (e.to === f.id && pos[e.from] && !separateFloats[e.from]) touching.push(pos[e.from].cx);
       });
       return touching.length ? touching.reduce(function(a,b){return a+b;},0)/touching.length : W/2;
     });
     xs = spreadPositions(xs, 150 + 24, 75 + 10, W - 75 - 10);
     var fy = side === 'above' ? rowsMeta[0].top - 45 - FLOAT_H/2 : belowY;
-    group.forEach(function(f, i){
+    var spreadIndex = 0;
+    group.forEach(function(f){
+      if(f.noSpread===true && !positionedFloat(f))return;
       /* optional manual nudge (like edge bend/labelDx): dy<0 raises a below
          float up into the inter-row gap; dx shifts it sideways */
-      var cx = xs[i] + (typeof f.dx === 'number' ? f.dx : 0);
+      var cx = f.noSpread===true ? f.x : xs[spreadIndex++] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
       if(positionedFloat(f)){cx=f.x;cy=f.y;}
       pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
       if(positionedFloat(f))pos[f.id].free=true;
     });
   });
+
+  /* Raw insertions carry no authored coordinates. Place them in a stable band
+     beyond the existing graph so they remain visible without participating in
+     automatic float spacing or disturbing established routes. Appending a
+     second insertion retains every earlier slot. */
+  var inserted = floats.filter(function(f){return f && f.noSpread===true && !positionedFloat(f);});
+  if(inserted.length){
+    var existingRight=W;
+    Object.keys(pos).forEach(function(id){
+      if(separateFloats[id])return;
+      existingRight=Math.max(existingRight,pos[id].cx+pos[id].w/2);
+    });
+    var insertX=existingRight+160,occupied=Object.keys(pos).map(function(id){return pos[id];});
+    inserted.forEach(function(f){
+      var y=42+FLOAT_H/2;
+      while(occupied.some(function(p){
+        return Math.abs(insertX-p.cx)<(150+p.w)/2+24 && Math.abs(y-p.cy)<(FLOAT_H+p.h)/2+24;
+      }))y+=FLOAT_H+40;
+      pos[f.id]={cx:insertX,cy:y,w:150,h:FLOAT_H,row:-1,flow:-1,stack:false,float:true};
+      occupied.push(pos[f.id]);
+    });
+  }
 
   /* group bounding boxes over member node positions */
   var groupBoxes = Object.create(null);
@@ -261,7 +292,7 @@ function layout(spec){
   var H = lastRow.top + lastRow.height + 40;
   if (lanes) H += (laneCounts[rowsMeta.length - 1] || 0) * 8;
   floats.forEach(function(f){
-    if (f && f.side === 'below' && pos[f.id]) H = Math.max(H, pos[f.id].cy + FLOAT_H/2 + 24);
+    if (f && (f.side === 'below' || f.noSpread===true) && pos[f.id]) H = Math.max(H, pos[f.id].cy + FLOAT_H/2 + 24);
   });
   Object.keys(groupBoxes).forEach(function(g){
     var b = groupBoxes[g];
@@ -272,7 +303,7 @@ function layout(spec){
      Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
   var vbX = 0, vbY = 0, vbR = W;
   floats.forEach(function(f){
-    var p=f && pos[f.id];if(!p || !positionedFloat(f))return;
+    var p=f && pos[f.id];if(!p || !positionedFloat(f) && f.noSpread!==true)return;
     vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);
     vbR=Math.max(vbR,p.cx+p.w/2+24);H=Math.max(H,p.cy+p.h/2+24);
   });
@@ -290,7 +321,7 @@ function layout(spec){
 /* Reserved horizontal tracks plus obstacle-free vertical channels. Keep
    this opt-in: authored stacks, floats and self-loops retain classic curves. */
 function laneRoutingSupported(d){
-  return !(d.floats || []).length && d.rows.every(function(row){
+  return !(d.floats || []).some(function(f){return !f || f.noSpread!==true;}) && d.rows.every(function(row){
     return row.length > 0 && row.length <= 5 && row.every(function(id){ return typeof id === 'string'; });
   }) && !(d.edges || []).some(function(e){ return e.from === e.to; });
 }
@@ -331,6 +362,8 @@ function laneConflict(a,b){
 }
 function laneRoutes(d,L){
   var endpoints=laneEndpoints(d), faces=new Map(), gaps=new Map(), ends=[];
+  var separate=Object.create(null);
+  (d.floats || []).forEach(function(f){if(f && f.noSpread===true)separate[f.id]=true;});
   endpoints.forEach(function(p){
     var key=p.id+':'+p.side;
     if (!faces.has(key)) faces.set(key,[]); faces.get(key).push(p);
@@ -362,6 +395,7 @@ function laneRoutes(d,L){
         var s=segs[si];
         // End stubs may touch their own card; every other segment must clear it.
         var blocked=Object.keys(L.pos).some(function(id){
+          if(separate[id])return false;
           if ((si===0 && id===e.from) || (si===segs.length-1 && id===e.to)) return false;
           return laneSegmentHits(s,L.pos[id],3);
         });

@@ -38,24 +38,26 @@ function builderNewNodeFloats(d, ids){
   /* Seed free nodes on a four-column grid, skipping occupied cards. Saved
      centers keep later insertions and connection edits from rearranging them. */
   var rows = d.rows && d.rows.length ? d.rows : [[]];
-  /* Adding floats can re-space automatic floats or switch lane routing to
-     curves. Check the resulting layout, excluding the new cards' draft slots. */
-  var floats = (d.floats || []).concat(ids.map(function(id){ return {id:id, side:'below'}; }));
-  var pos = layout(Object.assign({}, d, {rows:rows, floats:floats})).pos;
-  var occupied = Object.keys(pos).filter(function(id){ return ids.indexOf(id) < 0; }).map(function(id){ return pos[id]; });
+  var pos = layout(Object.assign({}, d, {rows:rows})).pos;
+  var occupied = Object.keys(pos).map(function(id){ return pos[id]; });
   var slot = 0;
   return ids.map(function(id){
     var x, y;
     do {
-      x = LEFT_X + (slot % 4) * (RIGHT_X - LEFT_X) / 3;
-      y = 42 + CARD_H / 2 + Math.floor(slot / 4) * (CARD_H + ROW_GAP);
+      if(d.routing==='lanes' && laneRoutingSupported(Object.assign({},d,{rows:rows}))){
+        x = W + 160 + (slot % 2) * 200;
+        y = 80 + Math.floor(slot / 2) * (FLOAT_H + 40);
+      }else{
+        x = LEFT_X + (slot % 4) * (RIGHT_X - LEFT_X) / 3;
+        y = 42 + CARD_H / 2 + Math.floor(slot / 4) * (CARD_H + ROW_GAP);
+      }
       slot++;
     } while (occupied.some(function(p){
       return Math.abs(x - p.cx) < (150 + p.w) / 2 + 24 &&
         Math.abs(y - p.cy) < (FLOAT_H + p.h) / 2 + 24;
     }));
     occupied.push({cx:x, cy:y, w:150, h:FLOAT_H});
-    return {id:id, side:'below', x:x, y:y};
+    return {id:id, side:'below', x:x, y:y, noSpread:true};
   });
 }
 

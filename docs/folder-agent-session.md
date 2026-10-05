@@ -137,8 +137,9 @@ then run the bundled `node tools/auto-arrange-spec.cjs --section <zero-based-sec
 from `authoring/` and propose
 its arranged output. Repeat `--section` for multiple new diagrams; use `--all`
 only when every diagram is new. Existing
-diagrams keep their node placement and edge routes. Adding one node uses an
-unpositioned float and automatic connections; the user can press **Auto
+diagrams keep their node placement and edge routes. Adding one node appends an
+unpositioned `{id,side:"below",noSpread:true}` float and automatic connections;
+the user can press **Auto
 arrange** if they want a whole-diagram re-layout. Never claim a Workbench button
 click through this browserless protocol.
 

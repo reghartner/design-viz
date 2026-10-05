@@ -63,8 +63,9 @@ without coordinates or edge controls, then runs
 from the Flowview checkout and proposes that arranged
 output. It repeats `--section` for multiple new diagrams and uses `--all` only
 when every diagram is new. For an existing diagram, it keeps
-all placement and route fields. A newly added node remains unpositioned with
-automatic connections; use the Workbench **Auto arrange** button if you want to
+all placement and route fields. A newly added node uses an unpositioned
+`{id,side:"below",noSpread:true}` float with automatic connections; use the
+Workbench **Auto arrange** button if you want to
 replace the whole diagram's layout. The file session does not let the agent
 claim that it pressed the browser button.
 

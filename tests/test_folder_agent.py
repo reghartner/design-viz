@@ -160,7 +160,9 @@ class FolderAgentTests(unittest.TestCase):
         output = json.loads(arranged.read_text())
         self.assertEqual(output['edges'][0]['label'], 'send')
         self.assertTrue(all('x' in item and 'y' in item for item in output['floats']))
-        self.assertIn('curveControls', output['edges'][0])
+        self.assertNotIn('curveControls', output['edges'][0])
+        self.assertNotIn('fromPort', output['edges'][0])
+        self.assertNotIn('toPort', output['edges'][0])
 
     def test_watcher_notifies_once_and_renewal_skips_completed_request(self):
         run = self.run_helper('watch', '--minutes', '.01', '--interval', '.1')

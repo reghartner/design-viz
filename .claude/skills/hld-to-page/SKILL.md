@@ -189,8 +189,10 @@ prerequisites before validating a page.
     Workbench **Auto arrange** button. In a browser-capable Workbench you may
     instead activate each new diagram and use that button. Never claim either
     action without actually completing it. When adding a node to an existing
-    diagram, add it as an unpositioned float with its semantic edges, preserve
-    every existing placement and edge route, and tell the user they can press
+    diagram, append an unpositioned
+    `{id:"<new-node-id>",side:"below",noSpread:true}` float with its semantic
+    edges. The marker keeps existing automatic floats and lane routes stable;
+    do not add coordinates or edge geometry. Tell the user they can press
     **Auto arrange** to re-layout the whole diagram if desired. Do not re-run
     arrangement for other existing-diagram edits. Manual placement or route
     controls are an explicit user-directed exception.
@@ -535,7 +537,7 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   your notes. Submit one atomic `proposal.json` with the matching base
   revision and wait for `result.json`. Rebase rejected stale proposals on the
   latest source. Do not write OUT files or build unless the user asks.
-- **Small edits.** A small edit the user fully specified (rename, move, fix
+- **Small edits.** A small edit the user fully specified (rename, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
   the self-audit for the affected paths.

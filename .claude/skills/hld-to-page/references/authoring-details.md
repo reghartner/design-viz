@@ -238,12 +238,21 @@ new arithmetic, no new attributions.
   each gets its own numbered circle. Keep `edges` in true firing order; an
   overflowing edge label gets shortened, not nudged.
 
-## Placement and connection schema
+## Graph placement and connection schema
 
 For ordinary new-diagram authoring, follow SKILL rule 12: use unpositioned
 floats and automatic connections, then run the production Auto Arrange CLI or
 use the Workbench button. The fields below document existing specs and explicit
 user-directed layout work. Do not introduce them merely to improve appearance.
+
+For an existing diagram, append a raw float
+`{id:"<new-node-id>",side:"below",noSpread:true}` plus its semantic edges.
+`noSpread` keeps this unpositioned insertion outside existing automatic float
+spacing and lane routing, so established node positions and routes stay stable.
+Do not add X/Y, ports or route fields. Tell the user that Workbench **Auto
+arrange** can replace the whole diagram layout if they want. The Workbench
+**Add to diagram → Node** action uses the same marker with a product-chosen
+position.
 
 Existing `rows` arrays are in visual left-to-right order. A stack occupies one
 slot, with its members in top-to-bottom order. Each row retains its authored

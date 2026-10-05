@@ -72,7 +72,7 @@ test('both setup routes give browserless agents one truthful layout policy',()=>
     assert.ok(policy.includes('no browser control'));
     assert.ok(policy.includes('node tools/auto-arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
     assert.ok(policy.includes('wholly new diagram'));
-    assert.ok(policy.includes('When adding a node, add only an unpositioned float'));
+    assert.ok(policy.includes('When adding a node, append only an unpositioned {id,side:"below",noSpread:true} float'));
     assert.ok(policy.includes('preserve all rows, floats, coordinates, ports, bends, curve controls/points and label nudges'));
     assert.ok(policy.includes('press Auto arrange'));
   }

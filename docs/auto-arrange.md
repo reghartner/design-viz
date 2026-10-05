@@ -53,6 +53,22 @@ Sampled curves still determine card hits, crossings and occupied bounds.
 The footprint encloses cards, groups and sampled routes,
 excluding the viewer's minimum-width canvas and label boxes.
 
+After every search and refinement pass chooses its winner, Auto arrange expands
+that placement without changing its relative geometry. It applies one affine
+scale per screen axis about the top-left node center. A regular occupied-line
+pitch is reused when every interval is a whole multiple; otherwise calibration
+uses the normal 204-unit horizontal and 98-unit vertical pitch. The published
+pitch leaves 2.5 times the former horizontal rectangle gap and 1.5 times the
+former vertical gap. Shared rows, shared columns, empty grid slots, symmetry and
+node ordering are therefore preserved. Regular whitespace wider than three
+normal gaps is treated as aspect padding or empty lattice space and uses the
+normal pitch for calibration, so the expansion does not magnify an existing
+landscape-balancing margin. Existing native curve offsets scale with
+the same axes, then the normal route simplifier removes any controls it can.
+Fixed-position `nop2` routing is only a fallback and cannot move the expanded
+nodes. Both routes must preserve the winner's overlap, card-hit, ordinary-crossing
+and shared-endpoint-crossing ceilings; attachments remain automatic.
+
 After choosing the structural layout, ungrouped diagrams with at most 12 nodes
 and 24 edges may receive one local compaction attempt. A terminal sink with
 exactly one incident edge can move beside its neighbor if the new position

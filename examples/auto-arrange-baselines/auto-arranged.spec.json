@@ -72,32 +72,32 @@
             {
               "id": "edge",
               "side": "below",
-              "x": 324,
+              "x": 405,
               "y": 100
             },
             {
               "id": "verify",
               "side": "below",
-              "x": 528,
+              "x": 690,
               "y": 100
             },
             {
               "id": "queue",
               "side": "below",
-              "x": 528,
-              "y": 304
+              "x": 690,
+              "y": 384
             },
             {
               "id": "worker",
               "side": "below",
-              "x": 324,
-              "y": 304
+              "x": 405,
+              "y": 384
             },
             {
               "id": "partner",
               "side": "below",
               "x": 120,
-              "y": 304
+              "y": 384
             }
           ]
         }
@@ -197,56 +197,56 @@
             {
               "id": "uploader",
               "side": "below",
-              "x": 526,
+              "x": 687.2058823529411,
               "y": 100
             },
             {
               "id": "api",
               "side": "below",
-              "x": 526,
-              "y": 216
+              "x": 687.2058823529411,
+              "y": 252
             },
             {
               "id": "store",
               "side": "below",
               "x": 120,
-              "y": 332
+              "y": 404
             },
             {
               "id": "scan",
               "side": "below",
-              "x": 526,
-              "y": 332
+              "x": 687.2058823529411,
+              "y": 404
             },
             {
               "id": "policy",
               "side": "below",
-              "x": 932,
-              "y": 332
+              "x": 1254.4117647058822,
+              "y": 404
             },
             {
               "id": "review",
               "side": "below",
-              "x": 526,
-              "y": 448
+              "x": 687.2058823529411,
+              "y": 556
             },
             {
               "id": "reviewer",
               "side": "below",
-              "x": 526,
-              "y": 564
+              "x": 687.2058823529411,
+              "y": 708
             },
             {
               "id": "publish",
               "side": "below",
-              "x": 526,
-              "y": 680
+              "x": 687.2058823529411,
+              "y": 860
             },
             {
               "id": "archive",
               "side": "below",
-              "x": 730,
-              "y": 680
+              "x": 972.2058823529411,
+              "y": 860
             }
           ]
         }
@@ -399,74 +399,74 @@
             {
               "id": "jobs",
               "side": "below",
-              "x": 600,
+              "x": 870,
               "y": 100
             },
             {
               "id": "edge",
               "side": "below",
-              "x": 360,
+              "x": 495,
               "y": 100
             },
             {
               "id": "collector",
               "side": "below",
-              "x": 360,
-              "y": 216
+              "x": 495,
+              "y": 252
             },
             {
               "id": "router",
               "side": "below",
-              "x": 360,
-              "y": 332
+              "x": 495,
+              "y": 404
             },
             {
               "id": "metrics",
               "side": "below",
-              "x": 600,
-              "y": 448
+              "x": 870,
+              "y": 556
             },
             {
               "id": "logs",
               "side": "below",
               "x": 120,
-              "y": 332
+              "y": 404
             },
             {
               "id": "traces",
               "side": "below",
-              "x": 360,
-              "y": 448
+              "x": 495,
+              "y": 556
             },
             {
               "id": "metricdb",
               "side": "below",
-              "x": 840,
-              "y": 448
+              "x": 1245,
+              "y": 556
             },
             {
               "id": "logdb",
               "side": "below",
               "x": 120,
-              "y": 448
+              "y": 556
             },
             {
               "id": "tracedb",
               "side": "below",
-              "x": 360,
-              "y": 564
+              "x": 495,
+              "y": 708
             },
             {
               "id": "dashboard",
               "side": "below",
-              "x": 360,
-              "y": 680
+              "x": 495,
+              "y": 860
             },
             {
               "id": "alerts",
               "side": "below",
-              "x": 840,
-              "y": 332
+              "x": 1245,
+              "y": 404
             }
           ]
         }
@@ -637,98 +637,98 @@
             {
               "id": "buyer",
               "side": "below",
-              "x": 324,
+              "x": 405,
               "y": 100
             },
             {
               "id": "storefront",
               "side": "below",
-              "x": 528,
+              "x": 690,
               "y": 100
             },
             {
               "id": "gateway",
               "side": "below",
-              "x": 732,
+              "x": 975,
               "y": 100
             },
             {
               "id": "cart",
               "side": "below",
-              "x": 732,
-              "y": 220
+              "x": 975,
+              "y": 258
             },
             {
               "id": "checkout",
               "side": "below",
-              "x": 528,
-              "y": 220
+              "x": 690,
+              "y": 258
             },
             {
               "id": "payment",
               "side": "below",
               "x": 120,
-              "y": 340
+              "y": 416
             },
             {
               "id": "risk",
               "side": "below",
-              "x": 324,
-              "y": 340
+              "x": 405,
+              "y": 416
             },
             {
               "id": "inventory",
               "side": "below",
-              "x": 528,
-              "y": 340
+              "x": 690,
+              "y": 416
             },
             {
               "id": "order",
               "side": "below",
-              "x": 528,
-              "y": 460
+              "x": 690,
+              "y": 574
             },
             {
               "id": "events",
               "side": "below",
-              "x": 324,
-              "y": 460
+              "x": 405,
+              "y": 574
             },
             {
               "id": "warehouse",
               "side": "below",
               "x": 120,
-              "y": 460
+              "y": 574
             },
             {
               "id": "carrier",
               "side": "below",
               "x": 120,
-              "y": 580
+              "y": 732
             },
             {
               "id": "notify",
               "side": "below",
-              "x": 324,
-              "y": 580
+              "x": 405,
+              "y": 732
             },
             {
               "id": "mail",
               "side": "below",
-              "x": 324,
-              "y": 700
+              "x": 405,
+              "y": 890
             },
             {
               "id": "analytics",
               "side": "below",
-              "x": 528,
-              "y": 580
+              "x": 690,
+              "y": 732
             },
             {
               "id": "ops",
               "side": "below",
-              "x": 732,
-              "y": 580
+              "x": 975,
+              "y": 732
             }
           ]
         }
@@ -957,116 +957,116 @@
             {
               "id": "mobile",
               "side": "below",
-              "x": 324,
+              "x": 405,
               "y": 100
             },
             {
               "id": "upload",
               "side": "below",
               "x": 120,
-              "y": 220
+              "y": 258
             },
             {
               "id": "auth",
               "side": "below",
-              "x": 324,
-              "y": 220
+              "x": 405,
+              "y": 258
             },
             {
               "id": "queue",
               "side": "below",
-              "x": 324,
-              "y": 340
+              "x": 405,
+              "y": 416
             },
             {
               "id": "metadata",
               "side": "below",
               "x": 120,
-              "y": 820
+              "y": 1048
             },
             {
               "id": "object",
               "side": "below",
-              "x": 528,
-              "y": 220
+              "x": 690,
+              "y": 258
             },
             {
               "id": "splitter",
               "side": "below",
-              "x": 732,
-              "y": 220
+              "x": 975,
+              "y": 258
             },
             {
               "id": "thumbnail",
               "side": "below",
-              "x": 936,
-              "y": 340
+              "x": 1260,
+              "y": 416
             },
             {
               "id": "transcoder",
               "side": "below",
-              "x": 528,
-              "y": 340
+              "x": 690,
+              "y": 416
             },
             {
               "id": "captions",
               "side": "below",
-              "x": 732,
-              "y": 340
+              "x": 975,
+              "y": 416
             },
             {
               "id": "thumbstore",
               "side": "below",
-              "x": 936,
-              "y": 460
+              "x": 1260,
+              "y": 574
             },
             {
               "id": "videostore",
               "side": "below",
-              "x": 528,
-              "y": 460
+              "x": 690,
+              "y": 574
             },
             {
               "id": "textindex",
               "side": "below",
-              "x": 732,
-              "y": 460
+              "x": 975,
+              "y": 574
             },
             {
               "id": "publish",
               "side": "below",
-              "x": 732,
-              "y": 700
+              "x": 975,
+              "y": 890
             },
             {
               "id": "cdn",
               "side": "below",
-              "x": 936,
-              "y": 820
+              "x": 1260,
+              "y": 1048
             },
             {
               "id": "search",
               "side": "below",
-              "x": 528,
-              "y": 820
+              "x": 690,
+              "y": 1048
             },
             {
               "id": "notify",
               "side": "below",
-              "x": 936,
-              "y": 700
+              "x": 1260,
+              "y": 890
             },
             {
               "id": "analytics",
               "side": "below",
-              "x": 732,
-              "y": 820
+              "x": 975,
+              "y": 1048
             },
             {
               "id": "monitor",
               "side": "below",
-              "x": 324,
-              "y": 700
+              "x": 405,
+              "y": 890
             }
           ]
         }
@@ -1156,32 +1156,32 @@
             {
               "id": "returns",
               "side": "below",
-              "x": 324,
-              "y": 436
+              "x": 405,
+              "y": 498
             },
             {
               "id": "stock",
               "side": "below",
-              "x": 324,
-              "y": 604
+              "x": 405,
+              "y": 728
             },
             {
               "id": "audit",
               "side": "below",
               "x": 120,
-              "y": 604
+              "y": 728
             },
             {
               "id": "metrics",
               "side": "below",
               "x": 120,
-              "y": 436
+              "y": 498
             },
             {
               "id": "risk",
               "side": "below",
-              "x": 528,
-              "y": 436
+              "x": 690,
+              "y": 498
             }
           ]
         }

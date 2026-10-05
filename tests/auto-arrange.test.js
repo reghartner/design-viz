@@ -27,6 +27,18 @@ function minimumCardGap(result){
   }));
   return closest;
 }
+function canonicalCandidates(d,viz,cola){
+  const expand=C.autoArrangeExpandSpacing;
+  try{C.autoArrangeExpandSpacing=(diagram,selected)=>selected;return C.autoArrangeCandidates(d,viz,cola);}
+  finally{C.autoArrangeExpandSpacing=expand;}
+}
+function candidatesWithSelected(d,viz,cola){
+  const expand=C.autoArrangeExpandSpacing;let selected;
+  try{
+    C.autoArrangeExpandSpacing=(diagram,result,renderer)=>{selected=result;return expand(diagram,result,renderer);};
+    const result=C.autoArrangeCandidates(d,viz,cola);return {selected,result};
+  }finally{C.autoArrangeExpandSpacing=expand;}
+}
 
 test('approved 20-node grouped fixture retains groups and native routes with clear final viewer paths',()=>{
   const d=fixture.page.blocks[0].diagram,result=C.autoArrangeCandidates(d,viz,cola),out=C.autoArrangeDiagram(d,result);
@@ -199,7 +211,8 @@ test('directed paths follow topology in balanced snake rows with at most four ca
     const d={nodes:Object.fromEntries(ids.slice().reverse().map(id=>[id,{title:id}])),rows:[ids],
       edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})).reverse()};
     const columns=Math.ceil(count/Math.ceil(count/4));
-    const result=C.autoArrangeCandidates(d,viz,cola),byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+    const expand=C.autoArrangeExpandSpacing,result=canonicalCandidates(d,viz,cola);
+    const expanded=expand(d,result,viz),byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
     const rows=new Map();
     ids.forEach((id,i)=>{const p=byId[id];if(!rows.has(p.y))rows.set(p.y,[]);rows.get(p.y).push(id);
       if(i && i%columns){assert.equal(p.y,byId[ids[i-1]].y);assert.ok(Math.floor(i/columns)%2?p.x<byId[ids[i-1]].x:p.x>byId[ids[i-1]].x);}
@@ -213,7 +226,11 @@ test('directed paths follow topology in balanced snake rows with at most four ca
       assert.equal(Math.abs(byId[ids[1]].x-byId[ids[0]].x),204);
     }
     if(count>12)assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9);
-    if(count===6)assert.deepEqual([...rows.values()].map(row=>row.length),[3,3]);
+    if(count===6){
+      assert.deepEqual([...rows.values()].map(row=>row.length),[3,3]);
+      const repeated=C.autoArrangeCandidates(C.autoArrangeDiagram(d,expanded),viz,cola);
+      assert.deepEqual(plain(repeated.positions),plain(expanded.positions),'reapplying Auto Arrange expands the canonical winner exactly once');
+    }
   }
   assert.equal(C.autoArrangeChainPositions(simple()),null,'cycles do not become chains');
   assert.equal(C.autoArrangeChainPositions({nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'},{from:'a',to:'c'}]}),null,'forks do not become chains');
@@ -233,18 +250,57 @@ test('candidate ordering minimizes crossings before footprint, then center dista
   assert.equal(score(150,256).area,300*300,'minimum viewer width is excluded');
 });
 
+test('final spacing expansion is one affine transform per axis and preserves shared or empty grid lines',()=>{
+  const selected={positions:[
+    {id:'a',x:120,y:100},{id:'b',x:324,y:100},{id:'c',x:732,y:216},{id:'d',x:732,y:332}
+  ]},copy=plain(selected),expanded=C.autoArrangeExpandedPositions(selected);
+  assert.deepEqual(plain(selected),copy,'the canonical winner is not mutated');
+  assert.equal(expanded.horizontal.pitch,204);assert.equal(expanded.vertical.pitch,116);
+  assert.deepEqual(plain(expanded.positions),[
+    {id:'a',x:120,y:100},{id:'b',x:405,y:100},{id:'c',x:975,y:252},{id:'d',x:975,y:404}
+  ],'empty grid slots remain exact pitch multiples and shared axes stay shared');
+  const irregular={positions:[{id:'a',x:120,y:100},{id:'b',x:528,y:100},{id:'c',x:732,y:198},{id:'d',x:934,y:296}]};
+  const fallback=C.autoArrangeExpandedPositions(irregular);
+  assert.equal(fallback.horizontal.pitch,204);assert.equal(fallback.vertical.pitch,98,'nonregular axes use canonical calibration');
+  const padded=C.autoArrangeExpandedPositions({positions:[{id:'a',x:120,y:100},{id:'b',x:1203,y:216}]});
+  assert.equal(padded.horizontal.pitch,204,'aspect padding is not mistaken for a card gap');assert.equal(padded.vertical.pitch,116);
+  for(const axis of ['x','y'])for(let i=1;i<irregular.positions.length;i++){
+    const before=irregular.positions[i][axis]-irregular.positions[0][axis],after=fallback.positions[i][axis]-fallback.positions[0][axis];
+    if(!before){assert.equal(after,0,'shared '+axis+' axes remain shared');continue;}
+    assert.ok(Math.abs(after/before-fallback[axis==='x'?'horizontal':'vertical'].scale)<1e-9,'relative geometry uses one '+axis+' scale');
+  }
+});
+
+test('spacing reroute fallback preserves exact affine node positions and rejects unsafe routes',()=>{
+  const d={nodes:{a:{},b:{},c:{}},edges:[{from:'a',to:'b'},{from:'b',to:'c'}]};
+  const selected=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'LR'),{engine:'dot'}));selected.score=C.autoArrangeScore(d,selected);
+  const expected=plain(C.autoArrangeExpandedPositions(selected).positions),score=C.autoArrangeScore;let checks=0;
+  try{
+    C.autoArrangeScore=(diagram,candidate)=>{checks++;const actual=score(diagram,candidate);return checks===1?{...actual,hits:1}:actual;};
+    const result=C.autoArrangeExpandSpacing(d,selected,viz);
+    assert.deepEqual(plain(result.positions),expected,'nop2 contributes routes without moving transformed nodes');assertAutoPorts(C.autoArrangeDiagram(d,result).edges);
+  }finally{C.autoArrangeScore=score;}
+  try{
+    C.autoArrangeScore=(diagram,candidate)=>({...score(diagram,candidate),hits:1});
+    assert.throws(()=>C.autoArrangeExpandSpacing(d,selected,{renderJSON(){throw Error('no route');}}),/diagram is unchanged/);
+  }finally{C.autoArrangeScore=score;}
+});
+
 test('small-diagram leaf refinement preserves the selected fork and improves compactness before edge length',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
   const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));seed.score=C.autoArrangeScore(d,seed);
-  let attempts=0;const result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);
-  const before=Object.fromEntries(seed.positions.map(p=>[p.id,p])),after=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+  const expand=C.autoArrangeExpandSpacing;let canonical,attempts=0;
+  C.autoArrangeExpandSpacing=(d,r,v)=>{canonical=r;return expand(d,r,v);};
+  let result;try{result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);}finally{C.autoArrangeExpandSpacing=expand;}
+  const before=Object.fromEntries(seed.positions.map(p=>[p.id,p])),after=Object.fromEntries(canonical.positions.map(p=>[p.id,p]));
   for(const id of Object.keys(d.nodes).filter(id=>id!=='archive'))assert.deepEqual(plain(after[id]),plain(before[id]),'the fork retains '+id);
   assert.equal(after.archive.y,after.publish.y);assert.equal(after.archive.x-after.publish.x,204);
-  assert.equal(result.score.width,962);assert.equal(result.score.height,624);
+  assert.equal(canonical.score.width,962);assert.equal(canonical.score.height,624);
+  assert.ok(Math.abs(result.score.width-1284.4117647058822)<1e-6);assert.equal(result.score.height,804);
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
   assert.ok(minimumCardGap(result)>=48);assertAutoPorts(result.edges);
   assert.ok(result.score.length>seed.score.length,'tucking a leaf can shorten the footprint despite a longer connection');
-  assert.ok(C.autoArrangeCompare(result,seed,true)<0);assert.ok(C.autoArrangeCompare(result,seed)>0);
+  assert.ok(C.autoArrangeCompare(canonical,seed,true)<0);assert.ok(C.autoArrangeCompare(canonical,seed)>0);
   assert.equal(attempts,7,'only one extra routing attempt refines the chosen structural seed');
   assert.equal(C.autoArrangeSmall({nodes:Object.fromEntries(Array.from({length:13},(_,i)=>[i,{}])),edges:[]}),false);
   assert.equal(C.autoArrangeSmall({nodes:{a:{},b:{}},edges:Array(25).fill({from:'a',to:'b'})}),false);
@@ -258,7 +314,7 @@ test('terminal-leaf refinement skips blocked card positions and rejects unsafe r
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
   const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));
   let refinements=0;
-  const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+  const arranged=candidatesWithSelected(d,{renderJSON(source,options){
     const json=viz.renderJSON(source,options);
     if(options.engine==='nop2'){
       refinements++;const nodes=json.objects.filter(n=>/^n\d+$/.test(n.name));nodes[1].pos=nodes[0].pos;
@@ -266,8 +322,9 @@ test('terminal-leaf refinement skips blocked card positions and rejects unsafe r
     }
     return json;
   }},null);
-  assert.equal(refinements,1);assert.deepEqual(plain(result.positions),plain(seed.positions));
-  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);
+  assert.equal(refinements,1);assert.deepEqual(plain(arranged.selected.positions),plain(seed.positions));
+  assert.deepEqual(plain(arranged.result.positions),plain(C.autoArrangeExpandedPositions(arranged.selected).positions));
+  assert.equal(arranged.result.score.overlaps,0);assert.equal(arranged.result.score.hits,0);assert.equal(arranged.result.score.crossings,0);
 });
 
 test('unsafe candidate geometry is rejected even when every attempt returns it',()=>{
@@ -299,7 +356,7 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
     assert.ok(minimumCardGap(result)>=48,block.id+' gap '+minimumCardGap(result));
-    if(i===0){assert.equal(result.score.width,558);assert.equal(result.score.height,248);}
+    if(i===0){assert.equal(result.score.width,720);assert.equal(result.score.height,328);}
     else{assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,block.id+' aspect '+result.score.aspect);assert.equal(result.score.shape,0);}
     assert.equal(result.score.crossings,i===5?1:0,block.id);
     if(i===2 || i===3){
@@ -311,27 +368,27 @@ test('six reproducible baselines preserve semantics and fit complex graphs withi
       const byId=Object.fromEntries(result.positions.map(p=>[p.id,p]));
       if(i===2){
         const expectedRows=[['app','edge','jobs'],['collector'],['logs','router','alerts'],['logdb','traces','metrics','metricdb'],['tracedb'],['dashboard']];
-        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+116*index,id+' is on the intended shared row')));
+        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+152*index,id+' is on the intended shared row')));
         const expectedColumns=[['app','logs','logdb'],['edge','collector','router','traces','tracedb','dashboard'],['jobs','metrics'],['alerts','metricdb']];
-        expectedColumns.forEach((column,index)=>column.forEach(id=>assert.equal(byId[id].x,120+240*index,id+' is on the intended shared column')));
-        assert.equal(result.score.width,870);assert.equal(result.score.height,624);
+        expectedColumns.forEach((column,index)=>column.forEach(id=>assert.equal(byId[id].x,120+375*index,id+' is on the intended shared column')));
+        assert.equal(result.score.width,1275);assert.equal(result.score.height,804);
       }else{
-        assert.equal(result.score.width,762);assert.equal(result.score.height,644);assert.ok(result.score.length<4200);
+        assert.equal(result.score.width,1005);assert.equal(result.score.height,834);assert.ok(result.score.length<6000);
         const expectedRows=[['buyer','storefront','gateway'],['cart','checkout'],['payment','risk','inventory'],['warehouse','events','order'],['carrier','notify','analytics','ops'],['mail']];
-        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+120*index,id+' shares the compact processing row')));
+        expectedRows.forEach((row,index)=>row.forEach(id=>assert.equal(byId[id].y,100+158*index,id+' shares the compact processing row')));
         assert.ok(byId.buyer.x<byId.storefront.x && byId.storefront.x<byId.gateway.x,'entrance reads left to right');
         for(const [from,to] of [['warehouse','carrier'],['notify','mail']])assert.equal(byId[from].x,byId[to].x,'terminal chain stays in its column');
       }
     }
     if(i===4){
-      assert.ok(result.score.width<=1200 && result.score.height<=900);assert.ok(result.score.length<7000);
+      assert.ok(result.score.width<=1300 && result.score.height<=1000);assert.ok(result.score.length<8000);
       for(const axis of ['x','y']){
         const values=[...new Set(result.positions.map(p=>p[axis]))].sort((a,b)=>a-b),gap=values[1]-values[0];
         values.slice(1).forEach((value,j)=>assert.equal((value-values[j])%gap,0,'media uses a regular '+axis+' grid'));
       }
     }
     if(i>=4)assert.equal(result.score.incidentCrossings,0,'fan-in and fan-out curves do not weave after their shared endpoint');
-    if(i===5)assert.ok(result.score.length<2600,'nonplanar graph keeps compact center distances');
+    if(i===5)assert.ok(result.score.length<3300,'nonplanar graph keeps bounded center distances after spacing expansion');
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
   });
 });
@@ -341,13 +398,13 @@ test('failed aligned rerouting retains the safe selected layout',()=>{
   const align=C.autoArrangeAlignedPositions;
   try{
     C.autoArrangeAlignedPositions=()=>null;
-    const expected=C.autoArrangeCandidates(d,viz,null);
+    const expected=canonicalCandidates(d,viz,null);
     C.autoArrangeAlignedPositions=()=>{
       const unsafe=plain(expected);unsafe.positions[1].x=unsafe.positions[0].x;unsafe.positions[1].y=unsafe.positions[0].y;
       unsafe.score=C.autoArrangeScore(d,unsafe);assert.ok(unsafe.score.overlaps>0);return unsafe;
     };
     let retries=0;
-    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+    const result=canonicalCandidates(d,{renderJSON(source,options){
       if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
       return viz.renderJSON(source,options);
     }},null);
@@ -359,7 +416,7 @@ test('failed aligned rerouting retains the safe selected layout',()=>{
 test('compact corridor search is name-independent, bounded, and cannot replace a safe layout with failed routing',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[3].diagram,fold=C.autoArrangeFoldedPositions;
   let seed;
-  try{C.autoArrangeFoldedPositions=()=>[];seed=C.autoArrangeCandidates(d,viz,null);}
+  try{C.autoArrangeFoldedPositions=()=>[];seed=canonicalCandidates(d,viz,null);}
   finally{C.autoArrangeFoldedPositions=fold;}
   const positions=fold(d,seed);assert.ok(positions.length>0 && positions.length<=4);
   const ids=Object.keys(d.nodes),names=Object.fromEntries(ids.map((id,i)=>[id,'renamed_'+i]));
@@ -372,7 +429,7 @@ test('compact corridor search is name-independent, bounded, and cannot replace a
     C.autoArrangeFoldedPositions=()=>{
       const unsafe=plain(positions[0]);unsafe[ids[1]]={...unsafe[ids[0]]};return [unsafe];
     };
-    const result=C.autoArrangeCandidates(d,{renderJSON(source,options){
+    const result=canonicalCandidates(d,{renderJSON(source,options){
       if(options.engine==='nop2'){retries++;throw new Error('routing unavailable');}
       return viz.renderJSON(source,options);
     }},null);
@@ -459,20 +516,25 @@ test('grouped snakes with overlapping group boxes fall back to safe clustered ca
 test('natural grid search is deterministic and independent of IDs, titles and tints on synthetic bipartite graphs',()=>{
   const ids=['p0','p1','p2','q0','q1','q2'];
   const d={nodes:Object.fromEntries(ids.map(id=>[id,{title:id}])),edges:ids.slice(0,3).flatMap(from=>ids.slice(3).map(to=>({from,to}))),rows:[ids]};
-  const result=C.autoArrangeCandidates(d,viz,cola);
+  const arranged=candidatesWithSelected(d,viz,cola),result=arranged.selected;
   assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,1);
   assert.ok(result.score.length<2600);assert.equal(result.score.shape,0);assert.ok(result.edges.every(e=>!e.curveControls));
   const names=Object.fromEntries(ids.map((id,i)=>[id,'different_'+(19-i)]));
   const renamed={nodes:Object.fromEntries(ids.map(id=>[names[id],{title:'Unrelated text',tint:'auth'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]})),rows:[ids.map(id=>names[id])]};
-  const again=C.autoArrangeCandidates(renamed,viz,cola);
+  const renamedArrangement=candidatesWithSelected(renamed,viz,cola),again=renamedArrangement.selected;
   assert.deepEqual(plain(again.positions),plain(result.positions.map(p=>({...p,id:names[p.id]}))));
   assert.deepEqual(plain(again.score),plain(result.score));
+  const published=arranged.result;
+  assert.deepEqual(plain(published.positions),plain(C.autoArrangeExpandedPositions(result).positions));
+  assert.deepEqual(plain(renamedArrangement.result.positions),plain(published.positions.map(p=>({...p,id:names[p.id]}))));
+  assert.deepEqual(plain(renamedArrangement.result.score),plain(published.score));
+  assert.equal(published.score.overlaps,0);assert.equal(published.score.hits,0);assert.ok(published.score.crossings<=result.score.crossings);
 });
 
 test('optional natural grid proposals cannot regress final viewer safety, crossings, shape or length',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[5].diagram,grid=C.autoArrangeGridPositions;
   try{
-    C.autoArrangeGridPositions=()=>[];const expected=C.autoArrangeCandidates(d,viz,cola);
+    C.autoArrangeGridPositions=()=>[];const expected=canonicalCandidates(d,viz,cola);
     const overlap=plain(expected);overlap.positions[1]={...overlap.positions[0],id:overlap.positions[1].id};
     const longer=plain(expected);longer.positions.forEach(p=>{p.x*=2;p.y*=2;});
     const tall=plain(expected);tall.positions.forEach(p=>{p.y*=2;});
@@ -480,7 +542,7 @@ test('optional natural grid proposals cannot regress final viewer safety, crossi
     assert.ok(C.autoArrangeScore(d,overlap).overlaps>0);
     assert.ok(C.autoArrangeScore(d,crossed).crossings>expected.score.crossings);
     C.autoArrangeGridPositions=()=>[overlap,longer,tall,crossed];
-    assert.deepEqual(plain(C.autoArrangeCandidates(d,viz,cola)),plain(expected));
+    assert.deepEqual(plain(canonicalCandidates(d,viz,cola)),plain(expected));
   }finally{C.autoArrangeGridPositions=grid;}
 });
 
@@ -514,11 +576,12 @@ test('large cleanup straightens branches and shares ranks without worsening fina
   try{
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeLargeAligned=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    try{C.autoArrangeLargeAligned=(d,result)=>result;before=canonicalCandidates(d,viz,cola);}
     finally{C.autoArrangeLargeAligned=refine;}
-    const started=performance.now(),result=C.autoArrangeCandidates(d,viz,cola),out=plain(C.autoArrangeDiagram(d,result));
+    const started=performance.now(),arranged=candidatesWithSelected(d,viz,cola),result=arranged.selected,published=arranged.result,out=plain(C.autoArrangeDiagram(d,published));
     assert.ok(performance.now()-started<20000,block.id+' stays inside worker deadline');
     assert.deepEqual(plain(refine(d,before)),plain(result),block.id+' cleanup is deterministic');
+    assert.deepEqual(plain(published.positions),plain(C.autoArrangeExpandedPositions(result).positions),block.id+' final output applies one expansion');
     if(i===1){
       const names=Object.fromEntries(Object.keys(d.nodes).map((id,j)=>[id,'renamed-'+j]));
       const renamed={nodes:Object.fromEntries(Object.keys(d.nodes).map(id=>[names[id],{title:'Different label',tint:'data'}])),edges:d.edges.map(e=>({from:names[e.from],to:names[e.to]}))};
@@ -536,6 +599,8 @@ test('large cleanup straightens branches and shares ranks without worsening fina
     const lines=r=>['x','y'].reduce((n,axis)=>n+new Set(r.positions.map(p=>Math.round(p[axis]*10))).size,0);
     assert.ok(lines(result)<lines(before),block.id+' more shared row/column coordinates');
     assert.ok(result.edges.filter(e=>e.curveControls).length<=before.edges.filter(e=>e.curveControls).length);
+    assert.equal(published.score.overlaps,0);assert.equal(published.score.hits,0);
+    assert.ok(published.score.crossings<=result.score.crossings);assert.ok(published.score.incidentCrossings<=result.score.incidentCrossings);
     assertAutoPorts(out.edges);assert.deepEqual(out.nodes,d.nodes);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
@@ -572,34 +637,36 @@ test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
 
 test('global composition creates reproducible safe shared axes and a square freight scaffold',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
-  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds,geometry=C.autoArrangeMotifGeometry;
+  const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds,geometry=C.autoArrangeMotifGeometry,expand=C.autoArrangeExpandSpacing;
+  const timings=[];
   for(const [i,block] of input.page.blocks.entries()){
     const d=block.diagram;let before;
-    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;C.autoArrangeMotifGeometry=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;C.autoArrangeMotifGeometry=geometry;}
-    const started=performance.now();let beforeFold,afterFold,result;
-    try{C.autoArrangeTerminalFolds=(d,r,v)=>{beforeFold=r;afterFold=terminal(d,r,v);return afterFold;};result=C.autoArrangeCandidates(d,viz,cola);}
-    finally{C.autoArrangeTerminalFolds=terminal;}
-    const out=plain(C.autoArrangeDiagram(d,result));
-    assert.ok(performance.now()-started<20000,block.id+' worker deadline');
+    try{C.autoArrangeMotifCandidates=(d,result)=>result;C.autoArrangeGlobalLattice=(d,result)=>result;C.autoArrangeTerminalFolds=(d,result)=>result;C.autoArrangeMotifGeometry=(d,result)=>result;C.autoArrangeExpandSpacing=(d,result)=>result;before=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeMotifCandidates=motif;C.autoArrangeGlobalLattice=global;C.autoArrangeTerminalFolds=terminal;C.autoArrangeMotifGeometry=geometry;C.autoArrangeExpandSpacing=expand;}
+    const started=performance.now();let beforeFold,afterFold,selected;
+    try{C.autoArrangeExpandSpacing=(d,result)=>result;C.autoArrangeTerminalFolds=(d,r,v)=>{beforeFold=r;afterFold=terminal(d,r,v);return afterFold;};selected=C.autoArrangeCandidates(d,viz,cola);}
+    finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeTerminalFolds=terminal;}
+    const result=expand(d,selected,viz),out=plain(C.autoArrangeDiagram(d,result));
+    assert.deepEqual(plain(result.positions),plain(C.autoArrangeExpandedPositions(selected).positions),block.id+' applies one affine transform after canonical search');
+    timings.push({id:block.id,ms:performance.now()-started});
     assert.deepEqual(out,saved.page.blocks[i].diagram,block.id+' deterministic generated output');
     assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);
     assert.ok(result.score.crossings<=before.score.crossings);assert.ok(result.score.incidentCrossings<=before.score.incidentCrossings);
-    assert.ok(Math.hypot(result.score.width,result.score.height)<Math.hypot(before.score.width,before.score.height));
+    assert.ok(Math.hypot(selected.score.width,selected.score.height)<Math.hypot(before.score.width,before.score.height));
     assert.ok(minimumCardGap(result)>=53.9,block.id+' retains normal card clearance');
     assertAutoPorts(result.edges);assert.deepEqual(out.nodes,d.nodes);
     assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
     const axes=axis=>[...new Set(result.positions.map(p=>Math.round(p[axis]*10)/10))].sort((a,b)=>a-b);
     assert.ok(axes('x').length<=[6,7,8,9][i],block.id+' uses shared graph-wide columns');
-    for(const value of axes('x'))assert.ok(Math.abs((value-axes('x')[0])/204-Math.round((value-axes('x')[0])/204))<.001,block.id+' all composed motifs share the same x lattice');
+    for(const value of axes('x'))assert.ok(Math.abs((value-axes('x')[0])/285-Math.round((value-axes('x')[0])/285))<.001,block.id+' all composed motifs share the expanded x lattice');
     if(i<2){
       assert.ok(axes('y').length<=10,block.id+' reuses shared rows');
       for(const axis of ['x','y']){
-        const values=axes(axis),step=axis==='x'?204:98;
+        const values=axes(axis),step=axis==='x'?285:125;
         for(const value of values)assert.ok(Math.abs((value-values[0])/step-Math.round((value-values[0])/step))<.001,block.id+' every node remains on the global '+axis+' lattice');
       }
-      assert.ok(result.score.area<before.score.area*.5,block.id+' materially smaller footprint');
-      assert.ok(result.score.length<before.score.length*.8,block.id+' shorter center distances');
+      assert.ok(selected.score.area<before.score.area*.5,block.id+' canonical search keeps the materially smaller footprint');
+      assert.ok(selected.score.length<before.score.length*.8,block.id+' canonical search keeps shorter center distances');
     }
     if(i===0){
       const original=Object.fromEntries(beforeFold.positions.map(p=>[p.id,p])),folded=Object.fromEntries(afterFold.positions.map(p=>[p.id,p]));
@@ -608,28 +675,30 @@ test('global composition creates reproducible safe shared axes and a square frei
       assert.ok(afterFold.score.area<beforeFold.score.area*.7,'upward fold removes more than thirty percent of footprint');
       assert.ok(afterFold.score.length<=beforeFold.score.length*1.03,'upward folding keeps the original length allowance');
       assert.equal(afterFold.score.crossings,beforeFold.score.crossings);assert.equal(afterFold.score.incidentCrossings,beforeFold.score.incidentCrossings);
-      assert.equal(result.score.crossings,0);assert.equal(result.score.incidentCrossings,0,'compound motif moves remove the remaining fan intersection');
-      assert.ok(result.score.length<afterFold.score.length*.8,'compound composition shortens links by more than twenty percent');
-      assert.ok(result.score.area<=afterFold.score.area*1.03,'clarity improvement stays near the old occupied area');
-      const motifs=C.autoArrangeConnectedMotifs(d),positions=Object.fromEntries(result.positions.map(p=>[p.id,p])),ids=Object.keys(d.nodes);
+      assert.equal(selected.score.crossings,0);assert.equal(selected.score.incidentCrossings,0,'compound motif moves remove the remaining fan intersection');
+      assert.ok(selected.score.length<afterFold.score.length*.8,'compound composition shortens links by more than twenty percent');
+      assert.ok(selected.score.area<=afterFold.score.area*1.03,'clarity improvement stays near the old occupied area');
+      const selectedAxes=axis=>[...new Set(selected.positions.map(p=>Math.round(p[axis]*10)/10))].sort((a,b)=>a-b);
+      const motifs=C.autoArrangeConnectedMotifs(d),positions=Object.fromEntries(selected.positions.map(p=>[p.id,p])),ids=Object.keys(d.nodes);
       const tail=motifs.chains.find(chain=>chain.ids.length===3 && d.edges.some(e=>e.from===ids[chain.anchor] && e.to===ids[chain.ids[0]]));
       assert.ok(tail);const tailPoints=tail.ids.map(i=>positions[ids[i]]);
       assert.equal(new Set(tailPoints.map(p=>p.y)).size,1,'terminal tail docks as a shared bottom row');
       assert.ok(tailPoints.every(p=>p.y>positions[ids[tail.anchor]].y));
-      assert.ok(result.score.length<before.score.length*.9,'incident links become shorter');const cardWidth=axes('x').at(-1)-axes('x')[0]+150,cardHeight=axes('y').at(-1)-axes('y')[0]+44;
+      assert.ok(selected.score.length<before.score.length*.9,'incident links become shorter');const cardWidth=selectedAxes('x').at(-1)-selectedAxes('x')[0]+150,cardHeight=selectedAxes('y').at(-1)-selectedAxes('y')[0]+44;
       assert.ok(cardWidth>=cardHeight-204,'incident falls short of square by at most one global column pitch');
-      assert.ok(result.score.area<afterFold.score.area*.85,'portrait exception materially reduces occupied area');}
-    if(i===1)assert.ok(result.score.area<before.score.area*.92,'billing removes surplus row spacing');
+      assert.ok(selected.score.area<afterFold.score.area*.85,'portrait exception materially reduces occupied area');}
+    if(i===1)assert.ok(selected.score.area<before.score.area*.92,'billing removes surplus row spacing');
     if(i===2){
-      assert.ok(result.score.aspect>=1 && result.score.aspect<=16/9,'freight fits square to landscape without padding');
-      assert.ok(result.score.height<before.score.height*.65);assert.ok(result.score.length<before.score.length*1.1);
+      assert.ok(selected.score.aspect>=1 && selected.score.aspect<=16/9,'freight fits square to landscape without padding');
+      assert.ok(selected.score.height<before.score.height*.65);assert.ok(selected.score.length<before.score.length*1.1);
       assert.ok(axes('y').length<=15,'freight preserves composed rows');
       const rows=new Map();result.positions.forEach(p=>rows.set(p.y,(rows.get(p.y)||0)+1));
       assert.ok([...rows.values()].some(n=>n>=5),'several connected local motifs share an expanded row');
     }
-    if(i===3){assert.ok(axes('y').length<=17,'data preserves composed rows');assert.ok(result.score.crossings<=2);assert.equal(result.score.incidentCrossings,0);assert.ok(result.score.length<before.score.length*.75);}
+    if(i===3){assert.ok(axes('y').length<=17,'data preserves composed rows');assert.ok(selected.score.crossings<=2);assert.equal(selected.score.incidentCrossings,0);assert.ok(selected.score.length<before.score.length*.75);}
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
+  assert.deepEqual(timings.filter(row=>row.ms>=20000).map(row=>row.id),[],JSON.stringify(timings)+' worker deadline');
 });
 
 test('motif composition keeps unsafe layouts out and bounds routing attempts',()=>{

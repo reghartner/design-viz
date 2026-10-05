@@ -1006,6 +1006,43 @@ function autoArrangeGridPositions(d,result,preserveSeedOrder){
     return {positions:ids.map(function(id,i){var p=cells[finalist.cells[i]];return {id:id,x:120+p.cx,y:100+p.cy/dy*gap};}),edges:edges.map(function(){return {};})};
   });
 }
+function autoArrangeExpandedPitch(positions,axis,extent,fallback,multiplier){
+  var values=positions.map(function(p){return p[axis];}).sort(function(a,b){return a-b;}),lines=[];
+  values.forEach(function(value){if(!lines.length || Math.abs(value-lines[lines.length-1])>.1)lines.push(value);});
+  var intervals=lines.slice(1).map(function(value,i){return value-lines[i];}),wide=intervals.filter(function(gap){return gap>extent+.1;});
+  var pitch=wide.length?Math.min.apply(null,wide):fallback;
+  if(intervals.some(function(gap){var n=Math.round(gap/pitch);return n<1 || Math.abs(gap-n*pitch)>.1;}))pitch=fallback;
+  // Large regular whitespace is aspect padding (or empty lattice slots), not
+  // a card gap. Calibrate it from the canonical pitch so it is not magnified.
+  if(pitch>extent+3*(fallback-extent)+.1)pitch=fallback;
+  return {pitch:pitch,scale:(extent+multiplier*(pitch-extent))/pitch};
+}
+function autoArrangeExpandedPositions(result){
+  var horizontal=autoArrangeExpandedPitch(result.positions,'x',150,204,2.5),vertical=autoArrangeExpandedPitch(result.positions,'y',44,98,1.5);
+  var left=Math.min.apply(null,result.positions.map(function(p){return p.x;})),top=Math.min.apply(null,result.positions.map(function(p){return p.y;}));
+  var positions=result.positions.map(function(p){return {id:p.id,x:left+(p.x-left)*horizontal.scale,y:top+(p.y-top)*vertical.scale};});
+  return {positions:positions,horizontal:horizontal,vertical:vertical};
+}
+function autoArrangeExpandSpacing(d,result,viz){
+  var expandedPositions=autoArrangeExpandedPositions(result),positions=expandedPositions.positions;
+  var horizontal=expandedPositions.horizontal,vertical=expandedPositions.vertical;
+  var edges=result.edges.map(function(e){
+    if(!e.curveControls)return {};
+    var copy=Object.assign({},e);copy.curveControls=e.curveControls.map(function(p){return {t:p.t,dx:p.dx*horizontal.scale,dy:p.dy*vertical.scale};});
+    if(copy.labelDx!=null)copy.labelDx*=horizontal.scale;if(copy.labelDy!=null)copy.labelDy*=vertical.scale;return copy;
+  });
+  function safe(candidate){candidate.score=autoArrangeScore(d,candidate);var a=candidate.score,b=result.score;
+    return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings;
+  }
+  var expanded=autoArrangeNaturalRoutes(d,{positions:positions,edges:edges},true);
+  if(safe(expanded))return expanded;
+  try{
+    var placed=Object.create(null);positions.forEach(function(p){placed[p.id]={x:p.x,y:p.y};});
+    var routed=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'LR',placed),{engine:'nop2'}));
+    routed.positions=positions;routed=autoArrangeNaturalRoutes(d,routed,true);if(safe(routed))return routed;
+  }catch(ex){}
+  throw new Error('Could not expand layout spacing with clear cards and connections. The diagram is unchanged.');
+}
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -1017,7 +1054,7 @@ function autoArrangeCandidates(d,viz,cola){
   // at most four, balancing row lengths and reversing alternate rows. Require
   // the normal safety checks before accepting the routed result.
   var chain=autoArrangeChainPositions(d);
-  if(chain){attempt('LR',chain);if(candidates.length)return autoArrangeNaturalRoutes(d,candidates[0]);}
+  if(chain){attempt('LR',chain);if(candidates.length)return autoArrangeExpandSpacing(d,autoArrangeNaturalRoutes(d,candidates[0]),viz);}
   attempt('TB');attempt('LR');
   // Graphviz expands rank spacing on the short axis and reroutes its splines.
   // Keep ordinary candidates as well: fewer crossings always outrank shape.
@@ -1065,7 +1102,7 @@ function autoArrangeCandidates(d,viz,cola){
     // preserve safety, shape and footprint, and shorten center distances.
     if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
-      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return grid;
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeExpandSpacing(d,grid,viz);
   }
   // Ordered layouts are reproducible seeds, not a constraint on accepted
   // geometry. Unresolved small layouts also try direction-free searches.
@@ -1079,5 +1116,5 @@ function autoArrangeCandidates(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz);
+  return autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz);
 }

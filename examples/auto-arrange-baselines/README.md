@@ -18,19 +18,19 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 
 | Section | Nodes | Edges | Shape | Crossings | Occupied width × height | Ratio |
 | --- | ---: | ---: | --- | ---: | ---: | ---: |
-| 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 558 × 248 | 2.25 |
-| 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 962 × 624 | 1.54 |
-| 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 870 × 624 | 1.39 |
-| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 762 × 644 | 1.18 |
-| 05 Media platform | 20 | 24 | Five node colors without group boxes, legacy publishing, direct catalog write and upload retry | 0 | 966 × 764 | 1.26 |
-| 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 1 | 567 × 380 | 1.49 |
+| 01 Webhook delivery | 6 | 5 | 3+3 snake, second row reversed | 0 | 720 × 328 | 2.20 |
+| 02 Document approval | 9 | 10 | Three-way fork and join, terminal sink tucked beside its parent | 0 | 1284 × 804 | 1.60 |
+| 03 Telemetry pipeline | 13 | 17 | Three signal lanes, legacy observability, bypass and configuration feedback | 0 | 1275 × 804 | 1.59 |
+| 04 Order fulfillment | 16 | 20 | Deep spine, legacy commerce, reservation retry and manual order updates | 0 | 1005 × 834 | 1.21 |
+| 05 Media platform | 20 | 24 | Five node colors without group boxes, legacy publishing, direct catalog write and upload retry | 0 | 1290 × 992 | 1.30 |
+| 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 1 | 729 × 504 | 1.45 |
 
 All saved layouts have zero overlapping cards or groups and zero routes through
 unrelated cards according to `autoArrangeScore`. Dimensions enclose cards,
 groups and sampled routes, excluding labels and the viewer's minimum canvas
 width. The simple chain balances its rows within the four-card limit and
-alternates reading direction, using equal 204-unit center spacing rather than
-adding empty space to reach a screen ratio. Its 2.25 ratio is intentional.
+alternates reading direction, using 285-unit horizontal and 284-unit vertical center spacing rather than
+adding empty space to reach a screen ratio. Its 2.20 ratio is intentional.
 The five other layouts fall between square and 16:9 landscape.
 
 The approval layout preserves its fork and join positions, moving only the
@@ -54,12 +54,12 @@ updates their routes and attachment sides; retained native curves remain
 editable. Length tie-breaking uses straight center-to-center distances;
 drawn routes still determine collision, crossing and occupied-bounds checks.
 
-Telemetry uses four columns spaced 240 units apart and six rows spaced 116
+Telemetry uses four columns spaced 375 units apart and six rows spaced 152
 units apart. Logs and Alerts share the router's row; logs storage, traces,
 metrics and metrics storage share the next row. These assignments come from
 a deterministic grid search using topology and shared viewer geometry. The
 manual reference supplied only the intended shape; no IDs or coordinates from
-that file are special-cased. Fulfillment uses four 204-unit columns and six 120-unit rows. Its source chain
+that file are special-cased. Fulfillment uses four 285-unit columns and six 158-unit rows. Its source chain
 folds across the first row, followed by checkout/cart and the parallel payment,
 risk and inventory branches. Order, Events and Warehouse share the fourth row;
 Carrier, Notify, Analytics and Ops share the fifth; Mail occupies the sixth.
@@ -68,7 +68,7 @@ diagrams have zero overlaps, card hits and crossings, and all their connections
 use natural curves.
 
 Fulfillment's compact candidate reduces straight connection length from 6069
-to 4176 and occupied geometry from 1206 × 972 to 762 × 644. Compared with the
+to 4176 and occupied geometry from 1206 × 972 to 1005 × 834. Compared with the
 partial manual reference, the three processing branches run in the opposite
 column order and Carrier sits below Warehouse. This alternative needs no
 native route controls; the compact reference-style branch ordering needs a
@@ -87,9 +87,9 @@ The pastel skin displays the five supported tint categories as follows:
 | data | Output stores | `data` | Purple |
 | delivery | Delivery | `mqtt` | Pink |
 
-The media grid occupies 966 × 764 and reduces center-to-center connection
-length from 8190 to 5854. It has five columns spaced 204 units apart and seven
-rows spaced 120 units apart, including an empty row for route clearance. The
+The media grid occupies 1290 × 992 with 7,945 units of center-to-center
+connection length. It has five columns spaced 285 units apart and seven
+rows spaced 158 units apart, including an empty row for route clearance. The
 three processing branches and their stores each share a row. Near publication,
 one delivery sink shares its row and three are below it, reducing the number
 of curves leaving the same side. This layout has zero ordinary crossings and
@@ -121,8 +121,8 @@ full viewer checks. Cached automatic curves use a coarse crossing estimate
 during search; the final safety check uses full sampled geometry and automatic
 avoidance. A candidate must have no overlaps or card hits, no added ordinary or incident crossings,
 no worse shape or occupied diagonal, and shorter center distances. This pass
-changes only cases 05 and 06 here; cases 01–04 remain exactly unchanged. The
-matrix shrinks from 667 × 511 to 567 × 380 and center distance from 2900 to 2350.
+changes only canonical winners 05 and 06 here; winners 01–04 remain unchanged before final spacing expansion. The
+matrix winner remains unchanged before final spacing expansion; its published geometry is 729 × 504 with 3,258 units of center distance.
 The search uses topology and previous layout geometry, never node names,
 titles, tints, section IDs, or reference positions. It skips larger stress graphs.
 

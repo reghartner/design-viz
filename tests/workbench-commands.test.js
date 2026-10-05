@@ -189,19 +189,85 @@ test('planAddNode skips ids already taken and reports diagram-less sections plai
   assert.match(bad.error, /no diagram/);
 });
 
-test('new free nodes avoid automatic floats after insertion changes their spacing', () => {
+test('new free nodes avoid existing cards without moving automatic floats', () => {
   const raw = {nodes:{a:{},f:{},g:{},h:{},i:{}},rows:[['a']],
     floats:[{id:'f',side:'below',dx:-150,dy:-94},...['g','h','i'].map(id=>({id,side:'below'}))]};
+  const priorPositions = plain(B.layout(raw).pos);
   const before = JSON.stringify(raw), plan = B.planAddNode(before, raw, 0);
   assert.ok(!plan.error, plan.error);
   const next = JSON.parse(plan.text), positions = B.layout(next).pos, added = positions[plan.id];
   for (const id of Object.keys(raw.nodes)){
     const p = positions[id];
+    assert.deepStrictEqual(plain(p), priorPositions[id], 'existing node '+id+' stays put');
     assert.ok(Math.abs(added.cx - p.cx) >= (added.w + p.w) / 2 + 24 ||
       Math.abs(added.cy - p.cy) >= (added.h + p.h) / 2 + 24, 'overlap with ' + id);
   }
   assert.deepStrictEqual(next.floats.slice(0, -1), raw.floats);
   assert.equal(JSON.stringify(raw), before);
+});
+
+test('adding a node keeps lane rows and existing lane routes', () => {
+  const raw={nodes:{a:{title:'A'},b:{title:'B'}},rows:[['a','b']],routing:'lanes',
+    edges:[{from:'a',to:'b',kind:'int',label:'call'}]};
+  const prior=plain(B.layout(raw).pos), route=B.laneRoutes(raw,B.layout(raw))[0].path;
+  const plan=B.planAddNode(JSON.stringify(raw),raw,0);
+  assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text), placed=B.layout(next);
+  assert.equal(placed.routing,'lanes');
+  for(const id of Object.keys(raw.nodes))assert.deepStrictEqual(plain(placed.pos[id]),prior[id]);
+  assert.equal(B.laneRoutes(next,placed)[0].path,route);
+  assert.ok(next.floats[0].noSpread && B.positionedFloat(next.floats[0]));
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).warnings),[]);
+});
+
+function automaticPaths(d){
+  const placed=B.layout(d),adjust=B.edgeAutoAdjust(d.edges || [],placed);
+  B.resolveEdgeAvoidance(d.edges || [],placed,adjust);
+  return (d.edges || []).map((edge,index)=>B.edgePath(edge,placed,adjust[index]));
+}
+
+test('raw insertion markers preserve automatic floats and existing curve routes', () => {
+  const raw={nodes:{a:{},b:{},f:{},g:{}},rows:[['a','b']],
+    floats:[{id:'f',side:'below'},{id:'g',side:'below'}],
+    edges:[{from:'a',to:'f'},{from:'b',to:'g'},{from:'a',to:'b'}]};
+  const before=JSON.stringify(raw),positions=plain(B.layout(raw).pos),paths=automaticPaths(raw);
+  const once=plain(raw);
+  once.nodes.z={};once.floats.push({id:'z',side:'below',noSpread:true});
+  once.edges.push({from:'f',to:'z'});
+  const first=B.layout(once),firstInserted=plain(first.pos.z);
+  for(const id of Object.keys(raw.nodes))assert.deepStrictEqual(plain(first.pos[id]),positions[id]);
+  assert.deepStrictEqual(automaticPaths(once).slice(0,paths.length),paths);
+  assert.ok(first.vb.x<=firstInserted.cx-firstInserted.w/2 && first.vb.x+first.vb.w>=firstInserted.cx+firstInserted.w/2);
+
+  const twice=plain(once);
+  twice.nodes.q={};twice.floats.push({id:'q',side:'below',noSpread:true});
+  twice.edges.push({from:'z',to:'q'});
+  const second=B.layout(twice);
+  assert.deepStrictEqual(plain(second.pos.z),firstInserted);
+  for(const id of Object.keys(raw.nodes))assert.deepStrictEqual(plain(second.pos[id]),positions[id]);
+  assert.deepStrictEqual(automaticPaths(twice).slice(0,paths.length),paths);
+  assert.deepStrictEqual(plain(B.layout(twice)),plain(B.layout(twice)),'placement is deterministic');
+  assert.equal(JSON.stringify(raw),before,'layout does not mutate the source');
+});
+
+test('raw insertion markers preserve lane routes and legacy floats retain fallback behavior', () => {
+  const raw={nodes:{a:{},b:{}},rows:[['a','b']],routing:'lanes',edges:[{from:'a',to:'b'}]};
+  const before=JSON.stringify(raw),placed=B.layout(raw),route=B.laneRoutes(raw,placed)[0].path;
+  const next=plain(raw);
+  next.groups={inserted:{title:'Inserted'}};
+  next.nodes.z={group:'inserted'};next.floats=[{id:'z',side:'above',noSpread:true}];next.edges.push({from:'b',to:'z'});
+  const after=B.layout(next);
+  assert.equal(after.routing,'lanes');
+  assert.equal(B.laneRoutes(next,after)[0].path,route);
+  assert.deepStrictEqual(plain(after.pos.a),plain(placed.pos.a));
+  assert.deepStrictEqual(plain(after.pos.b),plain(placed.pos.b));
+  assert.ok(after.vb.x+after.vb.w>=after.pos.z.cx+after.pos.z.w/2);
+  assert.deepStrictEqual(plain(B.validate(B.normalize(next)).warnings),[]);
+  assert.equal(JSON.stringify(raw),before);
+
+  const legacy=plain(next);delete legacy.floats[0].noSpread;
+  assert.equal(B.layout(legacy).routing,undefined);
+  assert.match(B.validate(B.normalize(legacy)).warnings.join(' '),/no automatically spaced floats/);
 });
 
 test('planAddEdge avoids duplicate from->to keys and creates edges when missing', () => {

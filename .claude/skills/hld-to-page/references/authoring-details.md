@@ -238,14 +238,28 @@ new arithmetic, no new attributions.
   each gets its own numbered circle. Keep `edges` in true firing order; an
   overflowing edge label gets shortened, not nudged.
 
-## Row placement
+## Graph placement and connection schema
 
-Author every `rows` array in visual left-to-right order. A stack occupies one
+For ordinary new-diagram authoring, follow SKILL rule 12: use unpositioned
+floats and automatic connections, then run the production Auto Arrange CLI or
+use the Workbench button. The fields below document existing specs and explicit
+user-directed layout work. Do not introduce them merely to improve appearance.
+
+For an existing diagram, append a raw float
+`{id:"<new-node-id>",side:"below",noSpread:true}` plus its semantic edges.
+`noSpread` keeps this unpositioned insertion outside existing automatic float
+spacing and lane routing, so established node positions and routes stay stable.
+Do not add X/Y, ports or route fields. Tell the user that Workbench **Auto
+arrange** can replace the whole diagram layout if they want. The Workbench
+**Add to diagram → Node** action uses the same marker with a product-chosen
+position.
+
+Existing `rows` arrays are in visual left-to-right order. A stack occupies one
 slot, with its members in top-to-bottom order. Each row retains its authored
 horizontal order when other rows are added, moved, or removed. Cross-row edges
 follow their endpoint positions; steps and edges define the story order.
 
-## Free node placement and edge ports
+### Manual node placement and edge ports
 
 Use `floats:[{id,side:"below",x:430,y:220}]` for freely placed cards. X/Y are
 the center in diagram units, not screen pixels; Y increases downward. Fixed
@@ -254,7 +268,8 @@ side when pinning it so the row headroom stays stable. All-free diagrams use
 `rows:[[]]`. Row layout and order remain automatic. Do not duplicate placement
 of one node in both rows and floats.
 
-Use optional `edges[].fromPort` / `toPort` objects to pin exit/entry:
+Only when the user explicitly requests manual routing, use optional
+`edges[].fromPort` / `toPort` objects to pin exit/entry:
 `{side:"right",offset:0.25}`. Offset is 0–1 along the side, starting at its left
 or top. These edges use curves, including in lane diagrams; other edges retain
 their routing. Neither pinning nor manual placement guarantees no overlaps.

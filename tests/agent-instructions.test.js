@@ -63,3 +63,17 @@ test('both registered routes edit seeded request candidates and keep the legacy 
     assert.doesNotMatch(prompt,/--operations|assemble|fragment|extract/i);
   }
 });
+test('both setup routes give browserless agents one truthful layout policy',()=>{
+  for(const workflow of ['external','embedded']){
+    const paragraphs=context.folderAgentInstructions('Doorbell','mixed',false,identity,workflow).split('\n\n');
+    const policies=paragraphs.filter(paragraph=>paragraph.startsWith('Layout policy:'));
+    assert.equal(policies.length,1,workflow);
+    const policy=policies[0];
+    assert.ok(policy.includes('no browser control'));
+    assert.ok(policy.includes('node tools/auto-arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
+    assert.ok(policy.includes('wholly new diagram'));
+    assert.ok(policy.includes('When adding a node, append only an unpositioned {id,side:"below",noSpread:true} float'));
+    assert.ok(policy.includes('preserve all rows, floats, coordinates, ports, bends, curve controls/points and label nudges'));
+    assert.ok(policy.includes('press Auto arrange'));
+  }
+});

@@ -8,9 +8,9 @@ transport commands and files; paths below are relative to VIZ.
 
 This guide suffices for bounded corrections to an existing diagram: factual
 values, labels, statuses and times in panels, nodes, edges, captions or steps,
-with matching ledger entries. Ledger-only updates stay here. The edit keeps the
-story's meaning, schema, panel types, stable IDs, paths, step order, evidence
-sources and coverage.
+with matching ledger entries. The edit keeps the
+story's meaning, schema, panel types, stable IDs, paths, step order, evidence,
+coverage, node placement and edge routes.
 
 ## Escalate
 

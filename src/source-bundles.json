@@ -162,12 +162,15 @@
         "compatibility.js",
         "canon.js",
         "validator.js",
+        "workbench/auto-arrange-core.js",
         "core/backend.js"
       ],
       "exports": {
         "compatibility": "FlowviewCompatibility",
         "validateSpec": "validateSpec",
-        "viewerRouting": "viewerRouting"
+        "viewerRouting": "viewerRouting",
+        "autoArrangeCandidates": "autoArrangeCandidates",
+        "autoArrangeDiagram": "autoArrangeDiagram"
       },
       "defaultExport": "FlowCanon"
     },

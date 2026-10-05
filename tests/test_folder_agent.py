@@ -132,11 +132,13 @@ class FolderAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'symlink'):
             helper.prepare(self.folder)
 
-    def test_prepared_real_kit_carries_clip_cue_in_skill_and_helper(self):
-        # The editor's real kit builder; the runtime bundle is irrelevant here.
-        (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, '// runtime'))
+    def test_prepared_real_kit_carries_guidance_helpers_and_production_arranger(self):
+        runtime = subprocess.check_output(
+            ['node', str(ROOT/'tools/source-loader.cjs'), '--module', 'backend', 'cjs'], text=True)
+        (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
-        for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py']:
+        for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
+                     'tools/auto-arrange-spec.cjs']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
         skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
         self.assertIn(widget_doc.CLIP_CUE, ' '.join(skill.split()))
@@ -144,6 +146,23 @@ class FolderAgentTests(unittest.TestCase):
                                 text=True, capture_output=True, timeout=10, cwd=self.folder)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.count(widget_doc.CLIP_CUE), 1)
+        draft = self.folder/'authoring/draft.spec.json'
+        arranged = self.folder/'authoring/arranged.spec.json'
+        draft.write_text(json.dumps({'nodes': {'a': {'title': 'A'}, 'b': {'title': 'B'}},
+                                     'rows': [[]],
+                                     'floats': [{'id': 'a', 'side': 'below'},
+                                                {'id': 'b', 'side': 'below'}],
+                                     'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}]}))
+        result = subprocess.run(['node', 'tools/auto-arrange-spec.cjs', draft.name, arranged.name],
+                                text=True, capture_output=True, timeout=30,
+                                cwd=self.folder/'authoring')
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+        output = json.loads(arranged.read_text())
+        self.assertEqual(output['edges'][0]['label'], 'send')
+        self.assertTrue(all('x' in item and 'y' in item for item in output['floats']))
+        self.assertNotIn('curveControls', output['edges'][0])
+        self.assertNotIn('fromPort', output['edges'][0])
+        self.assertNotIn('toPort', output['edges'][0])
 
     def test_watcher_notifies_once_and_renewal_skips_completed_request(self):
         run = self.run_helper('watch', '--minutes', '.01', '--interval', '.1')

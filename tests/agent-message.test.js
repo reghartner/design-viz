@@ -62,3 +62,10 @@ test('context-only copy works with a selection and no message, but not with an e
   assert.equal(c.workbenchAgentMessage({...current,previewCurrent:false},{contextOnly:true}),'');
   assert.equal(c.workbenchAgentMessage(current,{message:''}),'','the message composer still requires a request');
 });
+test('prepared edit requests preserve existing geometry and reserve the CLI for new diagrams',()=>{
+  const message=c.workbenchAgentMessage(snapshot([{section:1,kind:'node',id:'camera'}]),{message:'Add a relay after the camera.'});
+  assert.ok(message.includes('Preserve existing node placement and edge routes.'));
+  assert.ok(message.includes('append an unpositioned {id,side:"below",noSpread:true} float without X/Y or edge geometry'));
+  assert.ok(message.includes('I can press Auto arrange'));
+  assert.ok(message.includes('production Auto Arrange CLI only for a wholly new diagram'));
+});

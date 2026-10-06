@@ -1,22 +1,17 @@
 # Connected request: existing-diagram edit guide
 
-Read this first for every connected request after `prepare`. VIZ is the
-authoring directory named in `CONNECT.md`, which remains the authority for
-transport commands and files; paths below are relative to VIZ.
+Read this after `prepare`. VIZ is the authoring directory in `CONNECT.md`;
+paths below are relative to VIZ.
 
-For a requested pilot, or when the diagram root contains
-`.flowview-pilot/config.json`, first follow
-[pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md).
-Capture at entry and before every reply, including questions and completion.
-This also applies to a bounded edit that does not load the full skill.
+For a requested or already enabled pilot, follow
+[pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md)
+at entry and before every reply, including bounded edits.
 
 ## Scope
 
-This guide suffices for bounded corrections to an existing diagram: factual
-values, labels, statuses and times in panels, nodes, edges, captions or steps,
-with matching ledger entries. The edit keeps the
-story's meaning, schema, panel types, stable IDs, paths, step order, evidence,
-coverage, node placement and edge routes.
+This guide covers bounded corrections to facts, labels, statuses and times in
+an existing diagram and ledger. Keep story meaning, schema, panel types, IDs,
+paths, step order, evidence, coverage, placement and edge routes.
 
 ## Escalate
 

@@ -138,9 +138,14 @@ class FolderAgentTests(unittest.TestCase):
         (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
-                     'tools/auto-arrange-spec.cjs', 'tools/trace2spec.js', 'src/trace-import.js',
+                     'tools/auto-arrange-spec.cjs',
                      '.claude/skills/hld-to-page/scripts/pilot_capture.py']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
+        trace_cli = (self.folder/'authoring/tools/trace2spec.js').read_text()
+        self.assertIn("'trace-import.js'", trace_cli)
+        self.assertNotIn('../src/trace-import.js', trace_cli)
+        self.assertEqual((self.folder/'authoring/tools/trace-import.js').read_text(),
+                         (ROOT/'src/trace-import.js').read_text())
         skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
         self.assertIn(widget_doc.CLIP_CUE, ' '.join(skill.split()))
         result = subprocess.run([sys.executable, str(self.folder/'authoring/tools/widget_doc.py'), 'deviceapp'],

@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""Capture this Claude Code session locally. No hooks, API calls, or cost estimates.
-
-The native transcript is the authority. In particular, cost-state may only be
-persisted when Claude exits: token counts are useful before dollars are known.
-"""
+"""Capture this Claude Code session's raw transcript, models, and token usage locally."""
 import argparse
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -219,13 +215,12 @@ def pasted_request(text):
 
 
 def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
-    """Use cumulative native snapshots; never allocate a multi-turn delta to one turn."""
-    turns, snapshots, models, seen_turns = [], [], set(), set()
-    requests, active_turn, interleaved = {}, None, set()
+    """Index participant turns without changing the preserved native transcript."""
+    turns, models, seen_turns = [], set(), set()
+    requests, active_turn = {}, None
     attribution_issues, unattributed_assistants = [], []
     native_assistant_line, native_final = 0, False
     native_assistant_turn_id = None
-    root_start = False
     invalid = 0
     for line_number, line in enumerate(raw.splitlines(), 1):
         try:
@@ -247,8 +242,6 @@ def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
                 # can remove the tentative turn; an authored skill stays intact.
                 turns.pop()
                 active_turn = len(turns) - 1 if turns else None
-                if not turns:
-                    root_start = False
                 continue
         events = flowview_payloads(row)
         copied = pasted_request(raw_text) if not events else None
@@ -276,8 +269,6 @@ def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
                         target['finalResponseCaptured'] = False
                         target['lastAssistantLine'] = None
                 active_turn = target_index
-                if active_turn != len(turns) - 1:
-                    interleaved.update(range(active_turn, len(turns)))
                 continue
             # An unmatched result/cancellation cannot invent a participant
             # request. Preserve earlier covered turns; detach subsequent work.
@@ -307,15 +298,8 @@ def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
                 if signature[1]:
                     turns[-1]['_command'] = signature
                 continue
-            # A root user message proves the start of a session; a partial or
-            # compacted transcript does not justify assuming a zero baseline.
-            if not turns and 'parentUuid' in row and row['parentUuid'] is None:
-                root_start = True
             turns.append({'id': turn_id, 'timestamp': row.get('timestamp'), 'transcriptLine': line_number,
-                          'modelsObserved': [], 'tokens': {}, 'costUsd': None,
-                          'costStatus': 'pending', 'cumulativeCostUsd': None,
-                          'costReason': 'awaiting_native_snapshot',
-                          'costSnapshotId': None, 'finalResponseCaptured': False,
+                          'modelsObserved': [], 'tokens': {}, 'finalResponseCaptured': False,
                           'lastAssistantLine': None, 'userMessageAliases': [],
                           'flowviewRequest': {key: event[key] for key in ('sessionId', 'connectionId', 'requestId')} if event else None,
                           'flowviewEvents': [{key: event[key] for key in ('event', 'id', 'requestId')}] if event else [],
@@ -349,65 +333,7 @@ def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
                     target['_messages'][key] = usage
                 target['lastAssistantLine'] = line_number
                 target['finalResponseCaptured'] = message.get('stop_reason') == 'end_turn'
-        if row.get('type') != 'cost-state':
-            continue
-        cost = row.get('totalCostUSD')
-        model_usage = row.get('modelUsage')
-        if isinstance(model_usage, dict):
-            models.update(k for k in model_usage if isinstance(k, str) and not k.startswith('<'))
-        snapshot = {'id': hashlib.sha256(line).hexdigest(), 'transcriptLine': line_number,
-                    'totalCostUsd': cost if number(cost) and not row.get('hasUnknownModelCost') else None,
-                    'modelUsage': model_usage if isinstance(model_usage, dict) else {},
-                    'hasUnknownModelCost': row.get('hasUnknownModelCost'), 'source': 'claude-transcript:cost-state'}
-        snapshots.append(snapshot)
-    baseline = next((s['totalCostUsd'] for s in reversed(snapshots)
-                     if not turns or s['transcriptLine'] < turns[0]['transcriptLine']), 0.0 if root_start else None)
-    previous_cost, previous_turn = baseline, -1
-    for index, turn in enumerate(turns):
-        next_line = turns[index + 1]['transcriptLine'] if index + 1 < len(turns) else math.inf
-        candidates = [s for s in snapshots if turn['lastAssistantLine'] is not None and
-                      turn['lastAssistantLine'] < s['transcriptLine'] < next_line]
-        barrier = attribution_issues[0]['transcriptLine'] if attribution_issues else None
-        before_barrier = [s for s in candidates if barrier is not None and s['transcriptLine'] < barrier]
-        ambiguous = bool(barrier is not None and not before_barrier)
-        response_complete = turn['finalResponseCaptured']
-        if before_barrier:
-            # A later unrelated result cannot invalidate already covered work.
-            candidates = before_barrier
-        elif ambiguous:
-            detached = [(line, final) for line, final in unattributed_assistants if barrier <= line < next_line]
-            coverage_line = max(turn['lastAssistantLine'] or 0, barrier,
-                                detached[-1][0] if detached else 0)
-            candidates = [s for s in candidates if s['transcriptLine'] > coverage_line]
-            if detached:
-                response_complete = response_complete and detached[-1][1]
-        snapshot = candidates[-1] if candidates and response_complete else None
-        if snapshot:
-            cost = snapshot['totalCostUsd']
-            turn['cumulativeCostUsd'], turn['costSnapshotId'] = cost, snapshot['id']
-            if cost is not None:
-                if index == previous_turn + 1 and previous_cost is not None and cost >= previous_cost:
-                    turn['costUsd'], turn['costStatus'] = round(cost - previous_cost, 12), 'reported'
-                    turn['costReason'] = None
-                else:
-                    turn['costStatus'] = 'unavailable'
-                    turn['costReason'] = 'turn_cost_unattributable'
-                    turn['costReasonDetail'] = 'missing_baseline_or_multi_turn_gap' if previous_cost is None or index != previous_turn + 1 else 'decreasing_counter'
-                previous_cost, previous_turn = cost, index
-            else:
-                turn['costStatus'] = 'unavailable'
-                turn['costReason'] = 'unknown_model_cost' if snapshot['hasUnknownModelCost'] else 'invalid_native_cost'
-        elif any(s['transcriptLine'] >= next_line and s['totalCostUsd'] is not None for s in snapshots):
-            turn['costStatus'] = 'unavailable'
-            turn['costReason'] = 'turn_cost_unattributable'
-            turn['costReasonDetail'] = 'multi_turn_snapshot_gap'
-        if index in interleaved:
-            turn['costUsd'], turn['costStatus'], turn['costReason'] = None, 'unavailable', 'turn_cost_unattributable'
-            turn['costReasonDetail'] = 'interleaved_request_work'
-        turn['attributionStatus'] = 'unavailable' if ambiguous else 'observed'
-        if ambiguous:
-            turn['costUsd'], turn['costStatus'], turn['costReason'] = None, 'unavailable', 'turn_cost_unattributable'
-            turn['costReasonDetail'] = 'ambiguous_monitor_work_from_line_' + str(barrier)
+    for turn in turns:
         turn.pop('_command')
         turn.pop('_commandWrapper')
         messages = turn.pop('_messages')
@@ -415,30 +341,16 @@ def analyze(raw, session_id, flowview_owners=(), native_line_offset=0):
         turn['tokens'] = {key: sum(value[key] for value in messages.values() if number(value.get(key)))
                           for key in TOKEN_KEYS if any(number(value.get(key)) for value in messages.values())}
         turn['modelsObserved'].sort()
-    latest = snapshots[-1] if snapshots else None
-    if invalid:
-        for turn in turns:
-            turn['costUsd'], turn['costStatus'] = None, 'unavailable'
-            turn['costReason'] = 'invalid_native_json'
-    covered = bool(latest and latest['totalCostUsd'] is not None and
-                   (not turns or (native_final and latest['transcriptLine'] > native_assistant_line and
-                                  latest['transcriptLine'] > turns[-1]['transcriptLine'])))
-    unknown = bool(latest and latest['totalCostUsd'] is None)
-    reply_snapshot = latest if latest and native_final and latest['transcriptLine'] > native_assistant_line else None
     return {'sessionId': session_id, 'modelsObserved': sorted(models), 'turns': turns,
             'activeParticipantTurnId': turns[active_turn]['id'] if active_turn is not None else None,
             'attributionIssues': attribution_issues,
-            'costSnapshots': snapshots, 'reportedSessionCostUsd': latest['totalCostUsd'] if latest else None,
-            'costStatus': 'reported' if covered else 'unavailable' if unknown else 'pending',
-            'costReason': None if covered else ('unknown_model_cost' if latest['hasUnknownModelCost'] else 'invalid_native_cost') if unknown else 'awaiting_native_snapshot',
+            'unattributedAssistantLines': [native_line_offset + line for line, _ in unattributed_assistants],
             'nativeProgress': {'capturedThroughLine': native_line_offset + raw.count(b'\n'),
                                'lastAssistantLine': native_line_offset + native_assistant_line if native_assistant_line else None,
                                'lastAssistantTurnId': native_assistant_turn_id,
-                               'finalResponseCaptured': native_final,
-                               'costSnapshotId': reply_snapshot['id'] if reply_snapshot else None,
-                               'costSnapshotLine': native_line_offset + reply_snapshot['transcriptLine'] if reply_snapshot else None},
+                               'finalResponseCaptured': native_final},
             'invalidJsonLines': invalid,
-            'scope': 'exact pilot slice of the main native transcript; native cumulative dollars cover the entire Claude session'}
+            'scope': 'exact pilot slice of the main native transcript'}
 
 
 def source_for(session_id, claude_dir):
@@ -582,37 +494,23 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
         # Rebuild from exact per-session prefixes. Repeating or resuming capture
         # cannot duplicate lines; another participant's session is retained.
         atomic(folder / TRANSCRIPT, b''.join(combined))
-        known = [s['reportedSessionCostUsd'] for s in sessions if s['reportedSessionCostUsd'] is not None]
         report = {'schema': 'flowview-pilot-v1', 'capturedAt': now(), 'enabledAt': config['enabledAt'],
                   'transcript': TRANSCRIPT, 'sessions': sessions,
-                  'reportedTotalCostUsd': round(sum(known), 12) if sessions and all(s['costStatus'] == 'reported' and s['sourceAvailable'] and s['pendingBytes'] == 0 and not s['invalidJsonLines'] for s in sessions) else None,
-                  'knownReportedCostUsd': round(sum(known), 12) if known else None,
                   'errors': errors,
-                  'limits': ['Native cost-state can be delayed until Claude exits. Pending/unavailable USD is null; tokens are not priced.',
-                             'A cumulative snapshot spanning several turns cannot establish each turn\'s dollar cost.',
-                             'The active final response is absent until a later checkpoint or bounded after-turn copy.',
-                             'Separate subagent transcripts are not copied. Per-turn models/tokens cover the main transcript; native cumulative modelUsage may also name subagent models.',
-                             'Each session starts at its participant-authorized pilot turn. Native cumulative dollars may include excluded earlier history.']}
+                  'limits': ['The active final response is absent until a later checkpoint or bounded after-turn copy.',
+                             'Separate subagent transcripts are not copied. Per-turn models and tokens cover the main transcript.',
+                             'Each session starts at its participant-authorized pilot turn.']}
         save_json(folder / USAGE, report)
         current = next((s for s in sessions if s['sessionId'] == session_id), None)
         selected_turn_id = target_turn_id or (current['activeParticipantTurnId'] if current else None)
         last = (next((t for t in current['turns'] if t['id'] == selected_turn_id or selected_turn_id in t['userMessageAliases']), None)
                 if current and selected_turn_id else current['turns'][-1] if current and current['turns'] else None)
-        previous = next((t for t in reversed(current['turns']) if t is not last and t['finalResponseCaptured']), None) if current else None
         return {'status': 'partial' if errors else 'captured', 'transcript': str(folder / TRANSCRIPT),
                 'usage': str(folder / USAGE), 'sessions': len(sessions), 'errors': errors,
                 'modelsObserved': current['modelsObserved'] if current else [],
                 'currentSourceAvailable': bool(current and current['sourceAvailable']),
                 'nativeProgress': current['nativeProgress'] if current else None,
-                'turnId': last['id'] if last else None, 'turnCostUsd': last['costUsd'] if last else None,
-                'turnCostStatus': last['costStatus'] if last else 'pending',
-                'turnCostReason': last['costReason'] if last else 'awaiting_native_snapshot',
-                'turnSnapshotId': last['costSnapshotId'] if last else None,
-                'turnCumulativeCostUsd': last['cumulativeCostUsd'] if last else None,
-                'reportedSessionCostUsd': current['reportedSessionCostUsd'] if current else None,
-                'reportedSessionCostScope': 'Entire Claude session; may include pre-pilot history and subagent usage. This is not a pilot-only spend total.',
-                'sessionCostStatus': current['costStatus'] if current else 'pending',
-                'previousCompletedTurn': {key: previous[key] for key in ('id', 'costUsd', 'costStatus', 'costReason', 'cumulativeCostUsd')} if previous else None,
+                'turnId': last['id'] if last else None,
                 'finalResponseCaptured': last['finalResponseCaptured'] if last else False}
 
 
@@ -625,9 +523,7 @@ def settle(folder, session_id, turn_id, after_line, seconds=45):
     deadline = time.monotonic() + seconds
     status = None
     outcome = None
-    reply = {'afterNativeLine': after_line, 'finalResponseCaptured': False,
-             'costUsd': None, 'costScope': 'associated_participant_turn',
-             'costStatus': 'pending', 'costReason': 'awaiting_native_reply'}
+    reply = {'afterNativeLine': after_line, 'finalResponseCaptured': False}
     while time.monotonic() < deadline:
         time.sleep(1)
         try:
@@ -640,24 +536,16 @@ def settle(folder, session_id, turn_id, after_line, seconds=45):
                                 (progress.get('lastAssistantLine') or 0) > after_line)
             reply.update({'finalResponseCaptured': new_response,
                           'nativeAssistantLine': progress.get('lastAssistantLine'),
-                          'participantTurnId': progress.get('lastAssistantTurnId'),
-                          'costReason': 'awaiting_native_snapshot' if new_response else 'awaiting_native_reply'})
-            if new_response and progress.get('costSnapshotId') and progress.get('costSnapshotLine', 0) > progress['lastAssistantLine']:
-                attributed = progress.get('lastAssistantTurnId') == turn_id
-                reason = status.get('turnCostReason') if attributed else 'turn_cost_unattributable'
-                reported = attributed and status.get('turnCostStatus') == 'reported'
-                reply.update({'costSnapshotId': progress['costSnapshotId'],
-                              'costSnapshotNativeLine': progress['costSnapshotLine'],
-                              'costUsd': status.get('turnCostUsd') if reported else None,
-                              'costStatus': 'reported' if reported else 'unavailable', 'costReason': reason})
-                outcome = 'captured' if reported else 'turn_cost_unattributable' if reason == 'turn_cost_unattributable' else 'cost_unavailable'
+                          'participantTurnId': progress.get('lastAssistantTurnId')})
+            if new_response:
+                outcome = 'captured'
                 break
         except (OSError, ValueError, KeyError) as error:
             status = {'status': 'failed', 'error': str(error)}
             outcome = 'failed'
             break
     if outcome is None:
-        outcome = 'timeout_cost_pending' if reply['finalResponseCaptured'] else 'timeout_response_pending'
+        outcome = 'timeout_response_pending'
     saved_status = {'finishedAt': now(), 'sessionId': session_id, 'turnId': turn_id, 'outcome': outcome,
                     'replyCapture': reply, 'result': status}
     private = Path(folder) / PRIVATE
@@ -687,7 +575,7 @@ def main():
                                   '--session-id', args.session_id, '--settle-turn', result['turnId'],
                                   '--settle-after-line', str(result['nativeProgress']['capturedThroughLine'])],
                                  stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
-            result['afterTurnCopy'] = 'scheduled for up to 45 seconds, including a wait for native cost; completion is not yet confirmed'
+            result['afterTurnCopy'] = 'scheduled for up to 45 seconds to copy the final response; completion is not yet confirmed'
         print(json.dumps(result))
         return 1 if result['status'] == 'partial' else 0
     except (OSError, ValueError, KeyError) as error:

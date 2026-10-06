@@ -23,9 +23,8 @@ contains `.flowview-pilot/config.json`, follow [pilot capture](references/pilot-
 at entry and before **every** user-turn reply, including questions, approval
 waits, errors, and the final handoff. The packaged helper discovers this Claude
 Code session itself and saves local raw transcript and usage artifacts. Do not
-ask the participant to find/export a transcript. USD that Claude has not
-persisted is `null`; never invent cost or claim capture is complete without
-checking its status.
+ask the participant to find/export a transcript. Check capture status before
+claiming the transcript includes the final response.
 Each new participant must authorize their session as the pilot guide describes;
 an existing folder alone does not grant consent. Capture starts at that session's
 current pilot turn, with its exact native boundary recorded.

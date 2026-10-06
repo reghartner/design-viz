@@ -110,9 +110,7 @@ separately and included in the combined transcript; returning to a session does
 not duplicate it. Separate subagent transcripts are outside this capture scope.
 
 The agent checkpoints at entry and before each reply, and can schedule a bounded
-final copy with a 45-second wait budget for the final response and its native cost
-snapshot. It keeps waiting for cost after the response lands and explicitly
-reports a timeout if either remains pending. It reports
+final copy with a 45-second wait budget for the final response. It reports
 the actual capture status and any gaps; a scheduled copy is not a verified copy.
 No hooks, additional Claude session or permanent listener is installed. The next
 turn refreshes all recorded sessions, including a previous participant's final
@@ -130,24 +128,9 @@ copies marked `archived_only`; their errors do not block the engineer's current
 capture. Later native writes on the original machine cannot be refreshed here.
 Without the full folder handoff, that earlier capture remains on its original
 machine; the next participant's session cannot reconstruct it.
-If cost is persisted only after the final copy's wait window, the handed-off
-folder can still have pending cost. The original machine would need a later
-capture to refresh that evidence; the destination cannot recover it from Git.
-
-Usage records observed models, token usage per user turn and Claude's native
-cumulative `cost-state` snapshots. Dollar deltas are attributed only between
-snapshots covering exactly one completed turn. Claude can persist those totals
-only on session exit, so exact cost after every live turn is not guaranteed:
-pending/unavailable USD is `null`, never inferred from a pricing table. A snapshot
-spanning several turns establishes a cumulative total but not each turn's cost.
-Unknown model pricing is explicitly unavailable. Native cumulative dollars can
-include history before the pilot boundary; cumulative `modelUsage` can also
-include subagent models, while per-turn models/tokens cover the captured main
-transcript. The combined current total remains null if any source is unavailable;
-known reported totals remain visible separately.
-The CLI labels native session totals as potentially including pre-pilot history,
-and calls a known total with an unprovable turn delta `turn_cost_unattributable`.
-The agent distinguishes the latest reported total from a complete current total.
+The usage artifact records observed models and token usage per participant turn.
+The pilot owner collects dollar-cost figures separately from participants; the
+packaged skill does not calculate or report them.
 See the packaged [pilot instructions](../.claude/skills/hld-to-page/references/pilot-capture.md).
 
 ### Starting material

@@ -19,9 +19,14 @@ def folder_agent_kit(root, runtime):
                     files[relative.as_posix()] = path.read_text()
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs',
-                 'tools/trace2spec.js', 'src/trace-import.js',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
+    trace_cli = (root / 'tools/trace2spec.js').read_text()
+    source_path = '../src/trace-import.js'
+    if source_path not in trace_cli:
+        raise ValueError('Trace CLI converter path changed; update the portable kit')
+    files['tools/trace2spec.js'] = trace_cli.replace(source_path, 'trace-import.js')
+    files['tools/trace-import.js'] = (root / 'src/trace-import.js').read_text()
     for name in ['viz-3.31.0.js', 'webcola-3.4.0.js']:
         files['tools/auto-arrange/vendor/' + name] = (root / 'src/workbench/vendor' / name).read_text()
     # Build from these sources; never depend on an existing generated file.

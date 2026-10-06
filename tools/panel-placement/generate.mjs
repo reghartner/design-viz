@@ -4,7 +4,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
-const require=createRequire(import.meta.url),{chromium}=require('../browser-tests/node_modules/@playwright/test');
+const require=createRequire(import.meta.url);
 const {entrypoint,entrypointAssets,fontCss}=require('../source-loader.cjs'),corpus=require('./corpus.cjs'),L=require('./layouts.cjs');
 const root=path.resolve(fileURLToPath(new URL('../..',import.meta.url)));
 const args=process.argv.slice(2),options={};while(args.length){const k=args.shift();if(!['--output','--seed','--limit'].includes(k)||!args.length)throw Error('Use --output DIR [--seed round-1] [--limit N for smoke captures]');options[k]=args.shift();}
@@ -12,6 +12,8 @@ if(!options['--output'])throw Error('--output required');
 const out=path.resolve(options['--output']),seed=options['--seed']||'round-1';
 try{if((await fs.readdir(out)).length)throw Error('Output is populated; choose a new output directory/version.');}catch(e){if(e.code!=='ENOENT')throw e;}
 await fs.mkdir(out,{recursive:true});
+// Refuse existing evidence before loading optional browser tooling (also absent in Node-only CI).
+const {chromium}=require('../browser-tests/node_modules/@playwright/test');
 const C=corpus.engine(),native=entrypoint('native'),assets=entrypointAssets('native'),css=fontCss('all')+'\n'+assets.styles.map(a=>a.source).join('\n');
 const harnessCSS='html,body{margin:0;background:#fff}#capture{box-sizing:border-box;padding:20px;background:#fff}.docview{max-width:none;margin:0}.doc-sec{box-shadow:none}*,*::before,*::after{animation:none!important;transition:none!important}';
 const html=`<!doctype html><meta charset="utf-8"><style>${css}\n${harnessCSS}</style>${assets.icons}<main id="capture"><div id="view"></div></main><script>${native.body.replace(/<\/script/gi,'<\\/script')}\nwindow.paint=(raw,width,target)=>{if(window.ctl)window.ctl.destroy();document.getElementById('capture').style.width=width+'px';document.getElementById('capture').style.minHeight='';applySkinClasses(document.body,document.getElementById('view'),'pastel');window.ctl=renderPage(document.getElementById('view'),normalize(raw),'pastel',null,{layoutTarget:target});window.ctl.sections[0].stepper.jump(5);};</script>`;

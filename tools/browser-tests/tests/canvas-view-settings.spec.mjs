@@ -18,6 +18,8 @@ const section=(page,index=0)=>page.locator('#docview .doc-sec[data-dv-section="'
 const settings=(page,index=0)=>section(page,index).locator('.section-view-settings');
 const presentation=(page,index=0)=>settings(page,index).locator('select[aria-label="Viewing mode"]');
 const text=page=>page.locator('#src').inputValue();
+// Newly authored copies/promoted views use 24 columns; their legacy source stays untouched.
+const migratedLayout=legacy=>({columns:24,...Object.fromEntries(Object.entries(legacy).map(([profile,tiles])=>[profile,tiles.map(tile=>({...tile,x:tile.x*2,w:tile.w*2}))]))});
 async function open(page,server,raw=fixture()){
   const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
   await expect(page.locator('#workspace-view')).toHaveCount(0);await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(settings(page)).toBeVisible();await options(page);return source;
@@ -80,7 +82,7 @@ test('View options duplicates and renames a sibling without changing its source 
   await settings(page).getByRole('button',{name:'Duplicate chapter',exact:true}).click();
   const duplicated=await text(page),d=JSON.parse(duplicated).page.blocks[0].diagram,copy=d.layouts.at(-1);
   expect(d.layouts).toHaveLength(3);expect(d.layouts.slice(0,2)).toEqual(raw.page.blocks[0].diagram.layouts);expect(d.defaultLayout).toBe('resident');
-  expect(copy.sectionLayout).toEqual(d.layouts[0].sectionLayout);expect(copy.presentation).toBe('standard');
+  expect(copy.sectionLayout).toEqual(migratedLayout(d.layouts[0].sectionLayout));expect(copy.presentation).toBe('standard');
   await expect(section(page)).toHaveAttribute('data-view-id',copy.id);await expect(presentation(page)).toHaveValue('standard');
   await options(page);await presentation(page).selectOption('explore');const explored=await text(page);
   expect(JSON.parse(explored).page.blocks[0].diagram.layouts.slice(0,2)).toEqual(raw.page.blocks[0].diagram.layouts);
@@ -129,7 +131,7 @@ for(const legacy of [false,true])test('direct canvas Explore selection promotes 
   await expect(settings(page).getByRole('button',{name:'Opening chapter',exact:true,includeHidden:true})).toBeDisabled();
   await options(page);await presentation(page).selectOption('explore');const promoted=await text(page),next=JSON.parse(promoted).page.blocks[0].diagram;
   expect(next.layouts).toHaveLength(2);const selected=legacy?'layout':'flow';expect(next.layouts.find(v=>v.id===selected).presentation).toBe('explore');expect(next.layouts.find(v=>v.id!==selected).presentation || 'standard').toBe('standard');expect(next.defaultLayout).toBe(selected);
-  if(legacy)expect(next.layouts[0].sectionLayout).toEqual(arrangement);
+  if(legacy)expect(next.layouts[0].sectionLayout).toEqual(migratedLayout(arrangement));
   const retained=structuredClone(next);delete retained.layouts;delete retained.defaultLayout;const expected=structuredClone(d);delete expected.sectionLayout;delete expected.layoutName;
   expect(retained).toEqual(expected);await expect(presentation(page)).toHaveValue('explore');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();

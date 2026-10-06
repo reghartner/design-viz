@@ -1,5 +1,8 @@
 # Offline arranger preference experiment
 
+For Standard panel placement comparisons, see [Panel placement preference rounds](panel-placement-training.md). The shared review server selects panel labels only when `reviewMode` is `panel-layout`; node rounds retain Tie.
+
+
 This tool evaluates four recorded human A/B choices and fits a small constrained
 pairwise model. It does not change the production arranger or install weights in
 any shipped runtime. The corpus is preference evidence, not a set of optimal

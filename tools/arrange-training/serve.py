@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import socket
+import struct
 import tempfile
 import threading
 import uuid
@@ -17,6 +18,7 @@ from urllib.parse import unquote, urlsplit
 
 MAX_BODY = 128 * 1024
 CHOICES = {'A', 'B', 'Tie', 'Neither'}
+PANEL_CHOICES = {'A', 'B', 'Both', 'Neither'}
 ID = re.compile(r'^[A-Za-z0-9][A-Za-z0-9_.-]{0,119}$')
 DIGEST = re.compile(r'^[0-9a-f]{64}$')
 APP = Path(__file__).with_name('review.html')
@@ -38,6 +40,45 @@ def relative_asset(root, name):
     return target
 
 
+def panel_semantics(spec):
+    # Offline panel rounds have one section/view/profile. Everything except the
+    # active tile rectangles remains evidence, including order and hidden flags.
+    copy = json.loads(json.dumps(spec))
+    try:
+        sections = copy['page']['sections']
+        if len(sections) != 1:
+            raise ValueError('Panel comparison needs one section')
+        diagram = sections[0]['diagram']
+        if len(diagram['layouts']) != 1:
+            raise ValueError('Panel comparison needs one view')
+        layout = diagram['layouts'][0]['sectionLayout']
+        if set(layout) != {'columns', 'default'} or layout['columns'] != 24:
+            raise ValueError('Panel comparison needs an explicit 24-column default profile')
+        tiles, seen, boxes = layout['default'], set(), []
+        for tile in tiles:
+            key = ('panel:' + tile['panel']) if 'panel' in tile else ('controls:' + tile['controls']) if 'controls' in tile else 'diagram'
+            if key in seen:
+                raise ValueError('Duplicate panel tile')
+            seen.add(key)
+            if not all(type(tile.get(k)) is int for k in ('x', 'y', 'w', 'h')):
+                raise ValueError('Panel geometry must be integer')
+            x, y, w, h = (tile[k] for k in ('x', 'y', 'w', 'h'))
+            if x < 0 or y < 0 or y > 500 or w < 1 or x + w > 24 or not 3 <= h <= 40:
+                raise ValueError('Panel geometry outside grid')
+            if not tile.get('hidden'):
+                if any(x < bx+bw and x+w > bx and y < by+bh and y+h > by for bx, by, bw, bh in boxes):
+                    raise ValueError('Overlapping panel geometry')
+                boxes.append((x, y, w, h))
+            for k in ('x', 'y', 'w', 'h'):
+                del tile[k]
+        expected = {'diagram', 'controls:steps'} | {'panel:' + p['id'] for p in diagram['panels']}
+        if seen != expected:
+            raise ValueError('Missing panel tile')
+    except (KeyError, TypeError, IndexError) as error:
+        raise ValueError('Invalid panel comparison spec') from error
+    return json.dumps(copy, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
+
+
 class Dataset:
     def __init__(self, root):
         self.root = Path(root).resolve()
@@ -50,6 +91,10 @@ class Dataset:
             raise ValueError('Manifest needs 1..36 pairs')
         if m.get('datasetPurpose', 'human-review') not in ('human-review', 'synthetic-test'):
             raise ValueError('Invalid dataset purpose')
+        self.mode = m.get('reviewMode', 'node-layout')
+        if self.mode not in ('node-layout', 'panel-layout'):
+            raise ValueError('Unknown review mode')
+        self.choices = PANEL_CHOICES if self.mode == 'panel-layout' else CHOICES
         self.pairs, self.assets = {}, {}
         batch_counts = {}
         for pair in m['pairs']:
@@ -74,10 +119,29 @@ class Dataset:
                     data = asset.read_bytes()
                     if field == 'spec' and sha(data) != candidate['sha256']:
                         raise ValueError('Candidate spec hash mismatch')
+                    if self.mode == 'panel-layout' and field == 'png' and sha(data) != candidate.get('pngSha256'):
+                        raise ValueError('Candidate PNG hash mismatch')
                     # Freeze exact bytes at startup; changes on disk require restart/version update.
                     self.assets[name] = (data, 'image/png' if field == 'png' else 'application/json')
             if pair['A']['id'] == pair['B']['id']:
                 raise ValueError('A/B candidate IDs must differ')
+            if self.mode == 'panel-layout':
+                a, b = [json.loads(self.assets[pair[label]['spec']][0]) for label in ('A', 'B')]
+                semantics = panel_semantics(a)
+                if semantics != panel_semantics(b) or sha(semantics) != pair.get('contentSha256'):
+                    raise ValueError('Panel content identity mismatch')
+                if pair.get('panelCount') != len(a['page']['sections'][0]['diagram']['panels']) or pair.get('panelTypes') != [p['type'] for p in a['page']['sections'][0]['diagram']['panels']]:
+                    raise ValueError('Panel metadata mismatch')
+                for label in ('A', 'B'):
+                    png = self.assets[pair[label]['png']][0]
+                    if png[:8] != b'\x89PNG\r\n\x1a\n' or len(png) < 24:
+                        raise ValueError('Invalid PNG image')
+                    if tuple(struct.unpack('>II', png[16:24])) != (pair.get('capture', {}).get('width'), pair.get('capture', {}).get('height')):
+                        raise ValueError('Panel previews need equal declared dimensions')
+                if a == b:
+                    raise ValueError('Identical panel candidates')
+                if pair.get('split') != 'review':
+                    raise ValueError('Holdout may not be served')
             self.pairs[pid] = pair
         self.digest = sha(raw)
         self.public = {**m, 'manifestSha256': self.digest}
@@ -94,22 +158,25 @@ class Dataset:
             raise ValueError('Invalid browser reviewer ID')
         choices = payload.get('choices')
         if not isinstance(choices, list) or not 1 <= len(choices) <= len(self.pairs):
-            raise ValueError('Select at least one graph; partial submissions are welcome')
+            raise ValueError('Select at least one pair; partial submissions are welcome')
         seen, records = set(), []
         for item in choices:
             if not isinstance(item, dict):
                 raise ValueError('Invalid choice')
             pid = item.get('pairId')
-            if not isinstance(pid, str) or not isinstance(item.get('choice'), str) or pid not in self.pairs or pid in seen or item['choice'] not in CHOICES:
-                raise ValueError('Invalid/duplicate graph ID or choice')
+            if not isinstance(pid, str) or not isinstance(item.get('choice'), str) or pid not in self.pairs or pid in seen or item['choice'] not in self.choices:
+                raise ValueError('Invalid/duplicate pair ID or choice')
             seen.add(pid)
             pair = self.pairs[pid]
             for label in ('A', 'B'):
-                expected = {k: pair[label][k] for k in ('id', 'sha256')}
+                expected = {k: pair[label][k] for k in (('id', 'sha256', 'pngSha256') if self.mode == 'panel-layout' else ('id', 'sha256'))}
                 if item.get(label) != expected:
                     raise ValueError('Candidate identity/hash changed; reload before submitting')
+            reason = item.get('reason', '')
+            if not isinstance(reason, str) or len(reason) > 500:
+                raise ValueError('Reason must be at most 500 characters')
             records.append({'pairId': pid, 'choice': item['choice'], **{
-                label: {k: pair[label][k] for k in ('id', 'sha256')} for label in ('A', 'B')}})
+                label: {k: pair[label][k] for k in (('id', 'sha256', 'pngSha256') if self.mode == 'panel-layout' else ('id', 'sha256'))} for label in ('A', 'B')}, **({'reason': reason} if self.mode == 'panel-layout' and reason else {})})
         return records
 
 
@@ -135,7 +202,7 @@ class Store:
             identifier = str(uuid.uuid4())
             purpose = dataset.manifest.get('datasetPurpose', 'human-review')
             record = {'schemaVersion': 1, 'source': 'synthetic-comparison-test' if purpose == 'synthetic-test' else 'human-comparison-ui',
-                      'datasetPurpose': purpose,
+                      'datasetPurpose': purpose, 'reviewMode': dataset.mode,
                       'evidenceKind': 'explicit-browser-selection',
                       'datasetId': dataset.manifest['datasetId'],
                       'datasetVersion': dataset.manifest['datasetVersion'],
@@ -185,6 +252,8 @@ def allowed_host(value, bound_host):
 def make_server(dataset, submissions, host='127.0.0.1', port=8770):
     data = Dataset(dataset)
     store = Store(submissions)
+    if store.directory.is_relative_to(data.root):
+        raise ValueError('Submissions must be outside the served dataset root')
 
     class Handler(BaseHTTPRequestHandler):
         server_version = 'ArrangeReview/1'

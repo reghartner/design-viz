@@ -10,8 +10,10 @@
 <script>
 'use strict';
 const $=id=>document.getElementById(id), state={manifest:null,batches:[],batch:0,choices:Object.create(null),receipt:null,reviewerId:null,key:null,pending:false,storage:true};
-const identity=pair=>({A:{id:pair.A.id,sha256:pair.A.sha256},B:{id:pair.B.id,sha256:pair.B.sha256}});
-const selected=()=>state.manifest.pairs.filter(p=>state.choices[p.id]).map(p=>({pairId:p.id,choice:state.choices[p.id].choice,...identity(p)}));
+const panelMode=()=>state.manifest?.reviewMode==='panel-layout';
+const choiceValues=()=>panelMode()?['A','B','Both','Neither']:['A','B','Tie','Neither'];
+const identity=pair=>Object.fromEntries(['A','B'].map(label=>[label,{id:pair[label].id,sha256:pair[label].sha256,...(panelMode()?{pngSha256:pair[label].pngSha256}:{})}]));
+const selected=()=>state.manifest.pairs.filter(p=>state.choices[p.id]).map(p=>({pairId:p.id,choice:state.choices[p.id].choice,...(panelMode()&&state.choices[p.id].reason?{reason:state.choices[p.id].reason}:{}),...identity(p)}));
 const signature=()=>JSON.stringify({manifestSha256:state.manifest.manifestSha256,choices:selected()});
 function persist(){try{localStorage.setItem(state.key,JSON.stringify({reviewerId:state.reviewerId,choices:state.choices,receipt:state.receipt,batch:state.batch}));}catch{state.storage=false;$('notice').textContent='This browser cannot save drafts locally. Keep this tab open, submit now, or download a backup.';}}
 function status(message,error=false){$('state').textContent=message;$('state').className=error?'error':'';}
@@ -27,9 +29,9 @@ function update(){
 }
 function choose(id,choice){
  const pair=state.manifest.pairs.find(p=>p.id===id);
- if(choice)state.choices[id]={choice,...identity(pair)};else delete state.choices[id];
+ if(choice)state.choices[id]={choice,reason:state.choices[id]?.reason||'',...identity(pair)};else delete state.choices[id];
  const article=document.querySelector(`[data-pair-id="${id}"]`);
- if(article){article.querySelectorAll('input').forEach(input=>input.checked=input.value===choice);article.querySelectorAll('.preview').forEach(card=>card.classList.toggle('chosen',card.dataset.label===choice));}
+ if(article){const reason=article.querySelector('textarea');if(reason){reason.disabled=!choice;if(!choice)reason.value='';}article.querySelectorAll('input[type=radio]').forEach(input=>input.checked=input.value===choice);article.querySelectorAll('.preview').forEach(card=>card.classList.toggle('chosen',card.dataset.label===choice));}
  persist();update();
 }
 function enlarge(pair,label){$('zoomTitle').textContent=`${pair.title || pair.id} · ${label}`;$('zoomImage').src=asset(pair[label].png);$('imageScroll').classList.remove('zoom');$('zoomToggle').textContent='Zoom to full size';$('zoom').showModal();}
@@ -40,7 +42,8 @@ function render(){
  pairs.forEach(pair=>{
   const article=element('article',undefined,'pair');article.dataset.pairId=pair.id;article.tabIndex=-1;
   article.append(element('h2',`${state.manifest.pairs.indexOf(pair)+1}. ${pair.title || pair.id}`));
-  article.append(element('div',`${pair.nodeCount??''} nodes · ${pair.edgeCount??''} connections`,'count'));
+  article.append(element('div',panelMode()?`${pair.audience} · ${pair.panelCount} panels · ${pair.host.width}px ${pair.host.profile}`:`${pair.nodeCount??''} nodes · ${pair.edgeCount??''} connections`,'count'));
+  if(panelMode()){article.append(element('p',pair.goal));article.append(element('div',pair.panelTypes.join(' · '),'count'));}
   const previews=element('div',undefined,'previews');
   for(const label of ['A','B']){
    const card=element('div',undefined,'preview');card.dataset.label=label;card.classList.toggle('chosen',state.choices[pair.id]?.choice===label);
@@ -49,8 +52,8 @@ function render(){
    const img=element('img');img.src=asset(pair[label].png);img.alt=`${pair.title || pair.id}, layout ${label}`;img.loading='lazy';img.addEventListener('click',()=>enlarge(pair,label));card.append(img);previews.append(card);
   }
   article.append(previews);const choices=element('fieldset',undefined,'choices');choices.append(element('legend','Your preference'));
-  for(const choice of ['A','B','Tie','Neither']){const label=element('label',undefined,'vote'),input=element('input');input.type='radio';input.name=pair.id;input.value=choice;input.checked=state.choices[pair.id]?.choice===choice;input.addEventListener('change',()=>choose(pair.id,choice));label.append(input,document.createTextNode(choice));choices.append(label);}
-  const clear=element('button','Clear selection','clear');clear.addEventListener('click',()=>choose(pair.id,null));choices.append(clear);article.append(choices);container.append(article);
+  for(const choice of choiceValues()){const label=element('label',undefined,'vote'),input=element('input');input.type='radio';input.name=pair.id;input.value=choice;input.checked=state.choices[pair.id]?.choice===choice;input.addEventListener('change',()=>choose(pair.id,choice));label.append(input,document.createTextNode(panelMode()&&['Both','Neither'].includes(choice)?choice+' acceptable':choice));choices.append(label);}
+  const clear=element('button','Clear selection','clear');clear.addEventListener('click',()=>choose(pair.id,null));choices.append(clear);article.append(choices);if(panelMode()){const label=element('label','Reason (optional) '),reason=element('textarea');reason.maxLength=500;reason.disabled=!state.choices[pair.id];reason.rows=2;reason.style.cssText='display:block;width:100%;margin-top:8px;font:inherit';reason.setAttribute('aria-label','Reason for '+pair.title);reason.value=state.choices[pair.id]?.reason||'';reason.addEventListener('input',()=>{if(state.choices[pair.id]){state.choices[pair.id].reason=reason.value;persist();update();}});label.append(reason);article.append(label);}container.append(article);
  });
  update();
 }
@@ -68,10 +71,10 @@ $('submit').onclick=async()=>{
 };
 (async()=>{
  try{
-  const response=await fetch('/api/manifest');if(!response.ok)throw Error('Could not load comparison manifest.');const m=state.manifest=await response.json();$('title').textContent=m.title||'Layout comparisons';document.title=$('title').textContent;
+  const response=await fetch('/api/manifest');if(!response.ok)throw Error('Could not load comparison manifest.');const m=state.manifest=await response.json();$('title').textContent=m.title||'Layout comparisons';document.title=$('title').textContent;if(panelMode())$('intro').textContent='Which arrangement supports the goal? Choose A, B, Both acceptable, or Neither acceptable. All scenarios are fictional. Both keeps two acceptable alternatives; it is not a forced winner. Enlarge to inspect. Skip any pair; submit whenever ready.';
   state.key=`arrange-review:${m.datasetId}:${m.datasetVersion}`;let saved={};try{saved=JSON.parse(localStorage.getItem(state.key)||'{}');if(!saved||typeof saved!=='object')saved={};}catch{state.storage=false;}
   state.reviewerId=saved.reviewerId||('browser-'+(globalThis.crypto?.randomUUID?crypto.randomUUID():Array.from({length:24},()=>Math.floor(Math.random()*16).toString(16)).join('')));
-  let stale=0;for(const pair of m.pairs){const old=saved.choices?.[pair.id];if(!old)continue;if(['A','B','Tie','Neither'].includes(old.choice)&&JSON.stringify({A:old.A,B:old.B})===JSON.stringify(identity(pair)))state.choices[pair.id]=old;else stale++;}
+  let stale=0;for(const pair of m.pairs){const old=saved.choices?.[pair.id];if(!old)continue;if(choiceValues().includes(old.choice)&&JSON.stringify({A:old.A,B:old.B})===JSON.stringify(identity(pair)))state.choices[pair.id]=old;else stale++;}
   state.receipt=saved.receipt||null;const batches=[...new Set(m.pairs.map(p=>p.batch||1))].sort((a,b)=>a-b);state.batches=batches.map(batch=>m.pairs.filter(p=>(p.batch||1)===batch));state.batch=Math.min(state.batches.length-1,Math.max(0,saved.batch||0));
   if(stale)$('notice').textContent=`${stale} draft selections were cleared because those candidates changed. Other selections were restored.`;
   persist();render();

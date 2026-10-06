@@ -1,5 +1,5 @@
 import {test,expect,pastePage} from '../helpers/test.mjs';
-import {mkdir,mkdtemp,writeFile,cp,rm} from 'node:fs/promises';
+import {mkdir,mkdtemp,writeFile,readFile,cp,rm} from 'node:fs/promises';
 import {pathToFileURL,fileURLToPath} from 'node:url';
 import path from 'node:path';
 import {publishLibrary} from '../../canon/library.mjs';
@@ -18,8 +18,8 @@ function fixtures(){
   };
 }
 
-for(const mode of ['local-provider','direct-consumer','nested-consumer']){
-  test('File export makes a page-only offline HTML snapshot for '+mode,async({page,context,server},info)=>{
+for(const [mode,action] of [['local-provider','file'],['direct-consumer','file'],['nested-consumer','file'],['nested-consumer','html'],['direct-consumer','both']]){
+  test(action+' export makes a page-only offline HTML snapshot for '+mode,async({page,context,server},info)=>{
     const root=await mkdtemp(path.join(server.root,'topology-export-'));
     try{
       const workspace=path.join(root,'workbench');await mkdir(workspace);
@@ -55,18 +55,26 @@ for(const mode of ['local-provider','direct-consumer','nested-consumer']){
         await writeFile(path.join(root,'diagrams/provider/provider.spec.json'),JSON.stringify(source.provider));
       }
       const providerRequests=[];page.on('request',request=>{if(request.url().endsWith('.spec.json'))providerRequests.push(request.url());});
-      await page.locator('#editor-tab-file').click();await page.locator('#file-export').click();
-      const name=local?'provider':'consumer';
-      await expect.poll(()=>page.evaluate(async name=>{
-        try{const root=await navigator.storage.getDirectory();return (await(await root.getFileHandle(name+'.html')).getFile()).size;}catch{return 0;}
-      },name)).toBeGreaterThan(0);
-      expect(await page.evaluate(()=>window.exportPickerActive)).toBe(true);
-      const files=await page.evaluate(async name=>{
-        const root=await navigator.storage.getDirectory();
-        async function read(suffix){return (await(await root.getFileHandle(name+suffix)).getFile()).text();}
-        return {json:await read('.spec.json'),html:await read('.html')};
-      },name);
-      expect(files.json).toBe(expected);await expect(page.locator('#src')).toHaveValue(original);
+      const name=local?'provider':'consumer';let files;
+      if(action==='html'){
+        const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-html').click();
+        const result=await download;expect(result.suggestedFilename()).toBe(name+'.html');
+        files={html:await readFile(await result.path(),'utf8')};
+        expect(await page.evaluate(()=>window.exportPickerActive)).toBeUndefined();
+      }else{
+        if(action==='file'){await page.locator('#editor-tab-file').click();await page.locator('#file-export').click();}
+        else{await page.locator('#workspace-export-trigger').click();await page.locator('#file-export-both').click();}
+        await expect.poll(()=>page.evaluate(async name=>{
+          try{const root=await navigator.storage.getDirectory();return (await(await root.getFileHandle(name+'.html')).getFile()).size;}catch{return 0;}
+        },name)).toBeGreaterThan(0);
+        expect(await page.evaluate(()=>window.exportPickerActive)).toBe(true);
+        files=await page.evaluate(async name=>{
+          const root=await navigator.storage.getDirectory();
+          async function read(suffix){return (await(await root.getFileHandle(name+suffix)).getFile()).text();}
+          return {json:await read('.spec.json'),html:await read('.html')};
+        },name);
+      }
+      if(action!=='html')expect(files.json).toBe(expected);await expect(page.locator('#src')).toHaveValue(original);
       const snapshot=JSON.parse(files.html.match(/^<script type="application\/json" id="flowspec">\n([\s\S]*?)\n<\/script>/m)[1]);
       expect(JSON.stringify(snapshot)).not.toMatch(/"topology(?:Imports|Exports|Provenance)"/);
       expect(files.html).not.toContain('id="flowview-topology"');

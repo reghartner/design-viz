@@ -23,7 +23,15 @@ skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 
-**File → export…** keeps the stamped authored JSON and creates a separate
+The toolbar **Export** menu offers **JSON only**, **Static HTML**, and **Both**.
+JSON only downloads the editable source, including repairable invalid JSON.
+Static HTML downloads one standalone reader page with imports included and no
+dynamic provider lookups. Both uses a folder picker when available and otherwise
+downloads the two files. **File → export…** retains that same two-file action.
+HTML export needs valid JSON and the viewer template served beside the workbench;
+if it fails, use **Export → JSON only** to keep your source.
+
+Both keeps the stamped authored JSON and creates a separate
 read-only HTML snapshot of the current page. Shared topology stays referenced
 in JSON; the HTML contains the visible resolved nodes and edges with no provider
 context or topology declarations/provenance. Local providers can export offline

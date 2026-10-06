@@ -593,7 +593,7 @@ function createBuilderInteractions(opts){
     if (addModeExit) addModeExit.hidden = true;
   }
   var ADD_MODE_BLOCKED = '.mbtn, .tbtn, .schip, .path-chip, .tabbtn, .skbtn, #go, ' +
-    '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
+    '#undo-builder, #redo-builder, #file-open, #file-save, #file-export, #workspace-export, #spec-diff, #diffbox .diffline, #draftbar .bbtn, ' +
     '#diagram-add, #diagram-add-target, #add-node, #add-edge, #add-step, #add-panel, #add-paragraph, #add-bullet, #add-section, #add-tabs, #add-contract, ' +
     '#import-mermaid, #import-mermaid-convert, #import-trace, #trace-convert, .outline-item, .patchedit .fctl, .groupctl';
   function addModeBlocker(ev){

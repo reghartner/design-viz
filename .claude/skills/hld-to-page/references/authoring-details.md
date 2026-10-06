@@ -132,6 +132,8 @@ and `hidden` booleans; `{hidden:true}` can stand alone. Use independent
 `canvas.prose` graph rectangle. Older files initially inherit `panelPlacement`;
 placement edits preserve that initial notes placement. Floating notes use 16px
 text at 100% scale, unaffected by panel sizing; resize their own window.
+Canvas notes use 26px logical text and a new 440-unit-wide content-sized rectangle.
+They move and scale with diagram zoom; zooming out makes their text smaller.
 **Visible elements → Section notes** saves visibility per view;
 the window’s Hide button is temporary. Adding the first paragraph or bullet in
 the workbench creates notes and keeps Explore open; later additions restore

@@ -160,7 +160,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var states=memory.canvasPanels || (memory.canvasPanels=Object.create(null)),key=w===playerWindow?'controls':w.prose?'prose':'panel:'+w.panel.id;
     if(!states[key]){
       var layout=memory.layout.canvas || {},saved=w===playerWindow?layout.controls:w.prose?layout.prose:(layout.panels || []).find(function(p){return p.panel===w.panel.id;});
-      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(index/3)*380),y:(index%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:false});
+      // Floating panels do not consume a canvas slot before new notes.
+      var slot=w.prose?windows.filter(function(item){return !item.prose && canvasWindow(item);}).length:index;
+      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(slot/3)*380),y:(slot%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:w.prose && !saved});
     }
     return states[key];
   }
@@ -367,7 +369,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function sizeAutomaticWindow(w){
     if(!w.state.automatic)return;
     var b=bounds(),scale=windowScale(w),type=w.prose?'prose':w.panel.type;
-    var preferred=/^(screen|homemap|image)$/.test(type)?340:/^(prose|phone|deviceapp)$/.test(type)?320:300;
+    var preferred=w.prose && canvasWindow(w)?440:/^(screen|homemap|image)$/.test(type)?340:/^(prose|phone|deviceapp)$/.test(type)?320:300;
     var logicalWidth=Math.min(preferred,Math.max(96,(b.w-24)/scale));
     // Probe at the preferred width so the default follows rendered content.
     // A short second pass absorbs scrollbar wrapping and font rounding.
@@ -375,10 +377,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     apply(w,constrain(w,scaledRect(w,w.state)));
     var contentHeight=Math.ceil(w.body.scrollHeight),insets=stackInsets(),laneHeight=Math.max(72,b.h-insets.top-insets.bottom);
     var logicalMax=32+Math.max(40,laneHeight-32)/scale;
-    w.state.h=Math.min(logicalMax,Math.max(72,44+contentHeight));
+    w.state.h=Math.min(logicalMax,Math.max(72,(canvasWindow(w)?2:44)+contentHeight));
     apply(w,constrain(w,scaledRect(w,w.state)));
     var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
+    // Seed new canvas notes from their larger type, then preserve the rectangle.
+    if(w.prose && canvasWindow(w))w.state.automatic=false;
   }
   function paint(){
     if(!active || retired)return;
@@ -565,6 +569,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       [['floating','Floating'],['canvas','On canvas']].forEach(function(pair){var option=document.createElement('option');option.value=pair[0];option.textContent=pair[1];select.appendChild(option);});
       placementLabel.appendChild(select);row.appendChild(placementLabel);w.placement=select;
       select.addEventListener('change',function(){changePlacement(select.value,w);});
+      if(notes){var hint=document.createElement('div');hint.className='explore-placement-hint explore-notes-size-hint';hint.textContent='Section notes ignore Panels & controls sizing. Resize the notes window.';row.appendChild(hint);}
     }
     check.addEventListener('change',function(){setWindowHidden(w,!check.checked);if(check.checked)memory.focus=false;paint();});
     grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});

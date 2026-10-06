@@ -480,8 +480,11 @@ changes save with one Undo/Redo operation; reader changes stay in the session.
 Notes keep separate floating `prose` and graph-unit `canvas.prose` rectangles.
 Drag the notes header or resize its corner in either placement; select canvas
 notes first to reveal these handles. Floating notes use 16px body text at 100%
-scale, independently of the Panels & controls size setting. Canvas notes scale
-with diagram zoom. Saved placement declares `layout.explore-prose-placement`.
+scale, independently of the Panels & controls size setting. Canvas notes use
+26px logical body text and new canvas rectangles start 440 graph units wide with
+a height fitted to the content. Saved rectangles retain their dimensions. Canvas
+notes move and scale with diagram zoom; manual zoom-out makes their text smaller.
+Saved placement declares `layout.explore-prose-placement`.
 
 The **Step controls** placement selector in Panels, also available in the step
 controls inspector, independently saves `exploreLayout.controlsPlacement` as

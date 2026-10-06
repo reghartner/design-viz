@@ -234,5 +234,15 @@ for(const width of [1280,1920])test('notes remain readable and independently siz
  expect(await notes(page).locator('.explore-window-body').evaluate(el=>({overflow:el.scrollHeight-el.clientHeight,scale:getComputedStyle(el).transform}))).toEqual({overflow:0,scale:'matrix(1, 0, 0, 1, 0, 0)'});
  await page.screenshot({path:info.outputPath('section-notes-'+width+'.png')});
  await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');await page.getByRole('button',{name:'Fit canvas',exact:true}).click();
- await expect(notes(page)).toBeInViewport();await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
+ await expect(notes(page)).toBeInViewport();
+ const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
+ expect(metrics.font).toBeGreaterThanOrEqual(16);expect(metrics.overflow).toBeLessThanOrEqual(1);
+ await info.attach('canvas-notes-rendered-size-'+width,{body:JSON.stringify(metrics),contentType:'application/json'});
+ await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
+ await page.locator('.explore-panel-menu summary').click();
+ await expect(page.getByText('Section notes ignore Panels & controls sizing. Resize the notes window.',{exact:true})).toBeVisible();
+ await page.locator('.explore-panel-menu .explore-panel-body').screenshot({path:info.outputPath('section-notes-menu-'+width+'.png')});await page.keyboard.press('Escape');
+ await page.getByRole('button',{name:'Zoom out',exact:true}).click();
+ const reduced=await notes(page).evaluate(el=>parseFloat(getComputedStyle(el.querySelector('.sec-text')).fontSize)*el.getBoundingClientRect().width/el.offsetWidth);
+ expect(reduced).toBeCloseTo(metrics.font*.8,1);
 });

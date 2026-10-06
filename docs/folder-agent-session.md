@@ -85,6 +85,82 @@ candidate files are not project deliverables. Existing unrelated files, includin
 a root README or `.gitignore`, are preserved. Previously created exchange folders
 can still be selected directly; their transport files remain in place.
 
+### Pilot capture
+
+Tell Claude to use **pilot mode** during the normal authoring conversation. The
+packaged skill handles capture; participants do not locate or export transcript
+files. Each new participant authorizes their own session; “Use pilot mode for
+this session” in their setup prompt is sufficient, with no repeated question.
+An existing folder's pilot setting alone does not authorize a new participant's
+capture. It writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
+the spec/ledger, and uses `.flowview-pilot/` for local session copies and status.
+It appends capture ignore rules to the root `.gitignore` without removing existing
+rules. These are local pilot artifacts; commit only the reviewed spec and ledger.
+There is no central upload.
+The helper keeps its managed ignore block last, so capture exclusions override
+earlier negation rules without duplicating that block or removing unrelated rules.
+
+The native JSONL is distinct from `.flowview-agent/transcript.json`, which keeps
+at most 100 workbench messages and does not contain native agent reasoning/tool
+history. Pilot capture preserves exact complete native lines from the participant's
+current pilot turn onward, excluding earlier unrelated chat. The usage artifact
+records the native byte/line boundary and participant-turn UUID so this slice
+cannot be confused with an entire session. Each participant's pilot slice is retained
+separately and included in the combined transcript; returning to a session does
+not duplicate it. Separate subagent transcripts are outside this capture scope.
+
+The agent checkpoints at entry and before each reply, and can schedule a bounded
+final copy with a 45-second wait budget for the final response and its native cost
+snapshot. It keeps waiting for cost after the response lands and explicitly
+reports a timeout if either remains pending. It reports
+the actual capture status and any gaps; a scheduled copy is not a verified copy.
+No hooks, additional Claude session or permanent listener is installed. The next
+turn refreshes all recorded sessions, including a previous participant's final
+native writes. If no later checkpoint occurs, delayed writes can remain missing.
+For the Beta route, a verified Monitor `flowview_request` is a participant turn;
+its `flowview_result` is attached to the same request. Duplicate delivery is
+deduplicated, and unrelated background, shell and local-command notifications
+do not create turns. Verification uses this folder's session and connection IDs.
+
+For a handoff to another machine, transfer the entire local diagram folder,
+including its ignored `.flowview-pilot/` directory and capture artifacts, using
+the authorized pilot handoff. Git alone does not transfer ignored captures.
+Earlier sessions whose native sources are unavailable remain as exact saved
+copies marked `archived_only`; their errors do not block the engineer's current
+capture. Later native writes on the original machine cannot be refreshed here.
+Without the full folder handoff, that earlier capture remains on its original
+machine; the next participant's session cannot reconstruct it.
+If cost is persisted only after the final copy's wait window, the handed-off
+folder can still have pending cost. The original machine would need a later
+capture to refresh that evidence; the destination cannot recover it from Git.
+
+Usage records observed models, token usage per user turn and Claude's native
+cumulative `cost-state` snapshots. Dollar deltas are attributed only between
+snapshots covering exactly one completed turn. Claude can persist those totals
+only on session exit, so exact cost after every live turn is not guaranteed:
+pending/unavailable USD is `null`, never inferred from a pricing table. A snapshot
+spanning several turns establishes a cumulative total but not each turn's cost.
+Unknown model pricing is explicitly unavailable. Native cumulative dollars can
+include history before the pilot boundary; cumulative `modelUsage` can also
+include subagent models, while per-turn models/tokens cover the captured main
+transcript. The combined current total remains null if any source is unavailable;
+known reported totals remain visible separately.
+The CLI labels native session totals as potentially including pre-pilot history,
+and calls a known total with an unprovable turn delta `turn_cost_unattributable`.
+The agent distinguishes the latest reported total from a complete current total.
+See the packaged [pilot instructions](../.claude/skills/hld-to-page/references/pilot-capture.md).
+
+### Starting material
+
+One `hld-to-page` skill shares this folder, evidence ledger and approval protocol
+across four [use-case routes](../.claude/skills/hld-to-page/SKILL.md#choose-the-starting-point):
+business story with engineer handoff, existing engineering flow, HLD, and
+Honeycomb trace. Story and HLD authoring already share the worksheet/evidence
+rules; the route guides make continuation and engineer enrichment explicit.
+The Honeycomb route includes the local trace CLI/converter in the downloaded
+kit. It requires trace data or an authorized connector; a trace URL alone does
+not grant account access or provide the spans.
+
 Copy the displayed instructions into the agent. The browser knows the folder name,
 not its absolute path. The agent verifies the supplied connection IDs in that
 folder's metadata. If it cannot identify the folder as its working directory or

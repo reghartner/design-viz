@@ -19,6 +19,7 @@ def folder_agent_kit(root, runtime):
                     files[relative.as_posix()] = path.read_text()
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs',
+                 'tools/trace2spec.js', 'src/trace-import.js',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
     for name in ['viz-3.31.0.js', 'webcola-3.4.0.js']:

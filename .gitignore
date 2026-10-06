@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
+*.agent.transcript.jsonl
+*.agent.usage.json
+.flowview-pilot/
 .DS_Store
 .manifest.lock
 .*.page-build-prev.json

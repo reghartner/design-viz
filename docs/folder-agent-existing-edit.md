@@ -4,6 +4,12 @@ Read this first for every connected request after `prepare`. VIZ is the
 authoring directory named in `CONNECT.md`, which remains the authority for
 transport commands and files; paths below are relative to VIZ.
 
+For a requested pilot, or when the diagram root contains
+`.flowview-pilot/config.json`, first follow
+[pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md).
+Capture at entry and before every reply, including questions and completion.
+This also applies to a bounded edit that does not load the full skill.
+
 ## Scope
 
 This guide suffices for bounded corrections to an existing diagram: factual

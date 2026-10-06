@@ -1,9 +1,34 @@
 ---
 name: hld-to-page
-description: Author or update a Flowview diagram from an HLD, a system description, or trace evidence. Produces a source-grounded storyboard, spec, coverage ledger, and verified visual page. Use for diagram authoring, not renderer implementation or PR review.
+description: Author or update a Flowview diagram from a business story, an existing engineering flow, an HLD, or Honeycomb trace evidence. Supports engineer enrichment and local pilot transcript capture. Produces a source-grounded storyboard, spec, coverage ledger, and verified visual page. Use for diagram authoring, not renderer implementation or PR review.
 ---
 
 # HLD to page: worksheet first, JSON second
+
+## Choose the starting point
+
+Use this one skill and its shared spec/ledger/approval protocol for all four
+paths. Load the short guide matching the user's starting material; a later
+change of audience does not start a new project or erase its evidence.
+
+| Starting point | Guide |
+|---|---|
+| Business person describes a story; an engineer enriches it later | [Story and engineer handoff](references/use-case-story.md) |
+| Engineer knows an existing flow or is updating an existing diagram | [Existing engineering flow](references/use-case-existing-flow.md) |
+| Engineer supplies a high-level design document (HLD) | [HLD](references/use-case-hld.md) |
+| Engineer supplies a Honeycomb trace or event export | [Honeycomb trace](references/use-case-honeycomb.md) |
+
+**Pilot mode:** When the user requests a pilot, or the diagram folder already
+contains `.flowview-pilot/config.json`, follow [pilot capture](references/pilot-capture.md)
+at entry and before **every** user-turn reply, including questions, approval
+waits, errors, and the final handoff. The packaged helper discovers this Claude
+Code session itself and saves local raw transcript and usage artifacts. Do not
+ask the participant to find/export a transcript. USD that Claude has not
+persisted is `null`; never invent cost or claim capture is complete without
+checking its status.
+Each new participant must authorize their session as the pilot guide describes;
+an existing folder alone does not grant consent. Capture starts at that session's
+current pilot turn, with its exact native boundary recorded.
 
 **Shared topology?** When reusing a canon provider's structural nodes/edges,
 read [shared topology](../../../docs/shared-topology.md). Author explicit exports

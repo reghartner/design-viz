@@ -30,6 +30,20 @@ test('both setups load the existing-edit guide first instead of the full skill a
     assert.match(old,stampNote,'legacy '+workflow);
   }
 });
+test('pilot capture reaches bounded edits and both connection methods without participant export chores',()=>{
+  for(const workflow of ['external','embedded']){
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',false,identity,workflow);
+    assert.match(prompt,/request pilot mode, or this diagram folder contains \.flowview-pilot\/config\.json/);
+    assert.match(prompt,/references\/pilot-capture\.md at entry and before every user-turn reply/);
+    assert.match(prompt,/never ask me to locate or export a transcript/);
+    assert.match(prompt,/pending USD honestly/);
+    assert.match(prompt,/Each new participant must authorize their own session/);
+    assert.match(prompt,/current pilot turn, excluding earlier unrelated chat/);
+  }
+  const guide=require('node:fs').readFileSync(require('node:path').join(__dirname,'../docs/folder-agent-existing-edit.md'),'utf8');
+  assert.match(guide,/references\/pilot-capture\.md/);
+  assert.match(guide,/bounded edit that does not load the full skill/);
+});
 test('the existing-edit guide escalates to the full skill and widget_doc, where the clip cue lives',()=>{
   // The clip-evidence cue reaches connected agents only through SKILL.md (new diagrams, via escalation)
   // and widget_doc.py deviceapp/screen (positional lookups); tests/test_folder_agent.py checks both texts.

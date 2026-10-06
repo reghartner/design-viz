@@ -10,6 +10,7 @@
         "contracts": [
           {
             "id": "request",
+            "wires": [{"step":"press","edge":"doorbell->ingestion"}],
             "title": "Doorbell \u2192 ingestion",
             "span": 6,
             "fields": [
@@ -33,6 +34,7 @@
           },
           {
             "id": "response",
+            "wires": [{"step":"ack","edge":"ingestion->doorbell"}],
             "title": "Ingestion \u2192 doorbell",
             "span": 6,
             "fields": [

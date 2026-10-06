@@ -312,6 +312,27 @@ See [contract block recipe](../docs/contract-blocks.md) and the
 The compatibility capability is `content.contracts`; rebuild existing HTML
 and upgrade the packaged viewer to use it. No schema-major change is needed.
 
+### Step wire contract previews
+
+A section contract may declare `wires: [{step, edge, path?}]`. `step` is a unique,
+stable ID in that section's diagram; `edge` is an existing `from->to` edge used
+by that step. Optional `path` is an explicit path ID containing the step. Without
+`path`, shared occurrences all use the binding. A malformed or stale binding
+warns and is skipped. Duplicate bindings to the same contract/edge collapse to
+one marker. Delivered visible edges alone show markers in Step mode; unrelated
+edges, failed communications, and Ambient mode do not.
+
+```json
+{"title":"Request", "wires":[{"step":"send","edge":"doorbell->cloud","path":"happy"}],
+ "fields":[{"k":"event","v":"button_press"}]}
+```
+
+Hover/focus previews the shared card presentation. Click/Enter/Space pins it and
+pauses playback; Close/Escape or leaving the step/path/section dismisses it.
+Links remain usable in the preview. Row reveal/hide thresholds follow the current
+path step. Workbench's contract inspector adds/removes bindings with one Undo.
+The capability is `content.wire-contracts`. See [contract blocks](../docs/contract-blocks.md#preview-a-contract-on-a-step-wire).
+
 ### fragment-level reveals
 
 Object-form section bullet items, contract-card field rows, and diagram edge

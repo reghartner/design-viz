@@ -38,3 +38,25 @@ The [doorbell example](../examples/contract-blocks/contract-blocks.spec.json)
 shows two half-width request/response blocks and a full-width failure block.
 See the [authoring contract](../contract/authoring-contract.md#multiple-contract-blocks-and-widths)
 for the complete fields.
+
+## Preview a contract on a step wire
+
+Select a contract block, choose **Step wire binding**, and click **Bind to step
+wire**. Choices combine a stable step ID and one of its edges. **All paths**
+shows the contract wherever that shared step appears; choose a path ID to scope
+it to that route. Add several bindings to reuse one contract. Remove a binding
+with **Remove wire binding**; each edit has one Undo/Redo entry.
+
+The associated wire shows a small notepad in Step mode. Hover or focus it to
+preview the same contract card; move into the preview to read its source links.
+Click or press Enter/Space to pin it (and pause playback). Close or Escape
+returns focus to its marker; changing step, path, mode, or section closes it.
+Each contract has its own marker when several contracts share an edge. Pulse
+stops with reduced motion. Failed, hidden, and unrelated wires have no marker.
+
+Bindings use `wires: [{"step":"send", "edge":"doorbell->cloud"}]` on either
+`contract` or a `contracts` entry. Add `"path":"happy"` to scope a binding.
+Bindings never use step positions. Invalid or stale references warn and show no
+marker; update bindings if you change step, node, or path IDs in JSON. Existing
+section cards and diagrams without bindings retain their presentation. The
+capability is `content.wire-contracts`; regenerate exports to add this behavior.

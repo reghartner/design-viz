@@ -73,3 +73,29 @@ test('outline and compatibility include contract blocks in tabbed sections',()=>
  assert.ok(C.FlowviewCompatibility.detect(raw).includes('content.contracts'));
  assert.ok(C.FlowviewCompatibility.detect(doc({contract:card('Legacy',6)})).includes('content.contracts'));
 });
+
+test('wire contracts require exact active step/edge/path identities and never cross-wire blocks',()=>{
+ const diagram={nodes:{a:{},b:{},c:{}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{id:'send',edges:['a->b','b->c']},{id:'reply',edge:'a->b'}],paths:[{id:'happy',steps:['send','reply']},{id:'alternate',steps:['send']}]};
+ const sec={diagram,contract:{...card('Legacy'),wires:[{step:'send',edge:'a->b'}]},contracts:[{...card('Scoped'),wires:[{step:'send',edge:'b->c',path:'happy'},{step:'send',edge:'b->c',path:'happy'}]}]};
+ assert.deepEqual(plain(C.stepWireContracts(sec,diagram.steps[0],'happy')).map(e=>[e.edge,e.record.value.title]),[['a->b','Legacy'],['b->c','Scoped']]);
+ assert.equal(C.stepWireContracts(sec,diagram.steps[0],'alternate').length,1);
+ assert.equal(C.stepWireContracts(sec,diagram.steps[1],'happy').length,0);
+ assert.equal(C.stepWireContracts({...sec,contract:card('Old'),contracts:[]},diagram.steps[0],'happy').length,0);
+ assert.equal(C.stepWireContracts(sec,{...diagram.steps[0],failures:{'a->b':'dropped'}},'happy').length,1);
+ for(const wire of [null,[],{}, {step:0,edge:'a->b'},{step:'gone',edge:'a->b'},{step:'reply',edge:'b->c'},{step:'send',edge:'a->c'},{step:'reply',edge:'a->b',path:'alternate'},{step:'send',edge:'a->b',path:42}])assert.ok(C.contractWireProblem(diagram,wire),JSON.stringify(wire));
+ const ambiguous={...diagram,steps:[...diagram.steps,diagram.steps[0]]};assert.ok(C.contractWireProblem(ambiguous,{step:'send',edge:'a->b'}));
+ const invalid=doc({...sec,contracts:[{...card('Broken'),wires:[null,{step:'missing',edge:'a->b'}]}]});
+ assert.equal(C.validate(C.normalize(invalid)).warnings.filter(w=>w.includes('.wires[')).length,2);
+ assert.ok(C.FlowviewCompatibility.detect(doc(sec)).includes('content.wire-contracts'));
+});
+
+test('wire binding authoring preserves raw wrappers, unrelated source and refuses stale targets',()=>{
+ const sec={contract:card('Legacy'),diagram:{nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],steps:[{id:'send',edge:'a->b'}]}};
+ const raw=doc(sec),text=JSON.stringify(raw,null,2),target={kind:'contract',section:1,card:'legacy'},wire={step:'send',edge:'a->b'};
+ const added=C.planContractWire(text,raw,target,wire);assert.ok(!added.error);const next=JSON.parse(added.text);
+ assert.deepEqual(section(next).contract.wires,[wire]);assert.deepEqual(next.page.blocks[0],raw.page.blocks[0]);
+ assert.ok(C.planContractWire(added.text,next,target,wire).error);
+ assert.ok(C.planContractWire(text,raw,target,{...wire,step:'deleted'}).error);
+ const removed=C.planContractWire(added.text,next,target,null,0);assert.equal(section(JSON.parse(removed.text)).contract.wires,undefined);
+ assert.ok(C.planContractWire(text,raw,target,null,9).error);
+});

@@ -47,3 +47,76 @@ function contractBlocksHTML(section,reference){
     return contractCardHTML(rec.value,reference,rec);
   }).join('')+'</div></div>';
 }
+
+/* One owner per active step. The manual popover escapes board clipping while
+   retaining the host's skin/shadow tree. No document listeners survive close. */
+function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
+  if(!entries.length)return null;
+  var pop=document.createElement('div');pop.className='nbackpop wire-contract-preview';pop.id=prefix+'-wire-contract';
+  pop.setAttribute('popover','manual');pop.setAttribute('role','dialog');pop.hidden=true;host.appendChild(pop);
+  var markers=[],active=null,pinned=false,closeTimer=null,retired=false,suppressFocus=false;
+  function cancelClose(){if(closeTimer!=null)clearTimeout(closeTimer);closeTimer=null;}
+  function close(focus){
+    cancelClose();var previous=active;active=null;pinned=false;
+    if(previous){previous.setAttribute('aria-expanded','false');previous.setAttribute('aria-pressed','false');}
+    document.removeEventListener('keydown',escape,true);document.removeEventListener('pointerdown',outsideSection,true);document.removeEventListener('focusin',outsideSection,true);document.removeEventListener('scroll',position,true);window.removeEventListener('resize',position);
+    if(pop.hidePopover && pop.matches(':popover-open'))pop.hidePopover();pop.hidden=true;
+    if(focus && previous && previous.isConnected){suppressFocus=true;previous.focus({preventScroll:true});suppressFocus=false;}
+  }
+  function outsideSection(ev){if(active && !host.contains(ev.target))close(false);}
+  function escape(ev){if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();close(true);}}
+  function position(){
+    if(!active || retired)return;
+    var rect=active.getBoundingClientRect(),vw=window.innerWidth,vh=window.innerHeight;
+    var width=pop.offsetWidth,height=pop.offsetHeight;
+    var left=Math.max(8,Math.min(vw-width-8,rect.left+rect.width/2-width/2));
+    var top=rect.top-height-10;
+    if(top<8)top=rect.bottom+10;
+    pop.style.left=left+'px';pop.style.top=Math.max(8,Math.min(vh-height-8,top))+'px';
+  }
+  function scheduleClose(){
+    cancelClose();if(pinned)return;
+    closeTimer=setTimeout(function(){closeTimer=null;if(!pinned && !pop.matches(':hover') && !(active && active.matches(':hover')) && !pop.contains(document.activeElement) && document.activeElement!==active)close(false);},220);
+  }
+  function show(marker,entry,pin){
+    if(retired || suppressFocus || pinned && active!==marker && !pin)return;
+    cancelClose();
+    if(active!==marker){
+      close(false);active=marker;
+      pop.innerHTML='<div class="wire-contract-heading"><span>On this wire</span><button type="button" aria-label="Close wire contract">×</button></div>'+contractCardHTML(entry.record.value,null,entry.record);
+      pop.setAttribute('aria-label',entry.record.value.title || 'Wire contract');
+      pop.querySelector('button').addEventListener('click',function(){close(true);});
+      setFragmentStep(pop,stepIndex,true);
+      pop.hidden=false;if(pop.showPopover)pop.showPopover();
+      active.setAttribute('aria-expanded','true');
+      document.addEventListener('keydown',escape,true);document.addEventListener('pointerdown',outsideSection,true);document.addEventListener('focusin',outsideSection,true);document.addEventListener('scroll',position,true);window.addEventListener('resize',position);
+    }
+    if(pin){pinned=true;active.setAttribute('aria-pressed','true');if(onPin)onPin();}
+    pop.classList.toggle('is-pinned',pinned);position();
+  }
+  pop.addEventListener('pointerenter',cancelClose);pop.addEventListener('pointerleave',scheduleClose);
+  pop.addEventListener('focusin',cancelClose);pop.addEventListener('focusout',scheduleClose);
+  pop.addEventListener('click',function(ev){ev.stopPropagation();});
+  pop.addEventListener('keydown',function(ev){ev.stopPropagation();});
+  entries.forEach(function(entry,index){
+    var info=board.edgeIds[entry.edge];if(!info || !info.pathEl || info.pathEl.classList.contains('dv-fragment-hidden'))return;
+    var siblings=entries.filter(function(item){return item.edge===entry.edge;}),slot=siblings.indexOf(entry);
+    var point=info.pathEl.getPointAtLength(info.pathEl.getTotalLength()*(.72+slot*.18/Math.max(1,siblings.length-1)));
+    var marker=document.createElementNS(SVGNS,'g');marker.setAttribute('class','wire-contract-marker');
+    marker.setAttribute('transform','translate('+point.x+' '+point.y+')');marker.setAttribute('role','button');marker.setAttribute('tabindex','0');
+    marker.setAttribute('aria-label','Contract: '+(entry.record.value.title || 'On the wire')+' on '+entry.edge);
+    marker.setAttribute('aria-haspopup','dialog');marker.setAttribute('aria-controls',pop.id);marker.setAttribute('aria-expanded','false');marker.setAttribute('aria-pressed','false');
+    marker.setAttribute('data-wire-edge',entry.edge);marker.setAttribute('data-wire-contract',entry.record.key);
+    marker.innerHTML='<circle class="wire-contract-pulse" r="16"/><rect x="-14" y="-14" width="28" height="28" rx="7"/><path d="M-6-7H6V8H-6Z M-3-10V-5 M3-10V-5 M-3-1H3 M-3 3H3"/>';
+    marker.addEventListener('pointerenter',function(){show(marker,entry,false);});marker.addEventListener('pointerleave',scheduleClose);
+    marker.addEventListener('focus',function(){show(marker,entry,false);});marker.addEventListener('blur',scheduleClose);
+    marker.addEventListener('pointerdown',function(ev){ev.stopPropagation();});
+    marker.addEventListener('click',function(ev){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);});
+    marker.addEventListener('keydown',function(ev){
+      if(ev.key==='Enter' || ev.key===' '){ev.preventDefault();ev.stopPropagation();show(marker,entry,true);pop.querySelector('button').focus({preventScroll:true});}
+      else if(ev.key==='Tab' && !ev.shiftKey && active===marker){ev.preventDefault();pop.querySelector('button').focus({preventScroll:true});}
+    });
+    board.svg.appendChild(marker);markers.push(marker);
+  });
+  return {destroy:function(){retired=true;close(false);markers.forEach(function(marker){marker.remove();});pop.remove();}};
+}

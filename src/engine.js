@@ -1363,8 +1363,13 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   var steps = playbackSteps(d);
   var N = steps.length;
   var cur = 0, paintedStep = null, timer = null, mode = 'ambient';
-  var pending = [];
+  var pending = [], wireContracts = null;
   var svg = board.svg;
+  function clearWireContracts(){if(wireContracts)wireContracts.destroy();wireContracts=null;}
+  function paintWireContracts(){
+    clearWireContracts();
+    if(options && options.section && mode==='step' && !hidden)wireContracts=wireStepContracts(secBox,board,stepWireContracts(options.section,d.steps[cur],selectedPath.id),prefix,cur,stopAuto);
+  }
 
   var btnAmb = termbar.btnAmb, btnStep = termbar.btnStep;
   var bar = termbar.bar, chipsBox = termbar.chips, stepN = termbar.stepN,
@@ -1619,6 +1624,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     var s = steps[cur];
     renderRuntimeConditions(board,termbar.runtimeStatus,s.conditions);
     lightEdgeKeys(s.keys);
+    paintWireContracts();
     applyStepNodeFocus(board.nodeEls, s, board.edgeIds);
     showCommunicationFailures(board,s.failures,!RM);
     /* ordered packet chain: explicit packets list, else edges in step order */
@@ -1690,7 +1696,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stopAuto(); setStep(at == null || at===0 ? stops(next)[0] : at,true,false);
       return true;
     }
-    stopAuto(); clearLit(); clearCaptionTween();
+    stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
     selectedPath = next; d = diagramForPath(source,id);
     steps = playbackSteps(d); N = steps.length; toneStates = foldNodeTones(d); paintedStep = null;
     if (options && options.renderPath){ board = options.renderPath(d); svg = board.svg; }
@@ -1731,6 +1737,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
   function enterAmbient(){
     if (destroyed) return;
     mode = 'ambient';
+    clearWireContracts();
     stopAuto();
     clearLit();
     clearCaptionTween();
@@ -1848,7 +1855,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     /* Pausing must not replace panel contents: an editor may have focus there. */
     pause: stopAuto,
     destroy: function(){
-      destroyed = true; stopAuto(); clearLit(); clearCaptionTween();
+      destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
       if(pathTimeline)pathTimeline.destroy();
       if(chipDeltas)chipDeltas.destroy();
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
@@ -1856,11 +1863,11 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     onHide: function(){ if (!destroyed && !hidden){
       if (board.deltaDetails) board.deltaDetails.close();
       if (chipDeltas) chipDeltas.close();
-      var wasPlaying = !!timer; hidden = true; stopAuto();
+      var wasPlaying = !!timer; hidden = true; stopAuto(); clearWireContracts();
       resumeOnShow = wasPlaying && (!options || options.autoplay !== false); settleCurrentStep();
     } },
     onShow: function(){ if (!destroyed){
-      hidden = false; settleCurrentStep();
+      hidden = false; settleCurrentStep(); paintWireContracts();
       var resume = resumeOnShow; resumeOnShow = false;
       if (resume) startAuto();
     } }
@@ -2802,7 +2809,7 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var stepper = attachStepper(box, boardDiv, {
     bar:bar, chips:chips, stepN:stepN, stepText:stepText, sharedStatus:sharedStatus, failureStatus:failureStatus, srcA:srcA, lanePill:lanePill, stepIdEl:stepIdEl,evidenceLinks:evidenceLinks,runtimeStatus:runtimeStatus,
     btnPrev:btnPrev, btnPlay:btnPlay, btnNext:btnNext, btnAmb:btnAmb, btnStep:btnStep, playbackStatus:playbackStatus
-  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {viewSteps:function(ids,pathIds){
+  }, d, prefix, board, lanes, panelCtl, onChange, Object.assign({}, options, {section:sec,viewSteps:function(ids,pathIds){
     var pathSteps=null;
     if(Array.isArray(pathIds)){
       pathSteps=[];diagramPathList(d).forEach(function(path){if(pathIds.indexOf(path.id)>=0)path.indices.forEach(function(index){var step=d.steps[index];if(step && pathSteps.indexOf(step.id)<0)pathSteps.push(step.id);});});

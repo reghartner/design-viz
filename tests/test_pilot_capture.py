@@ -9,6 +9,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / '.claude/skills/hld-to-page/scripts/pilot_capture.py'
@@ -252,6 +253,20 @@ class CaptureTests(unittest.TestCase):
         self.assertTrue(status.exists())
         self.assertEqual(json.loads(status.read_text())['outcome'], 'captured')
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), self.native.read_bytes())
+
+    def test_final_copy_does_not_accept_another_turns_reply(self):
+        self.run_capture()
+        unrelated = {'currentSourceAvailable': True, 'turnId': 'target',
+                     'finalResponseCaptured': False, 'turnLastAssistantLine': 2,
+                     'nativeProgress': {'lastAssistantLine': 4, 'lastAssistantTurnId': 'other',
+                                        'finalResponseCaptured': True}}
+        with patch.object(capture, 'capture', return_value=unrelated), \
+             patch.object(capture.time, 'sleep'), \
+             patch.object(capture.time, 'monotonic', side_effect=[0, 0, 1]):
+            capture.settle(self.folder, SID, 'target', after_line=2, seconds=1)
+        status = json.loads((self.folder / capture.PRIVATE / 'after-turn-status.json').read_text())
+        self.assertEqual(status['outcome'], 'timeout_response_pending')
+        self.assertFalse(status['replyCapture']['finalResponseCaptured'])
 
 
 if __name__ == '__main__':

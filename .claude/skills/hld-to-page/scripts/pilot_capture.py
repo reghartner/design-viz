@@ -511,7 +511,9 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
                 'currentSourceAvailable': bool(current and current['sourceAvailable']),
                 'nativeProgress': current['nativeProgress'] if current else None,
                 'turnId': last['id'] if last else None,
-                'finalResponseCaptured': last['finalResponseCaptured'] if last else False}
+                'finalResponseCaptured': last['finalResponseCaptured'] if last else False,
+                'turnLastAssistantLine': (current['captureStart']['nativeLine'] - 1 + last['lastAssistantLine']
+                                          if current and last and last['lastAssistantLine'] is not None else None)}
 
 
 def settle(folder, session_id, turn_id, after_line, seconds=45):
@@ -532,11 +534,11 @@ def settle(folder, session_id, turn_id, after_line, seconds=45):
                 outcome = 'failed'
                 break
             progress = status.get('nativeProgress') or {}
-            new_response = bool(progress.get('finalResponseCaptured') and
-                                (progress.get('lastAssistantLine') or 0) > after_line)
+            new_response = bool(status.get('turnId') == turn_id and status.get('finalResponseCaptured') and
+                                (status.get('turnLastAssistantLine') or 0) > after_line)
             reply.update({'finalResponseCaptured': new_response,
-                          'nativeAssistantLine': progress.get('lastAssistantLine'),
-                          'participantTurnId': progress.get('lastAssistantTurnId')})
+                          'nativeAssistantLine': status.get('turnLastAssistantLine'),
+                          'participantTurnId': status.get('turnId')})
             if new_response:
                 outcome = 'captured'
                 break

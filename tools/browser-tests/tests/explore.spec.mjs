@@ -95,13 +95,18 @@ test('automatic Explore panels open at readable content size across desktop view
   const windows=await floats(page).evaluateAll(nodes=>nodes.map(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.explore-window-body');return {id:el.getAttribute('data-explore-panel') || el.getAttribute('data-explore-content'),x:r.x,y:r.y,width:r.width,height:r.height,clientHeight:body.clientHeight,scrollHeight:body.scrollHeight};}));
   expect(windows.map(w=>w.id).sort()).toEqual(['clip','home','outcome','prose','queue']);
   for(const win of windows){
-   const preferred={clip:340,home:340,outcome:300,prose:320,queue:300}[win.id];expect(win.width,win.id).toBeCloseTo(preferred*scale,0);
+   const preferred={clip:340,home:340,outcome:300,prose:320,queue:300}[win.id];expect(win.width,win.id).toBeCloseTo(preferred*(win.id==='prose'?1:scale),0);
    expect(win.scrollHeight-win.clientHeight,win.id).toBeLessThanOrEqual(2);
+   expect(win.x,win.id+' left bound').toBeGreaterThanOrEqual(stage.x+10);expect(win.y,win.id+' top bound').toBeGreaterThanOrEqual(stage.y+10);
+   expect(win.x+win.width,win.id+' right bound').toBeLessThanOrEqual(stage.x+stage.width-10);expect(win.y+win.height,win.id+' bottom bound').toBeLessThanOrEqual(stage.y+stage.height-10);
   }
-  if(width===1280)expect(stage.x+stage.width-12-Math.min(...windows.map(win=>win.x)),surface+' panel footprint').toBeLessThanOrEqual(540);
+  // Notes remain 320px at 100%; allow two columns with an 8px gap.
+  const footprint=stage.x+stage.width-12-Math.min(...windows.map(win=>win.x));
+  expect(footprint,surface+' panel footprint').toBeLessThanOrEqual(Math.ceil(Math.max(320,340*scale)+340*scale+8));
   for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
   const controls=await rect(page.locator('.explore-player'));
   for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
+  await info.attach(surface+'-'+width+'x'+height+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
   await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
   if(width===1280)await page.screenshot({path:'/tmp/explore-'+surface+'-1280x800-responsive.png'});
  }

@@ -133,7 +133,10 @@ function createBuilderInteractions(opts){
     if (!t || t.kind !== 'step') return;
     var parsed = parseEditor();
     if (parsed.error) return;
-    var got = builderStepAt(parsed.raw, t.section, t.index);
+    // Imported edges occupy resolved render indices and need the same outline
+    // and halo markers as consumer-owned members of this authored step.
+    var resolved;try{resolved=session.resolve?session.resolve(parsed.raw):parsed.raw;}catch(ex){return;}
+    var got = builderStepAt(resolved, t.section, t.index);
     var secEl = view.querySelector('.doc-sec[data-dv-section="' + t.section + '"]');
     if (!got || !secEl) return;
     var keyToIdx = Object.create(null);
@@ -307,6 +310,93 @@ function createBuilderInteractions(opts){
     multiSel=targets;multiSel.forEach(function(t){t.el.classList.add('dv-sel');});
     session.insertSection=targets[0].section;selectionChanged();renderMultiInspector();
   }
+  /* Reference actions apply in both Standard and Canvas. Resolve provenance at
+     the gesture boundary, before the ordinary Canvas object-menu listener. */
+  var referenceMenu=null,referenceMenuLife=null,referenceOpener=null;
+  function closeReferenceMenu(focus){
+    if(referenceMenuLife)referenceMenuLife.destroy();referenceMenuLife=null;
+    if(referenceMenu)referenceMenu.remove();referenceMenu=null;
+    var opener=referenceOpener;referenceOpener=null;
+    if(focus && opener && opener.isConnected)opener.focus({preventScroll:true});
+  }
+  function referenceTarget(el){
+    if(!el || !el.closest || inDetailPreview(el))return null;
+    var sec=el.closest('.doc-sec[data-dv-section]'),s=parseEditor();
+    if(!sec || s.error || s.renderedText!=null && s.renderedText!==s.text)return null;
+    var section=Number(sec.getAttribute('data-dv-section')),resolved;
+    try{resolved=session.resolve(s.raw);}catch(ex){return null;}
+    var record=specSectionPaths(resolved)[section],diagram=record && specValueAt(resolved,record.diagram);
+    var imports=(((diagram || {}).topologyProvenance || {}).imports || []).slice();
+    var boundary=el.closest('.dv-topology-boundary'),member=el.closest('[data-dv-node],[data-dv-edge],[data-dv-group]'),kind,id,target;
+    if(member){
+      kind=member.hasAttribute('data-dv-node')?'node':member.hasAttribute('data-dv-edge')?'edge':'group';
+      id=member.getAttribute('data-dv-'+kind);
+      target={kind:kind,section:section,el:member};
+      if(kind==='edge'){target.index=Number(id);var edge=(diagram.edges || [])[target.index];id=edge && builderEdgeKey(edge);}else target.id=id;
+    }
+    imports.sort(function(a,b){return b.as.split('::').length-a.as.split('::').length;});
+    var imp=imports.find(function(value){return boundary?value.as===boundary.getAttribute('data-topology-import'):member && (value[kind==='node'?'nodes':kind==='edge'?'edges':'groups'] || []).includes(id);});
+    if(!imp)return null;
+    if(!target){target={kind:'node',id:imp.nodes[0],section:section};target.el=findTargetEl(target);}
+    return {s:s,section:section,imp:imp,target:target,sec:sec,el:boundary && boundary.querySelector('.dv-topology-handle') || member};
+  }
+  function referenceURL(context,imp){
+    try{
+      var here=new URL(window.location.href),catalog=context && context.catalog;
+      if(!catalog || catalog.version!==3 || new URL(context.catalogURL).href!==new URL('diagrams.json',here).href || !/^https?:$/.test(here.protocol))return null;
+      if(!parseCanonLibrary(catalog).some(function(entry){return entry.id===imp.spec;}))return null;
+      return canonDiagramURL(here.href,imp.spec);
+    }catch(ex){return null;}
+  }
+  function openReferenceMenu(ev){
+    if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag)return;
+    var ref=referenceTarget(ev.target);if(!ref)return;
+    ev.preventDefault();ev.stopImmediatePropagation();closeReferenceMenu(false);if(spatial)spatial.clear();pausePreview();
+    var context=session.topologyContext(),contextKey=JSON.stringify(context),url=referenceURL(context,ref.imp);
+    function current(){var now=parseEditor();return !now.error && now.project===ref.s.project && now.text===ref.s.text && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(session.topologyContext())===contextKey && ref.el && ref.el.isConnected && (!opts.isActive || opts.isActive());}
+    referenceMenu=document.createElement('div');referenceMenu.className='dv-object-menu dv-reference-menu';referenceMenu.setAttribute('popover','manual');referenceMenu.setAttribute('role','menu');referenceMenu.setAttribute('aria-label','Reference actions for '+ref.imp.as);
+    referenceMenuLife=createWorkbenchLifetime();referenceOpener=ref.el.hasAttribute('tabindex')?ref.el:ref.sec.querySelector('.dv-topology-boundary[data-topology-import="'+cssQuote(ref.imp.as)+'"] .dv-topology-handle');
+    function item(label,action,reason){
+      var button=document.createElement('button');button.type='button';button.setAttribute('role','menuitem');button.textContent=label;button.tabIndex=-1;
+      if(reason){button.setAttribute('aria-disabled','true');button.title=reason;var note=document.createElement('small');note.textContent=reason;button.appendChild(note);}
+      referenceMenuLife.listen(button,'click',function(e){e.stopPropagation();if(reason)return;var valid=current();closeReferenceMenu(false);if(valid)action();});referenceMenu.appendChild(button);
+    }
+    var unavailable='This provider has no verified published link in this repository catalog.';
+    item('Go to diagram',function(){window.open(url,'_blank','noopener,noreferrer');},url?null:unavailable);
+    item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
+    item('Copy diagram link',function(){window.navigator.clipboard.writeText(url).catch(function(){if(current())inspectorMessage('Could not copy the diagram link.');});},!url?unavailable:!window.navigator.clipboard?'Clipboard access is unavailable in this browser.':null);
+    var got=builderDiagram(ref.s.text,ref.s.raw,ref.section),direct=!got.error && (got.d.topologyImports || []).some(function(imp){return imp.as===ref.imp.as;});
+    var removal=direct?planRemoveTopologyImport(ref.s.text,ref.s.raw,ref.section,ref.imp.as,context):{error:'This nested reference belongs to its containing provider. Remove it in the diagram that imports it.'};
+    item('Delete reference',function(){
+      var plan=planRemoveTopologyImport(session.text(),parseEditor().raw,ref.section,ref.imp.as,session.topologyContext());
+      if(applyPlan(plan,null,ref.s)){selectSpatial([]);inspectorMessage('Reference removed — Undo restores it.');}
+    },removal.error);
+    (ref.el.closest('.section-viewport') || ref.sec).appendChild(referenceMenu);if(referenceMenu.showPopover)referenceMenu.showPopover();
+    var bounds=referenceMenu.getBoundingClientRect(),anchor=ref.el.getBoundingClientRect(),x=ev.clientX || anchor.left,y=ev.clientY || anchor.bottom;
+    referenceMenu.style.left=Math.max(8,Math.min(x,window.innerWidth-bounds.width-8))+'px';referenceMenu.style.top=Math.max(8,Math.min(y,window.innerHeight-bounds.height-8))+'px';
+    var items=Array.from(referenceMenu.querySelectorAll('button'));items[0].tabIndex=0;items[0].focus({preventScroll:true});
+    referenceMenuLife.listen(referenceMenu,'keydown',function(e){
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeReferenceMenu(true);return;}
+      if(e.key==='Tab'){closeReferenceMenu(false);return;}
+      var index=items.indexOf(document.activeElement),next=index;
+      if(e.key==='ArrowDown')next=(index+1)%items.length;else if(e.key==='ArrowUp')next=(index+items.length-1)%items.length;else if(e.key==='Home')next=0;else if(e.key==='End')next=items.length-1;else return;
+      e.preventDefault();items.forEach(function(button,i){button.tabIndex=i===next?0:-1;});items[next].focus();
+    });
+    referenceMenuLife.listen(document,'pointerdown',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);},true);
+    referenceMenuLife.listen(document,'focusin',function(e){if(referenceMenu && !referenceMenu.contains(e.target))closeReferenceMenu(false);});
+    referenceMenuLife.listen(window,'resize',function(){closeReferenceMenu(false);});
+    var scrollPositions=[];for(var host=ref.el.parentElement;host;host=host.parentElement)scrollPositions.push({el:host,left:host.scrollLeft,top:host.scrollTop});
+    referenceMenuLife.listen(view,'scroll',function(e){var saved=scrollPositions.find(function(p){return p.el===e.target;});if(saved && (saved.el.scrollLeft!==saved.left || saved.el.scrollTop!==saved.top))closeReferenceMenu(false);},true);
+  }
+  life.listen(view,'contextmenu',openReferenceMenu,true);
+  life.listen(view,'click',function(ev){if(ev.target.closest('.dv-topology-handle'))openReferenceMenu(ev);},true);
+  life.listen(view,'keydown',function(ev){
+    var handle=ev.target.closest('.dv-topology-handle');
+    if(handle && (ev.key==='Enter' || ev.key===' ') || (ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey))openReferenceMenu(ev);
+  },true);
+  life.listen(src,'input',function(){closeReferenceMenu(false);});
+  life.listen(view,'dv:pathchange',function(){closeReferenceMenu(false);});
+  life.own(function(){closeReferenceMenu(false);});
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
@@ -922,6 +1012,7 @@ function createBuilderInteractions(opts){
     });
   }
   function applyTopologyBoundaries(){
+    closeReferenceMenu(false);
     Array.prototype.forEach.call(view.querySelectorAll('.dv-topology-boundary'),function(boundary){boundary.remove();});
     var parsed=parseEditor(),resolved;
     if(parsed.error || !session.resolve)return;
@@ -947,9 +1038,15 @@ function createBuilderInteractions(opts){
         if(String(imp.as).indexOf('::')>=0)g.classList.add('dv-topology-boundary-nested');
         var rect=document.createElementNS(SVG_NS,'rect');rect.setAttribute('x',String(x1-16-depth*8));rect.setAttribute('y',String(y1-topPad));
         rect.setAttribute('width',String(x2-x1+32+depth*16));rect.setAttribute('height',String(y2-y1+topPad+16));rect.setAttribute('rx','12');g.appendChild(rect);
-        var label=document.createElementNS(SVG_NS,'text');label.setAttribute('x',String(x1-4-depth*8));label.setAttribute('y',String(y1-10-depth*16));
+        var label=document.createElementNS(SVG_NS,'text');label.setAttribute('x',String(x1+24-depth*8));label.setAttribute('y',String(y1-10-depth*16));
         label.textContent='Referenced · '+imp.spec+' / '+imp.export+' · '+imp.as;g.appendChild(label);
         var title=document.createElementNS(SVG_NS,'title');title.textContent='Referenced topology from '+imp.spec+' / '+imp.export+' (namespace '+imp.as+')';g.appendChild(title);
+        var handle=document.createElementNS(SVG_NS,'g');handle.setAttribute('class','dv-topology-handle');
+        handle.setAttribute('transform','translate('+(x1-10-depth*8)+' '+(y1-28-depth*16)+')');
+        handle.setAttribute('role','button');handle.setAttribute('tabindex','0');handle.setAttribute('aria-haspopup','menu');
+        handle.setAttribute('aria-label','Reference actions for '+imp.as);handle.setAttribute('aria-keyshortcuts','Enter Space Shift+F10');
+        var handleRect=document.createElementNS(SVG_NS,'rect');handleRect.setAttribute('width','26');handleRect.setAttribute('height','24');handleRect.setAttribute('rx','5');handle.appendChild(handleRect);
+        var dots=document.createElementNS(SVG_NS,'text');dots.setAttribute('x','13');dots.setAttribute('y','16');dots.setAttribute('text-anchor','middle');dots.setAttribute('aria-hidden','true');dots.textContent='⋯';handle.appendChild(dots);g.appendChild(handle);
         svg.appendChild(g);
       });
     });
@@ -1513,6 +1610,7 @@ function createBuilderInteractions(opts){
 
 
   function cancelGestures(){
+    closeReferenceMenu(false);
     if(spatial)spatial.clear();
     curveEditor.cancel();
     cancelNodeDrag();cancelGroupDrag();cancelRowDrag();

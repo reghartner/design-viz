@@ -126,6 +126,85 @@ test('a referenced block is visibly framed, blocked removal explains consumer re
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);await expect(page.locator('#docview [data-dv-node="'+imported+'"]')).toHaveCount(0);
 });
 
+for(const canvas of [false,true])test('reference actions navigate, explain blocked deletion, and undo in '+(canvas?'Canvas':'Standard'),async({page,server},info)=>{
+  await page.setViewportSize({width:canvas?1280:1440,height:1000});const fixture=await pickerFixture(page,server);
+  if(canvas){
+    const raw=JSON.parse(await page.locator('#src').inputValue());raw.page.blocks[0].diagram.layouts=[{...editorSpec().page.blocks[0].diagram.layouts[0],id:'canvas',name:'Canvas',presentation:'explore'}];raw.page.blocks[0].diagram.defaultLayout='canvas';
+    await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();await prepareEditorSurface(page);
+  }
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  const handle=page.getByRole('button',{name:'Reference actions for first',exact:true}),menu=page.getByRole('menu',{name:'Reference actions for first',exact:true});
+  const member=page.locator('#docview g.node[data-dv-node="first::dispatch"]');
+  await expect(handle).toBeVisible();await handle.click({button:'right'});await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem',{name:'Go to diagram',exact:true})).toBeFocused();
+  await info.attach('reference-menu-'+(canvas?'canvas':'standard'),{body:await page.screenshot(),contentType:'image/png'});
+  await page.keyboard.press('End');await expect(menu.getByRole('menuitem',{name:'Delete reference',exact:true})).toBeFocused();
+  await page.keyboard.press('Escape');await expect(menu).toHaveCount(0);await expect(handle).toBeFocused();
+  await page.locator('#docview .dv-topology-boundary[data-topology-import="first"] > text').click({button:'right'});await expect(menu).toBeVisible();await page.keyboard.press('Escape');
+  await page.locator('#docview path.edge[data-dv-edge="1"]').dispatchEvent('contextmenu',{clientX:400,clientY:500});await expect(menu).toBeVisible();await page.keyboard.press('Escape');
+  if(canvas){await page.locator('#docview g.node[data-dv-node="a"]').click({button:'right'});await expect(page.getByRole('menu',{name:'Object actions',exact:true})).toBeVisible();await page.keyboard.press('Escape');}
+  await handle.focus();await page.keyboard.press('Shift+F10');await expect(menu).toBeVisible();
+  const popupPromise=page.context().waitForEvent('page');await menu.getByRole('menuitem',{name:'Go to diagram',exact:true}).click();
+  const provider=await popupPromise;await expect(provider).toHaveURL(fixture.url+'?diagram=first');await expect(provider.locator('#canon-reader')).toContainText('Notification platform');
+  await expect(provider.locator('#canon-reader')).toContainText('Never exported');await expect(provider.locator('.dv-topology-handle')).toHaveCount(0);
+  expect(await provider.evaluate(()=>window.opener)).toBeNull();await provider.close();
+  const importedText=await page.locator('#src').inputValue(),raw=JSON.parse(importedText),diagram=raw.page.blocks[0].diagram;
+  diagram.edges.push({from:Object.keys(diagram.nodes)[0],to:'first::dispatch'});const blocked=JSON.stringify(raw,null,2);
+  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(blocked);await page.locator('#go').click();await prepareEditorSurface(page);
+  await member.click({button:'right'});await expect(menu).toBeVisible();const remove=menu.getByRole('menuitem',{name:/Delete reference/});
+  await expect(remove).toHaveAttribute('aria-disabled','true');await expect(remove).toContainText('Consumer connections');await remove.click({force:true});await expect(page.locator('#src')).toHaveValue(blocked);
+  await page.keyboard.press('Escape');await page.locator('#editor-tab-json').click();await page.locator('#src').fill(importedText);await page.locator('#go').click();await prepareEditorSurface(page);
+  await handle.click();await expect(menu).toBeVisible();await menu.getByRole('menuitem',{name:'Inspect imported member',exact:true}).click();await expect(page.locator('#guide')).toContainText('Read-only topology from first');await prepareEditorSurface(page);
+  await handle.click();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu).toHaveCount(0);
+  await page.locator('#editor-tab-json').click();await page.locator('#src').fill(importedText);await page.locator('#go').click();await prepareEditorSurface(page);
+  await member.click({button:'right'});await menu.getByRole('menuitem',{name:'Delete reference',exact:true}).click();
+  const removed=await page.locator('#src').inputValue();expect(JSON.parse(removed).page.blocks[0].diagram.topologyImports).toBeUndefined();await expect(handle).toHaveCount(0);await expect(member).toHaveCount(0);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(importedText);await expect(handle).toBeVisible();await expect(member).toBeVisible();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);
+});
+
+test('reference actions choose the deepest provider and refuse unverified deployment links',async({page,server})=>{
+  const fixture=await publish(server),leaf={page:{title:'Leaf provider',sections:[{heading:'Leaf',diagram:{nodes:{leaf:{title:'Leaf node'}},rows:[['leaf']],edges:[],topologyExports:{leaf:{nodes:['leaf'],edges:[]}}}}]}};
+  await mkdir(path.join(fixture.root,'diagrams/leaf'),{recursive:true});await writeFile(path.join(fixture.root,'diagrams/leaf/leaf.spec.json'),JSON.stringify(leaf));
+  const provider=fixture.specs.first.page.blocks[0].diagram;provider.topologyImports=[{spec:'leaf',export:'leaf',as:'inner'}];provider.topologyExports={nested:{nodes:['inner::leaf'],edges:[]}};
+  await writeFile(path.join(fixture.root,'diagrams/first/first.spec.json'),JSON.stringify(fixture.specs.first));
+  await writeFile(path.join(fixture.root,'canon.json'),JSON.stringify({version:1,diagrams:['first','second','leaf'].map(id=>({folder:'diagrams/'+id,owner:'group:default/home'}))}));
+  await publishLibrary({registryPath:path.join(fixture.root,'canon.json'),output:path.join(fixture.root,'workbench/diagrams.json')});
+  await page.goto(fixture.url+'?diagram=second');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();await prepareEditorSurface(page);
+  await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  const menu=page.getByRole('menu',{name:'Reference actions for first::inner',exact:true}),node=page.locator('#docview g.node[data-dv-node="first::inner::leaf"]');
+  await node.click({button:'right'});await expect(menu).toBeVisible();await expect(menu.getByRole('menuitem',{name:/Delete reference/})).toContainText('nested reference belongs to its containing provider');
+  const popupPromise=page.context().waitForEvent('page');await menu.getByRole('menuitem',{name:'Go to diagram',exact:true}).click();const popup=await popupPromise;await expect(popup).toHaveURL(fixture.url+'?diagram=leaf');await expect(popup.locator('#canon-reader')).toContainText('Leaf provider');await popup.close();
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));recovered.topologyContext.catalogURL='https://another-deployment.invalid/workbench/diagrams.json';
+  await page.addInitScript(draft=>localStorage.setItem('dv-workbench-draft',JSON.stringify(draft)),recovered);
+  await page.reload();await prepareEditorSurface(page);await node.click({button:'right'});await expect(menu).toBeVisible();
+  await expect(menu.getByRole('menuitem',{name:/Go to diagram/})).toHaveAttribute('aria-disabled','true');await expect(menu.getByRole('menuitem',{name:/Copy diagram link/})).toHaveAttribute('aria-disabled','true');
+  await page.keyboard.press('Escape');await page.getByRole('button',{name:'Reference actions for first',exact:true}).click();
+  const outer=page.getByRole('menu',{name:'Reference actions for first',exact:true});await expect(outer).toBeVisible();
+  const before=await page.locator('#src').inputValue();await outer.getByRole('menuitem',{name:'Delete reference',exact:true}).evaluate(el=>window.staleReferenceDelete=el);
+  await page.locator('#workspace-home').click();await expect(outer).toHaveCount(0);await page.evaluate(()=>window.staleReferenceDelete.click());await expect(page.locator('#src')).toHaveValue(before);
+});
+
+test('Add to step gives imported nodes and edges the same emphasis as local members',async({page,server},info)=>{
+  await page.setViewportSize({width:1440,height:1000});await pickerFixture(page,server);await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
+  await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#editor-tab-inspect').click();
+  await page.locator('#guide').getByRole('button',{name:'ADD TO STEP',exact:true}).click();await prepareEditorSurface(page);
+  const localNode=page.locator('#docview g.node[data-dv-node="c"]'),importedNode=page.locator('#docview g.node[data-dv-node="first::dispatch"]');
+  await localNode.locator('.t1').click();await importedNode.locator('.t1').click();
+  const localEdge=page.locator('#docview path.edge[data-dv-edge="0"]'),importedEdge=page.locator('#docview path.edge[data-dv-edge="1"]');
+  await importedEdge.dispatchEvent('click');
+  for(const member of [localNode,importedNode,localEdge,importedEdge])await expect(member).toHaveClass(/dv-instep/);
+  const nodeStyle=el=>{const card=getComputedStyle(el.querySelector('.card'));return {opacity:getComputedStyle(el).opacity,width:card.strokeWidth,dash:card.strokeDasharray};};
+  const edgeStyle=el=>{const style=getComputedStyle(el),halo=getComputedStyle(el.parentNode.querySelector('path.halo[data-dv-edge="'+el.getAttribute('data-dv-edge')+'"]'));return {opacity:style.opacity,width:style.strokeWidth,haloOpacity:halo.opacity,haloWidth:halo.strokeWidth};};
+  expect(await importedNode.evaluate(nodeStyle)).toEqual(await localNode.evaluate(nodeStyle));
+  expect(await importedEdge.evaluate(edgeStyle)).toEqual(await localEdge.evaluate(edgeStyle));
+  expect((await importedEdge.evaluate(edgeStyle)).haloOpacity).toBe('0.5');
+  await expect(page.locator('#docview path.halo[data-dv-edge="1"]')).toHaveClass(/dv-instep/);
+  await info.attach('add-to-step-imported-and-local-emphasis',{body:await page.screenshot(),contentType:'image/png'});
+  await page.keyboard.press('Escape');const raw=JSON.parse(await page.locator('#src').inputValue()),step=raw.page.blocks[0].diagram.steps[0];
+  expect(step.edges).toContain('first::dispatch->first::push');expect(step.nodes).toEqual(expect.arrayContaining(['c','first::dispatch']));expect(raw.page.blocks[0].diagram.nodes['first::dispatch']).toBeUndefined();
+});
+
 test('a brand-new local diagram explicitly connects to the repository catalog and persists only its reference',async({page,server})=>{
   await pickerFixture(page,server);await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
   await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();await prepareEditorSurface(page);
@@ -240,7 +319,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
   expect(await page.locator('#src').inputValue()).not.toContain('topologyProvenance');
   const before=await page.locator('#src').inputValue(),root=page.locator('#docview');
   const boundary=root.locator('.dv-topology-boundary[data-topology-import="platform"]');await expect(boundary).toBeVisible();
-  const boundaryBefore=await boundary.locator('rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
+  const boundaryBefore=await boundary.locator(':scope > rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
   await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeEnabled();await page.locator('#diagram-add-close').click();
   const author=await root.elementHandle();await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
   await expect(page.locator('#page-preview-view [data-dv-node="platform::api"]')).toBeVisible();
@@ -268,7 +347,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
   const placed=await Promise.all(['client','platform::api','platform::store'].map(center));
   expect(placed[0]).toEqual(original[0]);
   for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(90,0);expect(placed[i].y-original[i].y).toBeCloseTo(70,0);}
-  const boundaryAfter=await boundary.locator('rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
+  const boundaryAfter=await boundary.locator(':scope > rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
   expect(boundaryAfter.x-boundaryBefore.x).toBeCloseTo(90,0);expect(boundaryAfter.y-boundaryBefore.y).toBeCloseTo(70,0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -288,7 +367,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
   await testInfo.attach('floating-import',{body:await root.screenshot(),contentType:'image/png'});
 });
 
-test('nested repository references receive separate non-interactive Workbench boundaries',async({page,server})=>{
+test('nested repository references receive separate Workbench boundaries and action handles',async({page,server})=>{
   const fixture=await publish(server),sources=[];
   for(const id of ['platform','checkout'])sources.push(JSON.parse(await readFile(new URL('../../../examples/canon/topology/'+id+'.json',import.meta.url),'utf8')));
   sources[1].page.sections[0].diagram.topologyExports={story:{nodes:['platform::api','platform::store'],edges:['platform::api->platform::store']}};
@@ -303,6 +382,7 @@ test('nested repository references receive separate non-interactive Workbench bo
   await expect(page.locator('#docview .dv-topology-boundary[data-topology-import="shared"]')).toBeVisible();
   await expect(page.locator('#docview .dv-topology-boundary[data-topology-import="shared::platform"]')).toContainText('platform / core');
   await expect(boundaries.first()).toHaveCSS('pointer-events','none');
+  await expect(boundaries.first().locator('.dv-topology-handle')).toHaveCSS('pointer-events','all');
 });
 
 test('a published topology consumer renders and its imported node inspector is read only',async({page,server})=>{

@@ -71,6 +71,10 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value===undefined)return out;
   if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.prosePlacement!==undefined){
+    if(['floating','canvas'].indexOf(value.prosePlacement)<0)warn(path+'.prosePlacement','use floating or canvas');
+    else out.prosePlacement=value.prosePlacement;
+  }
   if(value.controlsPlacement!==undefined){
     if(['floating','canvas'].indexOf(value.controlsPlacement)<0)warn(path+'.controlsPlacement','use floating or canvas');
     else out.controlsPlacement=value.controlsPlacement;
@@ -151,7 +155,7 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value.controls!==undefined){var controls=rect(value.controls,path+'.controls');if(controls)out.controls=controls;}
   if(value.camera!==undefined){
-    var c=value.camera,canvasCamera=out.controlsPlacement==='canvas' || out.panelPlacement==='canvas' || out.canvas || (out.panelPlacements || []).some(function(p){return p.placement==='canvas';}),minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
+    var c=value.camera,canvasCamera=out.prosePlacement==='canvas' || out.controlsPlacement==='canvas' || out.panelPlacement==='canvas' || out.canvas || (out.panelPlacements || []).some(function(p){return p.placement==='canvas';}),minZoom=canvasCamera ? .001 : .15,maxCenter=canvasCamera?10000:100;
     if(!object(c) || !Number.isFinite(c.zoom) || c.zoom<minZoom || c.zoom>4 || !['x','y'].every(function(k){return Number.isFinite(c[k]) && Math.abs(c[k])<=maxCenter;}))warn(path+'.camera','use zoom '+minZoom+'–4 and finite x/y SVG center coordinates between -'+maxCenter+' and '+maxCenter);
     else out.camera={zoom:c.zoom,x:c.x,y:c.y};
   }

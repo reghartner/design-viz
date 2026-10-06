@@ -86,7 +86,9 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   const resized=await source();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);expect((await size(panel(page))).w).toBeCloseTo(r.width,0);
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);
   await canvasTools(page);await page.locator('#workspace-panels').click(); // The inspector opened by Undo would otherwise cover the panel grip.
-  await page.locator('[data-explore-panel=clip] .explore-window-hide').click(); // Undocking the first panel lets the next docked header occupy its old position.
+  // Undocking the first panel lets the next docked windows occupy its old position.
+  await page.locator('[data-explore-panel=clip] .explore-window-hide').click();
+  await page.locator('[data-explore-content=prose] .explore-window-hide').click();
   const dragStart=await panel(page).boundingBox(),grip=await panel(page).locator('.explore-window-grip').boundingBox();
   await page.mouse.move(grip.x+24,grip.y+12);await page.mouse.down();await page.mouse.move(grip.x-76,grip.y+42,{steps:6});await page.mouse.up();
   expect((await panel(page).boundingBox()).x).toBeCloseTo(dragStart.x-100,0);expect((await panel(page).boundingBox()).y).toBeCloseTo(dragStart.y+30,0);

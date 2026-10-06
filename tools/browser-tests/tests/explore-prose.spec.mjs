@@ -58,14 +58,14 @@ test('editor notes move/resize/visibility and zoom author one view, keep Explore
   const resized=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);await closeTools(page);
   const beforeDrag=await notes(page).boundingBox(),handle=await grip.boundingBox();await page.mouse.move(handle.x+28,handle.y+12);await page.mouse.down();await page.mouse.move(handle.x-72,handle.y+36,{steps:8});await page.mouse.up();expect((await notes(page).boundingBox()).x).toBeCloseTo(beforeDrag.x-100,0);
   const dragged=await source(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(dragged);await closeTools(page);
-  const graph=await page.locator('.explore-board .boardcanvas>svg').boundingBox(),width=(await notes(page).boundingBox()).width;await panelsOptions(page);await page.locator('#docview .explore-navigation').getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect((await notes(page).boundingBox()).width).toBeCloseTo(width*.9,0);expect(await page.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graph);
+  const graph=await page.locator('.explore-board .boardcanvas>svg').boundingBox(),width=(await notes(page).boundingBox()).width;await panelsOptions(page);await page.locator('#docview .explore-navigation').getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect((await notes(page).boundingBox()).width).toBeCloseTo(width,0);expect(await page.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graph);
   await prepareEditorSurface(page);await arrangeChapter(page);const visible=page.getByRole('checkbox',{name:'Show Section notes in Explore',exact:true});const beforeHide=await source(page);await visible.uncheck();await expect(notes(page)).toBeHidden();expect(JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.prose.hidden).toBe(true);
   const hidden=await source(page);await page.getByRole('button',{name:'Optimize layout',exact:true}).click();await expect(notes(page)).toBeHidden();expect(JSON.parse(await source(page)).page.sections[0].diagram.layouts[1].exploreLayout.prose).toEqual({hidden:true});await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeHide);await expect(notes(page)).toBeVisible();await page.getByRole('button',{name:'Done arranging',exact:true}).click();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await closeTools(page);
   await inspectPageElement(page,notes(page).locator('[data-dv-para="0"]'));const text=page.locator('#guide .prose-editor textarea');await text.fill('**Updated explanation.** The recording stays local until delivery.');await text.press('Tab');await expect(notes(page).locator('strong')).toHaveText('Updated explanation.');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await closeTools(page);await verifySeparation(page);
   const saved=JSON.parse(await source(page));expect(saved.page.sections[0].diagram.layouts[0]).toEqual(fixture().page.sections[0].diagram.layouts[0]);expect(saved.page.sections[0].diagram.layouts[2]).toEqual(fixture().page.sections[0].diagram.layouts[2]);
   await page.screenshot({path:info.outputPath('explore-notes-editor.png')});
-  const reader=await context.newPage();await reader.goto(await build(server,saved,'explore-notes-saved'));await verifySeparation(reader);await expect(notes(reader).locator('strong')).toHaveText('Updated explanation.');const r=await notes(reader).boundingBox(),s=await reader.locator('.explore-stage').boundingBox();expect(r.width/s.width).toBeCloseTo(saved.page.sections[0].diagram.layouts[1].exploreLayout.prose.w*.9,3);await reader.close();
+  const reader=await context.newPage();await reader.goto(await build(server,saved,'explore-notes-saved'));await verifySeparation(reader);await expect(notes(reader).locator('strong')).toHaveText('Updated explanation.');const r=await notes(reader).boundingBox(),s=await reader.locator('.explore-stage').boundingBox();expect(r.width/s.width).toBeCloseTo(saved.page.sections[0].diagram.layouts[1].exploreLayout.prose.w,3);await reader.close();
 });
 
 test('native notes are isolated, keep exact prose on view switches, and retire with their viewer',async({page,server})=>{
@@ -168,6 +168,7 @@ for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprin
     if(surface==='reader')await page.goto(await build(server,raw,'notes-'+skin));
     else{await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);}
     await expect(notes(page)).toBeVisible();await page.evaluate(()=>document.fonts.ready);
+    for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');
     const contrast=await notes(page).evaluate(el=>{
       function luminance(color){const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
       const bg=luminance(getComputedStyle(el).backgroundColor);
@@ -178,4 +179,60 @@ for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprin
     expect(Math.min(...contrast)).toBeGreaterThanOrEqual(4.5);
     await notes(page).screenshot({path:info.outputPath('notes-'+skin+'-'+surface+'.png')});
   }
+});
+
+async function place(page,label,value){
+  const menu=page.locator('.explore-panel-menu');if(!await menu.evaluate(el=>el.open))await menu.locator('summary').click();
+  await page.getByRole('combobox',{name:label,exact:true}).selectOption(value);await page.keyboard.press('Escape');
+}
+async function parentClass(locator){return locator.evaluate(el=>el.parentElement.className);}
+
+test('legacy notes placement stays independent of the last panel and default, with temporary reader overrides',async({page,server})=>{
+ for(const legacy of ['floating','canvas']){
+  const raw=fixture('explore'),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.panelPlacement=legacy;
+  await page.goto(await build(server,raw,'legacy-notes-'+legacy));const expected=legacy==='canvas'?'explore-canvas-objects':'explore-stage';
+  expect(await parentClass(notes(page))).toBe(expected);
+  await place(page,'Default panel placement',legacy==='canvas'?'floating':'canvas');expect(await parentClass(notes(page))).toBe(expected);
+  await place(page,'Placement for Upload queue','floating');expect(await parentClass(notes(page))).toBe(expected);
+  await place(page,'Placement for Upload queue','canvas');expect(await parentClass(notes(page))).toBe(expected);
+  const panel=page.locator('[data-explore-panel="queue"]'),controls=page.locator('.explore-player');
+  await place(page,'Placement for Section notes',legacy==='canvas'?'floating':'canvas');expect(await parentClass(panel)).toBe('explore-canvas-objects');expect(await parentClass(controls)).toBe('explore-stage');
+  await place(page,'Placement for Upload queue','floating');expect(await parentClass(notes(page))).toBe(legacy==='canvas'?'explore-stage':'explore-canvas-objects');
+  await page.getByRole('button',{name:'Business',exact:true}).click();await page.getByRole('button',{name:'Explore',exact:true}).click();expect(await parentClass(notes(page))).toBe(legacy==='canvas'?'explore-stage':'explore-canvas-objects');
+  await page.reload();expect(await parentClass(notes(page))).toBe(expected);expect(await parentClass(panel)).toBe(expected);
+ }
+});
+
+test('notes placement and both geometries save, undo, redo and reopen independently',async({page,server,context})=>{
+ const raw=fixture('explore');await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ const initial=await source(page);
+ await place(page,'Default panel placement','canvas');const panelChanged=await source(page);
+ expect(JSON.parse(panelChanged).page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement).toBe('floating');expect(await parentClass(notes(page))).toBe('explore-stage');
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(initial);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(panelChanged);
+ await place(page,'Placement for Section notes','canvas');const onCanvas=await source(page);expect(await parentClass(notes(page))).toBe('explore-canvas-objects');
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(panelChanged);expect(await parentClass(notes(page))).toBe('explore-stage');
+ await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(onCanvas);await closeTools(page);
+ await notes(page).focus();await notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowRight');const moved=await source(page);
+ await notes(page).getByRole('button',{name:'Resize Section notes; use arrow keys',exact:true}).press('Shift+ArrowRight');const resized=await source(page);
+ expect(resized).not.toBe(moved);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(resized);
+ const canvasRect=JSON.parse(resized).page.sections[0].diagram.layouts[1].exploreLayout.canvas.prose;
+ await place(page,'Placement for Section notes','floating');const floating=await source(page);expect(JSON.parse(floating).page.sections[0].diagram.layouts[1].exploreLayout.prose).toEqual(raw.page.sections[0].diagram.layouts[1].exploreLayout.prose);
+ await closeTools(page);await notes(page).getByRole('button',{name:'Resize Section notes; use arrow keys',exact:true}).press('ArrowRight');const floatingResized=await source(page),floatRect=JSON.parse(floatingResized).page.sections[0].diagram.layouts[1].exploreLayout.prose;
+ expect(JSON.parse(floatingResized).page.sections[0].diagram.layouts[1].exploreLayout.canvas.prose).toEqual(canvasRect);
+ await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');const savedText=await source(page),saved=JSON.parse(savedText),layout=saved.page.sections[0].diagram.layouts[1].exploreLayout;
+ expect(layout.prose).toEqual(floatRect);expect(layout.canvas.prose).toEqual(canvasRect);expect(layout.controlsPlacement).toBeUndefined();
+ const reader=await context.newPage();await reader.goto(await build(server,saved,'independent-notes-saved'));expect(await parentClass(notes(reader))).toBe('explore-canvas-objects');expect(await parentClass(reader.locator('[data-explore-panel="queue"]'))).toBe('explore-stage');
+ expect(await notes(reader).evaluate(el=>({x:parseFloat(el.style.getPropertyValue('--float-x')),w:parseFloat(el.style.getPropertyValue('--float-w'))}))).toEqual({x:canvasRect.x,w:canvasRect.w});
+ await place(reader,'Placement for Section notes','floating');expect(await source(page)).toBe(savedText);await reader.close();
+});
+
+for(const width of [1280,1920])test('notes remain readable and independently sized at '+width+'px',async({page,server},info)=>{
+ await page.setViewportSize({width,height:1000});const raw=fixture('explore');delete raw.page.sections[0].diagram.layouts[1].exploreLayout.prose;
+ await page.goto(await build(server,raw,'readable-notes-'+width));await page.evaluate(()=>document.fonts.ready);
+ for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');const before=await notes(page).boundingBox();
+ await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect(await notes(page).boundingBox()).toEqual(before);
+ expect(await notes(page).locator('.explore-window-body').evaluate(el=>({overflow:el.scrollHeight-el.clientHeight,scale:getComputedStyle(el).transform}))).toEqual({overflow:0,scale:'matrix(1, 0, 0, 1, 0, 0)'});
+ await page.screenshot({path:info.outputPath('section-notes-'+width+'.png')});
+ await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');await page.getByRole('button',{name:'Fit canvas',exact:true}).click();
+ await expect(notes(page)).toBeInViewport();await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
 });

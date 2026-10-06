@@ -305,3 +305,13 @@ test('canvas step controls declare placement capability even with dormant graph 
   assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-controls-placement'));
  }
 });
+
+test('independent Section notes placement declares its capability without needing geometry',()=>{
+ for(const prosePlacement of ['canvas','floating']){
+  const raw={page:{sections:[{diagram:{layouts:[{id:'story',presentation:'explore',exploreLayout:{prosePlacement}}]}}]}};
+  assert.ok(C.detect(raw).includes('layout.explore-prose-placement'));
+  if(prosePlacement==='canvas')assert.ok(C.detect(raw).includes('layout.explore-canvas'));
+  const available={...C.features};delete available['layout.explore-prose-placement'];
+  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-prose-placement'));
+ }
+});

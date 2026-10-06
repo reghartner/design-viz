@@ -49,6 +49,15 @@ Workbench Explore supports Alt/Option-drag marquee selection of nodes and
 on-canvas panels, plus a shared right-click action menu. The Nodes & connections
 chapter explains mixed selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap distribution, Fit selection, Free placement, and Undo.
 
+In Explore, **Panels → Placement for Section notes** chooses **Floating** or
+**On canvas** independently of other panels and step controls. Notes retain a
+separate position and size for each placement. Select canvas notes to reveal
+their move and resize handles. Floating notes use 16px body text and remain at
+100% when you resize panels with **Panels & controls**. Use the notes corner to
+resize their window. Workbench changes save with Undo/Redo; reader changes are
+temporary. Older files preserve their initial notes placement when you change
+other placements.
+
 ## Maintaining the guide
 
 The single content source is `src/workbench/human-guide.html`; its small dialog

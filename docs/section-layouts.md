@@ -215,8 +215,8 @@ columns as the lane fills. Exceptionally tall automatic content is capped at the
 usable lane height and scrolls inside its panel. When the view has no saved
 panel, notes or step-control rectangles and no saved panel scale, this automatic
 stack uses 80% scale on desktop stages through 1280px wide and grows smoothly
-to 100% at 1440px. Stages narrower than 800px retain 100% so the compact
-playback controls remain readable. An authored or manually resized
+to 100% at 1440px. Section notes remain at 100% independently. Stages narrower
+than 800px retain 100% so the compact playback controls remain readable. An authored or manually resized
 panel taller than the available stack lane stays full-size and top-aligned, with
 the next panel starting a column to its left. **Expand**
 opens a larger view, using browser fullscreen when available and an expanded
@@ -428,7 +428,7 @@ grid. Positions and dimensions use fractions of the Explore viewport. Panel
 width/height and control height describe their size at 100% content scale;
 control width is its horizontal span and does not change with content scale.
 Optional `overlayScale`
-(0.5–1.25) scales all floating panels and step controls together,
+(0.5–1.25) scales floating panels and step controls together,
 independently of diagram zoom. The **Panels & controls** minus/plus buttons
 change this scale; clicking its percentage saves an explicit 100% reset. A layout
 with saved panel, notes or controls geometry and no `overlayScale` uses 100% for
@@ -450,6 +450,7 @@ Invalid optional entries warn and fall back independently.
 ```json
 "exploreLayout": {
   "overlayScale": 0.75,
+  "prosePlacement": "floating",
   "panels": [
     {"panel":"outcome", "x":0.72, "y":0.02, "w":0.26, "h":0.3, "stacked":true}
   ],
@@ -463,14 +464,30 @@ Invalid optional entries warn and fall back independently.
 Explore's **Panels** menu shows a **Placement** control for each named panel:
 **Floating** keeps it anchored to the viewport; **On canvas** moves and scales
 it with the graph. A chapter can mix both. **Default placement** sets the fallback
-for panels without an individual override and the placement of Section notes.
+for panels without an individual override.
 Changing that default preserves existing per-panel overrides.
 
 `exploreLayout.panelPlacements` is an array of `{panel, placement}` overrides.
 Each `panel` must be a unique existing ID and `placement` must be `"floating"`
 or `"canvas"`. Omitted entries use the legacy `exploreLayout.panelPlacement`,
 which still accepts `"floating"` or `"canvas"` and defaults to Floating.
-Section notes continue to use that chapter default.
+Section notes have their own **Placement for Section notes** selector in Panels.
+`exploreLayout.prosePlacement` accepts `"floating"` or `"canvas"`. For older files
+that omit it, notes open at the saved `panelPlacement` (Floating if omitted).
+The first placement edit preserves that initial notes placement explicitly,
+so changing the default or any individual panel cannot move notes. Workbench
+changes save with one Undo/Redo operation; reader changes stay in the session.
+Notes keep separate floating `prose` and graph-unit `canvas.prose` rectangles.
+Drag the notes header or resize its corner in either placement; select canvas
+notes first to reveal these handles. Floating notes use 16px body text at 100%
+scale, independently of the Panels & controls size setting. Canvas notes use
+fluid logical body text: 26px at a 1280px browser width, decreasing smoothly to
+19px at 1920px, clamped to that range. New canvas rectangles start 440 graph units
+wide with a height fitted to the content. Unsaved notes keep fitting through
+browser resizing until moved, resized, or saved as an authored rectangle.
+Saved rectangles retain their dimensions. Canvas
+notes move and scale with diagram zoom; manual zoom-out makes their text smaller.
+Saved placement declares `layout.explore-prose-placement`.
 
 The **Step controls** placement selector in Panels, also available in the step
 controls inspector, independently saves `exploreLayout.controlsPlacement` as

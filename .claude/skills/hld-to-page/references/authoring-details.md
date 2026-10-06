@@ -127,8 +127,15 @@ paragraphs and nested bullets become one **Section notes** window using the same
 controls; only prose floats there, never the diagram or an entire section card.
 Keep content in `section.text`/`bullets`, not fake diagram panels. Optional
 `exploreLayout.prose` saves `x/y/w/h` viewport fractions together, plus `stacked`
-and `hidden` booleans; `{hidden:true}` can stand alone. Notes follow the common
-overlay scale. **Visible elements → Section notes** saves visibility per view;
+and `hidden` booleans; `{hidden:true}` can stand alone. Use independent
+`exploreLayout.prosePlacement` (`"floating"` or `"canvas"`) and retain the separate
+`canvas.prose` graph rectangle. Older files initially inherit `panelPlacement`;
+placement edits preserve that initial notes placement. Floating notes use 16px
+text at 100% scale, unaffected by panel sizing; resize their own window.
+Canvas notes use fluid 19–26px logical text across desktop browser widths and a
+new 440-unit-wide content-sized rectangle.
+They move and scale with diagram zoom; zooming out makes their text smaller.
+**Visible elements → Section notes** saves visibility per view;
 the window’s Hide button is temporary. Adding the first paragraph or bullet in
 the workbench creates notes and keeps Explore open; later additions restore
 temporarily hidden notes without changing saved visibility. Standard restores the prose and its prior

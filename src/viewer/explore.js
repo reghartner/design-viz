@@ -16,7 +16,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
   if(value.canvasPanels)saved.canvasPanels=JSON.parse(JSON.stringify(value.canvasPanels));else delete saved.canvasPanels;
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
   if(value.layout){
-    ['panels','prose','controls','overlayScale','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
+    ['panels','prose','controls','overlayScale','prosePlacement','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
       if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
     });
   }
@@ -49,7 +49,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var placement=document.createElement('select');placement.setAttribute('aria-label','Default panel placement');
   [['floating','Floating'],['canvas','On canvas']].forEach(function(pair){var option=document.createElement('option');option.value=pair[0];option.textContent=pair[1];placement.appendChild(option);});
   placementLabel.appendChild(placement);panelBody.appendChild(placementLabel);
-  var placementHint=document.createElement('small');placementHint.className='explore-placement-hint';placementHint.textContent='Default applies to Section notes and panels without overrides.';placementLabel.appendChild(placementHint);placementLabel.hidden=true;placement.addEventListener('change',function(){changePlacement(placement.value);});
+  var placementHint=document.createElement('small');placementHint.className='explore-placement-hint';placementHint.textContent='Default applies to panels without overrides.';placementLabel.appendChild(placementHint);placementLabel.hidden=true;placement.addEventListener('change',function(){changePlacement(placement.value);});
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
   var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(function(w){return available(w) && !canvasWindow(w);}).forEach(function(w){w.state.stacked=true;setWindowHidden(w,false);w.state.automatic=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
   var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
@@ -102,7 +102,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
+    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,prosePlacement:value.layout.prosePlacement,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
@@ -114,13 +114,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(retired || !active || token===false)return false;
     var ok=!token.authored || !author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
     if(!ok){memory.layout=token.layout;zoom=token.zoom;sizeGraph(false);positionCamera(token.camera);}
+    // Once a notes rectangle is authored, preserve it just like a reopened file.
+    if(ok && token.authored && memory.layout.canvas && memory.layout.canvas.prose && memory.canvasPanels && memory.canvasPanels.prose)memory.canvasPanels.prose.automatic=false;
     if(ok && token.panels){var after=panelGeometry(memory);if(JSON.stringify(token.panels)!==JSON.stringify(after))shell.dispatchEvent(new CustomEvent('workbench-panel-geometry',{bubbles:true,detail:{view:definition.id,before:token.panels,after:after}}));}
     return ok;
   }
-  // Named panels override the chapter default. Notes keep the legacy fallback.
+  // Old specs retain their initial notes placement until an explicit placement edit.
   function windowPlacement(w){
     if(w===playerWindow)return memory.layout.controlsPlacement || 'floating';
-    var override=!w.prose && (memory.layout.panelPlacements || []).find(function(p){return p.panel===w.panel.id;});
+    if(w.prose)return memory.layout.prosePlacement || memory.layout.panelPlacement || 'floating';
+    var override=(memory.layout.panelPlacements || []).find(function(p){return p.panel===w.panel.id;});
     return override?override.placement:memory.layout.panelPlacement || 'floating';
   }
   function canvasWindow(w){return windowPlacement(w)==='canvas';}
@@ -128,6 +131,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   // Workbench queries placement for Standard views too, before any Explore
   // memory exists and after a canvas view has left its player state behind.
   function onCanvas(){return active && (canvasWindow(playerWindow) || windows.some(canvasWindow));}
+  function hasFloatingPanels(){return windows.some(function(w){return !w.prose && !canvasWindow(w);});}
   function hasFloating(){return windows.some(function(w){return !canvasWindow(w);});}
   function canvasWindowLabel(w,selected){var label=w.label+(w===playerWindow?' on canvas':' canvas panel');return selected?label+', selected':'Select '+label;}
   function syncCanvasWindow(w){
@@ -145,8 +149,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(previous)syncCanvasWindow(previous);
     if(w){syncCanvasWindow(w);raise(w);}
   }
+  // Notes retain readable text and independent geometry when panels are scaled.
   // Dormant canvas controls sizing must never resize floating panel content.
-  function windowScale(w){return w===playerWindow?overlayScale():floatingOverlayScale();}
+  function windowScale(w){return w.prose?1:w===playerWindow?overlayScale():floatingOverlayScale();}
   function zoomFloor(){
     if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
     var extent=canvasExtent();return Math.min(.15,200/Math.max(1,extent.w),200/Math.max(1,extent.h),fitFloor===null?4:fitFloor);
@@ -157,7 +162,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var states=memory.canvasPanels || (memory.canvasPanels=Object.create(null)),key=w===playerWindow?'controls':w.prose?'prose':'panel:'+w.panel.id;
     if(!states[key]){
       var layout=memory.layout.canvas || {},saved=w===playerWindow?layout.controls:w.prose?layout.prose:(layout.panels || []).find(function(p){return p.panel===w.panel.id;});
-      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(index/3)*380),y:(index%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:false});
+      // Floating panels do not consume a canvas slot before new notes.
+      var slot=w.prose?windows.filter(function(item){return !item.prose && canvasWindow(item);}).length:index;
+      states[key]=Object.assign(saved?graphRect(saved):w===playerWindow?{x:0,y:Math.min(10000,(board.querySelector('.boardcanvas>svg').viewBox.baseVal.height || 800)+40),w:720,h:220}:{x:Math.min(10000,graphWidth()+40+Math.floor(slot/3)*380),y:(slot%3)*330,w:340,h:300},{hidden:w.state && w.state.hidden,stacked:false,automatic:w.prose && !saved});
     }
     return states[key];
   }
@@ -184,10 +191,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     (canvasControls?objectLayer:stage).appendChild(player);
     controlsPlacement.value=canvasControls?'canvas':'floating';controlsPlacementLabel.hidden=false;
     syncCanvasWindow(playerWindow);
-    var mode=onCanvas(),controlsOnly=mode && !hasFloating();
+    var mode=onCanvas(),controlsOnly=mode && !hasFloatingPanels();
     placement.value=memory.layout.panelPlacement || 'floating';placementLabel.hidden=false;stack.hidden=!hasFloating();
     fitButton.textContent=mode?'Fit canvas':'Fit diagram';
-    overlayZoom.hidden=canvasControls && !hasFloating();
+    overlayZoom.hidden=canvasControls && !hasFloatingPanels();
     overlayZoom.querySelector('.explore-zoom-title').textContent=canvasControls?'Floating panels':controlsOnly?'Controls':mode?'Floating panels & controls':'Panels & controls';
     overlayOut.setAttribute('aria-label',canvasControls?'Shrink floating panels':controlsOnly?'Shrink controls':'Shrink panels and controls');overlayIn.setAttribute('aria-label',canvasControls?'Enlarge floating panels':controlsOnly?'Enlarge controls':'Enlarge panels and controls');
     overlayLabel.setAttribute('aria-label',canvasControls?'Reset floating panels size':controlsOnly?'Reset controls size':'Reset panels and controls size');overlayLabel.title=canvasControls?'Reset floating panels to 100%':controlsOnly?'Reset controls to 100%':'Reset panels and controls to 100%';
@@ -196,9 +203,15 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(!active || retired || (w?windowPlacement(w):memory.layout.panelPlacement || 'floating')===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false){mountWindows();return;}
     selectCanvasWindow(null);var firstCanvas=value==='canvas' && (!onCanvas() || w===playerWindow && !(memory.layout.canvas && memory.layout.canvas.controls));
+    // Capture the legacy fallback before changing any panel/default placement.
+    // Persist it with the same edit so a preview rebuild cannot move notes.
+    if(prose && memory.layout.prosePlacement===undefined)memory.layout.prosePlacement=memory.layout.panelPlacement || 'floating';
     if(w===playerWindow){
       if(!canvasWindow(w) && !memory.layout.controls)rememberRect(w);
       memory.layout.controlsPlacement=value;
+    }else if(w && w.prose){
+      if(!canvasWindow(w) && !(memory.layout.prose && memory.layout.prose.w))rememberRect(w);
+      memory.layout.prosePlacement=value;
     }else if(w){
       var placements=memory.layout.panelPlacements || (memory.layout.panelPlacements=[]),index=placements.findIndex(function(p){return p.panel===w.panel.id;}),entry={panel:w.panel.id,placement:value};
       if(index<0)placements.push(entry);else placements[index]=entry;
@@ -307,7 +320,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return savedOverlayGeometry(memory.layout)?1:responsiveOverlayScale();
   }
   function overlayScale(){return onCanvas() && memory.layout.canvas && memory.layout.canvas.controlsScale!==undefined?memory.layout.canvas.controlsScale:floatingOverlayScale();}
-  function sizingScale(){return hasFloating()?floatingOverlayScale():overlayScale();}
+  function sizingScale(){return hasFloatingPanels()?floatingOverlayScale():overlayScale();}
   function latchOverlayScale(){if(memory.layout.overlayScale===undefined && !savedOverlayGeometry(memory.layout))memory.layout.overlayScale=floatingOverlayScale();}
   // Panel dimensions and control height describe the size at 100%. Controls
   // retain their chosen horizontal span so smaller text exposes more steps.
@@ -319,11 +332,11 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function changeOverlayScale(value){
     if(!active || retired || !Number.isFinite(value))return;
-    var explicit=onCanvas() && !hasFloating()?memory.layout.canvas && memory.layout.canvas.controlsScale:memory.layout.overlayScale;
+    var explicit=onCanvas() && !hasFloatingPanels()?memory.layout.canvas && memory.layout.canvas.controlsScale:memory.layout.overlayScale;
     value=Math.round(clamp(value,.5,1.25)*100)/100;if(value===sizingScale() && value===overlayScale() && explicit===value)return;
     finish(true);clearScrollEdit();var token=beginEdit(true);if(token===false)return;
     if(onCanvas() && !canvasWindow(playerWindow)){var canvasLayout=memory.layout.canvas || (memory.layout.canvas={});canvasLayout.controlsScale=value;}
-    if(!onCanvas() || hasFloating())memory.layout.overlayScale=value;
+    if(!onCanvas() || hasFloatingPanels())memory.layout.overlayScale=value;
     paint();publish(token);paint();
     if(!retired && active)shell.dispatchEvent(new CustomEvent('explore-overlay-scale',{bubbles:true}));
   }
@@ -358,7 +371,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function sizeAutomaticWindow(w){
     if(!w.state.automatic)return;
     var b=bounds(),scale=windowScale(w),type=w.prose?'prose':w.panel.type;
-    var preferred=/^(screen|homemap|image)$/.test(type)?340:/^(prose|phone|deviceapp)$/.test(type)?320:300;
+    var preferred=w.prose && canvasWindow(w)?440:/^(screen|homemap|image)$/.test(type)?340:/^(prose|phone|deviceapp)$/.test(type)?320:300;
     var logicalWidth=Math.min(preferred,Math.max(96,(b.w-24)/scale));
     // Probe at the preferred width so the default follows rendered content.
     // A short second pass absorbs scrollbar wrapping and font rounding.
@@ -366,10 +379,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     apply(w,constrain(w,scaledRect(w,w.state)));
     var contentHeight=Math.ceil(w.body.scrollHeight),insets=stackInsets(),laneHeight=Math.max(72,b.h-insets.top-insets.bottom);
     var logicalMax=32+Math.max(40,laneHeight-32)/scale;
-    w.state.h=Math.min(logicalMax,Math.max(72,44+contentHeight));
+    w.state.h=Math.min(logicalMax,Math.max(72,(canvasWindow(w)?2:44)+contentHeight));
     apply(w,constrain(w,scaledRect(w,w.state)));
     var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
+    // Pristine notes keep fitting fluid type through viewport changes.
+    // Gestures and authored rectangles leave automatic sizing explicitly.
   }
   function paint(){
     if(!active || retired)return;
@@ -391,7 +406,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // State changes can replace panel content without changing the viewport.
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
-    windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:floatingOverlayScale()));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
+    windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
@@ -549,13 +564,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     check.type='checkbox';text.textContent=label;choice.appendChild(check);choice.appendChild(text);choice.appendChild(note);choices.appendChild(choice);
     var w={el:el,body:body,card:card,panel:panel,prose:!!notes,label:label,state:state,grip:grip,resize:resize,check:check,note:note,authoredHidden:!!it.hidden,canvasSizing:sizing};
     if(sizing)el.setAttribute('data-explore-canvas-sizing',sizing.mode);
-    if(!notes){
+    {
       var row=document.createElement('div');row.className='explore-panel-choice';choice.replaceWith(row);row.appendChild(choice);
       var placementLabel=document.createElement('label');placementLabel.className='explore-placement';placementLabel.textContent='Placement';
       var select=document.createElement('select');select.setAttribute('aria-label','Placement for '+label);
       [['floating','Floating'],['canvas','On canvas']].forEach(function(pair){var option=document.createElement('option');option.value=pair[0];option.textContent=pair[1];select.appendChild(option);});
       placementLabel.appendChild(select);row.appendChild(placementLabel);w.placement=select;
       select.addEventListener('change',function(){changePlacement(select.value,w);});
+      if(notes){var hint=document.createElement('div');hint.className='explore-placement-hint explore-notes-size-hint';hint.textContent='Section notes ignore Panels & controls sizing. Resize the notes window.';row.appendChild(hint);}
     }
     check.addEventListener('change',function(){setWindowHidden(w,!check.checked);if(check.checked)memory.focus=false;paint();});
     grip.addEventListener('pointerdown',function(ev){begin(ev,w,'move',grip);});resize.addEventListener('pointerdown',function(ev){begin(ev,w,'resize',resize);});

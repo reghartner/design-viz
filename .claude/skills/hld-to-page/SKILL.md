@@ -237,6 +237,8 @@ use the authored default; hosting sites may override reader appearance.
 For section text/bullets, `collapsed:true` starts prose folded. Humans set this
 with **Initially collapse prose** in the section inspector; the diagram and
 contract blocks remain visible, and reader toggles do not rewrite that default.
+For independent Explore Section notes placement and readable sizing, see
+[authoring details](references/authoring-details.md) and `docs/section-layouts.md`.
 
 For human editing, the workbench can create and reorder section paragraphs
 and bullet lists through Add and Inspect. See

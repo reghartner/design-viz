@@ -624,3 +624,18 @@ test('step controls placement and independent graph geometry validate without ch
  for(const invalid of [null,[],{},'screen']){const input={controls,controlsPlacement:invalid},issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{controls});assert.equal(issues.length,1);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);}
  for(const rect of [null,[],{x:0,y:0,w:0,h:10},{x:10001,y:0,w:10,h:10},{x:0,y:0,w:10,h:Infinity}]){const input={controls,canvas:{controls:rect}},issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{controls,canvas:{}});assert.equal(issues.length,1);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);}
 });
+
+test('Section notes placement validates, preserves both geometries and survives duplication',()=>{
+ const d=diagram(),prose={x:.1,y:.2,w:.3,h:.4},canvas={prose:{x:900,y:30,w:340,h:300}};
+ for(const prosePlacement of ['floating','canvas']){
+  const value={prosePlacement,prose,canvas},warnings=[];
+  assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
+  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+  const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',{...value,prosePlacement:prosePlacement==='canvas'?'floating':'canvas'});assert.ok(!plan.error,plan.error);
+  const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
+ }
+ for(const prosePlacement of [null,[],{},'screen']){const input={prosePlacement,prose},before=JSON.stringify(input),warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,warnings)),{prose});assert.equal(warnings.length,1);assert.equal(JSON.stringify(input),before);}
+ const camera={zoom:.001,x:500,y:-500};assert.deepEqual(plain(ctx.sectionExploreLayout(d,{prosePlacement:'canvas',camera})),{prosePlacement:'canvas',camera});
+ assert.deepEqual(plain(ctx.sectionExploreLayout(d,{panelPlacement:'canvas',prose})),{panelPlacement:'canvas',prose});
+});

@@ -1361,6 +1361,13 @@ perspectives" of one timeline). Types:
   arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
   `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
   its host profiles; tile `hidden:true` hides a panel or diagram in that view.
+  New Standard arrangements use `sectionLayout:{columns:24,default:[...]}`.
+  All host arrays share that column count: integer `x >= 0`, `w >= 1`,
+  `x + w <= 24`; `y` remains 0–500 and `h` 3–40. An absent marker or
+  `columns:12` is legacy: reading doubles x/w without mutating source; an
+  arrangement edit migrates all sibling profiles together exactly once.
+  See [section layouts](../docs/section-layouts.md) for examples. Contract-block
+  spans remain on their separate 12-column grid; Explore coordinates are unchanged.
   Optional `layouts[].presentation` is `"standard"` (the default when omitted)
   or `"explore"`. Standard retains the authored arrangement. Explore provides a
   full-height graph with independently draggable, resizable, hideable floating

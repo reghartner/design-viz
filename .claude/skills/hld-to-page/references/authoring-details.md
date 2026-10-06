@@ -95,7 +95,7 @@ coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
 **Arrange for the delivery surface.** For independently positioned/resized
 panels and data-flow diagrams, use `diagram.sectionLayout` with `default`,
 `backstage`, and/or `confluence` profiles. Read `docs/section-layouts.md` for the
-12-column tile contract and a complete example. Use `{controls:"steps",x,y,w,h}`
+24-column tile contract (`columns:24`; absent markers mean legacy 12) and a complete example. Use `{controls:"steps",x,y,w,h}`
 for an independent playback/path/caption tile;
 omitting it keeps controls attached to the diagram. Arrange section preserves
 existing combined controls; choosing Detached separates them. The workbench's Arrange section

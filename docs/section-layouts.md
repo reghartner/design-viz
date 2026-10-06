@@ -26,7 +26,7 @@ scrolling lets you inspect a preview wider than your editor split.
 
 To arrange a Standard view, choose **Chapter → Arrange chapter and saved visibility…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
-a twelve-column grid. Overlapping tiles move down to remain visible. Click
+a 24-column grid. Overlapping tiles move down to remain visible. Click
 **Hide arrangement controls** tucks away the fields while you drag tiles. Choose **Done arranging** to finish. Diagram nodes and Home elements
 retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
@@ -65,8 +65,8 @@ controls tile. In Ambient mode a detached tile prompts you to choose Step.
   It arranges only visible elements and preserves hidden panels and Data flow
   in that layout/profile. Hidden tiles retain their saved size and position and
   reserve no space; if all supporting panels are hidden, the main tile fills the row.
-  Responsive and Backstage use an eight-column main tile with supporting
-  panels in four columns; without supporting panels, main tiles fill the row.
+  Responsive and Backstage use a 16-column main tile with supporting
+  panels in eight columns; without supporting panels, main tiles fill the row.
   Confluence gives the diagram and Home a full row,
   with smaller panels paired below. A declared centerpiece comes first.
 - **Reset layout** removes only the selected host arrangement. The default
@@ -339,23 +339,24 @@ Older specs without named layouts keep their automatic Home/Data flow behavior.
 
 ## Spec contract
 
-A diagram can declare one legacy `sectionLayout`, or a `layouts` array of named
+A diagram can declare one `sectionLayout`, or a `layouts` array of named
 arrangements. No schema-version switch is needed. Omitting both preserves the
 existing presentation.
 
 ```json
 "sectionLayout": {
+  "columns": 24,
   "default": [
-    {"panel":"home", "x":0, "y":0, "w":8, "h":12},
-    {"panel":"phone", "x":8, "y":0, "w":4, "h":12},
-    {"controls":"steps", "x":0, "y":12, "w":12, "h":6},
-    {"x":0, "y":18, "w":12, "h":12}
+    {"panel":"home", "x":0, "y":0, "w":16, "h":12},
+    {"panel":"phone", "x":16, "y":0, "w":8, "h":12},
+    {"controls":"steps", "x":0, "y":12, "w":24, "h":6},
+    {"x":0, "y":18, "w":24, "h":12}
   ],
   "confluence": [
-    {"panel":"home", "x":0, "y":0, "w":12, "h":12},
-    {"controls":"steps", "x":0, "y":12, "w":12, "h":6},
-    {"x":0, "y":18, "w":12, "h":12},
-    {"panel":"phone", "x":0, "y":30, "w":6, "h":12}
+    {"panel":"home", "x":0, "y":0, "w":24, "h":12},
+    {"controls":"steps", "x":0, "y":12, "w":24, "h":6},
+    {"x":0, "y":18, "w":24, "h":12},
+    {"panel":"phone", "x":0, "y":30, "w":12, "h":12}
   ]
 }
 ```
@@ -373,8 +374,17 @@ combine `panel` and `controls` on one tile. Omitting the controls tile preserves
 the previous combined diagram-and-controls presentation. A saved controls
 position is ignored while no steps are available and reused if steps return.
 `x` and `y` are zero-based grid positions;
-`w` and `h` are integer spans. There are twelve columns, with `x + w <= 12`,
+`w` and `h` are integer spans. New layouts declare `columns:24`, with `x + w <= 24`,
 `y` from 0 to 500, and `h` from 3 to 40. Rows are 32 pixels with an 8-pixel gap.
+The `columns` marker applies to all host arrays in that `sectionLayout`.
+Omitting it, or using `columns:12`, retains the legacy 12-column format.
+The viewer doubles legacy `x` and `w` in memory, preserving physical geometry;
+`y` and `h` are unchanged. Reading does not rewrite the document. The first
+arrangement edit migrates all sibling profiles together and saves `columns:24`;
+subsequent edits never scale them again. New presets and copies use 24 columns.
+For example, widths 15 and 9 fit side by side at x 0 and 15. Contract-block
+`span` still uses its separate 12-column grid; Explore coordinates are unchanged.
+Exports declare the `layout.grid-24` compatibility capability.
 These are presentation coordinates, not story evidence or Home coordinates.
 Unknown, duplicate, or malformed tiles produce validation warnings. The viewer
 ignores invalid tiles and appends unspecified/new panels and the diagram, so
@@ -399,17 +409,17 @@ Confluence or Backstage. Check the installed host after deployment.
 ```json
 "defaultLayout": "home-story",
 "layouts": [
-  {"id":"home-story", "name":"Home story", "presentation":"standard", "paths":["happy"], "sectionLayout":{"default":[
-    {"panel":"home","x":0,"y":0,"w":8,"h":12},
-    {"x":0,"y":18,"w":8,"h":12,"hidden":true},
-    {"controls":"steps","x":0,"y":12,"w":8,"h":6},
-    {"panel":"phone","x":8,"y":0,"w":4,"h":12}
+  {"id":"home-story", "name":"Home story", "presentation":"standard", "paths":["happy"], "sectionLayout":{"columns":24,"default":[
+    {"panel":"home","x":0,"y":0,"w":16,"h":12},
+    {"x":0,"y":18,"w":16,"h":12,"hidden":true},
+    {"controls":"steps","x":0,"y":12,"w":16,"h":6},
+    {"panel":"phone","x":16,"y":0,"w":8,"h":12}
   ]}},
-  {"id":"service-flow", "name":"Service flow", "presentation":"explore", "sectionLayout":{"default":[
-    {"x":0,"y":0,"w":8,"h":12},
-    {"panel":"home","x":0,"y":18,"w":8,"h":12,"hidden":true},
-    {"controls":"steps","x":0,"y":12,"w":8,"h":6},
-    {"panel":"phone","x":8,"y":0,"w":4,"h":12}
+  {"id":"service-flow", "name":"Service flow", "presentation":"explore", "sectionLayout":{"columns":24,"default":[
+    {"x":0,"y":0,"w":16,"h":12},
+    {"panel":"home","x":0,"y":18,"w":16,"h":12,"hidden":true},
+    {"controls":"steps","x":0,"y":12,"w":16,"h":6},
+    {"panel":"phone","x":16,"y":0,"w":8,"h":12}
   ]}}
 ]
 ```
@@ -601,10 +611,10 @@ to the view across all host profiles. For example:
 {"id":"resident", "name":"Resident story",
  "paths":["happy"],
  "steps":["quiet","notify","inside"],
- "sectionLayout":{"default":[
-   {"panel":"home","x":0,"y":0,"w":8,"h":18},
-   {"controls":"steps","attachTo":"panel:home","x":0,"y":18,"w":8,"h":6},
-   {"x":0,"y":0,"w":8,"h":12,"hidden":true}
+ "sectionLayout":{"columns":24,"default":[
+   {"panel":"home","x":0,"y":0,"w":16,"h":18},
+   {"controls":"steps","attachTo":"panel:home","x":0,"y":18,"w":16,"h":6},
+   {"x":0,"y":0,"w":16,"h":12,"hidden":true}
  ]}}
 ```
 

@@ -390,7 +390,10 @@ Start from the closest cookbook example and replace its facts with yours. The
 [routing table](references/recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
 Confluence, named views, and explicit manual-placement requests). Follow rule 12
-for node placement and connection routing. The schema's manual floats, ports,
+for node placement and connection routing. Standard panel arrangements use
+`sectionLayout.columns:24`; consult [section layouts](../../../docs/section-layouts.md)
+for host profiles and legacy 12-column migration. Contract-block spans retain
+their separate 12-column grid. The schema's manual floats, ports,
 bends and curve fields are reference material for user-directed exceptions and
 for preserving an existing diagram; they are not ordinary authoring defaults.
 

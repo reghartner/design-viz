@@ -1,8 +1,12 @@
 /* Pure section/view layout. Uses diagramPathList() and panelCapability() at
    call time, after panel definitions have registered; no DOM measurements. */
 
-/* Section composition uses a bounded twelve-column grid. Missing/new panels
+/* Section composition uses a bounded twenty-four-column grid. Missing/new panels
    are appended; collisions push later tiles down instead of hiding content. */
+var SECTION_LAYOUT_COLUMNS=24;
+/* Unmarked documents are the original 12-column format. The marker describes
+   every host profile; runtime projection never changes authored objects. */
+function sectionLayoutColumns(layouts){return layouts && layouts.columns===24?24:12;}
 function sectionLayoutKey(item){
   if(item && item.panel!=null)return typeof item.panel==='string'?'panel:'+item.panel:'invalid-panel';
   return item && item.controls!=null ? (item.controls==='steps'?'steps':'invalid-controls') : 'diagram';
@@ -46,9 +50,9 @@ function sectionLayoutPreset(d, target, excludedKeys){
   var supporting=tiles.some(function(t){return t!==main && t.key!=='diagram' && t.key!=='steps' && panelCapability(t.type,'supporting',true);});
   ordered.forEach(function(t){
     var panelLarge=panelCapability(t.type,'large',false), large=t.key==='diagram'||t.key==='steps'||panelLarge||t===main;
-    var w=large?(narrow||!supporting?12:8):(narrow?6:4);
+    var w=large?(narrow||!supporting?24:16):(narrow?12:8);
     var h=t.key==='steps'?((d.paths || []).length>1?6:4):panelLarge?panelCapability(t.type,'height',12):large?12:panelCapability(t.type,'height',6);
-    var xs=large?[0]:narrow?[0,6]:[8], candidates=xs.map(function(x){
+    var xs=large?[0]:narrow?[0,12]:[16], candidates=xs.map(function(x){
       var it={x:x,y:0,w:w,h:h}, hits;
       while((hits=items.filter(function(p){return it.x<p.x+p.w&&it.x+it.w>p.x&&it.y<p.y+p.h&&it.y+it.h>p.y;})).length)
         it.y=Math.max.apply(null,hits.map(function(p){return p.y+p.h;}));
@@ -185,14 +189,15 @@ function sectionViewStepsReachable(d,ids,pathIds){
 function sectionLayoutItems(d, target, id){
   var definition=sectionLayoutDefinition(d,id), layouts = definition && definition.sectionLayout, tiles = sectionLayoutTiles(d), saved = layouts && (Array.isArray(layouts[target]) ? layouts[target] : layouts.default);
   if (!Array.isArray(saved)) return definition && !definition.legacy ? sectionLayoutPreset(d,target) : null;
+  var columns=sectionLayoutColumns(layouts),scale=SECTION_LAYOUT_COLUMNS/columns;
   var items = [], used = Object.create(null);
   saved.forEach(function(it){
-    if (!it || typeof it !== 'object') return;
+    if (!it || typeof it !== 'object' || Array.isArray(it)) return;
     if(it.controls!=null && (it.controls!=='steps'||it.panel!=null))return;
     var key = sectionLayoutKey(it);
     if (used[key] || !tiles.some(function(t){return t.key === key;})) return;
-    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>12 || it.y>500 || it.h>40) return;
-    var copy = {x:it.x,y:it.y,w:it.w,h:it.h};
+    if (!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);}) || it.x<0 || it.y<0 || it.w<1 || it.h<3 || it.x+it.w>columns || it.y>500 || it.h>40) return;
+    var copy = {x:it.x*scale,y:it.y,w:it.w*scale,h:it.h};
     if (it.panel != null) copy.panel=it.panel;
     if (it.controls==='steps'){
       copy.controls='steps';
@@ -204,7 +209,7 @@ function sectionLayoutItems(d, target, id){
   var y = items.reduce(function(n,it){return it.hidden?n:Math.max(n,it.y+it.h);},0);
   tiles.forEach(function(t){
     if (used[t.key] || t.key==='steps') return; /* Old layouts keep controls attached. */
-    var item={x:0,y:y,w:12,h:t.key==='diagram'?12:panelCapability(t.type,'fallbackHeight',6)};
+    var item={x:0,y:y,w:SECTION_LAYOUT_COLUMNS,h:t.key==='diagram'?12:panelCapability(t.type,'fallbackHeight',6)};
     if(t.panel != null)item.panel=t.panel;
     items.push(item);y+=item.h;
   });

@@ -75,7 +75,7 @@ test('panel clipboard retains valid node mappings and drops unavailable destinat
 test('Optimize gives the app and source map the available width and respects hidden panels',()=>{
  const d=spec(panel()).page.blocks[0].diagram;
  for(const target of ['default','backstage','confluence']){
-  const items=C.sectionLayoutPreset(d,target,[]),app=items.find(i=>i.panel==='app');assert.equal(app.w,12);
+  const items=C.sectionLayoutPreset(d,target,[]),app=items.find(i=>i.panel==='app');assert.equal(app.w,24);
   assert.ok(!C.sectionLayoutPreset(d,target,['panel:app']).some(i=>i.panel==='app'));
  }
 });

@@ -354,17 +354,37 @@ function planPrimaryPanel(text, raw, sectionIdx, panelId){
 
 /* Authored section layouts are spec data; host preview dimensions are workspace
    state. Pointer previews never write source until one successful release. */
+/* Upgrade all sibling profiles together because columns belongs to the whole
+   sectionLayout. Preserve dormant/hidden tiles and unknown authored fields. */
+function builderSectionLayout24(value){
+  var layouts=builderClone(value || {});
+  if(layouts.columns!==undefined && layouts.columns!==12 && layouts.columns!==24)return layouts;
+  if(sectionLayoutColumns(layouts)===12){
+    ['default','backstage','confluence'].forEach(function(target){
+      if(Array.isArray(layouts[target]))layouts[target].forEach(function(it){
+        if(it && typeof it==='object' && !Array.isArray(it)){
+          if(Number.isInteger(it.x))it.x*=2;
+          if(Number.isInteger(it.w))it.w*=2;
+        }
+      });
+    });
+  }
+  layouts.columns=SECTION_LAYOUT_COLUMNS;return layouts;
+}
+function builderSectionLayoutHasProfiles(layouts){
+  return ['default','backstage','confluence'].some(function(target){return Object.prototype.hasOwnProperty.call(layouts,target);});
+}
 function planSectionLayout(text,raw,section,target,items,layoutId){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(['default','backstage','confluence'].indexOf(target)<0)return {error:'Unknown layout target.'};
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
   if(Array.isArray(got.d.layouts) && index<0)return {error:'Reselect the layout before editing it.'};
-  var definition=index>=0?got.d.layouts[index]:got.d, layouts=builderClone(definition.sectionLayout || {});
+  var definition=index>=0?got.d.layouts[index]:got.d, layouts=builderSectionLayout24(definition.sectionLayout);
   if(items===null)delete layouts[target];else layouts[target]=items;
-  if(index>=0 && !Object.keys(layouts).length)layouts.default=sectionLayoutPreset(got.d,'default');
+  if(index>=0 && !builderSectionLayoutHasProfiles(layouts))layouts.default=sectionLayoutPreset(got.d,'default');
   var warnings=[];sectionLayoutProfileWarnings(got.d,layouts,'diagram',warnings);
   if(warnings.length)return {error:warnings.join('\n')};
-  return planSetField(text,raw,index>=0?got.path.concat(['layouts',index]):got.path,'sectionLayout',Object.keys(layouts).length?JSON.stringify(layouts):null);
+  return planSetField(text,raw,index>=0?got.path.concat(['layouts',index]):got.path,'sectionLayout',builderSectionLayoutHasProfiles(layouts)?JSON.stringify(layouts):null);
 }
 function planSectionLayoutName(text,raw,section,name,layoutId){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
@@ -403,7 +423,7 @@ function planSectionExploreLayout(text,raw,section,layoutId,value){
 }
 function builderEnsureSectionView(d){
   var source=sectionLayoutDefinition(d),name=source?source.name:(d.primaryPanel?'Home':'Data flow');
-  d.layouts=[{id:'view-1',name:name,sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutOptimize(d,'default',null)})}];
+  d.layouts=[{id:'view-1',name:name,sectionLayout:builderSectionLayout24(source?source.sectionLayout:{columns:24,default:sectionLayoutOptimize(d,'default',null)})}];
   d.defaultLayout='view-1';delete d.sectionLayout;delete d.layoutName;
 }
 /* Match the viewer's legacy Home/Layout and Data choices when a header action
@@ -417,7 +437,7 @@ function builderPromoteSectionViews(d,layoutId){
   if(selected!=='flow' && selected!==first)return {error:'Reselect the view before editing it.'};
   var views=[],targets=['default'];
   if(source){
-    views.push({id:'layout',name:source.name,sectionLayout:builderClone(source.sectionLayout)});
+    views.push({id:'layout',name:source.name,sectionLayout:builderSectionLayout24(source.sectionLayout)});
     ['backstage','confluence'].forEach(function(target){if(Array.isArray(source.sectionLayout[target]))targets.push(target);});
   }else if(focus){
     var homeDiagram=Object.assign({},d,{primaryPanel:focus.id}),preset=sectionLayoutPreset(homeDiagram,'default');
@@ -428,9 +448,9 @@ function builderPromoteSectionViews(d,layoutId){
       items=sectionLayoutOptimize(homeDiagram,'default',[hidden,controls]);
     }else items=sectionLayoutPreset(homeDiagram,'default',['diagram']).concat([hidden]);
     var label=panelCapability(focus.type,'focusLabel',focus.title || 'Home');
-    views.push({id:'home',name:String(label).trim().slice(0,40) || 'Home',sectionLayout:{default:items}});
+    views.push({id:'home',name:String(label).trim().slice(0,40) || 'Home',sectionLayout:{columns:24,default:items}});
   }
-  var flowDiagram=Object.assign({},d,{primaryPanel:undefined}),profiles={};
+  var flowDiagram=Object.assign({},d,{primaryPanel:undefined}),profiles={columns:24};
   targets.forEach(function(target){profiles[target]=sectionLayoutOptimize(flowDiagram,target,null);});
   views.push({id:'flow',name:'Data flow',sectionLayout:profiles});
   d.layouts=views;d.defaultLayout=defaultId;delete d.sectionLayout;delete d.layoutName;
@@ -483,7 +503,7 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
       var selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
       source=sectionLayoutDefinition(d,selected.layoutId);
     }else{
-      d.layouts=[{id:'layout-1',name:source?source.name:'Layout',sectionLayout:builderClone(source?source.sectionLayout:{default:sectionLayoutPreset(d,'default')})}];
+      d.layouts=[{id:'layout-1',name:source?source.name:'Layout',sectionLayout:builderSectionLayout24(source?source.sectionLayout:{columns:24,default:sectionLayoutPreset(d,'default')})}];
       d.defaultLayout='layout-1';delete d.sectionLayout;delete d.layoutName;source=d.layouts[0];
     }
   }
@@ -491,8 +511,9 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   var n=1;while(d.layouts.some(function(v){return v.id==='layout-'+n;}))n++;
   var id='layout-'+n, name=source.name.slice(0,33)+' copy';
   var suffix=2;while(d.layouts.some(function(v){return v.name===name;}))name=source.name.slice(0,28)+' copy '+suffix++;
-  var profiles=builderClone(source.sectionLayout);
+  var profiles=builderSectionLayout24(source.sectionLayout);
   Object.keys(profiles).forEach(function(target){
+    if(!Array.isArray(profiles[target]))return;
     profiles[target]=sectionLayoutItems(Object.assign({},d,{layouts:undefined,defaultLayout:undefined,sectionLayout:profiles}),target);
   });
   var copy={id:id,name:name,sectionLayout:profiles};if(source.paths)copy.paths=builderClone(source.paths);if(source.steps)copy.steps=builderClone(source.steps);
@@ -554,8 +575,8 @@ function sectionLayoutOptimize(d,target,items){
 function sectionLayoutGesture(items,key,dx,dy,resize){
   var next=items.map(function(it){return Object.assign({},it);}),item=next.find(function(it){return sectionLayoutKey(it)===key;});
   if(!item)return next;
-  if(resize){item.w=Math.max(1,Math.min(12-item.x,item.w+Math.round(dx)));item.h=Math.max(3,Math.min(40,item.h+Math.round(dy)));}
-  else{item.x=Math.max(0,Math.min(12-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
+  if(resize){item.w=Math.max(1,Math.min(SECTION_LAYOUT_COLUMNS-item.x,item.w+Math.round(dx)));item.h=Math.max(3,Math.min(40,item.h+Math.round(dy)));}
+  else{item.x=Math.max(0,Math.min(SECTION_LAYOUT_COLUMNS-item.w,item.x+Math.round(dx)));item.y=Math.max(0,Math.min(500,item.y+Math.round(dy)));}
   return sectionLayoutPack(next,key);
 }
 function sectionLayoutAttach(d,items,key){

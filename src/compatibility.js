@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
     'layout.explore-controls-placement':['Independent placement of Explore step controls','0.2.0'],
     'layout.explore-panel-placement':['Independent placement of Explore panels','0.2.0'],
@@ -129,6 +130,7 @@ var FlowviewCompatibility = (function(){
       if(Array.isArray(d.paths) && d.paths.length)used['flow.alternates']=true;
       if((Array.isArray(d.steps)?d.steps:[]).some(function(s){return s && object(s.failures) && Object.keys(s.failures).length;}))used['flow.failures']=true;
       if(d.sectionLayout)used['layout.arranged']=true;
+      if([d].concat(Array.isArray(d.layouts)?d.layouts:[]).some(function(v){return v && object(v.sectionLayout) && v.sectionLayout.columns===24;}))used['layout.grid-24']=true;
       if(Array.isArray(d.layouts) && d.layouts.length){
         used['layout.named']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;

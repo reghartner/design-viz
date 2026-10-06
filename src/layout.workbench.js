@@ -165,13 +165,13 @@ function initSectionLayoutEditor(opts){
     if(!items.some(function(it){return sectionLayoutKey(it)===selected;}))selected='diagram';choose.value=selected;
     fieldLife.listen(choose,'change',function(){selected=choose.value;fields(section,d);});row.appendChild(choose);
     var item=items.find(function(it){return sectionLayoutKey(it)===selected;}),inputs={};
-    [['x','Column',1,12],['y','Row',1,501],['w','Width',1,12],['h','Height',3,40]].forEach(function(f){
+    [['x','Column',1,SECTION_LAYOUT_COLUMNS],['y','Row',1,501],['w','Width',1,SECTION_LAYOUT_COLUMNS],['h','Height',3,40]].forEach(function(f){
       var l=el('label',null,f[1]+' '),input=el('input');input.type='number';input.min=f[2];input.max=f[3];input.step='1';input.value=item[f[0]]+(f[0]==='x'||f[0]==='y'?1:0);input.setAttribute('aria-label',f[1]);inputs[f[0]]=input;l.appendChild(input);row.appendChild(l);
     });
     row.appendChild(button('Apply size / position',function(){
       var next=items.map(function(it){return Object.assign({},it);}),it=next.find(function(v){return sectionLayoutKey(v)===selected;});
       Object.keys(inputs).forEach(function(k){it[k]=Number(inputs[k].value)-(k==='x'||k==='y'?1:0);});
-      var warnings=[];sectionLayoutWarnings(Object.assign({},d,{sectionLayout:{default:next}}),'diagram',warnings);
+      var warnings=[];sectionLayoutWarnings(Object.assign({},d,{sectionLayout:{columns:24,default:next}}),'diagram',warnings);
       if(warnings.length){feedback(warnings[0]);return;}
       persist(Number(section.getAttribute('data-dv-section')),sectionLayoutPack(next,selected));
     }));
@@ -366,7 +366,7 @@ function initSectionLayoutEditor(opts){
     var grid=handle.closest('.section-layout-grid');if(getComputedStyle(grid).display!=='grid'){feedback('Use size / position fields on narrow screens, or widen the preview to drag.');return;}
     ev.preventDefault();ev.stopPropagation();cancel();selected=handle.closest('.section-layout-tile').getAttribute('data-layout-key');
     var items=currentItems(index),rect=grid.getBoundingClientRect(),scale=grid.offsetWidth?rect.width/grid.offsetWidth:1;
-    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)*scale/12,row:40*scale,minHeight:grid.style.minHeight};
+    drag={handle:handle,grid:grid,section:index,key:selected,items:items,next:items,text:opts.src.value,x:ev.clientX,y:ev.clientY,left:rect.left,top:rect.top,pointer:ev.pointerId,resize:handle.classList.contains('section-tile-resize'),controls:handle.classList.contains('section-controls-resize'),cell:(grid.clientWidth+8)*scale/SECTION_LAYOUT_COLUMNS,row:40*scale,minHeight:grid.style.minHeight};
     // Keep the scroll range while moving the bottom tile upward. Otherwise
     // scroll clamping moves the grid origin and feeds back into the next delta.
     grid.style.minHeight=rect.height/scale+'px';

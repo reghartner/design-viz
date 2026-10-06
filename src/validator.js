@@ -164,14 +164,17 @@ function validatePaths(d, path, errors){
 function sectionLayoutProfileWarnings(d, v, path, warnings){
   if(v == null)return;
   if(typeof v!=='object'||Array.isArray(v)){warnings.push(path+'.sectionLayout: expected default/backstage/confluence grid layouts');return;}
+  var columns=sectionLayoutColumns(v);
+  if(v.columns!==undefined && v.columns!==12 && v.columns!==24)warnings.push(path+'.sectionLayout.columns: use 12 (legacy) or 24');
   Object.keys(v).forEach(function(target){
+    if(target==='columns')return;
     if(['default','backstage','confluence'].indexOf(target)<0){warnings.push(path+'.sectionLayout: unknown target '+target);return;}
     var list=v[target],used=Object.create(null),tiles=sectionLayoutTiles(d);
     if(!Array.isArray(list)){warnings.push(path+'.sectionLayout.'+target+': expected an array of tiles');return;}
     list.forEach(function(it,i){
       var p=path+'.sectionLayout.'+target+'['+i+']',key=sectionLayoutKey(it);
-      if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>12||it.y>500||it.h>40)
-        warnings.push(p+': use integer x/y/w/h; 12 columns, y 0–500, h 3–40');
+      if(!it||typeof it!=='object'||Array.isArray(it)||!['x','y','w','h'].every(function(k){return Number.isInteger(it[k]);})||it.x<0||it.y<0||it.w<1||it.h<3||it.x+it.w>columns||it.y>500||it.h>40)
+        warnings.push(p+': use integer x/y/w/h; '+columns+' columns, y 0–500, h 3–40');
       if(it && it.hidden!=null && (typeof it.hidden!=='boolean' || it.controls!=null))warnings.push(p+': hidden must be a boolean on a diagram or panel tile; step controls stay available');
       if(it && it.controls!=null && (it.controls!=='steps'||it.panel!=null))warnings.push(p+': controls must be "steps", without a panel ID');
       if(it && it.attachTo!=null && (it.controls!=='steps' || !(it.attachTo==='diagram' || tiles.some(function(t){return t.key===it.attachTo && panelCapability(t.type,'attachControls',false);}))))warnings.push(p+'.attachTo: attach step controls to "diagram" or "panel:<homemap ID>"');

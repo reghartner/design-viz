@@ -122,7 +122,7 @@ and default changes use the normal source Undo/Redo history.
 
 The selected Chapter owns its Standard or Explore surface. **Chapter → Arrange chapter and saved visibility…** opens the detailed arranger for placement, saved visibility, paths and steps. Its **Arrangement profile** selector edits Responsive, Backstage, or Confluence arrangements independently; moving, resizing, hiding, optimizing, or resetting Standard tiles changes only that profile. **Panels** owns temporary Hide/Restore, Stack at edge and panel/control scale; **Legend** owns protocol keys. These popovers overlay the canvas. **Preview → Open page preview** renders a separate reader. It opens the last usable document with the current skin, tab, Chapter, path and step. Host and width choices apply there. The editor tree is suspended while reader controls remain interactive; Close preview or Escape restores the same source (including an invalid draft), history, editing selection, playback and camera.
 
-**File**, **Add**, **Undo/Redo**, **Preview**, **Help**, and download share one project band. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
+**Home**, **File**, **Add**, **Undo/Redo**, **Preview**, **Help**, and download share one project band. Story navigation shares the next band. At narrow widths those lanes wrap and scroll; Undo stays in project actions. Add shows the active editing destination as a breadcrumb. **Change destination** groups sections by tab and deliberately selects that context before accepting another insertion snapshot. Prose-only tabs never insert into a hidden diagram. Detail previews explain why insertion requires returning to the source diagram.
 
 Each card in **Add to diagram** opens its next step immediately. **Node** opens
 presets; click a preset to add it and customize it in the inspector. **All additions**
@@ -208,7 +208,7 @@ The bottom-left **Copy for agent** button copies selected references directly.
 The full spec and ledger remain available through the shared folder.
 
 **⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
-Save, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
+Home, File, Download JSON, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
 story and panel fields side by side; narrower windows stack them.
 
 On the page, all row diagrams have their own **Auto / Fit width / Readable** controls,
@@ -264,5 +264,6 @@ activity state without another button in the header.
 
 **Brief → Download review package** downloads a ZIP containing the current JSON,
 viewer HTML, story notes, and evidence references. It does not publish or submit
-anything. The header’s **Download JSON** keeps a source file, while File reports
-whether browser recovery was saved.
+anything. The header’s **File** opens the project files workspace, where export
+writes the JSON and standalone HTML together. **Download JSON** keeps the direct
+source-file shortcut, while File reports whether browser recovery was saved.

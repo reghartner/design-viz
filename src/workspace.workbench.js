@@ -145,6 +145,8 @@ function initWorkbenchWorkspace(){
     if(options && options.focus)focusTab(name);
     persist();return true;
   }
+  var fileButton=document.getElementById('workspace-file');
+  if(fileButton)fileButton.addEventListener('click',function(){showTool('file',{focus:true});});
   function close(name){prefs.windows[name].open=false;paint(name);persist();focusTab(name);}
   function inspectSelection(){
     if(!revealFreshInspect)return false;

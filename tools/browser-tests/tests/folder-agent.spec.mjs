@@ -894,12 +894,12 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     const preview=page.locator('#folder-agent-copy-preview');await expect(preview).toBeVisible();await expect(preview).toHaveAttribute('readonly','');
     expect(await preview.evaluate(el=>el.selectionEnd-el.selectionStart)).toBe((await preview.inputValue()).length);
     expect(await preview.inputValue()).not.toContain(source);expect(await preview.inputValue()).not.toContain('"rows"');
-    for(const width of [768,640,390])for(let cycle=0;cycle<2;cycle++){
+    for(const width of [1051,1050,900,801,800,768,640,390])for(let cycle=0;cycle<2;cycle++){
       await page.setViewportSize({width,height:360});
       await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-working')).toHaveAccessibleName(/Open Agent/);
       for(const selector of ['#workbench-home','#workspace-home','#workspace-file','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#file-save']){
-        const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit)};});
-        expect(control,selector+' while Agent is active at '+width+'px').toEqual({inside:true,reachable:true});
+        const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1)};});
+        expect(control,selector+' while Agent is active at '+width+'px').toMatchObject({inside:true,reachable:true});
       }
       if(!await preview.isVisible())await page.locator('#folder-agent-send').click();
       await expect(preview).toBeVisible();await preview.focus();

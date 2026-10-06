@@ -315,3 +315,15 @@ test('independent Section notes placement declares its capability without needin
   assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-prose-placement'));
  }
 });
+
+test('24-column Standard layouts declare a capability while legacy12 layouts remain compatible',()=>{
+  for(const named of [false,true]){
+    const raw=spec(),d=raw.page.blocks[0].tabs[0].sections[0].diagram,layout={default:[{x:0,y:0,w:12,h:12}]};
+    if(named)d.layouts=[{id:'one',name:'One',sectionLayout:layout}];else d.sectionLayout=layout;
+    assert.ok(!C.detect(raw).includes('layout.grid-24'));layout.columns=12;assert.ok(!C.detect(raw).includes('layout.grid-24'));
+    layout.columns=24;assert.ok(C.detect(raw).includes('layout.grid-24'));
+    const stamped=C.stamp(raw),older={...C.features};delete older['layout.grid-24'];
+    assert.ok(stamped.page.flowview.features.includes('layout.grid-24'));
+    assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('layout.grid-24'));
+  }
+});

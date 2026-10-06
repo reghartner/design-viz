@@ -148,7 +148,7 @@ test('Forge selects the Confluence composition and preserves alternate state thr
   d.sectionLayout={default:[{x:0,y:0,w:8,h:12}],confluence:[{panel:'home',x:0,y:0,w:12,h:12},{x:0,y:12,w:12,h:12}]};
   const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview');
   const grid=view.querySelector('.section-layout-grid');assert.equal(grid.dataset.layoutTarget,'confluence');
-  assert.equal(grid.firstChild.dataset.layoutKey,'panel:home');assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'12');
+  assert.equal(grid.firstChild.dataset.layoutKey,'panel:home');assert.equal(grid.firstChild.style.getPropertyValue('--tile-w'),'24');
   assert.equal(grid.querySelectorAll('.pwidget').length,d.panels.length,'unspecified panels stay visible');
   const bar=view.querySelector('.termbar'),map=view.querySelector('.pt-homemap'),board=view.querySelector('.board');
   view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();

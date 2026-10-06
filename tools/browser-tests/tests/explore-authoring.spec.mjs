@@ -33,7 +33,11 @@ test('Presentation is a per-view undoable edit and survives host preview changes
   expect(copy.presentation).toBe('explore');expect(diagram.defaultLayout).toBe('home-story');
   expect(diagram.layouts[0]).toEqual(named.page.sections[0].diagram.layouts[0]);
   expect(diagram.steps).toEqual(named.page.sections[0].diagram.steps);expect(diagram.paths).toEqual(named.page.sections[0].diagram.paths);
-  expect(copy.sectionLayout).toEqual(diagram.layouts[1].sectionLayout);
+  // Duplication migrates every Standard host profile, including hidden tiles and docked controls.
+  const sourceLayout=diagram.layouts[1].sectionLayout;
+  expect(sourceLayout).toEqual(named.page.sections[0].diagram.layouts[1].sectionLayout);
+  expect(copy.sectionLayout).toEqual({columns:24,...Object.fromEntries(Object.entries(sourceLayout).map(([profile,tiles])=>[profile,tiles.map(tile=>({...tile,x:tile.x*2,w:tile.w*2}))]))});
+  expect(copy.exploreLayout).toEqual(diagram.layouts[1].exploreLayout);
   await expect(section(page)).toHaveAttribute('data-view-id',copy.id);await expect(presentation()).toHaveValue('explore');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);
 });

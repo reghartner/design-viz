@@ -45,6 +45,7 @@
 @media(max-width:600px){.practice-agent-content{padding:18px}.practice-window-folder{display:none}.practice-conversation h2{font-size:24px}.practice-message{padding:12px;margin:14px 0}.practice-reply{margin-left:16px}}
 .folder-agent-setup-choices{grid-template-columns:1fr!important}
 #folder-agent-setup-mode-external{border-width:2px}
-#folder-agent-setup-mode-embedded{padding:9px 12px;font-size:12px;background:transparent}
+#folder-agent-setup-mode-embedded{padding:9px 12px;font-size:12px}
+#folder-agent-setup-mode-embedded:not([aria-pressed="true"]){background:transparent}
 [data-open-human-guide]+.welcome-text-button{margin-left:14px}
 @media(max-width:800px){.welcome-hero{grid-template-columns:1fr}.workbench-tour-header>b{width:100%}}

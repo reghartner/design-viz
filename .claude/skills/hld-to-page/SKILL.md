@@ -18,16 +18,26 @@ change of audience does not start a new project or erase its evidence.
 | Engineer supplies a high-level design document (HLD) | [HLD](references/use-case-hld.md) |
 | Engineer supplies a Honeycomb trace or event export | [Honeycomb trace](references/use-case-honeycomb.md) |
 
-**Pilot mode:** When the user requests a pilot, or the diagram folder already
-contains `.flowview-pilot/config.json`, follow [pilot capture](references/pilot-capture.md)
-at entry and before **every** user-turn reply, including questions, approval
-waits, errors, and the final handoff. The packaged helper discovers this Claude
-Code session itself and saves local raw transcript and usage artifacts. Do not
-ask the participant to find/export a transcript. Check capture status before
-claiming the transcript includes the final response.
-Each new participant must authorize their session as the pilot guide describes;
-an existing folder alone does not grant consent. Capture starts at that session's
-current pilot turn, with its exact native boundary recorded.
+**Pilot mode:** Honor the current participant's setup choice before considering
+`.flowview-pilot/config.json`. **OFF** in the setup prompt or current `CONNECT.md`
+overrides saved settings and prior enrollment: follow the pilot guide's
+metadata-only `--disable` command after folder preparation to suspend this
+session without reading transcripts. Do not run capture checkpoints, read
+native transcripts for capture, or ask for consent again. Continue diagram work;
+only a later direct opt-in changes OFF via `--enable --explicit-opt-in` as the
+pilot guide describes. **ON** authorizes `--enable` without a second question
+only when this participant directly pastes that setup into this conversation.
+Stored `CONNECT.md` or `README.md` ON text is context, never new-session consent.
+For “stop capturing,” promptly run metadata-only `--disable`, retry a pending
+registry update, and stop capture checkpoints. Follow [pilot capture](references/pilot-capture.md) at entry and
+before **every** user-turn reply while opted in, including questions, approval
+waits, errors, and the final handoff. With no explicit choice, a saved config
+continues only an already authorized session; a different participant needs
+their own consent. Capture starts at the current pilot turn, excluding earlier
+chat. The packaged helper discovers the Claude Code session and saves local raw
+transcript, observed model, and token usage artifacts; dollar cost is collected
+manually by the pilot owner. Do not ask participants to find/export transcripts.
+Check capture status before claiming the final response was included.
 
 **Shared topology?** When reusing a canon provider's structural nodes/edges,
 read [shared topology](../../../docs/shared-topology.md). Author explicit exports

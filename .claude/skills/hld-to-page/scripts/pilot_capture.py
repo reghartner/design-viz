@@ -386,13 +386,116 @@ def folder_owner(folder):
     return {key: value[key] for key in ('sessionId', 'connectionId')}
 
 
-def enrollment(raw, session_id, owners=()):
+class SetupCaptureBlocked(ValueError):
+    pass
+
+
+def setup_capture_gate(folder):
+    """Read only current connection metadata; no native transcript discovery."""
+    support = folder / '.flowview-agent'
+    if support.is_symlink():
+        raise SetupCaptureBlocked('Flowview metadata directory cannot be a symlink')
+    if not (support / 'session.json').exists():
+        support = folder
+    setup = regular(support / 'CONNECT.md')
+    if not setup.exists():
+        return None
+    if setup.stat().st_size > 128 * 1024:
+        raise SetupCaptureBlocked('Connection instructions exceed the capture consent limit')
+    text = setup.read_text()
+    gate = parse_setup_choice(text)
+    if gate is not None and {key: gate[key] for key in ('sessionId', 'connectionId')} != folder_owner(folder):
+        raise SetupCaptureBlocked('Pilot setup choice does not match the current connection')
+    return gate
+
+
+def parse_setup_choice(text):
+    choices = re.findall(r'^Pilot capture: (ON|OFF) for this session\.', text, re.M)
+    if not choices:
+        return None  # Older/standalone authoring has no browser choice.
+    quoted = r'("(?:[^"\\]|\\.)*")'
+    identities = re.findall(r'Verify [^\n]*?/session\.json has sessionId ' + quoted +
+                            r' and connectionId ' + quoted + r'\.', text)
+    if len(choices) != 1 or len(identities) != 1:
+        raise SetupCaptureBlocked('Pilot setup choice has no unambiguous connection identity')
+    identity = dict(zip(('sessionId', 'connectionId'), map(json.loads, identities[0])))
+    return {**identity, 'choice': choices[0]}
+
+
+def gate_authorized(item, gate):
+    return gate is None or item.get('setupConsent') == gate
+
+
+def stop_record(folder, session_id):
+    path = regular(folder / PRIVATE / (session_id + '.capture-stop'))
+    if not path.exists():
+        return {}
+    text = path.read_text()
+    record = {'token': text} if re.fullmatch(r'[0-9a-f]{32}', text) else json.loads(text)
+    if not isinstance(record, dict) or not isinstance(record.get('token'), str) or not re.fullmatch(r'[0-9a-f]{32}', record['token']):
+        raise SetupCaptureBlocked('Invalid capture stop token')
+    return record
+
+
+def stop_token(folder, session_id):
+    return stop_record(folder, session_id).get('token')
+
+
+def check_setup_gate(folder, expected, session_id=None, expected_stop=None):
+    if setup_capture_gate(folder) != expected or (session_id and stop_token(folder, session_id) != expected_stop):
+        raise SetupCaptureBlocked('Pilot consent changed during capture; retry only with current consent')
+
+
+def publish_capture_batch(folder, gate, authorizations, writes):
+    """Restore the prior batch if browser setup or a stop token changes mid-write."""
+    def verify():
+        check_setup_gate(folder, gate)
+        for session_id, token in authorizations:
+            if stop_token(folder, session_id) != token:
+                raise SetupCaptureBlocked('Capture was stopped during publication; prior captures were restored')
+    previous = []
+    try:
+        for path, data in writes:
+            verify()
+            path = regular(path)
+            before = path.read_bytes() if path.exists() else None
+            previous.append((path, before))
+            atomic(path, data)
+            verify()
+    except Exception:
+        for path, before in reversed(previous):
+            if before is None:
+                regular(path).unlink(missing_ok=True)
+            else:
+                atomic(path, before)
+        raise
+
+
+def json_bytes(value):
+    return (json.dumps(value, indent=2, ensure_ascii=False) + '\n').encode()
+
+
+def blocked_capture(error=None):
+    return {'status': 'disabled', 'currentSourceAvailable': False,
+            'message': str(error) if error else 'The current setup requires this Claude session to explicitly opt in before capture.'}
+
+
+def enrollment(raw, session_id, owners=(), gate=None, explicit_opt_in=False):
     complete = raw[:raw.rfind(b'\n') + 1]
     parsed = analyze(complete, session_id, owners)
     turns = parsed['turns']
     if not turns or parsed['activeParticipantTurnId'] is None:
         raise ValueError('No current verified participant turn is available to establish a pilot capture boundary')
     current = turns[-1]
+    row = json.loads(complete.splitlines()[current['transcriptLine'] - 1])
+    prompt = participant_text(row) or ''
+    if explicit_opt_in:
+        if current['flowviewRequest'] or not re.search(
+                r'(?im)^\s*(?:use pilot mode(?: for this session)?|enable pilot capture(?: for this session| now)?)\s*[.!]?\s*$', prompt):
+            raise SetupCaptureBlocked('A later opt-in requires a direct participant turn saying “Use pilot mode for this session.”')
+    elif gate is not None:
+        if current['flowviewRequest'] or gate['choice'] != 'ON' or parse_setup_choice(prompt) != gate:
+            raise SetupCaptureBlocked('Enrollment requires the participant to directly paste their ON setup prompt; stored CONNECT.md or README.md is not consent.')
     prefix = b''.join(complete.splitlines(keepends=True)[:current['transcriptLine'] - 1])
     return {'id': session_id, 'consentedAt': now(), 'startTurnId': current['id'],
             'startOffset': len(prefix), 'startLine': current['transcriptLine'],
@@ -400,7 +503,76 @@ def enrollment(raw, session_id, owners=()):
             'prefixSha256': hashlib.sha256(prefix).hexdigest()}
 
 
-def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=None):
+def validate_config(config):
+    def valid_slice(item):
+        return (isinstance(item, dict) and isinstance(item.get('id'), str) and SESSION_ID.fullmatch(item['id']) and
+                isinstance(item.get('startOffset', 0), int) and not isinstance(item.get('startOffset', 0), bool) and item.get('startOffset', 0) >= 0 and
+                isinstance(item.get('monitorOwners', []), list) and
+                all(isinstance(owner, dict) and all(isinstance(owner.get(key), str) and owner[key]
+                    for key in ('sessionId', 'connectionId')) for owner in item.get('monitorOwners', [])) and
+                ('prefixSha256' not in item or re.fullmatch(r'[0-9a-f]{64}', str(item['prefixSha256']))) and
+                ('stopToken' not in item or item['stopToken'] is None or isinstance(item['stopToken'], str) and re.fullmatch(r'[0-9a-f]{32}', item['stopToken'])) and
+                isinstance(item.get('suspended', False), bool) and
+                ('setupConsent' not in item or isinstance(item['setupConsent'], dict) and
+                 item['setupConsent'].get('choice') in ('ON', 'OFF') and
+                 all(isinstance(item['setupConsent'].get(key), str) and item['setupConsent'][key]
+                     for key in ('sessionId', 'connectionId'))) and
+                ('archive' not in item or isinstance(item['archive'], str) and
+                 re.fullmatch(re.escape(item['id']) + r'\.[0-9a-f]{32}\.jsonl', item['archive'])))
+    if (not isinstance(config, dict) or not isinstance(config.get('sessions'), list) or
+            any(not valid_slice(item) or not isinstance(item.get('previousCaptures', []), list) or
+                any(not valid_slice(old) or old['id'] != item['id'] or not old.get('suspended') or
+                    'previousCaptures' in old for old in item.get('previousCaptures', []))
+                for item in config['sessions']) or
+            len({item['id'] for item in config['sessions']}) != len(config['sessions'])):
+        raise ValueError('Invalid pilot session registry')
+    names = [item.get('archive', item['id'] + '.jsonl') for session in config['sessions']
+             for item in [*session.get('previousCaptures', []), session]]
+    if len(names) != len(set(names)):
+        raise ValueError('Duplicate pilot capture archive')
+
+
+def disable(folder, session_id):
+    """Publish a metadata-only stop barrier before waiting on registry lock."""
+    folder = Path(folder)
+    if folder.is_symlink() or not folder.is_dir():
+        raise ValueError('Use the existing diagram folder, not a symlink')
+    private = folder.resolve() / PRIVATE
+    if private.is_symlink():
+        raise ValueError('Pilot directory cannot be a symlink')
+    config_path = private / 'config.json'
+    result = {'status': 'disabled', 'currentSourceAvailable': False,
+              'message': 'Future capture for this Claude session is disabled in this folder. Existing captures are retained; no transcript was read.'}
+    if not config_path.exists() and not (private / 'capture.lock').exists():
+        return result  # A never-piloted folder needs no Claude session identity.
+    if not session_id or not SESSION_ID.fullmatch(session_id):
+        raise ValueError('CLAUDE_CODE_SESSION_ID is missing or invalid; cannot suspend a guessed session')
+    stop = {'token': uuid.uuid4().hex}
+    try:
+        stop['setup'] = setup_capture_gate(folder)
+    except (OSError, ValueError):
+        pass  # Unknown setup must not authorize a future plain --enable.
+    atomic(private / (session_id + '.capture-stop'), json_bytes(stop))
+    try:
+        with locked(private):
+            config = json.loads(regular(config_path).read_bytes())
+            validate_config(config)
+            for item in config['sessions']:
+                if item['id'] == session_id:
+                    item['suspended'] = True
+                    item['suspendedAt'] = now()
+                    save_json(config_path, config)
+                    break
+    except (OSError, ValueError) as error:
+        # Readers honor the stop token even while the registry lock is busy.
+        result['registryUpdatePending'] = True
+        result['message'] = 'Capture stop barrier is active without reading transcripts. Retry --disable to finish the registry update: ' + str(error)
+    return result
+
+
+def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=None, expected_capture_id=None, explicit_opt_in=False):
+    if explicit_opt_in and not enable:
+        raise ValueError('--explicit-opt-in requires --enable and a direct participant request')
     folder = Path(folder)
     if folder.is_symlink() or not folder.is_dir():
         raise ValueError('Use the existing diagram folder, not a symlink')
@@ -413,24 +585,45 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
         return {'status': 'disabled', 'message': 'Pilot capture is not enabled for this folder.'}
     private.mkdir(mode=0o700, exist_ok=True)
     with locked(private):
+        try:
+            gate = setup_capture_gate(folder)
+        except (OSError, ValueError) as error:
+            return blocked_capture(error)
         fresh = not config_path.exists()
         config = json.loads(regular(config_path).read_bytes()) if not fresh else {'enabledAt': now(), 'sessions': []}
-        if (not isinstance(config, dict) or not isinstance(config.get('sessions'), list) or
-                any(not isinstance(item, dict) or not isinstance(item.get('id'), str) or
-                    not SESSION_ID.fullmatch(item['id']) or
-                    not isinstance(item.get('startOffset', 0), int) or isinstance(item.get('startOffset', 0), bool) or item.get('startOffset', 0) < 0 or
-                    not isinstance(item.get('monitorOwners', []), list) or
-                    any(not isinstance(owner, dict) or any(not isinstance(owner.get(key), str) or not owner[key]
-                        for key in ('sessionId', 'connectionId')) for owner in item.get('monitorOwners', [])) or
-                    ('prefixSha256' in item and not re.fullmatch(r'[0-9a-f]{64}', str(item['prefixSha256'])))
-                    for item in config['sessions']) or
-                len({item['id'] for item in config['sessions']}) != len(config['sessions'])):
-            raise ValueError('Invalid pilot session registry')
+        validate_config(config)
         if fresh and any((folder / name).exists() for name in (TRANSCRIPT, USAGE)):
             raise ValueError('Unmanaged pilot artifacts already exist; refusing to overwrite them')
+        current_entry = next((item for item in config['sessions'] if item['id'] == session_id), None)
+        stop = stop_record(folder, session_id) if session_id and SESSION_ID.fullmatch(session_id) else {}
+        current_stop = stop.get('token')
+        stopped = current_stop is not None and (current_entry is None or current_entry.get('stopToken') != current_stop)
+        fresh_on = gate is not None and gate['choice'] == 'ON' and 'setup' in stop and stop['setup'] != gate
+        if stopped and (not enable or not explicit_opt_in and not fresh_on):
+            return blocked_capture('This session was stopped; a later direct opt-in requires --enable --explicit-opt-in.')
+        if gate is not None and enable and not explicit_opt_in and any(
+                part['id'] != session_id and part.get('setupConsent') == gate
+                for item in config['sessions'] for part in [*item.get('previousCaptures', []), item]):
+            return blocked_capture('Another Claude session already claimed this setup. Use fresh setup or a direct opt-in with --enable --explicit-opt-in.')
+        if gate is not None and not enable and (current_entry is None or not gate_authorized(current_entry, gate)):
+            return blocked_capture()
+        if gate is not None and gate['choice'] == 'OFF' and enable and not explicit_opt_in:
+            return blocked_capture('Setup is OFF. A later explicit user opt-in requires --enable --explicit-opt-in.')
         if session_id and SESSION_ID.fullmatch(session_id) and not enable and not any(item['id'] == session_id for item in config['sessions']):
             return {'status': 'consent_required', 'currentSourceAvailable': False,
                     'message': 'This Claude session is new to the pilot folder. Disclose local capture and use --enable only when this participant authorizes pilot mode. Earlier chat will be excluded.'}
+        if (current_entry and current_entry.get('suspended') and not enable or
+                expected_capture_id is not None and (not current_entry or
+                    current_entry.get('archive', session_id + '.jsonl') != expected_capture_id)):
+            return {'status': 'disabled', 'currentSourceAvailable': False,
+                    'message': 'This capture enrollment is suspended or has been replaced.'}
+        for session in config['sessions']:
+            for part in [*session.get('previousCaptures', []), session]:
+                retained = part.get('suspended') or not gate_authorized(part, gate) or part.get('stopToken') != stop_token(folder, part['id'])
+                if retained and not regular(private / part.get('archive', part['id'] + '.jsonl')).exists():
+                    return {'status': 'partial', 'currentSourceAvailable': False,
+                            'errors': ['A retained capture segment is missing; existing combined transcript was preserved.'],
+                            'message': 'Restore the missing private capture segment before capturing again.'}
         # Preserve unrelated ignore rules. Do this before writing private data.
         ignore_path = regular(folder / '.gitignore')
         ignored = ignore_path.read_text() if ignore_path.exists() else ''
@@ -446,44 +639,78 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
         root = Path(claude_dir or os.environ.get('CLAUDE_CONFIG_DIR', str(Path.home() / '.claude')))
         if not session_id or not SESSION_ID.fullmatch(session_id):
             errors.append('CLAUDE_CODE_SESSION_ID is missing or invalid; no session was guessed.')
-        elif not any(item['id'] == session_id for item in config['sessions']):
+        elif current_entry is None or current_entry.get('suspended') or stopped or not gate_authorized(current_entry, gate):
             try:
+                check_setup_gate(folder, gate, session_id, current_stop)
                 raw = source_for(session_id, root).read_bytes()
-                config['sessions'].append(enrollment(raw, session_id, [owner] if owner else []))
+                check_setup_gate(folder, gate, session_id, current_stop)
+                new_entry = enrollment(raw, session_id, [owner] if owner else [], gate, explicit_opt_in)
+                new_entry['stopToken'] = current_stop
+                if gate is not None:
+                    new_entry['setupConsent'] = gate
+                if current_entry is None:
+                    config['sessions'].append(new_entry)
+                else:
+                    # Keep every old slice immutable. A new archive and boundary
+                    # excludes the entire opted-out interval without byte loss.
+                    old_archive = regular(private / current_entry.get('archive', session_id + '.jsonl'))
+                    old_bytes = old_archive.stat().st_size if old_archive.exists() else 0
+                    if new_entry['startOffset'] < current_entry.get('startOffset', 0) + old_bytes:
+                        raise ValueError('Re-enrollment requires a new participant turn after the previous captured segment')
+                    previous = {key: value for key, value in current_entry.items() if key != 'previousCaptures'}
+                    previous['suspended'] = True
+                    previous.setdefault('suspendedAt', now())
+                    new_entry['archive'] = session_id + '.' + uuid.uuid4().hex + '.jsonl'
+                    new_entry['previousCaptures'] = [*current_entry.get('previousCaptures', []), previous]
+                    config['sessions'][config['sessions'].index(current_entry)] = new_entry
+            except SetupCaptureBlocked as error:
+                return blocked_capture(error)
             except (OSError, ValueError) as error:
                 errors.append(str(error))
         if owner:
             for item in config['sessions']:
                 if item['id'] == session_id and owner not in item.setdefault('monitorOwners', []):
                     item['monitorOwners'].append(owner)
-        save_json(config_path, config)
         combined, sessions, aggregate_line = [], [], 1
-        for item in config['sessions']:
-            archive = regular(private / (item['id'] + '.jsonl'))
+        writes, authorizations = [], []
+        for item in [part for session in config['sessions'] for part in [*session.get('previousCaptures', []), session]]:
+            archive_name = item.get('archive', item['id'] + '.jsonl')
+            archive = regular(private / archive_name)
             saved = archive.read_bytes() if archive.exists() else b''
             source_error = None
-            try:
-                raw = source_for(item['id'], root).read_bytes()
-                complete = raw[:raw.rfind(b'\n') + 1]
-                offset = item.get('startOffset', 0)
-                if offset > len(complete) or ('prefixSha256' in item and hashlib.sha256(complete[:offset]).hexdigest() != item['prefixSha256']):
-                    raise ValueError('Native transcript prefix changed before the pilot boundary; retained its earlier exact capture')
-                complete = complete[offset:]
-                if not complete.startswith(saved):
-                    raise ValueError('Native transcript was rewritten; retained its earlier exact capture')
-                if complete != saved:
-                    atomic(archive, complete)
-                    saved = complete
-                pending_bytes = len(raw) - offset - len(complete)
-            except (OSError, ValueError) as error:
-                source_error = str(error)
-                errors.append(item['id'] + ': ' + source_error)
-                pending_bytes = None
+            pending_bytes = None
+            suspended = item.get('suspended', False) or item.get('stopToken') != stop_token(folder, item['id'])
+            setup_blocked = not gate_authorized(item, gate)
+            if not suspended and not setup_blocked:
+                try:
+                    check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                    raw = source_for(item['id'], root).read_bytes()
+                    check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                    complete = raw[:raw.rfind(b'\n') + 1]
+                    offset = item.get('startOffset', 0)
+                    if offset > len(complete) or ('prefixSha256' in item and hashlib.sha256(complete[:offset]).hexdigest() != item['prefixSha256']):
+                        raise ValueError('Native transcript prefix changed before the pilot boundary; retained its earlier exact capture')
+                    complete = complete[offset:]
+                    if not complete.startswith(saved):
+                        raise ValueError('Native transcript was rewritten; retained its earlier exact capture')
+                    if complete != saved:
+                        check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                        writes.append((archive, complete))
+                        saved = complete
+                    pending_bytes = len(raw) - offset - len(complete)
+                    authorizations.append((item['id'], item.get('stopToken')))
+                except SetupCaptureBlocked as error:
+                    return blocked_capture(error)
+                except (OSError, ValueError) as error:
+                    source_error = str(error)
+                    errors.append(item['id'] + ': ' + source_error)
+                    pending_bytes = None
             combined.append(saved)
             sessions.append({**analyze(saved, item['id'], item.get('monitorOwners', []), item.get('startLine', 1) - 1), 'capturedBytes': len(saved), 'pendingBytes': pending_bytes,
                              'verifiedMonitorIdentities': item.get('monitorOwners', []),
-                             'sourceAvailable': source_error is None, 'sourceError': source_error,
-                             'sourceStatus': 'current' if source_error is None else 'archived_only',
+                             'captureId': archive_name, 'captureState': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'active',
+                             'sourceAvailable': not suspended and not setup_blocked and source_error is None, 'sourceError': source_error,
+                             'sourceStatus': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'current' if source_error is None else 'archived_only',
                              'aggregateStartLine': aggregate_line,
                              'captureStart': {'nativeByteOffset': item.get('startOffset', 0), 'nativeLine': item.get('startLine', 1),
                                               'participantTurnId': item.get('startTurnId'), 'consentedAt': item.get('consentedAt'),
@@ -493,20 +720,25 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
                 errors.append(item['id'] + ': complete native lines contain invalid JSON; raw bytes retained')
         # Rebuild from exact per-session prefixes. Repeating or resuming capture
         # cannot duplicate lines; another participant's session is retained.
-        atomic(folder / TRANSCRIPT, b''.join(combined))
         report = {'schema': 'flowview-pilot-v1', 'capturedAt': now(), 'enabledAt': config['enabledAt'],
                   'transcript': TRANSCRIPT, 'sessions': sessions,
                   'errors': errors,
                   'limits': ['The active final response is absent until a later checkpoint or bounded after-turn copy.',
                              'Separate subagent transcripts are not copied. Per-turn models and tokens cover the main transcript.',
                              'Each session starts at its participant-authorized pilot turn.']}
-        save_json(folder / USAGE, report)
-        current = next((s for s in sessions if s['sessionId'] == session_id), None)
+        writes.extend([(config_path, json_bytes(config)), (folder / TRANSCRIPT, b''.join(combined)),
+                       (folder / USAGE, json_bytes(report))])
+        try:
+            publish_capture_batch(folder, gate, authorizations, writes)
+        except SetupCaptureBlocked as error:
+            return blocked_capture(error)
+        current = next((s for s in reversed(sessions) if s['sessionId'] == session_id), None)
         selected_turn_id = target_turn_id or (current['activeParticipantTurnId'] if current else None)
         last = (next((t for t in current['turns'] if t['id'] == selected_turn_id or selected_turn_id in t['userMessageAliases']), None)
                 if current and selected_turn_id else current['turns'][-1] if current and current['turns'] else None)
         return {'status': 'partial' if errors else 'captured', 'transcript': str(folder / TRANSCRIPT),
-                'usage': str(folder / USAGE), 'sessions': len(sessions), 'errors': errors,
+                'usage': str(folder / USAGE), 'sessions': len(config['sessions']), 'errors': errors,
+                'captureId': current['captureId'] if current else None,
                 'modelsObserved': current['modelsObserved'] if current else [],
                 'currentSourceAvailable': bool(current and current['sourceAvailable']),
                 'nativeProgress': current['nativeProgress'] if current else None,
@@ -516,7 +748,7 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
                                           if current and last and last['lastAssistantLine'] is not None else None)}
 
 
-def settle(folder, session_id, turn_id, after_line, seconds=45):
+def settle(folder, session_id, turn_id, after_line, seconds=45, capture_id=None):
     """One bounded final copy, not an installed listener or an authoring agent."""
     if not session_id or not SESSION_ID.fullmatch(session_id):
         raise ValueError('Invalid Claude session ID for the bounded final copy')
@@ -529,9 +761,9 @@ def settle(folder, session_id, turn_id, after_line, seconds=45):
     while time.monotonic() < deadline:
         time.sleep(1)
         try:
-            status = capture(folder, session_id, target_turn_id=turn_id)
+            status = capture(folder, session_id, target_turn_id=turn_id, expected_capture_id=capture_id)
             if not status.get('currentSourceAvailable'):
-                outcome = 'failed'
+                outcome = 'disabled' if status.get('status') == 'disabled' else 'failed'
                 break
             progress = status.get('nativeProgress') or {}
             new_response = bool(status.get('turnId') == turn_id and status.get('finalResponseCaptured') and
@@ -558,24 +790,38 @@ def settle(folder, session_id, turn_id, after_line, seconds=45):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--folder', required=True, help='Diagram root containing the spec and ledger')
-    parser.add_argument('--enable', action='store_true', help='Enroll this participant-authorized session from its current turn; exclude earlier chat')
+    consent = parser.add_mutually_exclusive_group()
+    consent.add_argument('--disable', action='store_true', help='Suspend this session using registry metadata only; never read a transcript')
+    consent.add_argument('--enable', action='store_true', help='Enroll this participant-authorized session from its current turn; exclude earlier chat')
+    parser.add_argument('--explicit-opt-in', action='store_true', help='Only for a direct participant opt-in turn: override stored setup or stopped capture with --enable')
     parser.add_argument('--after-turn', action='store_true', help='Schedule a bounded 45-second final-response copy')
     parser.add_argument('--session-id', default=os.environ.get('CLAUDE_CODE_SESSION_ID'))
+    parser.add_argument('--settle-capture', help=argparse.SUPPRESS)
     parser.add_argument('--settle-turn', help=argparse.SUPPRESS)
     parser.add_argument('--settle-after-line', type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
+    if args.explicit_opt_in and not args.enable:
+        parser.error('--explicit-opt-in requires --enable and a later explicit user opt-in')
+    if args.settle_turn and not args.settle_capture:
+        parser.error('The bounded final copy requires its capture enrollment identity')
+    if args.disable and (args.after_turn or args.settle_turn):
+        parser.error('--disable cannot be combined with capture scheduling')
     try:
+        if args.disable:
+            print(json.dumps(disable(args.folder, args.session_id)))
+            return 0
         if args.settle_turn:
-            settle(args.folder, args.session_id, args.settle_turn, args.settle_after_line)
+            settle(args.folder, args.session_id, args.settle_turn, args.settle_after_line, capture_id=args.settle_capture)
             return
-        result = capture(args.folder, args.session_id, enable=args.enable)
+        result = capture(args.folder, args.session_id, enable=args.enable, explicit_opt_in=args.explicit_opt_in)
         if args.after_turn and result.get('turnId') and result.get('currentSourceAvailable'):
             log_path = regular(Path(args.folder) / PRIVATE / 'after-turn.log')
             with log_path.open('ab') as log:
                 os.chmod(log_path, 0o600)
                 subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--folder', str(Path(args.folder).resolve()),
                                   '--session-id', args.session_id, '--settle-turn', result['turnId'],
-                                  '--settle-after-line', str(result['nativeProgress']['capturedThroughLine'])],
+                                  '--settle-after-line', str(result['nativeProgress']['capturedThroughLine']),
+                                  '--settle-capture', result['captureId']],
                                  stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
             result['afterTurnCopy'] = 'scheduled for up to 45 seconds to copy the final response; completion is not yet confirmed'
         print(json.dumps(result))

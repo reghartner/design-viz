@@ -94,8 +94,14 @@ test('reload keeps draft/detail and a visible disconnected recovery without acce
 test('denied remembered permission is explicit and preserves draft with a picker fallback',async({page})=>{
   await mount(page,{denied:true,stored:{sessionId:'s1',folderName:'flowview-session-test',title:'My story',draft:'Preserve me',sourceKey:'unknown'}});
   expect(await page.evaluate(()=>permissionCalls)).toBe(0);await page.locator('#folder-agent-continue').click();
+  await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
+  expect(await page.evaluate(()=>({permissionCalls,pickerCalls,starts:starts.length}))).toEqual({permissionCalls:0,pickerCalls:0,starts:0});
+  await page.locator('#folder-agent-pilot-capture').check();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-status')).toContainText('Folder access was not granted');expect(await page.evaluate(()=>permissionCalls)).toBe(1);expect(await page.evaluate(()=>diskWrites.length)).toBe(0);
-  await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();expect(await page.evaluate(()=>pickerCalls)).toBe(1);
+  await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
+  await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+  expect(await page.evaluate(()=>({pickerCalls,permissionCalls}))).toEqual({pickerCalls:1,permissionCalls:1});
+  await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: OFF/);
 });
 test('setup separates conversation mode from adopt, resume and new-folder intent',async({page})=>{
   await mount(page);await page.locator('#folder-agent-open-setup').click();
@@ -409,7 +415,11 @@ for(const method of ['external','embedded'])test('Agent panel follows the '+meth
   for(const id of ['input','send','selection','pairing','folder'])await expect(page.locator('#folder-agent-'+id)).toBeHidden();
   await expect(page.locator('#folder-agent-continue')).toBeVisible();
   await expect(page.getByRole('button',{name:'New Connection',exact:true})).toBeVisible();
+  const startsBeforeRecovery=await page.evaluate(()=>starts.length);
   await page.locator('#folder-agent-continue').click();
+  await expect(page.locator('#folder-agent-pilot-capture')).not.toBeChecked();
+  expect(await page.evaluate(()=>starts.length)).toBe(startsBeforeRecovery);
+  await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await page.locator('#folder-agent-close-guide').click();
   await expect(page.locator('#editor-agent')).toHaveAttribute('data-workflow',method);
   await expect(page.locator('#folder-agent-folder')).toBeVisible();

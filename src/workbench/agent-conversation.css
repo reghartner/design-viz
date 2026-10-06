@@ -146,3 +146,10 @@
 #editor-agent[data-connected="false"] .folder-agent-workflow-body{display:block;overflow:auto;}
 .folder-agent-header>.folder-agent-folder{overflow-wrap:anywhere;margin:4px 0 8px;font-size:12px;}
 .folder-agent-header>#folder-agent-connection{margin:4px 0;font-size:12px;color:var(--sub);}
+
+.folder-agent-pilot-choice{margin:16px 0;padding:14px;border:1px solid var(--line);border-radius:8px;background:var(--card);}
+.folder-agent-pilot-choice h3{margin:0 0 10px;font-size:15px;}
+.folder-agent-pilot-choice label{display:flex;align-items:flex-start;gap:8px;font-weight:600;cursor:pointer;}
+.folder-agent-pilot-choice input{flex:0 0 auto;margin-top:3px;}
+.folder-agent-pilot-choice p{margin:10px 0 0;}
+.folder-agent-pilot-review{padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--card);}

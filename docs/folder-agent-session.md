@@ -87,12 +87,33 @@ can still be selected directly; their transport files remain in place.
 
 ### Pilot capture
 
-Tell Claude to use **pilot mode** during the normal authoring conversation. The
-packaged skill handles capture; participants do not locate or export transcript
-files. Each new participant authorizes their own session; “Use pilot mode for
-this session” in their setup prompt is sufficient, with no repeated question.
-An existing folder's pilot setting alone does not authorize a new participant's
-capture. It writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
+In agent setup, select **Enable pilot capture for this session** to opt in.
+It is off by default for each new setup, including a reopened diagram folder.
+Setup explains the scope and the review screen repeats your choice. The browser
+does not capture a transcript: after you paste the setup instructions into
+Claude Code, the packaged skill saves the raw conversation from that turn and
+subsequent turns, observed models, and token usage locally. The pilot owner
+collects dollar cost manually. Participants do not locate or export transcripts.
+
+The generated prompt explicitly says ON or OFF. Directly pasting ON into your
+Claude conversation authorizes `--enable` without a second question. Stored
+`CONNECT.md` or `README.md` ON text never authorizes another Claude session;
+the helper checks the current participant turn before enrollment. OFF overrides old folder settings and prior enrollment:
+Claude runs only the metadata-only `--disable` command after preparing the folder.
+That command suspends this Claude session without reading transcripts, including
+future refreshes triggered by another participant. Existing capture files are
+retained. Claude must not run capture checkpoints, read a native transcript for
+capture, or ask again. You can later type **“Use pilot mode for this session”** directly in Claude Code
+(including when using the Beta workbench chat) to
+opt in from that turn. Re-enrollment creates a new capture segment, preserving
+previously captured bytes and excluding the opted-out interval. The agent uses
+`--enable --explicit-opt-in` only for this later direct request. You can also say
+“stop capturing”; the agent promptly publishes a metadata-only stop token before
+waiting for the registry lock, and stops checkpoints. A new OFF setup gates old
+copiers immediately when the setup is saved, before it is pasted into Claude. Each new participant authorizes their own session; an
+existing folder alone never grants consent.
+
+Capture writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
 the spec/ledger, and uses `.flowview-pilot/` for local session copies and status.
 It appends capture ignore rules to the root `.gitignore` without removing existing
 rules. These are local pilot artifacts; commit only the reviewed spec and ledger.

@@ -147,9 +147,9 @@ class CaptureTests(unittest.TestCase):
         self.native = self.project / (SID + '.jsonl')
         self.native.write_bytes(encoded(user(), assistant()))
 
-    def run_capture(self, session_id=SID, enable=True, folder=None, claude_dir=None):
+    def run_capture(self, session_id=SID, enable=True, folder=None, claude_dir=None, explicit_opt_in=False):
         return capture.capture(folder or self.folder, session_id, enable=enable,
-                               claude_dir=claude_dir or self.claude)
+                               claude_dir=claude_dir or self.claude, explicit_opt_in=explicit_opt_in)
 
     def usage(self):
         return json.loads((self.folder / capture.USAGE).read_text())
@@ -181,6 +181,342 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), pilot)
         self.run_capture(OTHER)
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), pilot + other_raw)
+
+    def write_setup(self, choice, connection='connection-new'):
+        support = self.folder / '.flowview-agent'
+        support.mkdir(exist_ok=True)
+        owner = {**OWNER, 'connectionId': connection}
+        (support / 'session.json').write_text(json.dumps({'protocol': 'flowview-folder-v1', **owner}))
+        text = ('Locate the diagram folder. Verify .flowview-agent/session.json has sessionId ' +
+            json.dumps(owner['sessionId']) + ' and connectionId ' + json.dumps(owner['connectionId']) + '.\n\n' +
+            'Pilot capture: ' + choice + ' for this session.\n')
+        (support / 'CONNECT.md').write_text(text)
+        return text
+
+    def test_never_enrolled_session_can_directly_paste_new_on_after_off(self):
+        self.run_capture()  # Another participant has already used this folder.
+        self.write_setup('OFF')
+        capture.disable(self.folder, OTHER)
+        prompt = self.write_setup('ON', connection='later-on-connection')
+        (self.project / (OTHER + '.jsonl')).write_bytes(encoded({**user('direct-on', content=prompt), 'sessionId': OTHER}))
+        result = self.run_capture(OTHER)
+        self.assertEqual(result['status'], 'captured')
+        self.assertTrue(result['currentSourceAvailable'])
+        self.assertEqual(self.usage()['sessions'][-1]['captureStart']['participantTurnId'], 'direct-on')
+
+    def test_never_enrolled_session_cannot_reuse_same_stopped_on_setup(self):
+        self.run_capture()
+        prompt = self.write_setup('ON')
+        capture.disable(self.folder, OTHER)
+        (self.project / (OTHER + '.jsonl')).write_bytes(encoded({**user('stale-on', content=prompt), 'sessionId': OTHER}))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('stopped ON cannot be reused')):
+            self.assertEqual(self.run_capture(OTHER)['status'], 'disabled')
+
+    def test_stopped_new_on_setup_cannot_reuse_an_older_enrollment(self):
+        self.run_capture()
+        prompt = self.write_setup('ON', connection='new-connection')
+        capture.disable(self.folder, SID)
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('stale-new-on', content=prompt)))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('same stopped setup needs later explicit opt-in')):
+            self.assertEqual(self.run_capture()['status'], 'disabled')
+
+    def test_unknown_stopped_setup_cannot_authorize_plain_enable(self):
+        self.run_capture()
+        prompt = self.write_setup('ON')
+        (self.folder / '.flowview-agent' / 'CONNECT.md').write_text('Pilot capture: ON for this session.\n')
+        capture.disable(self.folder, OTHER)
+        self.write_setup('ON')
+        (self.project / (OTHER + '.jsonl')).write_bytes(encoded({**user('old-on', content=prompt), 'sessionId': OTHER}))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('unknown stopped setup requires explicit later consent')):
+            self.assertEqual(self.run_capture(OTHER)['status'], 'disabled')
+
+    def test_stored_on_is_not_initial_consent_for_a_different_session(self):
+        prompt = self.write_setup('ON')
+        other_native = self.project / (OTHER + '.jsonl')
+        other_native.write_bytes(encoded({**user('copied-request', content='Read CONNECT.md and use registered request request-1'), 'sessionId': OTHER}))
+        result = self.run_capture(OTHER)
+        self.assertEqual(result['status'], 'disabled')
+        self.assertFalse((self.folder / capture.TRANSCRIPT).exists())
+        self.native.write_bytes(encoded(user(content=prompt), assistant()))
+        self.assertEqual(self.run_capture()['status'], 'captured')
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        with patch.object(capture, 'source_for', side_effect=AssertionError('another session cannot reuse the claimed ON setup')):
+            self.assertEqual(self.run_capture(OTHER)['status'], 'disabled')
+        # Even the separate override flag requires direct consent in this turn.
+        self.assertEqual(self.run_capture(OTHER, explicit_opt_in=True)['status'], 'disabled')
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+        other_native.write_bytes(other_native.read_bytes() + encoded({**user('direct-opt-in', content='Use pilot mode for this session.'), 'sessionId': OTHER}))
+        self.assertEqual(self.run_capture(OTHER, explicit_opt_in=True)['status'], 'captured')
+        self.assertNotIn(b'copied-request', (self.folder / capture.TRANSCRIPT).read_bytes())
+
+    def test_stop_barrier_blocks_reads_when_registry_lock_is_busy(self):
+        self.run_capture()
+        before = self.native.read_bytes()
+        with patch.object(capture, 'locked', side_effect=OSError('busy lock')):
+            result = capture.disable(self.folder, SID)
+        self.assertEqual(result['status'], 'disabled')
+        self.assertTrue(result['registryUpdatePending'])
+        self.native.write_bytes(before + encoded(user('stop-request'), assistant('private-answer')))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('stop barrier must block stale registry')):
+            self.assertEqual(self.run_capture(enable=False)['status'], 'disabled')
+            self.assertEqual(self.run_capture()['status'], 'disabled')
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+        self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+        with self.assertRaises(ValueError):
+            capture.capture(self.folder, SID, explicit_opt_in=True)
+
+    def test_missing_retained_segment_preserves_combined_transcript_and_reports_error(self):
+        self.run_capture()
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        capture.disable(self.folder, SID)
+        (self.folder / capture.PRIVATE / (SID + '.jsonl')).unlink()
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('opt-in', content='Use pilot mode for this session.')))
+        result = self.run_capture(explicit_opt_in=True)
+        self.assertEqual(result['status'], 'partial')
+        self.assertIn('missing', result['errors'][0])
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+
+    def test_off_setup_blocks_old_copier_and_other_participant_before_disable_runs(self):
+        first = self.run_capture()
+        other_raw = encoded({**user('engineer'), 'sessionId': OTHER},
+                            {**assistant('engineer-reply'), 'sessionId': OTHER})
+        other_native = self.project / (OTHER + '.jsonl')
+        other_native.write_bytes(other_raw)
+        self.run_capture(OTHER)
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        usage_before = (self.folder / capture.USAGE).read_bytes()
+        archive_before = (self.folder / capture.PRIVATE / (SID + '.jsonl')).read_bytes()
+        # Browser publishes OFF before the participant pastes the new setup turn.
+        # Neither participant has executed --disable yet.
+        self.write_setup('OFF')
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('off-setup'), assistant('off-reply')))
+        other_native.write_bytes(other_raw + encoded({**user('other-new'), 'sessionId': OTHER}))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('OFF must block before transcript discovery')):
+            self.assertEqual(self.run_capture(enable=False)['status'], 'disabled')
+            self.assertEqual(self.run_capture()['status'], 'disabled', 'stale --enable cannot override OFF')
+            self.assertEqual(self.run_capture(OTHER, enable=False)['status'], 'disabled')
+            self.assertEqual(self.run_capture(OTHER)['status'], 'disabled', 'another stale --enable cannot override OFF')
+            with patch.object(capture.time, 'sleep'):
+                capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=first['captureId'])
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+        self.assertEqual((self.folder / capture.USAGE).read_bytes(), usage_before)
+        self.assertEqual((self.folder / capture.PRIVATE / (SID + '.jsonl')).read_bytes(), archive_before)
+        # Even a broken registry cannot turn the explicit OFF gate into reads.
+        (self.folder / capture.PRIVATE / 'config.json').write_text('{broken')
+        with patch.object(capture, 'source_for', side_effect=AssertionError('broken registry must fail closed')):
+            with self.assertRaises(ValueError):
+                self.run_capture(enable=False)
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+
+    def test_explicit_reenable_after_off_gate_creates_segment_without_disable_first(self):
+        self.run_capture()
+        before = self.native.read_bytes()
+        self.write_setup('OFF')
+        off = encoded(user('off-setup'), assistant('off-reply'))
+        self.native.write_bytes(before + off)
+        self.assertEqual(self.run_capture(enable=False)['status'], 'disabled')
+        enabled = encoded(user('later-opt-in', content='Enable pilot capture now'), assistant('later-public'))
+        self.native.write_bytes(before + off + enabled)
+        self.assertEqual(self.run_capture()['status'], 'disabled')
+        result = self.run_capture(explicit_opt_in=True)
+        self.assertEqual(result['status'], 'captured')
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before + enabled)
+        self.assertEqual(self.usage()['sessions'][-1]['captureStart']['nativeByteOffset'], len(before + off))
+        self.assertEqual(self.run_capture(enable=False)['status'], 'captured')
+        # This later authorization belongs only to its current connection.
+        self.write_setup('OFF', connection='connection-next')
+        with patch.object(capture, 'source_for', side_effect=AssertionError('old consent cannot cross a new connection')):
+            self.assertEqual(self.run_capture(enable=False)['status'], 'disabled')
+
+    def test_gate_change_during_native_read_discards_bytes_before_publication(self):
+        prompt = self.write_setup('ON')
+        self.native.write_bytes(encoded(user(content=prompt), assistant()))
+        self.run_capture()
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        archive = self.folder / capture.PRIVATE / (SID + '.jsonl')
+        archive_before = archive.read_bytes()
+        native = self.native
+        write_setup = self.write_setup
+        class InterruptedNative:
+            def read_bytes(self):
+                write_setup('OFF')
+                native.write_bytes(native.read_bytes() + encoded(user('off-arrived-during-read')))
+                return native.read_bytes()
+        with patch.object(capture, 'source_for', return_value=InterruptedNative()):
+            result = self.run_capture(enable=False)
+        self.assertEqual(result['status'], 'disabled')
+        self.assertEqual(archive.read_bytes(), archive_before)
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+
+    def test_stop_during_initial_enrollment_blocks_before_registry_exists(self):
+        atomic = capture.atomic
+        archive = self.folder / capture.PRIVATE / (SID + '.jsonl')
+        fired = False
+        def stop_initial_publish(path, data):
+            nonlocal fired
+            if path.resolve() == archive.resolve() and not fired:
+                fired = True
+                with patch.object(capture, 'locked', side_effect=OSError('initial capture owns lock')):
+                    self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+            atomic(path, data)
+        with patch.object(capture, 'atomic', side_effect=stop_initial_publish):
+            self.assertEqual(self.run_capture()['status'], 'disabled')
+        self.assertTrue(fired)
+        self.assertFalse(archive.exists())
+        self.assertFalse((self.folder / capture.TRANSCRIPT).exists())
+        self.assertFalse((self.folder / capture.PRIVATE / 'config.json').exists())
+        with patch.object(capture, 'source_for', side_effect=AssertionError('stale enable must not defeat initial stop')):
+            self.assertEqual(self.run_capture()['status'], 'disabled')
+
+    def test_stop_token_during_archive_replace_restores_prior_batch(self):
+        self.run_capture()
+        archive = self.folder / capture.PRIVATE / (SID + '.jsonl')
+        targets = [archive, self.folder / capture.TRANSCRIPT, self.folder / capture.USAGE,
+                   self.folder / capture.PRIVATE / 'config.json']
+        before = {path: path.read_bytes() for path in targets}
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('off-turn-at-replace')))
+        atomic = capture.atomic
+        fired = False
+        def revoke_on_archive(path, data):
+            nonlocal fired
+            if path.resolve() == archive.resolve() and not fired:
+                fired = True
+                atomic(self.folder / capture.PRIVATE / (SID + '.capture-stop'), b'a' * 32)
+            atomic(path, data)
+        with patch.object(capture, 'atomic', side_effect=revoke_on_archive):
+            result = self.run_capture(enable=False)
+        self.assertTrue(fired)
+        self.assertEqual(result['status'], 'disabled')
+        for path in targets:
+            self.assertEqual(path.read_bytes(), before[path], str(path))
+
+    def test_off_setup_during_combined_replace_rolls_back_archives_and_registry(self):
+        prompt = self.write_setup('ON')
+        self.native.write_bytes(encoded(user(content=prompt), assistant()))
+        self.run_capture()
+        targets = [self.folder / capture.PRIVATE / (SID + '.jsonl'),
+                   self.folder / capture.TRANSCRIPT, self.folder / capture.USAGE,
+                   self.folder / capture.PRIVATE / 'config.json']
+        before = {path: path.read_bytes() for path in targets}
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('off-turn-at-combined-replace')))
+        atomic = capture.atomic
+        fired = False
+        def revoke_on_combined(path, data):
+            nonlocal fired
+            if path.resolve() == (self.folder / capture.TRANSCRIPT).resolve() and not fired:
+                fired = True
+                self.write_setup('OFF')
+            atomic(path, data)
+        with patch.object(capture, 'atomic', side_effect=revoke_on_combined):
+            result = self.run_capture(enable=False)
+        self.assertTrue(fired)
+        self.assertEqual(result['status'], 'disabled')
+        for path in targets:
+            self.assertEqual(path.read_bytes(), before[path], str(path))
+
+    def test_disable_is_metadata_only_even_with_missing_native_source(self):
+        self.run_capture()
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        usage_before = (self.folder / capture.USAGE).read_bytes()
+        self.native.unlink()
+        original_read = Path.read_bytes
+        def metadata_only(path):
+            self.assertEqual(path.name, 'config.json', 'disable may read registry metadata only')
+            return original_read(path)
+        with patch.object(capture, 'source_for', side_effect=AssertionError('native discovery forbidden')), \
+             patch.object(Path, 'read_bytes', metadata_only):
+            self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+            self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+            self.assertEqual(self.run_capture(enable=False)['status'], 'disabled')
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
+        self.assertEqual((self.folder / capture.USAGE).read_bytes(), usage_before)
+        with self.assertRaises(ValueError):
+            capture.disable(self.folder, None)
+
+    def test_disable_unenrolled_session_does_not_create_capture_artifacts(self):
+        with patch.object(capture, 'source_for', side_effect=AssertionError('native discovery forbidden')):
+            self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+            self.assertEqual(capture.disable(self.folder, None)['status'], 'disabled')
+        self.assertEqual(list(self.folder.iterdir()), [])
+
+    def test_other_participant_checkpoint_never_reads_suspended_native_source(self):
+        self.run_capture()
+        before = self.native.read_bytes()
+        capture.disable(self.folder, SID)
+        self.native.write_bytes(before + encoded(user('private-off-turn'), assistant('private-off-answer')))
+        other_raw = encoded({**user('engineer'), 'sessionId': OTHER},
+                            {**assistant('engineer-reply'), 'sessionId': OTHER})
+        (self.project / (OTHER + '.jsonl')).write_bytes(other_raw)
+        source_for = capture.source_for
+        def only_other(session_id, root):
+            self.assertEqual(session_id, OTHER, 'suspended native source must not be discovered')
+            return source_for(session_id, root)
+        with patch.object(capture, 'source_for', side_effect=only_other):
+            self.assertEqual(self.run_capture(OTHER)['status'], 'captured')
+            self.assertEqual(self.run_capture(OTHER, enable=False)['status'], 'captured')
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before + other_raw)
+        self.assertEqual(self.usage()['sessions'][0]['sourceStatus'], 'suspended')
+        self.assertFalse(self.usage()['sessions'][0]['sourceAvailable'])
+
+    def test_reenable_preserves_segments_and_excludes_off_interval_and_stale_copiers(self):
+        first = self.run_capture()
+        kept = self.native.read_bytes()
+        for number in range(2):
+            capture.disable(self.folder, SID)
+            off = encoded(user('private-' + str(number)), assistant('private-' + str(number)))
+            new = encoded(user('opt-in-' + str(number), content='Use pilot mode'), assistant('public-' + str(number)))
+            previous_native = self.native.read_bytes()
+            self.native.write_bytes(previous_native + off + new)
+            result = self.run_capture(explicit_opt_in=True)
+            self.assertEqual(result['status'], 'captured')
+            kept += new
+            self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), kept)
+            segments = self.usage()['sessions']
+            self.assertEqual(len(segments), number + 2)
+            self.assertEqual(segments[-1]['captureStart']['nativeByteOffset'], len(previous_native + off))
+            self.assertEqual(segments[-1]['captureStart']['nativeLine'], (previous_native + off).count(b'\n') + 1)
+            self.assertEqual(segments[-1]['captureState'], 'active')
+            self.assertTrue(all(segment['captureState'] == 'suspended' for segment in segments[:-1]))
+            self.assertEqual(result['turnId'], 'opt-in-' + str(number))
+            with patch.object(capture, 'source_for', side_effect=AssertionError('stale copier must not read native source')):
+                stale = capture.capture(self.folder, SID, expected_capture_id=first['captureId'])
+                self.assertEqual(stale['status'], 'disabled')
+            self.run_capture(enable=False)
+            self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), kept)
+        self.assertEqual(len({segment['captureId'] for segment in self.usage()['sessions']}), 3)
+        capture.disable(self.folder, SID)
+        refused = self.run_capture(explicit_opt_in=True)
+        self.assertEqual(refused['status'], 'partial', 'cannot recapture a turn already in a retained segment')
+        self.assertFalse(refused['currentSourceAvailable'])
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), kept)
+
+    def test_pending_final_copy_stops_after_disable_without_reading_native_source(self):
+        enrolled = self.run_capture()
+        capture.disable(self.folder, SID)
+        with patch.object(capture, 'source_for', side_effect=AssertionError('disabled copier must not read source')), \
+             patch.object(capture.time, 'sleep'):
+            capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=enrolled['captureId'])
+        status = json.loads((self.folder / capture.PRIVATE / 'after-turn-status.json').read_text())
+        self.assertEqual(status['outcome'], 'disabled')
+        self.assertFalse(status['replyCapture']['finalResponseCaptured'])
+
+    def test_cli_disable_does_not_schedule_and_retains_existing_capture(self):
+        self.run_capture()
+        before = (self.folder / capture.TRANSCRIPT).read_bytes()
+        self.native.unlink()
+        env = {**os.environ, 'CLAUDE_CODE_SESSION_ID': SID, 'CLAUDE_CONFIG_DIR': str(self.claude)}
+        command = [sys.executable, str(SCRIPT), '--folder', str(self.folder), '--disable']
+        run = subprocess.run(command, env=env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        self.assertEqual(json.loads(run.stdout)['status'], 'disabled')
+        invalid = subprocess.run(command + ['--after-turn'], env=env, capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(invalid.returncode, 0)
+        stale_command = [sys.executable, str(SCRIPT), '--folder', str(self.folder),
+                         '--settle-turn', 'turn-1', '--settle-after-line', '2']
+        stale = subprocess.run(stale_command, env=env, capture_output=True, text=True, timeout=10)
+        self.assertEqual(stale.returncode, 2, 'pre-upgrade copier lacks a safe enrollment identity')
+        self.assertFalse((self.folder / capture.PRIVATE / 'after-turn.log').exists())
+        self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
 
     def test_transferred_folder_retains_prior_capture_when_source_is_missing(self):
         self.run_capture()

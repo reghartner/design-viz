@@ -138,8 +138,14 @@ class FolderAgentTests(unittest.TestCase):
         (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
-                     'tools/auto-arrange-spec.cjs']:
+                     'tools/auto-arrange-spec.cjs',
+                     '.claude/skills/hld-to-page/scripts/pilot_capture.py']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
+        trace_cli = (self.folder/'authoring/tools/trace2spec.js').read_text()
+        self.assertIn("'trace-import.js'", trace_cli)
+        self.assertNotIn('../src/trace-import.js', trace_cli)
+        self.assertEqual((self.folder/'authoring/tools/trace-import.js').read_text(),
+                         (ROOT/'src/trace-import.js').read_text())
         skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
         self.assertIn(widget_doc.CLIP_CUE, ' '.join(skill.split()))
         result = subprocess.run([sys.executable, str(self.folder/'authoring/tools/widget_doc.py'), 'deviceapp'],
@@ -163,6 +169,13 @@ class FolderAgentTests(unittest.TestCase):
         self.assertNotIn('curveControls', output['edges'][0])
         self.assertNotIn('fromPort', output['edges'][0])
         self.assertNotIn('toPort', output['edges'][0])
+        trace = subprocess.run(['node', 'tools/trace2spec.js', str(ROOT/'examples/traces/checkout.events.json'), '--preview'],
+                               text=True, capture_output=True, timeout=10, cwd=self.folder/'authoring')
+        self.assertEqual(trace.returncode, 0, trace.stderr)
+        self.assertTrue(json.loads(trace.stdout)['canBuild'])
+        for guide in ['use-case-story.md', 'use-case-existing-flow.md', 'use-case-hld.md', 'use-case-honeycomb.md', 'pilot-capture.md']:
+            self.assertIn('references/' + guide, skill)
+            self.assertTrue((self.folder/'authoring/.claude/skills/hld-to-page/references'/guide).is_file())
 
     def test_watcher_notifies_once_and_renewal_skips_completed_request(self):
         run = self.run_helper('watch', '--minutes', '.01', '--interval', '.1')

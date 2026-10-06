@@ -165,6 +165,74 @@ test('editor conversation uses real local files and helper; changes render with 
     expect(h.errors).toEqual([]);expect(h.requests.filter(url=>!['/index.html','/starters.json','/catalog.json'].includes(new URL(url).pathname))).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
+test('pilot capture is an explicit session choice and resets when changing or reopening setup',async({page},info)=>{
+  const h=await setup(page);
+  try{
+    // Prior capture configuration must never preselect consent for this participant.
+    await mkdir(path.join(h.folder,'.flowview-pilot'));
+    await writeFile(path.join(h.folder,'.flowview-pilot/config.json'),'{}');
+    await page.locator('#welcome-agent').click();
+    const choice=page.locator('#folder-agent-pilot-capture');
+    await expect(choice).not.toBeChecked();
+    await expect(page.locator('#folder-agent-pilot-explanation')).toContainText('Dollar cost is collected manually');
+    await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('Off for this session');
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: OFF for this session/);
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('overrides any existing .flowview-pilot/config.json');
+    await page.locator('[data-agent-change-folder]').first().click();
+    await expect(choice).not.toBeChecked();
+    await choice.check();
+    await page.locator('#folder-agent-start-resume').click();
+    await page.locator('#folder-agent-setup-mode-embedded').click();
+    await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('On for this session');
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('Dollar cost is collected manually');
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/authorizes --enable without asking me again/);
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('Pilot capture: ON for this session');
+    await page.screenshot({path:info.outputPath('pilot-capture-review.png')});
+    await closeGuide(page);await page.locator('#folder-agent-open-setup').click();
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('On for this session');
+    await page.locator('[data-agent-change-folder]').first().click();
+    await expect(choice).not.toBeChecked();
+    // Leaving an unfinished setup and reopening it must also discard an old opt-in.
+    await choice.check();await closeGuide(page);await page.locator('#folder-agent-open-setup').click();
+    await expect(choice).not.toBeChecked();
+    await page.setViewportSize({width:640,height:800});
+    await choice.scrollIntoViewIfNeeded();
+    await expect(choice).toBeVisible();
+    await expect(page.locator('#folder-agent-setup-mode-embedded')).not.toHaveCSS('background-color','rgba(0, 0, 0, 0)');
+    const modeContrast=await page.locator('#folder-agent-setup-mode-embedded').evaluate(button=>{
+      const luminance=color=>{
+        const values=color.match(/[\d.]+/g).slice(0,3).map(Number).map(value=>value/255);
+        return values.map(value=>value<=.04045?value/12.92:((value+.055)/1.055)**2.4)
+          .reduce((sum,value,index)=>sum+value*[.2126,.7152,.0722][index],0);
+      };
+      const background=luminance(getComputedStyle(button).backgroundColor);
+      return [...button.children].map(child=>{
+        const foreground=luminance(getComputedStyle(child).color);
+        return (Math.max(foreground,background)+.05)/(Math.min(foreground,background)+.05);
+      });
+    });
+    for(const contrast of modeContrast)expect(contrast).toBeGreaterThanOrEqual(4.5);
+    await page.screenshot({path:info.outputPath('pilot-capture-choice-narrow.png')});
+    await page.locator('#folder-agent-start-resume').click();
+    await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: OFF for this session/);
+    expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('Pilot capture: OFF for this session');
+    await closeGuide(page);await disconnect(page);
+    await page.locator('#folder-agent-continue').click();
+    await expect(choice).toBeVisible();await expect(choice).not.toBeChecked();
+    await expect(page.locator('#folder-agent-guide-folder')).toBeVisible();
+    await choice.check();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/Pilot capture: ON for this session/);
+    expect(h.writes.some(name=>/story\.agent\.(transcript|usage)/.test(name))).toBe(false);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 test('agent topology declarations preview both states and commit authored source with one Undo/Redo',async({page},info)=>{
   const h=await setup(page);
   try{

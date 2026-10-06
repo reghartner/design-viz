@@ -85,6 +85,86 @@ candidate files are not project deliverables. Existing unrelated files, includin
 a root README or `.gitignore`, are preserved. Previously created exchange folders
 can still be selected directly; their transport files remain in place.
 
+### Pilot capture
+
+In agent setup, select **Enable pilot capture for this session** to opt in.
+It is off by default for each new setup, including a reopened diagram folder.
+Setup explains the scope and the review screen repeats your choice. The browser
+does not capture a transcript: after you paste the setup instructions into
+Claude Code, the packaged skill saves the raw conversation from that turn and
+subsequent turns, observed models, and token usage locally. The pilot owner
+collects dollar cost manually. Participants do not locate or export transcripts.
+
+The generated prompt explicitly says ON or OFF. Directly pasting ON into your
+Claude conversation authorizes `--enable` without a second question. Stored
+`CONNECT.md` or `README.md` ON text never authorizes another Claude session;
+the helper checks the current participant turn before enrollment. OFF overrides old folder settings and prior enrollment:
+Claude runs only the metadata-only `--disable` command after preparing the folder.
+That command suspends this Claude session without reading transcripts, including
+future refreshes triggered by another participant. Existing capture files are
+retained. Claude must not run capture checkpoints, read a native transcript for
+capture, or ask again. You can later type **“Use pilot mode for this session”** directly in Claude Code
+(including when using the Beta workbench chat) to
+opt in from that turn. Re-enrollment creates a new capture segment, preserving
+previously captured bytes and excluding the opted-out interval. The agent uses
+`--enable --explicit-opt-in` only for this later direct request. You can also say
+“stop capturing”; the agent promptly publishes a metadata-only stop token before
+waiting for the registry lock, and stops checkpoints. A new OFF setup gates old
+copiers immediately when the setup is saved, before it is pasted into Claude. Each new participant authorizes their own session; an
+existing folder alone never grants consent.
+
+Capture writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
+the spec/ledger, and uses `.flowview-pilot/` for local session copies and status.
+It appends capture ignore rules to the root `.gitignore` without removing existing
+rules. These are local pilot artifacts; commit only the reviewed spec and ledger.
+There is no central upload.
+The helper keeps its managed ignore block last, so capture exclusions override
+earlier negation rules without duplicating that block or removing unrelated rules.
+
+The native JSONL is distinct from `.flowview-agent/transcript.json`, which keeps
+at most 100 workbench messages and does not contain native agent reasoning/tool
+history. Pilot capture preserves exact complete native lines from the participant's
+current pilot turn onward, excluding earlier unrelated chat. The usage artifact
+records the native byte/line boundary and participant-turn UUID so this slice
+cannot be confused with an entire session. Each participant's pilot slice is retained
+separately and included in the combined transcript; returning to a session does
+not duplicate it. Separate subagent transcripts are outside this capture scope.
+
+The agent checkpoints at entry and before each reply, and can schedule a bounded
+final copy with a 45-second wait budget for the final response. It reports
+the actual capture status and any gaps; a scheduled copy is not a verified copy.
+No hooks, additional Claude session or permanent listener is installed. The next
+turn refreshes all recorded sessions, including a previous participant's final
+native writes. If no later checkpoint occurs, delayed writes can remain missing.
+For the Beta route, a verified Monitor `flowview_request` is a participant turn;
+its `flowview_result` is attached to the same request. Duplicate delivery is
+deduplicated, and unrelated background, shell and local-command notifications
+do not create turns. Verification uses this folder's session and connection IDs.
+
+For a handoff to another machine, transfer the entire local diagram folder,
+including its ignored `.flowview-pilot/` directory and capture artifacts, using
+the authorized pilot handoff. Git alone does not transfer ignored captures.
+Earlier sessions whose native sources are unavailable remain as exact saved
+copies marked `archived_only`; their errors do not block the engineer's current
+capture. Later native writes on the original machine cannot be refreshed here.
+Without the full folder handoff, that earlier capture remains on its original
+machine; the next participant's session cannot reconstruct it.
+The usage artifact records observed models and token usage per participant turn.
+The pilot owner collects dollar-cost figures separately from participants; the
+packaged skill does not calculate or report them.
+See the packaged [pilot instructions](../.claude/skills/hld-to-page/references/pilot-capture.md).
+
+### Starting material
+
+One `hld-to-page` skill shares this folder, evidence ledger and approval protocol
+across four [use-case routes](../.claude/skills/hld-to-page/SKILL.md#choose-the-starting-point):
+business story with engineer handoff, existing engineering flow, HLD, and
+Honeycomb trace. Story and HLD authoring already share the worksheet/evidence
+rules; the route guides make continuation and engineer enrichment explicit.
+The Honeycomb route includes the local trace CLI/converter in the downloaded
+kit. It requires trace data or an authorized connector; a trace URL alone does
+not grant account access or provide the spans.
+
 Copy the displayed instructions into the agent. The browser knows the folder name,
 not its absolute path. The agent verifies the supplied connection IDs in that
 folder's metadata. If it cannot identify the folder as its working directory or

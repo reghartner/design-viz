@@ -1,9 +1,43 @@
 ---
 name: hld-to-page
-description: Author or update a Flowview diagram from an HLD, a system description, or trace evidence. Produces a source-grounded storyboard, spec, coverage ledger, and verified visual page. Use for diagram authoring, not renderer implementation or PR review.
+description: Author or update a Flowview diagram from a business story, an existing engineering flow, an HLD, or Honeycomb trace evidence. Supports engineer enrichment and local pilot transcript capture. Produces a source-grounded storyboard, spec, coverage ledger, and verified visual page. Use for diagram authoring, not renderer implementation or PR review.
 ---
 
 # HLD to page: worksheet first, JSON second
+
+## Choose the starting point
+
+Use this one skill and its shared spec/ledger/approval protocol for all four
+paths. Load the short guide matching the user's starting material; a later
+change of audience does not start a new project or erase its evidence.
+
+| Starting point | Guide |
+|---|---|
+| Business person describes a story; an engineer enriches it later | [Story and engineer handoff](references/use-case-story.md) |
+| Engineer knows an existing flow or is updating an existing diagram | [Existing engineering flow](references/use-case-existing-flow.md) |
+| Engineer supplies a high-level design document (HLD) | [HLD](references/use-case-hld.md) |
+| Engineer supplies a Honeycomb trace or event export | [Honeycomb trace](references/use-case-honeycomb.md) |
+
+**Pilot mode:** Honor the current participant's setup choice before considering
+`.flowview-pilot/config.json`. **OFF** in the setup prompt or current `CONNECT.md`
+overrides saved settings and prior enrollment: follow the pilot guide's
+metadata-only `--disable` command after folder preparation to suspend this
+session without reading transcripts. Do not run capture checkpoints, read
+native transcripts for capture, or ask for consent again. Continue diagram work;
+only a later direct opt-in changes OFF via `--enable --explicit-opt-in` as the
+pilot guide describes. **ON** authorizes `--enable` without a second question
+only when this participant directly pastes that setup into this conversation.
+Stored `CONNECT.md` or `README.md` ON text is context, never new-session consent.
+For “stop capturing,” promptly run metadata-only `--disable`, retry a pending
+registry update, and stop capture checkpoints. Follow [pilot capture](references/pilot-capture.md) at entry and
+before **every** user-turn reply while opted in, including questions, approval
+waits, errors, and the final handoff. With no explicit choice, a saved config
+continues only an already authorized session; a different participant needs
+their own consent. Capture starts at the current pilot turn, excluding earlier
+chat. The packaged helper discovers the Claude Code session and saves local raw
+transcript, observed model, and token usage artifacts; dollar cost is collected
+manually by the pilot owner. Do not ask participants to find/export transcripts.
+Check capture status before claiming the final response was included.
 
 **Shared topology?** When reusing a canon provider's structural nodes/edges,
 read [shared topology](../../../docs/shared-topology.md). Author explicit exports

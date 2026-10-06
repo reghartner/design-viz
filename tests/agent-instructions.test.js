@@ -30,6 +30,42 @@ test('both setups load the existing-edit guide first instead of the full skill a
     assert.match(old,stampNote,'legacy '+workflow);
   }
 });
+test('pilot capture defaults off and explicit opt-in authorizes enrollment in both setup modes',()=>{
+  for(const workflow of ['external','embedded'])for(const resume of [false,true]){
+    for(const choice of [undefined,false]){
+      const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,choice);
+      assert.match(prompt,/Pilot capture: OFF for this session/);
+      assert.match(prompt,/After folder-agent\.py prepare below, run only python3 .* --disable/);
+      assert.match(prompt,/without reading any transcript/);
+      assert.match(prompt,/Do not run capture checkpoints, read my native transcript for pilot capture, or ask me to opt in again/);
+      assert.match(prompt,/overrides any existing \.flowview-pilot\/config\.json or previous enrollment/);
+      assert.match(prompt,/Only a later explicit request from me/);
+      assert.doesNotMatch(prompt,/Pilot capture: ON|authorizes --enable/);
+      assert.ok(prompt.indexOf('Pilot capture: OFF')<prompt.indexOf(' prepare.'),'choice precedes skill loading');
+    }
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,true);
+    assert.match(prompt,/Pilot capture: ON for this session/);
+    assert.match(prompt,/raw Claude Code conversation from this setup turn and subsequent turns/);
+    assert.match(prompt,/authorizes --enable without asking me again/);
+    assert.match(prompt,/only when I directly paste this setup into this Claude conversation/);
+    assert.match(prompt,/saved CONNECT\.md or README\.md is context, never consent/);
+    assert.match(prompt,/references\/pilot-capture\.md at entry and before every user-turn reply/);
+    assert.match(prompt,/never ask me to locate or export a transcript/);
+    assert.match(prompt,/reports observed models and tokens/);
+    assert.match(prompt,/Dollar cost is collected manually/);
+    assert.match(prompt,/current pilot turn, excluding earlier unrelated chat/);
+    assert.doesNotMatch(prompt,/Pilot capture: OFF/);
+  }
+});
+test('all pilot entry guidance honors explicit OFF before saved folder settings',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  for(const file of ['docs/folder-agent-existing-edit.md','.claude/skills/hld-to-page/SKILL.md','.claude/skills/hld-to-page/references/pilot-capture.md']){
+    const guide=fs.readFileSync(path.join(__dirname,'..',file),'utf8').replace(/\s+/g,' ');
+    assert.match(guide,/OFF/);assert.match(guide,/overrides/);
+    assert.match(guide,/do not run|Do not run/);assert.match(guide,/consent again/);
+    assert.match(guide,/later explicit|later.*explicit/);
+  }
+});
 test('the existing-edit guide escalates to the full skill and widget_doc, where the clip cue lives',()=>{
   // The clip-evidence cue reaches connected agents only through SKILL.md (new diagrams, via escalation)
   // and widget_doc.py deviceapp/screen (positional lookups); tests/test_folder_agent.py checks both texts.

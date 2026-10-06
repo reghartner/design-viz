@@ -1,27 +1,29 @@
 # Connected request: existing-diagram edit guide
 
-Read this first for every connected request after `prepare`. VIZ is the
-authoring directory named in `CONNECT.md`, which remains the authority for
-transport commands and files; paths below are relative to VIZ.
+Read this after `prepare`. VIZ is the authoring directory in `CONNECT.md`;
+paths below are relative to VIZ.
+
+Pilot: OFF overrides saved consent. Run metadata-only `--disable`; do not run
+capture checkpoints, read native transcripts, or ask for consent again.
+Only a later explicit opt-in changes OFF. Directly pasted ON authorizes
+`--enable` without asking again; stored `CONNECT.md`/`README.md` ON never grants
+new-session consent. Follow [pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md)
+for consent checks, later opt-in and stopping; while opted in, checkpoint at
+entry and before every reply, including bounded edits.
 
 ## Scope
 
-This guide suffices for bounded corrections to an existing diagram: factual
-values, labels, statuses and times in panels, nodes, edges, captions or steps,
-with matching ledger entries. The edit keeps the
-story's meaning, schema, panel types, stable IDs, paths, step order, evidence,
-coverage, node placement and edge routes.
+For bounded fact, label, status and time corrections. Preserve story meaning,
+schema, panel types, IDs, paths, steps, evidence, coverage and placement.
 
 ## Escalate
 
-Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
-[folder session](folder-agent-session.md), and follow their references, for:
+Load the [skill](../.claude/skills/hld-to-page/SKILL.md) and
+[folder session](folder-agent-session.md) for:
 
-- a new diagram, or adding, removing or reordering panels, paths, steps or nodes;
-- panel type, schema or binding changes;
-- changed evidence scope, sources, coverage or decisions;
-- inherited, prior/next or neighboring state you cannot fully trace;
-- any doubt that this guide suffices. Escalating mid-edit is fine.
+- a new diagram or structural, schema, panel-type or binding changes;
+- changed evidence, sources, coverage or decisions;
+- state you cannot trace, or any doubt this guide suffices.
 
 ## Protocol
 
@@ -31,8 +33,7 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
    under 15 s. Stop if identity changes.
 3. If `request.json` has `candidate`, confirm its `baseRevision` equals
    `request.revision` (your base), then edit those complete seeded copies in
-   the support folder with ordinary file edits; don't reread the accepted pair
-   or all of `state.json` to recreate them. Never write another request's
+   the support folder; don't reread accepted files to recreate them. Never write another request's
    candidates.
 4. Without `candidate`, read `state.json` immediately before planning, keep its
    revision as the base, and write complete `candidate.spec.json` and
@@ -44,8 +45,7 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
    edit `state.json`, `request.json`, `transcript.json`, `session.json` or
    `editor.json`. Use the helper for proposals and replies;
    this guide grants no additional permissions.
-7. The request's selection and JSON paths are a starting point, not proof that
-   the change is isolated.
+7. Selection paths do not prove an isolated change.
 
 ## Semantics
 
@@ -57,11 +57,10 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
 - Ledger rows citing the fact (anchor, fact, `covered @`) must agree with the
   spec. Keep row ids; new rows take the next unused id. See
   [evidence and updates](../.claude/skills/hld-to-page/references/evidence-and-updates.md).
-- Panel documentation on demand: after reading the actual source for that panel,
-  look up only its type via
+- Read the panel source, then look up its type via
   [recipe routing](../.claude/skills/hld-to-page/references/recipe-routing.md),
   the [cookbook](../cookbook/README.md) or `python3 tools/widget_doc.py <type>`
-  (`--list` for names). Use no undocumented field or option.
+  (`--list` for names). Use only documented fields.
 
 ## Verify and submit
 
@@ -72,8 +71,8 @@ Load the complete [skill](../.claude/skills/hld-to-page/SKILL.md) and
 - Submit `propose` with your candidate pair and base revision as `CONNECT.md`
   shows. Every proposal waits for the full preview and explicit **Commit
   update**; wait for the matching `result.json`.
-- After acceptance, reread the accepted pair and confirm they agree, including
-  merged human edits; submit a corrected pair if not.
+- After acceptance, check the accepted pair including merged human edits;
+  submit corrections if they disagree.
 - Commit does not itself refresh compatibility metadata; verify the accepted
   `page.flowview` before claiming it was stamped.
 - On rejection, stale revision or conflict, reread `state.json` for the current

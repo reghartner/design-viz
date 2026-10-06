@@ -547,6 +547,12 @@
       <button type="button" id="folder-agent-setup-mode-embedded" data-agent-workflow-choice="embedded" aria-pressed="false"><b>Inside workbench · Beta</b><span>Use Claude Monitor</span></button>
     </div>
     <p id="folder-agent-workflow-note" class="folder-agent-hint">The diagram folder can be anywhere your agent can access. It does not have to be the agent’s working directory.</p>
+    <section class="folder-agent-pilot-choice" aria-labelledby="folder-agent-pilot-title">
+      <h3 id="folder-agent-pilot-title">Pilot capture · Optional</h3>
+      <label><input type="checkbox" id="folder-agent-pilot-capture" aria-describedby="folder-agent-pilot-explanation"> Enable pilot capture for this session</label>
+      <p id="folder-agent-pilot-explanation">After you paste the setup instructions into Claude Code, the agent saves your raw conversation from that turn onward, observed models, and token usage in your selected diagram folder. This feature does not upload those files separately. Dollar cost is collected manually by the pilot owner.</p>
+      <p class="folder-agent-hint">Off by default for each new setup. The browser does not capture the conversation. To enable capture later, type “Use pilot mode for this session” directly in Claude Code, including when using the Beta workbench chat.</p>
+    </section>
     <p class="folder-agent-choice-label">What are you doing?</p>
     <div class="folder-agent-start-choices" role="group" aria-label="How you are starting">
       <button type="button" id="folder-agent-start-adopt" data-agent-start-choice="adopt" aria-pressed="true"><b>Add an agent to this open diagram</b><span>This document has never used an agent diagram folder.</span></button>
@@ -571,6 +577,7 @@
   <div id="folder-agent-guide-review" hidden>
     <p>Copy these instructions into your agent’s conversation. Everything you’ll send is visible below.</p>
     <p id="folder-agent-guide-folder-name" class="folder-agent-folder"></p>
+    <p id="folder-agent-pilot-review" class="folder-agent-pilot-review"></p>
     <label for="folder-agent-instructions">Full connection instructions</label><textarea id="folder-agent-instructions" readonly spellcheck="false" rows="12" aria-label="Full agent connection instructions"></textarea>
     <div class="folder-agent-guide-actions"><button type="button" class="welcome-text-button" data-agent-change-folder>Change folder</button><button type="button" class="welcome-button welcome-button-primary" id="folder-agent-copy" disabled>Copy connection instructions</button></div>
     <p class="folder-agent-hint">Your spec and ledger stay in the diagram folder. Your agent keeps its own permission prompts.</p>

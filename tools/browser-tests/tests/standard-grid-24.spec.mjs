@@ -42,7 +42,7 @@ test('legacy geometry stays exact while24-column fields, pointer and keyboard ge
   expect((await saved(page)).default[0].x).toBe(1);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeKeyboard);
   await page.screenshot({path:testInfo.outputPath('grid-24-editor.png'),fullPage:true});
-  await page.locator('#editor-tab-file').click();const downloadPromise=page.waitForEvent('download');await page.locator('#file-save').click();const download=await downloadPromise;
+  await page.locator('#editor-tab-file').click();await page.locator('#workspace-export-trigger').click();const downloadPromise=page.waitForEvent('download');await page.locator('#file-save').click();const download=await downloadPromise;
   const exported=JSON.parse(await readFile(await download.path(),'utf8'));expect(exported.page.flowview.features).toContain('layout.grid-24');
   expect(exported.page.blocks[0].diagram.layouts[0].sectionLayout).toEqual(await saved(page));
   await page.locator('#file-input').setInputFiles(await download.path());await expect.poll(async()=>JSON.parse(await source(page))).toEqual(exported);await prepareEditorSurface(page);await arrangeChapter(page);expect((await saved(page)).default[0].w).toBe(15);expect((await saved(page)).default.find(it=>it.panel==='home').w).toBe(9);

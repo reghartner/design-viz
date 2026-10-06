@@ -60,12 +60,37 @@ async function avoidsCanvasControls(root){
  for(const overlap of overlaps)expect(overlap.area,overlap.control+' remains reachable').toBe(0);
 }
 
+async function nearMarkerOrAboveToolbar(page,root){
+ const anchor=await marker(root).first().boundingBox(),card=await preview(root).boundingBox(),viewport=page.viewportSize();
+ const gap=Math.hypot(Math.max(0,card.x-anchor.x-anchor.width,anchor.x-card.x-card.width),Math.max(0,card.y-anchor.y-anchor.height,anchor.y-card.y-card.height));
+ if(gap<=12)return 'near-marker';
+ // Rendered card and toolbar heights vary across hosts. A full-width
+ // toolbar can leave too little room below it for the complete card: require
+ // that measured constraint before accepting the above-toolbar fallback.
+ const bars=await root.locator('.diagram-views,.explore-tools').evaluateAll(els=>els.map(el=>{
+  const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};
+ }).filter(r=>r.width && r.height));
+ expect(bars.length).toBeGreaterThan(0);
+ const top=Math.min(...bars.map(r=>r.y)),bottom=Math.max(...bars.map(r=>r.y+r.height));
+ expect(anchor.y,'toolbar separates fallback from wire').toBeGreaterThanOrEqual(bottom);
+ expect(await preview(root).evaluate(el=>el.scrollHeight<=el.clientHeight+1),'complete card remains readable without cropping').toBe(true);
+ expect(card.height,'whole card cannot fit below the toolbar').toBeGreaterThan(viewport.height-8-bottom);
+ for(const bar of bars){
+  expect(bar.x-8,'card cannot fit left of toolbar').toBeLessThan(card.width);
+  expect(viewport.width-8-bar.x-bar.width,'card cannot fit right of toolbar').toBeLessThan(card.width);
+ }
+ expect(top-card.y-card.height,'fallback clears and hugs toolbar top').toBeGreaterThanOrEqual(0);
+ expect(top-card.y-card.height,'fallback does not drift farther up the page').toBeLessThanOrEqual(6);
+ const expectedLeft=Math.max(8,Math.min(viewport.width-card.width-8,anchor.x+anchor.width/2-card.width/2));
+ expect(Math.abs(card.x-expectedLeft),'fallback stays aligned with its wire marker').toBeLessThanOrEqual(1);
+ return 'above-toolbar';
+}
+
 for(const native of [false,true])test('Canvas wire contracts position and retire in '+(native?'native Backstage':'standalone'),async({page,server},testInfo)=>{
  await page.setViewportSize({width:1100,height:850});const root=await open(page,server,fixture(true),native);
  await expect(marker(root)).toHaveCount(3);await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
  await marker(root).first().click();await expect(preview(root)).toBeVisible();await geometry(page,preview(root));await avoidsCanvasControls(root);
- const anchor=await marker(root).first().boundingBox(),card=await preview(root).boundingBox();
- expect(Math.hypot(Math.max(0,card.x-anchor.x-anchor.width,anchor.x-card.x-card.width),Math.max(0,card.y-anchor.y-anchor.height,anchor.y-card.y-card.height))).toBeLessThanOrEqual(12);
+ await nearMarkerOrAboveToolbar(page,root);
  await testInfo.attach('wire-contract-canvas-'+(native?'native':'standalone'),{body:await page.screenshot(),contentType:'image/png'});
  await page.setViewportSize({width:900,height:760});await geometry(page,preview(root));await avoidsCanvasControls(root);
  await page.keyboard.press('Escape');await expect(preview(root)).toBeHidden();
@@ -83,4 +108,13 @@ test('Workbench binds an existing card to an active wire with one Undo/Redo and 
  const bound=JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].tabs[0].sections[0].contract.wires;expect(bound).toEqual([{step:'send',edge:'a->b'}]);
  await page.locator('#undo-builder').click();await expect(marker(root)).toHaveCount(0);await page.locator('#redo-builder').click();await expect(marker(root)).toHaveCount(1);
  await root.locator('[data-dv-contract="legacy"] .cttitle>span').click({position:{x:5,y:5}});await guide.getByRole('button',{name:'Remove wire binding 1',exact:true}).click();await expect(marker(root)).toHaveCount(0);
+});
+
+test('native Canvas keeps the full preview above its toolbar when no adjacent card fits',async({page,server})=>{
+ await page.setViewportSize({width:1100,height:780});const root=await open(page,server,fixture(true),true);
+ await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
+ await marker(root).first().click();await geometry(page,preview(root));await avoidsCanvasControls(root);
+ expect(await nearMarkerOrAboveToolbar(page,root)).toBe('above-toolbar');
+ await page.keyboard.press('Escape');await expect(preview(root)).toBeHidden();await expect(marker(root).first()).toBeFocused();
+ await page.evaluate(()=>viewer.destroy());await expect(root).toBeEmpty();
 });

@@ -1390,7 +1390,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
   .workspace-canvas .workspace-create{flex:none;}
   .workspace-canvas .editor-add-label{font-size:0;}
   .workspace-canvas .editor-add-label::after{content:'Add';font-size:11px;}
-  .workspace-canvas #file-save{max-width:76px;white-space:normal;font-size:11px;line-height:1.2;padding:6px 8px;}
+  .workspace-canvas #workspace-export-trigger{font-size:11px;padding:6px 8px;}
 }
 /* In compact windows, editor panels overlap canvas chrome. Keep editor
    controls above that chrome and the tool rail accessible. */
@@ -1508,3 +1508,7 @@ body .docview .viewport-explore .boardcanvas g.node[data-dv-object-menu]:focus-v
 body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:focus-visible{outline:3px dashed var(--accent);outline-offset:4px}
 .dv-spatial-status{position:absolute;z-index:1100;left:24px;bottom:84px;max-width:420px;padding:10px 14px;border:1px solid var(--explore-border);border-radius:8px;background:var(--explore-bg);color:var(--dtext);box-shadow:0 4px 16px #0002}
 .dv-spatial-actions .fnote{flex-basis:100%}
+
+.workspace-export{position:relative;font-size:12px;}
+.workspace-export>summary{cursor:pointer;white-space:nowrap;}
+.workspace-export-body .bbtn{text-align:left;}

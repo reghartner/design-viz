@@ -92,7 +92,7 @@ test('reference picker browses bounded exports, inserts a closed subset, and pre
   await page.locator('#topology-namespace').fill('notify');await expect(page.locator('#topology-add')).toBeDisabled();await expect(page.locator('#topology-status')).toContainText('duplicate namespace');
   await page.keyboard.press('Escape');await expect(page.locator('#src')).toHaveValue(after);await expect(page.locator('#diagram-add')).toBeFocused();
   expect(fixture.requests).toEqual([fixture.specURL('second'),fixture.specURL('first')]);
-  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.blocks).toEqual(raw.page.blocks);expect(JSON.stringify(saved)).not.toContain('topologyProvenance');
   await page.reload();await prepareEditorSurface(page);await expect(page.locator('#src')).toHaveValue(after);
@@ -359,7 +359,7 @@ test('the backend workspace handoff drags a whole floating import with authored 
   await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);
   await expect(root.locator('.dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
   await page.locator('#editor-tab-json').click();await page.locator('#go').click();await prepareEditorSurface(page);
-  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  await page.locator('#editor-tab-file').click();const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.sections[0].diagram).toEqual(d);
   await page.reload();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram).toEqual(d);
@@ -424,7 +424,7 @@ test('a published topology consumer renders and its imported node inspector is r
   await expect(page.locator('#docview .stepid')).toHaveText('persist');
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(source);
   await page.locator('#editor-tab-file').click();
-  const download=page.waitForEvent('download');await page.locator('#file-save').click();
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
   const saved=JSON.parse(await readFile(await (await download).path(),'utf8'));
   expect(saved.page.sections[0].diagram).toEqual(source.page.sections[0].diagram);
   expect(JSON.stringify(saved)).not.toContain('topologyProvenance');

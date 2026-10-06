@@ -40,7 +40,7 @@ function harness(adapters={},options={}){
   }
   Object.assign(doc,element('document'),{createElement:tag=>element(tag),getElementById:id=>elements[id]||null});
   doc.body=element('body');
-  const ids=['src','msgs','file-input','file-open','file-save','file-export','confluence-handoff','confluence-json',
+  const ids=['src','msgs','file-input','file-open','file-save','file-export-html','file-export-both','file-export','confluence-handoff','confluence-json',
     'confluence-status','confluence-copy','confluence-export','confluence-close','import-mermaid','importbox','import-mermaid-text',
     'import-mermaid-convert','import-mermaid-cancel','import-trace','tracebox','trace-text','trace-feedback','trace-file','trace-scope',
     'trace-root','trace-service','trace-convert','trace-preview-box','trace-search','trace-fields','trace-id','trace-url',
@@ -281,12 +281,12 @@ test('direct and nested imports freeze the stamped click revision and safely esc
   }}finally{delete C.FlowviewCompatibility;}
 });
 
-test('missing or broken frozen providers refuse both export modes before any writes or template fetch',()=>{
-  for(const directoryMode of [false,true])for(const broken of [false,true]){
+test('missing or broken frozen providers refuse all HTML exports before any writes or template fetch',()=>{
+  for(const action of ['file-export','file-export-html','file-export-both'])for(const directoryMode of [false,true])for(const broken of [false,true]){
     const d=directory(),h=harness(directoryMode?{pickDirectory:()=>{throw Error('picker must not open');}}:{}),fixture=topologyFixture();
     if(broken)fixture.provider.page.sections[0].diagram.rows=[['api']];
     h.session.replaceProject(JSON.stringify(fixture.consumer),null,broken?{topologyContext:fixture.context}:null);
-    h.click('file-export');assert.deepEqual(d.events,[]);assert.equal(h.requests.length,0);assert.equal(h.downloads.length,0);
+    h.click(action);assert.deepEqual(d.events,[]);assert.equal(h.requests.length,0);assert.equal(h.downloads.length,0);
     assert.match(h.messages.at(-1),broken?/placement/:/open this authored spec from Canon/);
   }
 });
@@ -331,4 +331,42 @@ test('picker and unopened handle failures publish no files; retired failures lea
     await startDirectory(h);d.gates[stage].reject(new Error('unopened'));await settle();
     assert.equal(d.events.some(e=>e[0]==='write'||e[0]==='abort'),false);assert.match(h.messages.at(-1),/export failed while writing: unopened/);
   }
+});
+
+
+test('Static HTML downloads one frozen snapshot without opening a folder or changing source/history',async()=>{
+  let picks=0;const h=harness({pickDirectory(){picks++;throw Error('must not pick');}});
+  const authored=INITIAL+'  ';h.session.accept({text:authored});
+  const baseline=h.session.baseline();h.click('file-export-html');h.type('src','new unfinished draft');
+  h.requests[0].resolve(response());await settle();
+  assert.equal(picks,0);assert.deepEqual(h.downloads.map(d=>d.name),['original.html']);
+  assert.match(h.blobs.get(h.downloads[0].url).text,/Original/);
+  assert.equal(h.text,'new unfinished draft');assert.equal(h.session.baseline(),baseline);assert.equal(h.session.canUndo(),true);
+  h.flush();assert.equal(h.revoked.length,1);assert.equal(h.doc.body.children.length,0);
+});
+
+test('toolbar Both reuses folder and fallback exports; invalid source publishes nothing for either HTML choice',async()=>{
+  const d=directory(),folder=harness({pickDirectory:()=>Promise.resolve(d.dir)});
+  folder.click('file-export-both');await settle();folder.requests[0].resolve(response());await settle();
+  assert.deepEqual(d.events.filter(e=>e[0]==='handle').map(e=>e[1]),['original.spec.json','original.html']);
+  const fallback=harness();fallback.click('file-export-both');fallback.requests[0].resolve(response());await settle();
+  assert.deepEqual(fallback.downloads.map(d=>d.name),['original.spec.json','original.html']);
+  for(const action of ['file-export-html','file-export-both']){
+    let picks=0;const bad=harness({pickDirectory(){picks++;}});bad.type('src','{ unfinished');bad.click(action);
+    assert.equal(picks,0);assert.equal(bad.requests.length,0);assert.equal(bad.downloads.length,0);assert.match(bad.messages.at(-1),/valid JSON/);
+  }
+});
+
+test('new format choices, project replacement and destroy retire pending Static HTML; failures release resources',async()=>{
+  for(const retire of ['file-save','file-export-both','project','destroy']){
+    const h=harness();h.click('file-export-html');const pending=h.requests[0];
+    if(retire==='project')h.session.replaceProject('{}');else if(retire==='destroy')h.io.destroy();else h.click(retire);
+    assert.equal(pending.options.signal.aborted,true);const before=h.downloads.length;
+    pending.resolve(response());await settle();assert.equal(h.downloads.length,before,retire);
+  }
+  const failed=harness();failed.click('file-export-html');
+  for(let i=0;i<3;i++){failed.requests[i].resolve(response('bad template'));await settle();}
+  assert.equal(failed.downloads.length,0);assert.match(failed.messages.at(-1),/Export → JSON only/);
+  const denied=harness({anchorClick(){throw Error('denied');}});denied.click('file-export-html');denied.requests[0].resolve(response());await settle();
+  assert.equal(denied.downloads.length,0);assert.equal(denied.revoked.length,1);assert.equal(denied.timers.size,0);
 });

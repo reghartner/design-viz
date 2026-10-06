@@ -208,7 +208,7 @@ The bottom-left **Copy for agent** button copies selected references directly.
 The full spec and ledger remain available through the shared folder.
 
 **⌘/Ctrl K** opens Outline and focuses search. Explicit inspection opens Inspect;
-Home, File, Download JSON, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
+Home, File, Export, Undo/Redo and Add remain in the top toolbar. Wide Inspect windows place
 story and panel fields side by side; narrower windows stack them.
 
 On the page, all row diagrams have their own **Auto / Fit width / Readable** controls,
@@ -265,5 +265,8 @@ activity state without another button in the header.
 **Brief → Download review package** downloads a ZIP containing the current JSON,
 viewer HTML, story notes, and evidence references. It does not publish or submit
 anything. The header’s **File** opens the project files workspace, where export
-writes the JSON and standalone HTML together. **Download JSON** keeps the direct
-source-file shortcut, while File reports whether browser recovery was saved.
+writes the JSON and standalone HTML together. The header’s **Export** menu offers **JSON only** for editable source,
+**Static HTML** for one offline reader snapshot, and **Both** for the same two-file
+export as File (folder picker or two downloads). Imported topology is included in
+HTML without dynamic provider lookups. JSON only also preserves invalid source
+for later repair. File reports whether browser recovery was saved.

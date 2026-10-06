@@ -37,7 +37,7 @@ function createBuilderIO(opts){
   function exportCurrent(run){return !disposed && run===exportVersion;}
   function retireProject(){
     if(disposed)return;
-    cancelFileRead();cancelTraceRead();cancelExport();confluenceCopyRun++;
+    cancelFileRead();cancelTraceRead();cancelExport();closeExportMenu();confluenceCopyRun++;
     if(importBox)importBox.hidden=true;
     retireTraceUI();
     if(confluenceBox)confluenceBox.hidden=true;
@@ -69,8 +69,26 @@ function createBuilderIO(opts){
       fileInput.value = ''; /* allow re-opening the same file */
     });
   }
+  var exportMenu=document.getElementById('workspace-export');
+  var exportTrigger=document.getElementById('workspace-export-trigger');
+  var htmlBtn=document.getElementById('file-export-html'),bothBtn=document.getElementById('file-export-both');
+  function closeExportMenu(refocus){
+    if(!exportMenu)return;
+    var wasOpen=exportMenu.open;exportMenu.open=false;
+    var body=exportMenu.querySelector('.workspace-export-body');
+    if(body && body.hidePopover && body.matches(':popover-open'))body.hidePopover();
+    if(refocus && wasOpen && exportTrigger)exportTrigger.focus();
+  }
+  if(exportMenu){
+    listen(document,'pointerdown',function(ev){if(exportMenu.open && !exportMenu.contains(ev.target))closeExportMenu();});
+    listen(document,'focusin',function(ev){if(exportMenu.open && !exportMenu.contains(ev.target))closeExportMenu();});
+    listen(exportMenu,'keydown',function(ev){
+      if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();closeExportMenu(true);}
+    });
+  }
   if (saveBtn){
     listen(saveBtn,'click',function(){
+      closeExportMenu(true);cancelExport();
       /* Stamp the downloaded snapshot; preserve the live source and unfinished JSON. */
       var parsed = parseEditor();
       var name = specFileName(parsed.error ? null : parsed.raw);
@@ -81,7 +99,7 @@ function createBuilderIO(opts){
     });
   }
 
-  /* ---- export: spec JSON + published page HTML into a picked folder ---- */
+  /* ---- export: static HTML, optionally paired with editable JSON ---- */
   var EXPORT_TEMPLATE_PATHS = ['../template/flowview.html', 'template/flowview.html', 'flowview.html'];
   function fetchExportTemplate(run,done){
     if(!browser.fetch){done('this browser cannot fetch the page template');return;}
@@ -92,7 +110,7 @@ function createBuilderIO(opts){
       if(!exportCurrent(run))return;
       if(i>=EXPORT_TEMPLATE_PATHS.length){
         exportRequest=null;done('could not load the page template ('+EXPORT_TEMPLATE_PATHS.join(' / ')+') — '+
-          'serve the workbench over http beside template/flowview.html; save still downloads the JSON alone');return;
+          'serve the workbench over http beside template/flowview.html; Export → JSON only still downloads the editable source');return;
       }
       var path=EXPORT_TEMPLATE_PATHS[i++],pending;
       try{pending=browser.fetch(path,{cache:'no-store',signal:request?request.signal:undefined});}
@@ -189,7 +207,8 @@ function createBuilderIO(opts){
     confluenceCopyRun++; confluenceBox.hidden = true; confluenceCopy.focus();
   });
   var exportBtn = document.getElementById('file-export');
-  if (exportBtn) listen(exportBtn,'click',function(){
+  function exportFiles(mode){
+    closeExportMenu(true);
     cancelExport();var run=exportVersion;
     var parsed = parseEditor();
     if (parsed.error){ inspectorMessage('export needs valid JSON — ' + parsed.error); return; }
@@ -201,7 +220,7 @@ function createBuilderIO(opts){
     /* the folder picker needs the click's transient activation, which a
        fetch would spend — so pick the directory FIRST, then fetch, build,
        and write. Files are overwritten in place. */
-    if(browser.pickDirectory){
+    if(mode==='both' && browser.pickDirectory){
       var picked;
       try{picked=browser.pickDirectory({mode:'readwrite'});}
       catch(ex){if(!ex || ex.name!=='AbortError')inspectorMessage('export failed: '+errorText(ex));return;}
@@ -226,21 +245,24 @@ function createBuilderIO(opts){
         inspectorMessage('export failed: ' + (ex && ex.message ? ex.message : ex));
       });
     } else {
-      /* no folder picker in this browser: plain downloads instead */
+      /* Static HTML is one download; Both falls back to two downloads. */
       fetchExportTemplate(run,function(err, tplText){
           if(!exportCurrent(run))return;
         if (err){ inspectorMessage(err); return; }
         var built = buildExportHtml(tplText, snapshot.text.trim());
         if (built.error){ inspectorMessage(built.error); return; }
         try{
-          downloadTextFile(jsonName, exportText, 'application/json');
+          if(mode==='both')downloadTextFile(jsonName, exportText, 'application/json');
           if(!exportCurrent(run))return;
           downloadTextFile(htmlName, built.html, 'text/html');
         }catch(ex){inspectorMessage('export failed: '+errorText(ex));return;}
-        inspectorMessage('no folder picker here — downloaded ' + jsonName + ' and ' + htmlName);
+        inspectorMessage(mode==='both'?'no folder picker here — downloaded ' + jsonName + ' and ' + htmlName:'downloaded ' + htmlName);
       });
     }
-  });
+  }
+  if(exportBtn)listen(exportBtn,'click',function(){exportFiles('both');});
+  if(bothBtn)listen(bothBtn,'click',function(){exportFiles('both');});
+  if(htmlBtn)listen(htmlBtn,'click',function(){exportFiles('html');});
 
   /* ---- inline Mermaid import ---- */
   var importBtn = document.getElementById('import-mermaid');

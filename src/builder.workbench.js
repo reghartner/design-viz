@@ -468,7 +468,7 @@ function initWorkbenchBuilder(opts){
       cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
       status:function(state){
         var status=document.getElementById('workbench-recovery-status');if(!status)return;
-        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Download JSON to keep your changes.'}[state];
+        status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Export → JSON only to keep your changes.'}[state];
         status.dataset.state=state;
       }}),
     deferInitialSave:opts.deferInitialSave,render:render,renderedText:opts.renderedText,
@@ -1220,7 +1220,7 @@ function initWorkbenchBuilder(opts){
   }
   function refreshProvenance(){
     var value=provenance(),el=document.getElementById('workspace-provenance');
-    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Download JSON writes a file; Brief can download a review package. Neither publishes to your company.';}
+    if(el){el.textContent='Local draft'+(value.title?' · '+value.title:'');el.title='Local draft'+(value.title?' based on '+value.title:'')+'. Export → JSON only writes a file; Brief can download a review package. Neither publishes to your company.';}
     var raw=session.snapshot().raw,imports=[];
     try{raw=session.resolve(raw);}catch(ex){}
     (typeof FlowCanon!=='undefined'?FlowCanon.sections(raw):[]).forEach(function(sec){imports.push.apply(imports,(sec.diagram.topologyProvenance || {}).imports || []);});

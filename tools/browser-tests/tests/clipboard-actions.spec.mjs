@@ -17,14 +17,14 @@ test('clipboard actions reflect capabilities, retain targetless Paste and duplic
   await expect(copy).toBeDisabled();await expect(duplicate).toBeDisabled();
 });
 
-test('Download JSON is explicit and browser recovery reports a real write failure and recovery',async({page,server})=>{
+test('Export JSON only is explicit and browser recovery reports a real write failure and recovery',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));
-  await expect(page.locator('#file-save')).toHaveText('Download JSON');
+  await expect(page.locator('#workspace-export-trigger')).toHaveText('Export');
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toHaveText('Draft saved in this browser');
   await page.evaluate(()=>{const original=Storage.prototype.setItem;window.restoreStorage=()=>{Storage.prototype.setItem=original;};Storage.prototype.setItem=function(key,value){if(key==='dv-workbench-draft')throw new DOMException('Full','QuotaExceededError');return original.call(this,key,value);};});
   await page.locator('#editor-tab-json').click();const source=page.locator('#src'),before=await source.inputValue();await source.fill(before+' ');
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toContainText('Browser recovery unavailable');
   await page.evaluate(()=>window.restoreStorage());await page.locator('#editor-tab-json').click();await source.fill(before+'\n');
   await page.locator('#editor-tab-file').click();await expect(page.locator('#workbench-recovery-status')).toHaveText('Draft saved in this browser');
-  const download=page.waitForEvent('download');await page.locator('#file-save').click();expect((await download).suggestedFilename()).toMatch(/\.json$/);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();expect((await download).suggestedFilename()).toMatch(/\.json$/);
 });

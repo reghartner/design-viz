@@ -897,7 +897,7 @@ test('clipboard failure offers manual copy and invalid source cannot create cont
     for(const width of [1051,1050,900,801,800,768,640,390])for(let cycle=0;cycle<2;cycle++){
       await page.setViewportSize({width,height:360});
       await expect(page.locator('#folder-agent-working')).toBeVisible();await expect(page.locator('#folder-agent-working')).toHaveAccessibleName(/Open Agent/);
-      for(const selector of ['#workbench-home','#workspace-home','#workspace-file','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#file-save']){
+      for(const selector of ['#workbench-home','#workspace-home','#workspace-file','#diagram-add','#undo-builder','#redo-builder','#workspace-appearance>summary','#folder-agent-working','.workspace-help>summary','#workspace-export-trigger']){
         const control=await page.locator(selector).evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return {inside:r.left>=0 && r.right<=innerWidth && r.top>=0 && r.bottom<=innerHeight,reachable:hit===node || node.contains(hit),left:+r.left.toFixed(1),right:+r.right.toFixed(1),width:+r.width.toFixed(1)};});
         expect(control,selector+' while Agent is active at '+width+'px').toMatchObject({inside:true,reachable:true});
       }

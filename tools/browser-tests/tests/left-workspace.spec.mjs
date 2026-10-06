@@ -25,7 +25,7 @@ test('floating tools leave the diagram full-window and global actions available'
   await expect(page.locator('#workspace-columns')).toBeHidden();
   for(const name of ['inspect','steps','outline','json','file']){
     await page.locator('#editor-tab-'+name).click();await expect(page.locator('#editor-'+name)).toBeVisible();
-    for(const id of ['diagram-add','undo-builder','redo-builder','file-save'])await expect(page.locator('#'+id)).toBeInViewport();
+    for(const id of ['diagram-add','undo-builder','redo-builder','workspace-export-trigger'])await expect(page.locator('#'+id)).toBeInViewport();
   }
   await expect(page.locator('.editor-pane:visible')).toHaveCount(5);
   await canvasTools(page);await page.locator('#workspace-panels').click();await expect(page.locator('.editor-pane:visible')).toHaveCount(0);
@@ -99,7 +99,7 @@ test('File hosts company catalog, imports and exports; global Save works from JS
   await page.locator('#import-mermaid-cancel').click();
   const exportedPromise=page.waitForEvent('download');await page.locator('#confluence-export').click();const exported=await exportedPromise;
   expect(exported.suggestedFilename()).toContain('confluence');expect(JSON.parse(await readFile(await exported.path(),'utf8'))).toBeTruthy();
-  await page.locator('#editor-tab-json').click();const savePromise=page.waitForEvent('download');await page.locator('#file-save').click();const saved=await savePromise;
+  await page.locator('#editor-tab-json').click();const savePromise=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await savePromise;
   expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);
 });
 
@@ -110,7 +110,7 @@ test('top Home and File keep project navigation and exports reachable at desktop
   await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#editor-tab-file')).toBeFocused();
   await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-preset').selectOption('present');await expect(page.locator('.workspace-window:visible')).toHaveCount(0);
   await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
-  const download=page.waitForEvent('download');await page.locator('#file-save').click();const saved=await download;
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();const saved=await download;
   expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);await expect(page.locator('#src')).toHaveValue(original);
   await home.click();await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#workbench-workspace')).toBeHidden();
 });

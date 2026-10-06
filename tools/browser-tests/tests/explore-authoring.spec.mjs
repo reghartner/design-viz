@@ -25,6 +25,7 @@ test('Presentation is a per-view undoable edit and survives host preview changes
   await chapterOptions(page);await presentation().selectOption('explore');
   const explored=await page.locator('#src').inputValue();await page.keyboard.press('Escape');await page.getByRole('button',{name:'Done arranging',exact:true}).click();await prepareEditorSurface(page);
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
+  await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#layout-preview-target')).toBeHidden();
   await arrangeChapter(page,section(page));
   await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
   await chapterOptions(page);await section(page).getByRole('button',{name:'Duplicate chapter',exact:true}).click();

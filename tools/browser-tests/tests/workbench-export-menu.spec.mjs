@@ -7,7 +7,7 @@ for(const width of [1280,1800])test('Export disclosure is reachable and keyboard
   await page.setViewportSize({width,height:900});await page.goto(server.origin+'/workbench.html');await pastePage(page,source);
   const trigger=page.locator('#workspace-export-trigger'),menu=page.locator('#workspace-export');
   await expect(trigger).toBeInViewport();await expect(trigger).toHaveAccessibleName('Export');
-  await trigger.focus();await page.keyboard.press('Enter');await expect(menu).toHaveAttribute('open','');
+  await trigger.focus();await page.keyboard.press('Enter');await expect(menu).toHaveAttribute('open','');await expect(page.locator('#file-save')).toBeVisible();
   await page.keyboard.press('Tab');await expect(page.locator('#file-save')).toBeFocused();
   await page.keyboard.press('Tab');await expect(page.locator('#file-export-html')).toBeFocused();
   await page.keyboard.press('Tab');await expect(page.locator('#file-export-both')).toBeFocused();
@@ -17,7 +17,11 @@ for(const width of [1280,1800])test('Export disclosure is reachable and keyboard
   await trigger.click();await page.locator('#workspace-provenance').click();await expect(menu).not.toHaveAttribute('open','');
   await trigger.click();await page.locator('#workspace-home').focus();await expect(menu).not.toHaveAttribute('open','');
   await trigger.click();await page.locator('.workspace-help>summary').click();await expect(menu).not.toHaveAttribute('open','');
-  await page.locator('.workspace-help>summary').click();await trigger.focus();await page.keyboard.press('Enter');await page.keyboard.press('Tab');
+  await page.locator('.workspace-help>summary').click();await expect(page.locator('.workspace-help .workspace-help-body')).toBeHidden();
+  await trigger.focus();await expect(trigger).toBeFocused();await page.keyboard.press('Enter');
+  // Native details toggle exposes its popover asynchronously. Wait for the choices before tabbing.
+  await expect(menu).toHaveAttribute('open','');await expect(page.locator('#file-save')).toBeVisible();
+  await page.keyboard.press('Tab');await expect(page.locator('#file-save')).toBeFocused();
   const download=page.waitForEvent('download');await page.keyboard.press('Enter');
   const file=await download;expect(file.suggestedFilename()).toBe('export-choices.spec.json');
   expect(JSON.parse(await readFile(await file.path(),'utf8')).page.title).toBe('Export choices');

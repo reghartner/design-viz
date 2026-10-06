@@ -169,6 +169,7 @@
         "compatibility": "FlowviewCompatibility",
         "validateSpec": "validateSpec",
         "viewerRouting": "viewerRouting",
+        "exportAnonymousLayout": "exportAnonymousLayout",
         "autoArrangeCandidates": "autoArrangeCandidates",
         "autoArrangeDiagram": "autoArrangeDiagram"
       },

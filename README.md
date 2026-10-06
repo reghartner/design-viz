@@ -258,6 +258,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/browser-tests/` | Required pinned-Chromium contracts for offline HTML, editor source/history and teardown, native React isolation, and copied Forge resources. [Commands and boundaries](tools/browser-tests/README.md). |
 | `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
+| `tools/export-layout.cjs` | Local diagnostic export: writes only anonymous node bounds, numeric edge topology and the exact rendered SVG edge paths. It never writes titles, source IDs, labels, prose, panels or metadata. |
 | `template/flowview.html` | The render target (generated locally, not tracked — edit `src/`). Self-contained single file: layout engine, six skins, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
 | `tools/inject.py` | The injection step: `inject.py <spec.json> <template.html> <out.html>`. Validates the JSON, refuses unescaped `</script`, sets the page title from `page.title`, and discovers derived sibling links when the conventional output root already has `crossref.json`. |
 | `tools/build_index.py` | Generates a root's `index.html` and `crossref.json` from `manifest.json` plus every named spec. The index groups pages by family and lists exact-title services shared by 2+ pages; the JSON catalog supplies derived per-page backlinks. |
@@ -272,6 +273,48 @@ Panel modules are discovered through `src/source-bundles.json`. For headless
 Node tools or VM tests, load `readSource('validator.js')` from
 `tools/source-loader.cjs`, then the assembled engine when needed; raw validator
 and engine file reads omit the registered panel implementations.
+
+### Sharing anonymous graph geometry
+
+Build the local backend once, then point the diagnostic exporter at a FlowSpec:
+
+```sh
+python3 tools/build.py --runtime-only
+node tools/export-layout.cjs input.spec.json output.layout.json
+```
+
+The output is a coordinate snapshot for discussing awkward layouts. It is not a
+FlowSpec and cannot recreate the source content. Every diagram is exported in
+page and tab order; prose sections are skipped. Node IDs are local integers in
+renderer node order (integer-like keys enumerate numerically), and edges refer
+only to those integers.
+Coordinates use the renderer's SVG user units: `x` and `y` are the node's
+top-left corner, while `width` and `height` are its rendered card bounds. `path`
+is the exact SVG path data produced by the renderer, including authored curves,
+ports, automatic routing, overlaps, negative coordinates and fractional values.
+The exporter does not arrange, normalize, snap or simplify the graph.
+
+```json
+{
+  "format": "flowview-layout-v1",
+  "diagrams": [
+    {
+      "nodes": [
+        {"id": 1, "x": 35, "y": 42, "width": 150, "height": 54},
+        {"id": 2, "x": 995, "y": 42, "width": 150, "height": 54}
+      ],
+      "edges": [
+        {"from": 1, "to": 2, "path": "M 185 69 L 995 69"}
+      ]
+    }
+  ]
+}
+```
+
+Only the fixed keys above, finite numbers, the format literal and generated SVG
+commands appear in the file. The CLI refuses source/output aliases, writes with
+private permissions and replaces an existing destination only after the entire
+input validates and all geometry has been computed.
 
 ## Regenerating the example
 

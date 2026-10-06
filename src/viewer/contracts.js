@@ -68,11 +68,25 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
   function position(){
     if(!active || retired)return;
     var rect=active.getBoundingClientRect(),vw=window.innerWidth,vh=window.innerHeight;
-    var width=pop.offsetWidth,height=pop.offsetHeight;
-    var left=Math.max(8,Math.min(vw-width-8,rect.left+rect.width/2-width/2));
-    var top=rect.top-height-10;
-    if(top<8)top=rect.bottom+10;
-    pop.style.left=left+'px';pop.style.top=Math.max(8,Math.min(vh-height-8,top))+'px';
+    var width=pop.offsetWidth,height=pop.offsetHeight,cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
+    var controls=Array.prototype.map.call(host.querySelectorAll('.diagram-views,.explore-tools,.explore-player,.termbar'),function(el){return el.getBoundingClientRect();}).filter(function(r){return r.width && r.height;});
+    var boardRect=board.svg.closest('.board').getBoundingClientRect(),candidates=[];
+    function overlap(a,b){return Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));}
+    function candidate(x,y){
+      var left=Math.max(8,Math.min(vw-width-8,x)),top=Math.max(8,Math.min(vh-height-8,y));
+      var box={left:left,top:top,right:left+width,bottom:top+height};
+      candidates.push({box:box,cover:controls.reduce(function(sum,r){return sum+overlap(box,r);},0),marker:overlap(box,rect),distance:Math.pow(Math.max(0,left-rect.right,rect.left-box.right),2)+Math.pow(Math.max(0,top-rect.bottom,rect.top-box.bottom),2),centerDistance:Math.pow(left+width/2-cx,2)+Math.pow(top+height/2-cy,2)});
+    }
+    candidate(cx-width/2,rect.top-height-10);candidate(cx-width/2,rect.bottom+10);
+    candidate(rect.right+10,cy-height/2);candidate(rect.left-width-10,cy-height/2);
+    /* Native Canvas can begin near the viewport bottom, leaving the toolbar
+       directly above the wire. Try beside the marker inside the measured board,
+       then beyond each control boundary, instead of covering those controls. */
+    var rows=[boardRect.top+4,boardRect.bottom-height-4];
+    controls.forEach(function(r){rows.push(r.bottom+4,r.top-height-4);});
+    rows.forEach(function(y){[cx-width/2,rect.right+10,rect.left-width-10].forEach(function(x){candidate(x,y);});});
+    candidates.sort(function(a,b){return a.cover-b.cover || a.marker-b.marker || a.distance-b.distance || a.centerDistance-b.centerDistance;});
+    pop.style.left=candidates[0].box.left+'px';pop.style.top=candidates[0].box.top+'px';
   }
   function scheduleClose(){
     cancelClose();if(pinned)return;

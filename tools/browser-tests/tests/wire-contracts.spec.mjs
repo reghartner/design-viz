@@ -50,11 +50,24 @@ test('wire hover, traversable content, pin, source links, keyboard, dismissal an
  await expect(marks.first().locator('.wire-contract-pulse')).toHaveCSS('animation-name','none');
 });
 
+async function avoidsCanvasControls(root){
+ const overlaps=await root.evaluate(el=>{
+  const scope=el.shadowRoot || el,pop=scope.querySelector('.wire-contract-preview').getBoundingClientRect();
+  return Array.from(scope.querySelectorAll('.diagram-views,.explore-tools,.explore-player')).map(control=>{
+   const r=control.getBoundingClientRect();return {control:control.className,area:Math.max(0,Math.min(pop.right,r.right)-Math.max(pop.left,r.left))*Math.max(0,Math.min(pop.bottom,r.bottom)-Math.max(pop.top,r.top))};
+  });
+ });
+ for(const overlap of overlaps)expect(overlap.area,overlap.control+' remains reachable').toBe(0);
+}
+
 for(const native of [false,true])test('Canvas wire contracts position and retire in '+(native?'native Backstage':'standalone'),async({page,server},testInfo)=>{
  await page.setViewportSize({width:1100,height:850});const root=await open(page,server,fixture(true),native);
- await expect(marker(root)).toHaveCount(3);await marker(root).first().click();await expect(preview(root)).toBeVisible();await geometry(page,preview(root));
+ await expect(marker(root)).toHaveCount(3);await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
+ await marker(root).first().click();await expect(preview(root)).toBeVisible();await geometry(page,preview(root));await avoidsCanvasControls(root);
+ const anchor=await marker(root).first().boundingBox(),card=await preview(root).boundingBox();
+ expect(Math.hypot(Math.max(0,card.x-anchor.x-anchor.width,anchor.x-card.x-card.width),Math.max(0,card.y-anchor.y-anchor.height,anchor.y-card.y-card.height))).toBeLessThanOrEqual(12);
  await testInfo.attach('wire-contract-canvas-'+(native?'native':'standalone'),{body:await page.screenshot(),contentType:'image/png'});
- await page.setViewportSize({width:900,height:760});await geometry(page,preview(root));
+ await page.setViewportSize({width:900,height:760});await geometry(page,preview(root));await avoidsCanvasControls(root);
  await page.keyboard.press('Escape');await expect(preview(root)).toBeHidden();
  await page.emulateMedia({reducedMotion:'no-preference'});await expect(marker(root).first().locator('.wire-contract-pulse')).toHaveCSS('animation-name','wire-contract-pulse');
  await marker(root).last().click();await expect(preview(root)).toContainText('Receipt');

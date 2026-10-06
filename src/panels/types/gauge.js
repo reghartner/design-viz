@@ -117,3 +117,5 @@ PanelRegistry.extend('gauge', {
     },
   },
 });
+
+PanelRegistry.extend('gauge', {layout: {sectionSizing: { minWidth: 160, preferredWidth: 200, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

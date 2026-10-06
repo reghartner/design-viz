@@ -384,3 +384,5 @@ PanelRegistry.extend('queue', {
     },
   },
 });
+
+PanelRegistry.extend('queue', {layout: {sectionSizing: { minWidth: 190, preferredWidth: 250, maxWidth: 450, aspectPolicy: 'content', grow: 1 }}});

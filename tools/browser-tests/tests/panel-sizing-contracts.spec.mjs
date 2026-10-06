@@ -1,0 +1,13 @@
+import {test,expect} from '@playwright/test';
+import {createRequire} from 'node:module';
+import {createCapture} from '../../panel-placement/capture.mjs';
+const require=createRequire(import.meta.url),corpus=require('../../panel-placement/corpus.cjs'),L=require('../../panel-placement/layouts.cjs'),S=require('../../panel-placement/solver.cjs'),{calibrate}=require('../../panel-placement/calibrate.cjs');
+test('native measured contracts bound phone and SVG interiors without changing content or renderer CSS',async()=>{
+ const C=corpus.engine(),scenario={...corpus.scenarios().find(s=>s.id==='residential-3'),id:'synthetic-contract-qa',panelTypes:['deviceapp','homemap'],panelCount:2,host:{width:1440,profile:'default'}};
+ const source=corpus.specification(C,scenario,'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII='),d=L.diagram(source);d.floats=Object.keys(d.nodes).map((id,i)=>({id,x:100+i*80,y:100}));d.rows=[[]];d.layouts[0].sectionLayout.default=[{x:0,y:0,w:24,h:3,hidden:true},{panel:'p0',x:0,y:0,w:12,h:24},{panel:'p1',x:12,y:0,w:12,h:6},{controls:'steps',x:0,y:24,w:24,h:3}];
+ const capture=await createCapture();try{const initial=await capture.paint(source,scenario);const fullHeight=Math.ceil(await capture.page.locator('#capture').evaluate(e=>e.getBoundingClientRect().height));expect(fullHeight).toBeGreaterThan(1000);expect(initial.panels.find(p=>p.key==='panel:p0').rect.bottom).toBeGreaterThan(1000);const png=await capture.fullScreenshot(scenario.host.width,fullHeight);expect(png.readUInt32BE(16)).toBe(scenario.host.width);expect(png.readUInt32BE(20)).toBe(fullHeight);const result=await calibrate(source,{initial,solve:(spec,o,minimums)=>S.solve(spec,{registry:C.PanelRegistry,geometry:initial.geometry,measurements:Object.fromEntries(o.panels.map(p=>[p.key.slice(6),p])),minimums}),measure:spec=>capture.paint(spec,scenario),validate:(spec,o)=>{L.check(spec);expect(o.panels.every(p=>p.overflowX<=4&&p.overflowY<=4)).toBeTruthy();}});
+  expect(L.semantic(result.spec)).toBe(L.semantic(source));expect(result.observed.controls.reachableAfterScroll).toBeTruthy();
+  for(const p of result.observed.panels){const old=initial.panels.find(x=>x.key===p.key);expect(old.horizontalLetterbox).toBeGreaterThan(.35);expect(p.horizontalLetterbox).toBeLessThan(.12);expect(p.letterboxFraction).toBeLessThan(.25);}
+  await capture.page.evaluate(()=>window.scrollTo(0,0));const h=await capture.page.locator('#view .doc-title').boundingBox();expect(h.y).toBeGreaterThanOrEqual(0);expect(await capture.page.locator('#view .doc-title').textContent()).toBe(source.page.title);
+ }finally{await capture.browser.close();}
+});

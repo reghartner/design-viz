@@ -180,3 +180,5 @@ PanelRegistry.extend('leds', {
     },
   },
 });
+
+PanelRegistry.extend('leds', {layout: {sectionSizing: { minWidth: 150, preferredWidth: 180, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

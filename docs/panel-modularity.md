@@ -284,3 +284,18 @@ snapshots. When both locations are authored, editing the temporary value leaves
 the carried value intact; an explicit duration choice collapses the pair to the
 current temporary value. The planner preserves unknown siblings and refuses
 malformed transient containers instead of repairing them implicitly.
+
+### Experimental Standard-section sizing
+
+`layout.sectionSizing` is optional metadata for the offline panel-placement
+experiment. Existing renderer/editor/preset behavior does not consume it.
+Widths (`minWidth`, `preferredWidth`, `maxWidth`) are native CSS pixels before
+host scaling. `grow` permits residual row width distribution; zero preserves
+fixed-body width. `aspectPolicy` is `fixed`, `intrinsic`, or `content`.
+`bodyAspect` applies only to the body, excluding measured title, borders and
+padding. `bodyInset` describes padding inside the content wrapper.
+`contentSelector` locates the actual fitted body (for example the phone inside
+Device app); `ancillarySelector` identifies audio/caption content outside that
+aspect. These are trusted, panel-owned selectors, never spec-provided code.
+See [the experiment and limits](panel-placement-training.md#round-3-panel-sizing-contracts)
+for measured calibration, fallbacks, provenance and verification.

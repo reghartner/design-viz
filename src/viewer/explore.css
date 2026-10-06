@@ -39,7 +39,7 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-window-body>.pwidget>.ptitle{display:none;}
 .explore-prose-window .sec-prose{box-sizing:border-box;width:100%;min-width:0;padding:12px 14px 24px;color:var(--dtext);font:16px/1.55 'IBM Plex Sans',sans-serif;overflow-wrap:anywhere;}
 .docview .section-viewport .explore-prose-window .sec-text,.docview .section-viewport .explore-prose-window .sec-bullets{font-size:16px;line-height:1.55;}
-.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-prose,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-text,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-bullets{font-size:26px;}
+.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-prose,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-text,.docview .section-viewport .explore-canvas-objects>.explore-prose-window .sec-bullets{font-size:clamp(19px,calc(40px - 1.09375vw),26px);}
 .explore-prose-window .sec-text{max-width:none;margin:0 0 12px;}
 .explore-prose-window .sec-prose>ul{margin:0;padding-left:20px;}
 .explore-prose-window .sec-prose li{margin:6px 0;}

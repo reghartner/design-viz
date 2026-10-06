@@ -226,7 +226,7 @@ test('notes placement and both geometries save, undo, redo and reopen independen
  await place(reader,'Placement for Section notes','floating');expect(await source(page)).toBe(savedText);await reader.close();
 });
 
-for(const width of [1280,1920])test('notes remain readable and independently sized at '+width+'px',async({page,server},info)=>{
+for(const width of [1280,1440,1920])test('notes remain readable and independently sized at '+width+'px',async({page,server},info)=>{
  await page.setViewportSize({width,height:1000});const raw=fixture('explore');delete raw.page.sections[0].diagram.layouts[1].exploreLayout.prose;
  await page.goto(await build(server,raw,'readable-notes-'+width));await page.evaluate(()=>document.fonts.ready);
  for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');const before=await notes(page).boundingBox();
@@ -236,7 +236,7 @@ for(const width of [1280,1920])test('notes remain readable and independently siz
  await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');await page.getByRole('button',{name:'Fit canvas',exact:true}).click();
  await expect(notes(page)).toBeInViewport();
  const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
- expect(metrics.font).toBeGreaterThanOrEqual(16);expect(metrics.overflow).toBeLessThanOrEqual(1);
+ expect(metrics.font).toBeGreaterThanOrEqual(19);expect(metrics.font).toBeLessThanOrEqual(22);expect(metrics.overflow).toBeLessThanOrEqual(1);
  await info.attach('canvas-notes-rendered-size-'+width,{body:JSON.stringify(metrics),contentType:'application/json'});
  await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
  await page.locator('.explore-panel-menu summary').click();

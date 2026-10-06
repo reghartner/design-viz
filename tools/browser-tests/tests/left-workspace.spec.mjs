@@ -103,6 +103,18 @@ test('File hosts company catalog, imports and exports; global Save works from JS
   expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);
 });
 
+test('top Home and File keep project navigation and exports reachable at desktop width',async({page,server})=>{
+  await page.setViewportSize({width:1280,height:800});await open(page,server);const original=await page.locator('#src').inputValue();
+  const home=page.locator('#workspace-home'),file=page.locator('#workspace-file');
+  await expect(home).toHaveText('Home');await expectCenterHit(home,'top Home');await expectCenterHit(file,'top File');
+  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#editor-tab-file')).toBeFocused();
+  await page.locator('.workspace-preferences summary').click();await page.locator('#workspace-preset').selectOption('present');await expect(page.locator('.workspace-window:visible')).toHaveCount(0);
+  await file.click();await expect(page.locator('#workspace-window-file')).toBeVisible();await expect(page.locator('#file-export')).toBeVisible();await expect(page.locator('#src')).toHaveValue(original);
+  const download=page.waitForEvent('download');await page.locator('#file-save').click();const saved=await download;
+  expect(JSON.parse(await readFile(await saved.path(),'utf8')).page.title).toBe(editorSpec().page.title);await expect(page.locator('#src')).toHaveValue(original);
+  await home.click();await expect(page.locator('#welcome-home')).toBeVisible();await expect(page.locator('#workbench-workspace')).toBeHidden();
+});
+
 test('wide step inspectors share space with nested panel controls and retain their state when changing tools',async({page,server},testInfo)=>{
   await page.setViewportSize({width:1800,height:1100});await open(page,server);
   await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="0"]').click();await page.locator('#steps-inspect').click();

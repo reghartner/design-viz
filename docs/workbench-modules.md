@@ -341,6 +341,19 @@ menus and cancels gestures while preserving Inspector selection with stale-sourc
 feedback. View changes and preview
 replacement retain their existing selection-retirement policy.
 
+Imported topology boundaries also expose an editor-only, keyboard-focusable
+reference handle. The reference menu is available on the handle, boundary stroke
+or label, and imported nodes, edges and groups in Standard and Canvas. It chooses
+the deepest matching import and offers published-reader navigation in a new tab,
+link copying, member inspection and reference removal. Navigation requires the
+provider ID in the frozen v3 catalog for this deployment. Removal uses
+`planRemoveTopologyImport` and its consumer-reference blockers; nested imports
+remain owned by their containing provider. Menu actions check the exact source,
+project, frozen context and preview identity, and retire on replacement, source
+input or project departure. One successful removal produces one Undo entry.
+Step membership markers use resolved edge indices so referenced nodes and edges
+receive the same outline and halo treatment as local members during Add to step.
+
 `createBuilderInteractions()` owns board hit testing, single/multiple selection
 rings, step-member markers, ADD TO STEP and connect state, graph label/node/group/
 row gestures and their temporary SVG elements. It receives the live session,

@@ -1726,6 +1726,32 @@ function contractManager(section,val){
     });
     return list;
   }
+function contractWireControl(val,ctx){
+    var t=Object.assign({},session.target),box=document.createElement('div'),diagram=ctx.diagram || {},choices=[];
+    function edit(wire,index){return commitCascade(function(raw){return planContractWire(session.text(),raw,t,wire,index);},{after:refreshFormSoon});}
+    (Array.isArray(val.wires)?val.wires:[]).forEach(function(wire,index){
+      var row=document.createElement('div'),label=document.createElement('span');
+      label.textContent=wire && typeof wire==='object'?(wire.step || '?')+' · '+(wire.edge || '?')+(wire.path?' · '+wire.path:' · All paths'):'Invalid binding';row.appendChild(label);
+      var remove=actionButton('Remove wire binding',function(){edit(null,index);});remove.setAttribute('aria-label','Remove wire binding '+(index+1));row.appendChild(remove);box.appendChild(row);
+    });
+    (diagram.steps || []).forEach(function(step){
+      stepKeys(step).forEach(function(edge){
+        var wire={step:step.id,edge:edge};
+        if(contractWireProblem(diagram,wire))return;
+        choices.push({wire:wire,label:step.id+' · '+edge+' · All paths'});
+        (diagram.paths || []).forEach(function(path){
+          var scoped={step:step.id,edge:edge,path:path.id};
+          if(!contractWireProblem(diagram,scoped))choices.push({wire:scoped,label:step.id+' · '+edge+' · '+path.id});
+        });
+      });
+    });
+    if(choices.length){
+      var selected=choices[0],select=selectControl(choices.map(function(c){return c.label;}),selected.label,function(label){selected=choices.find(function(c){return c.label===label;});});
+      select.setAttribute('aria-label','Step wire binding');box.appendChild(select);
+      box.appendChild(actionButton('Bind to step wire',function(){edit(selected.wire);}));
+    }else{var hint=document.createElement('p');hint.textContent='Give a step a stable ID and an active edge to bind this contract.';box.appendChild(hint);}
+    return box;
+  }
 function contractForm(val,ctx){
     var t=session.target,widths={'Full width':12,'Half width':6,'Third width':4,'Two-thirds width':8};
     var selected=Object.keys(widths).find(function(label){return widths[label]===contractColumnSpan(val.span);});
@@ -1734,6 +1760,7 @@ function contractForm(val,ctx){
     return [
       frow('title',textControl(val.title,function(v){return commitSimple('title',v==null?null:JSON.stringify(v));})),
       frow('Width',widthControl),
+      frowBlock('Step wires',contractWireControl(val,ctx)),
       frow('source',textControl(val.source,function(v){return commitSimple('source',v==null?null:JSON.stringify(v));},{placeholder:'permalink URL'})),
       frowBlock('note',proseControl(val.note,function(v){return commitSimple('note',v==null?null:JSON.stringify(v));})),
       frowBlock('Fields',actionButton('+ Add field',function(){

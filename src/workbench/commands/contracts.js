@@ -37,3 +37,19 @@ function planAddContractField(text,raw,target){
   if(!plan || plan.error)return plan || {error:'Could not add the field.'};
   plan.index=(value.fields || []).length;return plan;
 }
+function planContractWire(text,raw,target,wire,removeIndex){
+  var rec=specSectionPaths(raw)[target.section],sec=rec && specValueAt(raw,rec.section);
+  var path=builderTargetPath(raw,Object.assign({},target,{kind:'contract'})),value=path && specValueAt(raw,path);
+  if(!sec || !value)return {error:'Contract block not found.'};
+  if(value.wires!=null && !Array.isArray(value.wires))return {error:'Fix wires to be an array before editing bindings.'};
+  var wires=(value.wires || []).slice();
+  if(removeIndex!=null){
+    if(removeIndex<0 || removeIndex>=wires.length)return {error:'Wire binding not found.'};
+    wires.splice(removeIndex,1);
+  }else{
+    var problem=contractWireProblem(sec.diagram,wire);if(problem)return {error:problem};
+    if(wires.some(function(w){return w && w.step===wire.step && w.edge===wire.edge && w.path===wire.path;}))return {error:'This wire binding already exists.'};
+    wires.push(wire);
+  }
+  return planSetField(text,raw,path,'wires',wires.length?JSON.stringify(wires,null,2):null);
+}

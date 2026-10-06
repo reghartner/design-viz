@@ -271,6 +271,13 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
     if (!ct || typeof ct !== 'object' || Array.isArray(ct)){
       warnings.push(CP + ': must be an object {title?, source?, fields:[...], note?} — card skipped');
     } else {
+      if(ct.wires!=null){
+        if(!Array.isArray(ct.wires))warnings.push(CP+'.wires: must be an array of {step, edge, path?} — markers skipped');
+        else ct.wires.forEach(function(wire,index){
+          var problem=contractWireProblem(sec.diagram,wire);
+          if(problem)warnings.push(CP+'.wires['+index+']: '+problem+' — marker skipped');
+        });
+      }
       if(ct.span!=null && [4,6,8,12].indexOf(ct.span)<0)warnings.push(CP+'.span: use 4 (third), 6 (half), 8 (two-thirds), or 12 (full) — using full width');
       if(ct.id!=null && (typeof ct.id!=='string' || !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(ct.id) || ct.id==='legacy'))warnings.push(CP+'.id: use a stable ID beginning with a letter; "legacy" is reserved');
       if (ct.source && typeof ct.source !== 'string')

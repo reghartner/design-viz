@@ -15,7 +15,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Happy and failure outcomes on the SAME diagram; aligned alternate timelines | `cookbook/alternate-paths.md`, `docs/alternate-paths.md` |
 | Domain cards that open focused internals; a child flow matching the current outcome | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md`; stable section IDs, `detailOnly`, `node.detail`, explicit `stepMap` and `mode:"focus"` |
 | A send that never arrives, or a communication that is never sent | `docs/failed-communications.md` (also demonstrated in the alternate-path recipe) |
-| Multiple message contracts, request/response tables side by side or stacked | `docs/contract-blocks.md`; use `section.contracts`, stable block IDs and widths 4/6/8/12 |
+| Multiple message contracts, request/response tables side by side or stacked, payload previews on active wires | `docs/contract-blocks.md`; use `section.contracts`, stable block IDs and widths 4/6/8/12; optional `wires: [{step, edge, path?}]` binds a contract to a stable step and active edge |
 | Inline backticks or fenced code in descriptions, bullets, notes or step captions | `contract/authoring-contract.md` → Prose markup; labels inside nodes and panels stay plain |
 | Copy/share steps across paths, converge after translation, continue an ending, or detach a shared step | `docs/workbench-step-reuse.md`; `docs/alternate-paths.md` for shared middle blocks and endings (reuse consecutive IDs, not copies; paths can split and rejoin again) |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |

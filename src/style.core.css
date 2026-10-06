@@ -3886,3 +3886,24 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 
 .handoff-back{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere;}
 @media print{.handoff-back{display:none !important;}}
+
+/* Wire contract markers and shared-card preview. Top-layer popovers retain skin
+   styles but are independent of Canvas transforms and scroll clipping. */
+.wire-contract-marker{cursor:pointer;outline:none;--wire-fill:#101a2c;}
+:is(.sk-daylight,.sk-pastel,.sk-editorial) .wire-contract-marker{--wire-fill:#fff;}
+.wire-contract-marker>rect{fill:var(--wire-fill);stroke:var(--dfaint,#68788f);stroke-width:1.5;}
+.wire-contract-marker>path{fill:none;stroke:var(--dink,#334155);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;}
+.wire-contract-pulse{fill:none;stroke:var(--dfaint,#68788f);stroke-width:1.5;animation:wire-contract-pulse 2.8s ease-out infinite;pointer-events:none;}
+.wire-contract-marker:focus-visible>rect,.wire-contract-marker:hover>rect,.wire-contract-marker[aria-pressed=true]>rect{stroke:var(--acc,#38bdf8);stroke-width:2.5;}
+@keyframes wire-contract-pulse{0%,100%{opacity:.15}45%{opacity:.5}}
+@media(prefers-reduced-motion:reduce){.wire-contract-pulse{animation:none;opacity:.3;}}
+.wire-contract-preview{display:block;font:400 12px/1.5 'IBM Plex Sans',sans-serif;position:fixed;inset:auto;margin:0;z-index:10000;box-sizing:border-box;width:440px;max-width:calc(100vw - 16px);max-height:min(460px,calc(100vh - 16px));overflow:auto;padding:10px;border:1px solid var(--muted,#68788f);border-radius:12px;box-shadow:0 12px 40px #0003;}
+.wire-contract-preview[hidden]{display:none;}
+.wire-contract-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:12px;}
+.wire-contract-heading button{cursor:pointer;border:0;border-radius:5px;background:transparent;color:inherit;font-size:22px;width:30px;height:30px;}
+.wire-contract-heading button:focus-visible{outline:2px solid var(--acc,#38bdf8);}
+.wire-contract-preview .ctcard{margin:4px 0 0;overflow-wrap:anywhere;}
+.wire-contract-preview .cttable{table-layout:fixed;}
+.wire-contract-preview .ctk{width:24%;white-space:normal;overflow-wrap:anywhere;}
+.wire-contract-preview .ctv{width:26%;white-space:normal;overflow-wrap:anywhere;}
+@media print{.wire-contract-marker,.wire-contract-preview{display:none!important;}}

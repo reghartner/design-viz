@@ -22,7 +22,7 @@ topology, notification or outcome without evidence.
 | Engineering and business views of one timeline | `cookbook/two-perspectives.md`, `docs/section-layouts.md` |
 | Named views, Standard/Explore presentation, selected playback stops, host profiles | `docs/section-layouts.md` |
 | Color-coded phases in one timeline | `docs/step-colors.md` |
-| Several message contracts in one section | `docs/contract-blocks.md` |
+| Several message contracts in one section or step wire payload previews | `docs/contract-blocks.md` |
 | Domain overview with focused internals | `cookbook/domain-drilldowns.md`, `docs/drilldowns.md` (`mode: "focus"` only) |
 | Extracting selected nodes from a branched or custom-layout flow | `docs/drilldowns.md#extract-an-independent-diagram`; preserve the overview story, create an independent destination with no inherited timeline; preview reference changes and download external destinations before applying |
 | Endpoints continuing in another diagram | `cookbook/diagram-handoffs.md` (`node.handoff`) |

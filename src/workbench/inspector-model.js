@@ -230,7 +230,7 @@ var BUILDER_GUIDES = {
   contract: {
     title:'Contract block — size and content',
     how:'Choose half width for two blocks side by side, or full width to stack. Blocks fill in source order and stack automatically in narrow embeds. Click a field row to edit it.',
-    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing']]
+    fields:[['title','block heading'],['span','4 = third, 6 = half, 8 = two-thirds, 12 = full (default)'],['id','optional stable ID for links'],['wires','step/edge bindings with optional path scope; hover previews, click pins'],['source','source permalink'],['note','prose below the fields; supports code spans and fenced code'],['fields','k/v/g rows, each with optional step reveal timing']]
   },
   crow: {
     title: 'Contract field — one "on the wire" row',

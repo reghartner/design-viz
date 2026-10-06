@@ -246,3 +246,28 @@ for(const width of [1280,1440,1920])test('notes remain readable and independentl
  const reduced=await notes(page).evaluate(el=>parseFloat(getComputedStyle(el.querySelector('.sec-text')).fontSize)*el.getBoundingClientRect().width/el.offsetWidth);
  expect(reduced).toBeCloseTo(metrics.font*.8,1);
 });
+
+async function notesGeometry(page){return notes(page).evaluate(el=>({x:parseFloat(el.style.getPropertyValue('--float-x')),y:parseFloat(el.style.getPropertyValue('--float-y')),w:parseFloat(el.style.getPropertyValue('--float-w')),h:parseFloat(el.style.getPropertyValue('--float-h'))}));}
+async function notesOverflow(page){return notes(page).locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight);}
+for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live desktop resize until '+gesture.toLowerCase(),async({page,server},info)=>{
+ await page.setViewportSize({width:1920,height:1000});const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);
+ const wide=await notesGeometry(page);expect(await notesOverflow(page)).toBe(0);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(async()=>(await notesGeometry(page)).h).toBeGreaterThan(wide.h);await expect.poll(()=>notesOverflow(page)).toBe(0);
+ await page.getByRole('button',{name:'Fit canvas',exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
+ await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);expect(await notesOverflow(page)).toBe(0);
+ await notes(page).focus();await notes(page).getByRole('button',{name:gesture+' Section notes; use arrow keys',exact:true}).press('ArrowRight');const manual=await notesGeometry(page);expect(manual).not.toEqual(wide);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(manual);
+ await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(manual);
+});
+
+test('saved and newly authored canvas notes retain their rectangle on live browser resize',async({page,server})=>{
+ const raw=fixture('explore'),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.prosePlacement='canvas';layout.canvas={prose:{x:1220,y:0,w:440,h:280}};
+ await page.setViewportSize({width:1920,height:1000});await page.goto(await build(server,raw,'saved-notes-resize'));
+ expect(await notesGeometry(page)).toEqual(layout.canvas.prose);await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(layout.canvas.prose);
+ await page.setViewportSize({width:1920,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture('explore'),null,2));await closeTools(page);
+ await place(page,'Placement for Section notes','canvas');const savedText=await source(page),saved=JSON.parse(savedText).page.sections[0].diagram.layouts[1].exploreLayout.canvas.prose;
+ expect(await notesGeometry(page)).toEqual(saved);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
+ await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
+});

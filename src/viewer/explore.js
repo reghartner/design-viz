@@ -114,6 +114,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(retired || !active || token===false)return false;
     var ok=!token.authored || !author || author.commit(definition.id,copy(memory.layout),token.token)!==false;
     if(!ok){memory.layout=token.layout;zoom=token.zoom;sizeGraph(false);positionCamera(token.camera);}
+    // Once a notes rectangle is authored, preserve it just like a reopened file.
+    if(ok && token.authored && memory.layout.canvas && memory.layout.canvas.prose && memory.canvasPanels && memory.canvasPanels.prose)memory.canvasPanels.prose.automatic=false;
     if(ok && token.panels){var after=panelGeometry(memory);if(JSON.stringify(token.panels)!==JSON.stringify(after))shell.dispatchEvent(new CustomEvent('workbench-panel-geometry',{bubbles:true,detail:{view:definition.id,before:token.panels,after:after}}));}
     return ok;
   }
@@ -381,8 +383,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     apply(w,constrain(w,scaledRect(w,w.state)));
     var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
-    // Seed new canvas notes from their larger type, then preserve the rectangle.
-    if(w.prose && canvasWindow(w))w.state.automatic=false;
+    // Pristine notes keep fitting fluid type through viewport changes.
+    // Gestures and authored rectangles leave automatic sizing explicitly.
   }
   function paint(){
     if(!active || retired)return;

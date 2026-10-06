@@ -483,7 +483,9 @@ notes first to reveal these handles. Floating notes use 16px body text at 100%
 scale, independently of the Panels & controls size setting. Canvas notes use
 fluid logical body text: 26px at a 1280px browser width, decreasing smoothly to
 19px at 1920px, clamped to that range. New canvas rectangles start 440 graph units
-wide with a height fitted to the content. Saved rectangles retain their dimensions. Canvas
+wide with a height fitted to the content. Unsaved notes keep fitting through
+browser resizing until moved, resized, or saved as an authored rectangle.
+Saved rectangles retain their dimensions. Canvas
 notes move and scale with diagram zoom; manual zoom-out makes their text smaller.
 Saved placement declares `layout.explore-prose-placement`.
 

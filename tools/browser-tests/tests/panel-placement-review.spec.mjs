@@ -11,7 +11,7 @@ async function fixture(mode){
  const pairs=[];
  for(let i=0;i<3;i++){
   const spec={page:{sections:[{diagram:{panels:[{id:'p',type:'state',initial:{state:'Ready'}}],layouts:[{id:'one',sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:6},{panel:'p',x:0,y:6,w:24,h:6},{controls:'steps',x:0,y:12,w:24,h:3}]}}]}}]}};
-  const pair={id:'synthetic-'+i,title:'Synthetic case '+i,batch:i===2?2:1,split:'review',audience:'Synthetic tester',goal:'Verify UI persistence only.',host:{width:800,profile:'default'},panelCount:1,panelTypes:['state'],capture:{width:1,height:1},contentSha256:L.hash(L.semantic(spec))};
+  const pair={id:'synthetic-'+i,title:'Synthetic case '+i,batch:i===2?2:1,split:'review',experimentAxis:'panel-sizing',comparisonNote:'Synthetic scrolling tradeoff.',audience:'Synthetic tester',goal:'Verify UI persistence only.',host:{width:800,profile:'default'},panelCount:1,panelTypes:['state'],capture:{width:1,height:1},contentSha256:L.hash(L.semantic(spec))};
   for(const label of ['A','B']){if(label==='B')L.layout(spec)[1].w=18;const bytes=JSON.stringify(spec),base='public/'+i+'-'+label;await fs.writeFile(path.join(dataset,base+'.json'),bytes);await fs.writeFile(path.join(dataset,base+'.png'),png);pair[label]={id:i+'-'+label,sha256:L.hash(bytes),pngSha256:L.hash(png),spec:base+'.json',png:base+'.png'};}
   pairs.push(pair);
  }
@@ -24,7 +24,7 @@ for(const width of [390,1440])test('panel acceptance labels, reason clearing and
  const f=await fixture('panel-layout');try{
   await page.setViewportSize({width,height:900});await page.goto(f.url);
   const first=page.locator('.pair').nth(0),second=page.locator('.pair').nth(1);
-  await first.getByRole('radio',{name:'Both acceptable',exact:true}).check();await first.getByRole('textbox').fill('Both communicate the goal.');
+  await expect(first.getByText('Focus: panel sizing · same step-control policy')).toBeVisible();await expect(first.getByText('Synthetic scrolling tradeoff.')).toBeVisible();await first.getByRole('radio',{name:'Both acceptable',exact:true}).check();await first.getByRole('textbox').fill('Both communicate the goal.');
   await second.getByRole('radio',{name:'Neither acceptable',exact:true}).check();await second.getByRole('textbox').fill('Neither prioritizes the evidence.');
   await page.reload();await expect(first.getByRole('radio',{name:'Both acceptable',exact:true})).toBeChecked();await expect(first.getByRole('textbox')).toHaveValue('Both communicate the goal.');
   await page.getByRole('button',{name:'Next batch',exact:true}).click();await page.locator('.pair').getByRole('radio',{name:'A',exact:true}).check();

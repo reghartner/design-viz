@@ -9,7 +9,7 @@ Standard versus Explore on another diagram.
 
 | Chapter | What the audience sees | Point of the chapter |
 |---|---|---|
-| Build new with Claude | The real new-diagram Workbench setup points to the detail dropdown, then shows Story or Engineering selected, the matching full dialog with Copy & paste highlighted, a focused Copy control, and an empty-folder choice. Three **tour paths** show illustrative YOU/CLAUDE conversations. | A business story, HLD, or Honeycomb trace can start a new six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice. |
+| Build new with Claude | The Flowview landing page highlights **Build with my agent**. The next beat opens **How are you starting?** with the detail dropdown highlighted; Story or Engineering selection, the matching Copy & paste view, a focused Copy control, and an empty-folder choice follow. Three **tour paths** show illustrative YOU/CLAUDE conversations. | A business story, HLD, or Honeycomb trace can start a new six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice. |
 | Reconnect existing folder | The real Workbench recovery and Continue existing controls reopen a saved diagram folder before an illustrative Claude Code exchange updates the existing six-step story. | An existing flow may serve a business audience. Claude reads the accepted spec and ledger, preserves stable IDs, and proposes a revision. This is an alternative entry to Build new. |
 | Review and accept | Two native paths: First creation compares the empty Current scaffold with a source-neutral first candidate; Update existing inspects the wording-only proposal, compares the accepted Current spec and ledger, discards that pending proposal, then reviews a new evidence-corrected proposal. | Both entry routes share the human preview gate, with a different starting state and a distinct actual Workbench sequence. |
 | Find and use in Backstage | Seven actual plugin states: Recording service Diagrams page → native inline viewer → matching destinations → section → step 3 → expanded viewer → entity page. Broad screens are followed by focused UI details. | An explicitly bound service exposes the approved diagram on its own page; section/step jumps keep the selected diagram in context. |
@@ -66,12 +66,12 @@ GitHub loaders; the local fixture does not prove company login or loader setup.
 ## Screenshot provenance
 
 PNG originals live in [screenshots](screenshots/) and are embedded as data URLs
-in the spec and portable HTML. The new-build Workbench captures
-(`agent-setup-detail-selector-next.png`, `agent-focus-story-landscape.png`,
+in the spec and portable HTML. The new-build captures
+(`agent-landing-start-with-agent.png`, `agent-setup-detail-selector-next.png`, `agent-focus-story-landscape.png`,
 `agent-focus-engineering-landscape.png`, `agent-setup-copy-next.png`,
 `agent-setup-copy-engineering-next.png`, `agent-setup-copy-focused.png`, and
-`select-folder.png`) came from the built Workbench on 2026-10-07. The broad
-opening capture outlines the actual detail dropdown. Story and Engineering
+`select-folder.png`) came from the local Flowview landing page and built Workbench on 2026-10-07. The first broad
+capture outlines the actual Build with my agent button; the next outlines the detail dropdown. Story and Engineering
 paths then show their selected detail and matching broad Copy & paste choice
 before a shared focused Copy image. The orange outlines are presentation
 highlights on real controls. No folder permission was granted for these

@@ -78,6 +78,12 @@ body #section-build .appscreens:has([data-screen-id="choice"]) {
   --appscreen-ratio: 2.947368 !important;
 }
 
+/* Keep the landing-page action readable in the half-width screenshot tile. */
+body #section-build .appscreen-image img[data-screen-id="landing"] {
+  transform: scale(1.8);
+  transform-origin: left 80%;
+}
+
 body #section-review .appscreens:has([data-screen-id="committed"]) {
   --appscreen-ratio: 2.105590 !important;
 }

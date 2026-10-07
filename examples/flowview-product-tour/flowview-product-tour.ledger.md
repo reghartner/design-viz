@@ -27,7 +27,8 @@ access policy, a production outcome, time, cost, or adoption.
 
 ## Story and audience
 
-A PM or engineer starts a new agent-backed diagram in Workbench, chooses
+A PM or engineer clicks Build with my agent on the Flowview landing page,
+then starts a new agent-backed diagram in Workbench, chooses
 audience detail, selects Copy & paste, and chooses an empty folder. In the
 illustrative Claude exchange, the agent asks what the chosen source proves
 before drafting six fictional doorbell beats. An existing project can instead
@@ -47,7 +48,7 @@ navigate a published service association in Backstage.
 
 | Tab | Panel | Question answered | Evidence |
 |---|---|---|---|
-| Build new | setup-screen | What does a new build require in Workbench? | Broad Workbench setup with the next detail selector outlined, Story/Engineering choice, later path-matched Copy & paste highlight, focused Copy & paste control, and empty-folder chooser. |
+| Build new | setup-screen | What does a new build require in Workbench? | Broad landing page with the actual Build with my agent button outlined, followed by the How are you starting? dialog with its detail selector outlined, Story/Engineering choice, later path-matched Copy & paste highlight, focused Copy & paste control, and empty-folder chooser. |
 | Build new | agent | What must Claude ask and record for this source? | Clearly illustrative YOU/CLAUDE dialogue, with a six-beat doorbell proposal for each route. |
 | Reconnect existing | update-screen | How does a saved project reopen? | Actual Workbench context, Reopen card, Continue existing choice, restored folder/setup, Copy instructions, and connected Agent state. |
 | Reconnect existing | update-agent | How can Claude continue from the saved pair? | Illustrative dialogue that reads the spec and ledger, asks a boundary question, and submits an update. |
@@ -87,8 +88,9 @@ where trace evidence stops.
 
 ## Paths and handoffs
 
-**Build new:** a common opening highlights the actual detail selector to be
-clicked next. Source-specific focus selection follows. The later Copy & paste
+**Build new:** a common landing-page opening highlights the actual Build with
+my agent button. The next beat shows the How are you starting? dialog and
+highlights its detail selector. Source-specific focus selection follows. The later Copy & paste
 beat highlights that control in a broad Workbench view with Story selected
 for business or Engineering selected for HLD and trace, followed by a focused
 control view. Then come empty-folder setup, source-specific Claude questions,
@@ -127,7 +129,8 @@ present in that tab. A held screenshot does not imply a new UI action.
 
 | Step | UI screenshot panel | Dialogue / decision panel | Why it changes or holds |
 |---|---|---|---|
-| build-open | P: context | H: empty exchange | Broad setup outlines the actual detail selector clicked next. |
+| build-open | P: landing | H: empty exchange | Broad Flowview landing page outlines the actual Build with my agent button. |
+| build-setup-detail | P: context | H | Actual How are you starting? dialog outlines the detail selector clicked next. |
 | build-story-focus | P: story-focus | H | Actual Story detail choice. |
 | build-hld-focus | P: engineering-focus | H | Engineering detail for HLD. |
 | build-trace-focus | P: engineering-focus | H | Same Engineering control for trace. |
@@ -188,9 +191,10 @@ present in that tab. A held screenshot does not imply a new UI action.
 
 ## Build capture provenance
 
-The broad new-build Workbench capture
-agent-setup-detail-selector-next.png outlines the actual Story detail
-dropdown, which is the next control in the sequence. After the selected
+The broad landing capture agent-landing-start-with-agent.png outlines the
+actual Build with my agent button. The next Workbench capture
+agent-setup-detail-selector-next.png outlines the Story detail dropdown
+in the How are you starting? dialog. After the selected
 detail is shown, agent-setup-copy-next.png outlines Copy & paste with Story
 still selected; agent-setup-copy-engineering-next.png shows the same control
 with Engineering selected for HLD and trace. The shared focused

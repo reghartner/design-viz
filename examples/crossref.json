@@ -14,7 +14,7 @@
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
       }
     ],
-    "Accepted pair": [
+    "Accepted files": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
         "family": "flowview-product-tour",
@@ -75,6 +75,13 @@
         "file": "nestrel-warden/warden.html",
         "family": "nestrel-warden",
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Ask for a fix": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Back to entity": [
@@ -143,13 +150,6 @@
         "file": "loomworks-trellis/trellis.html",
         "family": "loomworks-trellis",
         "title": "loomworks Trellis — Camera-as-Hub"
-      }
-    ],
-    "Candidate pair": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Casebook": [
@@ -253,13 +253,6 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
-    "Correction": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
     "Courier": [
       {
         "file": "nestrel-warden/warden.html",
@@ -331,13 +324,6 @@
         "file": "shared-icons/shared-icons.html",
         "family": "shared-icons",
         "title": "Shared icons & company branding"
-      }
-    ],
-    "Draft pair": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Drawbridge": [
@@ -518,6 +504,13 @@
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
       }
     ],
+    "Inline viewer": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Keymaster": [
       {
         "file": "gridseye-bastion/bastion.html",
@@ -579,34 +572,6 @@
         "file": "gridseye-bastion/bastion.html",
         "family": "gridseye-bastion",
         "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
-      }
-    ],
-    "Native inline viewer": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "New proposal": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "Next · Backstage": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "Next · Review": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Nimbus API": [
@@ -731,6 +696,13 @@
         "file": "basecraft-keep/keep.html",
         "family": "basecraft-keep",
         "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Proposed draft": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Pulse Events": [
@@ -887,7 +859,14 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
-    "Revised pair": [
+    "Review the draft": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Revised draft": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
         "family": "flowview-product-tour",
@@ -927,13 +906,6 @@
         "file": "loomworks-trellis/trellis.html",
         "family": "loomworks-trellis",
         "title": "loomworks Trellis — Camera-as-Hub"
-      }
-    ],
-    "Saved diagram folder": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Scribe": [
@@ -1145,6 +1117,13 @@
         "file": "cumulus/cumulus-flow.html",
         "family": "cumulus",
         "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Use in Backstage": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Vault": [

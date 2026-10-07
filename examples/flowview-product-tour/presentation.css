@@ -1,378 +1,78 @@
-/* Presentation-only framing for this portable tour. The diagram, panels, and
-   step controls share one screen at 1280×800 without changing the renderer. */
-body .doc-heading,
-body .doc-sub,
-body .generated-from,
-body .sec-eyebrow,
-body .sec-prose,
-body .dv-tour-discovery,
-body .dv-tour-replay {
+/* Tour-only presentation. Keep the authored grid, let the page grow, and give
+   captions normal reading size instead of squeezing them into the viewport. */
+body .doc-heading, body .doc-sub, body .generated-from,
+body .sec-eyebrow, body .dv-tour-discovery, body .dv-tour-replay,
+body .explore-navigation-actions, body .prosetoggle {
   display: none !important;
 }
-
-body .docview {
-  padding-top: 8px !important;
+body .docview { max-width: 1500px !important; padding: 12px 20px 28px !important; }
+body .doc-sec { width: 100% !important; box-sizing: border-box; margin-top: 0 !important; padding: 16px !important; }
+body .sec-h { font-size: 24px !important; }
+body .sec-prose { max-width: none; font-size: 14px; line-height: 1.5; margin: 6px 0 12px; }
+body .presentbtn { position: absolute; top: 16px; right: 28px; }
+/* There is one authored view per tab; a second "Chapters" picker adds no choice. */
+body .explore-navigation-chapters { display: none; }
+body .section-layout-grid { grid-auto-rows: 22px !important; gap: 8px !important; margin-top: 12px !important; }
+body .section-layout-tile > .pwidget { border-radius: 12px; }
+body .section-layout-tile[data-layout-key="steps"] > .termbar {
+  display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  gap: 12px; padding: 14px; height: 100%; max-height: none; overflow: auto;
 }
-
-body .presentbtn {
-  position: fixed !important;
-  top: 10px !important;
-  right: 12px !important;
-  z-index: 9 !important;
-  float: none !important;
+body [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) { display: none; }
+body [data-layout-key="steps"] .step-transport { flex-wrap: nowrap; }
+body [data-layout-key="steps"] .schips { flex: 0 0 auto !important; width: 100%; max-width: none; box-sizing: border-box; gap: 6px; overflow: visible; }
+body [data-layout-key="steps"] .schip { width: 30px; height: 30px; min-width: 30px; padding: 0; box-sizing: border-box; font-size: 12px; }
+body [data-layout-key="steps"] .stepline {
+  flex: 0 0 auto !important; min-width: 0; width: 100%; font: 400 16px/1.5 'IBM Plex Sans', sans-serif;
+  color: var(--dink); overflow: visible;
 }
-
-body .doc-sec {
-  width: 100% !important;
-  box-sizing: border-box !important;
-  margin-top: 4px !important;
-  padding: 10px 14px !important;
-}
-
-body .section-layout-grid {
-  grid-auto-rows: 28px !important;
-  gap: 6px !important;
-  margin-top: 6px !important;
-}
-
-body #section-build-layout,
-body #section-update-layout {
-  /* The first two chapters keep their original viewport-scaled rows. */
-  grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
-  gap: 4px !important;
-}
-
-body #section-build .explore-navigation-actions,
-body #section-review .explore-navigation-actions,
-body #section-update .explore-navigation-actions,
-body #section-backstage .explore-navigation-actions {
-  display: none !important;
-}
-
-body #section-build .path-timeline {
-  zoom: .82;
-}
-
-body #section-build .pt-log .pbody,
-body #section-update .pt-log .pbody {
-  box-sizing: border-box;
-  height: calc(100% - 20px);
-  min-height: 0;
-  overflow: hidden;
-}
-
-body #section-build .pt-log .plog,
-body #section-update .pt-log .plog {
-  height: 100%;
-}
-
-body #section-build .appscreens:has([data-screen-id="story-focus"]),
-body #section-build .appscreens:has([data-screen-id="engineering-focus"]) {
-  --appscreen-ratio: 2.226563 !important;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) {
-  --appscreen-ratio: 2.947368 !important;
-}
-
-/* Keep the landing-page action readable in the half-width screenshot tile. */
-body #section-build .appscreen-image img[data-screen-id="landing"] {
-  transform: scale(1.8);
-  transform-origin: left 80%;
-}
-
-/* The step caption narrates the composer and status states. Giving each
-   Workbench frame the caption's space keeps its highlighted control readable. */
-body #section-build .appscreens:has(img.appscreen-current:is([data-screen-id="request-story"], [data-screen-id="request-engineering"], [data-screen-id="working"], [data-screen-id="review-ready"])) figcaption {
-  display: none;
-}
-
-body #section-review .appscreens:has([data-screen-id="first-step-one"]) {
-  --appscreen-ratio: 1.8 !important;
-}
-
-body #section-review .appscreens:has([data-screen-id="first-applied"]) {
-  --appscreen-ratio: 2.354167 !important;
-}
-
-body #section-review .appscreens:has([data-screen-id="ledger"]) {
-  --appscreen-ratio: 4.009804 !important;
-}
-
-/* The step caption carries the narration. The wide captures preserve the
-   complete original window beside an enlarged detail of the same frame. */
-body #section-review .appscreens figcaption,
-body #section-backstage .appscreens figcaption {
-  display: none;
-}
-
-body #section-review .pt-appscreens > .ptitle,
-body #section-backstage .pt-appscreens > .ptitle {
-  display: none;
-}
-
-/* Focused ledger captures use their source aspect ratios. */
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="first-ledger"]) {
-  --appscreen-ratio: 3.635556 !important;
-}
-
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="update-current-ledger"]) {
-  --appscreen-ratio: 4.469945 !important;
-}
-
-/* Focused receipts stay legible in the full-width evidence tile. */
-body #section-review .appscreens:has(img.appscreen-current:is([data-screen-id="update-discarded"], [data-screen-id="committed"])) {
-  --appscreen-ratio: 2.897436 !important;
-}
-
-/* The connected Agent capture is tall. Fill the screen tile with its request
-   controls so Story detail and Copy request stay legible at 1280×800. */
-body #section-update .appscreen-image img[data-screen-id="connected"] {
-  object-fit: cover;
-  object-position: center bottom;
-}
-
-body #section-backstage .appscreens:has([data-screen-id="inline"]),
-body #section-backstage .appscreens:has([data-screen-id="where"]),
-body #section-backstage .appscreens:has([data-screen-id="step"]),
-body #section-backstage .appscreens:has([data-screen-id="expanded"]) {
-  --appscreen-ratio: 1.777778 !important;
-}
-
-/* Presentation callouts mark the next control before the following image
-   shows its result. The screenshots beneath them remain actual UI captures. */
-body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
-body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after,
-body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after,
-body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after,
-body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-  border: 3px solid #F59E0B;
-  border-radius: 8px;
-  box-shadow: 0 0 0 3px #F59E0B33;
-  box-sizing: border-box;
-}
-
-body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
-body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after {
-  left: 4%; top: 19%; width: 92%; height: 17%;
-}
-
-body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after {
-  left: 8.4%; top: 43%; width: 12.8%; height: 3.5%;
-}
-
-body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after {
-  left: .3%; top: 29.5%; width: 48.5%; height: 11%;
-}
-
-body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
-  left: 1.5%; top: 2%; width: 17.5%; height: 10%;
-}
-
-body #section-build .appscreen-viewport:has([data-screen-id="choice"]) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 560 / 190;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) {
-  justify-content: flex-start;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage {
-  flex: none;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 560 / 190;
-  margin-top: clamp(55px, 9vh, 110px);
-}
-
-@media (max-width: 1350px) {
-  body .path-timeline {
-    zoom: .9;
-  }
-}
-
-/* Review and catalog chapters share a compact control column beside the
-   evidence window. The graph uses the remaining height without clipping. */
-body :is(#section-review-layout, #section-backstage-layout) {
-  grid-template-columns: 252px minmax(0, 1fr) !important;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1.15fr) !important;
-  grid-auto-rows: auto !important;
-  height: calc(100vh - 150px);
-  gap: 8px !important;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
-  grid-column: 1 !important;
-  grid-row: 1 / -1 !important;
-  align-self: start;
-  height: auto;
-  max-height: 100%;
-}
-
-body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
-  grid-column: 2 !important;
-  grid-row: 1 !important;
-}
-
-body :is(#section-review, #section-backstage) .pt-appscreens {
-  padding: 2px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
-  grid-column: 1 / -1 !important;
-  grid-row: 2 !important;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .termbar {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px 10px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .step-transport {
-  flex-wrap: nowrap;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) {
-  display: none;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schips {
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
-  gap: 4px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schip {
-  box-sizing: border-box;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .stepline {
-  flex: none;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-  font-size: 12px;
-  line-height: 1.4;
-  overflow: auto;
-}
-
-body :is(#section-review, #section-backstage) .board {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-body :is(#section-review, #section-backstage) .boardcanvas {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  justify-content: center;
-}
-
-body :is(#section-review, #section-backstage) .board:not(.board-zoomed) .boardcanvas > svg {
-  width: auto;
-  height: 100%;
-  max-width: 100%;
-  min-width: 0;
-}
-
-/* Keep the complete process readable while emphasizing the active hop. */
-body :is(#section-review, #section-backstage) .board g.node:not(.lit) {
-  opacity: .6;
-}
-body :is(#section-review, #section-backstage) .board :is(path.edge, text.lbl):not(.lit) {
-  opacity: .5;
-}
-
-/* Review paths need labels and a second row for the thirteen-step update. */
-body #section-review [data-layout-key="steps"] .termbar {
-  gap: 6px;
-  padding-block: 6px;
-}
-
-body #section-review [data-layout-key="steps"] .path-matrix {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  zoom: 1;
-}
-
-body #section-review [data-layout-key="steps"] .path-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-body #section-review [data-layout-key="steps"] .path-chip {
-  flex: 0 0 100%;
-  max-width: none;
-}
-
-body #section-review [data-layout-key="steps"] .path-row[data-selected="false"] .schip {
-  display: none;
-}
-
-body #section-review [data-layout-key="steps"] .stepline {
-  flex: 1 1 auto;
-  font-size: 10.5px;
-  line-height: 1.35;
-}
-
-/* The longer update path needs a little more height above its full-width graph. */
-@media (min-width: 701px) {
-  body #section-review-layout:has(.path-row[data-path-row="update-existing"][data-selected="true"]) {
-    grid-template-rows: calc((100vh - 158px) / 2.15 + 16px) minmax(0, 1fr) !important;
-  }
-}
-
-body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
-  max-height: calc((100vh - 158px) / 2.15);
-}
-
-/* Short laptop viewports keep all update buttons above a scrollable caption. */
-@media (min-width: 701px) and (max-height: 768px) {
-  body #section-review:has(.path-row[data-path-row="update-existing"][data-selected="true"]) [data-layout-key="steps"] {
-    max-height: calc((100vh - 158px) / 2.15 + 16px);
-  }
-}
-
-@media (max-width: 700px) {
-  body :is(#section-review-layout, #section-backstage-layout) {
-    grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: 320px 300px 240px !important;
-    height: auto;
-  }
-  body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
-    grid-row: 1 !important;
-    height: 100%;
-  }
-  body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
-    max-height: 320px;
-  }
-  body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
-    grid-column: 1 !important;
-    grid-row: 2 !important;
-  }
-  body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
-    grid-column: 1 !important;
-    grid-row: 3 !important;
-  }
+body [data-layout-key="steps"] .stepnum { font-size: 12px; }
+body .path-matrix { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; width: 100%; align-items: stretch; }
+body .path-matrix::after { content: ""; flex-basis: 100%; order: 0; }
+body .path-row { display: contents; }
+body .path-matrix .path-chip { order: 0; flex: 1 1 28%; max-width: none; min-width: 0; justify-content: center; padding: 5px 7px; font: 600 12px/1.4 'IBM Plex Sans',sans-serif; }
+body .path-matrix .schip { order: 1; }
+body .path-row[data-selected="false"] .schip { display: none; }
+body .termbar.has-paths .path-row[data-selected="false"] .path-chip { opacity: .75; filter: none; }
+/* The graph is a compact map above the evidence, always read left to right.
+   Review alone adds a correction loop under the direct acceptance route. */
+body .board { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+body .board-size { display: none; }
+body .boardcanvas { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+body .board:not(.board-zoomed) .boardcanvas > svg { height: 100%; width: auto; max-width: 100%; min-width: 0; }
+body .board g.node:not(.lit) { opacity: .8 !important; }
+body .board :is(path.edge,text.lbl):not(.lit) { opacity: .65 !important; }
+/* Screen labels carry provenance; captions below the controls carry the story. */
+body .ptitle { font-size: 11px !important; letter-spacing: .07em; }
+body .pt-appscreens { padding: 12px; }
+body .appscreens figcaption { display: none; }
+body .appscreen-stage, body .appscreen-viewport { width: 100%; height: 100%; min-height: 0; }
+body .appscreen-viewport { background: transparent; }
+body .appscreen-image img { object-fit: contain; transform: none; }
+/* Show the newest exchange; the stored log still retains the full dialogue. */
+body .pt-log .plogline:nth-last-child(n+3) { display: none; }
+body .stepline.dv-caption-old { display: none; }
+body .stepline.dv-caption-new { animation: none; }
+body .pt-log .pbody { height: calc(100% - 28px); min-height: 0; }
+body .pt-log .plog { height: 100%; box-sizing: border-box; font: 400 14px/1.5 'IBM Plex Sans',sans-serif; color: var(--dink); }
+body .pt-log .plogline { padding: 4px 0; gap: 10px; }
+body .pt-log .plogtag { min-width: 52px; font-size: 11px; padding-top: 2px; }
+/* Build's source choices need room above the caption. */
+body #section-build [data-layout-key="steps"] > .termbar { gap: 6px; padding: 10px; }
+@media (max-width: 900px) {
+  body .docview { padding: 8px !important; }
+  body .doc-sec { padding: 12px !important; }
+  body .sec-h { font-size: 21px !important; white-space: normal; }
+  body .presentbtn { display: none; }
+  body .section-layout-grid { zoom: 1 !important; width: 100% !important; display: flex !important; flex-direction: column; gap: 12px !important; }
+  body .section-layout-tile { width: 100%; height: auto; }
+  body [data-layout-key="diagram"] { order: 3; height: 190px; }
+  body :is(#section-review,#section-backstage) [data-layout-key="diagram"] { height: 280px; }
+  body [data-layout-key="steps"] { order: 0; }
+  body .section-layout-tile:has(> .pt-appscreens) { order: 1; height: 380px; }
+  body .section-layout-tile:has(> .pt-log) { order: 2; min-height: 160px; }
+  body .section-layout-tile > .pwidget { height: 100%; }
+  body .pt-log .plog { height: auto; }
+  body .boardcanvas { overflow-x: auto; justify-content: flex-start; }
+  body .board:not(.board-zoomed) .boardcanvas > svg { flex: none; width: 1000px; min-width: 1000px; max-width: none; height: auto; }
 }

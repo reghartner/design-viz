@@ -7936,383 +7936,83 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 <div class="docview sk-aurora sk-pastel" id="docview"></div>
 
 <style>
-/* Presentation-only framing for this portable tour. The diagram, panels, and
-   step controls share one screen at 1280×800 without changing the renderer. */
-body .doc-heading,
-body .doc-sub,
-body .generated-from,
-body .sec-eyebrow,
-body .sec-prose,
-body .dv-tour-discovery,
-body .dv-tour-replay {
+/* Tour-only presentation. Keep the authored grid, let the page grow, and give
+   captions normal reading size instead of squeezing them into the viewport. */
+body .doc-heading, body .doc-sub, body .generated-from,
+body .sec-eyebrow, body .dv-tour-discovery, body .dv-tour-replay,
+body .explore-navigation-actions, body .prosetoggle {
   display: none !important;
 }
-
-body .docview {
-  padding-top: 8px !important;
+body .docview { max-width: 1500px !important; padding: 12px 20px 28px !important; }
+body .doc-sec { width: 100% !important; box-sizing: border-box; margin-top: 0 !important; padding: 16px !important; }
+body .sec-h { font-size: 24px !important; }
+body .sec-prose { max-width: none; font-size: 14px; line-height: 1.5; margin: 6px 0 12px; }
+body .presentbtn { position: absolute; top: 16px; right: 28px; }
+/* There is one authored view per tab; a second "Chapters" picker adds no choice. */
+body .explore-navigation-chapters { display: none; }
+body .section-layout-grid { grid-auto-rows: 22px !important; gap: 8px !important; margin-top: 12px !important; }
+body .section-layout-tile > .pwidget { border-radius: 12px; }
+body .section-layout-tile[data-layout-key="steps"] > .termbar {
+  display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  gap: 12px; padding: 14px; height: 100%; max-height: none; overflow: auto;
 }
-
-body .presentbtn {
-  position: fixed !important;
-  top: 10px !important;
-  right: 12px !important;
-  z-index: 9 !important;
-  float: none !important;
+body [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) { display: none; }
+body [data-layout-key="steps"] .step-transport { flex-wrap: nowrap; }
+body [data-layout-key="steps"] .schips { flex: 0 0 auto !important; width: 100%; max-width: none; box-sizing: border-box; gap: 6px; overflow: visible; }
+body [data-layout-key="steps"] .schip { width: 30px; height: 30px; min-width: 30px; padding: 0; box-sizing: border-box; font-size: 12px; }
+body [data-layout-key="steps"] .stepline {
+  flex: 0 0 auto !important; min-width: 0; width: 100%; font: 400 16px/1.5 'IBM Plex Sans', sans-serif;
+  color: var(--dink); overflow: visible;
 }
-
-body .doc-sec {
-  width: 100% !important;
-  box-sizing: border-box !important;
-  margin-top: 4px !important;
-  padding: 10px 14px !important;
-}
-
-body .section-layout-grid {
-  grid-auto-rows: 28px !important;
-  gap: 6px !important;
-  margin-top: 6px !important;
-}
-
-body #section-build-layout,
-body #section-update-layout {
-  /* The first two chapters keep their original viewport-scaled rows. */
-  grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
-  gap: 4px !important;
-}
-
-body #section-build .explore-navigation-actions,
-body #section-review .explore-navigation-actions,
-body #section-update .explore-navigation-actions,
-body #section-backstage .explore-navigation-actions {
-  display: none !important;
-}
-
-body #section-build .path-timeline {
-  zoom: .82;
-}
-
-body #section-build .pt-log .pbody,
-body #section-update .pt-log .pbody {
-  box-sizing: border-box;
-  height: calc(100% - 20px);
-  min-height: 0;
-  overflow: hidden;
-}
-
-body #section-build .pt-log .plog,
-body #section-update .pt-log .plog {
-  height: 100%;
-}
-
-body #section-build .appscreens:has([data-screen-id="story-focus"]),
-body #section-build .appscreens:has([data-screen-id="engineering-focus"]) {
-  --appscreen-ratio: 2.226563 !important;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) {
-  --appscreen-ratio: 2.947368 !important;
-}
-
-/* Keep the landing-page action readable in the half-width screenshot tile. */
-body #section-build .appscreen-image img[data-screen-id="landing"] {
-  transform: scale(1.8);
-  transform-origin: left 80%;
-}
-
-/* The step caption narrates the composer and status states. Giving each
-   Workbench frame the caption's space keeps its highlighted control readable. */
-body #section-build .appscreens:has(img.appscreen-current:is([data-screen-id="request-story"], [data-screen-id="request-engineering"], [data-screen-id="working"], [data-screen-id="review-ready"])) figcaption {
-  display: none;
-}
-
-body #section-review .appscreens:has([data-screen-id="first-step-one"]) {
-  --appscreen-ratio: 1.8 !important;
-}
-
-body #section-review .appscreens:has([data-screen-id="first-applied"]) {
-  --appscreen-ratio: 2.354167 !important;
-}
-
-body #section-review .appscreens:has([data-screen-id="ledger"]) {
-  --appscreen-ratio: 4.009804 !important;
-}
-
-/* The step caption carries the narration. The wide captures preserve the
-   complete original window beside an enlarged detail of the same frame. */
-body #section-review .appscreens figcaption,
-body #section-backstage .appscreens figcaption {
-  display: none;
-}
-
-body #section-review .pt-appscreens > .ptitle,
-body #section-backstage .pt-appscreens > .ptitle {
-  display: none;
-}
-
-/* Focused ledger captures use their source aspect ratios. */
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="first-ledger"]) {
-  --appscreen-ratio: 3.635556 !important;
-}
-
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="update-current-ledger"]) {
-  --appscreen-ratio: 4.469945 !important;
-}
-
-/* Focused receipts stay legible in the full-width evidence tile. */
-body #section-review .appscreens:has(img.appscreen-current:is([data-screen-id="update-discarded"], [data-screen-id="committed"])) {
-  --appscreen-ratio: 2.897436 !important;
-}
-
-/* The connected Agent capture is tall. Fill the screen tile with its request
-   controls so Story detail and Copy request stay legible at 1280×800. */
-body #section-update .appscreen-image img[data-screen-id="connected"] {
-  object-fit: cover;
-  object-position: center bottom;
-}
-
-body #section-backstage .appscreens:has([data-screen-id="inline"]),
-body #section-backstage .appscreens:has([data-screen-id="where"]),
-body #section-backstage .appscreens:has([data-screen-id="step"]),
-body #section-backstage .appscreens:has([data-screen-id="expanded"]) {
-  --appscreen-ratio: 1.777778 !important;
-}
-
-/* Presentation callouts mark the next control before the following image
-   shows its result. The screenshots beneath them remain actual UI captures. */
-body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
-body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after,
-body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after,
-body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after,
-body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
-  content: "";
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-  border: 3px solid #F59E0B;
-  border-radius: 8px;
-  box-shadow: 0 0 0 3px #F59E0B33;
-  box-sizing: border-box;
-}
-
-body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
-body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after {
-  left: 4%; top: 19%; width: 92%; height: 17%;
-}
-
-body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after {
-  left: 8.4%; top: 43%; width: 12.8%; height: 3.5%;
-}
-
-body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after {
-  left: .3%; top: 29.5%; width: 48.5%; height: 11%;
-}
-
-body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
-  left: 1.5%; top: 2%; width: 17.5%; height: 10%;
-}
-
-body #section-build .appscreen-viewport:has([data-screen-id="choice"]) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 560 / 190;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) {
-  justify-content: flex-start;
-}
-
-body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage {
-  flex: none;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 560 / 190;
-  margin-top: clamp(55px, 9vh, 110px);
-}
-
-@media (max-width: 1350px) {
-  body .path-timeline {
-    zoom: .9;
-  }
-}
-
-/* Review and catalog chapters share a compact control column beside the
-   evidence window. The graph uses the remaining height without clipping. */
-body :is(#section-review-layout, #section-backstage-layout) {
-  grid-template-columns: 252px minmax(0, 1fr) !important;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1.15fr) !important;
-  grid-auto-rows: auto !important;
-  height: calc(100vh - 150px);
-  gap: 8px !important;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
-  grid-column: 1 !important;
-  grid-row: 1 / -1 !important;
-  align-self: start;
-  height: auto;
-  max-height: 100%;
-}
-
-body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
-  grid-column: 2 !important;
-  grid-row: 1 !important;
-}
-
-body :is(#section-review, #section-backstage) .pt-appscreens {
-  padding: 2px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
-  grid-column: 1 / -1 !important;
-  grid-row: 2 !important;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .termbar {
-  display: flex;
-  flex-direction: column;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  gap: 8px;
-  padding: 8px 10px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .step-transport {
-  flex-wrap: nowrap;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) {
-  display: none;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schips {
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
-  gap: 4px;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schip {
-  box-sizing: border-box;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-}
-
-body :is(#section-review, #section-backstage) [data-layout-key="steps"] .stepline {
-  flex: none;
-  min-height: 0;
-  min-width: 0;
-  width: 100%;
-  font-size: 12px;
-  line-height: 1.4;
-  overflow: auto;
-}
-
-body :is(#section-review, #section-backstage) .board {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  min-height: 0;
-}
-
-body :is(#section-review, #section-backstage) .boardcanvas {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  justify-content: center;
-}
-
-body :is(#section-review, #section-backstage) .board:not(.board-zoomed) .boardcanvas > svg {
-  width: auto;
-  height: 100%;
-  max-width: 100%;
-  min-width: 0;
-}
-
-/* Keep the complete process readable while emphasizing the active hop. */
-body :is(#section-review, #section-backstage) .board g.node:not(.lit) {
-  opacity: .6;
-}
-body :is(#section-review, #section-backstage) .board :is(path.edge, text.lbl):not(.lit) {
-  opacity: .5;
-}
-
-/* Review paths need labels and a second row for the thirteen-step update. */
-body #section-review [data-layout-key="steps"] .termbar {
-  gap: 6px;
-  padding-block: 6px;
-}
-
-body #section-review [data-layout-key="steps"] .path-matrix {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  zoom: 1;
-}
-
-body #section-review [data-layout-key="steps"] .path-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-body #section-review [data-layout-key="steps"] .path-chip {
-  flex: 0 0 100%;
-  max-width: none;
-}
-
-body #section-review [data-layout-key="steps"] .path-row[data-selected="false"] .schip {
-  display: none;
-}
-
-body #section-review [data-layout-key="steps"] .stepline {
-  flex: 1 1 auto;
-  font-size: 10.5px;
-  line-height: 1.35;
-}
-
-/* The longer update path needs a little more height above its full-width graph. */
-@media (min-width: 701px) {
-  body #section-review-layout:has(.path-row[data-path-row="update-existing"][data-selected="true"]) {
-    grid-template-rows: calc((100vh - 158px) / 2.15 + 16px) minmax(0, 1fr) !important;
-  }
-}
-
-body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
-  max-height: calc((100vh - 158px) / 2.15);
-}
-
-/* Short laptop viewports keep all update buttons above a scrollable caption. */
-@media (min-width: 701px) and (max-height: 768px) {
-  body #section-review:has(.path-row[data-path-row="update-existing"][data-selected="true"]) [data-layout-key="steps"] {
-    max-height: calc((100vh - 158px) / 2.15 + 16px);
-  }
-}
-
-@media (max-width: 700px) {
-  body :is(#section-review-layout, #section-backstage-layout) {
-    grid-template-columns: minmax(0, 1fr) !important;
-    grid-template-rows: 320px 300px 240px !important;
-    height: auto;
-  }
-  body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
-    grid-row: 1 !important;
-    height: 100%;
-  }
-  body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
-    max-height: 320px;
-  }
-  body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
-    grid-column: 1 !important;
-    grid-row: 2 !important;
-  }
-  body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
-    grid-column: 1 !important;
-    grid-row: 3 !important;
-  }
+body [data-layout-key="steps"] .stepnum { font-size: 12px; }
+body .path-matrix { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; width: 100%; align-items: stretch; }
+body .path-matrix::after { content: ""; flex-basis: 100%; order: 0; }
+body .path-row { display: contents; }
+body .path-matrix .path-chip { order: 0; flex: 1 1 28%; max-width: none; min-width: 0; justify-content: center; padding: 5px 7px; font: 600 12px/1.4 'IBM Plex Sans',sans-serif; }
+body .path-matrix .schip { order: 1; }
+body .path-row[data-selected="false"] .schip { display: none; }
+body .termbar.has-paths .path-row[data-selected="false"] .path-chip { opacity: .75; filter: none; }
+/* The graph is a compact map above the evidence, always read left to right.
+   Review alone adds a correction loop under the direct acceptance route. */
+body .board { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+body .board-size { display: none; }
+body .boardcanvas { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+body .board:not(.board-zoomed) .boardcanvas > svg { height: 100%; width: auto; max-width: 100%; min-width: 0; }
+body .board g.node:not(.lit) { opacity: .8 !important; }
+body .board :is(path.edge,text.lbl):not(.lit) { opacity: .65 !important; }
+/* Screen labels carry provenance; captions below the controls carry the story. */
+body .ptitle { font-size: 11px !important; letter-spacing: .07em; }
+body .pt-appscreens { padding: 12px; }
+body .appscreens figcaption { display: none; }
+body .appscreen-stage, body .appscreen-viewport { width: 100%; height: 100%; min-height: 0; }
+body .appscreen-viewport { background: transparent; }
+body .appscreen-image img { object-fit: contain; transform: none; }
+/* Show the newest exchange; the stored log still retains the full dialogue. */
+body .pt-log .plogline:nth-last-child(n+3) { display: none; }
+body .stepline.dv-caption-old { display: none; }
+body .stepline.dv-caption-new { animation: none; }
+body .pt-log .pbody { height: calc(100% - 28px); min-height: 0; }
+body .pt-log .plog { height: 100%; box-sizing: border-box; font: 400 14px/1.5 'IBM Plex Sans',sans-serif; color: var(--dink); }
+body .pt-log .plogline { padding: 4px 0; gap: 10px; }
+body .pt-log .plogtag { min-width: 52px; font-size: 11px; padding-top: 2px; }
+/* Build's source choices need room above the caption. */
+body #section-build [data-layout-key="steps"] > .termbar { gap: 6px; padding: 10px; }
+@media (max-width: 900px) {
+  body .docview { padding: 8px !important; }
+  body .doc-sec { padding: 12px !important; }
+  body .sec-h { font-size: 21px !important; white-space: normal; }
+  body .presentbtn { display: none; }
+  body .section-layout-grid { zoom: 1 !important; width: 100% !important; display: flex !important; flex-direction: column; gap: 12px !important; }
+  body .section-layout-tile { width: 100%; height: auto; }
+  body [data-layout-key="diagram"] { order: 3; height: 190px; }
+  body :is(#section-review,#section-backstage) [data-layout-key="diagram"] { height: 280px; }
+  body [data-layout-key="steps"] { order: 0; }
+  body .section-layout-tile:has(> .pt-appscreens) { order: 1; height: 380px; }
+  body .section-layout-tile:has(> .pt-log) { order: 2; min-height: 160px; }
+  body .section-layout-tile > .pwidget { height: 100%; }
+  body .pt-log .plog { height: auto; }
+  body .boardcanvas { overflow-x: auto; justify-content: flex-start; }
+  body .board:not(.board-zoomed) .boardcanvas > svg { flex: none; width: 1000px; min-width: 1000px; max-width: none; height: auto; }
 }
 </style>
 <script>
@@ -8335,14 +8035,14 @@ if (!window.location.hash) {
       {
         "tabs": [
           {
-            "label": "01 · Build new with Claude",
+            "label": "01 · Create",
             "sections": [
               {
                 "id": "build",
-                "heading": "Start a new fictional doorbell diagram with Claude",
+                "heading": "Turn a doorbell story into a reviewable draft",
                 "accent": "violet",
                 "text": [
-                  "Start a new diagram in an empty folder. Choose Story, Mixed, or Engineering detail for the audience; separately choose Business story, HLD, or Honeycomb trace as source material in this tour. Reconnect existing folder is a separate starting tab."
+                  "Connect a folder, bring a source, and turn the doorbell journey into a draft with evidence to review."
                 ],
                 "diagram": {
                   "view": "step",
@@ -8360,27 +8060,21 @@ if (!window.location.hash) {
                       "icon": "db",
                       "tint": "data"
                     },
-                    "you": {
-                      "title": "You",
-                      "sub": "source + decisions",
-                      "icon": "person",
-                      "tint": "dev"
-                    },
                     "claude": {
                       "title": "Claude Code",
-                      "sub": "external conversation",
+                      "sub": "external agent",
                       "icon": "terminal",
                       "tint": "cmd"
                     },
                     "proposal": {
-                      "title": "Draft pair",
+                      "title": "Proposed draft",
                       "sub": "spec + ledger",
                       "icon": "package",
                       "tint": "data"
                     },
                     "next": {
-                      "title": "Next · Review",
-                      "sub": "human decision",
+                      "title": "Review the draft",
+                      "sub": "choose First creation",
                       "icon": "monitor",
                       "tint": "cmd",
                       "handoff": {
@@ -8395,17 +8089,12 @@ if (!window.location.hash) {
                     {
                       "from": "workbench",
                       "to": "folder",
-                      "label": "select"
+                      "label": "create"
                     },
                     {
                       "from": "folder",
-                      "to": "you",
-                      "label": "copy setup"
-                    },
-                    {
-                      "from": "you",
                       "to": "claude",
-                      "label": "describe"
+                      "label": "connect"
                     },
                     {
                       "from": "claude",
@@ -8422,7 +8111,7 @@ if (!window.location.hash) {
                     {
                       "id": "setup-screen",
                       "type": "appscreens",
-                      "title": "Actual Workbench · start the agent build",
+                      "title": "Workbench capture",
                       "frame": "none",
                       "transition": "cut",
                       "initial": {
@@ -8542,20 +8231,25 @@ if (!window.location.hash) {
                     {
                       "id": "agent",
                       "type": "log",
-                      "title": "Illustrative Claude Code conversation · YOU / CLAUDE",
+                      "title": "Example conversation · illustrative",
                       "tags": {
                         "YOU": "#7C3AED",
                         "CLAUDE": "#0891B2"
                       },
                       "initial": {
-                        "log": []
+                        "log": [
+                          {
+                            "tag": "NOTE",
+                            "text": "Choose a source above. The example conversation starts after the folder is connected."
+                          }
+                        ]
                       }
                     }
                   ],
                   "steps": [
                     {
                       "id": "build-open",
-                      "text": "On the Flowview landing page, click Build with my agent. The outlined button opens the new-diagram setup.",
+                      "text": "A visitor rings the doorbell. How does the resident get an alert? Start with Build with my agent to turn that question into a diagram.",
                       "nodes": [
                         "workbench"
                       ],
@@ -8566,23 +8260,11 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "build-setup-detail",
-                      "text": "The How are you starting? dialog opens. Use its Story/Mixed/Engineering dropdown to choose detail for the audience; the source examples in this tour are separate from this setting.",
-                      "nodes": [
-                        "workbench"
-                      ],
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "context"
-                        }
-                      }
-                    },
-                    {
                       "id": "build-story-focus",
                       "nodes": [
                         "workbench"
                       ],
-                      "text": "Select Story in the actual Workbench detail selector for the business story example. Story focus keeps the PM narrative in people, actions, and outcomes; an engineer can enrich the same folder later.",
+                      "text": "Choose Story for a product audience. This controls the level of detail; the business story is the source you will give Claude.",
                       "panels": {
                         "setup-screen": {
                           "screen": "story-focus"
@@ -8590,20 +8272,8 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "build-hld-focus",
-                      "nodes": [
-                        "workbench"
-                      ],
-                      "text": "Select Engineering. Any context such as an HLD or a honeycomb trace is provided directly to the agent.",
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "engineering-focus"
-                        }
-                      }
-                    },
-                    {
                       "id": "build-copy-broad-story",
-                      "text": "With Story detail selected, find Copy & paste in the full Workbench dialog. The orange outline marks the next control.",
+                      "text": "Choose Copy & paste to work in Claude Code. Flowview will prepare the folder connection and setup instructions.",
                       "nodes": [
                         "workbench"
                       ],
@@ -8614,32 +8284,8 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "build-copy-broad-engineering",
-                      "text": "With Engineering detail selected, find Copy & paste in the full Workbench dialog. The orange outline marks the next control.",
-                      "nodes": [
-                        "workbench"
-                      ],
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "copy-broad-engineering"
-                        }
-                      }
-                    },
-                    {
-                      "id": "build-connection",
-                      "text": "Select the focused Copy & paste control for an external Claude Code conversation. The three source paths are choices in this tour, not buttons in the Workbench.",
-                      "nodes": [
-                        "workbench"
-                      ],
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "choice"
-                        }
-                      }
-                    },
-                    {
                       "id": "build-folder",
-                      "text": "Select an empty diagram folder. Flowview prepares the spec, coverage ledger, and connection instructions in that folder.",
+                      "text": "Select an empty diagram folder. It will hold the diagram spec, the coverage ledger, and the instructions to connect Claude.",
                       "edge": "workbench->folder",
                       "panels": {
                         "setup-screen": {
@@ -8649,8 +8295,8 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "build-story-request",
-                      "text": "After pasting setup into Claude Code, return to the connected Agent panel with Story detail. Draft the first request, click Copy request, and paste it into the same Claude conversation. That action registers the request; setup paste alone does not activate Agent working.",
-                      "edge": "folder->you",
+                      "text": "Paste the setup into Claude Code. Then write the first request in the Agent panel, click Copy request, and paste it into that conversation.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
@@ -8660,7 +8306,7 @@ if (!window.location.hash) {
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I can read this folder. What is your source, who will view the diagram, and which outcome should the story explain?"
+                              "text": "Connected. What should this diagram explain, and what source can I use?"
                             }
                           ]
                         },
@@ -8670,63 +8316,19 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "build-hld-request",
-                      "text": "After pasting setup into Claude Code, return to the connected Agent panel with Engineering detail. Draft the first request, click Copy request, and paste it into the same Claude conversation. That action registers the request; setup paste alone does not activate Agent working.",
-                      "edge": "folder->you",
-                      "panels": {
-                        "agent": {
-                          "log": [
-                            {
-                              "tag": "YOU",
-                              "text": "[Pasted Flowview Setup Instructions]"
-                            },
-                            {
-                              "tag": "CLAUDE",
-                              "text": "I can read this folder. What is your source, who will view the diagram, and which outcome should the story explain?"
-                            }
-                          ]
-                        },
-                        "setup-screen": {
-                          "screen": "request-engineering"
-                        }
-                      }
-                    },
-                    {
-                      "id": "build-trace-request",
-                      "text": "After pasting setup into Claude Code, return to the connected Agent panel with Engineering detail. Draft the first request, click Copy request, and paste it into the same Claude conversation. That action registers the request; setup paste alone does not activate Agent working.",
-                      "edge": "folder->you",
-                      "panels": {
-                        "agent": {
-                          "log": [
-                            {
-                              "tag": "YOU",
-                              "text": "[Pasted Flowview Setup Instructions]"
-                            },
-                            {
-                              "tag": "CLAUDE",
-                              "text": "I can read this folder. What is your source, who will view the diagram, and which outcome should the story explain?"
-                            }
-                          ]
-                        },
-                        "setup-screen": {
-                          "screen": "request-engineering"
-                        }
-                      }
-                    },
-                    {
                       "id": "build-story-source",
-                      "text": "With the first Workbench Copy request registered, the empty diagram shows Agent working. The PM now explains the resident journey in plain language; Story detail keeps technical gaps visible rather than guessing them.",
-                      "edge": "you->claude",
+                      "text": "Describe the resident journey. Claude asks where the story starts and ends while Workbench shows Agent working.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Audience: product and engineering. A visitor presses the doorbell; the resident should receive an alert. Show the major handoffs without service names yet."
+                              "text": "Show how a doorbell press leads to a resident alert. This is for product and engineering."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "Does the story include an actual clip playback, or only a recording request and notification? What is the starting state?"
+                              "text": "Should we show playback, or stop at the notification? Where does the story begin?"
                             }
                           ]
                         },
@@ -8737,60 +8339,127 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "build-story-answer",
-                      "text": "The PM clarifies the outcome and boundary. Claude can now storyboard six beats, leaving backend identities for the engineer.",
-                      "nodes": [
-                        "claude"
-                      ],
+                      "text": "Agree on six beats, from a quiet porch to an alert being sent. Service names and delivery evidence remain questions for engineering.",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Start with a quiet porch. Show the press, recording request, stored clip metadata, queued alert, then resident notification. Do not claim playback or a failure."
+                              "text": "Quiet porch → press → recording → stored metadata → queued alert → alert sent. No playback."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I will draft those six beats as a story and mark service identities, protocols, and delivery evidence as engineer handoff questions."
+                              "text": "Six beats. I will flag service names and delivery evidence for engineering review."
+                            }
+                          ]
+                        }
+                      },
+                      "edge": "claude->proposal"
+                    },
+                    {
+                      "id": "build-story-review",
+                      "text": "The diagram and ledger are ready. Open Review → First creation to inspect a representative candidate before accepting either file.",
+                      "edge": "proposal->next",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "review-ready"
+                        },
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "CLAUDE",
+                              "text": "The candidate diagram and ledger are ready. Preview both in Flowview."
+                            },
+                            {
+                              "tag": "YOU",
+                              "text": "I will check the story against its sources before accepting."
                             }
                           ]
                         }
                       }
                     },
                     {
-                      "id": "build-story-draft",
-                      "text": "Claude names the six doorbell beats and explicitly marks the technical enrichment still needed.",
+                      "id": "build-open-hld",
+                      "text": "A visitor rings the doorbell. How does the resident get an alert? Start with Build with my agent to turn that question into a diagram.",
                       "nodes": [
-                        "claude"
+                        "workbench"
                       ],
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "landing"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-hld-focus-hld",
+                      "nodes": [
+                        "workbench"
+                      ],
+                      "text": "Choose Engineering for this audience. Supply the HLD or trace separately in Claude; source material and audience detail are independent.",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "engineering-focus"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-copy-broad-engineering-hld",
+                      "text": "Choose Copy & paste to work in Claude Code. Flowview will prepare the folder connection and setup instructions.",
+                      "nodes": [
+                        "workbench"
+                      ],
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "copy-broad-engineering"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-folder-hld",
+                      "text": "Select an empty diagram folder. It will hold the diagram spec, the coverage ledger, and the instructions to connect Claude.",
+                      "edge": "workbench->folder",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "folder"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-hld-request",
+                      "text": "Paste the setup into Claude Code. Then write the first request in the Agent panel, click Copy request, and paste it into that conversation.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
-                              "tag": "CLAUDE",
-                              "text": "Draft: 1 quiet; 2 button event reaches hub; 3 recording requested; 4 clip metadata stored; 5 notification queued; 6 resident alert sent. The PM version uses plain boxes; engineering names and evidence come later."
+                              "tag": "YOU",
+                              "text": "[Pasted Flowview Setup Instructions]"
                             },
                             {
-                              "tag": "YOU",
-                              "text": "Keep that order. The engineer can enrich the same folder and ledger after reviewing actual design and trace evidence."
+                              "tag": "CLAUDE",
+                              "text": "Connected. What should this diagram explain, and what source can I use?"
                             }
                           ]
+                        },
+                        "setup-screen": {
+                          "screen": "request-engineering"
                         }
                       }
                     },
                     {
                       "id": "build-hld-source",
-                      "text": "With the first Workbench Copy request registered, the empty diagram shows Agent working. The engineer now supplies the HLD; Claude distinguishes design intent from verified runtime behavior.",
-                      "edge": "you->claude",
+                      "text": "Provide the doorbell HLD. Claude asks which behavior is designed and which is observed before drawing the service handoffs.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Use the fictional doorbell HLD: porch hub receives the button event; recording service requests a recording, writes metadata, and queues a resident alert."
+                              "text": "HLD: porch hub → recording service → clip store → notification queue → notification service."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "Does the HLD specify the last delivery hop? Which outcomes are design intent rather than observed production behavior?"
+                              "text": "Does it specify app delivery? Is this planned behavior or an observed run?"
                             }
                           ]
                         },
@@ -8801,60 +8470,127 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "build-hld-answer",
-                      "text": "The engineer names the remaining proposed hop and scopes the claim.",
-                      "nodes": [
-                        "claude"
-                      ],
+                      "text": "Keep design intent visible. The proposed route includes the resident alert, but the HLD alone cannot prove runtime delivery.",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Notification service delivers to the resident app. This is proposed design, not production proof. Keep the starting quiet state and no playback or failure claim."
+                              "text": "App delivery is planned design. Start at the quiet porch; exclude playback and failures."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I will label the diagram as authored HLD, show the six planned beats, and keep acceptance and operational validation as separate decisions."
+                              "text": "I will label this HLD intent and record the missing runtime evidence in the ledger."
+                            }
+                          ]
+                        }
+                      },
+                      "edge": "claude->proposal"
+                    },
+                    {
+                      "id": "build-hld-review",
+                      "text": "The diagram and ledger are ready. Open Review → First creation to inspect a representative candidate before accepting either file.",
+                      "edge": "proposal->next",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "review-ready"
+                        },
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "CLAUDE",
+                              "text": "The candidate diagram and ledger are ready. Preview both in Flowview."
+                            },
+                            {
+                              "tag": "YOU",
+                              "text": "I will check the story against its sources before accepting."
                             }
                           ]
                         }
                       }
                     },
                     {
-                      "id": "build-hld-draft",
-                      "text": "Claude records the HLD decisions and unanswered questions beside the six-step proposal.",
+                      "id": "build-open-trace",
+                      "text": "A visitor rings the doorbell. How does the resident get an alert? Start with Build with my agent to turn that question into a diagram.",
                       "nodes": [
-                        "claude"
+                        "workbench"
                       ],
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "landing"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-hld-focus-trace",
+                      "nodes": [
+                        "workbench"
+                      ],
+                      "text": "Choose Engineering for this audience. Supply the HLD or trace separately in Claude; source material and audience detail are independent.",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "engineering-focus"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-copy-broad-engineering-trace",
+                      "text": "Choose Copy & paste to work in Claude Code. Flowview will prepare the folder connection and setup instructions.",
+                      "nodes": [
+                        "workbench"
+                      ],
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "copy-broad-engineering"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-folder-trace",
+                      "text": "Select an empty diagram folder. It will hold the diagram spec, the coverage ledger, and the instructions to connect Claude.",
+                      "edge": "workbench->folder",
+                      "panels": {
+                        "setup-screen": {
+                          "screen": "folder"
+                        }
+                      }
+                    },
+                    {
+                      "id": "build-trace-request",
+                      "text": "Paste the setup into Claude Code. Then write the first request in the Agent panel, click Copy request, and paste it into that conversation.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
-                              "tag": "CLAUDE",
-                              "text": "Draft: quiet → button received → recording requested → metadata persisted → alert queued → resident notified. The ledger marks route/ownership decisions as HLD source and flags any missing evidence."
+                              "tag": "YOU",
+                              "text": "[Pasted Flowview Setup Instructions]"
                             },
                             {
-                              "tag": "YOU",
-                              "text": "That is the story to review. Do not present this design as a measured trace."
+                              "tag": "CLAUDE",
+                              "text": "Connected. What should this diagram explain, and what source can I use?"
                             }
                           ]
+                        },
+                        "setup-screen": {
+                          "screen": "request-engineering"
                         }
                       }
                     },
                     {
                       "id": "build-trace-source",
-                      "text": "With the first Workbench Copy request registered, the empty diagram shows Agent working. The engineer now supplies a Honeycomb export and investigation question; the observed spans do not prove every customer-facing beat.",
-                      "edge": "you->claude",
+                      "text": "Provide the Honeycomb export. Claude checks the spans and their links before calling a hop observed.",
+                      "edge": "folder->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Use the fictional happy trace. Which doorbell hops are observed, and which part of the six-step diagram is authored context?"
+                              "text": "Which doorbell handoffs does this Honeycomb happy trace support?"
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I see porch-hub POST /button, recording-service POST /recordings, clip-store INSERT clip, notification-queue publish doorbell, and notification-service POST /notifications. I will check their parent or link relationships."
+                              "text": "Five service spans, including a queue-to-notification link. I will separate them from the customer story."
                             }
                           ]
                         },
@@ -8865,85 +8601,26 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "build-trace-answer",
-                      "text": "Claude separates trace observations from inferred or authored context before drawing an edge.",
-                      "nodes": [
-                        "claude"
-                      ],
+                      "text": "The trace reaches notification-service. Physical button press and resident-app receipt remain authored context, not observations.",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Show the trace-backed service chain. Keep quiet porch, physical button press, and resident-app notification labeled as authored context unless another source supports them."
+                              "text": "Keep the quiet porch, physical press, and app receipt labeled as authored context."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "The trace has five spans and a queue-to-notification link. It does not by itself prove the camera event, app receipt, playback, or a failure. I will not infer those as observations."
+                              "text": "The observed chain ends at the notification-service call. App receipt and playback are not proven."
                             }
                           ]
                         }
-                      }
-                    },
-                    {
-                      "id": "build-trace-draft",
-                      "text": "The same six-beat diagram gains evidence annotations only where the Honeycomb export supports them.",
-                      "nodes": [
-                        "claude"
-                      ],
-                      "panels": {
-                        "agent": {
-                          "log": [
-                            {
-                              "tag": "CLAUDE",
-                              "text": "Draft: six canonical beats. Spans support hub, recording request, metadata insert, queue publish, and notification-service call. The ledger separates those observations from HLD/customer-outcome assertions."
-                            },
-                            {
-                              "tag": "YOU",
-                              "text": "Good. Show the evidence gaps in preview so I can decide whether the authored context is acceptable."
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    {
-                      "id": "build-story-review",
-                      "text": "The story-level candidate is ready. The actual Workbench now offers Preview Agent Updates; continue to Review and accept to inspect the first proposal and its ledger before applying it.",
-                      "edge": "proposal->next",
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "review-ready"
-                        },
-                        "agent": {
-                          "log": [
-                            {
-                              "tag": "CLAUDE",
-                              "text": "The story-level candidate spec and ledger are ready. Service identities and evidence gaps stay marked for engineering enrichment. Please preview both in Flowview before accepting."
-                            }
-                          ]
-                        }
-                      }
-                    },
-                    {
-                      "id": "build-hld-review",
-                      "text": "The HLD-based candidate is ready. The actual Workbench now offers Preview Agent Updates; continue to Review and accept to inspect the first proposal and its ledger before applying it.",
-                      "edge": "proposal->next",
-                      "panels": {
-                        "setup-screen": {
-                          "screen": "review-ready"
-                        },
-                        "agent": {
-                          "log": [
-                            {
-                              "tag": "CLAUDE",
-                              "text": "The HLD-based candidate spec and ledger are ready. The design route remains labeled as proposed, with open evidence questions. Please preview both in Flowview before accepting."
-                            }
-                          ]
-                        }
-                      }
+                      },
+                      "edge": "claude->proposal"
                     },
                     {
                       "id": "build-trace-review",
-                      "text": "The trace-based candidate is ready. The actual Workbench now offers Preview Agent Updates; continue to Review and accept to inspect the first proposal and its ledger before applying it.",
+                      "text": "The diagram and ledger are ready. Open Review → First creation to inspect a representative candidate before accepting either file.",
                       "edge": "proposal->next",
                       "panels": {
                         "setup-screen": {
@@ -8953,7 +8630,11 @@ if (!window.location.hash) {
                           "log": [
                             {
                               "tag": "CLAUDE",
-                              "text": "The trace-based candidate spec and ledger are ready. Observed spans and authored customer context are separated. Please preview both in Flowview before accepting."
+                              "text": "The candidate diagram and ledger are ready. Preview both in Flowview."
+                            },
+                            {
+                              "tag": "YOU",
+                              "text": "I will check the story against its sources before accepting."
                             }
                           ]
                         }
@@ -8970,38 +8651,32 @@ if (!window.location.hash) {
                     {
                       "id": "folder",
                       "side": "below",
-                      "x": 405,
-                      "y": 100
-                    },
-                    {
-                      "id": "you",
-                      "side": "below",
-                      "x": 690,
+                      "x": 370,
                       "y": 100
                     },
                     {
                       "id": "claude",
                       "side": "below",
-                      "x": 690,
-                      "y": 384
+                      "x": 620,
+                      "y": 100
                     },
                     {
                       "id": "proposal",
                       "side": "below",
-                      "x": 405,
-                      "y": 384
+                      "x": 870,
+                      "y": 100
                     },
                     {
                       "id": "next",
                       "side": "below",
-                      "x": 120,
-                      "y": 384
+                      "x": 1120,
+                      "y": 100
                     }
                   ],
                   "layouts": [
                     {
                       "id": "system",
-                      "name": "System walkthrough",
+                      "name": "Walkthrough",
                       "presentation": "standard",
                       "sectionLayout": {
                         "columns": 24,
@@ -9009,29 +8684,29 @@ if (!window.location.hash) {
                           {
                             "x": 0,
                             "y": 0,
-                            "w": 12,
-                            "h": 18
-                          },
-                          {
-                            "panel": "setup-screen",
-                            "x": 12,
-                            "y": 0,
-                            "w": 12,
-                            "h": 19
-                          },
-                          {
-                            "panel": "agent",
-                            "x": 12,
-                            "y": 19,
-                            "w": 12,
-                            "h": 14
+                            "w": 24,
+                            "h": 5
                           },
                           {
                             "controls": "steps",
                             "x": 0,
-                            "y": 18,
-                            "w": 12,
-                            "h": 15
+                            "y": 5,
+                            "w": 8,
+                            "h": 9
+                          },
+                          {
+                            "panel": "setup-screen",
+                            "x": 8,
+                            "y": 5,
+                            "w": 16,
+                            "h": 16
+                          },
+                          {
+                            "panel": "agent",
+                            "x": 0,
+                            "y": 14,
+                            "w": 8,
+                            "h": 7
                           }
                         ]
                       }
@@ -9039,10 +8714,10 @@ if (!window.location.hash) {
                   ],
                   "defaultLayout": "system",
                   "graphFrame": {
-                    "x": 21,
-                    "y": 54,
-                    "w": 797,
-                    "h": 377
+                    "x": 15,
+                    "y": 40,
+                    "w": 1210,
+                    "h": 125
                   },
                   "paths": [
                     {
@@ -9051,15 +8726,12 @@ if (!window.location.hash) {
                       "color": "#7C3AED",
                       "steps": [
                         "build-open",
-                        "build-setup-detail",
                         "build-story-focus",
                         "build-copy-broad-story",
-                        "build-connection",
                         "build-folder",
                         "build-story-request",
                         "build-story-source",
                         "build-story-answer",
-                        "build-story-draft",
                         "build-story-review"
                       ]
                     },
@@ -9068,16 +8740,13 @@ if (!window.location.hash) {
                       "label": "HLD design",
                       "color": "#D97706",
                       "steps": [
-                        "build-open",
-                        "build-setup-detail",
-                        "build-hld-focus",
-                        "build-copy-broad-engineering",
-                        "build-connection",
-                        "build-folder",
+                        "build-open-hld",
+                        "build-hld-focus-hld",
+                        "build-copy-broad-engineering-hld",
+                        "build-folder-hld",
                         "build-hld-request",
                         "build-hld-source",
                         "build-hld-answer",
-                        "build-hld-draft",
                         "build-hld-review"
                       ]
                     },
@@ -9086,16 +8755,13 @@ if (!window.location.hash) {
                       "label": "Honeycomb trace",
                       "color": "#059669",
                       "steps": [
-                        "build-open",
-                        "build-setup-detail",
-                        "build-hld-focus",
-                        "build-copy-broad-engineering",
-                        "build-connection",
-                        "build-folder",
+                        "build-open-trace",
+                        "build-hld-focus-trace",
+                        "build-copy-broad-engineering-trace",
+                        "build-folder-trace",
                         "build-trace-request",
                         "build-trace-source",
                         "build-trace-answer",
-                        "build-trace-draft",
                         "build-trace-review"
                       ]
                     }
@@ -9105,14 +8771,14 @@ if (!window.location.hash) {
             ]
           },
           {
-            "label": "02 · Reconnect existing folder",
+            "label": "02 · Reconnect",
             "sections": [
               {
                 "id": "update",
-                "heading": "Update a saved doorbell diagram with Claude",
+                "heading": "Continue from the saved diagram",
                 "accent": "violet",
                 "text": [
-                  "Alternative entry: this diagram folder already has an accepted spec and coverage ledger. Reopen it, read the current pair, then request an update. An existing flow can be presented to Story, Mixed, or Engineering audiences."
+                  "Reopen the saved folder and ask Claude for a focused change to the accepted story."
                 ],
                 "diagram": {
                   "view": "step",
@@ -9125,32 +8791,26 @@ if (!window.location.hash) {
                       "tint": "cmd"
                     },
                     "folder": {
-                      "title": "Saved diagram folder",
-                      "sub": "accepted spec + ledger",
+                      "title": "Diagram folder",
+                      "sub": "spec + ledger",
                       "icon": "db",
                       "tint": "data"
                     },
-                    "you": {
-                      "title": "You",
-                      "sub": "audience + change",
-                      "icon": "person",
-                      "tint": "dev"
-                    },
                     "claude": {
                       "title": "Claude Code",
-                      "sub": "new conversation",
+                      "sub": "external agent",
                       "icon": "terminal",
                       "tint": "cmd"
                     },
                     "proposal": {
-                      "title": "Revised pair",
-                      "sub": "candidate spec + ledger",
+                      "title": "Proposed draft",
+                      "sub": "spec + ledger",
                       "icon": "package",
                       "tint": "data"
                     },
                     "next": {
-                      "title": "Next · Review",
-                      "sub": "human decision",
+                      "title": "Review the draft",
+                      "sub": "choose Update existing",
                       "icon": "monitor",
                       "tint": "cmd",
                       "handoff": {
@@ -9169,18 +8829,13 @@ if (!window.location.hash) {
                     },
                     {
                       "from": "folder",
-                      "to": "you",
-                      "label": "fresh setup"
-                    },
-                    {
-                      "from": "you",
                       "to": "claude",
-                      "label": "request"
+                      "label": "connect"
                     },
                     {
                       "from": "claude",
                       "to": "proposal",
-                      "label": "revise"
+                      "label": "propose"
                     },
                     {
                       "from": "proposal",
@@ -9192,7 +8847,7 @@ if (!window.location.hash) {
                     {
                       "id": "update-screen",
                       "type": "appscreens",
-                      "title": "Actual Workbench · reopen the saved project",
+                      "title": "Workbench capture",
                       "frame": "none",
                       "transition": "cut",
                       "initial": {
@@ -9258,20 +8913,25 @@ if (!window.location.hash) {
                     {
                       "id": "update-agent",
                       "type": "log",
-                      "title": "Illustrative Claude Code continuation · YOU / CLAUDE",
+                      "title": "Example conversation · illustrative",
                       "tags": {
                         "YOU": "#7C3AED",
                         "CLAUDE": "#0891B2"
                       },
                       "initial": {
-                        "log": []
+                        "log": [
+                          {
+                            "tag": "NOTE",
+                            "text": "The saved folder carries the project context. Reconnect it before asking Claude for a change."
+                          }
+                        ]
                       }
                     }
                   ],
                   "steps": [
                     {
                       "id": "update-open",
-                      "text": "Alternative entry: open Agent beside the existing doorbell diagram. The disconnected panel offers Reopen diagram folder; this is not a new empty-folder build.",
+                      "text": "Start with the saved doorbell diagram. Open Agent to reconnect its folder and continue from the accepted files.",
                       "nodes": [
                         "workbench"
                       ],
@@ -9283,7 +8943,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-reopen-detail",
-                      "text": "Click Reopen diagram folder. The focused actual Workbench control names the saved doorbell project and notes that interrupted requests will not replay.",
+                      "text": "Choose Reopen diagram folder. The recovery card identifies the saved project; interrupted requests are not replayed.",
                       "nodes": [
                         "workbench"
                       ],
@@ -9295,7 +8955,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-continue",
-                      "text": "Choose Continue an existing agent build, then Select Diagram Folder. This reopens the saved folder; a new build would require an empty folder.",
+                      "text": "Choose Continue an existing agent build, then Select Diagram Folder. Select the folder that holds this diagram.",
                       "edge": "workbench->folder",
                       "panels": {
                         "update-screen": {
@@ -9305,7 +8965,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-restore",
-                      "text": "Select the same folder. Flowview reads its accepted spec and ledger and restores Workbench history; old pending requests and native Claude chat are not replayed.",
+                      "text": "Flowview restores the accepted diagram, coverage ledger, and Workbench history. A new Claude conversation still needs fresh setup.",
                       "nodes": [
                         "folder"
                       ],
@@ -9317,8 +8977,8 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-copy",
-                      "text": "Review and copy the fresh setup for this folder. Copy & paste keeps the conversation in Claude Code; the Workbench shows the current project filenames.",
-                      "edge": "folder->you",
+                      "text": "Copy the setup instructions for this folder. They point Claude to the current accepted files.",
+                      "edge": "folder->claude",
                       "panels": {
                         "update-screen": {
                           "screen": "copy-button"
@@ -9327,8 +8987,8 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-paste",
-                      "text": "Paste the current setup into Claude Code. This illustrative exchange starts a new conversation with the saved project, not inherited chat memory.",
-                      "edge": "you->claude",
+                      "text": "Paste that setup into Claude Code. Claude reads the saved diagram and ledger to establish the starting point.",
+                      "edge": "folder->claude",
                       "panels": {
                         "update-agent": {
                           "log": [
@@ -9346,7 +9006,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "update-read",
-                      "text": "Claude reads the accepted spec and ledger, then handles the copied change request. The first candidate keeps all six step IDs and the engineering Data flow while clarifying resident-facing wording. Open Review and accept to inspect it against the saved Current pair.",
+                      "text": "Copy a request to clarify the resident wording. Claude preserves the six step IDs and proposes a revision. Open Review → Update existing.",
                       "panels": {
                         "update-screen": {
                           "screen": "connected"
@@ -9354,16 +9014,12 @@ if (!window.location.hash) {
                         "update-agent": {
                           "log": [
                             {
-                              "tag": "CLAUDE",
-                              "text": "I found the accepted six-step doorbell diagram and its ledger. I will keep the existing service route and stable step IDs."
-                            },
-                            {
                               "tag": "YOU",
-                              "text": "Formal request: make the resident-facing wording clearer for product leaders. Preserve all six step IDs, the engineering Data flow, and the coverage ledger."
+                              "text": "Clarify the resident wording. Preserve the six step IDs, engineering flow, and ledger."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I validated a wording-only candidate and submitted it for Flowview preview. Please compare step 6 and the ledger with Current before accepting."
+                              "text": "A wording-only candidate is ready. Compare step 6 and its evidence before applying it."
                             }
                           ]
                         }
@@ -9381,38 +9037,32 @@ if (!window.location.hash) {
                     {
                       "id": "folder",
                       "side": "below",
-                      "x": 405,
-                      "y": 100
-                    },
-                    {
-                      "id": "you",
-                      "side": "below",
-                      "x": 690,
+                      "x": 370,
                       "y": 100
                     },
                     {
                       "id": "claude",
                       "side": "below",
-                      "x": 690,
-                      "y": 384
+                      "x": 620,
+                      "y": 100
                     },
                     {
                       "id": "proposal",
                       "side": "below",
-                      "x": 405,
-                      "y": 384
+                      "x": 870,
+                      "y": 100
                     },
                     {
                       "id": "next",
                       "side": "below",
-                      "x": 120,
-                      "y": 384
+                      "x": 1120,
+                      "y": 100
                     }
                   ],
                   "layouts": [
                     {
                       "id": "system",
-                      "name": "System walkthrough",
+                      "name": "Walkthrough",
                       "presentation": "standard",
                       "sectionLayout": {
                         "columns": 24,
@@ -9420,29 +9070,29 @@ if (!window.location.hash) {
                           {
                             "x": 0,
                             "y": 0,
-                            "w": 12,
-                            "h": 18
-                          },
-                          {
-                            "panel": "update-screen",
-                            "x": 12,
-                            "y": 0,
-                            "w": 12,
-                            "h": 19
-                          },
-                          {
-                            "panel": "update-agent",
-                            "x": 12,
-                            "y": 19,
-                            "w": 12,
-                            "h": 14
+                            "w": 24,
+                            "h": 5
                           },
                           {
                             "controls": "steps",
                             "x": 0,
-                            "y": 18,
-                            "w": 12,
-                            "h": 15
+                            "y": 5,
+                            "w": 8,
+                            "h": 9
+                          },
+                          {
+                            "panel": "update-screen",
+                            "x": 8,
+                            "y": 5,
+                            "w": 16,
+                            "h": 16
+                          },
+                          {
+                            "panel": "update-agent",
+                            "x": 0,
+                            "y": 14,
+                            "w": 8,
+                            "h": 7
                           }
                         ]
                       }
@@ -9450,67 +9100,67 @@ if (!window.location.hash) {
                   ],
                   "defaultLayout": "system",
                   "graphFrame": {
-                    "x": 20,
-                    "y": 48,
-                    "w": 773,
-                    "h": 382
+                    "x": 15,
+                    "y": 40,
+                    "w": 1210,
+                    "h": 125
                   }
                 }
               }
             ]
           },
           {
-            "label": "03 · Review and accept",
+            "label": "03 · Review",
             "sections": [
               {
                 "id": "review",
-                "heading": "Review the first proposal or an existing update",
+                "heading": "Decide what becomes the accepted diagram",
                 "accent": "amber",
                 "text": [
-                  "Choose First creation for an empty-folder build, or Update existing for a revision to an accepted diagram. Each path shows the actual Workbench preview and ends with human approval; repository publication remains separate."
+                  "Check the story and its evidence. Accept a sound draft, or request a correction before publishing."
                 ],
                 "diagram": {
                   "view": "step",
                   "autoplay": false,
                   "nodes": {
                     "proposal": {
-                      "title": "Candidate pair",
+                      "title": "Proposed draft",
                       "sub": "spec + ledger",
                       "icon": "package",
                       "tint": "data"
                     },
                     "human": {
                       "title": "Human review",
-                      "sub": "Current vs Proposed",
+                      "sub": "story + sources",
                       "icon": "person",
                       "tint": "dev"
                     },
                     "feedback": {
-                      "title": "Correction",
-                      "sub": "specific change",
+                      "title": "Ask for a fix",
+                      "sub": "explain the gap",
                       "icon": "terminal",
                       "tint": "cmd"
                     },
                     "revised": {
-                      "title": "New proposal",
+                      "title": "Revised draft",
                       "sub": "fresh review",
                       "icon": "package",
                       "tint": "data"
                     },
                     "accepted": {
-                      "title": "Accepted pair",
+                      "title": "Accepted files",
                       "sub": "same folder",
                       "icon": "db",
                       "tint": "data"
                     },
                     "resume": {
                       "title": "Repository review",
-                      "sub": "separate publication",
+                      "sub": "publish to team",
                       "icon": "monitor",
                       "tint": "cmd"
                     },
                     "next": {
-                      "title": "Next · Backstage",
+                      "title": "Use in Backstage",
                       "sub": "published diagram",
                       "icon": "monitor",
                       "tint": "cmd",
@@ -9530,8 +9180,13 @@ if (!window.location.hash) {
                     },
                     {
                       "from": "human",
+                      "to": "accepted",
+                      "label": "accept"
+                    },
+                    {
+                      "from": "human",
                       "to": "feedback",
-                      "label": "request change"
+                      "label": "needs work"
                     },
                     {
                       "from": "feedback",
@@ -9540,25 +9195,25 @@ if (!window.location.hash) {
                     },
                     {
                       "from": "revised",
-                      "to": "accepted",
-                      "label": "approve"
+                      "to": "human",
+                      "label": "review again"
                     },
                     {
                       "from": "accepted",
                       "to": "resume",
-                      "label": "publish separately"
+                      "label": "publish"
                     },
                     {
                       "from": "resume",
                       "to": "next",
-                      "label": "discover"
+                      "label": "published"
                     }
                   ],
                   "panels": [
                     {
                       "id": "review-screen",
                       "type": "appscreens",
-                      "title": "Review · Workbench UI and illustrative Claude exchange",
+                      "title": "Workbench capture",
                       "frame": "none",
                       "transition": "cut",
                       "initial": {
@@ -9715,7 +9370,7 @@ if (!window.location.hash) {
                   "steps": [
                     {
                       "id": "review-first-proposal",
-                      "text": "First creation: this actual Workbench preview shows a representative source-neutral doorbell candidate from an empty folder. It illustrates the human gate after any Build new starting path; Proposed state is selected, with no accepted six-step baseline yet.",
+                      "text": "First creation starts with a draft, not an accepted diagram. Preview Agent Updates opens on Proposed state. This representative candidate shows the six doorbell beats.",
                       "edge": "proposal->human",
                       "panels": {
                         "review-screen": {
@@ -9725,7 +9380,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-first-current",
-                      "text": "Click Current state. The folder still contains the empty My story scaffold with zero nodes; it has no accepted six-step doorbell diagram to compare against.",
+                      "text": "Switch to Current state: the folder still holds the empty My story scaffold. Nothing from the draft has been accepted.",
                       "nodes": [
                         "human"
                       ],
@@ -9737,7 +9392,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-first-inspect",
-                      "text": "Return to Proposed state and inspect step 1 of 6. Play through the proposed quiet porch → hub → recording → clip store → notification queue → notification service sequence before deciding.",
+                      "text": "Return to Proposed state. Walk the six beats and check the order: quiet porch, button event, recording request, stored metadata, queued alert, notification sent.",
                       "nodes": [
                         "human"
                       ],
@@ -9749,7 +9404,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-first-ledger",
-                      "text": "Expand Coverage ledger for the first candidate. Check its six proposed beats, source-check warning, and required human review before accepting either file.",
+                      "text": "Read the Coverage ledger. It records the source limits and open questions that the diagram alone may hide.",
                       "nodes": [
                         "human"
                       ],
@@ -9761,20 +9416,17 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-first-approve",
-                      "text": "Click Commit update after reviewing the first candidate and ledger. Flowview saves both in the diagram folder; the applied receipt and Undo confirm local acceptance.",
+                      "text": "Choose Commit update when the story and ledger agree. Flowview saves both locally; the Applied receipt and Undo confirm acceptance.",
                       "panels": {
                         "review-screen": {
                           "screen": "first-applied"
                         }
                       },
-                      "nodes": [
-                        "human",
-                        "accepted"
-                      ]
+                      "edge": "human->accepted"
                     },
                     {
                       "id": "review-first-publish",
-                      "text": "The first accepted spec and ledger are local files. Company repository review publishes them separately before Backstage can read the approved snapshot.",
+                      "text": "The accepted files are ready for separate repository review and publication. Continue to Backstage to see how teammates find a published, bound diagram.",
                       "edge": "accepted->resume",
                       "panels": {
                         "review-screen": {
@@ -9783,40 +9435,18 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "review-first-next",
-                      "text": "Continue to Find and use in Backstage to see how an explicitly bound, published diagram appears on a service page.",
-                      "edge": "resume->next",
-                      "panels": {
-                        "review-screen": {
-                          "screen": "first-applied"
-                        }
-                      }
-                    },
-                    {
-                      "id": "review-initial-proposal",
-                      "text": "Update existing begins with the wording-only candidate from Reconnect. Preview Agent Updates opens on Proposed state: one item modified, accepted ledger unchanged, and no update committed yet.",
-                      "edge": "proposal->human",
-                      "panels": {
-                        "review-screen": {
-                          "screen": "update-initial"
-                        }
-                      }
-                    },
-                    {
                       "id": "review-initial-step",
-                      "text": "Inspect Proposed step 6. The clearer resident wording now says the app receives an alert without marking that app outcome as authored context; the evidence boundary needs explicit treatment before approval.",
-                      "nodes": [
-                        "human"
-                      ],
+                      "text": "The wording-only update says the resident app receives an alert. That sounds like a measured result. Does the source actually prove receipt?",
                       "panels": {
                         "review-screen": {
                           "screen": "update-initial-step"
                         }
-                      }
+                      },
+                      "edge": "proposal->human"
                     },
                     {
                       "id": "review-current",
-                      "text": "Click Current state to compare the accepted six-step baseline. Its existing step 6 says the notification service delivers an alert to the resident app; this baseline has a saved coverage ledger.",
+                      "text": "Compare Current step 6 with the proposed wording. The saved story describes delivery to the app, so check its evidence before strengthening the claim.",
                       "panels": {
                         "review-screen": {
                           "screen": "current"
@@ -9828,7 +9458,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-current-ledger",
-                      "text": "Expand Coverage ledger in Current state. The accepted ledger already distinguishes the authored HLD app outcome from a trace that ends at notification-service; use it to review the unqualified first proposal.",
+                      "text": "The accepted ledger answers the question: app delivery is authored HLD intent; the trace ends at notification-service. The new wording needs that boundary.",
                       "nodes": [
                         "human"
                       ],
@@ -9840,7 +9470,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-discard",
-                      "text": "Return to Proposed state and click Discard update on the first wording-only proposal. Workbench records Not applied; the accepted spec and ledger remain unchanged while Claude prepares a corrected candidate.",
+                      "text": "Discard this proposal. Not applied confirms that the accepted diagram and ledger remain unchanged.",
                       "nodes": [
                         "human"
                       ],
@@ -9852,7 +9482,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-correct",
-                      "text": "Explain why the first step-6 wording needs a source boundary: the accepted ledger limits trace evidence to the notification-service call, while app delivery remains authored design. Ask Claude to revise the candidate spec and ledger and submit a fresh preview.",
+                      "text": "Ask Claude to label app receipt as authored design and state where trace evidence stops. Request a revised diagram and ledger together.",
                       "edge": "human->feedback",
                       "panels": {
                         "review-screen": {
@@ -9862,7 +9492,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-new-proposal",
-                      "text": "Claude submits a fresh candidate spec and ledger after the feedback. Preview Agent Updates opens a second proposal; compare it anew before committing.",
+                      "text": "Open the fresh proposal. Discarding the first draft left Current unchanged; review this candidate against that same baseline.",
                       "edge": "feedback->revised",
                       "panels": {
                         "review-screen": {
@@ -9871,45 +9501,29 @@ if (!window.location.hash) {
                       }
                     },
                     {
-                      "id": "review-compare-current",
-                      "text": "Click Current state in the second proposal. The first wording candidate was discarded, so this is still the same accepted baseline and not a partly accepted draft.",
-                      "nodes": [
-                        "revised"
-                      ],
-                      "panels": {
-                        "review-screen": {
-                          "screen": "current-revised"
-                        }
-                      }
-                    },
-                    {
                       "id": "review-compare-proposed",
-                      "text": "Click Proposed state and inspect step 6. It now labels the resident-app alert as fictional authored design and says the trace only reaches the notification-service call; app receipt is unobserved.",
-                      "nodes": [
-                        "revised"
-                      ],
+                      "text": "Inspect revised step 6. It now distinguishes the designed app alert from the observed notification-service call. App receipt remains unobserved.",
                       "panels": {
                         "review-screen": {
                           "screen": "proposed"
                         }
-                      }
+                      },
+                      "edge": "revised->human"
                     },
                     {
                       "id": "review-ledger",
-                      "text": "Inspect the focused changed Coverage ledger. It repeats the authored outcome and trace limit and flags the revised business wording for human review. Compare it with the spec before accepting both files.",
-                      "nodes": [
-                        "revised"
-                      ],
+                      "text": "Check the revised ledger too. It should tell the same story about the intended outcome and the limit of the trace.",
                       "panels": {
                         "review-screen": {
                           "screen": "ledger"
                         }
-                      }
+                      },
+                      "edge": "revised->human"
                     },
                     {
                       "id": "review-approve",
-                      "text": "Click Commit update only after comparing the second proposal. Flowview saves its corrected spec and ledger together in the folder; the Applied receipt and Undo confirm local acceptance. This is not a Git commit.",
-                      "edge": "revised->accepted",
+                      "text": "Accept the corrected pair with Commit update. The Applied receipt confirms local acceptance; this action does not publish a Git commit.",
+                      "edge": "human->accepted",
                       "panels": {
                         "review-screen": {
                           "screen": "committed"
@@ -9918,18 +9532,8 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "review-publish",
-                      "text": "Workbench acceptance saves this update locally. Separate company repository review publishes the changed pair before Backstage reads it; this process hop is conceptual.",
+                      "text": "Send the accepted files through repository review and publication. Then continue to Backstage, where a service binding makes the diagram discoverable.",
                       "edge": "accepted->resume",
-                      "panels": {
-                        "review-screen": {
-                          "screen": "committed"
-                        }
-                      }
-                    },
-                    {
-                      "id": "review-next",
-                      "text": "Continue to Find and use in Backstage after separate repository publication of the accepted update.",
-                      "edge": "resume->next",
                       "panels": {
                         "review-screen": {
                           "screen": "committed"
@@ -9941,73 +9545,73 @@ if (!window.location.hash) {
                     {
                       "id": "proposal",
                       "side": "below",
-                      "x": 120,
-                      "y": 100
+                      "x": 120.0,
+                      "y": 90
                     },
                     {
                       "id": "human",
                       "side": "below",
-                      "x": 405,
-                      "y": 100
-                    },
-                    {
-                      "id": "feedback",
-                      "side": "below",
-                      "x": 690,
-                      "y": 100
-                    },
-                    {
-                      "id": "revised",
-                      "side": "below",
-                      "x": 975,
-                      "y": 100
+                      "x": 350.0,
+                      "y": 90
                     },
                     {
                       "id": "accepted",
                       "side": "below",
-                      "x": 975,
-                      "y": 384
+                      "x": 580.0,
+                      "y": 90
                     },
                     {
                       "id": "resume",
                       "side": "below",
-                      "x": 690,
-                      "y": 384
+                      "x": 810.0,
+                      "y": 90
                     },
                     {
                       "id": "next",
                       "side": "below",
-                      "x": 405,
-                      "y": 384
+                      "x": 1040.0,
+                      "y": 90
+                    },
+                    {
+                      "id": "feedback",
+                      "side": "below",
+                      "x": 350.0,
+                      "y": 205
+                    },
+                    {
+                      "id": "revised",
+                      "side": "below",
+                      "x": 580.0,
+                      "y": 205
                     }
                   ],
                   "layouts": [
                     {
                       "id": "system",
-                      "name": "System walkthrough",
+                      "name": "Walkthrough",
                       "presentation": "standard",
                       "sectionLayout": {
                         "columns": 24,
                         "default": [
                           {
-                            "panel": "review-screen",
                             "x": 0,
                             "y": 0,
                             "w": 24,
-                            "h": 21
+                            "h": 8
                           },
                           {
                             "controls": "steps",
                             "x": 0,
-                            "y": 21,
-                            "w": 24,
-                            "h": 7
+                            "y": 8,
+                            "w": 8,
+                            "h": 13
                           },
                           {
-                            "x": 0,
-                            "y": 28,
-                            "w": 24,
-                            "h": 27
+                            "panel": "review-screen",
+                            "x": 8,
+                            "y": 8,
+                            "w": 16,
+                            "h": 13
                           }
                         ]
                       }
@@ -10015,10 +9619,10 @@ if (!window.location.hash) {
                   ],
                   "defaultLayout": "system",
                   "graphFrame": {
-                    "x": 20,
-                    "y": 48,
-                    "w": 1054,
-                    "h": 382
+                    "x": 25,
+                    "y": 45,
+                    "w": 1100,
+                    "h": 195
                   },
                   "paths": [
                     {
@@ -10031,8 +9635,7 @@ if (!window.location.hash) {
                         "review-first-inspect",
                         "review-first-ledger",
                         "review-first-approve",
-                        "review-first-publish",
-                        "review-first-next"
+                        "review-first-publish"
                       ]
                     },
                     {
@@ -10040,19 +9643,16 @@ if (!window.location.hash) {
                       "label": "Update existing",
                       "color": "#0891B2",
                       "steps": [
-                        "review-initial-proposal",
                         "review-initial-step",
                         "review-current",
                         "review-current-ledger",
                         "review-discard",
                         "review-correct",
                         "review-new-proposal",
-                        "review-compare-current",
                         "review-compare-proposed",
                         "review-ledger",
                         "review-approve",
-                        "review-publish",
-                        "review-next"
+                        "review-publish"
                       ]
                     }
                   ]
@@ -10061,14 +9661,14 @@ if (!window.location.hash) {
             ]
           },
           {
-            "label": "04 · Find and use in Backstage",
+            "label": "04 · Backstage",
             "sections": [
               {
                 "id": "backstage",
-                "heading": "Walk the Recording service Diagrams preview",
+                "heading": "Find the answer from a service page",
                 "accent": "cyan",
                 "text": [
-                  "This local host shows the actual Flowview plugin with fictional catalog data. Follow its selected doorbell diagram through the inline viewer, service jumps, expanded canvas, and return to the entity."
+                  "Follow a service binding to the recording request. Screens show a local fictional Backstage fixture."
                 ],
                 "diagram": {
                   "view": "step",
@@ -10082,7 +9682,7 @@ if (!window.location.hash) {
                     },
                     "diagrams": {
                       "title": "Diagrams tab",
-                      "sub": "associated diagram",
+                      "sub": "bound diagram",
                       "icon": "monitor",
                       "tint": "cmd"
                     },
@@ -10100,7 +9700,7 @@ if (!window.location.hash) {
                     },
                     "step": {
                       "title": "Step jump",
-                      "sub": "recording requested",
+                      "sub": "service request",
                       "icon": "monitor",
                       "tint": "cmd"
                     },
@@ -10117,7 +9717,7 @@ if (!window.location.hash) {
                       "tint": "cmd"
                     },
                     "viewer": {
-                      "title": "Native inline viewer",
+                      "title": "Inline viewer",
                       "sub": "Home · Data flow",
                       "icon": "monitor",
                       "tint": "cmd"
@@ -10131,49 +9731,49 @@ if (!window.location.hash) {
                       "id": "service",
                       "side": "below",
                       "x": 120,
-                      "y": 100
+                      "y": 90
                     },
                     {
                       "id": "diagrams",
                       "side": "below",
                       "x": 405,
-                      "y": 100
+                      "y": 90
                     },
                     {
                       "id": "viewer",
                       "side": "below",
                       "x": 690,
-                      "y": 100
+                      "y": 90
                     },
                     {
                       "id": "where",
                       "side": "below",
                       "x": 975,
-                      "y": 100
+                      "y": 90
                     },
                     {
                       "id": "section",
                       "side": "below",
                       "x": 975,
-                      "y": 384
+                      "y": 215
                     },
                     {
                       "id": "step",
                       "side": "below",
                       "x": 690,
-                      "y": 384
+                      "y": 215
                     },
                     {
                       "id": "expanded",
                       "side": "below",
                       "x": 405,
-                      "y": 384
+                      "y": 215
                     },
                     {
                       "id": "return",
                       "side": "below",
                       "x": 120,
-                      "y": 384
+                      "y": 215
                     }
                   ],
                   "edges": [
@@ -10216,7 +9816,7 @@ if (!window.location.hash) {
                   "steps": [
                     {
                       "id": "backstage-entity",
-                      "text": "We arrive on the Recording service Diagrams surface. Its explicit binding reveals one associated fictional doorbell spec in this fixture.",
+                      "text": "A teammate opens Recording service → Diagrams. An explicit service binding makes the published doorbell diagram appear here.",
                       "edge": "service->diagrams",
                       "panels": {
                         "backstage-screen": {
@@ -10227,7 +9827,7 @@ if (!window.location.hash) {
                     {
                       "id": "backstage-inline",
                       "edge": "diagrams->viewer",
-                      "text": "The Diagram selector contains that one associated spec. Click Data flow inside the selected diagram: the native inline viewer changes from the Home scene to the service graph.",
+                      "text": "Open Data flow inside the selected diagram to see the service handoffs. This fixture has one associated diagram; the Diagram selector chooses among associated specs.",
                       "panels": {
                         "backstage-screen": {
                           "screen": "inline"
@@ -10236,7 +9836,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "backstage-where",
-                      "text": "Scroll below the inline viewer and open Where this service appears. It reveals the matching doorbell section and three Recording service step links.",
+                      "text": "To find Recording service in the story, open Where this service appears below the viewer. Its section and step links identify the relevant moments.",
                       "edge": "viewer->where",
                       "panels": {
                         "backstage-screen": {
@@ -10246,7 +9846,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "backstage-section",
-                      "text": "Click Doorbell press to resident notification. The selected diagram jumps to that section and shows its opening step, A quiet home.",
+                      "text": "Choose the doorbell section for context. The diagram opens at A quiet home, the beginning of the six-beat story.",
                       "edge": "where->section",
                       "panels": {
                         "backstage-screen": {
@@ -10256,7 +9856,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "backstage-step",
-                      "text": "Click the step 3 link, Recording service accepts the request. The inline viewer moves to STEP 3/6 and shows its recording-workflow caption.",
+                      "text": "Jump to Recording service accepts the request. Step 3 shows the handoff the teammate came to investigate.",
                       "edge": "section->step",
                       "panels": {
                         "backstage-screen": {
@@ -10266,7 +9866,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "backstage-expand",
-                      "text": "Click Expand canvas. The viewer fills the window; the floating controls still show STEP 3/6 and the recording-workflow caption. Use Back to entity to return.",
+                      "text": "Expand canvas for a closer look. The same diagram stays on step 3, with the recording-workflow caption visible.",
                       "edge": "step->expanded",
                       "panels": {
                         "backstage-screen": {
@@ -10276,7 +9876,7 @@ if (!window.location.hash) {
                     },
                     {
                       "id": "backstage-return",
-                      "text": "Click Back to entity. The expanded view closes and the Recording service Diagrams surface returns with the same selected spec.",
+                      "text": "Use Back to entity to return to the service page. The selected diagram stays in context for the next question.",
                       "edge": "expanded->return",
                       "panels": {
                         "backstage-screen": {
@@ -10289,7 +9889,7 @@ if (!window.location.hash) {
                     {
                       "id": "backstage-screen",
                       "type": "appscreens",
-                      "title": "Actual Flowview plugin · local fictional Backstage preview",
+                      "title": "Backstage · local fictional fixture",
                       "frame": "none",
                       "transition": "cut",
                       "initial": {
@@ -10365,30 +9965,30 @@ if (!window.location.hash) {
                   "layouts": [
                     {
                       "id": "system",
-                      "name": "System walkthrough",
+                      "name": "Walkthrough",
                       "presentation": "standard",
                       "sectionLayout": {
                         "columns": 24,
                         "default": [
                           {
-                            "panel": "backstage-screen",
                             "x": 0,
                             "y": 0,
                             "w": 24,
-                            "h": 21
+                            "h": 8
                           },
                           {
                             "controls": "steps",
                             "x": 0,
-                            "y": 21,
-                            "w": 24,
-                            "h": 6
+                            "y": 8,
+                            "w": 8,
+                            "h": 13
                           },
                           {
-                            "x": 0,
-                            "y": 27,
-                            "w": 24,
-                            "h": 27
+                            "panel": "backstage-screen",
+                            "x": 8,
+                            "y": 8,
+                            "w": 16,
+                            "h": 13
                           }
                         ]
                       }
@@ -10396,10 +9996,10 @@ if (!window.location.hash) {
                   ],
                   "defaultLayout": "system",
                   "graphFrame": {
-                    "x": 21,
-                    "y": 54,
-                    "w": 1053,
-                    "h": 377
+                    "x": 15,
+                    "y": 40,
+                    "w": 1060,
+                    "h": 215
                   }
                 }
               }

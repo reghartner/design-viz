@@ -840,7 +840,7 @@
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
       }
     ],
-    "Reopen folder": [
+    "Repository review": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
         "family": "flowview-product-tour",
@@ -887,6 +887,13 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
+    "Revised pair": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Rollbook": [
       {
         "file": "basecraft-keep/keep.html",
@@ -920,6 +927,13 @@
         "file": "loomworks-trellis/trellis.html",
         "family": "loomworks-trellis",
         "title": "loomworks Trellis — Camera-as-Hub"
+      }
+    ],
+    "Saved diagram folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Scribe": [

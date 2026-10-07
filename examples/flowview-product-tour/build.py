@@ -25,5 +25,16 @@ html = OUTPUT.read_text()
 style = (HERE / "presentation.css").read_text()
 marker = '<script type="application/json" id="flowspec">'
 assert html.count(marker) == 1
-html = html.replace(marker, f"<style>\n{style}</style>\n{marker}", 1)
+bootstrap = """<script>
+/* This presentation is the walkthrough. Suppress the viewer's separate
+   first-visit tour only for direct opens; explicit fragments still win. */
+if (!window.location.hash) {
+  try {
+    window.history.replaceState(null, '', window.location.href + '#tour=0');
+  } catch (error) {
+    window.location.hash = 'tour=0';
+  }
+}
+</script>"""
+html = html.replace(marker, f"<style>\n{style}</style>\n{bootstrap}\n{marker}", 1)
 OUTPUT.write_text(html)

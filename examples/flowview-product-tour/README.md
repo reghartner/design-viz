@@ -4,22 +4,34 @@ Open [the interactive walkthrough](flowview-product-tour.html), or edit the
 [spec](flowview-product-tour.spec.json) with its
 [coverage ledger](flowview-product-tour.ledger.md).
 This follows the presenter's separate live-diagram demo. It explains how a
-fictional doorbell diagram is built, reviewed, and used; the presenter shows
+fictional doorbell diagram is created or reopened, reviewed, and used; the presenter shows
 Standard versus Explore on another diagram.
 
 | Chapter | What the audience sees | Point of the chapter |
 |---|---|---|
-| Build with Claude | The real Workbench setup changes from the full dialog through a Story or Engineering detail example, Copy & paste, and folder selection. Four **tour paths** each reveal a detailed, explicitly illustrative YOU/CLAUDE conversation. | A business story, existing flow, HLD, or Honeycomb trace can start the same six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice; this tour shows an existing flow presented in Story detail. |
-| Review and continue | An illustrative YOU/CLAUDE correction, actual proposal comparison and ledger detail, the post-commit receipt, then same-folder continuation with a second illustrative exchange. | The person decides what lands; the spec and ledger persist together in the same folder. |
+| Build new with Claude | The real new-diagram Workbench setup points to the detail dropdown, then shows Story or Engineering selected, the matching full dialog with Copy & paste highlighted, a focused Copy control, and an empty-folder choice. Three **tour paths** show illustrative YOU/CLAUDE conversations. | A business story, HLD, or Honeycomb trace can start a new six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice. |
+| Reconnect existing folder | The real Workbench recovery and Continue existing controls reopen a saved diagram folder before an illustrative Claude Code exchange updates the existing six-step story. | An existing flow may serve a business audience. Claude reads the accepted spec and ledger, preserves stable IDs, and proposes a revision. This is an alternative entry to Build new. |
+| Review and accept | Two native paths: First creation compares the empty Current scaffold with a source-neutral first candidate; Update existing inspects the wording-only proposal, compares the accepted Current spec and ledger, discards that pending proposal, then reviews a new evidence-corrected proposal. | Both entry routes share the human preview gate, with a different starting state and a distinct actual Workbench sequence. |
 | Find and use in Backstage | Seven actual plugin states: Recording service Diagrams page → native inline viewer → matching destinations → section → step 3 → expanded viewer → entity page. Broad screens are followed by focused UI details. | An explicitly bound service exposes the approved diagram on its own page; section/step jumps keep the selected diagram in context. |
 
-All three chapters default to **Standard**. Use the chapter tabs to move between
-acts and the step control to play each act. Build's four path labels switch the
-**illustrative source conversation**, while the setup screen shows the actual
-Workbench controls: Story/Mixed/Engineering detail, Copy & paste, and folder
-selection. An existing flow can serve a business audience; it does not require
-Engineering detail. The conversation is not a transcript of a real Claude
-session. Its setup paste is shown as `[Pasted Flowview Setup Instructions]`.
+All four chapters default to **Standard**. Build new and Reconnect existing
+folder are alternative starting routes. Both handoffs open the Review chapter;
+select **First creation** after Build new or **Update existing** after Reconnect.
+Review defaults to First creation because local section handoffs do not select
+a path. Build's three path labels switch the **illustrative source
+conversation**, while its setup screen shows the actual Workbench controls:
+Story/Mixed/Engineering detail, Copy & paste, and an empty-folder selection.
+The First creation screenshots show a representative source-neutral candidate
+and the actual review controls; they are not captures of the illustrative
+Claude dialogue in any single Build path.
+The existing-folder tab starts with the real recovery UI, not new-diagram setup.
+Its Story audience example is independent of the already existing flow used as
+source material. The YOU/CLAUDE conversations are illustrative, not captured
+transcripts. Setup pastes appear as `[Pasted Flowview Setup Instructions]`.
+In the Update existing Review path, the first wording proposal is discarded
+before Claude submits a second proposal that clarifies the trace evidence
+boundary. The accepted spec and ledger remain unchanged between those two
+requests.
 
 The fictional reference is
 [`examples/canon/specs/doorbell.json`](../canon/specs/doorbell.json):
@@ -52,23 +64,42 @@ GitHub loaders; the local fixture does not prove company login or loader setup.
 ## Screenshot provenance
 
 PNG originals live in [screenshots](screenshots/) and are embedded as data URLs
-in the spec and portable HTML. The Workbench captures (`agent-setup-context.png`,
-`agent-focus-story-landscape.png`, `agent-focus-engineering-landscape.png`,
-`agent-conversation-choice-landscape.png`,
-`select-folder.png`, `resume-folder.png`) came from the built
-Workbench on 2026-10-07. Story and Engineering focus each have a readable
-landscape detail after the broad setup view. The contextual setup capture has a capture-time orange
-outline around Copy & paste. No folder permission was granted during capture.
-The Review captures (`review-doorbell-current-step.png`,
-`review-doorbell-update.png`, `review-doorbell-proposed-step.png`,
-`review-doorbell-ledger-focused.png`, `review-doorbell-receipt-distinct.png`, and
-`resume-folder.png`) show actual Workbench Current/Proposed/ledger,
-post-commit confirmation, and resume UI for the fictional doorbell example.
-For the receipt capture, only the local demo folder's persisted receipt message
-was shortened after a real Commit update; the Workbench's Applied status,
-validation, and Undo controls are unchanged.
-`review-correction-illustrative.png` and `review-reconnect-illustrative.png`
-are clearly labeled dialogue illustrations, not Claude Code captures.
+in the spec and portable HTML. The new-build Workbench captures
+(`agent-setup-detail-selector-next.png`, `agent-focus-story-landscape.png`,
+`agent-focus-engineering-landscape.png`, `agent-setup-copy-next.png`,
+`agent-setup-copy-engineering-next.png`, `agent-setup-copy-focused.png`, and
+`select-folder.png`) came from the built Workbench on 2026-10-07. The broad
+opening capture outlines the actual detail dropdown. Story and Engineering
+paths then show their selected detail and matching broad Copy & paste choice
+before a shared focused Copy image. The orange outlines are presentation
+highlights on real controls. No folder permission was granted for these
+new-build captures.
+The existing-folder sequence starts with `reconnect-workbench-wide.png` (the
+existing diagram and disconnected Agent panel in context, with a presentation
+highlight on Reopen diagram folder), then `reconnect-start.png` (the focused
+recovery card), `resume-folder.png` (Continue an existing agent build and folder picker),
+`reconnect-instructions-header.png` (saved project filenames and fresh setup),
+`reconnect-copy-button.png` (actual Copy connection instructions control), and
+`reconnect-agent-focused.png` (connected Agent with Story detail and Copy request).
+These came from a real local, disk-backed Workbench reconnect fixture. The
+focused captures omit one-time connection IDs. The adjacent YOU/CLAUDE log is
+illustrative; reconnecting does not replay an old Claude conversation.
+The First creation Review path uses `first-create-neutral-preview.png`,
+`first-create-neutral-empty-current.png`, `first-create-neutral-step-one.png`,
+`first-create-neutral-ledger-focused.png`, and `first-create-neutral-receipt.png`, captured from a real
+local Workbench first proposal after Start a new diagram with an agent in an
+empty folder. The starting draft was `My story` with zero nodes; the proposal
+adds a fictional doorbell story without attributing the candidate to one source path. The Update existing path uses
+`update-initial-proposal.png`, `update-initial-step-six.png`,
+`update-accepted-current-step.png`, `update-accepted-current-ledger.png`,
+`update-revised-proposal.png`, `update-revised-current-step.png`,
+`update-revised-proposed-step.png`, `update-revised-ledger.png`,
+`update-initial-discarded-card.png`, and `update-revised-applied-card.png`
+for actual Workbench first and second proposals, unchanged accepted Current
+spec and ledger, changed ledger, and the distinct Not applied and Applied
+receipts in one disk-backed folder.
+`review-correction-illustrative.png` is a clearly labeled dialogue
+illustration, not a Claude Code capture.
 The request to Claude is illustrative, not a recorded Claude run. The proposed
 revision separates an authored resident-app outcome from Honeycomb evidence
 that stops at the notification-service call.
@@ -90,11 +121,17 @@ node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec
 python3 examples/flowview-product-tour/build.py
 ```
 
-The saved 24-column Standard layouts use the same 33-row height in all three
+The saved 24-column Standard layouts use the same 33-row height in all four
 chapters: graph and step control on the left, changing UI evidence on the
-right. Build divides the right column between the actual Workbench screen and
-illustrative conversation; Review and Backstage give the changing screenshot
-the full right column. Focused landscape captures keep controls and evidence
-readable at presentation size. Visual
-QA should inspect every Build source path and every Backstage screenshot
+right. Both entry routes divide the right column between actual Workbench UI
+and illustrative Claude conversation; Review and Backstage give the changing
+screenshot the full right column. Focused captures keep controls and evidence
+readable at presentation size. Visual QA should inspect every Build source path,
+each reconnect state, both Review paths, and every Backstage screenshot
 transition at 1280×800 and 1440×900 after images decode.
+
+The Reconnect graph was run through `tools/arrange-spec.cjs --width 1280` on a
+temporary single-section copy without its named view. Its generated node
+positions and graph frame were applied to the saved spec. The measured panel
+and control tiles were enlarged into the tour's 33-row presentation grid so
+screens and dialogue remain readable beside the diagram.

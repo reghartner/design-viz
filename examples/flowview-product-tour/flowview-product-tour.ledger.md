@@ -2,66 +2,71 @@
 
 ## Operator decisions and source scope
 
-No questions were needed for this revision. The user specified the story, audience,
-and interaction: three purposeful chapters, actual setup and Backstage UI beats,
-source-specific Claude dialogue, and one fictional doorbell throughline. The
-presenter demonstrates an unrelated real diagram and Standard/Explore separately.
-No Backstage links or code references are required inside this explanatory tour.
-There is no time, latency, cost, adoption, or production outcome claim.
+The tour has four tabs: **Build new with Claude**, **Reconnect existing folder**,
+**Review and accept**, and **Find and use in Backstage**. Reconnect is an
+alternative entry to the shared review gate. Build has three source routes:
+Business story, HLD design, and Honeycomb trace. Those routes are controls in
+this tour; the actual Workbench controls audience detail, conversation mode,
+and the diagram folder.
 
-The source of truth for the example's six beats is
-`examples/canon/specs/doorbell.json`; the example's observed spans come from
-`examples/canon/traces/happy.json`. Product behavior is checked against
-`docs/folder-agent-session.md`, `apps/backstage/README.md`,
-`apps/backstage/src/FlowviewEntityDiagrams.tsx`,
-`apps/backstage/src/InlineFlowview.tsx`, and the built Workbench. Actual local
-screenshots show UI states, while YOU/CLAUDE messages and the human correction
-are labeled illustrative. The local Backstage shell uses a fictional catalog and
-reference adapter. It does not verify the company GitHub loader, SSO, or access
-policy.
+One fictional doorbell example runs throughout. Its six beats come from
+examples/canon/specs/doorbell.json; the observed service spans come from
+examples/canon/traces/happy.json. Workbench behavior was checked against
+workbench/flowspec.html and docs/folder-agent-session.md. Backstage behavior
+was checked against apps/backstage/README.md,
+apps/backstage/src/FlowviewEntityDiagrams.tsx, and
+apps/backstage/src/InlineFlowview.tsx. Captured Workbench and local Backstage
+screens show actual UI states. YOU/CLAUDE turns and the human correction are
+marked illustrative, not presented as a recorded Claude transcript.
+
+The presenter can demonstrate an unrelated real diagram and Standard/Explore
+separately. This explanatory tour contains no service binding or code
+reference; the separate canonical doorbell spec carries the binding. The
+local fixtures do not verify company publication, the GitHub loader, SSO,
+access policy, a production outcome, time, cost, or adoption.
 
 ## Story and audience
 
-A PM or engineer opens the real Workbench setup, chooses a detail level and
-external Claude conversation, then selects a diagram folder. The viewer chooses
-one of four source paths in this **tour**, not in Workbench. Each path shows the
-questions and answers Claude needs to produce a grounded six-beat fictional
-doorbell draft. A person compares the proposed diagram and ledger, requests a
-specific correction, reviews the revised pair, and accepts it. Later, the same
-folder is reopened for another change. After a separate repository publication,
-the approved diagram appears on the Recording service Component page in
-Backstage. The presenter follows the actual plugin UI from entity tab to
-matching section, matching step, expanded canvas, and back to entity.
+A PM or engineer starts a new agent-backed diagram in Workbench, chooses
+audience detail, selects Copy & paste, and chooses an empty folder. In the
+illustrative Claude exchange, the agent asks what the chosen source proves
+before drafting six fictional doorbell beats. An existing project can instead
+be reopened through its saved folder, with fresh setup instructions for
+Claude. Both entries reach Review. First creation compares the proposed
+six-step diagram with an empty scaffold; Update existing compares the saved
+step 6 with a corrected proposal. A person checks the ledger before
+accepting either pair. After separate company
+repository review and publication, the Recording service Diagrams page in
+the local Backstage example shows where that service appears.
 
-Takeaway: source material can differ, but the agent's proposal, human decision,
-folder continuity, and Backstage service association remain explicit.
+Takeaway: the source changes what Claude can claim. A human previews the
+proposed spec and ledger, can later return to the same folder, and can
+navigate a published service association in Backstage.
 
 ## Panel plan
 
-| Chapter | Panel | Question answered | Best beat | Evidence mode |
-|---|---|---|---|---|
-| Build with Claude | `setup-screen` | What does the person actually click? | broad dialog → readable Story/Engineering selector → Copy & paste detail → empty-folder chooser | Actual Workbench captures; orange click outline on the broad view |
-| Build with Claude | `agent` | What would a useful Claude exchange contain for this source? | source-specific question, clarification, six-beat draft | Explicitly illustrative YOU/CLAUDE messages; never a real transcript |
-| Review and continue | `review-screen` | How does a correction become an accepted pair and a later continuation? | illustrative correction → actual Preview Agent Updates and focused ledger → applied receipt → actual resume choice → illustrative continuation | Actual Workbench captures and clearly labeled dialogue illustrations |
-| Find and use in Backstage | `backstage-screen` | What changes after each action in the service page? | seven distinct screenshot states | Actual current plugin in local fictional fixture |
+| Tab | Panel | Question answered | Evidence |
+|---|---|---|---|
+| Build new | setup-screen | What does a new build require in Workbench? | Broad Workbench setup with the next detail selector outlined, Story/Engineering choice, later path-matched Copy & paste highlight, focused Copy & paste control, and empty-folder chooser. |
+| Build new | agent | What must Claude ask and record for this source? | Clearly illustrative YOU/CLAUDE dialogue, with a six-beat doorbell proposal for each route. |
+| Reconnect existing | update-screen | How does a saved project reopen? | Actual Workbench context, Reopen card, Continue existing choice, restored folder/setup, Copy instructions, and connected Agent state. |
+| Reconnect existing | update-agent | How can Claude continue from the saved pair? | Illustrative dialogue that reads the spec and ledger, asks a boundary question, and submits an update. |
+| Review and accept | review-screen | What must a human check before accepting first creation or an existing update? | First creation: source-neutral proposal, empty Current scaffold, step-1 viewer, ledger, and receipt. Update existing: wording-only proposal, accepted Current and nonempty ledger, Discard, illustrative correction, fresh Current/Proposed and ledger comparison, then receipt. |
+| Find and use in Backstage | backstage-screen | What changes after each service-page action? | Seven actual local plugin states from entity tab through inline viewer, links, jumps, expanded canvas, and return. |
 
-Every panel has one job; there is no generic explanation-only table. The graph
-explains the process and the adjacent panel shows the matching UI or conversation.
-All three chapters use a 33-row Standard layout: graph `h18` and step controls
-`h15` on the left; changing visual evidence on the right. Build's right column
-splits `h19/h14`. Review and Backstage use the full `h33` right column.
-Focused landscape captures follow the broad UI views so key controls and
-evidence remain legible at 1280×800.
+All four tabs use the spec's Standard layout: graph in left h18, step controls
+below in h15, changing evidence on the right. Build and Reconnect split the
+right side into h19 UI and h14 dialogue. Review and Backstage give the right
+panel h33. Broad UI captures establish location; focused captures make
+controls and evidence readable at 1280×800.
 
 ## Starting materials and canonical route
 
-The four Build paths share the Workbench setup and final proposal. The path
-labels are Story, Existing flow, HLD, and Honeycomb trace. The Workbench's
-Story/Mixed/Engineering selector controls audience detail independently of those
-source paths: this tour shows Story detail for the business story and a
-business-led existing flow, and Engineering detail for the HLD and trace.
-Each path asks a source-specific clarifying question,
-records the user's boundary, then drafts the canonical six beats:
+Build has three native tour paths: **Business story**, **HLD design**, and
+**Honeycomb trace**. The Workbench Story/Mixed/Engineering selector is
+independent of those paths. This tour selects Story for the PM route and
+Engineering for HLD and trace. The paths share setup and proposal beats,
+while each source receives its own question, answer, and draft:
 
 1. Quiet porch.
 2. Doorbell camera button event reaches porch hub.
@@ -70,120 +75,206 @@ records the user's boundary, then drafts the canonical six beats:
 5. Recording service queues a resident notification.
 6. Notification service sends the alert to the resident app.
 
-The Story route leaves backend identities to engineer enrichment in the same
-folder. The Existing flow route preserves a documented process for business
-readers and flags service identities and technical proof for engineering
-follow-up. The HLD route marks
-an authored proposed design. The trace route identifies five observed spans:
-`porch-hub POST /button`, `recording-service POST /recordings`, `clip-store
-INSERT clip`, `notification-queue publish doorbell`, and
-`notification-service POST /notifications`, including the queue-to-notification
-span link. The trace alone does not prove the physical button press or app
-receipt. No path claims clip playback or a failure outcome. No source is silently
-converted into production proof.
+The business story leaves service identities and proof for engineering
+enrichment. The HLD marks the route as authored design, not production
+observation. The trace route identifies five observed spans: porch-hub
+POST /button, recording-service POST /recordings, clip-store INSERT clip,
+notification-queue publish doorbell, and notification-service
+POST /notifications, including the queue-to-notification link. That trace
+alone does not prove the physical button press, app receipt, clip playback,
+or a failure outcome. The customer outcome stays labeled as authored context
+where trace evidence stops.
 
 ## Paths and handoffs
 
-Build has four native alternate paths with a shared opening beat, a path-specific actual focus-selector beat, three shared setup beats, three
-source-specific dialogue beats, and two shared proposal/handoff beats. Review is
-one deliberate correction, fresh preview, human approval, and same-folder resume
-sequence. Backstage is one UI walk; each visible action switches its screenshot, including
-the native inline viewer before the matching destinations.
-The three chapters default to Standard. Build hands off to Review; Review hands
-off to Backstage. The Backstage chapter ends on the entity page.
+**Build new:** a common opening highlights the actual detail selector to be
+clicked next. Source-specific focus selection follows. The later Copy & paste
+beat highlights that control in a broad Workbench view with Story selected
+for business or Engineering selected for HLD and trace, followed by a focused
+control view. Then come empty-folder setup, source-specific Claude questions,
+and draft. The proposal hands directly to Review. A Workbench detail choice
+does not switch the source route.
+
+**Reconnect existing:** a separate entry tab. The disconnected Agent card
+offers Reopen diagram folder. Setup selects Continue an existing agent build
+and the prior folder. Workbench restores the accepted spec, ledger, and its
+own history, then supplies fresh connection instructions. A new Claude
+conversation reads those files and receives a newly copied request. The
+candidate pair hands to Review. Old pending work is not replayed.
+
+**Review and accept:** two native paths share the human gate. First creation
+starts from an empty folder and inspects a representative, source-neutral
+six-step proposal. Current state is an empty My story scaffold, not an
+accepted doorbell baseline. Update existing starts with an accepted six-step
+spec and nonempty ledger. A wording-only first proposal makes step 6 clearer
+for business readers but leaves its app outcome ambiguous. The human views
+the accepted Current state and ledger, discards that pending proposal, asks
+for the trace boundary, and compares a fresh proposal with the same Current
+baseline and a changed ledger. Both paths inspect the ledger before Commit
+update.
+The spec and ledger save together locally. Git commit and company repository
+publication are separate, unpictured actions before Backstage.
+
+**Backstage:** one local fictional Recording service walk. The diagram's
+Data flow tab, Where this service appears links, section and step jumps,
+expanded canvas, and Back to entity action have matching captures.
 
 ## Step × panel worksheet
 
-`P` means an explicit panel patch. `H` means the prior state deliberately holds.
-`D` means the Build dialogue appends new illustrative messages. Every step below
-has a disposition for each panel present in its chapter. The graph focus names
-the action, while the step caption states the source/evidence boundary.
+P means an explicit panel patch. H means the prior state holds. D means
+illustrative dialogue appended in the log panel. Each row covers the panels
+present in that tab. A held screenshot does not imply a new UI action.
 
-| Step | Screenshot | Conversation or decision | Why a hold is valid |
+| Step | UI screenshot panel | Dialogue / decision panel | Why it changes or holds |
 |---|---|---|---|
-| `build-open` | P: `context` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-story-focus` | P: `story-focus` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-flow-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-hld-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-trace-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-connection` | P: `choice` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-folder` | P: `folder` | H: prior exchange/decision | Actual UI changes at this beat |
-| `build-paste` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-story-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-story-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-story-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-flow-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-flow-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-flow-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-hld-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-hld-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-hld-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-trace-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-trace-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-trace-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-propose` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
-| `build-next` | H: same UI until next action | H: prior exchange/decision | The visible UI/decision remains valid |
-| `review-current` | P: `current` | — | Actual UI changes at this beat |
-| `review-correct` | P: illustrative `correction-dialogue` | — | Dialogue makes the correction visible before a new proposal |
-| `review-new-proposal` | P: `summary` | — | Actual UI changes at this beat |
-| `review-compare-current` | P: `current` | — | Actual UI changes at this beat |
-| `review-compare-proposed` | P: `proposed` | — | Actual UI changes at this beat |
-| `review-ledger` | P: focused `ledger` | — | Actual UI changes at this beat |
-| `review-approve` | P: applied `committed` receipt | — | Actual UI confirms acceptance |
-| `review-resume` | P: `resume` | — | Actual UI changes at this beat |
-| `review-reconnect` | P: illustrative `reconnect-dialogue` | — | Dialogue shows a new session reading the accepted pair |
-| `review-next` | P: `resume` | — | Actual same-folder UI returns for the handoff |
-| `backstage-entity` | P: `entity` | — | Actual UI changes at this beat |
-| `backstage-inline` | P: `inline` | — | Actual UI changes at this beat |
-| `backstage-where` | P: `where` | — | Actual UI changes at this beat |
-| `backstage-section` | P: `section` | — | Actual UI changes at this beat |
-| `backstage-step` | P: `step` | — | Actual UI changes at this beat |
-| `backstage-expand` | P: `expanded` | — | Actual UI changes at this beat |
-| `backstage-return` | P: `return` | — | Actual UI changes at this beat |
+| build-open | P: context | H: empty exchange | Broad setup outlines the actual detail selector clicked next. |
+| build-story-focus | P: story-focus | H | Actual Story detail choice. |
+| build-hld-focus | P: engineering-focus | H | Engineering detail for HLD. |
+| build-trace-focus | P: engineering-focus | H | Same Engineering control for trace. |
+| build-copy-broad-story | P: copy-broad-story | H | Broad Copy & paste highlight with Story still selected. |
+| build-copy-broad-engineering | P: copy-broad-engineering | H | Broad Copy & paste highlight with Engineering still selected. |
+| build-connection | P: choice | H | Focused actual Copy & paste control follows the broad view. |
+| build-folder | P: folder | H | Actual new-folder chooser. |
+| build-paste | H: folder | D: setup and source question | External Claude exchange begins. |
+| build-story-source | H | D: PM source and boundary question | Source-specific dialogue. |
+| build-story-answer | H | D: PM boundary and Claude response | Source-specific dialogue. |
+| build-story-draft | H | D: six-beat PM draft | Source-specific dialogue. |
+| build-hld-source | H | D: HLD source and question | Source-specific dialogue. |
+| build-hld-answer | H | D: authored-design boundary | Source-specific dialogue. |
+| build-hld-draft | H | D: six-beat HLD draft | Source-specific dialogue. |
+| build-trace-source | H | D: observed spans and question | Source-specific dialogue. |
+| build-trace-answer | H | D: observed/authored boundary | Source-specific dialogue. |
+| build-trace-draft | H | D: trace-annotated six-beat draft | Source-specific dialogue. |
+| build-propose | H | D: candidate pair ready | Shared proposal beat. |
+| build-next | H | H | Text handoff directly to Review. |
+| update-open | P: wide | H: empty exchange | Broad Workbench and disconnected Agent. |
+| update-reopen-detail | P: reopen | H | Focused Reopen diagram folder control. |
+| update-continue | P: continue | H | Continue existing and Select Diagram Folder. |
+| update-restore | P: instructions | H | Restored folder and fresh setup header. |
+| update-copy | P: copy-button | H | Copy connection instructions control. |
+| update-paste | H: copy-button | D: Claude verifies folder | External conversation starts. |
+| update-read | H | D: accepted pair read | Saved project context in illustrative dialogue. |
+| update-request | P: connected | D: update request and acknowledgment | Actual Story-detail Agent composer and Copy request accompany illustrative dialogue. |
+| update-question | H | D: evidence question and answer | Illustrative dialogue. |
+| update-propose | H | D: candidate pair submitted | Shared Review gate follows. |
+| update-next | H | H | Text handoff to Review. |
+| review-first-proposal | P: first-preview | — | Actual source-neutral first proposal from empty folder. |
+| review-first-current | P: first-current | — | Current is the zero-node My story scaffold, not an accepted doorbell. |
+| review-first-inspect | P: first-step-one | — | Proposed step 1/6 and six-step controls visible. |
+| review-first-ledger | P: first-ledger | — | First-candidate six beats, source check, and human-review requirement. |
+| review-first-approve | P: first-applied | — | Actual applied receipt after first Commit update. |
+| review-first-publish | P: first-applied | — | Receipt holds; company publication is unpictured. |
+| review-first-next | P: first-applied | — | Receipt holds for Backstage handoff. |
+| review-initial-proposal | P: update-initial | — | First wording-only Proposed state; 0 added, 1 modified, Discard visible. |
+| review-initial-step | P: update-initial-step | — | Step 6 uses resident-facing wording without visible source boundary. |
+| review-current | P: current | — | Accepted six-step Current baseline from the same folder. |
+| review-current-ledger | P: update-current-ledger | — | Accepted nonempty ledger already separates authored outcome from trace observation. |
+| review-discard | P: update-discarded | — | Actual Not applied receipt after Discard update; baseline files remain. |
+| review-correct | P: correction-dialogue | — | Illustrative request for a new candidate with explicit trace boundary. |
+| review-new-proposal | P: summary | — | Second actual Preview Agent Updates proposal in that folder. |
+| review-compare-current | P: current-revised | — | Current still shows the accepted baseline because first proposal was discarded. |
+| review-compare-proposed | P: proposed | — | Corrected step 6 labels authored app outcome and trace limit. |
+| review-ledger | P: ledger | — | Changed ledger repeats authored outcome, evidence limit, and human review. |
+| review-approve | P: committed | — | Same-folder Applied receipt after second Commit update. |
+| review-publish | P: committed | — | Receipt holds; company publication is unpictured. |
+| review-next | P: committed | — | Receipt holds for Backstage handoff. |
+| backstage-entity | P: entity | — | Recording service Diagrams surface. |
+| backstage-inline | P: inline | — | Data flow selected in native viewer. |
+| backstage-where | P: where | — | Service appearance links expanded. |
+| backstage-section | P: section | — | Section jump. |
+| backstage-step | P: step | — | Recording request at STEP 3/6. |
+| backstage-expand | P: expanded | — | Expanded canvas retains step and caption. |
+| backstage-return | P: return | — | Back to entity restores initial surface. |
 
-## Review semantics
+## Build capture provenance
 
-The illustrative correction in Review clarifies the evidence boundary at
-step 6: the authored resident-app outcome remains, while the Honeycomb trace
-ends at the notification-service call. It does not change the canonical
-six-beat service route. A corrected candidate must be compared
-again; the earlier preview or approval does not carry forward. The accepted
-spec and coverage ledger land together only after the human clicks Commit
-update. That Workbench action is separate from a Git commit and from company
-repository publication. Reopening the same folder restores accepted files and
-Workbench history; a new Claude session needs current setup and project context.
+The broad new-build Workbench capture
+agent-setup-detail-selector-next.png outlines the actual Story detail
+dropdown, which is the next control in the sequence. After the selected
+detail is shown, agent-setup-copy-next.png outlines Copy & paste with Story
+still selected; agent-setup-copy-engineering-next.png shows the same control
+with Engineering selected for HLD and trace. The shared focused
+agent-setup-copy-focused.png makes the conversation choice readable. These
+are actual local Workbench states with an orange screenshot annotation around
+the targeted control; no product UI code was changed for the annotation.
+
+## Review semantics and provenance
+
+The **First creation** captures came from actual Workbench new-agent setup and
+a disk-backed empty folder. Before proposing, the saved My story scaffold had
+zero nodes. A source-neutral display copy derived from the canonical
+fictional six-step spec was submitted with a first-candidate ledger through
+the real folder-agent helper. Proposed state showed 21 added and 2 modified;
+Current state showed the empty scaffold. The focused viewer shows step 1/6,
+and the ledger asks for source checking and human review. Its six-beat line
+ends at a notification-service alert sent; it does not claim app receipt was
+observed. After Commit update, the saved spec had six nodes and the ledger
+was present. The Workbench showed an Applied receipt with Undo change. This
+proves the local preview and acceptance UI. It does not claim Claude authored
+the fixture or that every Build source produces identical technical detail.
+
+The **Update existing** captures were made in one disk-backed Workbench
+folder. The canonical six-step fictional spec and a nonempty accepted coverage
+ledger were on disk before the update request. The folder was disconnected and
+reopened through Continue an existing agent build. The first request proposed
+a wording-only step-6 change and left that accepted ledger unchanged. Actual
+Proposed and Current screens show one modified item; the Current ledger
+explicitly records the authored HLD outcome and that the fictional happy
+trace stops before app receipt. The human used Discard update; the Workbench
+then displayed Not applied and left the accepted files intact. A second
+request proposed a corrected step 6 and changed ledger, naming the resident
+app alert as fictional design while limiting trace evidence to the
+notification-service call. Actual Current, Proposed, focused ledger, and
+Applied receipt screens all come from this same folder. The final saved spec
+and ledger were checked on disk after Commit update. The YOU/CLAUDE exchange
+is illustrative; the candidate files were seeded through the real local
+folder-agent helper to exercise the Workbench review UI.
+
+In both paths, Commit update accepts spec and ledger together in the local
+folder. It is neither a Git commit nor company repository publication. The
+actual receipts confirm Workbench acceptance; publication remains an
+unpictured handoff.
+
+## Reconnect evidence boundary
+
+The images reconnect-workbench-wide.png, reconnect-start.png,
+resume-folder.png, reconnect-instructions-header.png,
+reconnect-copy-button.png, and reconnect-agent-focused.png came from the real
+Workbench UI with a disk-backed local fictional doorbell fixture. They show
+disconnection, reopening the same folder, fresh instructions, and a ready
+Copy & paste Agent panel. The fixture provided a directory handle, so the OS
+folder picker itself was not captured. Those images do not depict an accepted
+edit. The same-folder Update Review sequence described above separately proves
+that an accepted spec and nonempty ledger can be reopened and then updated.
+Claude Code
+keeps its own conversation; Workbench restores the files and its own history,
+not an external Claude transcript. The reconnect dialogue is illustrative.
 
 ## Backstage associations and viewer semantics
 
-The fictional Recording service is explicitly bound as
-`component:default/recording-service` in the canonical spec. Therefore its
-Component page shows the approved diagram in its single Diagrams entity tab.
-API entities require explicit API bindings; text mentions do not count. The
-fixture contains one associated spec, so the tour shows the selected Diagram
-control but does not claim a multi-spec dropdown click. The actual plugin code
-supports choosing among multiple associated specs, with authored tabs inside
-the selected viewer. The seven captures show: entity page, inline native viewer with Home/Data flow
-authored tabs, expanded Where this service appears, section jump, matching recording-request step jump (step 3 of
-6), expanded same viewer, and return to the entity page. The image switches at
-every visible UI action. The installed Backstage renderer consumes approved
-JSON; the company fork's static Workbench and authorized loaders are integration
-responsibilities not verified by these local captures.
+The canonical fictional spec binds Recording service as
+component:default/recording-service. Its Component page therefore shows the
+associated diagram in the Diagrams entity tab. API entities require explicit
+bindings of their own; text mentions do not count. The local fixture has one
+associated spec. The tour shows the selected Diagram control but does not
+claim a multiple-spec selection, an Overview-to-Diagrams click, or a company
+catalog integration test. The native viewer has Home and Data flow tabs
+inside the selected diagram. Where this service appears reveals matching
+section and step links; the recording-request link lands at step 3 of 6.
+Expand canvas retains the step and caption; Back to entity restores the
+service page. The capture does not verify the company fork's GitHub loader,
+SSO, or authorization policy.
 
 ## Binding, code, time, and icon checks
 
-The explanatory tour itself has no service bindings or code references, per the
-user's stated exception. Its captions cite the separate canonical diagram's
-explicit binding. No time, battery, thermal, outage, or icon-state progression
-applies. Step edges reflect process transitions, not network hops. No playback,
-failed delivery, recorded cost, or live Claude transcript is asserted.
+The explanatory tour has no bindings or code references. Its captions point
+to the separate canonical spec's explicit binding. Step edges are process
+transitions, not network hops. No playback, failed delivery, recorded cost,
+live Claude transcript, battery state, or time progression is asserted.
 
 ## Verification and integration
 
-- `node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec.json` must report zero errors and warnings.
-- The portable HTML must be rebuilt after spec/CSS changes.
-- Browser QA must inspect all four Build paths, the Review correction and resume,
-  and every Backstage screenshot transition at 1280×800 and 1440×900 after image
-  decode. Check readable dialogue, no clipped controls or images, and no stale
-  screenshot relative to the caption.
-- The Review captures show the fictional doorbell's Current and Proposed step 6
-  and the changed ledger, matching the authored-versus-observed correction.
+- Validate the current spec with node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec.json; require zero errors and warnings.
+- Rebuild portable HTML after spec or CSS changes. This ledger edit alone does not alter embedded tour content.
+- Browser QA should inspect all three Build paths, alternate Reconnect entry, both Review paths, and every Backstage transition at 1280×800 and 1440×900 after image decode.
+- Check that dialogue is not presented as a recorded transcript and no screenshot is credited with an OS picker or company publication.

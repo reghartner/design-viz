@@ -121,7 +121,7 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
     });
     tracks.forEach(function(track){
       var active=track.pathIds.indexOf(selectedId)>=0,path=active?selected:pathById.get(track.pathIds[0]);
-      track.element.setAttribute('stroke',path.color);track.element.setAttribute('opacity',active?'.85':'.25');
+      track.element.setAttribute('stroke',path.color);track.element.setAttribute('opacity',active?'.85':'.45');
     });
   }
   return {sync:sync,destroy:function(){retired=true;}};

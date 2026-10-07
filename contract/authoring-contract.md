@@ -842,6 +842,20 @@ perspectives" of one timeline). Types:
   captures: base64 adds about one third to file size, and the existing 128 KiB
   Confluence snapshot limit applies to the entire spec. Hosted HTML has no such
   snapshot limit. Label mocked interfaces and provide actual capture provenance.
+- `chime` — a silent doorbell chime with an explicit playback indicator and message:
+  `{"id":"chime","type":"chime","title":"Hallway chime","initial":{"playback":"stopped"}}`.
+  Patch `playback` with `playing|stopped`; omission inherits the previous value
+  (default `stopped`). The panel always labels the state **Playing** or **Not playing**.
+  Optional `text` is plain text carried between steps; `null` restores the
+  state-specific default message and `""` hides it. Defaults are “Someone is at
+  the door.” while playing and “Waiting for the next ring.” while stopped.
+  `enterOnce` supports either field for the current step only. Alternate paths
+  fold independently from the starting state. The workbench panel picker and
+  **Starting state** / step inspector expose these fields, including Undo/Redo.
+  Sound bars briefly animate on forward steps and remain static on seeks,
+  reduced motion and print. This panel never plays audio or infers playback
+  from a doorbell node or another panel. See the
+  [doorbell chime example](../examples/doorbell-chime/doorbell-chime.spec.json).
 - `security` — security monitoring with independently authored sensor health,
   alarms and operator assessment. Declare `site` text and 1–12 `sensors`:
   `{"id":"monitor","type":"security","title":"Security monitoring",

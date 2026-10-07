@@ -14,11 +14,12 @@ process and system operation; it does not compare Standard and Explore.
 | Backstage | Publish through repository review; bindings make diagrams discoverable on entities. | One Component/API Diagrams tab, then the Diagram dropdown. |
 | Render | The selected spec renders with the plugin installed in Backstage. | Native viewer, section/step jumps, same-viewer expansion, and external edit handoff. |
 
-All six chapters open in **Standard**. The full-width auto-arranged graph keeps
-node labels readable. Scroll the page to its screenshot, changing state panel,
-and playback controls; panels are sized to show their full content. Use each
-**Next** arrow to continue; Render returns to Start. **PRESENT** removes the page
-header. On a fresh browser, dismiss the first-visit walkthrough with **Skip**.
+All six chapters open in **Standard**. At 1280×800 or larger, the diagram,
+screen capture, and step controls sit together on one screen. Start, Claude,
+Review, and Resume also show changing evidence beside the capture. Backstage and
+Render give the native plugin capture the full right column. Use each **Next**
+arrow to continue; Render returns to Start. On a fresh browser, dismiss the
+first-visit walkthrough with **Skip**.
 
 Backstage has **one Diagrams entity tab**, not a new entity tab for each spec.
 Multiple associated specs are chosen through its **Diagram dropdown**. Each explicitly bound service gets its diagram entry on its own Component page; explicit API bindings also associate API pages. **Where this service appears** offers section and path/step jumps. Mere text mentions do not create an association. The
@@ -41,7 +42,7 @@ spec and portable HTML. No image server or network connection is needed.
 - `backstage-discovery.png`, `backstage-service-jumps.png`, `backstage-inline.png`, `backstage-render.png`: freshly built actual React
   plugin in the repository's local preview shell, using fictional catalog data
   and its reference adapter. Discovery is a focused capture of the entity tab,
-  dropdown, selected title and actions. At the service-jump beat, the screenshot panel changes to the actual matching section/step controls. Render starts with the actual inline viewer, retains it through the inline-render beat, and switches to a capture from the same session at Expand canvas. Both captures share a square viewport; the service-jump capture includes owner/HLD context at the discovery capture’s aspect ratio. This is not a company Backstage deployment, company login, or
+  dropdown, selected title and actions. At the service-jump beat, the screenshot panel changes to the actual matching section/step controls. Render starts with the actual inline viewer, retains it through the inline-render beat, and switches to a capture from the same session at Expand canvas. Both captures share a square viewport; the service-jump capture includes owner/HLD context at the discovery capture’s aspect ratio. These two chapters reserve the full right column for the screenshots. This is not a company Backstage deployment, company login, or
   proof of the company GitHub loader. The fixture has one associated spec; the
   dropdown's multiple-spec behavior is verified in current plugin code.
 
@@ -56,16 +57,19 @@ only YOU/CLAUDE tags.
 ```sh
 python3 tools/build.py
 node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec.json
-python3 tools/inject.py examples/flowview-product-tour/flowview-product-tour.spec.json template/flowview.html examples/flowview-product-tour/flowview-product-tour.html
+python3 examples/flowview-product-tour/build.py
 ```
 
-Start, Claude and Review preserve their production-arranged coordinates. New
-Resume, Backstage and Render graphs were generated with
-`tools/auto-arrange-spec.cjs --section 3`, `--section 4`, and `--section 5`, each
-using distinct input/output files. Semantic topology precedes layout; do not
-hand-position replacement graphs. Manual panel sizing is intentional.
+The six graphs, content frames, panel sizes, and control positions were measured
+with `tools/arrange-spec.cjs --all --rearrange --width 1280` on a temporary copy
+without the single named-view wrapper, then applied to the existing Standard
+views. The saved tile proportions were refined after full-page visual checks.
+`build.py` embeds the spec plus [presentation.css](presentation.css) in the
+portable HTML; this local framing removes repeated page prose and tightens the
+grid without changing the shared renderer.
 
 Visual checks cover all six tabs and both Review endings at 1440×900 and
-1280×800. Standard pages scroll vertically. No panel content should require
-internal scrolling or truncate into ellipses. Automated captures must await
-visible image `decode()` and settled step transitions.
+1280×800. Every selected step caption and screenshot must remain in view, and
+no panel content should require internal scrolling or truncate into ellipses.
+Automated captures must await visible image `decode()` and settled step
+transitions. Smaller browser windows can scroll.

@@ -1,0 +1,42 @@
+/* Presentation-only framing for this portable tour. The diagram, panels, and
+   step controls share one screen at 1280×800 without changing the renderer. */
+body .doc-heading,
+body .doc-sub,
+body .generated-from,
+body .sec-eyebrow,
+body .sec-prose,
+body .dv-tour-discovery,
+body .dv-tour-replay {
+  display: none !important;
+}
+
+body .docview {
+  padding-top: 8px !important;
+}
+
+body .presentbtn {
+  position: fixed !important;
+  top: 10px !important;
+  right: 12px !important;
+  z-index: 9 !important;
+  float: none !important;
+}
+
+body .doc-sec {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin-top: 4px !important;
+  padding: 10px 14px !important;
+}
+
+body .section-layout-grid {
+  grid-auto-rows: 28px !important;
+  gap: 6px !important;
+  margin-top: 6px !important;
+}
+
+@media (max-width: 1350px) {
+  body .path-timeline {
+    zoom: .9;
+  }
+}

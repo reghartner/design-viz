@@ -14,6 +14,13 @@
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
       }
     ],
+    "Accepted": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Ack Topic": [
       {
         "file": "cumulus/cumulus-flow.html",
@@ -42,6 +49,13 @@
         "title": "Sentinel — Cellular Off-Grid Solar Camera"
       }
     ],
+    "Approved pair": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Archivist": [
       {
         "file": "gridseye-bastion/bastion.html",
@@ -68,6 +82,13 @@
         "file": "nestrel-warden/warden.html",
         "family": "nestrel-warden",
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
+      }
+    ],
+    "Back · Start": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Backoff": [
@@ -178,6 +199,13 @@
         "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
       }
     ],
+    "Claude Code": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Clip Sealer": [
       {
         "file": "doorbell-atlas/atlas.html",
@@ -253,6 +281,13 @@
         "title": "Cumulus Command & OTA Paths"
       }
     ],
+    "Diagram folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Dispatch": [
       {
         "file": "chime-radar/chime-radar.html",
@@ -305,6 +340,27 @@
         "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
       }
     ],
+    "Engineer": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Evidence": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Export": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Facewright": [
       {
         "file": "basecraft-keep/keep.html",
@@ -338,6 +394,13 @@
         "file": "wrenlight-perch/perch.html",
         "family": "wrenlight-perch",
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Flowview": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Forge": [
@@ -518,6 +581,41 @@
         "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
       }
     ],
+    "Next · Claude": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Iterate": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Review": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Share": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Views": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Nimbus API": [
       {
         "file": "chime-radar/chime-radar.html",
@@ -542,6 +640,13 @@
         "file": "doorbell-atlas/atlas.html",
         "family": "doorbell-atlas",
         "title": "Lookout Feature Atlas"
+      }
+    ],
+    "One spec": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Ops Console": [
@@ -640,6 +745,20 @@
         "file": "basecraft-keep/keep.html",
         "family": "basecraft-keep",
         "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Preview": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Proposal": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Pulse Events": [
@@ -817,6 +936,13 @@
         "title": "loomworks Trellis — Camera-as-Hub"
       }
     ],
+    "Same folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Scribe": [
       {
         "file": "nestrel-warden/warden.html",
@@ -902,6 +1028,13 @@
         ]
       }
     ],
+    "Shared folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Sift": [
       {
         "file": "chime-radar/chime-radar.html",
@@ -949,6 +1082,13 @@
         "file": "cumulus/cumulus-flow.html",
         "family": "cumulus",
         "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Standard": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Stitcher": [
@@ -1138,6 +1278,13 @@
         "file": "doorbell-atlas/atlas.html",
         "family": "doorbell-atlas",
         "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Workbench": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Wrangler": [

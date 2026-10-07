@@ -148,6 +148,25 @@
       ]
     },
     {
+      "file": "flowview-product-tour/flowview-product-tour.html",
+      "spec": "flowview-product-tour/flowview-product-tour.spec.json",
+      "title": "Flowview \u00b7 from story to shared system understanding",
+      "family": "flowview-product-tour",
+      "description": "Interactive product tour: business and engineering entry points, Claude Code authoring, review and approval, Standard and Explore, iteration, and sharing.",
+      "tags": [
+        "product-tour",
+        "agent-authoring",
+        "review",
+        "standard",
+        "explore"
+      ],
+      "widgets": [
+        "checks",
+        "log",
+        "tiles"
+      ]
+    },
+    {
       "file": "gridseye-bastion/bastion.html",
       "spec": "gridseye-bastion/bastion.spec.json",
       "title": "Bastion \u2014 PoE Camera Fleet & Stronghold NVR",

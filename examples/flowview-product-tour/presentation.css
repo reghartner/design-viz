@@ -35,36 +35,109 @@ body .section-layout-grid {
   margin-top: 6px !important;
 }
 
-body #section-start-layout {
-  /* At tall presentation sizes the two visual tiles are 50% taller. Shorter
-     screens retain the complete step controls without clipping the chapter. */
+body #section-build-layout,
+body #section-review-layout,
+body #section-backstage-layout {
+  /* All three chapters grow together on tall screens and compress on shorter
+     screens so the 33-row graph, evidence, and controls stay visible. */
   grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
   gap: 4px !important;
 }
 
-body #section-start .explore-navigation-actions {
+body #section-build .explore-navigation-actions,
+body #section-review .explore-navigation-actions,
+body #section-backstage .explore-navigation-actions {
   display: none !important;
 }
 
-body #section-start .path-timeline {
+body #section-build .path-timeline {
   zoom: .82;
 }
 
-body #section-start .appscreen-viewport:has([data-screen-id="detail"]) {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 550 / 207;
+body #section-build .pt-log .pbody {
+  box-sizing: border-box;
+  height: calc(100% - 20px);
+  min-height: 0;
+  overflow: hidden;
 }
 
-body #section-start .appscreens:has([data-screen-id="detail"]) {
+body #section-build .pt-log .plog {
+  height: 100%;
+}
+
+body #section-build .appscreens:has([data-screen-id="story-focus"]),
+body #section-build .appscreens:has([data-screen-id="engineering-focus"]) {
+  --appscreen-ratio: 2.226563 !important;
+}
+
+body #section-build .appscreens:has([data-screen-id="choice"]) {
+  --appscreen-ratio: 3.518519 !important;
+}
+
+body #section-review .appscreens:has([data-screen-id="committed"]) {
+  --appscreen-ratio: 2.105590 !important;
+}
+
+body #section-review .appscreens:has([data-screen-id="ledger"]) {
+  --appscreen-ratio: 2.696078 !important;
+}
+
+body #section-backstage .appscreens:has([data-screen-id="inline"]),
+body #section-backstage .appscreens:has([data-screen-id="where"]),
+body #section-backstage .appscreens:has([data-screen-id="step"]),
+body #section-backstage .appscreens:has([data-screen-id="expanded"]) {
+  --appscreen-ratio: 1.777778 !important;
+}
+
+/* Presentation callouts mark the next control before the following image
+   shows its result. The screenshots beneath them remain actual UI captures. */
+body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
+body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after,
+body #section-backstage .appscreen-image:has(img[data-screen-id="entity"])::after,
+body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after,
+body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  border: 3px solid #F59E0B;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px #F59E0B33;
+  box-sizing: border-box;
+}
+
+body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
+body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after {
+  left: 4%; top: 19%; width: 92%; height: 17%;
+}
+
+body #section-backstage .appscreen-image:has(img[data-screen-id="entity"])::after {
+  left: 15%; top: 94.5%; width: 11%; height: 5%;
+}
+
+body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after {
+  left: .3%; top: 29.5%; width: 48.5%; height: 11%;
+}
+
+body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
+  left: 1.5%; top: 2%; width: 17.5%; height: 10%;
+}
+
+body #section-build .appscreen-viewport:has([data-screen-id="choice"]) {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 570 / 162;
+}
+
+body #section-build .appscreens:has([data-screen-id="choice"]) {
   justify-content: flex-start;
 }
 
-body #section-start .appscreens:has([data-screen-id="detail"]) .appscreen-stage {
+body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage {
   flex: none;
   width: 100%;
   height: auto;
-  aspect-ratio: 550 / 207;
+  aspect-ratio: 570 / 162;
   margin-top: clamp(55px, 9vh, 110px);
 }
 

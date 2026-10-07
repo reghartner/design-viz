@@ -2,136 +2,184 @@
 
 ## Operator decisions and source scope
 
-No questions needed: the approved storyboard defines a mixed PM/engineer audience, an explanatory process sequence, and six tabs: Start → Claude → Review → Resume → Backstage → Render. The presenter demonstrates a real diagram and Standard/Explore separately. This tour explains how the system works. No Backstage bindings or code references are required inside this explanatory diagram (explicit user override). No clock, elapsed-duration, adoption, cost or quality claims are made.
+No questions were needed for this revision. The user specified the story, audience,
+and interaction: three purposeful chapters, actual setup and Backstage UI beats,
+source-specific Claude dialogue, and one fictional doorbell throughline. The
+presenter demonstrates an unrelated real diagram and Standard/Explore separately.
+No Backstage links or code references are required inside this explanatory tour.
+There is no time, latency, cost, adoption, or production outcome claim.
 
-Evidence: `docs/folder-agent-session.md`, `apps/backstage/README.md`, `apps/backstage/src/FlowviewEntityDiagrams.tsx`, `apps/backstage/src/plugin.tsx`, `apps/backstage/src/InlineFlowview.tsx`, `docs/diagrams/platform/README.md` and the platform spec. Current code verifies a single Diagrams entity tab on Component/API, a Diagram dropdown for multiple associated specs, and one selected inline viewer. Spec-authored tabs remain inside that selected viewer. They are not separate Backstage entity tabs.
+The source of truth for the example's six beats is
+`examples/canon/specs/doorbell.json`; the example's observed spans come from
+`examples/canon/traces/happy.json`. Product behavior is checked against
+`docs/folder-agent-session.md`, `apps/backstage/README.md`,
+`apps/backstage/src/FlowviewEntityDiagrams.tsx`,
+`apps/backstage/src/InlineFlowview.tsx`, and the built Workbench. Actual local
+screenshots show UI states, while YOU/CLAUDE messages and the human correction
+are labeled illustrative. The local Backstage shell uses a fictional catalog and
+reference adapter. It does not verify the company GitHub loader, SSO, or access
+policy.
 
-## A. Story
+## Story and audience
 
-A PM starts with an outcome and exceptions; an engineer can bring an existing flow, HLD, or trace evidence. Start offers these as four alternate paths, not four sequential steps. Its first image shows the Workbench setup dialog in context with Copy & paste highlighted; the next step shows that choice close up. Flowview prepares a shared diagram folder. Claude works in its external conversation and proposes the story and coverage ledger together. A human previews or requests corrections. Reopening the same folder restores the accepted project for another iteration. Repository review publishes approved diagrams. Backstage associates explicit service/API bindings with entity pages, selects one diagram from a dropdown, and renders its JSON with the plugin already installed in the Backstage app.
+A PM or engineer opens the real Workbench setup, chooses a detail level and
+external Claude conversation, then selects a diagram folder. The viewer chooses
+one of four source paths in this **tour**, not in Workbench. Each path shows the
+questions and answers Claude needs to produce a grounded six-beat fictional
+doorbell draft. A person compares the proposed diagram and ledger, requests a
+specific correction, reviews the revised pair, and accepts it. Later, the same
+folder is reopened for another change. After a separate repository publication,
+the approved diagram appears on the Recording service Component page in
+Backstage. The presenter follows the actual plugin UI from entity tab to
+matching section, matching step, expanded canvas, and back to entity.
 
-Most important moment: proposal versus human acceptance, shown by the real preview screenshot and authored checks. Required additional evidence: folder resume, entity Diagrams entry, diagram selection and inline controls. Never imply setup publishes, Workbench approval is a Git commit, a new conversation has old chat memory, a screenshot proves company GitHub integration, or each diagram becomes a separate Backstage tab.
+Takeaway: source material can differ, but the agent's proposal, human decision,
+folder continuity, and Backstage service association remain explicit.
 
-## B. Panel plan
+## Panel plan
 
-| Tab | Image question / best moment | Companion question / best moment | Must never imply |
+| Chapter | Panel | Question answered | Best beat | Evidence mode |
+|---|---|---|---|---|
+| Build with Claude | `setup-screen` | What does the person actually click? | broad dialog → readable Story/Engineering selector → Copy & paste detail → empty-folder chooser | Actual Workbench captures; orange click outline on the broad view |
+| Build with Claude | `agent` | What would a useful Claude exchange contain for this source? | source-specific question, clarification, six-beat draft | Explicitly illustrative YOU/CLAUDE messages; never a real transcript |
+| Review and continue | `review-screen` | How does a correction become an accepted pair and a later continuation? | illustrative correction → actual Preview Agent Updates and focused ledger → applied receipt → actual resume choice → illustrative continuation | Actual Workbench captures and clearly labeled dialogue illustrations |
+| Find and use in Backstage | `backstage-screen` | What changes after each action in the service page? | seven distinct screenshot states | Actual current plugin in local fictional fixture |
+
+Every panel has one job; there is no generic explanation-only table. The graph
+explains the process and the adjacent panel shows the matching UI or conversation.
+All three chapters use a 33-row Standard layout: graph `h18` and step controls
+`h15` on the left; changing visual evidence on the right. Build's right column
+splits `h19/h14`. Review and Backstage use the full `h33` right column.
+Focused landscape captures follow the broad UI views so key controls and
+evidence remain legible at 1280×800.
+
+## Starting materials and canonical route
+
+The four Build paths share the Workbench setup and final proposal. The path
+labels are Story, Existing flow, HLD, and Honeycomb trace. Story detail is the
+demonstrated setup value; Mixed and Engineering are genuine detail choices, not
+separate source buttons. Each path asks a source-specific clarifying question,
+records the user's boundary, then drafts the canonical six beats:
+
+1. Quiet porch.
+2. Doorbell camera button event reaches porch hub.
+3. Porch hub requests a recording from recording service.
+4. Recording service persists clip metadata.
+5. Recording service queues a resident notification.
+6. Notification service sends the alert to the resident app.
+
+The Story route leaves backend identities to engineer enrichment in the same
+folder. The Existing flow route names supplied operations. The HLD route marks
+an authored proposed design. The trace route identifies five observed spans:
+`porch-hub POST /button`, `recording-service POST /recordings`, `clip-store
+INSERT clip`, `notification-queue publish doorbell`, and
+`notification-service POST /notifications`, including the queue-to-notification
+span link. The trace alone does not prove the physical button press or app
+receipt. No path claims clip playback or a failure outcome. No source is silently
+converted into production proof.
+
+## Paths and handoffs
+
+Build has four native alternate paths with a shared opening beat, a path-specific actual focus-selector beat, three shared setup beats, three
+source-specific dialogue beats, and two shared proposal/handoff beats. Review is
+one deliberate correction, fresh preview, human approval, and same-folder resume
+sequence. Backstage is one UI walk; each visible action switches its screenshot, including
+the native inline viewer before the matching destinations.
+The three chapters default to Standard. Build hands off to Review; Review hands
+off to Backstage. The Backstage chapter ends on the entity page.
+
+## Step × panel worksheet
+
+`P` means an explicit panel patch. `H` means the prior state deliberately holds.
+`D` means the Build dialogue appends new illustrative messages. Every step below
+has a disposition for each panel present in its chapter. The graph focus names
+the action, while the step caption states the source/evidence boundary.
+
+| Step | Screenshot | Conversation or decision | Why a hold is valid |
 |---|---|---|---|
-| Start | Where is the conversation choice in the whole Workbench dialog, then what does it say? / highlighted context → close detail | Which material am I bringing? / four native alternate paths | Guaranteed generation quality |
-| Claude | Where is the project stored? / choose folder | What happens in external Claude? / question and reply | Live transcript, FILE events |
-| Review | Where do I compare and accept? / preview | Has the reviewer completed each gate? / approved or feedback | Automated certification |
-| Resume | How do I reopen the existing project? / Continue existing | What persists versus reconnects? / restored pair | Automatic recovery of Claude chat |
-| Backstage | Where is Diagrams and the selector, then the service jump? / entity page and matching steps | Step caption names the publish and association boundary | Company authentication proven by fixture |
-| Render | How do inline and expanded viewer controls behave? / selected diagram | Step caption names the runtime/content boundary | JSON delivering executable renderer code |
+| `build-open` | P: `context` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-story-focus` | P: `story-focus` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-flow-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-hld-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-trace-focus` | P: `engineering-focus` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-connection` | P: `choice` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-folder` | P: `folder` | H: prior exchange/decision | Actual UI changes at this beat |
+| `build-paste` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-story-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-story-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-story-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-flow-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-flow-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-flow-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-hld-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-hld-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-hld-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-trace-source` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-trace-answer` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-trace-draft` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-propose` | H: same UI until next action | D: append YOU/CLAUDE turn | Dialogue changes with this beat |
+| `build-next` | H: same UI until next action | H: prior exchange/decision | The visible UI/decision remains valid |
+| `review-current` | P: `current` | — | Actual UI changes at this beat |
+| `review-correct` | P: illustrative `correction-dialogue` | — | Dialogue makes the correction visible before a new proposal |
+| `review-new-proposal` | P: `summary` | — | Actual UI changes at this beat |
+| `review-compare-current` | P: `current` | — | Actual UI changes at this beat |
+| `review-compare-proposed` | P: `proposed` | — | Actual UI changes at this beat |
+| `review-ledger` | P: focused `ledger` | — | Actual UI changes at this beat |
+| `review-approve` | P: applied `committed` receipt | — | Actual UI confirms acceptance |
+| `review-resume` | P: `resume` | — | Actual UI changes at this beat |
+| `review-reconnect` | P: illustrative `reconnect-dialogue` | — | Dialogue shows a new session reading the accepted pair |
+| `review-next` | P: `resume` | — | Actual same-folder UI returns for the handoff |
+| `backstage-entity` | P: `entity` | — | Actual UI changes at this beat |
+| `backstage-inline` | P: `inline` | — | Actual UI changes at this beat |
+| `backstage-where` | P: `where` | — | Actual UI changes at this beat |
+| `backstage-section` | P: `section` | — | Actual UI changes at this beat |
+| `backstage-step` | P: `step` | — | Actual UI changes at this beat |
+| `backstage-expand` | P: `expanded` | — | Actual UI changes at this beat |
+| `backstage-return` | P: `return` | — | Actual UI changes at this beat |
 
-All image panels are reported UI evidence. Start uses native alternate paths and gives the changing setup capture the full right column. Claude, Review, and Resume retain authored companion states, not live telemetry. Backstage and Render use the full right column for the changing plugin capture; their step captions carry the explanatory facts. Standard/Explore comparison panels and generic sharing panels are removed because the presenter covers viewing modes separately.
+## Review semantics
 
-## C. Paths
+The illustrative correction in Review clarifies the evidence boundary at
+step 6: the authored resident-app outcome remains, while the Honeycomb trace
+ends at the notification-service call. It does not change the canonical
+six-beat service route. A corrected candidate must be compared
+again; the earlier preview or approval does not carry forward. The accepted
+spec and coverage ledger land together only after the human clicks Commit
+update. That Workbench action is separate from a Git commit and from company
+repository publication. Reopening the same folder restores accepted files and
+Workbench history; a new Claude session needs current setup and project context.
 
-Start: Business story, Existing flow, HLD design, and Honeycomb trace share the full setup screen and its close detail. Each path then has one material-specific beat; all four rejoin at spec/ledger drafting, preview, and the Claude handoff. Review: Approve shares request/pair/preview and ends at accepted pair. Needs work shares that prefix, branches through feedback/revised pair/fresh preview, then rejoins human acceptance. Other tabs have one process path. Last Render step hands off back to Start. No automatic publication is part of the local approval path.
+## Backstage associations and viewer semantics
 
-## D. Time
+The fictional Recording service is explicitly bound as
+`component:default/recording-service` in the canonical spec. Therefore its
+Component page shows the approved diagram in its single Diagrams entity tab.
+API entities require explicit API bindings; text mentions do not count. The
+fixture contains one associated spec, so the tour shows the selected Diagram
+control but does not claim a multi-spec dropdown click. The actual plugin code
+supports choosing among multiple associated specs, with authored tabs inside
+the selected viewer. The seven captures show: entity page, inline native viewer with Home/Data flow
+authored tabs, expanded Where this service appears, section jump, matching recording-request step jump (step 3 of
+6), expanded same viewer, and return to the entity page. The image switches at
+every visible UI action. The installed Backstage renderer consumes approved
+JSON; the company fork's static Workbench and authorized loaders are integration
+responsibilities not verified by these local captures.
 
-No temporal measurements apply. All steps are ordered process beats; no wall clock, battery, dates or rates are authored.
+## Binding, code, time, and icon checks
 
-## E–F. Step × panel worksheet and coverage
+The explanatory tour itself has no service bindings or code references, per the
+user's stated exception. Its captions cite the separate canonical diagram's
+explicit binding. No time, battery, thermal, outage, or icon-state progression
+applies. Step edges reflect process transitions, not network hops. No playback,
+failed delivery, recorded cost, or live Claude transcript is asserted.
 
-Start switches from the highlighted full setup capture to the close detail at start-setup; the four material-specific paths hold that detail. Render uses matched inline and expanded screenshots and switches only at render-expand. Backstage uses an App screens panel with no device frame: discovery holds until backstage-jump, which selects the real service jump screenshot; the final beat holds it. Start, Backstage, and Render use step captions (C) in place of companion tables. Other companion cells are patches (P) or deliberate holds (H). Node/edge focus follows the named process hop; loops use explicit distinct correction beats.
+## Verification and integration
 
-| Step | Image | Companion |
-|---|---|---|
-| start-open | P: highlighted full Workbench setup dialog | C: common entry; select Copy & paste in context |
-| start-setup | P: close conversation-choice screenshot | C: shared setup; Claude Code remains external |
-| start-story | H: close detail remains | C: Business story path; people, goal, steps, exceptions |
-| start-flow | H: close detail remains | C: Existing flow path; current sequence, services, exceptions |
-| start-hld | H: close detail remains | C: HLD design path; decisions and open questions |
-| start-trace | H: close detail remains | C: Honeycomb trace path; observed events and inference |
-| start-artifacts | H: close detail remains | C: shared spec and coverage ledger draft |
-| start-preview | H: close detail remains | C: shared visual inspection before acceptance |
-| start-next | H: close detail remains | C: handoff to Claude chapter |
-| create-choose | H: current genuine UI reference | H: accepted state / conversation remains valid |
-| create-folder | H: current genuine UI reference | H: accepted state / conversation remains valid |
-| create-paste | H: current genuine UI reference | P: agent; Paste the setup instructions into Claude Code. Claude verifies the exact folder, reads the packaged guidance, and works with normal file permissions. |
-| create-draft | H: current genuine UI reference | P: agent; Claude turns the story into steps, nodes and edges, while recording assumptions and open questions in the ledger. This panel is illustrative, not a live transcript. |
-| create-next | H: current genuine UI reference | P: agent; Click Next · Review to see the proposed change and the human approval gate. |
-| review-request | H: current genuine UI reference | P: gate; A request captures the message, selected items, view, path, step, and detail level. Copy alone does not silently send it to Claude. |
-| review-pair | H: current genuine UI reference | P: gate; Claude edits the seeded candidate spec and ledger. The accepted files remain untouched until a person approves the proposal. |
-| review-preview | H: current genuine UI reference | P: gate; Preview Agent Updates renders the proposal. Compare Current and Proposed, inspect change highlights, and expand the coverage ledger when needed. |
-| review-approve | H: current genuine UI reference | P: gate; Choose Commit update only after review. Flowview saves the spec and ledger together; one Undo can restore the prior pair. |
-| review-feedback | H: current genuine UI reference | P: gate; If the proposal is wrong or conflicts with a newer edit, discard or copy feedback. Claude reconciles the current pair and submits a new proposal. |
-| review-revise | H: current genuine UI reference | P: gate; Claude uses the feedback and latest accepted revision to prepare corrected candidates. The new proposal still needs a fresh human review. |
-| review-preview-again | H: current genuine UI reference | P: gate; Review the corrected Current and Proposed states. An earlier approval cannot be reused after a change. |
-| review-next | H: current genuine UI reference | H: accepted state / conversation remains valid |
-| resume-folder | H: current genuine UI reference | P: continuity; Choose Continue an existing agent build, then select the SAME diagram folder used before. |
-| resume-load | H: current genuine UI reference | P: continuity; Flowview restores the saved spec, coverage ledger and workbench history. An open draft is kept in Earlier drafts; old pending work is not replayed. |
-| resume-connect | H: current genuine UI reference | P: continuity; Reconnect using Copy & paste. Continue the earlier Claude conversation when available; in a new session, provide the current setup and project context. |
-| resume-request | H: current genuine UI reference | P: continuity; Describe the next change. Claude reads the current project, prepares candidates, and submits another proposal for human review. |
-| resume-next | H: current genuine UI reference | H: accepted state / conversation remains valid |
-| backstage-publish | H: current genuine UI reference | C: step caption; After local acceptance, publish the spec and ledger through the company repository review process. Workbench Commit update does not make a Git commit. |
-| backstage-read | H: current genuine UI reference | C: step caption; The company Backstage integration reads the approved snapshot from GitHub. The company fork hosts the static Workbench; it does not host a diagram API. |
-| backstage-bind | H: current genuine UI reference | C: step caption; Explicit service and API bindings associate a diagram with full catalog entity identities. The association index includes matching sections, paths and steps. |
-| backstage-service | H: current genuine UI reference | C: step caption; Each explicitly bound service in the published diagram gets that diagram in the Diagrams entry on its OWN Component page. Explicit API bindings also associate it with that API entity page; a text mention alone does not. |
-| backstage-tab | H: current genuine UI reference | C: step caption; Open that entity’s Diagrams tab. Its Diagram dropdown lists the published diagrams that entity participates in. Multiple matching nodes or sections collapse to one entry per diagram. |
-| backstage-jump | P: switch to actual service jump controls | C: step caption; Open Where this service appears, then choose a section or a matching path/step button. The jump opens that exact point inside the selected diagram. |
-| backstage-next | H: current genuine UI reference | C: final handoff caption |
-| render-select | P: actual selected inline viewer capture | C: step caption; The Diagram dropdown chooses one associated spec. Switching diagrams selects another viewer instance; authored tabs inside a spec remain navigation within that selected diagram. |
-| render-check | H: current genuine UI reference | C: step caption; The renderer already ships in the Backstage app. Compatibility checks compare the loaded spec requirements with that installed release; unsupported contract majors stop rendering. |
-| render-inline | P: actual selected inline viewer capture | C: step caption; The native viewer renders inline: authored sections and tabs, panels, steps, alternate paths and saved evidence links. Diagram JSON provides content, not executable renderer code. |
-| render-jump | H: current genuine UI reference | C: step caption; Where this service appears offers section and path/step buttons. Each button jumps within the same selected viewer. |
-| render-expand | P: same-session expanded viewer capture | C: step caption; Expand canvas moves the SAME live viewer into a full-window modal. Back to entity or Escape returns it without another spec read or viewer mount. |
-| render-edit | H: current genuine UI reference | C: step caption; Edit in Workbench and Build with Claude open the external editor at this diagram and reading position. Build prepares a local draft and setup; folder permission and publication remain explicit. |
-| render-next | H: current genuine UI reference | C: final handoff caption |
-
-## G. Icons
-
-Static role icons only. Focus follows the active beat; no physical or device state icon changes are claimed.
-
-## H. Binding and code coverage
-
-This explanatory tour deliberately has no `binding` or `codeRefs`, per user instruction. Product implementation sources above establish accuracy. Company GitHub loaders, SSO, access policy and deployment are integration responsibilities and are not verified by the local screenshot fixture. Drift detection, trace processing details and feature-release pipelines are out of this tour's scope.
-
-## I. Checkable expectations
-
-Six Standard defaults, six working local-section handoffs, four selectable Start paths with no sequential “or” step, Review corrections requiring fresh preview, no FILE log rows, no view comparison tab, actual Resume setup image, explicit Component/API entity-tab scope, Diagram dropdown distinction, native rendering and same-viewer expansion. The current Auto Arrange pass measured all six graphs, panels, and control positions before presentation refinement. At 1440×900 and 1280×800 the active diagram, screenshot, step controls, and declared companion panel must fit on one screen without an internal clipped viewport. Images must decode before visual capture. Spec validator must report zero errors and warnings.
-
-
-## Amendments and verification
-
-- Additional user requirement: each **explicitly bound service** in a published diagram exposes that diagram through its own Component page; explicit API bindings do the same on API pages. Added a service-page node/beat and the Where this service appears jump node/beat. Mere text mentions do not associate. All sections/tabs are indexed; multiple matching nodes/sections collapse to one entry. Sources: apps/backstage/README.md association rules and FlowviewEntityDiagrams.tsx.
-- New Resume/Backstage/Render topology was run through the production Auto Arrange CLI on sections 3, 4, 5. Backstage was arranged again after adding the service/jump topology. The first three diagrams retain prior arranged coordinates.
-- Earlier fixed-width tiles ellipsized explanatory text. Start now gives its full setup context and close detail the right column and uses four native paths for the starting materials. Resume uses a wrapping state table; Claude keeps its illustrative log and Review keeps its checks. Backstage and Render give the real plugin screenshots the full right column. The graph, image, and controls are all in the opening viewport.
-- Captures: actual Workbench setup/Resume; production review with seeded checkout example; actual current React Backstage plugin in its local fixture shell with fictional data and reference adapter. No company login or company GitHub loader is proved. The new discovery capture shows the single Diagrams tab, associated-spec selector and selected title/actions. The additional actual service-jump capture shows matching section and step links. The expanded capture is the same live native viewer after clicking Expand canvas.
-- Spec walk: no WARN findings. CHECK findings for unchanged static image panels are intentional: each is a persistent UI reference for the corresponding live process. The Backstage screenshot changes at the service-jump beat. No battery, time, icon or source-reference checks apply.
-- Browser review: six tabs and Review's two terminal paths at 1440×900 and 1280×800, images decoded and transitions settled. Measured all displayed panels for internal overflow; measured all graph node bounds against their clipping ancestors. Evidence and metrics are in /tmp/flowview-system-tour-qa; the temporary path is reviewer evidence, not a runtime dependency.
-
-Current layout pass: `arrange-spec.cjs --all --rearrange --width 1280` succeeded
-on a temporary copy without the single named-view wrapper. Its graph positions,
-content frames, panel measurements, and control suggestions were applied to the
-six existing Standard views, then the saved tiles were refined against actual
-browser screenshots. All six opening states fit 1280×800 and 1440×900. All
-four Start paths, six beats each, were inspected at both sizes with no
-image-load, caption, or timeline overflow. The latest capture shows the actual
-Workbench dialog and highlights the clicked Copy & paste option; the following
-step switches to a close detail without changing its underlying UI claim.
-The Start diagram and adjacent screen panel now use 18 and 33 grid rows,
-respectively, a 50% increase from their former 12 and 22. Row height responds
-to viewport height so the controls still fit at 1280×800 and 1440×900; the
-full increase is visible at 1800×1200. The detail image keeps its own aspect
-ratio and aligns with the top of the contextual image at all three sizes.
-Claude, Review, and Resume companion panels remain visible; Start, Backstage,
-and Render screenshot panels fill their right columns.
-
-
-### Screenshot-state correction
-
-The service-jump screenshot was recaptured as a 716×450 real viewport region,
-including canonical owner/HLD context and every matching step button. It now
-matches the discovery screen ratio without gray letterboxing or cropped text.
-Render now starts with a genuine selected inline viewer capture (including its
-title, native graph and playback), holds it through render-inline/render-jump,
-and selects a same-session expanded capture only at render-expand. Both source
-captures are 900×900. The screenshot panel height accommodates the larger
-square image and complete provenance caption. No renderer or topology changed.
-
-Focused visual evidence: /tmp/flowview-screen-transition-qa, at 1440×900 and
-1280×800. Assertions compare displayed image identity at initial/inline/expanded
-beats and confirm its viewport matches the source aspect ratio (no letterbox).
+- `node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec.json` must report zero errors and warnings.
+- The portable HTML must be rebuilt after spec/CSS changes.
+- Browser QA must inspect all four Build paths, the Review correction and resume,
+  and every Backstage screenshot transition at 1280×800 and 1440×900 after image
+  decode. Check readable dialogue, no clipped controls or images, and no stale
+  screenshot relative to the caption.
+- The Review captures show the fictional doorbell's Current and Proposed step 6
+  and the changed ledger, matching the authored-versus-observed correction.

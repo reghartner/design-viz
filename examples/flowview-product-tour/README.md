@@ -31,7 +31,9 @@ transcripts. Setup pastes appear as `[Pasted Flowview Setup Instructions]`.
 In the Update existing Review path, the first wording proposal is discarded
 before Claude submits a second proposal that clarifies the trace evidence
 boundary. The accepted spec and ledger remain unchanged between those two
-requests.
+requests. The first candidate changes only resident-facing step wording; its
+coverage ledger is unchanged. The second candidate changes the step wording
+and ledger to state the authored outcome and trace limit together.
 
 The fictional reference is
 [`examples/canon/specs/doorbell.json`](../canon/specs/doorbell.json):

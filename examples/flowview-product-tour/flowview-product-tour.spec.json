@@ -181,7 +181,7 @@
                   "steps": [
                     {
                       "id": "build-open",
-                      "text": "Open Build with my agent. In the actual Workbench setup, choose the diagram detail that matches the audience: Story, Mixed, or Engineering. This tour follows Story first.",
+                      "text": "Open Build with my agent. In the actual Workbench setup, choose the diagram detail that matches the audience: Story, Mixed, or Engineering. The source-path examples below are separate from this audience setting.",
                       "nodes": [
                         "workbench"
                       ],
@@ -882,7 +882,7 @@
                     },
                     {
                       "id": "update-read",
-                      "text": "Claude reads the saved pair before changing it, including existing steps and evidence decisions. The source can be an existing flow even when the audience is business-led.",
+                      "text": "Claude inventories the accepted spec and ledger before editing. The person names the audience and intended direction here; the formal change request is copied in the next step.",
                       "nodes": [
                         "claude"
                       ],
@@ -895,7 +895,7 @@
                             },
                             {
                               "tag": "YOU",
-                              "text": "Use Story detail for product leadership. Keep the six steps and the engineering Data flow, but make the resident-facing wording clearer."
+                              "text": "The audience is product leadership. I want the resident-facing story clearer; first confirm the existing six steps, engineering Data flow, and ledger that the formal request must preserve."
                             }
                           ]
                         }
@@ -903,7 +903,7 @@
                     },
                     {
                       "id": "update-request",
-                      "text": "In Agent → Copy & paste, use Copy request for this change and paste the registered request into Claude Code. Copying prepares candidate files; it does not send a request by itself.",
+                      "text": "In Agent → Copy & paste, use Copy request and paste the registered instruction into Claude Code. This is the formal change request; copying it alone does not send it.",
                       "nodes": [
                         "you"
                       ],
@@ -912,11 +912,11 @@
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Please make the resident journey clearer for business readers while retaining the six-step engineering flow and evidence ledger."
+                              "text": "Formal request: rewrite only the resident-facing step wording for product leaders. Preserve all six step IDs, the engineering Data flow, and the coverage ledger without source or evidence edits."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I will inspect the seeded candidate files and the accepted regions this change depends on before editing either artifact."
+                              "text": "I will compare the seeded candidate with the accepted files, then change only the requested step wording. The coverage ledger will remain unchanged in this first proposal."
                             }
                           ]
                         },
@@ -948,18 +948,18 @@
                     },
                     {
                       "id": "update-propose",
-                      "text": "Claude revises the seeded candidate spec and ledger for this business-facing update and submits them for human preview. The accepted folder pair stays unchanged until approval.",
+                      "text": "Claude changes only resident-facing step wording in the first candidate spec and leaves the coverage ledger unchanged. Workbench presents that wording-only proposal for human preview; the accepted folder pair stays unchanged until approval.",
                       "edge": "claude->proposal",
                       "panels": {
                         "update-agent": {
                           "log": [
                             {
                               "tag": "CLAUDE",
-                              "text": "The candidate makes the resident story clearer while retaining the existing Data flow and six step IDs. The ledger records the requested audience and source coverage."
+                              "text": "The first candidate makes the resident story clearer while retaining the existing Data flow and six step IDs. I left the coverage ledger unchanged."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I validated the candidate spec and submitted the spec and ledger together. Please inspect the proposal in Flowview before accepting it."
+                              "text": "I validated the wording-only candidate and submitted it for Flowview preview. Please inspect step 6 and the unchanged ledger before deciding."
                             }
                           ]
                         }
@@ -1496,7 +1496,7 @@
                     },
                     {
                       "id": "review-ledger",
-                      "text": "Expand the changed Coverage ledger. It repeats the authored outcome and trace limit and flags the revised business wording for human review. Compare it with the spec before accepting both files.",
+                      "text": "Inspect the focused changed Coverage ledger. It repeats the authored outcome and trace limit and flags the revised business wording for human review. Compare it with the spec before accepting both files.",
                       "nodes": [
                         "revised"
                       ],

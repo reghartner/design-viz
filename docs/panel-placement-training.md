@@ -146,3 +146,74 @@ family, graph role, width and panel count. Preserve Both/Neither as acceptance
 labels. Propose a scoring change from the review data, evaluate it on the sealed
 12 scenarios, then create a fresh round with a new identity. Do not report a
 preference improvement, winner or learned score before human evidence exists.
+
+## Focused round two: sizing and step controls
+
+Round two consumes the frozen round-one manifest, exact candidate specs/images,
+and the submitted human feedback file. The initial feedback contains 12 choices
+(five A/B preferences and seven Neither choices). The resulting size priors are
+**provisional heuristics informed by those choices and notes**, not statistically
+learned preferences. Round one and its 12 held-out cases remain unchanged.
+
+```sh
+node tools/panel-placement/generate-round-two.mjs \
+  --round-one .local/panel-placement/round-1 \
+  --feedback .local/panel-placement/round-1/human-submissions/submission-cfe6ea80-7f5d-4542-96d5-1ff853376864.json \
+  --output .local/panel-placement/round-2 --seed round-2
+python3 tools/arrange-training/serve.py \
+  --dataset .local/panel-placement/round-2/review \
+  --submissions .local/panel-placement/round-2/human-submissions \
+  --port 8772
+node --test tests/panel-placement-round-two.test.js tests/panel-placement.test.js
+```
+
+The new loader verifies the submission's manifest identity and candidate hashes,
+then checks both original PNGs/specs and full semantic equality before using any
+case. The new provenance includes the source manifest and real submission hashes
+and the source candidate identity for each pair. It never writes to the source
+round or creates new feedback. Tests use isolated synthetic protocol fixtures.
+
+| Experiment | Cases | Held fixed within each A/B pair |
+| --- | --- | --- |
+| Panel sizing (six) | residential-3, overview-3, capacity-3, video-2, health-2, experience-2 | Control placement policy, all content and node positions |
+| Step controls (six) | warehouse-1, hardware-2, ingestion-3, security-1, api-1, distributed-1 | Panel widths/heights, all content and node positions |
+
+Compact state indicators start small. Actual row counts, verbose content and
+measured native overflow override those priors. A two-dimensional packer fills
+available gaps. The small video screen shares a row with the other compact video
+panels. Narrow graphs use their **actual frozen node bounds**, rather than the
+minimum-width SVG canvas, to identify a column suited to stacked neighboring
+panels. Controls are a first-class band above or below the primary group, ahead
+of secondary reports. Control attachments and hidden state stay unchanged.
+
+### Honest viewport and readability measurements
+
+Captures still use a **1000px full-page browser viewport**, including document
+headings. The native Fit/Zoom controls and board scrolling frame frozen nodes
+without rewriting node positions, edges or saved content. This is a deterministic
+capture-time camera policy, **not authored camera state** in the exported specs.
+The report records each candidate's camera width, scroll offsets, scale, node
+rectangles and measured label size so that distinction stays explicit.
+
+The capture gate requires every node to be contained, graph labels at least 8px,
+real panels without unresolved outer overflow, and fully unclipped controls that
+can be reached after scrolling. Labels of 10px or larger are preferred; smaller
+native graph or panel secondary text is disclosed in readability notes. Frozen
+800px host profiles can still produce small native secondary labels. Use the
+full-size preview to inspect them; no font or panel CSS is stretched for capture.
+
+Initial viewport visibility is a separate objective from structural validity.
+Above-group controls must be in the initial viewport. The **warehouse under-group
+alternative** is a measured exception: its readable 12-node diagram plus the
+native document heading cannot fit with controls below the complete group within
+1000px. Its actual control position and `inInitialViewport: false` are retained,
+and the review page discloses the scrolling tradeoff. The alternative above-group
+placement remains initially visible. This exception does not shrink labels or
+change the meaning of the viewport budget.
+
+`capture-report.json` records packing waste, unused panel height, control position,
+clipping/overflow, readability notes and a diagnostic penalty. The penalty is not
+a fitted model or a human preference probability. `viewport/*.png` shows the
+actual first 1000px, with hashes in the report; these QA images are outside the
+served review root. Full comparison PNG/spec hashes remain in the manifest.
+The review page names the experiment axis while keeping candidate methods hidden.

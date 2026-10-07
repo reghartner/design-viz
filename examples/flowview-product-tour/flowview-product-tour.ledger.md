@@ -112,6 +112,11 @@ four Start paths, six beats each, were inspected at both sizes with no
 image-load, caption, or timeline overflow. The latest capture shows the actual
 Workbench dialog and highlights the clicked Copy & paste option; the following
 step switches to a close detail without changing its underlying UI claim.
+The Start diagram and adjacent screen panel now use 18 and 33 grid rows,
+respectively, a 50% increase from their former 12 and 22. Row height responds
+to viewport height so the controls still fit at 1280×800 and 1440×900; the
+full increase is visible at 1800×1200. The detail image keeps its own aspect
+ratio and aligns with the top of the contextual image at all three sizes.
 Claude, Review, and Resume companion panels remain visible; Start, Backstage,
 and Render screenshot panels fill their right columns.
 

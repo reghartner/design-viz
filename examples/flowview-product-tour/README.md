@@ -17,7 +17,9 @@ process and system operation; it does not compare Standard and Explore.
 All six chapters open in **Standard**. At 1280×800 or larger, the diagram,
 screen capture, and step controls sit together on one screen. Start gives the
 full setup capture its own column and uses native alternate paths for its four
-starting materials. Claude, Review, and Resume show changing evidence beside
+starting materials. Its diagram and screen panel grow about 50% taller on tall
+displays; on shorter displays the grid compresses to keep the controls visible.
+Claude, Review, and Resume show changing evidence beside
 their captures. Backstage and Render give the native plugin capture the full right column. Use each **Next**
 arrow to continue; Render returns to Start. On a fresh browser, dismiss the
 first-visit walkthrough with **Skip**.

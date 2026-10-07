@@ -7974,7 +7974,9 @@ body .section-layout-grid {
 }
 
 body #section-start-layout {
-  grid-auto-rows: 25px !important;
+  /* At tall presentation sizes the two visual tiles are 50% taller. Shorter
+     screens retain the complete step controls without clipping the chapter. */
+  grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
   gap: 4px !important;
 }
 
@@ -7993,12 +7995,15 @@ body #section-start .appscreen-viewport:has([data-screen-id="detail"]) {
 }
 
 body #section-start .appscreens:has([data-screen-id="detail"]) {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 body #section-start .appscreens:has([data-screen-id="detail"]) .appscreen-stage {
   flex: none;
-  height: 220px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 550 / 207;
+  margin-top: clamp(55px, 9vh, 110px);
 }
 
 @media (max-width: 1350px) {
@@ -8231,21 +8236,21 @@ body #section-start .appscreens:has([data-screen-id="detail"]) .appscreen-stage 
                             "x": 0,
                             "y": 0,
                             "w": 12,
-                            "h": 12
+                            "h": 18
                           },
                           {
                             "panel": "setup-screen",
                             "x": 12,
                             "y": 0,
                             "w": 12,
-                            "h": 22
+                            "h": 33
                           },
                           {
                             "controls": "steps",
                             "x": 0,
-                            "y": 12,
+                            "y": 18,
                             "w": 12,
-                            "h": 10
+                            "h": 15
                           }
                         ]
                       }

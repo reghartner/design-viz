@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
+    'layout.graph-frame':['Saved graph content framing','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
     'layout.explore-controls-placement':['Independent placement of Explore step controls','0.2.0'],
     'layout.explore-panel-placement':['Independent placement of Explore panels','0.2.0'],
@@ -58,6 +59,7 @@ var FlowviewCompatibility = (function(){
     var page=pageOf(raw),used=Object.create(null);
     function diagram(d){
       if(!object(d))return;
+      if(d.graphFrame!=null)used['layout.graph-frame']=true;
       if(d.brand)used['media.branding']=true;
       function icons(value,inStep){
         if(!value || typeof value!=='object')return;

@@ -222,23 +222,15 @@ standalone-output workflows with ordinary local specs.
     diagrams: each diagram resets to its initial state. Separate diagrams are
     fine when they are independent: an overview and its drilldown details, or
     unrelated scenarios.
-12. **Auto arrange owns new topology.** For a new diagram, author the semantic
-    graph first: nodes, groups and edges. Use `rows: [[]]` plus unpositioned
-    `floats` (`id` and `side` only), and omit manual X/Y positions and edge
-    geometry (`fromPort`, `toPort`, bends, curve points/controls and label
-    nudges). Connections route automatically until arrangement. Then run
-    `node <VIZ>/tools/auto-arrange-spec.cjs --section <zero-based-section> <input.spec.json> <different-output.spec.json>` for each new diagram in a
-    mixed page, or `--all` only when every diagram is new. It applies the same arranger as the
-    Workbench **Auto arrange** button. In a browser-capable Workbench you may
-    instead activate each new diagram and use that button. Never claim either
-    action without actually completing it. When adding a node to an existing
-    diagram, append an unpositioned
-    `{id:"<new-node-id>",side:"below",noSpread:true}` float with its semantic
-    edges. The marker keeps existing automatic floats and lane routes stable;
-    do not add coordinates or edge geometry. Tell the user they can press
-    **Auto arrange** to re-layout the whole diagram if desired. Do not re-run
-    arrangement for other existing-diagram edits. Manual placement or route
-    controls are an explicit user-directed exception.
+12. **Write content, then arrange once.** For a new diagram, write semantic
+    nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
+    run `node <VIZ>/tools/arrange-spec.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
+    The command arranges nodes, panels and step controls; do not choose their
+    coordinates or panel rectangles. For existing edits, preserve layout and
+    routes; add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}`
+    floats. Rearrange only when explicitly requested, using `--rearrange`.
+    Report actual tool results; the command alone is not visual QA. See `docs/auto-arrange.md` for one-time
+    setup and supported inputs.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the

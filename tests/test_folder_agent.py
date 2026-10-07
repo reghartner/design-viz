@@ -138,7 +138,8 @@ class FolderAgentTests(unittest.TestCase):
         (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
-                     'tools/auto-arrange-spec.cjs',
+                     'tools/auto-arrange-spec.cjs', 'tools/arrange-spec.cjs',
+                     'tools/arrange/setup.cjs', 'tools/arrange/package-lock.json',
                      '.claude/skills/hld-to-page/scripts/pilot_capture.py']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
         trace_cli = (self.folder/'authoring/tools/trace2spec.js').read_text()

@@ -106,10 +106,14 @@ test('both setup routes give browserless agents one truthful layout policy',()=>
     assert.equal(policies.length,1,workflow);
     const policy=policies[0];
     assert.ok(policy.includes('no browser control'));
-    assert.ok(policy.includes('node tools/auto-arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
+    assert.ok(policy.includes('node tools/arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
     assert.ok(policy.includes('wholly new diagram'));
-    assert.ok(policy.includes('When adding a node, append only an unpositioned {id,side:"below",noSpread:true} float'));
-    assert.ok(policy.includes('preserve all rows, floats, coordinates, ports, bends, curve controls/points and label nudges'));
-    assert.ok(policy.includes('press Auto arrange'));
+    assert.ok(policy.includes('unpositioned {id,side:"below",noSpread:true} floats'));
+    assert.ok(policy.includes('preserve all layout and routes'));
+    assert.ok(policy.includes('nodes, panels and step controls'));
+    assert.ok(policy.includes('do not choose coordinates or panel rectangles'));
+    assert.ok(policy.length<1000);
+    assert.ok(policy.includes('only when explicitly requested, using --rearrange'));
+    assert.ok(!policy.includes('auto-arrange-spec'));
   }
 });

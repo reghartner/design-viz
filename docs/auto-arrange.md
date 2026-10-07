@@ -166,19 +166,73 @@ and deforms retained curves through the shared viewer geometry.
 
 ## Headless authoring
 
-Agents without browser control can run the same production arranger with:
+Write semantic nodes, edges, panels and steps, then run one command:
 
 ```sh
-node tools/auto-arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
+node tools/arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
 ```
 
-Repeat `--section` for each new diagram, using its zero-based rendered section
-index. Use `--all` only when every diagram in the input is new. A one-diagram
-input needs no selector. The input and output paths must differ. The command
-validates first, arranges every selected diagram in memory, validates the full
-result, and writes the output atomically; a failure leaves both files unchanged.
-Use it for new diagrams. Existing diagrams retain their authored placement and
-routes unless the user explicitly requests a whole-diagram re-layout.
+The command arranges nodes and measures native panels and step captions before
+packing them into a 24-column Standard layout. No placeholder rectangles are
+needed. Use `rows:[[]]` and unpositioned floats for a new graph. Existing geometry
+is protected; `--rearrange` is only for an explicitly requested rearrangement.
+Repeat `--section` for each new diagram in a mixed page; use `--all` only when all
+are new. A one-diagram input needs no selector. Input/output must be different
+files (including symlinks and hard links). All selected diagrams must succeed
+before one atomic output write; errors preserve both files.
+
+**One-time setup** (checkout or downloaded authoring kit):
+
+```sh
+node tools/arrange/setup.cjs
+```
+
+This explicitly installs locked `playwright-core` 1.63.0 and its pinned Chromium
+headless shell. Arrangement never downloads dependencies or falls back to an
+ambient browser. Builds package the native renderer, styles, icons and fonts;
+a source-free kit does not need `src/`, a running Workbench, or browser tools.
+In a checkout, setup also generates both required runtimes from current sources;
+rerun setup after renderer source changes. Source-free kits keep their bundled runtimes.
+The command reports measurements, not visual QA or a Workbench button click.
+
+`--width` is the host viewport width (800–1920 pixels; default 1200).
+`--profile default|backstage|confluence` selects the arrangement profile.
+The page skin is used, defaulting to pastel when absent. Every native path/step
+and ambient state is measured; zero-step diagrams get no detached controls.
+The generic solver uses panel-owned sizing contracts, measured content, graph
+bounds and narrative depth. It packs small panels together and places controls
+near relevant evidence. It is a deterministic heuristic, not a learned model.
+Final checks reopen the native default camera without capture-only zoom/fit.
+The arranger saves a measured `diagram.graphFrame` around complete graph content,
+including groups, routes, labels and step decorations. This framing survives
+reopening and exports; unmarked diagrams keep the legacy drawing area. The
+sizing target is 10px graph labels and the hard admission floor is 8px, matching
+the reviewed experiments. Difficult graphs can still fail with a precise error.
+Framing is shared graph geometry like node positions; explicitly rearranging a
+diagram may change graph framing in sibling profiles, whose tile arrays remain
+unchanged.
+Controls may require scrolling in a tall document; diagnostics report their
+position in an isolated section’s initial 1000px viewport, not the absolute
+scroll position of a section within a multi-section document. Native scrollable panel content
+remains scrollable. Hidden clipping or unreadable graph labels fails explicitly.
+
+The initial adapter supports Standard diagrams with at most 24 panels, 100 steps
+and 20 paths (at most 200 rendered path/step states). Selected named views, Explore, explicitly attached controls,
+legacy 12-column sibling profiles, external media assets and content that cannot
+fit the bounded geometry are unsupported with an actionable error. Embed media
+as data URLs, or preserve the existing diagram. Unselected sections and their
+views remain unchanged. Existing explicit 24-column sibling profiles are
+preserved; graph positions remain shared across profiles. The tool changes
+arrangement geometry while preserving semantic content, state and declarations.
+It also refreshes system-owned compatibility metadata through the standard
+stamping helper, retaining prior requirements; a bare diagram is wrapped in a
+page so older hosts can read its required capabilities. Malformed compatibility
+metadata fails before any write.
+Native fitting stops after at most eight passes rather than emitting partial
+or clipped output. This does not add a new Workbench action.
+
+The old `tools/auto-arrange-spec.cjs` remains available for graph-only API/CLI
+compatibility. The authoring workflow above uses `arrange-spec.cjs` exclusively.
 
 ## Distribution and maintenance
 

@@ -6,12 +6,12 @@ import {spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
 const require=createRequire(import.meta.url),L=require('../../panel-placement/layouts.cjs');
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1kAAAAASUVORK5CYII=','base64');
-async function fixture(mode){
+async function fixture(mode,axis='panel-sizing'){
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'synthetic-review-browser-')),dataset=path.join(dir,'review'),submissions=path.join(dir,'synthetic-submissions');await fs.mkdir(path.join(dataset,'public'),{recursive:true});
  const pairs=[];
  for(let i=0;i<3;i++){
   const spec={page:{sections:[{diagram:{panels:[{id:'p',type:'state',initial:{state:'Ready'}}],layouts:[{id:'one',sectionLayout:{columns:24,default:[{x:0,y:0,w:24,h:6},{panel:'p',x:0,y:6,w:24,h:6},{controls:'steps',x:0,y:12,w:24,h:3}]}}]}}]}};
-  const pair={id:'synthetic-'+i,title:'Synthetic case '+i,batch:i===2?2:1,split:'review',experimentAxis:['panel-sizing','follow-up','new-case'][i],comparisonNote:'Synthetic scrolling tradeoff.',audience:'Synthetic tester',goal:'Verify UI persistence only.',host:{width:800,profile:'default'},panelCount:1,panelTypes:['state'],capture:{width:1,height:1},contentSha256:L.hash(L.semantic(spec))};
+  const pair={id:'synthetic-'+i,title:'Synthetic case '+i,batch:i===2?2:1,split:'review',experimentAxis:[axis,'follow-up','new-case'][i],comparisonNote:'Synthetic scrolling tradeoff.',audience:'Synthetic tester',goal:'Verify UI persistence only.',host:{width:800,profile:'default'},panelCount:1,panelTypes:['state'],capture:{width:1,height:1},contentSha256:L.hash(L.semantic(spec))};
   for(const label of ['A','B']){if(label==='B')L.layout(spec)[1].w=18;const bytes=JSON.stringify(spec),base='public/'+i+'-'+label;await fs.writeFile(path.join(dataset,base+'.json'),bytes);await fs.writeFile(path.join(dataset,base+'.png'),png);pair[label]={id:i+'-'+label,sha256:L.hash(bytes),pngSha256:L.hash(png),spec:base+'.json',png:base+'.png'};}
   pairs.push(pair);
  }
@@ -21,10 +21,10 @@ async function fixture(mode){
  return {dir,submissions,url,async close(){server.kill();await new Promise(r=>server.once('exit',r));await fs.rm(dir,{recursive:true,force:true});}};
 }
 for(const width of [390,1440])test('panel acceptance labels, reason clearing and durable revisions at '+width+'px',async({page})=>{
- const f=await fixture('panel-layout');try{
+ const f=await fixture('panel-layout',width===1440?'step-depth':'panel-sizing');try{
   await page.setViewportSize({width,height:900});await page.goto(f.url);
   const first=page.locator('.pair').nth(0),second=page.locator('.pair').nth(1);
-  await expect(first.getByText('Focus: panel sizing · same step-control policy')).toBeVisible();await expect(first.getByText('Synthetic scrolling tradeoff.')).toBeVisible();await first.getByRole('radio',{name:'Both acceptable',exact:true}).check();await first.getByRole('textbox').fill('Both communicate the goal.');
+  await expect(first.getByText(width===1440?'Step narrative depth · same panel packing':'Focus: panel sizing · same step-control policy')).toBeVisible();await expect(first.getByText('Synthetic scrolling tradeoff.')).toBeVisible();await first.getByRole('radio',{name:'Both acceptable',exact:true}).check();await first.getByRole('textbox').fill('Both communicate the goal.');
   await expect(second.getByText('Follow-up · panel shape and step controls')).toBeVisible();await second.getByRole('radio',{name:'Neither acceptable',exact:true}).check();await second.getByRole('textbox').fill('Neither prioritizes the evidence.');
   await page.reload();await expect(first.getByRole('radio',{name:'Both acceptable',exact:true})).toBeChecked();await expect(first.getByRole('textbox')).toHaveValue('Both communicate the goal.');
   await page.getByRole('button',{name:'Next batch',exact:true}).click();await expect(page.getByText('New case · panel shape and step controls')).toBeVisible();await page.locator('.pair').getByRole('radio',{name:'A',exact:true}).check();

@@ -395,3 +395,103 @@ constraint, not the unconstrained solver default. Its private
 layout hash and objective metrics. Other cases and private holdouts use the
 unconstrained objective. The comparison therefore tests the stated central-controls
 hypothesis without inserting hand-authored geometry or labeling it the default.
+
+## Round five: step narrative and independent control placement
+
+Round five reads the latest round-four submission revision and validates its
+predecessor chain. Revision two replaces revision one's choice snapshot; the two
+files are not counted as two independent sets of votes. `feedback-chain.cjs` is a
+new manifest-driven reader: it binds every choice to both spec/PNG hashes, verifies
+source semantics, rejects duplicate/unknown IDs and stale revisions, and retains
+Both as acceptance without a winner. Neither remains unaccepted, including a
+note expressing a partial preference. Historical loaders and evidence stay frozen.
+Scenario metadata is rebuilt from a whitelist; inherited old feedback hashes do
+not masquerade as current per-pair provenance.
+
+`solver-v3.cjs` separates panel packing from control placement. Generic packing
+candidates come from pinned v2 and are ranked with control-placement costs removed.
+The second pass considers solid edges, distance to relevant evidence, scroll cost,
+content above/below, and **measured narrative depth** at candidate widths. It can
+place a short bar beside content or a larger explanation across a full row. It
+removes empty whole rows left by old controls before reinserting a band. Fixed
+packing experiments retain panel/graph widths, heights, horizontal positions and
+source order; per-tile vertical movement is recorded. Neither solver takes a
+corpus scenario name or human-vote label as a geometry input.
+
+The native narrative is `.termbar .stepline .step-text`, inside the detached step
+controls tile. The mode selector, transport and step chips share that tile. These
+fixtures use native **Step** mode with the full caption visible; there is no
+collapsed/expanded-caption toggle in this state. Section overview prose is not
+used as a proxy for caption depth. `capture-v3.mjs` probes every authored step at
+each candidate control width, measuring native text fragments, line count, needed
+height including chrome, button bounds and overflow. It restores snapshot five
+and the same native graph framing policy before the screenshot. No renderer CSS,
+font sizes or saved node coordinates are changed to force a fit.
+
+New candidates must contain every caption and button at every relevant step.
+Historical baseline admissibility is separate: exact chosen specs are never
+silently resized to pass a new worst-step gate. Any such limitation is recorded
+as `historicalNarrativeLimitations`; screenshot-state controls still must pass the
+existing visible/unclipped/reachable checks. Native miniature text and necessary
+page scrolling remain limitations reported in the capture metrics.
+
+The 12 public pairs contain:
+
+- Six follow-ups: security, hardware, API trace, experience, distributed and
+  overview. Security permits generic repacking; the other five isolate controls
+  on the selected frozen packing. Explicit top/interior requests are documented
+  policy constraints, not claimed as unconstrained default choices.
+- Two matched short/long request-trace narratives. They derive from frozen API
+  panels and node geometry; only `diagram.steps[].text` changes **between** those
+  two experiments. The long fixture displays its longest caption at snapshot five,
+  so the visible comparison actually shows the tested depth. A and B within each
+  pair have identical text and semantics.
+  Both reference and proposed controls are fitted algorithmically. Private
+  metadata records source hash, changed fields and text hashes; neither synthetic
+  content variant is described as historic human evidence.
+- Four deterministically coverage-ranked, previously unjudged public cases.
+  Their reference uses pinned v2 at `cd06692c7885a7e6a52a0af92dd7986d981a4117`.
+  Private holdouts remain excluded from selection and serving.
+
+The API Both choice uses deterministic A without declaring it the winner. The
+experience Neither choice uses unaccepted A for its partial packing preference,
+then tests the generic interior control policy represented by B. Experiment
+constraints, source-reference approval status and methods stay in private reports.
+The public page gives neutral packing/narrative context. This remains a provisional
+heuristic evaluation, not a statistically learned preference model.
+
+```sh
+node tools/panel-placement/generate-round-five.mjs \
+  --round-one .local/panel-placement/round-1 \
+  --round-two .local/panel-placement/round-2 \
+  --round-three .local/panel-placement/round-3 \
+  --round-four .local/panel-placement/round-4 \
+  --feedback-one .local/panel-placement/round-1/human-submissions/submission-cfe6ea80-7f5d-4542-96d5-1ff853376864.json \
+  --feedback-two .local/panel-placement/round-2/human-submissions/submission-8dff7ef0-9e37-4c97-9c35-a496b9696ff0.json \
+  --feedback-three .local/panel-placement/round-3/human-submissions/submission-d17aa82e-fc2f-45eb-bdac-cacaded04fc2.json \
+  --feedback-four .local/panel-placement/round-4/human-submissions/submission-72643992-175f-4e5a-911c-67b25507a7c8.json \
+  --output .local/panel-placement/round-5
+python3 tools/panel-placement/montage.py .local/panel-placement/round-5
+python3 tools/arrange-training/serve.py \
+  --dataset .local/panel-placement/round-5/review \
+  --submissions .local/panel-placement/round-5/human-submissions --port 8775
+```
+
+All four feedback chains, source/renderer/solver hashes and actual Git status are
+recorded. Full-page images retain equal pair dimensions, original heading pixels
+and entire tiles; 1000px viewport captures remain separate. Repeated image hashes
+must settle. Twelve private holdouts exercise structural and all-step narrative
+checks, without any claim about human preference generalization. Existing rounds
+and servers are not regenerated. Output directories must be new and empty.
+
+Focused checks:
+
+```sh
+node --test tests/panel-step-context.test.js tests/panel-control-bands.test.js tests/panel-sizing-contracts.test.js tests/panel-placement*.test.js
+python3 -m unittest discover -s tests -p test_panel_placement_review.py
+npm test --prefix tools/browser-tests -- --config playwright.review.config.mjs panel-step-context.spec.mjs panel-control-bands.spec.mjs panel-sizing-contracts.spec.mjs panel-placement-review.spec.mjs
+```
+
+Tests use synthetic temporary datasets/submission stores. No test submits choices
+to a human review server. The native test makes step three longer than screenshot
+step six, ensuring fitting does not merely validate the displayed snapshot.

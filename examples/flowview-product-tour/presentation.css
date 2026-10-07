@@ -39,8 +39,8 @@ body #section-build-layout,
 body #section-review-layout,
 body #section-update-layout,
 body #section-backstage-layout {
-  /* Chapters grow together on tall screens and compress on shorter
-     screens so the 33-row graph, evidence, and controls stay visible. */
+  /* Chapter rows grow with the viewport; the review and Backstage diagrams
+     continue below evidence and controls at a height that shows both rows. */
   grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
   gap: 4px !important;
 }
@@ -84,46 +84,91 @@ body #section-build .appscreen-image img[data-screen-id="landing"] {
   transform-origin: left 80%;
 }
 
-body #section-review .appscreens:has([data-screen-id="committed"]) {
-  --appscreen-ratio: 2.105590 !important;
+body #section-review .appscreens:has([data-screen-id="first-step-one"]) {
+  --appscreen-ratio: 1.8 !important;
+}
+
+body #section-review .appscreens:has([data-screen-id="first-applied"]) {
+  --appscreen-ratio: 2.354167 !important;
 }
 
 body #section-review .appscreens:has([data-screen-id="ledger"]) {
-  --appscreen-ratio: 2.696078 !important;
+  --appscreen-ratio: 4.009804 !important;
 }
 
-/* Focused ledger captures span the available top row so their source text
-   stays readable while the step controls remain below them. */
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="first-ledger"]),
-body #section-review .appscreens:has(img.appscreen-current[data-screen-id="update-current-ledger"]) {
+/* The step caption carries the narration. The wide captures preserve the
+   complete original window beside an enlarged detail of the same frame. */
+body #section-review .appscreens figcaption,
+body #section-backstage .appscreens figcaption {
+  display: none;
+}
+
+body #section-review .pt-appscreens > .ptitle,
+body #section-backstage .pt-appscreens > .ptitle {
+  display: none;
+}
+
+/* Paths, transport, and the current beat fit in one middle band on this
+   presentation. The stock path matrix otherwise pushes the caption below
+   the detached controls tile. */
+body #section-review [data-layout-key="steps"] .termbar.has-paths {
+  flex-wrap: nowrap;
+  align-items: center;
+}
+
+body #section-review [data-layout-key="steps"] .playback-status {
+  display: none;
+}
+
+body #section-review [data-layout-key="steps"] .termbar.has-paths .schips {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 48%;
+}
+
+body #section-review [data-layout-key="steps"] .path-matrix {
+  grid-template-columns: minmax(100px, max-content) repeat(var(--path-step-count), 26px);
+  gap: 4px 2px;
+}
+
+body #section-review [data-layout-key="steps"] .path-matrix .path-chip {
+  max-width: 130px;
+  min-height: 26px;
+}
+
+body #section-review [data-layout-key="steps"] .path-row .schip {
+  width: 26px;
+  height: 26px;
+}
+
+body #section-review [data-layout-key="steps"] .path-row[data-selected="false"] .schip {
+  display: none;
+}
+
+body #section-review [data-layout-key="steps"] .stepline {
+  flex: 1 1 0;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+body #section-backstage [data-layout-key="steps"] .termbar {
+  padding: 6px 10px;
+  gap: 8px;
+}
+
+/* Focused ledger captures use their source aspect ratios. */
+body #section-review .appscreens:has(img.appscreen-current[data-screen-id="first-ledger"]) {
   --appscreen-ratio: 3.635556 !important;
 }
 
-body #section-review-layout:has(img.appscreen-current[data-screen-id="first-ledger"]) > [data-layout-key="diagram"],
-body #section-review-layout:has(img.appscreen-current[data-screen-id="update-current-ledger"]) > [data-layout-key="diagram"] {
-  visibility: hidden;
+body #section-review .appscreens:has(img.appscreen-current[data-screen-id="update-current-ledger"]) {
+  --appscreen-ratio: 4.469945 !important;
 }
 
-body #section-review-layout:has(img.appscreen-current[data-screen-id="first-ledger"]) > [data-layout-key="panel:review-screen"],
-body #section-review-layout:has(img.appscreen-current[data-screen-id="update-current-ledger"]) > [data-layout-key="panel:review-screen"] {
-  grid-column: 1 / span 24 !important;
-  grid-row: 1 / span 18 !important;
-  z-index: 1;
-}
-
-/* The two focused update receipts use the same evidence-first placement. */
+/* Focused receipts stay legible in the full-width evidence tile. */
 body #section-review .appscreens:has(img.appscreen-current:is([data-screen-id="update-discarded"], [data-screen-id="committed"])) {
   --appscreen-ratio: 2.897436 !important;
-}
-
-body #section-review-layout:has(img.appscreen-current:is([data-screen-id="update-discarded"], [data-screen-id="committed"])) > [data-layout-key="diagram"] {
-  visibility: hidden;
-}
-
-body #section-review-layout:has(img.appscreen-current:is([data-screen-id="update-discarded"], [data-screen-id="committed"])) > [data-layout-key="panel:review-screen"] {
-  grid-column: 1 / span 24 !important;
-  grid-row: 1 / span 18 !important;
-  z-index: 1;
 }
 
 /* The connected Agent capture is tall. Fill the screen tile with its request
@@ -145,7 +190,6 @@ body #section-backstage .appscreens:has([data-screen-id="expanded"]) {
 body #section-build .appscreen-image:has(img[data-screen-id="story-focus"])::after,
 body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"])::after,
 body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after,
-body #section-backstage .appscreen-image:has(img[data-screen-id="entity"])::after,
 body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after,
 body #section-backstage .appscreen-image:has(img[data-screen-id="expanded"])::after {
   content: "";
@@ -165,10 +209,6 @@ body #section-build .appscreen-image:has(img[data-screen-id="engineering-focus"]
 
 body #section-update .appscreen-image:has(img[data-screen-id="wide"])::after {
   left: 8.4%; top: 43%; width: 12.8%; height: 3.5%;
-}
-
-body #section-backstage .appscreen-image:has(img[data-screen-id="entity"])::after {
-  left: 15%; top: 94.5%; width: 11%; height: 5%;
 }
 
 body #section-backstage .appscreen-image:has(img[data-screen-id="where"])::after {

@@ -115,6 +115,12 @@ adapter. Each image corresponds to its displayed action. This is not a company
 Backstage deployment. The current plugin code, rather than the single-spec
 fixture, establishes multi-spec dropdown behavior.
 
+The `*-wide.png` review and Backstage images are presentation composites made
+from those same captures. Each shows the complete, unchanged source window at
+left and a magnified region of that same frame at right. They keep the modal
+footer or service-page context in view while making the current control or
+step readable; they do not depict a separate app state.
+
 ## Regenerate and check
 
 ```sh
@@ -123,12 +129,13 @@ node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec
 python3 examples/flowview-product-tour/build.py
 ```
 
-The saved 24-column Standard layouts use the same 33-row height in all four
-chapters: graph and step control on the left, changing UI evidence on the
-right. Both entry routes divide the right column between actual Workbench UI
-and illustrative Claude conversation; Review and Backstage give the changing
-screenshot the full right column. Focused captures keep controls and evidence
-readable at presentation size. Visual QA should inspect every Build source path,
+The saved 24-column Standard layouts keep the graph, step controls, Workbench
+capture, and Claude conversation side by side in the two entry tabs. Review
+and Backstage use a full-width vertical stack: changing window capture first,
+step controls next, and the graph below. Review uses 55 rows and Backstage 54;
+the page scrolls to the full graph. Both node rows and later highlighted nodes
+remain visible together without scrolling inside the graph. Focused captures keep
+controls and evidence readable. Visual QA should inspect every Build source path,
 each reconnect state, both Review paths, and every Backstage screenshot
 transition at 1280×800 and 1440×900 after images decode.
 

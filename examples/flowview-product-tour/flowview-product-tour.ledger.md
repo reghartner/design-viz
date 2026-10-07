@@ -51,7 +51,7 @@ navigate a published service association in Backstage.
 | Build new | setup-screen | What does a new build require in Workbench? | Broad landing page with the actual Build with my agent button outlined, followed by the How are you starting? dialog with its detail selector outlined, Story/Engineering choice, later path-matched Copy & paste highlight, focused Copy & paste control, and empty-folder chooser. |
 | Build new | agent | What must Claude ask and record for this source? | Clearly illustrative YOU/CLAUDE dialogue, with a six-beat doorbell proposal for each route. |
 | Reconnect existing | update-screen | How does a saved project reopen? | Actual Workbench context, Reopen card, Continue existing choice, restored folder/setup, Copy instructions, and connected Agent state. |
-| Reconnect existing | update-agent | How can Claude continue from the saved pair? | Illustrative dialogue that reads the spec and ledger, asks a boundary question, and submits an update. |
+| Reconnect existing | update-agent | How can Claude continue from the saved pair? | Illustrative dialogue that reads the spec and ledger, receives the formal request, and submits a wording-only candidate for review. |
 | Review and accept | review-screen | What must a human check before accepting first creation or an existing update? | First creation: source-neutral proposal, empty Current scaffold, step-1 viewer, ledger, and receipt. Update existing: wording-only proposal, accepted Current and nonempty ledger, Discard, illustrative correction, fresh Current/Proposed and ledger comparison, then receipt. |
 | Find and use in Backstage | backstage-screen | What changes after each service-page action? | Seven actual local plugin states from entity tab through inline viewer, links, jumps, expanded canvas, and return. |
 
@@ -97,12 +97,13 @@ control view. Then come empty-folder setup, source-specific Claude questions,
 and draft. The proposal hands directly to Review. A Workbench detail choice
 does not switch the source route.
 
-**Reconnect existing:** a separate entry tab. The disconnected Agent card
-offers Reopen diagram folder. Setup selects Continue an existing agent build
-and the prior folder. Workbench restores the accepted spec, ledger, and its
-own history, then supplies fresh connection instructions. A new Claude
-conversation reads those files and receives a newly copied request. The
-candidate pair hands to Review. Old pending work is not replayed.
+**Reconnect existing:** a separate seven-step entry tab. The disconnected
+Agent card offers Reopen diagram folder. Setup selects Continue an existing
+agent build and the prior folder. Workbench restores the accepted spec,
+ledger, and its own history, then supplies fresh connection instructions. A
+new Claude conversation reads those files, receives the copied change request,
+and submits a wording-only candidate. The candidate pair hands to Review.
+Old pending work is not replayed.
 
 **Review and accept:** two native paths share the human gate. First creation
 starts from an empty folder and inspects a representative, source-neutral
@@ -132,8 +133,7 @@ present in that tab. A held screenshot does not imply a new UI action.
 | build-open | P: landing | H: empty exchange | Broad Flowview landing page outlines the actual Build with my agent button. |
 | build-setup-detail | P: context | H | Actual How are you starting? dialog outlines the detail selector clicked next. |
 | build-story-focus | P: story-focus | H | Actual Story detail choice. |
-| build-hld-focus | P: engineering-focus | H | Engineering detail for HLD. |
-| build-trace-focus | P: engineering-focus | H | Same Engineering control for trace. |
+| build-hld-focus | P: engineering-focus | H | Shared Engineering detail choice for HLD and Honeycomb trace; the source material is provided to Claude. |
 | build-copy-broad-story | P: copy-broad-story | H | Broad Copy & paste highlight with Story still selected. |
 | build-copy-broad-engineering | P: copy-broad-engineering | H | Broad Copy & paste highlight with Engineering still selected. |
 | build-connection | P: choice | H | Focused actual Copy & paste control follows the broad view. |
@@ -156,11 +156,7 @@ present in that tab. A held screenshot does not imply a new UI action.
 | update-restore | P: instructions | H | Restored folder and fresh setup header. |
 | update-copy | P: copy-button | H | Copy connection instructions control. |
 | update-paste | H: copy-button | D: Claude verifies folder | External conversation starts. |
-| update-read | H | D: accepted pair read | Saved project context in illustrative dialogue. |
-| update-request | P: connected | D: update request and acknowledgment | Actual Story-detail Agent composer and Copy request accompany illustrative dialogue. |
-| update-question | H | D: evidence question and answer | Illustrative dialogue. |
-| update-propose | H | D: candidate pair submitted | Shared Review gate follows. |
-| update-next | H | H | Text handoff to Review. |
+| update-read | P: connected | D: accepted pair, formal request, candidate submitted | Actual connected Agent state accompanies the illustrative Claude handoff to Review. |
 | review-first-proposal | P: first-preview | — | Actual source-neutral first proposal from empty folder. |
 | review-first-current | P: first-current | — | Current is the zero-node My story scaffold, not an accepted doorbell. |
 | review-first-inspect | P: first-step-one | — | Proposed step 1/6 and six-step controls visible. |
@@ -203,6 +199,11 @@ are actual local Workbench states with an orange screenshot annotation around
 the targeted control; no product UI code was changed for the annotation.
 
 ## Review semantics and provenance
+
+For the square review and Backstage captures, the presentation uses wide
+composites with the complete source window beside a magnified region from the
+same capture. This preserves the modal footer and page context while making
+the selected UI state legible; no second app state is implied.
 
 The **First creation** captures came from actual Workbench new-agent setup and
 a disk-backed empty folder. Before proposing, the saved My story scaffold had

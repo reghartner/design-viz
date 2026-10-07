@@ -49,13 +49,6 @@
         "title": "Sentinel — Cellular Off-Grid Solar Camera"
       }
     ],
-    "Approved pair": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
     "Archivist": [
       {
         "file": "gridseye-bastion/bastion.html",
@@ -82,13 +75,6 @@
         "file": "nestrel-warden/warden.html",
         "family": "nestrel-warden",
         "title": "Nestrel Warden — a cloud camera that remembers the outage"
-      }
-    ],
-    "Back · Start": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Backoff": [
@@ -340,27 +326,6 @@
         "title": "Auralis Presence — mmWave room sensing, fall safety, offline autonomy"
       }
     ],
-    "Engineer": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "Evidence": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "Export": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
     "Facewright": [
       {
         "file": "basecraft-keep/keep.html",
@@ -581,6 +546,13 @@
         "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
       }
     ],
+    "Next · Backstage": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Next · Claude": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
@@ -588,7 +560,14 @@
         "title": "Flowview · from story to shared system understanding"
       }
     ],
-    "Next · Iterate": [
+    "Next · Render": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Resume": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
         "family": "flowview-product-tour",
@@ -602,14 +581,7 @@
         "title": "Flowview · from story to shared system understanding"
       }
     ],
-    "Next · Share": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
-    "Next · Views": [
+    "Next · Start": [
       {
         "file": "flowview-product-tour/flowview-product-tour.html",
         "family": "flowview-product-tour",
@@ -640,13 +612,6 @@
         "file": "doorbell-atlas/atlas.html",
         "family": "doorbell-atlas",
         "title": "Lookout Feature Atlas"
-      }
-    ],
-    "One spec": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Ops Console": [
@@ -936,13 +901,6 @@
         "title": "loomworks Trellis — Camera-as-Hub"
       }
     ],
-    "Same folder": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
-      }
-    ],
     "Scribe": [
       {
         "file": "nestrel-warden/warden.html",
@@ -1082,13 +1040,6 @@
         "file": "cumulus/cumulus-flow.html",
         "family": "cumulus",
         "title": "Cumulus Command & OTA Paths"
-      }
-    ],
-    "Standard": [
-      {
-        "file": "flowview-product-tour/flowview-product-tour.html",
-        "family": "flowview-product-tour",
-        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Stitcher": [

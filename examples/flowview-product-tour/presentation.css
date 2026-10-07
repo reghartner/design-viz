@@ -35,6 +35,34 @@ body .section-layout-grid {
   margin-top: 6px !important;
 }
 
+body #section-start-layout {
+  grid-auto-rows: 25px !important;
+  gap: 4px !important;
+}
+
+body #section-start .explore-navigation-actions {
+  display: none !important;
+}
+
+body #section-start .path-timeline {
+  zoom: .82;
+}
+
+body #section-start .appscreen-viewport:has([data-screen-id="detail"]) {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 550 / 207;
+}
+
+body #section-start .appscreens:has([data-screen-id="detail"]) {
+  justify-content: center;
+}
+
+body #section-start .appscreens:has([data-screen-id="detail"]) .appscreen-stage {
+  flex: none;
+  height: 220px;
+}
+
 @media (max-width: 1350px) {
   body .path-timeline {
     zoom: .9;

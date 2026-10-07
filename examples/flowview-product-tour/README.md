@@ -7,7 +7,7 @@ process and system operation; it does not compare Standard and Explore.
 
 | Tab | Main point | What to show |
 |---|---|---|
-| Start | A PM story or engineering evidence begins the same reviewable project. | Four entry routes and the real conversation-mode setup. |
+| Start | Four alternate starting routes converge on the same reviewable project. | Choose Business story, Existing flow, HLD design, or Honeycomb trace; show the highlighted full Workbench setup, then its close detail. |
 | Claude | The conversation stays in external Claude Code; the folder holds the project. | Folder setup and the explicitly illustrative YOU/CLAUDE conversation. |
 | Review | Spec and ledger are proposed together; a human accepts or requests corrections. | The actual preview dialog with a seeded checkout proposal; switch Approve / Needs work. |
 | Resume | Reopen the same folder and reconnect to continue the accepted project. | Actual Continue an existing agent build setup. |
@@ -15,9 +15,10 @@ process and system operation; it does not compare Standard and Explore.
 | Render | The selected spec renders with the plugin installed in Backstage. | Native viewer, section/step jumps, same-viewer expansion, and external edit handoff. |
 
 All six chapters open in **Standard**. At 1280×800 or larger, the diagram,
-screen capture, and step controls sit together on one screen. Start, Claude,
-Review, and Resume also show changing evidence beside the capture. Backstage and
-Render give the native plugin capture the full right column. Use each **Next**
+screen capture, and step controls sit together on one screen. Start gives the
+full setup capture its own column and uses native alternate paths for its four
+starting materials. Claude, Review, and Resume show changing evidence beside
+their captures. Backstage and Render give the native plugin capture the full right column. Use each **Next**
 arrow to continue; Render returns to Start. On a fresh browser, dismiss the
 first-visit walkthrough with **Skip**.
 
@@ -33,9 +34,11 @@ Workbench acceptance and company repository publication are separate actions.
 PNG originals are in [screenshots](screenshots/), embedded as data URLs in the
 spec and portable HTML. No image server or network connection is needed.
 
-- `agent-setup.png`, `select-folder.png`, `resume-folder.png`: actual built
+- `agent-setup-context.png`, `agent-setup.png`, `select-folder.png`, `resume-folder.png`: actual built
   Flowview Workbench dialog, captured with Chromium on 2026-10-07. No folder
-  permission was granted during capture.
+  permission was granted during capture. The contextual setup screenshot uses
+  a capture-time orange outline on the Copy & paste control; the next step
+  switches to a close capture of that same choice.
 - `review-update.png`: production preview dialog and renderer with a seeded
   checkout proposal. This illustrates Current/Proposed and Commit/Discard;
   it does not claim a live Claude run or completed approval.
@@ -66,7 +69,9 @@ without the single named-view wrapper, then applied to the existing Standard
 views. The saved tile proportions were refined after full-page visual checks.
 `build.py` embeds the spec plus [presentation.css](presentation.css) in the
 portable HTML; this local framing removes repeated page prose and tightens the
-grid without changing the shared renderer.
+grid without changing the shared renderer. Start's four native paths share the
+opening screen and close detail, branch for the selected material, then rejoin
+at spec/ledger drafting.
 
 Visual checks cover all six tabs and both Review endings at 1440×900 and
 1280×800. Every selected step caption and screenshot must remain in view, and

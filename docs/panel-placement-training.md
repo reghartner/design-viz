@@ -301,3 +301,97 @@ python3 tools/build.py
 
 The browser test authors a separate synthetic fixture; it does not submit to a
 human dataset. The review tests also use isolated temporary submission stores.
+
+## Round four: control bands and mixed-height packing
+
+Round four uses the 12 genuine choices in the third submission as another small
+heuristic-design signal. They are not fitted probabilities. Seven new-solver
+wins remain recorded; the next public set revisits only five unresolved or
+corrected cases (overview, security, health, hardware and API). It adds seven
+previously unjudged round-one public cases, greedily selected for new panel types,
+widths, panel counts, density, graph role and host profile. Seeded hash ties make
+selection independent of manifest order. Private holdouts are never eligible.
+
+Follow-up references preserve the exact round-three selected spec bytes. Neither
+uses deterministic A and explicitly records `referenceAccepted: false`. Fresh
+references are generated with the frozen v1 solver/calibrator at commit
+`c6487653`; they have no human approval. Both real choices and baseline method
+names stay in private reports. The public page identifies only follow-up versus
+new case. All three feedback and manifest hashes are recorded in provenance.
+
+`solver-v2.cjs` consumes native geometry, panel-owned contracts, measured content
+and frozen graph bounds. It has no scenario-name or audience branches. It tries
+minimum/preferred widths and several deterministic packing orders. Bottom-left
+packing can reuse column cavities beneath a shallow graph; compatible row peers
+share spare width without stretching fixed-aspect surfaces. The objective adds:
+
+- Compression below a content-sensitive preferred width for verbose panels.
+- Deep empty-column cost and internal graph blank-width cost. Graph occupancy is
+  estimated from frozen node aspect and available camera height, not the full
+  outer tile; native capture still checks actual node containment and labels.
+- Control bands at full-row boundaries and sufficiently wide column cavities.
+  A solid adjoining edge, current-step panel relevance, content on both sides,
+  scroll distance and narrow-control wrapping all affect the score.
+
+This can place controls above a short group with a ragged lower edge or between
+primary and detailed evidence in a long composition. It does not universally
+prefer above or below. If the best layout repeats a follow-up reference, the
+solver chooses the next generic candidate differing by at least six aggregate
+coordinate/span units; the private metadata records that exclusion rule.
+
+`calibrate-v2.cjs` retains bounded width-keyed native measurements and eight-pass
+termination. Wrapped controls include the native mode-selector chrome, with
+height constraints keyed by control width. A narrow wrapped bar must not inflate
+an unrelated full-width bar. Infeasible or nonconvergent cases are explicitly
+unsupported; fresh selection can continue to the next deterministically ranked
+case and records every skip. Holdout failures remain in the private QA report.
+
+```sh
+node tools/panel-placement/generate-round-four.mjs \
+  --round-one .local/panel-placement/round-1 \
+  --round-two .local/panel-placement/round-2 \
+  --round-three .local/panel-placement/round-3 \
+  --feedback-one .local/panel-placement/round-1/human-submissions/submission-cfe6ea80-7f5d-4542-96d5-1ff853376864.json \
+  --feedback-two .local/panel-placement/round-2/human-submissions/submission-8dff7ef0-9e37-4c97-9c35-a496b9696ff0.json \
+  --feedback-three .local/panel-placement/round-3/human-submissions/submission-d17aa82e-fc2f-45eb-bdac-cacaded04fc2.json \
+  --output .local/panel-placement/round-4
+python3 tools/panel-placement/montage.py .local/panel-placement/round-4
+python3 tools/arrange-training/serve.py \
+  --dataset .local/panel-placement/round-4/review \
+  --submissions .local/panel-placement/round-4/human-submissions --port 8774
+```
+
+Choose a new empty output directory for every regeneration. Old rounds, PNGs,
+human submissions and v1 source are not rewritten. Provenance computes actual
+Git dirty status and pins renderer/style and v1 source hashes. Baseline camera
+deltas are measured; camera framing follows the same native policy on both sides.
+Each PNG must match the complete root dimensions and contain the document title
+and all visible tiles. Decoded pixels in its first 150 rows must equal the origin
+viewport screenshot and the other candidate. Repeated full PNG hashes must
+settle. This supplements DOM bounds checks; a header-display false alarm during
+round-three inspection was disproven by identical decoded pixels, and no votes
+were discarded as confounded.
+
+Capture reports include actual graph internal whitespace, panel-body whitespace,
+content overflow, minimum native graph label size and controls reachability in
+the original 1000px viewport. A structurally valid long page may require scrolling;
+viewport diagnostics disclose this rather than redefining the viewport or hiding
+content. Public pairs use equal image dimensions, leaving padding outside the
+shorter composition. Private holdouts provide structural checks only, not evidence
+of preference generalization. No production placement button is enabled.
+
+Focused verification (all synthetic submissions remain in temporary test stores):
+
+```sh
+node --test tests/panel-control-bands.test.js tests/panel-sizing-contracts.test.js tests/panel-placement*.test.js
+python3 -m unittest discover -s tests -p test_panel_placement_review.py
+npm test --prefix tools/browser-tests -- --config playwright.review.config.mjs panel-control-bands.spec.mjs panel-sizing-contracts.spec.mjs panel-placement-review.spec.mjs
+```
+
+For this round's explicit center-controls feedback, the experiment selects the
+best valid **generic interior-band** candidate. This is an experimental policy
+constraint, not the unconstrained solver default. Its private
+`experimentalSelection` records the feedback hash, selection rule, default policy,
+layout hash and objective metrics. Other cases and private holdouts use the
+unconstrained objective. The comparison therefore tests the stated central-controls
+hypothesis without inserting hand-authored geometry or labeling it the default.

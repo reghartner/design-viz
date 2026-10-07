@@ -16,9 +16,9 @@ import pathlib
 import sys
 import subprocess
 try:
-    from folder_agent_kit import folder_agent_kit
+    from folder_agent_kit import folder_agent_kit, native_payload
 except ModuleNotFoundError:
-    from tools.folder_agent_kit import folder_agent_kit
+    from tools.folder_agent_kit import folder_agent_kit, native_payload
 from functools import lru_cache
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -193,9 +193,7 @@ def main() -> int:
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
     native_path = ROOT / 'tools/arrange/generated-native.html'
-    native_path.write_text(subprocess.run(
-        ['node', str(ROOT / 'tools/arrange/build-payload.cjs')],
-        check=True, capture_output=True, text=True).stdout)
+    native_path.write_text(native_payload(ROOT))
     if args.runtime_only:
         print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
         return 0

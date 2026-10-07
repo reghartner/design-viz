@@ -3,7 +3,17 @@ import base64
 import gzip
 import hashlib
 import json
+import subprocess
 from pathlib import Path
+
+
+def native_payload(root):
+    """Build the native bundle and retain Node's actionable failure details."""
+    command = ['node', str(Path(root) / 'tools/arrange/build-payload.cjs')]
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError('Native measurement payload build failed:\n' + result.stderr.strip())
+    return result.stdout
 
 
 def folder_agent_kit(root, runtime):
@@ -32,10 +42,7 @@ def folder_agent_kit(root, runtime):
     # Build from these sources; never depend on an existing generated file.
     files['tools/canon/generated-runtime.cjs'] = runtime
     # Generated from current native sources, never copied from a stale build.
-    import subprocess
-    files['tools/arrange/generated-native.html'] = subprocess.run(
-        ['node', str(root / 'tools/arrange/build-payload.cjs')],
-        check=True, capture_output=True, text=True).stdout
+    files['tools/arrange/generated-native.html'] = native_payload(root)
     files['tools/arrange-spec.cjs'] = (root / 'tools/arrange-spec.cjs').read_text()
     for path in sorted((root / 'tools/arrange').iterdir()):
         if path.suffix in ('.cjs', '.json') and path.name != 'build-payload.cjs':

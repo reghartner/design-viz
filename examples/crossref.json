@@ -14,6 +14,13 @@
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
       }
     ],
+    "Accepted": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Ack Topic": [
       {
         "file": "cumulus/cumulus-flow.html",
@@ -178,6 +185,13 @@
         "title": "HaloVista Aegis — cloud, keys, and a human in the loop"
       }
     ],
+    "Claude Code": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Clip Sealer": [
       {
         "file": "doorbell-atlas/atlas.html",
@@ -251,6 +265,13 @@
         "file": "cumulus/cumulus-flow.html",
         "family": "cumulus",
         "title": "Cumulus Command & OTA Paths"
+      }
+    ],
+    "Diagram folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Dispatch": [
@@ -338,6 +359,13 @@
         "file": "wrenlight-perch/perch.html",
         "family": "wrenlight-perch",
         "title": "wrenlight Perch — Two-Year Battery Camera & Loft Module"
+      }
+    ],
+    "Flowview": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Forge": [
@@ -518,6 +546,48 @@
         "title": "Bastion — PoE Camera Fleet & Stronghold NVR"
       }
     ],
+    "Next · Backstage": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Claude": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Render": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Resume": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Review": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Next · Start": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Nimbus API": [
       {
         "file": "chime-radar/chime-radar.html",
@@ -640,6 +710,20 @@
         "file": "basecraft-keep/keep.html",
         "family": "basecraft-keep",
         "title": "Keep — Local AI Hub & Camera Fleet"
+      }
+    ],
+    "Preview": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
+    "Proposal": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Pulse Events": [
@@ -902,6 +986,13 @@
         ]
       }
     ],
+    "Shared folder": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
+      }
+    ],
     "Sift": [
       {
         "file": "chime-radar/chime-radar.html",
@@ -1138,6 +1229,13 @@
         "file": "doorbell-atlas/atlas.html",
         "family": "doorbell-atlas",
         "title": "Lookout Feature Atlas"
+      }
+    ],
+    "Workbench": [
+      {
+        "file": "flowview-product-tour/flowview-product-tour.html",
+        "family": "flowview-product-tour",
+        "title": "Flowview · from story to shared system understanding"
       }
     ],
     "Wrangler": [

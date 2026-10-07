@@ -16,15 +16,7 @@ test('production and prebuilt images recursively copy the diagram tree',()=>{
   }
 });
 
-test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{
-  assert.ok(dockerAvailable,'Docker must be available in CI for the workbench image contract.');
-  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-'));
-  const name='flowview-library-'+process.pid+'-'+Date.now(),image=name+':test';
-  t.after(()=>{
-    spawnSync('docker',['rm','-f',name],{timeout:10000,stdio:'ignore'});
-    spawnSync('docker',['image','rm',image],{timeout:10000,stdio:'ignore'});
-    fs.rmSync(directory,{recursive:true,force:true});
-  });
+function prepareImageContext(directory){
   for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon']){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }
@@ -34,6 +26,10 @@ test('nginx image publishes central canon membership and replaces a stale librar
   fs.rmSync(path.join(directory,'workbench/flowspec.html'),{force:true});
   for(const file of fs.readdirSync(path.join(ROOT,'tools'))){
     if(/\.(?:py|cjs|js)$/.test(file))fs.copyFileSync(path.join(ROOT,'tools',file),path.join(directory,'tools',file));
+  }
+  fs.mkdirSync(path.join(directory,'tools/arrange'),{recursive:true});
+  for(const file of fs.readdirSync(path.join(ROOT,'tools/arrange'))){
+    if(/\.(?:cjs|js|json)$/.test(file))fs.copyFileSync(path.join(ROOT,'tools/arrange',file),path.join(directory,'tools/arrange',file));
   }
   assert.equal(fs.existsSync(path.join(directory,'template/flowview.html')),false);
   const spec=JSON.parse(fs.readFileSync(path.join(ROOT,'examples/canon/specs/doorbell.json')));
@@ -46,6 +42,32 @@ test('nginx image publishes central canon membership and replaces a stale librar
   fs.mkdirSync(path.join(directory,'diagrams/unlisted'));
   fs.writeFileSync(path.join(directory,'diagrams/unlisted/unlisted.spec.json'),JSON.stringify(spec));
   fs.writeFileSync(path.join(directory,'workbench/diagrams.json'),'{"version":0}');
+  return {source,spec,manifest};
+}
+
+test('image source fixture builds without Docker or preexisting generated arrangement inputs',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-source-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  prepareImageContext(directory);
+  for(const file of ['tools/arrange-spec.cjs','tools/arrange/build-payload.cjs','tools/arrange/native.js','tools/arrange/setup.cjs','tools/arrange/package.json','tools/arrange/package-lock.json'])
+    assert.equal(fs.readFileSync(path.join(directory,file),'utf8'),fs.readFileSync(path.join(ROOT,file),'utf8'));
+  for(const file of ['tools/arrange/generated-native.html','tools/arrange/node_modules','tools/canon/generated-runtime.cjs','workbench/flowspec.html'])
+    assert.equal(fs.existsSync(path.join(directory,file)),false,file);
+  execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
+  assert.match(fs.readFileSync(path.join(directory,'tools/arrange/generated-native.html'),'utf8'),/window\.arrangementNative/);
+  assert.match(fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8'),/id="flowview-folder-kit"/);
+});
+
+test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{
+  assert.ok(dockerAvailable,'Docker must be available in CI for the workbench image contract.');
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-'));
+  const name='flowview-library-'+process.pid+'-'+Date.now(),image=name+':test';
+  t.after(()=>{
+    spawnSync('docker',['rm','-f',name],{timeout:10000,stdio:'ignore'});
+    spawnSync('docker',['image','rm',image],{timeout:10000,stdio:'ignore'});
+    fs.rmSync(directory,{recursive:true,force:true});
+  });
+  const {source,spec,manifest}=prepareImageContext(directory);
   const docker=args=>execFileSync('docker',args,{encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
   docker(['build','-f',path.join(directory,'deploy/workbench/Dockerfile'),'-t',image,directory]);
   docker(['run','--rm','-d','--name',name,'-p','127.0.0.1::80',image]);

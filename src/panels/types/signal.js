@@ -446,3 +446,5 @@ PanelRegistry.extend('signal', {
     },
   },
 });
+
+PanelRegistry.extend('signal', {layout: {sectionSizing: { minWidth: 190, preferredWidth: 240, maxWidth: 450, aspectPolicy: 'content', grow: 1 }}});

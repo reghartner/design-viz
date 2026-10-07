@@ -204,7 +204,8 @@ PanelRegistry.define('cost', {
   render: function (host, panel, state) { return {html: costHTML(panel, state)}; },
   references: {nodes: ['items.*.node']},
   presentation: {ambientInitial: true},
-  layout: {large: true, height: 17, fallbackHeight: 17},
+  layout: {
+    sectionSizing: { minWidth: 420, preferredWidth: 570, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },large: true, height: 17, fallbackHeight: 17},
   styles: String.raw`
 .cost-panel{font-size:12px;line-height:1.5;color:var(--dtext);min-width:0;container-type:inline-size;overflow-wrap:anywhere}
 .cost-basis{display:flex;flex-direction:column;gap:3px;margin-bottom:20px}

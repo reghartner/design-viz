@@ -1133,6 +1133,7 @@ PanelRegistry.extend('homemap', {
   label: 'Home map',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 230, preferredWidth: 350, maxWidth: 520, bodyAspect: 320 / 216, aspectPolicy: 'fixed', grow: 0, ancillarySelector: '.hmaudio-captions', contentSelector: '.hmframe' },
     focusByDefault: true,
     fallbackHeight: 12,
     focusLabel: 'Home',

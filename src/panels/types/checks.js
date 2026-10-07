@@ -150,3 +150,5 @@ PanelRegistry.extend('checks', {
     },
   },
 });
+
+PanelRegistry.extend('checks', {layout: {sectionSizing: { minWidth: 220, preferredWidth: 270, maxWidth: 500, aspectPolicy: 'content', grow: 1 }}});

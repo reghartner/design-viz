@@ -157,7 +157,8 @@
   PanelRegistry.define('dispatch', {
     label:'Emergency dispatch', since:'0.1.0', render:render,
     presentation:{growing:true, ambientInitial:true},
-    layout:{height:14, fallbackHeight:14, supporting:true, attachControls:true},
+    layout:{
+    sectionSizing: { minWidth: 480, preferredWidth: 610, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },height:14, fallbackHeight:14, supporting:true, attachControls:true},
     validateDeclaration:function (panel, path, warnings) {
       if (panel.agency != null && typeof panel.agency !== 'string') warnings.push(path + '.agency: expected text — ignored');
       panelCollectionWarnings(panel, path, warnings, 'responders', 8, function (unit, at) {

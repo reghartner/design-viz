@@ -217,3 +217,87 @@ a fitted model or a human preference probability. `viewport/*.png` shows the
 actual first 1000px, with hashes in the report; these QA images are outside the
 served review root. Full comparison PNG/spec hashes remain in the manifest.
 The review page names the experiment axis while keeping candidate methods hidden.
+
+## Round 3: panel sizing contracts
+
+The third round uses the second round's 12 genuine choices: eight explicit
+preferences, one **Both**, and three **Neither**. The three Neither cases remain
+unaccepted. An A/B vote selects that exact round-two spec as the reference;
+Both and Neither use A deterministically, with the original acceptance status
+recorded privately. Both real submission files and their manifests/spec/PNG
+identities are verified before generation. No votes are synthesized or converted
+into training winners.
+
+`PanelRegistry.layout.sectionSizing` is an opt-in sizing contract owned by each
+panel module. It describes native CSS pixel min/preferred/max widths, whether a
+body can grow, a body aspect or intrinsic/content height policy, and selectors
+for measuring the actual body and ancillary content. It does not change the
+current editor, presets, renderer, or saved geometry. The experimental solver
+is its only consumer. Seventeen types declare contracts; the remaining types
+use their existing `large` and `canvasSizing` capabilities with conservative
+content-fit defaults. Actual row counts can increase a compact status panel's
+width, and native render measurements determine its height.
+
+The solver uses no scenario IDs, domain metadata, manually assigned coordinates,
+or scenario dimension arrays. It considers graph-side and full-width groups,
+compact packing of tall panels with shorter neighbors, and controls above or
+below the primary group before secondary details. Flexible bodies share residual
+row width up to their declared maxima; fixed-aspect bodies retain their width.
+The deterministic diagnostic objective includes total height, unused grid cells,
+aspect rounding waste, growth, control scroll distance and proximity to relevant
+panels. Current-step panel patches indicate relevance when present; otherwise
+compact primary evidence is the declared prominence heuristic. This is still an
+experimental heuristic, not a statistically fitted preference probability.
+
+A body aspect excludes title, borders and padding. Capture measures these
+separately, uses the Device app's actual `.da-phone` bounds, and calculates Home
+map SVG content bounds from `viewBox` and native `preserveAspectRatio` fitting.
+This catches interior letterboxing that measuring the full outer SVG misses.
+Ancillary audio/caption content is measured separately from aspect-fitted bodies.
+Native measurements are cached by panel width, so wrapped content measured at one width cannot create a height cycle at another. Native content overflow adds monotone minimum constraints. Calibration stops
+within eight iterations, and cycles or infeasible bounds produce an explicit
+unsupported result. It never stretches DOM elements outside the saved tile.
+
+```sh
+node tools/panel-placement/generate-round-three.mjs \
+  --round-one .local/panel-placement/round-1 \
+  --round-two .local/panel-placement/round-2 \
+  --feedback-one .local/panel-placement/round-1/human-submissions/submission-cfe6ea80-7f5d-4542-96d5-1ff853376864.json \
+  --feedback-two .local/panel-placement/round-2/human-submissions/submission-8dff7ef0-9e37-4c97-9c35-a496b9696ff0.json \
+  --output .local/panel-placement/round-3
+python3 tools/panel-placement/montage.py .local/panel-placement/round-3
+python3 tools/arrange-training/serve.py \
+  --dataset .local/panel-placement/round-3/review \
+  --submissions .local/panel-placement/round-3/human-submissions --port 8773
+```
+
+The generator refuses populated output directories. Public review contains only
+the same 12 reviewed cases. The 12 frozen holdouts are processed separately into
+private `holdout/` and `holdout-report.json`; unsupported cases stay explicit.
+The review server cannot serve these files. Structural holdout checks do not
+establish preference generalization. No placement button is shipped.
+
+Each public pair keeps exactly the same frozen content, nodes, state, attachment
+and visibility. The reference spec bytes are checked against round two. Native
+Fit/Zoom/scroll is replayed using the same deterministic framing policy; reference
+camera deltas are recorded. Camera state is capture-time state, not a saved spec
+edit. Captures record actual body whitespace, overflow, label size, controls
+reachability and their position in the original 1000px viewport. The screenshots
+use explicit page-coordinate clips at (0,0), with equal pair dimensions; document
+title text and bounds must match. Padding below a shorter candidate is intentional.
+The old reference PNG may differ because the new pair's common canvas height is
+different; hashes identify the exact new pixels. All node positions remain frozen.
+Small native text and scrolling are reported rather than hidden by changing the
+viewport budget or renderer. Source/style/harness/contract/generator hashes and
+both feedback chains are included in provenance.
+
+Focused verification:
+
+```sh
+node --test tests/panel-sizing-contracts.test.js tests/panel-modules.test.js tests/panel-placement*.test.js
+npm test --prefix tools/browser-tests -- --config playwright.review.config.mjs panel-sizing-contracts.spec.mjs panel-placement-review.spec.mjs
+python3 tools/build.py
+```
+
+The browser test authors a separate synthetic fixture; it does not submit to a
+human dataset. The review tests also use isolated temporary submission stores.

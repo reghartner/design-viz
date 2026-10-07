@@ -41,6 +41,7 @@ PanelRegistry.extend('image', {
   label: 'Embedded image',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 240, preferredWidth: 350, maxWidth: 600, aspectPolicy: 'intrinsic', grow: 0, contentSelector: 'img' },
     canvasSizing: { mode: 'content-fit', maxHeight: 640, resizeAxis: 'width' },
   },
 });

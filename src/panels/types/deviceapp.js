@@ -596,6 +596,7 @@ PanelRegistry.extend('deviceapp', {
   label: 'Device app',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 230, preferredWidth: 290, maxWidth: 364, bodyAspect: 9 / 18.5, aspectPolicy: 'fixed', grow: 0, contentSelector: '.da-phone', bodyInset: 10 },
     large: true,
     height: 23,
     supporting: false,

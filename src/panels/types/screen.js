@@ -490,6 +490,7 @@ PanelRegistry.extend('screen', {
   label: 'Camera screen',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 240, preferredWidth: 310, maxWidth: 480, bodyAspect: 16 / 9, aspectPolicy: 'fixed', grow: 0, ancillarySelector: '.screen-audio-slot', contentSelector: '.screenbox' },
     height: 8,
     canvasSizing: { mode: 'fixed-aspect', aspect: 16 / 9, resizeAxis: 'width' },
   },

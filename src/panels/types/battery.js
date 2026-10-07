@@ -532,3 +532,5 @@ PanelRegistry.extend('battery', {
     },
   },
 });
+
+PanelRegistry.extend('battery', {layout: {sectionSizing: { minWidth: 155, preferredWidth: 195, maxWidth: 420, aspectPolicy: 'content', grow: 1 }}});

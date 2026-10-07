@@ -26,6 +26,7 @@ PanelRegistry.extend('state', {
   label: 'State',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 150, preferredWidth: 180, maxWidth: 420, aspectPolicy: 'content', grow: 1 },
     canvasSizing: { mode: 'content-fit', maxHeight: 320, resizeAxis: 'width' },
   },
 });

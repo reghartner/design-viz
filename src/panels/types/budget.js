@@ -220,3 +220,5 @@ PanelRegistry.extend('budget', {
     },
   },
 });
+
+PanelRegistry.extend('budget', {layout: {sectionSizing: { minWidth: 230, preferredWidth: 310, maxWidth: 550, aspectPolicy: 'content', grow: 1 }}});

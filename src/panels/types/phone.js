@@ -256,6 +256,7 @@ PanelRegistry.extend('phone', {
   label: 'Phone',
   since: '0.1.0',
   layout: {
+    sectionSizing: { minWidth: 202, preferredWidth: 210, maxWidth: 250, aspectPolicy: 'intrinsic', grow: 0, contentSelector: '.phoneframe' },
     height: 10,
   },
 });

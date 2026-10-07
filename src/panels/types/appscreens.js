@@ -289,7 +289,8 @@
   }
   PanelRegistry.define('appscreens', {
     label:'App screens', since:'0.1.0', order:22, render:render,
-    layout:{large:true, height:23, supporting:false},
+    layout:{
+    sectionSizing: { minWidth: 230, preferredWidth: 300, maxWidth: 420, aspectPolicy: 'intrinsic', grow: 0, contentSelector: '.appscreen-viewport' },large:true, height:23, supporting:false},
     presentation:{ambientInitial:true},
     validateDeclaration:function (panel, path, warnings, errors) {
       if (panel.screens != null && !Array.isArray(panel.screens)) errors.push(path + '.screens: expected an array');

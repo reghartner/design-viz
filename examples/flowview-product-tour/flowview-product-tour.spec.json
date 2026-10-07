@@ -1,0 +1,1499 @@
+{
+  "page": {
+    "title": "Flowview · from story to shared system understanding",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "01 · Start",
+            "sections": [
+              {
+                "id": "start",
+                "heading": "Start with the story, not a blank canvas",
+                "accent": "violet",
+                "text": [
+                  "A product manager can describe the customer journey without placing nodes or edges. An engineer can begin with an existing flow, a high-level design, or trace evidence. All four routes feed the same reviewed diagram and coverage ledger.",
+                  "Presenter cue: advance the steps, then use the arrow card to move to the Claude tab. The tiles show different starting material, not four separate products."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "input": {
+                      "title": "Starting point",
+                      "sub": "story · flow · HLD · trace",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "claude": {
+                      "title": "Claude Code",
+                      "sub": "authoring partner",
+                      "icon": "terminal",
+                      "tint": "cmd"
+                    },
+                    "folder": {
+                      "title": "Diagram folder",
+                      "sub": "spec + coverage ledger",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "flowview": {
+                      "title": "Flowview",
+                      "sub": "visual review",
+                      "icon": "monitor",
+                      "tint": "cmd"
+                    },
+                    "next": {
+                      "title": "Next · Claude",
+                      "sub": "follow the handoff",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "create"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "input",
+                      "claude",
+                      "folder",
+                      "flowview",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "input",
+                      "to": "claude",
+                      "label": "describe"
+                    },
+                    {
+                      "from": "claude",
+                      "to": "folder",
+                      "label": "draft"
+                    },
+                    {
+                      "from": "folder",
+                      "to": "flowview",
+                      "label": "preview"
+                    },
+                    {
+                      "from": "flowview",
+                      "to": "next",
+                      "label": "continue"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "starts",
+                      "type": "tiles",
+                      "title": "Four ways to begin",
+                      "tiles": [
+                        {
+                          "id": "story",
+                          "label": "Story"
+                        },
+                        {
+                          "id": "existing",
+                          "label": "Flow"
+                        },
+                        {
+                          "id": "hld",
+                          "label": "HLD"
+                        },
+                        {
+                          "id": "trace",
+                          "label": "Trace"
+                        }
+                      ],
+                      "states": [
+                        "READY",
+                        "FOCUS",
+                        "COVERED"
+                      ],
+                      "colors": {
+                        "READY": "#64748B",
+                        "FOCUS": "#7C3AED",
+                        "COVERED": "#059669"
+                      },
+                      "initial": {
+                        "story": {
+                          "state": "FOCUS",
+                          "sub": "people · steps"
+                        },
+                        "existing": {
+                          "state": "READY",
+                          "sub": "known path"
+                        },
+                        "hld": {
+                          "state": "READY",
+                          "sub": "design sketch"
+                        },
+                        "trace": {
+                          "state": "READY",
+                          "sub": "issue evidence"
+                        }
+                      }
+                    }
+                  ],
+                  "sectionLayout": {
+                    "columns": 24,
+                    "default": [
+                      {
+                        "x": 0,
+                        "y": 0,
+                        "w": 24,
+                        "h": 6
+                      },
+                      {
+                        "panel": "starts",
+                        "x": 0,
+                        "y": 6,
+                        "w": 24,
+                        "h": 3
+                      },
+                      {
+                        "controls": "steps",
+                        "x": 0,
+                        "y": 9,
+                        "w": 24,
+                        "h": 3
+                      }
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "id": "start-story",
+                      "nodes": [
+                        "input"
+                      ],
+                      "text": "Start with a customer story: actor, goal, major steps, and exceptions. No graph vocabulary is required."
+                    },
+                    {
+                      "id": "start-engineer",
+                      "edge": "input->claude",
+                      "text": "Or start from an existing engineering flow, an HLD, or a Honeycomb trace. Claude asks for missing details and keeps evidence distinct from assumptions.",
+                      "panels": {
+                        "starts": {
+                          "existing": {
+                            "state": "FOCUS",
+                            "sub": "known path"
+                          },
+                          "hld": {
+                            "state": "FOCUS",
+                            "sub": "design sketch"
+                          },
+                          "trace": {
+                            "state": "FOCUS",
+                            "sub": "issue evidence"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "start-artifacts",
+                      "edge": "claude->folder",
+                      "text": "The draft becomes a Flowview spec plus a coverage ledger. The ledger records questions, decisions, evidence, and open work.",
+                      "panels": {
+                        "starts": {
+                          "story": {
+                            "state": "COVERED",
+                            "sub": "story saved"
+                          },
+                          "existing": {
+                            "state": "COVERED",
+                            "sub": "flow saved"
+                          },
+                          "hld": {
+                            "state": "COVERED",
+                            "sub": "HLD saved"
+                          },
+                          "trace": {
+                            "state": "COVERED",
+                            "sub": "trace saved"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "start-preview",
+                      "edge": "folder->flowview",
+                      "text": "Flowview renders the story so people can inspect the steps, system relationships, and missing coverage before accepting an update."
+                    },
+                    {
+                      "id": "start-next",
+                      "edge": "flowview->next",
+                      "text": "Click the Next · Claude arrow card to see how a new diagram begins with Claude Code."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "02 · Claude",
+            "sections": [
+              {
+                "id": "create",
+                "heading": "Create a new diagram with Claude",
+                "accent": "cyan",
+                "text": [
+                  "In Workbench, choose Agent → New Connection, then Start a new diagram with an agent. Select an empty diagram folder and the recommended Copy & paste conversation mode.",
+                  "The tagged panel represents the separate Claude Code window. In a real session, questions, permissions, and interrupts stay in Claude; Flowview shares the selected folder and handles preview and approval."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "person": {
+                      "title": "You",
+                      "sub": "story owner",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "workbench": {
+                      "title": "Workbench",
+                      "sub": "setup + selection",
+                      "icon": "monitor",
+                      "tint": "cmd"
+                    },
+                    "folder": {
+                      "title": "Shared folder",
+                      "sub": "spec · ledger · kit",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "agent": {
+                      "title": "Claude Code",
+                      "sub": "external app",
+                      "icon": "terminal",
+                      "tint": "cmd"
+                    },
+                    "next": {
+                      "title": "Next · Review",
+                      "sub": "follow the handoff",
+                      "icon": "shield",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "review"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "person",
+                      "workbench",
+                      "folder",
+                      "agent",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "person",
+                      "to": "workbench",
+                      "label": "choose new"
+                    },
+                    {
+                      "from": "workbench",
+                      "to": "folder",
+                      "label": "prepare folder"
+                    },
+                    {
+                      "from": "folder",
+                      "to": "agent",
+                      "label": "paste setup"
+                    },
+                    {
+                      "from": "agent",
+                      "to": "next",
+                      "label": "draft ready"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "agent",
+                      "type": "log",
+                      "title": "Claude Code · separate window",
+                      "tags": {
+                        "YOU": "#7C3AED",
+                        "CLAUDE": "#0891B2",
+                        "FILE": "#059669",
+                        "FLOW": "#D97706"
+                      },
+                      "initial": {
+                        "log": [
+                          {
+                            "tag": "YOU",
+                            "text": "Show our checkout story, including payment failure."
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "sectionLayout": {
+                    "columns": 24,
+                    "default": [
+                      {
+                        "x": 0,
+                        "y": 0,
+                        "w": 24,
+                        "h": 6
+                      },
+                      {
+                        "panel": "agent",
+                        "x": 0,
+                        "y": 6,
+                        "w": 24,
+                        "h": 4
+                      },
+                      {
+                        "controls": "steps",
+                        "x": 0,
+                        "y": 10,
+                        "w": 24,
+                        "h": 3
+                      }
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "id": "create-choose",
+                      "edge": "person->workbench",
+                      "text": "Choose New Connection → Start a new diagram with an agent. The workbench asks where the conversation will happen and where the diagram will live."
+                    },
+                    {
+                      "id": "create-folder",
+                      "edge": "workbench->folder",
+                      "text": "Select an empty folder. Flowview prepares the connection instructions and authoring kit there. Review the full instructions before copying them.",
+                      "panels": {
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "FILE",
+                              "text": "Diagram folder ready · story.spec.json + story.ledger.md"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "create-paste",
+                      "edge": "folder->agent",
+                      "text": "Paste the setup instructions into Claude Code. Claude verifies the exact folder, reads the packaged guidance, and works with normal file permissions.",
+                      "panels": {
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "YOU",
+                              "text": "Pasted Flowview setup instructions."
+                            },
+                            {
+                              "tag": "CLAUDE",
+                              "text": "I found the folder and will draft the worksheet first."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "create-draft",
+                      "nodes": [
+                        "agent",
+                        "folder"
+                      ],
+                      "text": "Claude turns the story into steps, nodes and edges, while recording assumptions and open questions in the ledger. This panel is illustrative, not a live transcript.",
+                      "panels": {
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "CLAUDE",
+                              "text": "What should happen when the payment is declined?"
+                            },
+                            {
+                              "tag": "YOU",
+                              "text": "Keep the cart; let the customer retry."
+                            },
+                            {
+                              "tag": "FILE",
+                              "text": "Candidate spec + ledger prepared for review."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "create-next",
+                      "edge": "agent->next",
+                      "text": "Click Next · Review to see the proposed change and the human approval gate.",
+                      "panels": {
+                        "agent": {
+                          "log": [
+                            {
+                              "tag": "FLOW",
+                              "text": "Preview available in Flowview · awaiting your review."
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "03 · Review",
+            "sections": [
+              {
+                "id": "review",
+                "heading": "Update → preview → approve",
+                "accent": "amber",
+                "text": [
+                  "Ask for a change from the Agent panel. Copy request registers the current selection and message; paste it into the same Claude conversation. Claude edits candidate copies of the spec and ledger, then submits a proposal.",
+                  "Preview Agent Updates compares Current and Proposed. Commit update accepts the reviewed pair as one Workbench Undo action. A Git commit or publication is a separate decision. Switch the path below to show a correction loop."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "request": {
+                      "title": "Your request",
+                      "sub": "selected context",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "agent": {
+                      "title": "Claude Code",
+                      "sub": "edits candidates",
+                      "icon": "terminal",
+                      "tint": "cmd"
+                    },
+                    "proposal": {
+                      "title": "Proposal",
+                      "sub": "spec + ledger",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "preview": {
+                      "title": "Preview",
+                      "sub": "Current vs Proposed",
+                      "icon": "monitor",
+                      "tint": "cmd"
+                    },
+                    "accepted": {
+                      "title": "Accepted",
+                      "sub": "one Undo action",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "next": {
+                      "title": "Next · Views",
+                      "sub": "follow the handoff",
+                      "icon": "monitor",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "views"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "request",
+                      "agent",
+                      "proposal"
+                    ],
+                    [
+                      "preview",
+                      "accepted",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "request",
+                      "to": "agent",
+                      "label": "Copy request"
+                    },
+                    {
+                      "from": "agent",
+                      "to": "proposal",
+                      "label": "submit pair"
+                    },
+                    {
+                      "from": "proposal",
+                      "to": "preview",
+                      "label": "render + compare"
+                    },
+                    {
+                      "from": "preview",
+                      "to": "accepted",
+                      "label": "Commit update"
+                    },
+                    {
+                      "from": "preview",
+                      "to": "agent",
+                      "label": "feedback"
+                    },
+                    {
+                      "from": "accepted",
+                      "to": "next",
+                      "label": "continue"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "gate",
+                      "type": "checks",
+                      "title": "Approval gate · illustrative",
+                      "checks": [
+                        {
+                          "id": "request",
+                          "label": "Request registered"
+                        },
+                        {
+                          "id": "pair",
+                          "label": "Spec and ledger proposed"
+                        },
+                        {
+                          "id": "preview",
+                          "label": "Visual comparison reviewed"
+                        },
+                        {
+                          "id": "decision",
+                          "label": "Human decision recorded"
+                        }
+                      ],
+                      "initial": {
+                        "results": {
+                          "request": {
+                            "status": "pending"
+                          },
+                          "pair": {
+                            "status": "pending"
+                          },
+                          "preview": {
+                            "status": "pending"
+                          },
+                          "decision": {
+                            "status": "pending"
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "sectionLayout": {
+                    "columns": 24,
+                    "default": [
+                      {
+                        "x": 0,
+                        "y": 0,
+                        "w": 24,
+                        "h": 12
+                      },
+                      {
+                        "panel": "gate",
+                        "x": 0,
+                        "y": 12,
+                        "w": 24,
+                        "h": 5
+                      },
+                      {
+                        "controls": "steps",
+                        "x": 0,
+                        "y": 17,
+                        "w": 24,
+                        "h": 6
+                      }
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "id": "review-request",
+                      "edge": "request->agent",
+                      "text": "A request captures the message, selected items, view, path, step, and detail level. Copy alone does not silently send it to Claude.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass",
+                              "detail": "Selection and message registered"
+                            },
+                            "pair": {
+                              "status": "pending"
+                            },
+                            "preview": {
+                              "status": "pending"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-pair",
+                      "edge": "agent->proposal",
+                      "text": "Claude edits the seeded candidate spec and ledger. The accepted files remain untouched until a person approves the proposal.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "pass",
+                              "detail": "Both candidate files submitted"
+                            },
+                            "preview": {
+                              "status": "pending"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-preview",
+                      "edge": "proposal->preview",
+                      "text": "Preview Agent Updates renders the proposal. Compare Current and Proposed, inspect change highlights, and expand the coverage ledger when needed.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "pass"
+                            },
+                            "preview": {
+                              "status": "pass",
+                              "detail": "Visual and ledger comparison"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-approve",
+                      "edge": "preview->accepted",
+                      "text": "Choose Commit update only after review. Flowview saves the spec and ledger together; one Undo can restore the prior pair.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "pass"
+                            },
+                            "preview": {
+                              "status": "pass"
+                            },
+                            "decision": {
+                              "status": "pass",
+                              "detail": "Human approved the update"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-feedback",
+                      "edge": "preview->agent",
+                      "text": "If the proposal is wrong or conflicts with a newer edit, discard or copy feedback. Claude reconciles the current pair and submits a new proposal.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "warn",
+                              "detail": "Correction requested"
+                            },
+                            "preview": {
+                              "status": "pass"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-revise",
+                      "edge": "agent->proposal",
+                      "text": "Claude uses the feedback and latest accepted revision to prepare corrected candidates. The new proposal still needs a fresh human review.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "pass",
+                              "detail": "Revised candidate pair"
+                            },
+                            "preview": {
+                              "status": "pending"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-preview-again",
+                      "edge": "proposal->preview",
+                      "text": "Review the corrected Current and Proposed states. An earlier approval cannot be reused after a change.",
+                      "panels": {
+                        "gate": {
+                          "results": {
+                            "request": {
+                              "status": "pass"
+                            },
+                            "pair": {
+                              "status": "pass"
+                            },
+                            "preview": {
+                              "status": "pass",
+                              "detail": "Correction reviewed"
+                            },
+                            "decision": {
+                              "status": "pending"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "review-next",
+                      "edge": "accepted->next",
+                      "text": "Click Next · Views to show two reader experiences built from this same approved story."
+                    }
+                  ],
+                  "paths": [
+                    {
+                      "id": "approve",
+                      "label": "Approve",
+                      "color": "#059669",
+                      "steps": [
+                        "review-request",
+                        "review-pair",
+                        "review-preview",
+                        "review-approve",
+                        "review-next"
+                      ]
+                    },
+                    {
+                      "id": "needs-work",
+                      "label": "Needs work",
+                      "color": "#D97706",
+                      "steps": [
+                        "review-request",
+                        "review-pair",
+                        "review-preview",
+                        "review-feedback",
+                        "review-revise",
+                        "review-preview-again",
+                        "review-approve",
+                        "review-next"
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "04 · Views",
+            "sections": [
+              {
+                "id": "views",
+                "heading": "Standard for the story. Explore for the system.",
+                "accent": "cyan",
+                "text": [
+                  "Use the Chapter buttons above the diagram: Standard story presents a curated page with its diagram, prose, panel, and steps. Explore canvas opens a full-height graph with floating panels and Section notes.",
+                  "Both Chapters read the same spec, paths, and step state. Switch views during this tab; pan, zoom, and Fit diagram in Explore, then return to Standard for the audience summary."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "spec": {
+                      "title": "One spec",
+                      "sub": "same source",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "standard": {
+                      "title": "Standard",
+                      "sub": "curated arrangement",
+                      "icon": "monitor",
+                      "tint": "cmd"
+                    },
+                    "explore": {
+                      "title": "Explore",
+                      "sub": "full-canvas graph",
+                      "icon": "gear",
+                      "tint": "dev"
+                    },
+                    "audience": {
+                      "title": "Your audience",
+                      "sub": "follow the story",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "next": {
+                      "title": "Next · Iterate",
+                      "sub": "follow the handoff",
+                      "icon": "terminal",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "iterate"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "spec",
+                      "standard",
+                      "explore",
+                      "audience",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "spec",
+                      "to": "standard",
+                      "label": "present"
+                    },
+                    {
+                      "from": "spec",
+                      "to": "explore",
+                      "label": "investigate"
+                    },
+                    {
+                      "from": "standard",
+                      "to": "audience",
+                      "label": "explain"
+                    },
+                    {
+                      "from": "explore",
+                      "to": "audience",
+                      "label": "inspect"
+                    },
+                    {
+                      "from": "audience",
+                      "to": "next",
+                      "label": "continue"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "modes",
+                      "type": "tiles",
+                      "title": "One story · two viewing modes",
+                      "tiles": [
+                        {
+                          "id": "standard",
+                          "label": "Standard"
+                        },
+                        {
+                          "id": "explore",
+                          "label": "Explore"
+                        },
+                        {
+                          "id": "same",
+                          "label": "Shared"
+                        }
+                      ],
+                      "states": [
+                        "READY",
+                        "ACTIVE",
+                        "SHARED"
+                      ],
+                      "colors": {
+                        "READY": "#64748B",
+                        "ACTIVE": "#7C3AED",
+                        "SHARED": "#059669"
+                      },
+                      "initial": {
+                        "standard": {
+                          "state": "ACTIVE",
+                          "sub": "curated page"
+                        },
+                        "explore": {
+                          "state": "READY",
+                          "sub": "pan · zoom"
+                        },
+                        "same": {
+                          "state": "SHARED",
+                          "sub": "same steps"
+                        }
+                      }
+                    }
+                  ],
+                  "defaultLayout": "standard-story",
+                  "layouts": [
+                    {
+                      "id": "standard-story",
+                      "name": "Standard story",
+                      "presentation": "standard",
+                      "sectionLayout": {
+                        "columns": 24,
+                        "default": [
+                          {
+                            "x": 0,
+                            "y": 0,
+                            "w": 24,
+                            "h": 6
+                          },
+                          {
+                            "panel": "modes",
+                            "x": 0,
+                            "y": 6,
+                            "w": 24,
+                            "h": 3
+                          },
+                          {
+                            "controls": "steps",
+                            "x": 0,
+                            "y": 9,
+                            "w": 24,
+                            "h": 3
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "id": "explore-canvas",
+                      "name": "Explore canvas",
+                      "presentation": "explore",
+                      "sectionLayout": {
+                        "columns": 24,
+                        "default": [
+                          {
+                            "x": 0,
+                            "y": 0,
+                            "w": 24,
+                            "h": 6
+                          },
+                          {
+                            "panel": "modes",
+                            "x": 0,
+                            "y": 6,
+                            "w": 24,
+                            "h": 3
+                          },
+                          {
+                            "controls": "steps",
+                            "x": 0,
+                            "y": 9,
+                            "w": 24,
+                            "h": 3
+                          }
+                        ]
+                      },
+                      "exploreLayout": {
+                        "panels": [
+                          {
+                            "panel": "modes",
+                            "x": 0.71,
+                            "y": 0.08,
+                            "w": 0.27,
+                            "h": 0.3,
+                            "stacked": true
+                          }
+                        ],
+                        "prose": {
+                          "x": 0.71,
+                          "y": 0.41,
+                          "w": 0.27,
+                          "h": 0.29,
+                          "stacked": true
+                        }
+                      }
+                    }
+                  ],
+                  "steps": [
+                    {
+                      "id": "views-source",
+                      "nodes": [
+                        "spec"
+                      ],
+                      "text": "The diagram, panels, captions, paths, and evidence live in one authored spec. The Chapter choice changes how the audience sees them."
+                    },
+                    {
+                      "id": "views-standard",
+                      "edge": "spec->standard",
+                      "text": "Standard arranges the story for a guided reading. Prose and panel sit beside the diagram, with step controls in the page layout."
+                    },
+                    {
+                      "id": "views-explore",
+                      "edge": "spec->explore",
+                      "text": "Switch to Explore canvas now. The graph fills the browser, while the panel and Section notes float above it. Pan, zoom, or Fit diagram.",
+                      "panels": {
+                        "modes": {
+                          "standard": {
+                            "state": "READY",
+                            "sub": "curated page"
+                          },
+                          "explore": {
+                            "state": "ACTIVE",
+                            "sub": "pan · zoom · fit"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "views-shared",
+                      "nodes": [
+                        "standard",
+                        "explore"
+                      ],
+                      "text": "Switch back and forth at this step. The current path, step, and panel values are shared; no duplicate story is maintained.",
+                      "panels": {
+                        "modes": {
+                          "same": {
+                            "state": "SHARED",
+                            "sub": "same story"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "views-next",
+                      "edge": "audience->next",
+                      "text": "Click Next · Iterate to see a business-to-engineering handoff and an evidence-based update."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "05 · Iterate",
+            "sections": [
+              {
+                "id": "iterate",
+                "heading": "The same diagram grows with the team",
+                "accent": "violet",
+                "text": [
+                  "A business person can author the experience first. An engineer can enrich that same folder with services, edges, and failure paths. An HLD or Honeycomb trace adds design intent or observed incident evidence.",
+                  "The ledger keeps decisions and uncertainty visible while the visual story changes. Each new agent proposal goes through the same preview and approval gate."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "pm": {
+                      "title": "Business owner",
+                      "sub": "customer outcome",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "engineer": {
+                      "title": "Engineer",
+                      "sub": "system detail",
+                      "icon": "terminal",
+                      "tint": "cmd"
+                    },
+                    "evidence": {
+                      "title": "Evidence",
+                      "sub": "HLD · trace",
+                      "icon": "server",
+                      "tint": "data"
+                    },
+                    "folder": {
+                      "title": "Same folder",
+                      "sub": "spec + ledger",
+                      "icon": "db",
+                      "tint": "data"
+                    },
+                    "next": {
+                      "title": "Next · Share",
+                      "sub": "follow the handoff",
+                      "icon": "monitor",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "share"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "pm",
+                      "engineer",
+                      "evidence",
+                      "folder",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "pm",
+                      "to": "engineer",
+                      "label": "handoff"
+                    },
+                    {
+                      "from": "engineer",
+                      "to": "evidence",
+                      "label": "ground detail"
+                    },
+                    {
+                      "from": "evidence",
+                      "to": "folder",
+                      "label": "update pair"
+                    },
+                    {
+                      "from": "folder",
+                      "to": "next",
+                      "label": "continue"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "handoff",
+                      "type": "log",
+                      "title": "Shared ledger · handoff notes",
+                      "tags": {
+                        "PM": "#7C3AED",
+                        "ENG": "#0891B2",
+                        "TRACE": "#D97706",
+                        "LEDGER": "#059669"
+                      },
+                      "initial": {
+                        "log": [
+                          {
+                            "tag": "PM",
+                            "text": "Checkout story: show the customer retry after a decline."
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "sectionLayout": {
+                    "columns": 24,
+                    "default": [
+                      {
+                        "x": 0,
+                        "y": 0,
+                        "w": 24,
+                        "h": 6
+                      },
+                      {
+                        "panel": "handoff",
+                        "x": 0,
+                        "y": 6,
+                        "w": 24,
+                        "h": 4
+                      },
+                      {
+                        "controls": "steps",
+                        "x": 0,
+                        "y": 10,
+                        "w": 24,
+                        "h": 3
+                      }
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "id": "iterate-story",
+                      "nodes": [
+                        "pm"
+                      ],
+                      "text": "The business owner records who acts, what they expect, and where the journey can fail. Their story remains visible after engineering detail is added."
+                    },
+                    {
+                      "id": "iterate-engineer",
+                      "edge": "pm->engineer",
+                      "text": "An engineer reopens the diagram folder, fills in services and connections, and preserves the narrative while making technical claims explicit.",
+                      "panels": {
+                        "handoff": {
+                          "log": [
+                            {
+                              "tag": "ENG",
+                              "text": "Add payment gateway, retry edge, and decline path."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "iterate-evidence",
+                      "edge": "engineer->evidence",
+                      "text": "An HLD can explain a proposed design. A Honeycomb trace can show the observed path behind an incident. Evidence and inference stay separate.",
+                      "panels": {
+                        "handoff": {
+                          "log": [
+                            {
+                              "tag": "TRACE",
+                              "text": "Observed decline spans differ from expected retry path."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "iterate-update",
+                      "edge": "evidence->folder",
+                      "text": "Claude updates candidate spec and ledger files in the same folder. The team previews the changes, resolves questions, and approves a new revision.",
+                      "panels": {
+                        "handoff": {
+                          "log": [
+                            {
+                              "tag": "LEDGER",
+                              "text": "Decision, source, assumption, and open question recorded."
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "id": "iterate-next",
+                      "edge": "folder->next",
+                      "text": "Click Next · Share to show what leaves the Workbench after the update is accepted."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "label": "06 · Share",
+            "sections": [
+              {
+                "id": "share",
+                "heading": "Share a living artifact, not a slide export",
+                "accent": "amber",
+                "text": [
+                  "After approval, export the editable JSON and a standalone interactive HTML page. Keep the coverage ledger with the working diagram folder. Readers can play steps, switch tabs and Chapters, follow handoffs, and inspect alternate paths.",
+                  "Committing or publishing the reviewed files is a separate authorized action. This very walkthrough is a Flowview spec and portable HTML export: use it to show the product by using it."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "accepted": {
+                      "title": "Approved pair",
+                      "sub": "spec + ledger",
+                      "icon": "shield",
+                      "tint": "auth"
+                    },
+                    "export": {
+                      "title": "Export",
+                      "sub": "JSON + HTML",
+                      "icon": "package",
+                      "tint": "cmd"
+                    },
+                    "reader": {
+                      "title": "Interactive page",
+                      "sub": "tabs · paths · steps",
+                      "icon": "monitor",
+                      "tint": "dev"
+                    },
+                    "team": {
+                      "title": "Team",
+                      "sub": "review and iterate",
+                      "icon": "person",
+                      "tint": "dev"
+                    },
+                    "next": {
+                      "title": "Back · Start",
+                      "sub": "replay the tour",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "handoff": {
+                        "localSection": "start"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "accepted",
+                      "export",
+                      "reader",
+                      "team",
+                      "next"
+                    ]
+                  ],
+                  "edges": [
+                    {
+                      "from": "accepted",
+                      "to": "export",
+                      "label": "download"
+                    },
+                    {
+                      "from": "export",
+                      "to": "reader",
+                      "label": "open"
+                    },
+                    {
+                      "from": "reader",
+                      "to": "team",
+                      "label": "share"
+                    },
+                    {
+                      "from": "team",
+                      "to": "next",
+                      "label": "replay"
+                    }
+                  ],
+                  "panels": [
+                    {
+                      "id": "outputs",
+                      "type": "tiles",
+                      "title": "What you can take away",
+                      "tiles": [
+                        {
+                          "id": "json",
+                          "label": "JSON source"
+                        },
+                        {
+                          "id": "html",
+                          "label": "Reader HTML"
+                        },
+                        {
+                          "id": "ledger",
+                          "label": "Ledger"
+                        },
+                        {
+                          "id": "repo",
+                          "label": "Repo review"
+                        }
+                      ],
+                      "states": [
+                        "READY",
+                        "SHARED"
+                      ],
+                      "colors": {
+                        "READY": "#64748B",
+                        "SHARED": "#059669"
+                      },
+                      "initial": {
+                        "json": {
+                          "state": "READY",
+                          "sub": "editable"
+                        },
+                        "html": {
+                          "state": "READY",
+                          "sub": "interactive"
+                        },
+                        "ledger": {
+                          "state": "READY",
+                          "sub": "decisions"
+                        },
+                        "repo": {
+                          "state": "READY",
+                          "sub": "Git review"
+                        }
+                      }
+                    }
+                  ],
+                  "sectionLayout": {
+                    "columns": 24,
+                    "default": [
+                      {
+                        "x": 0,
+                        "y": 0,
+                        "w": 24,
+                        "h": 6
+                      },
+                      {
+                        "panel": "outputs",
+                        "x": 0,
+                        "y": 6,
+                        "w": 24,
+                        "h": 3
+                      },
+                      {
+                        "controls": "steps",
+                        "x": 0,
+                        "y": 9,
+                        "w": 24,
+                        "h": 3
+                      }
+                    ]
+                  },
+                  "steps": [
+                    {
+                      "id": "share-pair",
+                      "nodes": [
+                        "accepted"
+                      ],
+                      "text": "The accepted spec and ledger remain together in the diagram folder. They are the editable source and the record of coverage."
+                    },
+                    {
+                      "id": "share-export",
+                      "edge": "accepted->export",
+                      "text": "Use Export to download JSON for further Workbench edits and standalone HTML for an interactive reader.",
+                      "panels": {
+                        "outputs": {
+                          "json": {
+                            "state": "SHARED",
+                            "sub": "editable source"
+                          },
+                          "html": {
+                            "state": "SHARED",
+                            "sub": "portable reader"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "share-reader",
+                      "edge": "export->reader",
+                      "text": "Open the HTML in a browser. The audience can still play the story, choose tabs and Chapters, and follow handoff arrows."
+                    },
+                    {
+                      "id": "share-team",
+                      "edge": "reader->team",
+                      "text": "Share the approved diagram with the team. If it needs another change, return to the source folder and run the same request → preview → approval loop.",
+                      "panels": {
+                        "outputs": {
+                          "ledger": {
+                            "state": "SHARED",
+                            "sub": "decisions"
+                          },
+                          "repo": {
+                            "state": "SHARED",
+                            "sub": "if approved"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "share-next",
+                      "edge": "team->next",
+                      "text": "Click Back · Start to replay the tour or jump directly to any tab above."
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "brand": {
+      "app": "Flowview",
+      "logo": "FV",
+      "accent": "#6750A4"
+    }
+  }
+}

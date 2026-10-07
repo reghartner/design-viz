@@ -113,6 +113,14 @@ waiting for the registry lock, and stops checkpoints. A new OFF setup gates old
 copiers immediately when the setup is saved, before it is pasted into Claude. Each new participant authorizes their own session; an
 existing folder alone never grants consent.
 
+Run every `pilot_capture.py` invocation in its **own Bash call**, including
+`--enable` (with or without `--explicit-opt-in`), turn-start refresh,
+`--after-turn`, and `--disable`. Include only the helper command: no `;`, `&&`,
+pipes, `cat`, `ls`, other commands, or file reads. Folder preparation is a
+separate call. Afterwards inspect `.flowview-pilot/after-turn-status.json` with
+a separate **Read** call, preferably on the next turn. Inspect `editor.json`
+and `story.agent.*` with **Read**, not `cat`, separately from capture.
+
 Capture writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
 the spec/ledger, and uses `.flowview-pilot/` for local session copies and status.
 It appends capture ignore rules to the root `.gitignore` without removing existing

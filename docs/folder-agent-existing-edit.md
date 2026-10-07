@@ -11,6 +11,13 @@ new-session consent. Follow [pilot capture](../.claude/skills/hld-to-page/refere
 for consent checks, later opt-in and stopping; while opted in, checkpoint at
 entry and before every reply, including bounded edits.
 
+Every `pilot_capture.py` invocation (`--enable`, turn-start refresh,
+`--after-turn`, or `--disable`) must be its **own Bash call** containing only
+that helper command: no `;`, `&&`, pipes, `cat`, `ls`, other commands, or reads.
+Afterwards inspect `.flowview-pilot/after-turn-status.json` with a separate
+**Read** call, preferably on the next turn. Inspect `editor.json` and
+`story.agent.*` with **Read**, not `cat`; never bundle those reads with capture.
+
 ## Scope
 
 For bounded fact, label, status and time corrections. Preserve story meaning,

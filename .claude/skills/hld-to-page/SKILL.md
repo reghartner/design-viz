@@ -39,6 +39,14 @@ transcript, observed model, and token usage artifacts; dollar cost is collected
 manually by the pilot owner. Do not ask participants to find/export transcripts.
 Check capture status before claiming the final response was included.
 
+Run **every** `pilot_capture.py` invocation in its **own Bash call**: enrollment
+(`--enable`, including later explicit opt-in), turn-start refresh, `--after-turn`,
+and metadata-only `--disable`. The call contains only that helper command: no
+`;`, `&&`, pipes, `cat`, `ls`, other commands, or file reads. Afterwards inspect
+`.flowview-pilot/after-turn-status.json` with a separate **Read** call, preferably
+on the next turn. Inspect `editor.json` and `story.agent.*` with **Read**, not
+`cat`; keep those reads separate from capture calls.
+
 **Shared topology?** When reusing a canon provider's structural nodes/edges,
 read [shared topology](../../../docs/shared-topology.md). Author explicit exports
 and namespaced imports, keep narrative local, and validate the complete canon

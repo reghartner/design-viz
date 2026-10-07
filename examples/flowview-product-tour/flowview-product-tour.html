@@ -8101,7 +8101,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                 "heading": "Build the fictional doorbell diagram with Claude",
                 "accent": "violet",
                 "text": [
-                  "Follow the real Workbench setup, including Story or Engineering focus, then choose a source path to see an illustrative Claude conversation. Every path targets the same six-beat doorbell story."
+                  "Choose Story, Mixed, or Engineering detail for the audience in the real Workbench setup. Separately, choose a source path in this tour to see an illustrative Claude conversation. Every path targets the same six-beat doorbell story."
                 ],
                 "diagram": {
                   "view": "step",
@@ -8278,10 +8278,10 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                       "nodes": [
                         "workbench"
                       ],
-                      "text": "Select Engineering in the actual Workbench detail selector for the existing flow example. Engineering focus makes service and evidence detail available for this source; the source path itself is chosen in this tour.",
+                      "text": "Select Story for this business-led existing flow. Story/Mixed/Engineering sets the audience; Existing flow is separate source material chosen in this tour.",
                       "panels": {
                         "setup-screen": {
-                          "screen": "engineering-focus"
+                          "screen": "story-focus"
                         }
                       }
                     },
@@ -8290,7 +8290,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                       "nodes": [
                         "workbench"
                       ],
-                      "text": "Select Engineering in the actual Workbench detail selector for the hld design example. Engineering focus makes service and evidence detail available for this source; the source path itself is chosen in this tour.",
+                      "text": "Select Engineering for this HLD walkthrough. Detail level serves the audience; the HLD is independent source material chosen in this tour.",
                       "panels": {
                         "setup-screen": {
                           "screen": "engineering-focus"
@@ -8302,7 +8302,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                       "nodes": [
                         "workbench"
                       ],
-                      "text": "Select Engineering in the actual Workbench detail selector for the honeycomb trace example. Engineering focus makes service and evidence detail available for this source; the source path itself is chosen in this tour.",
+                      "text": "Select Engineering for this trace walkthrough. Detail level serves the audience; the Honeycomb export is independent source material chosen in this tour.",
                       "panels": {
                         "setup-screen": {
                           "screen": "engineering-focus"
@@ -8340,7 +8340,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "I pasted the Flowview setup. Use this diagram folder for the fictional doorbell example."
+                              "text": "[Pasted Flowview Setup Instructions]"
                             },
                             {
                               "tag": "CLAUDE",
@@ -8413,18 +8413,18 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                     },
                     {
                       "id": "build-flow-source",
-                      "text": "Existing flow: an engineer brings the route that runs today. Engineering detail can carry real components and edges.",
+                      "text": "Existing flow: a PM brings a documented process to a business audience. Story detail preserves its actions and outcome.",
                       "edge": "you->claude",
                       "panels": {
                         "agent": {
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "Existing fictional route: camera button → porch hub → recording service. Recording service writes clip metadata and enqueues an alert. Notification service consumes that queue."
+                              "text": "We already have a fictional doorbell process: quiet porch → button press → recording request → clip metadata saved → alert queued → resident alerted. Present it to product leadership."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "Is the resident alert delivery in the source, and should I include a clip playback or failure branch?"
+                              "text": "Should I keep this six-beat order and lead with the resident outcome? Does the source include playback or a failure branch?"
                             }
                           ]
                         }
@@ -8432,7 +8432,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                     },
                     {
                       "id": "build-flow-answer",
-                      "text": "The engineer constrains the output to supported operations and customer-visible results.",
+                      "text": "The PM confirms the existing process and its boundary. Claude keeps the business view without inventing technical evidence.",
                       "nodes": [
                         "claude"
                       ],
@@ -8441,11 +8441,11 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                           "log": [
                             {
                               "tag": "YOU",
-                              "text": "The reference flow shows notification delivery to the resident app. Do not add playback or a failure outcome. Preserve the quiet initial state."
+                              "text": "Yes. Keep that order and end at the resident alert. Do not add playback or a failure outcome; leave service identities for engineering follow-up."
                             },
                             {
                               "tag": "CLAUDE",
-                              "text": "I will map the supported route into six steps, keep the DB and queue as separate hops, and record source coverage in the ledger."
+                              "text": "I will map the documented process into six Story steps, distinguish metadata storage from the alert queue, and record missing service evidence in the ledger."
                             }
                           ]
                         }
@@ -8453,7 +8453,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                     },
                     {
                       "id": "build-flow-draft",
-                      "text": "Claude mirrors the canonical six-step route and records unresolved evidence rather than inventing it.",
+                      "text": "Claude preserves the six-beat existing process for business readers and records unresolved technical evidence for a later engineer handoff.",
                       "nodes": [
                         "claude"
                       ],
@@ -8462,7 +8462,7 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
                           "log": [
                             {
                               "tag": "CLAUDE",
-                              "text": "Draft: quiet → button to porch hub → create recording → persist clip metadata → enqueue notification → notification service delivers the alert. I will bind only catalog identities supplied by the source."
+                              "text": "Draft: quiet → button press → recording requested → metadata saved → alert queued → resident notified. The Story view uses plain labels; the ledger flags service identities and trace proof for follow-up."
                             },
                             {
                               "tag": "YOU",

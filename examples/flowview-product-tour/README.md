@@ -9,7 +9,7 @@ Standard versus Explore on another diagram.
 
 | Chapter | What the audience sees | Point of the chapter |
 |---|---|---|
-| Build with Claude | The real Workbench setup changes from the full dialog through Story or Engineering focus, Copy & paste, and folder selection. Four **tour paths** each reveal a detailed, explicitly illustrative YOU/CLAUDE conversation. | A business story, existing flow, HLD, or Honeycomb trace can start the same six-beat doorbell project. These sources are not four Workbench buttons. |
+| Build with Claude | The real Workbench setup changes from the full dialog through a Story or Engineering detail example, Copy & paste, and folder selection. Four **tour paths** each reveal a detailed, explicitly illustrative YOU/CLAUDE conversation. | A business story, existing flow, HLD, or Honeycomb trace can start the same six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice; this tour shows an existing flow presented in Story detail. |
 | Review and continue | An illustrative YOU/CLAUDE correction, actual proposal comparison and ledger detail, the post-commit receipt, then same-folder continuation with a second illustrative exchange. | The person decides what lands; the spec and ledger persist together in the same folder. |
 | Find and use in Backstage | Seven actual plugin states: Recording service Diagrams page → native inline viewer → matching destinations → section → step 3 → expanded viewer → entity page. Broad screens are followed by focused UI details. | An explicitly bound service exposes the approved diagram on its own page; section/step jumps keep the selected diagram in context. |
 
@@ -17,7 +17,9 @@ All three chapters default to **Standard**. Use the chapter tabs to move between
 acts and the step control to play each act. Build's four path labels switch the
 **illustrative source conversation**, while the setup screen shows the actual
 Workbench controls: Story/Mixed/Engineering detail, Copy & paste, and folder
-selection. The conversation is not a transcript of a real Claude session.
+selection. An existing flow can serve a business audience; it does not require
+Engineering detail. The conversation is not a transcript of a real Claude
+session. Its setup paste is shown as `[Pasted Flowview Setup Instructions]`.
 
 The fictional reference is
 [`examples/canon/specs/doorbell.json`](../canon/specs/doorbell.json):

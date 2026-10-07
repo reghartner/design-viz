@@ -56,9 +56,11 @@ evidence remain legible at 1280×800.
 ## Starting materials and canonical route
 
 The four Build paths share the Workbench setup and final proposal. The path
-labels are Story, Existing flow, HLD, and Honeycomb trace. Story detail is the
-demonstrated setup value; Mixed and Engineering are genuine detail choices, not
-separate source buttons. Each path asks a source-specific clarifying question,
+labels are Story, Existing flow, HLD, and Honeycomb trace. The Workbench's
+Story/Mixed/Engineering selector controls audience detail independently of those
+source paths: this tour shows Story detail for the business story and a
+business-led existing flow, and Engineering detail for the HLD and trace.
+Each path asks a source-specific clarifying question,
 records the user's boundary, then drafts the canonical six beats:
 
 1. Quiet porch.
@@ -69,7 +71,9 @@ records the user's boundary, then drafts the canonical six beats:
 6. Notification service sends the alert to the resident app.
 
 The Story route leaves backend identities to engineer enrichment in the same
-folder. The Existing flow route names supplied operations. The HLD route marks
+folder. The Existing flow route preserves a documented process for business
+readers and flags service identities and technical proof for engineering
+follow-up. The HLD route marks
 an authored proposed design. The trace route identifies five observed spans:
 `porch-hub POST /button`, `recording-service POST /recordings`, `clip-store
 INSERT clip`, `notification-queue publish doorbell`, and

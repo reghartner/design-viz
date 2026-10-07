@@ -1,0 +1,148 @@
+# Panel placement preference rounds
+
+The offline panel corpus creates **48 fictional scenarios** with actual Flowview
+panels: **36 review pairs in three batches of 12**, plus **12 held-out scenarios**.
+Each batch mixes four first, four second and four third scenario variants, all
+three host widths, and all three graph roles. It is a source of comparison inputs,
+not human preference evidence. No algorithm has been fitted to these examples.
+
+## Generate and review
+
+Run from the repository root, after installing the locked browser tooling:
+
+```sh
+npm ci --prefix tools/browser-tests
+npm exec --prefix tools/browser-tests -- playwright install chromium
+node tools/panel-placement/generate.mjs --output .local/panel-placement/round-1 --seed round-1
+python3 tools/arrange-training/serve.py \
+  --dataset .local/panel-placement/round-1/review \
+  --submissions .local/panel-placement/round-1/human-submissions \
+  --port 8771
+```
+
+Open `http://127.0.0.1:8771`. Choose **A**, **B**, **Both acceptable**, or
+**Neither acceptable**. Both says that both candidates are acceptable; Neither
+says neither is acceptable. Neither label is converted to a preferred winner.
+A reason is optional (500 characters maximum). Partial submissions are welcome.
+Draft choices and reasons survive reload; each submit creates an immutable
+revision. Clearing a previously submitted reason creates a changed draft.
+Download backup preserves the current choices and reasons separately.
+
+Generation refuses a populated output directory. For a new round, use a new
+output directory **and seed**, preserving previous previews, manifests and
+submissions. Human submissions must be outside the served review root. The
+server creates that directory only when a person submits. Never use a real
+human submission directory for automated tests.
+
+`--limit N` produces a smoke dataset, not a complete round. Only the pinned
+Playwright dependency and its Chromium are used; there is no ambient browser
+fallback. Sources are loaded using `tools/source-loader.cjs`, without importing
+or trusting stale generated HTML. Optional visual QA contact sheets require
+Pillow:
+
+```sh
+python3 tools/panel-placement/montage.py .local/panel-placement/round-1
+python3 tools/panel-placement/montage.py .local/panel-placement/round-1 \
+  --ids residential-3,security-3,video-3,ingestion-3,api-3,health-3,capacity-3,warehouse-3,hardware-3,distributed-3,experience-3,overview-3
+```
+
+## Coverage
+
+Every panel has a nonempty authored declaration and concrete example state.
+Scenario goals describe an operational decision. Detailed rows, status checks,
+logs, budget values, notifications and replica observations vary with the case.
+Specialized scene renderers use their real fictional picker scenes with scenario
+context. The reference image is a deterministic illustrated operations screen.
+
+| Domain | Panel families | Review panel counts | Held-out panel count |
+| --- | --- | --- | --- |
+| Residential | homemap, screen, phone, battery, deviceapp, appscreens | 3, 5, 6 | 4 |
+| Security | radar, security, dispatch, zoneframe | 3, 4, 6 | 5 |
+| Video | screen, buffer, inflight, log | 2, 4, 7 | 6 |
+| Ingestion | queue, replicas, table, checks | 2, 5, 8 | 4 |
+| API | trace, waterfall, data-contract, timeline | 1, 4, 6 | 5 |
+| Device health | thermo, signal, gauge, battery, leds | 1, 3, 7 | 4 |
+| Capacity | cost, budget, gauge, table | 2, 3, 5 | 6 |
+| Warehouse | homemap, state, tiles, dispatch | 2, 4, 6 | 7 |
+| Hardware | xray, leds, signal, buffer | 1, 4, 8 | 3 |
+| Distributed systems | orbit, inflight, replicas, timeline | 2, 5, 7 | 8 |
+| Customer experience | appscreens, image, phone, deviceapp | 1, 3, 5 | 4 |
+| Operations overview | checks, cost, table, state, tiles | 2, 4, 8 | 6 |
+
+All **32 panel types** appear. Widths are **800, 1000 and 1440 CSS pixels**;
+host targets are default, Backstage and Confluence. Diagram roles are dominant,
+secondary and hidden. Four graph shapes contain 3, 6, 8 and 12 nodes. Existing
+Viz/auto-arrange helpers produce frozen node coordinates and routes before
+candidate creation; A/B always has the same graph geometry.
+
+Candidate families include independent main/rail stacks, equal columns, a
+summary-first composition, diagram with a rail, and full-width evidence stacks.
+Portrait devices use narrow tiles. Odd column spans are deliberate. Single-panel
+cases may compare width/height instead of grouping. The seeded shuffle hides
+family names from the review UI. Methods remain in the private capture report.
+
+## Identity, rendering and provenance
+
+The only permitted A/B differences are `x`, `y`, `w`, `h` in the active
+24-column Standard layout. Deep canonical comparison covers everything else:
+panels and their order, labels, content, images, steps, controls attachment,
+hidden flags, graph nodes/routes and named view. Each spec passes the production
+validator. Every visible panel must actually render, have content and match its
+expected ID. Rendered panel text must match between candidates. Geometry checks
+reject overlap, noninteger/out-of-bounds rectangles and duplicate/missing tiles.
+
+Captures use the actual native renderer, bundled fonts, the pastel skin,
+fixed UTC date, reduced motion and disabled CSS transitions/animations. The
+same checkpoint is rendered for both candidates. Each pair has equal pixel
+width, scale and canvas height; shorter layouts receive blank canvas padding
+below the document. The preview UI scales both images equally and offers full
+size enlargement. Individual panel DOM/CSS is never stretched to hide clipping.
+If a panel needs more height, its saved candidate rectangle grows and is packed
+again before capture. Unresolved outer clipping and capture errors are fatal.
+Repeated captures must settle to identical PNG hashes before publication.
+
+`corpus.json`, `provenance.json` and `capture-report.json` stay outside the served
+root. The report records nested scrolling/overflow for visual QA. The manifest
+records spec/PNG SHA-256 hashes and semantic content hash. Renderer provenance
+includes source, CSS, harness, generator, workbench/Viz digests, commit and dirty
+state, browser/Node versions, DPR, locale, time, seed and corpus hash. Saved votes
+bind the manifest digest and both candidate spec **and PNG** hashes. Server
+startup freezes the exact verified bytes and independently checks semantic
+identity, bounds, overlap, split, metadata and image dimensions.
+
+Holdout specs and images live under `holdout/`, outside `review/`. They are absent
+from the public manifest, and the server rejects holdout records. Inspecting
+holdout captures for render failures is quality assurance; do not use preference
+labels from them to tune candidates or fit the algorithm.
+
+### Limits
+
+These are frozen screenshots, not interactive host integration tests. A bounded
+inner scroller, collapsed trace details or small labels can require enlargement;
+not every possible interactive state is pictured. The native renderer receives
+the target host profile but does not launch the full host application. Stock
+scene artwork is illustrative, and the cases are not production telemetry.
+Pixel hashes identify the exact delivered evidence; another OS/font rasterizer
+may produce different hashes even with equivalent geometry. Keep the frozen
+round alongside submissions.
+
+## Validation and next iteration
+
+```sh
+node --test tests/panel-placement.test.js
+python3 tests/test_panel_placement_review.py
+python3 tests/auto-arrange-review-server.test.py
+npm test --prefix tools/browser-tests -- \
+  --config playwright.review.config.mjs panel-placement-review.spec.mjs
+```
+
+The browser tests create separate temporary `synthetic-test` datasets and test
+Both/Neither, reasons, cleared reasons, drafts, backups and durable revisions at
+390px and 1440px. Node-mode Tie behavior remains covered. Synthetic records use
+`synthetic-comparison-test`, never `human-comparison`.
+
+After genuine choices arrive, inspect acceptance and failure reasons by content
+family, graph role, width and panel count. Preserve Both/Neither as acceptance
+labels. Propose a scoring change from the review data, evaluate it on the sealed
+12 scenarios, then create a fresh round with a new identity. Do not report a
+preference improvement, winner or learned score before human evidence exists.

@@ -1,0 +1,62 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import path from 'node:path';
+import {test,expect,pastePage,inspectPageElement,openInspectorGroup} from '../helpers/test.mjs';
+import {repo} from '../helpers/prepare.mjs';
+const source=await readFile(path.join(repo,'examples/doorbell-chime/doorbell-chime.spec.json'),'utf8');
+
+test('doorbell chime renders independent paths, readable states and small Canvas panels in the native viewer',async({page,server},info)=>{
+ await page.setViewportSize({width:1280,height:900});
+ await writeFile(path.join(server.root,'chime-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
+ await writeFile(path.join(server.root,'chime-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./chime-native.js"; window.mountChime=mountNativeViewer;</script>');
+ await page.goto(server.origin+'/chime-native.html');await page.waitForFunction(()=>!!window.mountChime);
+ await page.evaluate(raw=>window.viewer=mountChime(document.querySelector('#host'),raw),JSON.parse(source));
+ const host=page.locator('#host'),panel=host.locator('.chime-panel');
+ await expect(panel).toHaveAttribute('data-playback','stopped');
+ await expect(panel.getByRole('status')).toHaveText('Not playing');
+ await page.screenshot({path:info.outputPath('chime-idle.png')});
+ const go=(route,step)=>page.evaluate(({route,step})=>viewer.navigate({section:'doorbell',path:route,step}),{route,step});
+ await go('ring','ring');await expect(panel).toHaveAttribute('data-playback','playing');
+ await expect(panel.getByRole('status')).toHaveText('Playing');await expect(panel).toContainText('Someone is at the front door.');
+ await page.screenshot({path:info.outputPath('chime-playing.png')});
+ await expect(panel.locator('.chime-bars i').first()).toHaveCSS('animation-name','none');
+ await go('quiet','quiet');await expect(panel).toHaveAttribute('data-playback','stopped');await expect(panel).toContainText('Quiet hours are on.');
+ await go('ring','finish');await expect(panel).toContainText('The resident has been alerted.');
+ await go('ring','ring');await page.evaluate(()=>viewer.setCanvas(true));
+ const tile=host.locator('[data-explore-panel="bell"]');await expect(tile).toBeVisible();
+ await tile.evaluate(el=>el.style.width='220px');
+ expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
+ await page.screenshot({path:info.outputPath('chime-canvas.png')});
+ await page.emulateMedia({reducedMotion:'no-preference'});
+ await page.reload();await page.waitForFunction(()=>!!window.mountChime);
+ await page.evaluate(raw=>window.viewer=mountChime(document.querySelector('#host'),raw),JSON.parse(source));
+ await host.getByRole('button',{name:'Next step',exact:true}).click();
+ await expect(panel).toHaveAttribute('data-playback','playing');
+ await expect(panel.locator('.chime-bars i').first()).toHaveCSS('animation-name','chime-sound');
+ await page.emulateMedia({reducedMotion:'reduce'});await expect(panel.locator('.chime-bars i').first()).toHaveCSS('animation-name','none');
+ await page.emulateMedia({media:'print',reducedMotion:'no-preference'});await expect(panel.locator('.chime-bars i').first()).toHaveCSS('animation-name','none');
+ // Standard print suppresses the shared panel column; its motion still settles.
+ await expect(panel.locator('.chime-status')).toHaveText('Playing');
+ await page.evaluate(()=>viewer.destroy());await expect(host).toBeEmpty();
+});
+
+test('doorbell chime uses the shared initial/step inspector, undo and panel picker',async({page,server})=>{
+ await page.goto(server.origin+'/workbench.html');await pastePage(page,source);
+ const root=page.locator('#docview'),guide=page.locator('#guide'),src=page.locator('#src');
+ await inspectPageElement(page,root.locator('.pt-chime .ptitle'));
+ const initial=guide.locator('.initialedit');await openInspectorGroup(initial);
+ await initial.getByLabel('playback',{exact:true}).selectOption('playing');
+ expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.panels[0].initial.playback).toBe('playing');
+ const edited=await src.inputValue();await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
+ await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
+ await page.locator('#undo-builder').click();
+ await page.locator('#editor-tab-steps').click();await page.locator('#steps-list [data-step-index="1"]').click();await page.locator('#editor-tab-inspect').click();
+ const patch=guide.locator('.patchedit[data-panel-state="step"]');await openInspectorGroup(patch);
+ await patch.getByLabel('playback',{exact:true}).selectOption('stopped');
+ await patch.getByLabel('text',{exact:true}).fill('Please use the side door.');await patch.getByLabel('text',{exact:true}).press('Tab');
+ const d=JSON.parse(await src.inputValue()).page.sections[0].diagram;
+ expect(d.steps[1].panels.bell).toEqual({playback:'stopped',text:'Please use the side door.'});
+ await page.locator('#diagram-add').click();await page.locator('[data-add-kind=panel]').click();
+ await page.locator('.panel-picker-card[data-panel-type=chime]').click();await expect(page.locator('#panel-picker-preview .chime-status')).toHaveText('Playing');
+ await page.locator('#panel-picker-add').click();
+ expect(JSON.parse(await src.inputValue()).page.sections[0].diagram.panels[1]).toMatchObject({type:'chime',initial:{playback:'stopped'}});
+});

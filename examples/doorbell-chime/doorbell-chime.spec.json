@@ -1,0 +1,28 @@
+{
+  "page": {
+    "title": "A ring at the front door",
+    "skin": "pastel",
+    "sections": [{
+      "id": "doorbell",
+      "heading": "Doorbell chime",
+      "bullets": ["Illustrative playback states. This preview is silent."],
+      "diagram": {
+        "view": "step", "autoplay": false,
+        "nodes": {"doorbell":{"title":"Front door","icon":"doorbell"},"chime":{"title":"Hallway chime","icon":"chime"}},
+        "rows": [["doorbell","chime"]],
+        "edges": [{"from":"doorbell","to":"chime","kind":"int"}],
+        "panels": [{"id":"bell","type":"chime","title":"Hallway chime","initial":{"playback":"stopped"}}],
+        "steps": [
+          {"id":"ready","text":"The hallway chime is ready for a visitor.","nodes":["chime"]},
+          {"id":"ring","text":"The visitor presses the doorbell.","edge":"doorbell->chime","panels":{"bell":{"playback":"playing","text":"Someone is at the front door."}}},
+          {"id":"finish","text":"The chime finishes playing.","nodes":["chime"],"panels":{"bell":{"playback":"stopped","text":"The resident has been alerted."}}},
+          {"id":"quiet","text":"Quiet hours keep the hallway chime silent.","nodes":["chime"],"panels":{"bell":{"text":"Quiet hours are on."}}}
+        ],
+        "paths": [
+          {"id":"ring","label":"Chime enabled","steps":["ready","ring","finish"]},
+          {"id":"quiet","label":"Quiet hours","steps":["ready","quiet"]}
+        ]
+      }
+    }]
+  }
+}

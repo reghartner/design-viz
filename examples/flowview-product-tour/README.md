@@ -11,6 +11,8 @@ arrow-shaped **Next** card to hand off to the following tab. The **Views** tab
 also has two Chapters: switch between **Standard story** and **Explore canvas**
 to demonstrate the actual viewing modes on one shared diagram. In **Review**,
 switch between **Approve** and **Needs work** to show the correction loop.
+The other tabs open in **Tour canvas**, an Explore Chapter that keeps the full
+auto-arranged graph, supporting panel, and step controls in view.
 On a fresh browser, dismiss Flowview's built-in first-visit walkthrough with
 **Skip** before presenting. **PRESENT** gives the diagram more room.
 
@@ -38,3 +40,31 @@ Validate the edited spec with:
 ```sh
 node tools/validate.js examples/flowview-product-tour/flowview-product-tour.spec.json
 ```
+
+The six node layouts were produced with the production
+`tools/auto-arrange-spec.cjs --all` command from an unpositioned draft. If you
+change topology, run that tool with distinct input and output paths, then
+review the result before regenerating HTML.
+
+Five embedded **On screen** image panels show the real Flowview interface:
+conversation mode on **Start**, folder selection on **Claude**, the update
+preview on **Review**, and the two reader modes on **Views**. They are stored as
+PNG data URLs inside the spec, so the exported HTML works without an asset server.
+Original captures are in [screenshots](screenshots/). The Claude conversation
+contains only illustrative conversational lines; file-status lines were removed.
+
+Screenshot provenance (2026-10-07): Chromium/Playwright captured this checkout’s
+built `workbench/flowspec.html` and portable reader. Setup images are focused
+crops of the actual connection dialog. The review image uses the production
+review dialog and renderer with a seeded checkout proposal (payment declined →
+keep cart/retry); it is a UI demonstration, not evidence of an agent run. No
+approval was committed. Reader captures show the tour before adding the image
+panels, avoiding screenshots nested inside themselves. Source images are static
+references; use the live Chapter controls to demonstrate interaction.
+
+In Explore, screenshot panels lead the right column at 37% of the viewport;
+conversation/check/summary panels follow them. Start, Claude, and Review keep
+Section notes closed initially because their step captions carry the narration.
+The review capture uses the actual responsive dialog at 700 × 570 so its
+Current/Proposed and Commit/Discard controls remain readable at presentation size.
+For automated visual checks, await each visible image’s `decode()` before capture.

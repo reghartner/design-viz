@@ -36,11 +36,8 @@ body .section-layout-grid {
 }
 
 body #section-build-layout,
-body #section-review-layout,
-body #section-update-layout,
-body #section-backstage-layout {
-  /* Chapter rows grow with the viewport; the review and Backstage diagrams
-     continue below evidence and controls at a height that shows both rows. */
+body #section-update-layout {
+  /* The first two chapters keep their original viewport-scaled rows. */
   grid-auto-rows: clamp(15px, calc(3.0303vh - 8.485px), 25px) !important;
   gap: 4px !important;
 }
@@ -112,55 +109,6 @@ body #section-backstage .appscreens figcaption {
 body #section-review .pt-appscreens > .ptitle,
 body #section-backstage .pt-appscreens > .ptitle {
   display: none;
-}
-
-/* Paths, transport, and the current beat fit in one middle band on this
-   presentation. The stock path matrix otherwise pushes the caption below
-   the detached controls tile. */
-body #section-review [data-layout-key="steps"] .termbar.has-paths {
-  flex-wrap: nowrap;
-  align-items: center;
-}
-
-body #section-review [data-layout-key="steps"] .playback-status {
-  display: none;
-}
-
-body #section-review [data-layout-key="steps"] .termbar.has-paths .schips {
-  flex: 0 0 auto;
-  width: auto;
-  max-width: 48%;
-}
-
-body #section-review [data-layout-key="steps"] .path-matrix {
-  grid-template-columns: minmax(100px, max-content) repeat(var(--path-step-count), 26px);
-  gap: 4px 2px;
-}
-
-body #section-review [data-layout-key="steps"] .path-matrix .path-chip {
-  max-width: 130px;
-  min-height: 26px;
-}
-
-body #section-review [data-layout-key="steps"] .path-row .schip {
-  width: 26px;
-  height: 26px;
-}
-
-body #section-review [data-layout-key="steps"] .path-row[data-selected="false"] .schip {
-  display: none;
-}
-
-body #section-review [data-layout-key="steps"] .stepline {
-  flex: 1 1 0;
-  min-width: 0;
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-body #section-backstage [data-layout-key="steps"] .termbar {
-  padding: 6px 10px;
-  gap: 8px;
 }
 
 /* Focused ledger captures use their source aspect ratios. */
@@ -247,8 +195,184 @@ body #section-build .appscreens:has([data-screen-id="choice"]) .appscreen-stage 
   body .path-timeline {
     zoom: .9;
   }
+}
 
-  body #section-review .path-matrix {
-    zoom: .9;
+/* Review and catalog chapters share a compact control column beside the
+   evidence window. The graph uses the remaining height without clipping. */
+body :is(#section-review-layout, #section-backstage-layout) {
+  grid-template-columns: 252px minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.15fr) !important;
+  grid-auto-rows: auto !important;
+  height: calc(100vh - 150px);
+  gap: 8px !important;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
+  grid-column: 1 !important;
+  grid-row: 1 / -1 !important;
+  align-self: start;
+  height: auto;
+  max-height: 100%;
+}
+
+body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+}
+
+body :is(#section-review, #section-backstage) .pt-appscreens {
+  padding: 2px;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] .termbar {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] .step-transport {
+  flex-wrap: nowrap;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) {
+  display: none;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schips {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+  gap: 4px;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] .schip {
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+}
+
+body :is(#section-review, #section-backstage) [data-layout-key="steps"] .stepline {
+  flex: none;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: auto;
+}
+
+body :is(#section-review, #section-backstage) .board {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+body :is(#section-review, #section-backstage) .boardcanvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+
+body :is(#section-review, #section-backstage) .board:not(.board-zoomed) .boardcanvas > svg {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Keep the complete process readable while emphasizing the active hop. */
+body :is(#section-review, #section-backstage) .board g.node:not(.lit) {
+  opacity: .6;
+}
+body :is(#section-review, #section-backstage) .board :is(path.edge, text.lbl):not(.lit) {
+  opacity: .5;
+}
+
+/* Review paths need labels and a second row for the thirteen-step update. */
+body #section-review [data-layout-key="steps"] .termbar {
+  gap: 6px;
+  padding-block: 6px;
+}
+
+body #section-review [data-layout-key="steps"] .path-matrix {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  zoom: 1;
+}
+
+body #section-review [data-layout-key="steps"] .path-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+body #section-review [data-layout-key="steps"] .path-chip {
+  flex: 0 0 100%;
+  max-width: none;
+}
+
+body #section-review [data-layout-key="steps"] .path-row[data-selected="false"] .schip {
+  display: none;
+}
+
+body #section-review [data-layout-key="steps"] .stepline {
+  flex: 1 1 auto;
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+/* The longer update path needs a little more height above its full-width graph. */
+@media (min-width: 701px) {
+  body #section-review-layout:has(.path-row[data-path-row="update-existing"][data-selected="true"]) {
+    grid-template-rows: calc((100vh - 158px) / 2.15 + 16px) minmax(0, 1fr) !important;
+  }
+}
+
+body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
+  max-height: calc((100vh - 158px) / 2.15);
+}
+
+/* Short laptop viewports keep all update buttons above a scrollable caption. */
+@media (min-width: 701px) and (max-height: 768px) {
+  body #section-review:has(.path-row[data-path-row="update-existing"][data-selected="true"]) [data-layout-key="steps"] {
+    max-height: calc((100vh - 158px) / 2.15 + 16px);
+  }
+}
+
+@media (max-width: 700px) {
+  body :is(#section-review-layout, #section-backstage-layout) {
+    grid-template-columns: minmax(0, 1fr) !important;
+    grid-template-rows: 320px 300px 240px !important;
+    height: auto;
+  }
+  body :is(#section-review, #section-backstage) [data-layout-key="steps"] {
+    grid-row: 1 !important;
+    height: 100%;
+  }
+  body #section-review:has(.path-row[data-path-row="first-creation"][data-selected="true"]) [data-layout-key="steps"] {
+    max-height: 320px;
+  }
+  body :is(#section-review, #section-backstage) .section-layout-tile:has(> .pt-appscreens) {
+    grid-column: 1 !important;
+    grid-row: 2 !important;
+  }
+  body :is(#section-review, #section-backstage) [data-layout-key="diagram"] {
+    grid-column: 1 !important;
+    grid-row: 3 !important;
   }
 }

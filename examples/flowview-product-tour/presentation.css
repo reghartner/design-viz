@@ -84,6 +84,12 @@ body #section-build .appscreen-image img[data-screen-id="landing"] {
   transform-origin: left 80%;
 }
 
+/* The step caption narrates the composer and status states. Giving each
+   Workbench frame the caption's space keeps its highlighted control readable. */
+body #section-build .appscreens:has(img.appscreen-current:is([data-screen-id="request-story"], [data-screen-id="request-engineering"], [data-screen-id="working"], [data-screen-id="review-ready"])) figcaption {
+  display: none;
+}
+
 body #section-review .appscreens:has([data-screen-id="first-step-one"]) {
   --appscreen-ratio: 1.8 !important;
 }

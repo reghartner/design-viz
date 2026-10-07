@@ -48,7 +48,7 @@ navigate a published service association in Backstage.
 
 | Tab | Panel | Question answered | Evidence |
 |---|---|---|---|
-| Build new | setup-screen | What does a new build require in Workbench? | Broad landing page with the actual Build with my agent button outlined, followed by the How are you starting? dialog with its detail selector outlined, Story/Engineering choice, later path-matched Copy & paste highlight, focused Copy & paste control, and empty-folder chooser. |
+| Build new | setup-screen | What does a new build require in Workbench? | Broad landing page with the actual Build with my agent button outlined, followed by the How are you starting? dialog with its detail selector outlined, Story/Engineering choice, path-matched Copy & paste highlight, focused Copy control, empty-folder chooser, connected first-request composer with path-matched detail, then the empty My story canvas with Agent working and Review agent update in sequence. |
 | Build new | agent | What must Claude ask and record for this source? | Clearly illustrative YOU/CLAUDE dialogue, with a six-beat doorbell proposal for each route. |
 | Reconnect existing | update-screen | How does a saved project reopen? | Actual Workbench context, Reopen card, Continue existing choice, restored folder/setup, Copy instructions, and connected Agent state. |
 | Reconnect existing | update-agent | How can Claude continue from the saved pair? | Illustrative dialogue that reads the spec and ledger, receives the formal request, and submits a wording-only candidate for review. |
@@ -93,8 +93,13 @@ my agent button. The next beat shows the How are you starting? dialog and
 highlights its detail selector. Source-specific focus selection follows. The later Copy & paste
 beat highlights that control in a broad Workbench view with Story selected
 for business or Engineering selected for HLD and trace, followed by a focused
-control view. Then come empty-folder setup, source-specific Claude questions,
-and draft. The proposal hands directly to Review. A Workbench detail choice
+control view. The empty-folder chooser is followed by the connected Agent
+request composer, with Story or Engineering detail matching the route. Clicking
+Copy request registers the first turn and activates the empty My story canvas
+with the Agent working pill. Source-specific Claude
+questions and draft play against that canvas. At Build step 11 the actual
+Workbench signals that a candidate is ready, while the first candidate preview
+begins in Review. A Workbench detail choice
 does not switch the source route.
 
 **Reconnect existing:** a separate seven-step entry tab. The disconnected
@@ -138,18 +143,21 @@ present in that tab. A held screenshot does not imply a new UI action.
 | build-copy-broad-engineering | P: copy-broad-engineering | H | Broad Copy & paste highlight with Engineering still selected. |
 | build-connection | P: choice | H | Focused actual Copy & paste control follows the broad view. |
 | build-folder | P: folder | H | Actual new-folder chooser. |
-| build-paste | H: folder | D: setup and source question | External Claude exchange begins. |
-| build-story-source | H | D: PM source and boundary question | Source-specific dialogue. |
+| build-story-request | P: request-story | D: setup and source question | Story-detail connected Agent composer shows the first request before Copy request is clicked. Paste setup into Claude Code, then register and copy this request into that conversation. |
+| build-hld-request | P: request-engineering | D: setup and source question | Engineering-detail connected Agent composer shows the first request before Copy request is clicked. Paste setup into Claude Code, then register and copy this request into that conversation. |
+| build-trace-request | P: request-engineering | D: setup and source question | Engineering-detail connected Agent composer shows the first request before Copy request is clicked. Paste setup into Claude Code, then register and copy this request into that conversation. |
+| build-story-source | P: working | D: PM source and boundary question | Real empty Workbench canvas replaces the folder chooser once the first Copy request is registered. |
 | build-story-answer | H | D: PM boundary and Claude response | Source-specific dialogue. |
 | build-story-draft | H | D: six-beat PM draft | Source-specific dialogue. |
-| build-hld-source | H | D: HLD source and question | Source-specific dialogue. |
+| build-hld-source | P: working | D: HLD source and question | Real empty Workbench canvas replaces the folder chooser once the first Copy request is registered. |
 | build-hld-answer | H | D: authored-design boundary | Source-specific dialogue. |
 | build-hld-draft | H | D: six-beat HLD draft | Source-specific dialogue. |
-| build-trace-source | H | D: observed spans and question | Source-specific dialogue. |
+| build-trace-source | P: working | D: observed spans and question | Real empty Workbench canvas replaces the folder chooser once the first Copy request is registered. |
 | build-trace-answer | H | D: observed/authored boundary | Source-specific dialogue. |
 | build-trace-draft | H | D: trace-annotated six-beat draft | Source-specific dialogue. |
-| build-propose | H | D: candidate pair ready | Shared proposal beat. |
-| build-next | H | H | Text handoff directly to Review. |
+| build-story-review | P: review-ready | D: candidate pair ready | Story candidate handoff. The actual Workbench offers Preview Agent Updates; Review tab begins with that preview. |
+| build-hld-review | P: review-ready | D: candidate pair ready | HLD candidate handoff. The actual Workbench offers Preview Agent Updates; Review tab begins with that preview. |
+| build-trace-review | P: review-ready | D: candidate pair ready | Trace candidate handoff. The actual Workbench offers Preview Agent Updates; Review tab begins with that preview. |
 | update-open | P: wide | H: empty exchange | Broad Workbench and disconnected Agent. |
 | update-reopen-detail | P: reopen | H | Focused Reopen diagram folder control. |
 | update-continue | P: continue | H | Continue existing and Select Diagram Folder. |

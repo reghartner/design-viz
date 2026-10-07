@@ -9,7 +9,7 @@ Standard versus Explore on another diagram.
 
 | Chapter | What the audience sees | Point of the chapter |
 |---|---|---|
-| Build new with Claude | The Flowview landing page highlights **Build with my agent**. The next beat opens **How are you starting?** with the detail dropdown highlighted; Story or Engineering selection, the matching Copy & paste view, a focused Copy control, and an empty-folder choice follow. Three **tour paths** show illustrative YOU/CLAUDE conversations. | A business story, HLD, or Honeycomb trace can start a new six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice. |
+| Build new with Claude | The Flowview landing page highlights **Build with my agent**. The next beat opens **How are you starting?** with the detail dropdown highlighted; Story or Engineering selection, the matching Copy & paste view, a focused Copy control, an empty-folder choice, and the connected first-request composer follow. Step 8 shows the empty diagram with Agent working, and step 11 shows the ready state. Three **tour paths** show illustrative YOU/CLAUDE conversations. | A business story, HLD, or Honeycomb trace can start a new six-beat doorbell project. The source path is separate from the Story/Mixed/Engineering audience choice; the first candidate preview starts in Review and accept. |
 | Reconnect existing folder | The real Workbench recovery and Continue existing controls reopen a saved diagram folder before an illustrative Claude Code exchange updates the existing six-step story. | An existing flow may serve a business audience. Claude reads the accepted spec and ledger, preserves stable IDs, and proposes a revision. This is an alternative entry to Build new. |
 | Review and accept | Two native paths: First creation compares the empty Current scaffold with a source-neutral first candidate; Update existing inspects the wording-only proposal, compares the accepted Current spec and ledger, discards that pending proposal, then reviews a new evidence-corrected proposal. | Both entry routes share the human preview gate, with a different starting state and a distinct actual Workbench sequence. |
 | Find and use in Backstage | Seven actual plugin states: Recording service Diagrams page → native inline viewer → matching destinations → section → step 3 → expanded viewer → entity page. Broad screens are followed by focused UI details. | An explicitly bound service exposes the approved diagram on its own page; section/step jumps keep the selected diagram in context. |
@@ -76,6 +76,22 @@ paths then show their selected detail and matching broad Copy & paste choice
 before a shared focused Copy image. The orange outlines are presentation
 highlights on real controls. No folder permission was granted for these
 new-build captures.
+`agent-working-empty-diagram.png` and `agent-review-ready-empty-diagram.png`
+show the actual Workbench My story scaffold in a local disk-backed fixture.
+The immediately preceding step uses `agent-first-request-story.png` or
+`agent-first-request-engineering.png`: actual connected Agent panels with a
+source-neutral request drafted and Copy request highlighted, before that
+control is clicked. Their detail setting matches the Story or Engineering
+route. The Agent working pill is absent in both composer captures.
+For the first, setup was completed and a separate Copy request was registered;
+the top-bar Agent working pill appears only with that active request. Pasting
+setup instructions alone does not activate it. The Agent drawer was closed to
+show the empty canvas. For the second, the local fixture's candidate spec and
+ledger were proposed for that request, producing the ready banner and Preview
+Agent Updates button. The candidate fixture is source-neutral and is not a
+captured Claude conversation from any Build path. Orange outlines highlight
+the real status pill in each screenshot. The review modal itself appears only
+in the Review and accept tab.
 The existing-folder sequence starts with `reconnect-workbench-wide.png` (the
 existing diagram and disconnected Agent panel in context, with a presentation
 highlight on Reopen diagram folder), then `reconnect-start.png` (the focused

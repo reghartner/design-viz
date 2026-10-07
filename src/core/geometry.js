@@ -7,6 +7,23 @@ var W = 1180, CARD_H = 54, FLOAT_H = 44, ROW_GAP = 140, STACK_GAP = 46;
    strip when Auto or Fit width scaled the entire canvas. */
 var LEFT_X = 110, RIGHT_X = W - LEFT_X;
 
+/* Optional saved drawing bounds, not a reader camera. Invalid containers keep
+   the legacy canvas. Native measurement includes text/decorations; this pure
+   layout() expands for cards/groups; expandPlacedEdgeBounds() then expands for
+   explicit routed curves in the renderer and anonymous geometry exporter. */
+function validGraphFrame(frame){
+  return !!frame && typeof frame==='object' && !Array.isArray(frame) &&
+    ['x','y','w','h'].every(function(k){return Number.isFinite(frame[k]) && Math.abs(frame[k])<=100000;}) && frame.w>0 && frame.h>0;
+}
+function unionGraphFrame(frame,rectangles,padding){
+  var x=frame?frame.x:Infinity,y=frame?frame.y:Infinity,r=frame?frame.x+frame.w:-Infinity,b=frame?frame.y+frame.h:-Infinity;
+  (rectangles || []).forEach(function(box){
+    if(!box || !['x','y','w','h'].every(function(k){return Number.isFinite(box[k]);}) || box.w<0 || box.h<0)return;
+    x=Math.min(x,box.x-padding);y=Math.min(y,box.y-padding);r=Math.max(r,box.x+box.w+padding);b=Math.max(b,box.y+box.h+padding);
+  });
+  return Number.isFinite(x) && r>x && b>y ? {x:Math.floor(x),y:Math.floor(y),w:Math.ceil(r)-Math.floor(x),h:Math.ceil(b)-Math.floor(y)} : null;
+}
+
 function floatCoordinate(value){return Number.isFinite(value) && Math.abs(value)<=100000;}
 function positionedFloat(f){return !!f && floatCoordinate(f.x) && floatCoordinate(f.y);}
 var EDGE_PORT_SIDES=['top','right','bottom','left'];
@@ -313,8 +330,12 @@ function layout(spec){
     if (b.y - 2 < vbY) vbY = b.y - 2;
     if (b.x + b.w + 2 > vbR) vbR = b.x + b.w + 2;
   });
+  var frame={x:vbX,y:vbY,w:vbR-vbX,h:H-vbY};
+  if(validGraphFrame(spec.graphFrame))frame=unionGraphFrame(spec.graphFrame,
+    Object.keys(pos).map(function(id){var p=pos[id];return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};}).concat(
+    Object.keys(groupBoxes).map(function(id){var b=groupBoxes[id];return {x:b.x,y:b.y,w:b.w,h:b.h};})),24);
   return {pos:pos, rows:rowsMeta, groups:groupBoxes, H: H,
-          vb:{x:vbX, y:vbY, w:vbR - vbX, h:H - vbY},
+          vb:frame,
           routing:lanes ? 'lanes' : undefined};
 }
 

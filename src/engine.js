@@ -565,6 +565,7 @@ function showCommunicationFailures(board,failures,animate){
       group.removeChild(packet); effect.packet = null;
     }
   });
+  if(board.refreshFrame)board.refreshFrame();
 }
 
 /* Board popovers own their listeners outside the board's DOM too. */
@@ -838,6 +839,27 @@ function fitLaneNodeTitle(node, title, width){
     span.setAttribute('x','46');span.setAttribute('y',y + index * 14);span.textContent = line;text.appendChild(span);
   });
   if (hasSub) sub.setAttribute('y','48');
+}
+/* Measure complete graph ink in SVG coordinates, including transformed node
+   groups, paths, labels and coins. Hidden story fragments retain their bounds.
+   Headless DOMs without SVG measurement use the saved/pure geometry fallback. */
+function boardContentBounds(svg){
+  if(!svg || typeof svg.getCTM!=='function')return null;
+  var root=svg.getCTM();if(!root || typeof root.inverse!=='function')return null;
+  var inverse=root.inverse(),boxes=[];
+  Array.prototype.forEach.call(svg.children,function(child){
+    // Packet dots follow already included paths. Their transient SMIL position
+    // must not change saved framing; the 24-unit gutter covers their <=4.5 radius.
+    if(child.tagName.toLowerCase()==='defs' || child.matches('.dv-board-ground,.dv-board-grid,.pkt') || typeof child.getBBox!=='function')return;
+    try{
+      var box=child.getBBox(),matrix=child.getCTM();if(!matrix || !box.width && !box.height)return;
+      matrix=inverse.multiply(matrix);
+      var corners=[[box.x,box.y],[box.x+box.width,box.y],[box.x,box.y+box.height],[box.x+box.width,box.y+box.height]].map(function(xy){return {x:matrix.a*xy[0]+matrix.c*xy[1]+matrix.e,y:matrix.b*xy[0]+matrix.d*xy[1]+matrix.f};});
+      var x=Math.min.apply(null,corners.map(function(p){return p.x;})),y=Math.min.apply(null,corners.map(function(p){return p.y;}));
+      boxes.push({x:x,y:y,w:Math.max.apply(null,corners.map(function(p){return p.x;}))-x,h:Math.max.apply(null,corners.map(function(p){return p.y;}))-y});
+    }catch(ignored){}
+  });
+  return unionGraphFrame(null,boxes,24);
 }
 function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   destroyBoardLinks(el);
@@ -1139,6 +1161,19 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     });
   })();
 
+  function refreshFrame(){
+    if(!validGraphFrame(d.graphFrame))return;
+    var ink=boardContentBounds(svg);
+    if(ink){
+      vb=unionGraphFrame(vb,[ink],0);
+      svg.setAttribute('viewBox',vb.x+' '+vb.y+' '+vb.w+' '+vb.h);
+      svg.querySelectorAll('rect.dv-board-ground,rect.dv-board-grid').forEach(function(r){
+        r.setAttribute('x',vb.x);r.setAttribute('y',vb.y);r.setAttribute('width',vb.w);r.setAttribute('height',vb.h);
+      });
+    }
+  }
+  refreshFrame();
+
   function makeDot(info, cls){
     var col = kindColor(protos, info.kind, skinBase(skin));
     var dot = document.createElementNS(SVGNS, 'circle');
@@ -1192,9 +1227,9 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
   });
 
   return {kindsUsed: Object.keys(kindsUsed), anyRet: anyRet, edgeIds: edgeIds,
-    nodeEls: nodeEls, svg: svg, deltaDetails: el._deltaDetails,
+    nodeEls: nodeEls, svg: svg, deltaDetails: el._deltaDetails, refreshFrame:refreshFrame,
     /* re-pack each shared-edge coin row around the coins still visible */
-    layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup); }};
+    layoutCoins: function(){ coinGroups.forEach(layoutCoinGroup);refreshFrame(); }};
 }
 
 function legendHTML(kinds, anyRet, skin, protos){
@@ -1311,6 +1346,7 @@ function renderRuntimeConditions(board, host, conditions){
     var circle=document.createElementNS(SVGNS,'circle');circle.setAttribute('r','11');badge.appendChild(circle);
     var text=document.createElementNS(SVGNS,'text');text.setAttribute('text-anchor','middle');text.setAttribute('y','4');text.textContent=symbols[c.kind] || '!';badge.appendChild(text);node.appendChild(badge);
   });
+  if(board.refreshFrame)board.refreshFrame();
 }
 
 /* Explicit marker paint wins over skin/path palettes; all navigation semantics

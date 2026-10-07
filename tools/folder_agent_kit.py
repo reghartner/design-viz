@@ -31,6 +31,15 @@ def folder_agent_kit(root, runtime):
         files['tools/auto-arrange/vendor/' + name] = (root / 'src/workbench/vendor' / name).read_text()
     # Build from these sources; never depend on an existing generated file.
     files['tools/canon/generated-runtime.cjs'] = runtime
+    # Generated from current native sources, never copied from a stale build.
+    import subprocess
+    files['tools/arrange/generated-native.html'] = subprocess.run(
+        ['node', str(root / 'tools/arrange/build-payload.cjs')],
+        check=True, capture_output=True, text=True).stdout
+    files['tools/arrange-spec.cjs'] = (root / 'tools/arrange-spec.cjs').read_text()
+    for path in sorted((root / 'tools/arrange').iterdir()):
+        if path.suffix in ('.cjs', '.json') and path.name != 'build-payload.cjs':
+            files[path.relative_to(root).as_posix()] = path.read_text()
     raw = json.dumps({'files': files}, sort_keys=True, ensure_ascii=True).encode()
     return json.dumps({'sha256': hashlib.sha256(raw).hexdigest(),
                        'gzip': base64.b64encode(gzip.compress(raw, mtime=0)).decode(),

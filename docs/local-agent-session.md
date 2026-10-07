@@ -57,17 +57,14 @@ Preview restoration
 uses the existing view/step identity rules. If an agent removes the current view
 or step, the renderer uses its normal fallback.
 
-For a wholly new diagram, the agent authors nodes and semantic connections
-without coordinates or edge controls, then runs
-`node tools/auto-arrange-spec.cjs --section <zero-based-section> <draft> <different-output>`
-from the Flowview checkout and proposes that arranged
-output. It repeats `--section` for multiple new diagrams and uses `--all` only
-when every diagram is new. For an existing diagram, it keeps
-all placement and route fields. A newly added node uses an unpositioned
-`{id,side:"below",noSpread:true}` float with automatic connections; use the
-Workbench **Auto arrange** button if you want to
-replace the whole diagram's layout. The file session does not let the agent
-claim that it pressed the browser button.
+For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
+`node tools/arrange-spec.cjs --section <zero-based-section> <draft> <different-output>`
+from the authoring kit (or checkout) and propose its output. The command handles
+node placement, panel sizes and step controls; do not choose coordinates or
+rectangles. Preserve existing layouts and routes during ordinary edits; a new
+node uses `{id,side:"below",noSpread:true}`. Use `--rearrange` only when explicitly
+requested. See `docs/auto-arrange.md` for one-time setup. Report tool results,
+not visual QA or a browser button click.
 
 Updates wait while a text field is focused, a dialog is open, or a supported
 editor gesture is active. Finish the edit and click outside the field. An update

@@ -4,6 +4,7 @@
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
   tools/canon/generated-runtime.cjs = static DOM-free backend entrypoint
+  tools/arrange/generated-native.html = portable native measurement renderer
   workbench/diagrams.json = metadata index for folders listed in root canon.json
 
 The source loader owns entrypoint expansion, exports and asset inventory.
@@ -179,7 +180,7 @@ def fill(skel: str, mapping: dict) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--runtime-only", action="store_true", help="build the static Node runtime without HTML")
+    parser.add_argument("--runtime-only", action="store_true", help="build packaged backend and measurement runtimes only")
     config = parser.add_mutually_exclusive_group()
     config.add_argument('--config', type=pathlib.Path, help='company site JSON; spec paths resolve relative to this file')
     config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json')
@@ -191,6 +192,10 @@ def main() -> int:
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
+    native_path = ROOT / 'tools/arrange/generated-native.html'
+    native_path.write_text(subprocess.run(
+        ['node', str(ROOT / 'tools/arrange/build-payload.cjs')],
+        check=True, capture_output=True, text=True).stdout)
     if args.runtime_only:
         print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
         return 0

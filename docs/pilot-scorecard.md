@@ -93,6 +93,8 @@ content here.
 | Main native transcript token fields/totals | |
 | Separate subagent usage | excluded / separately measured / unknown |
 | Scheduled job/native session/enrollment/turn/boundary | |
+| Scheduled enrollment selects one usage session with matching native session and turn | yes / no / missing |
+| Checkpoint-returned `lastAfterTurnReceipt` read before another after-turn | yes / no / legacy helper |
 | Private receipt identity matches every available scheduled field | yes / no / missing |
 | Flowview owner session/connection matches current folder | yes / no / unavailable |
 | Targeted final reply recorded | yes / no / unavailable |

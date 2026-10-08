@@ -167,22 +167,39 @@ standalone Bash call. Inspect status with a separate Read operation.
    the same available identity as `captureId`, `turnId`, and
    `nativeProgress.capturedThroughLine`. Scheduling the bounded, up-to-45-second
    copy is not proof that the response was captured.
-2. On a short follow-up closeout turn, read that checkpoint's private receipt.
-   For a current receipt, match all five fields above. For an older receipt,
-   match `turnId`, `result.captureId`, and `replyCapture.afterNativeLine` to the
-   scheduled output; retain its native `sessionId`. Only then interpret the
-   outcome and require `replyCapture.finalResponseCaptured: true`. The Flowview
-   `owner.sessionId` and `owner.connectionId`, when present, must match this
-   folder's current connection.
-3. Treat a missing or mismatched receipt, `pending`, `checkpoint`, `partial`,
+2. On a short follow-up closeout turn, run the ordinary turn-start checkpoint.
+   When its output includes `lastAfterTurnReceipt`, use a separate Read operation
+   on that exact path **before scheduling another `--after-turn`**. It names this
+   native session's latest scheduled after-turn job; a later after-turn replaces
+   it, while ordinary checkpoints leave it intact. With an older helper that does
+   not return this field, separately Read the legacy
+   `.flowview-pilot/after-turn-status.json`.
+3. Separately Read structured `story.agent.usage.json`, never the raw transcript.
+   The scheduled `captureId` must select exactly one `sessions[]` entry. Require
+   that its `turns[]` contains the scheduled participant `turnId` or its recorded
+   alias. With a current helper, also require the entry's native `sessionId` to
+   match the scheduled value. With a legacy helper, the selected usage entry's
+   native `sessionId` is the independent expected value for the receipt check in
+   the next step. An unavailable or ambiguous session, mismatched native session,
+   or missing participant turn is a gap.
+4. Match the private receipt to the scheduling output. For a current receipt,
+   match `jobId`, native `sessionId`, `captureId`, `turnId`, and
+   `afterNativeLine`. For a legacy receipt, match `turnId`, `result.captureId`,
+   and `replyCapture.afterNativeLine` to the scheduled `turnId`, `captureId`, and
+   `nativeProgress.capturedThroughLine`; its top-level `sessionId` must match the
+   usage session selected above. The Flowview `owner.sessionId` and
+   `owner.connectionId`, when present, must match this folder's current
+   connection. Only then interpret the outcome and require
+   `replyCapture.finalResponseCaptured: true`.
+5. Treat a missing or mismatched receipt, `pending`, `checkpoint`, `partial`,
    `timeout_response_pending`, `failed`, or `disabled` result as a gap. Preserve
    the files and report it. A later refresh may capture delayed writes, but do
    not promise it will. `.flowview-agent/pilot-status.json` is only a browser
    summary; its opaque job and outcome cannot verify native turn identity.
-4. Have the participant ask to stop capture. Run the documented metadata-only
+6. Have the participant ask to stop capture. Run the documented metadata-only
    `--disable` command. Retry it only when it reports a pending registry update.
    Do not read the raw transcript to stop capture.
-5. Record that the administrative closeout and stop acknowledgement may be
+7. Record that the administrative closeout and stop acknowledgement may be
    outside the captured slice. There is no export/finalize command or
    timeout-free final-response capture.
 

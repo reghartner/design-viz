@@ -124,6 +124,7 @@ test('typed authoring and node rename/delete/paste use shared commands', () => {
 });
 
 const operation = () => JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/operation-cost.json')));
+const sixOperations = () => JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/cost-six-operations.json')));
 const single = () => operation().page.sections[0].diagram.panels[0];
 test('single operation has visible priced components and no comparison story', () => {
   assert.deepEqual(validate(operation()),{errors:[],warnings:[]});
@@ -146,8 +147,19 @@ test('three through six entries share a scale and allow following every entry', 
     near(chart.max,count);near(chart.routes[2].pct,3/count*100);assert.equal(m.delta,null);
     const html=C.costHTML(p,{messages:1,activeRoute:'r2'});
     assert.match(html,/cost-route-2 cost-active/);assert.doesNotMatch(html,/BASELINE|ALTERNATIVE|Comparison unavailable|cost-gap/);
+    assert.match(html,new RegExp('cost-many cost-count-'+count));
+    assert.match(html,new RegExp('class="cost-routes" style="--cost-route-count:'+count+'"'));
     assert.ok(plain(C.panelPatchFields(p)).some(field=>field[0]==='activeRoute' && field[2].includes('r2')));
   }
+});
+test('six-operation starter is a valid full-width 24-column example', () => {
+  const example=sixOperations(),layout=example.page.sections[0].diagram.sectionLayout;
+  assert.deepEqual(validate(example),{errors:[],warnings:[]});
+  assert.equal(layout.columns,24);assert.equal(layout.default[0].panel,'costs');assert.equal(layout.default[0].w,24);
+  const p=example.page.sections[0].diagram.panels[0],html=C.costHTML(p,p.initial);
+  assert.equal(p.routes.length,6);assert.equal(p.items.length,18);
+  for(const label of ['Image preprocessing','Document text extraction','Model inference','Database writes'])assert.ok(html.includes(label));
+  assert.match(html,/cost-many cost-count-6/);assert.match(html,/--cost-route-count:6/);
 });
 test('invalid cardinalities and declarations never produce credible partial totals', () => {
   for(const mutate of [p=>p.routes=[],p=>p.routes=null,p=>p.routes.push(null),p=>p.routes.push({id:'operation'}),

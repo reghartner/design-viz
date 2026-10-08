@@ -1,0 +1,81 @@
+{
+  "page": {
+    "title": "Six operation costs at a glance",
+    "subtitle": "One workflow · six operations · component-level authored estimates",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Per-document processing costs",
+        "diagram": {
+          "view": "ambient",
+          "nodes": {
+            "workflow": {
+              "title": "Document processing workflow",
+              "sub": "Six priced operations",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            [
+              "workflow"
+            ]
+          ],
+          "panels": [
+            {
+              "id": "costs",
+              "type": "cost",
+              "title": "Cost by operation",
+              "currency": "USD",
+              "unit": "document",
+              "period": "per document",
+              "assumptions": "Illustrative per-document estimates, not vendor quotes. Fixed amounts allocate shared service charges to one document. Excludes tax and engineering labor.",
+              "routes": [
+                {"id": "preprocess", "label": "Image preprocessing"},
+                {"id": "extract", "label": "Document text extraction"},
+                {"id": "embed", "label": "Embedding generation"},
+                {"id": "infer", "label": "Model inference"},
+                {"id": "persist", "label": "Database writes"},
+                {"id": "notify", "label": "Audit and notification"}
+              ],
+              "items": [
+                {"route": "preprocess", "label": "Image decode and normalization", "perMillion": 0, "fixed": 0.018},
+                {"route": "preprocess", "label": "Content safety scan", "perMillion": 0, "fixed": 0.012},
+                {"route": "preprocess", "label": "Thumbnail generation", "perMillion": 0, "fixed": 0.01},
+                {"route": "extract", "label": "OCR and layout analysis", "perMillion": 0, "fixed": 0.045},
+                {"route": "extract", "label": "Language detection", "perMillion": 0, "fixed": 0.009},
+                {"route": "extract", "label": "Text cleanup", "perMillion": 0, "fixed": 0.006},
+                {"route": "embed", "label": "Tokenization", "perMillion": 0, "fixed": 0.004},
+                {"route": "embed", "label": "Vector model inference", "perMillion": 0, "fixed": 0.022},
+                {"route": "embed", "label": "Index serialization", "perMillion": 0, "fixed": 0.005},
+                {"route": "infer", "label": "Prompt assembly", "perMillion": 0, "fixed": 0.011},
+                {"route": "infer", "label": "Generative model inference", "perMillion": 0, "fixed": 0.112},
+                {"route": "infer", "label": "Response validation", "perMillion": 0, "fixed": 0.019},
+                {"route": "persist", "label": "Transaction writes", "perMillion": 0, "fixed": 0.015},
+                {"route": "persist", "label": "Search index updates", "perMillion": 0, "fixed": 0.021},
+                {"route": "persist", "label": "Object metadata writes", "perMillion": 0, "fixed": 0.011},
+                {"route": "notify", "label": "Audit event storage", "perMillion": 0, "fixed": 0.008},
+                {"route": "notify", "label": "Webhook delivery", "perMillion": 0, "fixed": 0.012},
+                {"route": "notify", "label": "Metrics aggregation", "perMillion": 0, "fixed": 0.006}
+              ],
+              "initial": {
+                "messages": 1
+              }
+            }
+          ],
+          "sectionLayout": {
+            "columns": 24,
+            "default": [
+              {
+                "panel": "costs",
+                "x": 0,
+                "y": 0,
+                "w": 24,
+                "h": 15
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

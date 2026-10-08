@@ -43,15 +43,19 @@ function harness() {
       isConnected: {get: () => !!node.parentNode},
       innerHTML: {set(html) {
         node.replaceChildren();
-        if (!html.startsWith('<svg ')) return;
-        const svg = node.appendChild(element('svg'));
-        // Only the link triggers need DOM nodes in these layout-free boards.
-        for (const match of html.matchAll(/<g class="([^"]*)"[^>]*data-dv-node-id="([^"]*)"[^>]*>/g)) {
-          const trigger = svg.appendChild(element('g')); trigger.className = match[1];
-          trigger.setAttribute('data-dv-node-id', match[2]);
-        }
+        node.insertAdjacentHTML('afterbegin', html);
       }},
     });
+    node.insertAdjacentHTML = function(position, html) {
+      assert.equal(position, 'afterbegin');
+      if (!html.startsWith('<svg ')) return;
+      const svg = node.insertBefore(element('svg'), node.firstChild);
+      // Only the link triggers need DOM nodes in these layout-free boards.
+      for (const match of html.matchAll(/<g class="([^"]*)"[^>]*data-dv-node-id="([^"]*)"[^>]*>/g)) {
+        const trigger = svg.appendChild(element('g')); trigger.className = match[1];
+        trigger.setAttribute('data-dv-node-id', match[2]);
+      }
+    };
     return node;
   }
   document = element('document');
@@ -119,6 +123,20 @@ test('destroy cancels pending work, releases every owned listener and stays idem
     assert.equal(pop.hidden, true); assert.equal(h.timers.size, 0); assert.equal(trigger.focusCount, focusBefore);
   }
   assert.equal(h.document.events.get('click').has(external), true);
+});
+
+test('graph replacement preserves sibling canvas objects and their live identities', () => {
+  const h = harness(), host = h.element();
+  h.c.renderBoard(host, diagram, 'flow', 'aurora', h.c.resolveProtocols({}), {});
+  const layer = host.appendChild(h.element()), panel = layer.appendChild(h.element());
+  for (let i = 0; i < 3; i++) {
+    const oldGraph = host.firstChild;
+    h.c.renderBoard(host, diagram, 'flow', 'aurora', h.c.resolveProtocols({}), {});
+    assert.equal(oldGraph.parentNode, null);
+    assert.equal(host.querySelectorAll('svg').length, 1);
+    assert.equal(layer.parentNode, host);
+    assert.equal(panel.parentNode, layer);
+  }
 });
 
 test('board replacement disposes both link menus before mounting their replacements', () => {

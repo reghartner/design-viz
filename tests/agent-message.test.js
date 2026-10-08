@@ -62,10 +62,13 @@ test('context-only copy works with a selection and no message, but not with an e
   assert.equal(c.workbenchAgentMessage({...current,previewCurrent:false},{contextOnly:true}),'');
   assert.equal(c.workbenchAgentMessage(current,{message:''}),'','the message composer still requires a request');
 });
-test('prepared edit requests preserve existing geometry and reserve the CLI for new diagrams',()=>{
+test('prepared edit requests split pure Node graph arrangement from manual panel layout',()=>{
   const message=c.workbenchAgentMessage(snapshot([{section:1,kind:'node',id:'camera'}]),{message:'Add a relay after the camera.'});
-  assert.ok(message.includes('Preserve existing node placement and edge routes.'));
-  assert.ok(message.includes('append an unpositioned {id,side:"below",noSpread:true} float without X/Y or edge geometry'));
-  assert.ok(message.includes('I can press Auto arrange'));
-  assert.ok(message.includes('production Auto Arrange CLI only for a wholly new diagram'));
+  assert.ok(message.includes('bundled pure Node Auto Arrange CLI for wholly new graph topology'));
+  assert.ok(message.includes('manually author panel and controls rectangles'));
+  assert.ok(message.includes('Preserve unrelated existing placement, routes and panel rectangles unless this request asks for rearrangement.'));
+  assert.ok(message.includes('unpositioned {id,side:"below",noSpread:true} float'));
+  assert.ok(message.includes('submit it for Workbench preview'));
+  assert.ok(message.includes('browserless agent checks are not visual QA'));
+  assert.doesNotMatch(message,/tools\/arrange-spec|Chromium|Playwright/);
 });

@@ -152,10 +152,16 @@ def prepare(folder):
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         target.write_text(text, encoding='utf-8')
         os.chmod(target, 0o600)
-    # These formerly bundled files teach the retired operation API. Refreshing
-    # an existing session must remove them without touching authored files.
+    # Refreshing an existing session removes retired bundle-owned files without
+    # touching authored files. The arrange entries were the Chromium-backed
+    # participant tool; pure Node auto-arrange-spec.cjs remains in the kit.
     for name in ('docs/agent-operations.md', 'docs/agent-intent-testing.md',
-                 'src/workbench/agent-operations.js'):
+                 'src/workbench/agent-operations.js', 'tools/arrange-spec.cjs',
+                 'tools/arrange/generated-native.html', 'tools/arrange/contracts.cjs',
+                 'tools/arrange/measure.cjs', 'tools/arrange/model.cjs',
+                 'tools/arrange/package-lock.json', 'tools/arrange/package.json',
+                 'tools/arrange/packing.cjs', 'tools/arrange/setup.cjs',
+                 'tools/arrange/solver.cjs'):
         if name in kit['files']:
             continue
         target = destination

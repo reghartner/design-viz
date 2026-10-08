@@ -92,13 +92,16 @@ step patches. Device and room dragging in the step inspector changes all
 paths, while subject dragging edits the selected step. These are authoring
 coordinates in the 320×180 frame, not physical dimensions or sensor evidence.
 
-**Arrange for the delivery surface.** For new diagrams, run `tools/arrange-spec.cjs`
-after writing semantic content; it creates the 24-column panel/control layout.
-Use `--profile backstage` or `--profile confluence` when requested for that host.
-Preserve existing profiles during ordinary edits. See `docs/auto-arrange.md`
-for setup and supported inputs, and `docs/section-layouts.md` for the schema
-(`columns:24`; an absent marker means legacy 12). Host/width preview is temporary;
-missing profiles fall back to default, then the existing layout.
+**Arrange for the delivery surface.** For independently positioned/resized
+panels and data-flow diagrams, author `diagram.sectionLayout` with `default`,
+`backstage`, and/or `confluence` profiles. Read `docs/section-layouts.md` for the
+24-column tile contract (`columns:24`; an absent marker means legacy 12) and a
+complete example. Use `{controls:"steps",x,y,w,h}` for an independent
+playback/path/caption tile; omitting it keeps controls attached to the diagram.
+The pure Node graph Auto Arrange CLI does not create or replace these tile
+rectangles. Preserve existing profiles during ordinary edits. The Workbench's Arrange
+section and Optimize layout controls can refine these profiles; its host/width
+preview is temporary. Missing profiles fall back to default, then the existing layout.
 Every row diagram has **Auto / Fit width / Readable** viewing controls, including
 curved edges. Do not enable lane routing just to expose sizing; these choices
 do not modify the spec or routing. Auto scales smoothly with column width;
@@ -252,18 +255,16 @@ new arithmetic, no new attributions.
 ## Graph placement and connection schema
 
 For ordinary new-diagram authoring, follow SKILL rule 12: use unpositioned
-floats and automatic connections, then run the production Auto Arrange CLI or
-use the Workbench button. The fields below document existing specs and explicit
-user-directed layout work. Do not introduce them merely to improve appearance.
+floats and automatic connections, then run the bundled pure Node graph Auto
+Arrange CLI. The fields below document existing specs and explicit
+user-directed layout work.
 
 For an existing diagram, append a raw float
 `{id:"<new-node-id>",side:"below",noSpread:true}` plus its semantic edges.
 `noSpread` keeps this unpositioned insertion outside existing automatic float
 spacing and lane routing, so established node positions and routes stay stable.
-Do not add X/Y, ports or route fields. Tell the user that Workbench **Auto
-arrange** can replace the whole diagram layout if they want. The Workbench
-**Add to diagram → Node** action uses the same marker with a product-chosen
-position.
+Do not add X/Y, ports or route fields unless the user requests placement or a
+rearrangement.
 
 Existing `rows` arrays are in visual left-to-right order. A stack occupies one
 slot, with its members in top-to-bottom order. Each row retains its authored

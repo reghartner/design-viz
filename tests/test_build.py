@@ -115,6 +115,9 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(files['LICENSE'], (ROOT / 'LICENSE').read_text())
         self.assertNotIn('tools/source-loader.cjs', files)
         self.assertFalse(any(name.startswith('src/') and name.endswith('.js') for name in files))
+        self.assertNotIn('tools/arrange-spec.cjs', files)
+        self.assertFalse(any(name.startswith('tools/arrange/') for name in files))
+        self.assertFalse(any(name.endswith('package.json') or name.endswith('package-lock.json') for name in files))
         with tempfile.TemporaryDirectory(prefix='flowview-kit-') as directory:
             root = pathlib.Path(directory)
             for name, content in files.items():
@@ -132,20 +135,28 @@ class BuildTests(unittest.TestCase):
             self.assertTrue(folded)
             draft = root / 'draft.spec.json'
             arranged = root / 'arranged.spec.json'
+            manual_layout = {'columns': 24, 'default': [
+                {'x': 0, 'y': 0, 'w': 16, 'h': 12},
+                {'panel': 'phone', 'x': 16, 'y': 0, 'w': 8, 'h': 12},
+                {'controls': 'steps', 'x': 0, 'y': 12, 'w': 24, 'h': 5}
+            ]}
             draft.write_text(json.dumps({'nodes': {'a': {'title': 'A'}, 'b': {'title': 'B'}},
                                          'rows': [[]],
                                          'floats': [{'id': 'a', 'side': 'below'},
                                                     {'id': 'b', 'side': 'below'}],
-                                         'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}]}))
+                                         'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}],
+                                         'steps': [{'edge': 'a->b', 'text': 'Send'}],
+                                         'panels': [{'id': 'phone', 'type': 'phone', 'title': 'Phone'}],
+                                         'sectionLayout': manual_layout}))
             result = subprocess.run(['node', 'tools/auto-arrange-spec.cjs', str(draft), str(arranged)],
                                     cwd=root, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             output = json.loads(arranged.read_text())
-            self.assertEqual(output['edges'][0]['label'], 'send')
+            self.assertEqual(output['sectionLayout'], manual_layout)
             self.assertTrue(all('x' in item and 'y' in item for item in output['floats']))
-            self.assertNotIn('curveControls', output['edges'][0])
-            self.assertNotIn('fromPort', output['edges'][0])
-            self.assertNotIn('toPort', output['edges'][0])
+            result = subprocess.run(['node', 'tools/validate.js', '--quiet', str(arranged)],
+                                    cwd=root, capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
 
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)

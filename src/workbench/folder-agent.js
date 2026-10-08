@@ -228,9 +228,11 @@ function createFolderAgentClient(opts){
     var token=epoch,turn=turnEpoch,requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
     var health=null;try{health=await files.read('pilot-status.json');}catch(ignored){}
     if(!alive(token) || turn!==turnEpoch)return;
-    var healthOwner=await files.read('session.json');if(!alive(token) || turn!==turnEpoch)return;
-    pilotStatus=belongs(healthOwner)?folderAgentPilotHealth(health,manifest,now()):null;
-    if(!belongs(healthOwner)){connected=false;epoch++;publish({status:'Another connection owns this folder. Reconnect explicitly.'});return;}
+    pilotStatus=folderAgentPilotHealth(health,manifest,now());
+    if(pilotStatus){
+      var healthOwner=await files.read('session.json');if(!alive(token) || turn!==turnEpoch)return;
+      if(!belongs(healthOwner)){pilotStatus=null;connected=false;epoch++;publish({status:'Another connection owns this folder. Reconnect explicitly.'});return;}
+    }
     if(opts.workflow==='external'){
       var incoming=await readOptional('agent-request.json');if(!alive(token) || turn!==turnEpoch)return;
       if(pending && nativeSeen.has(pending) && belongs(incoming) && incoming.id===pending && incoming.withdrawn===true){

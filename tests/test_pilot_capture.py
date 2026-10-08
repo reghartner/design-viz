@@ -798,6 +798,19 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(json.loads(Path(first['lastAfterTurnReceipt']).read_text())['outcome'], 'disabled')
         self.assertEqual(self.receipt()['outcome'], 'disabled')
 
+    def test_disable_upgrades_legacy_receipts_without_native_reads(self):
+        self.run_capture()
+        legacy = {'sessionId': SID, 'turnId': 'turn-1', 'outcome': 'captured',
+                  'replyCapture': {'finalResponseCaptured': True}}
+        private = self.folder / capture.PRIVATE
+        for name in [capture.STATUS_FILE, SID + '.' + capture.STATUS_FILE]:
+            (private / name).write_text(json.dumps(legacy))
+        with patch.object(capture, 'source_for', side_effect=AssertionError('legacy stop is metadata only')):
+            self.assertEqual(capture.disable(self.folder, SID)['status'], 'disabled')
+        self.assertEqual(self.receipt()['outcome'], 'disabled')
+        self.assertEqual(self.receipt(SID)['outcome'], 'disabled')
+        self.assertFalse(self.receipt()['replyCapture']['finalResponseCaptured'])
+
     def test_failed_checkpoint_replaces_old_verified_status(self):
         self.run_capture()
         self.native.unlink()

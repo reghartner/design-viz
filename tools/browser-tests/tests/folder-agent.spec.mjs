@@ -454,7 +454,9 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     const events=new Map(),waiting=new Map();
-    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:['ignore','pipe','pipe']});
+    // Keep the measurement watcher alive for the entire 90-second test budget.
+    // A one-minute watcher can expire before exchange 50 and strand its event wait.
+    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','2'],{stdio:['ignore','pipe','pipe']});
     createInterface({input:watcher.stdout}).on('line',line=>{
       const event=JSON.parse(line);if(event.event!=='flowview_request')return;
       const at=Date.now();events.set(event.id,at);waiting.get(event.id)?.(at);

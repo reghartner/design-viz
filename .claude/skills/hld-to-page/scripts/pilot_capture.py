@@ -833,7 +833,8 @@ def save_receipt(folder, receipt, latest=False):
         if latest or retained and retained.get('jobId') == receipt['jobId']:
             save_json(retained_path, receipt)
     current = read_receipt(private / STATUS_FILE)
-    if latest or current and current.get('jobId') == receipt['jobId']:
+    if latest or current and (current.get('jobId') == receipt['jobId'] or
+                              not current.get('jobId') and current.get('sessionId') == receipt['sessionId']):
         save_json(private / STATUS_FILE, receipt)
         save_health(folder, receipt)
     # The stop barrier does not wait for this lock. Recheck after publication
@@ -897,7 +898,8 @@ def stop_status(folder, session_id):
     """Separate from capture.lock so a busy copier cannot hide the stop barrier."""
     with locked(folder / PRIVATE, 'status.lock'):
         current = read_receipt(folder / PRIVATE / (session_id + '.' + STATUS_FILE))
-        if current:
+        if current and current.get('sessionId') == session_id:
+            current.setdefault('jobId', uuid.uuid4().hex)  # Pre-job receipts can also be stopped safely.
             at = int(time.time() * 1000)
             current.update({'outcome': 'disabled', 'finishedAt': now(), 'updatedAt': at, 'expiresAt': at + 120000,
                             'replyCapture': {'finalResponseCaptured': False}, 'result': None})

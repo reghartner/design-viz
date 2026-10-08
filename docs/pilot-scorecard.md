@@ -15,6 +15,7 @@ accepted artifact afterward. Write **not observed** instead of guessing. The
 | Scenario/source pack and version | |
 | Workbench build or repository commit | |
 | `hld-to-page` skill version or commit | |
+| Bundled browserless layout command / mode / outcome | |
 | OS / browser and version / display or viewport | |
 | Agent application and version | |
 | Requested model setting / models observed | |

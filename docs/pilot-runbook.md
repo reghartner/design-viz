@@ -25,11 +25,13 @@ uses the workbench conversation and explicit Monitor setup. Participants operate
 the workbench directly; do not require Chromium, Playwright, browser automation,
 or terminal work.
 
-For a new diagram, the agent uses the packaged browserless
-`tools/auto-arrange-spec.cjs` Node tool for nodes and connections. It arranges
-panels and step controls manually through the ordinary authoring workflow. Record
-whether this step succeeds, but do not turn its command into participant work or
-describe it as visual QA.
+For a new diagram, the agent follows that build's packaged instructions for its
+browserless Node graph/layout tooling. Some builds arrange the graph and leave
+other page placement to the ordinary authoring workflow; others may support a
+broader composition mode. Record the bundled command, mode, and outcome that
+were actually used. Do not turn layout commands or dependency installation into
+participant work, require Chromium or browser automation, or describe tool
+success as visual QA.
 
 Freeze the scenario pack before the cohort. For each run record the route and
 source version, connection method, repository/build commit, `hld-to-page` skill

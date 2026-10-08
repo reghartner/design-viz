@@ -63,13 +63,13 @@ class DockerSourceBuildTests(unittest.TestCase):
             self.assertIsNotNone(match)
             envelope = json.loads(match.group(1))
             files = json.loads(gzip.decompress(base64.b64decode(envelope['gzip'])))['files']
-            for name in ['tools/arrange-spec.cjs', 'tools/arrange/setup.cjs',
-                         'tools/arrange/package.json', 'tools/arrange/package-lock.json',
-                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs']:
-                self.assertEqual(files[name], (ROOT / name).read_text(), name)
-            self.assertIn('window.arrangementNative', files['tools/arrange/generated-native.html'])
+            self.assertNotIn('tools/arrange-spec.cjs', files)
+            self.assertFalse(any(name.startswith('tools/arrange/') for name in files))
+            self.assertTrue((context / 'tools/arrange/generated-native.html').is_file())
+            self.assertIn('window.arrangementNative', (context / 'tools/arrange/generated-native.html').read_text())
             self.assertIn('module.exports', files['tools/canon/generated-runtime.cjs'])
-            self.assertFalse(any('node_modules' in name for name in files))
+            self.assertFalse(any('node_modules' in name or name.endswith('package.json') or
+                                 name.endswith('package-lock.json') for name in files))
 
 
 if __name__ == '__main__':

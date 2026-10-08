@@ -622,11 +622,11 @@ Pinned nodes do not move when their connections or rows change, and may overlap
 if authored that way. A diagram with every node in floats uses `rows:[[]]`.
 New nodes can use `noSpread:true` to stay out of existing automatic float
 spacing and lane routing. Workbench **Add to diagram → Node** writes it with a
-product-chosen pinned position. For a raw agent addition to an existing
-diagram, append `{id,side:"below",noSpread:true}` without X/Y; the viewer puts
-it in a deterministic outside band without moving established nodes or routes.
-Do not use this marker for a new graph that will immediately run Auto arrange.
-It requires the `layout.inserted-floats` viewer capability.
+product-chosen pinned position. For a bounded addition to an existing diagram,
+append `{id,side:"below",noSpread:true}` without X/Y; the viewer puts it in a
+deterministic outside band without moving established nodes or routes. An
+explicit placement or rearrangement request may instead author geometry. It
+requires the `layout.inserted-floats` viewer capability.
 
 In the workbench, select **float → Free placement** or drag any floating node
 to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to
@@ -2231,12 +2231,12 @@ alternate steps and the reference approval workflow.
 
 ### Saved graph content framing
 
-`diagram.graphFrame: {x,y,w,h}` is optional SVG framing geometry emitted by
-`tools/arrange-spec.cjs`. Values must be finite and bounded to ±100000, with
+`diagram.graphFrame: {x,y,w,h}` is optional SVG framing geometry. Values must be finite and bounded to ±100000, with
 positive `w` and `h`. Normalization preserves the field. The renderer expands
 these bounds for cards, groups, routed paths, labels and decorations; it never
 moves nodes or routes to fit the frame. Unmarked or malformed values use the
 legacy drawing area (malformed values also produce a validation warning).
 The frame is shared across host profiles, survives native export/reopening and
-requires capability `layout.graph-frame`. Agents should let the command measure
-it rather than author coordinates. This is saved geometry, not reader zoom.
+requires capability `layout.graph-frame`. Automatic arrangement tooling may
+measure and save it; manual authors can omit it and use the legacy drawing area.
+This is saved geometry, not reader zoom.

@@ -19,9 +19,13 @@ async function helper(t){
 test('local helper publishes source/selection and delivers file proposals exactly once after acknowledgement',async t=>{
   const h=await helper(t),selection=[{kind:'node',section:0,id:'camera'}];
   const readme=await fs.readFile(path.join(h.server.scratch,'README.md'),'utf8');
-  assert.match(readme,/For existing edits, preserve layout and routes/);
-  assert.match(readme,/arrange-spec\.cjs.*--section <zero-based section> <draft spec> <different arranged spec>/);
-  assert.match(readme,/no browser control/);
+  assert.match(readme,/auto-arrange-spec\.cjs.*--section <zero-based section> <draft spec> <different arranged spec>/);
+  assert.match(readme,/manually author the 24-column sectionLayout rectangles/);
+  assert.match(readme,/pure Node CLI needs no browser or dependency install and does not compose panel\/control layout/);
+  assert.match(readme,/preserve unrelated layout and routes/);
+  assert.match(readme,/unpositioned \{id,side:"below",noSpread:true\} float/);
+  assert.match(readme,/no browser control, so do not claim screenshots or visual QA/);
+  assert.doesNotMatch(readme,/tools\/arrange-spec|Playwright|Chromium/);
   assert.equal((await h.send({snapshot:{...h.snapshot,selection}})).status,200);
   const state=await h.read('state.json');assert.deepEqual(state.selection,selection);assert.equal(state.connected,true);
   assert.equal(state.source,h.snapshot.source);assert.ok(!JSON.stringify(state).includes(h.server.token));

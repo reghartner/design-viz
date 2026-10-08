@@ -42,8 +42,10 @@ topology, notification or outcome without evidence.
 - `diagram.primaryPanel` makes a panel (often the `homemap`) the centerpiece.
 - Use panel `visible: false` plus step `panelVisibility` to show a panel only
   when it matters; this is different from device-app card `visible`.
-- Let Auto Arrange own new graph layout and connection routing. Preserve an
-  existing spec's rows, floats, positions, ports and route fields.
+- Let the pure Node Auto Arrange CLI own new graph layout and connection routing,
+  then author the panel/control `sectionLayout` rectangles. Preserve an existing
+  spec's rows, floats, positions, ports, route fields and panel rectangles unless
+  the user requests a rearrangement.
   Omit `diagram.routing` unless lanes are requested.
 - `diagram.brand` shares a company name/mark across phone, device app, camera
   and security panels. Use only an approved mark or a library icon; never

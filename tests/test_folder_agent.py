@@ -110,7 +110,10 @@ class FolderAgentTests(unittest.TestCase):
 
     def test_prepare_refreshes_skill_and_removes_only_retired_bundle_files(self):
         skill = '.claude/skills/hld-to-page/SKILL.md'
-        retired = ['docs/agent-operations.md', 'docs/agent-intent-testing.md', 'src/workbench/agent-operations.js']
+        retired = ['docs/agent-operations.md', 'docs/agent-intent-testing.md',
+                   'src/workbench/agent-operations.js', 'tools/arrange-spec.cjs',
+                   'tools/arrange/generated-native.html', 'tools/arrange/setup.cjs',
+                   'tools/arrange/package.json', 'tools/arrange/package-lock.json']
         self.kit({skill: 'Old skill', **dict.fromkeys(retired, 'Old API guidance')})
         helper.prepare(self.folder)
         note = self.folder/'authoring/operator-notes.md'
@@ -132,16 +135,18 @@ class FolderAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'symlink'):
             helper.prepare(self.folder)
 
-    def test_prepared_real_kit_carries_guidance_helpers_and_production_arranger(self):
+    def test_prepared_real_kit_arranges_graph_and_validates_manual_section_layout(self):
         runtime = subprocess.check_output(
             ['node', str(ROOT/'tools/source-loader.cjs'), '--module', 'backend', 'cjs'], text=True)
         (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
-                     'tools/auto-arrange-spec.cjs', 'tools/arrange-spec.cjs',
-                     'tools/arrange/setup.cjs', 'tools/arrange/package-lock.json',
+                     'tools/auto-arrange-spec.cjs', 'tools/validate.js',
                      '.claude/skills/hld-to-page/scripts/pilot_capture.py']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
+        for name in ['tools/arrange-spec.cjs', 'tools/arrange/setup.cjs',
+                     'tools/arrange/package.json', 'tools/arrange/generated-native.html']:
+            self.assertFalse((self.folder/'authoring'/name).exists(), name)
         trace_cli = (self.folder/'authoring/tools/trace2spec.js').read_text()
         self.assertIn("'trace-import.js'", trace_cli)
         self.assertNotIn('../src/trace-import.js', trace_cli)
@@ -155,21 +160,30 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual(result.stdout.count(widget_doc.CLIP_CUE), 1)
         draft = self.folder/'authoring/draft.spec.json'
         arranged = self.folder/'authoring/arranged.spec.json'
+        manual_layout = {'columns': 24, 'default': [
+            {'x': 0, 'y': 0, 'w': 16, 'h': 12},
+            {'panel': 'phone', 'x': 16, 'y': 0, 'w': 8, 'h': 12},
+            {'controls': 'steps', 'x': 0, 'y': 12, 'w': 24, 'h': 5}
+        ]}
         draft.write_text(json.dumps({'nodes': {'a': {'title': 'A'}, 'b': {'title': 'B'}},
                                      'rows': [[]],
                                      'floats': [{'id': 'a', 'side': 'below'},
                                                 {'id': 'b', 'side': 'below'}],
-                                     'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}]}))
+                                     'edges': [{'from': 'a', 'to': 'b', 'label': 'send'}],
+                                     'steps': [{'edge': 'a->b', 'text': 'Send'}],
+                                     'panels': [{'id': 'phone', 'type': 'phone', 'title': 'Phone'}],
+                                     'sectionLayout': manual_layout}))
         result = subprocess.run(['node', 'tools/auto-arrange-spec.cjs', draft.name, arranged.name],
                                 text=True, capture_output=True, timeout=30,
                                 cwd=self.folder/'authoring')
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         output = json.loads(arranged.read_text())
-        self.assertEqual(output['edges'][0]['label'], 'send')
+        self.assertEqual(output['sectionLayout'], manual_layout)
         self.assertTrue(all('x' in item and 'y' in item for item in output['floats']))
-        self.assertNotIn('curveControls', output['edges'][0])
-        self.assertNotIn('fromPort', output['edges'][0])
-        self.assertNotIn('toPort', output['edges'][0])
+        result = subprocess.run(['node', 'tools/validate.js', '--quiet', arranged.name],
+                                text=True, capture_output=True, timeout=10,
+                                cwd=self.folder/'authoring')
+        self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         trace = subprocess.run(['node', 'tools/trace2spec.js', str(ROOT/'examples/traces/checkout.events.json'), '--preview'],
                                text=True, capture_output=True, timeout=10, cwd=self.folder/'authoring')
         self.assertEqual(trace.returncode, 0, trace.stderr)

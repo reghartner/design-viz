@@ -230,15 +230,20 @@ standalone-output workflows with ordinary local specs.
     diagrams: each diagram resets to its initial state. Separate diagrams are
     fine when they are independent: an overview and its drilldown details, or
     unrelated scenarios.
-12. **Write content, then arrange once.** For a new diagram, write semantic
-    nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
-    run `node <VIZ>/tools/arrange-spec.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
-    The command arranges nodes, panels and step controls; do not choose their
-    coordinates or panel rectangles. For existing edits, preserve layout and
-    routes; add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}`
-    floats. Rearrange only when explicitly requested, using `--rearrange`.
-    Report actual tool results; the command alone is not visual QA. See `docs/auto-arrange.md` for one-time
-    setup and supported inputs.
+12. **Auto arrange owns new graph topology; author the section layout.** For a
+    new diagram, write nodes, groups and semantic edges with `rows:[[]]`,
+    unpositioned floats (`id` and `side` only), and no manual edge geometry.
+    Run `node <VIZ>/tools/auto-arrange-spec.cjs --section <zero-based-section> <input.spec.json> <different-output.spec.json>` for each new diagram in a
+    mixed page, or `--all` only when every diagram is new. This pure Node CLI
+    uses the Workbench graph arranger without a browser or dependency install.
+    Then author the 24-column `sectionLayout` rectangles for the diagram, panels
+    and step controls yourself; graph arrangement does not compose them. For an
+    existing diagram, preserve unrelated layout and routes. Add a node as an
+    unpositioned `{id:"<new-node-id>",side:"below",noSpread:true}` float with
+    semantic edges so established geometry stays stable. Rearrange existing
+    content only when the user requests it. Validate and submit the completed
+    spec for paired Workbench preview. Report actual tool results, and do not
+    claim visual QA from a browserless session.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path
 at its last source-backed outcome; do not add a user action (opening the
@@ -427,9 +432,9 @@ Confluence, named views, and explicit manual-placement requests). Follow rule 12
 for node placement and connection routing. Standard panel arrangements use
 `sectionLayout.columns:24`; consult [section layouts](../../../docs/section-layouts.md)
 for host profiles and legacy 12-column migration. Contract-block spans retain
-their separate 12-column grid. The schema's manual floats, ports,
-bends and curve fields are reference material for user-directed exceptions and
-for preserving an existing diagram; they are not ordinary authoring defaults.
+their separate 12-column grid. The schema's manual floats, ports, bends and
+curve fields are reference material for user-directed exceptions and for
+preserving an existing diagram; they are not ordinary new-graph defaults.
 
 Translation is mechanical once the worksheet is done:
 - One continuous timeline is one diagram. Worksheet step IDs become `steps[].id`; paths
@@ -603,9 +608,9 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   the conversation and progress feed, so periodic helper progress is unnecessary.
   Wait for the proposal result before completion `reply`. Copy/paste uses no
   Monitor; direct Send and the explicitly selected Beta conversation require it.
-  The bundled `authoring/` directory is VIZ; run validator, state-walk and the
-  production Auto Arrange CLI there without an OUT build. Browser access is
-  unavailable; never claim visual QA or a Workbench button click.
+  The bundled `authoring/` directory is VIZ; run the pure Node graph Auto Arrange
+  CLI, validator and state-walk tools there without an OUT build or dependency
+  install. Browser access is unavailable; never claim visual QA.
 - **Local workbench session.** When the user supplies a local session scratch
   directory, read its `README.md` and the
   [file-session protocol](../../../docs/local-agent-session.md). Read the
@@ -616,7 +621,7 @@ actual framework defect use [framework bugs](references/framework-bugs.md).
   your notes. Submit one atomic `proposal.json` with the matching base
   revision and wait for `result.json`. Rebase rejected stale proposals on the
   latest source. Do not write OUT files or build unless the user asks.
-- **Small edits.** A small edit the user fully specified (rename, fix
+- **Small edits.** A small edit the user fully specified (rename, move, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
   the self-audit for the affected paths.

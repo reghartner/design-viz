@@ -105,15 +105,18 @@ test('both setup routes give browserless agents one truthful layout policy',()=>
     const policies=paragraphs.filter(paragraph=>paragraph.startsWith('Layout policy:'));
     assert.equal(policies.length,1,workflow);
     const policy=policies[0];
-    assert.ok(policy.includes('no browser control'));
-    assert.ok(policy.includes('node tools/arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
+    assert.ok(policy.includes('node tools/auto-arrange-spec.cjs --section <zero-based section> <draft spec> <different arranged spec>'));
     assert.ok(policy.includes('wholly new diagram'));
-    assert.ok(policy.includes('unpositioned {id,side:"below",noSpread:true} floats'));
-    assert.ok(policy.includes('preserve all layout and routes'));
-    assert.ok(policy.includes('nodes, panels and step controls'));
-    assert.ok(policy.includes('do not choose coordinates or panel rectangles'));
-    assert.ok(policy.length<1000);
-    assert.ok(policy.includes('only when explicitly requested, using --rearrange'));
-    assert.ok(!policy.includes('auto-arrange-spec'));
+    assert.ok(policy.includes('unpositioned floats (id and side only)'));
+    assert.ok(policy.includes('pure Node CLI needs no browser or dependency install'));
+    assert.ok(policy.includes('Manually author the 24-column sectionLayout rectangles'));
+    assert.ok(policy.includes('CLI does not compose them'));
+    assert.ok(policy.includes('preserve unrelated layout and routes'));
+    assert.ok(policy.includes('unpositioned {id,side:"below",noSpread:true} float'));
+    assert.ok(policy.includes('Rearrange only when I request it'));
+    assert.ok(policy.includes('no browser control'));
+    assert.ok(policy.includes('do not claim screenshots or visual QA'));
+    assert.ok(policy.length<1400);
+    assert.ok(!policy.includes('node tools/arrange-spec.cjs'));
   }
 });

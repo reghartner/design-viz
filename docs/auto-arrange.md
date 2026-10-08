@@ -164,9 +164,28 @@ Positions and any retained native paths are stored in the spec, so opening or
 exporting never reruns Graphviz or WebCola. Moving nodes updates natural routes
 and deforms retained curves through the shared viewer geometry.
 
-## Headless authoring
+## Browserless graph authoring
 
-Write semantic nodes, edges, panels and steps, then run one command:
+For a wholly new diagram, agents write unpositioned nodes and semantic edges,
+then use the bundled pure Node graph arranger:
+
+```sh
+node tools/auto-arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
+```
+
+Repeat `--section` for each new diagram in a mixed page, or use `--all` only
+when every diagram is new. This uses the same graph arranger as the Workbench
+button and needs no browser, npm install or downloaded dependency. It arranges
+node and edge topology only. Agents author the 24-column `sectionLayout`
+rectangles for the diagram, panels and step controls separately, then validate
+and submit the whole spec for paired Workbench preview. Existing diagrams retain
+their placement and routes during bounded edits unless the user requests a
+rearrangement.
+
+## Optional measured full arrangement tool
+
+The normal agent workflow above does not require a browser runtime. Developers
+who intentionally want the measured graph, panel and controls arranger can run:
 
 ```sh
 node tools/arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
@@ -181,18 +200,20 @@ are new. A one-diagram input needs no selector. Input/output must be different
 files (including symlinks and hard links). All selected diagrams must succeed
 before one atomic output write; errors preserve both files.
 
-**One-time setup** (checkout or downloaded authoring kit):
+**One-time developer setup** (complete checkout only):
 
 ```sh
 node tools/arrange/setup.cjs
 ```
 
-This explicitly installs locked `playwright-core` 1.63.0 and its pinned Chromium
-headless shell. Arrangement never downloads dependencies or falls back to an
-ambient browser. Builds package the native renderer, styles, icons and fonts;
-a source-free kit does not need `src/`, a running Workbench, or browser tools.
-In a checkout, setup also generates both required runtimes from current sources;
-rerun setup after renderer source changes. Source-free kits keep their bundled runtimes.
+This explicitly installs locked `playwright-core` and its pinned Chromium
+headless shell for the optional developer tool. Arrangement never downloads
+dependencies or falls back to an ambient browser. Builds package the native
+renderer, styles, icons and fonts. The source-free authoring kit omits this
+browser-dependent tool; it supports pure Node graph arrangement, manual section
+layout and validation with the system Python and Node runtimes and no dependency installation. In a checkout,
+setup also generates both required runtimes from current sources; rerun setup
+after renderer source changes.
 The command reports measurements, not visual QA or a Workbench button click.
 
 `--width` is the host viewport width (800–1920 pixels; default 1200).
@@ -231,8 +252,8 @@ metadata fails before any write.
 Native fitting stops after at most eight passes rather than emitting partial
 or clipped output. This does not add a new Workbench action.
 
-The old `tools/auto-arrange-spec.cjs` remains available for graph-only API/CLI
-compatibility. The authoring workflow above uses `arrange-spec.cjs` exclusively.
+The pure Node `tools/auto-arrange-spec.cjs` is the agent authoring command for new
+graph topology. The Chromium-backed full arranger remains optional developer tooling.
 
 ## Distribution and maintenance
 

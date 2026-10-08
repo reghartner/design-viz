@@ -205,8 +205,15 @@ include the video aspect ratio and separate audio direction, status, caption,
 source and reason rows. Phone notification cards keep their native three-card
 and two-line limits; allocating a larger tile cannot reveal clamped text or
 enlarge the fixed 178px frame. Device-app portraits fit both body dimensions up
-to a native 330px cap. Diagnostics expose these internal limits separately from
-tile fit; they are not readability guarantees.
+to a native 330px cap. Automatic composition reserves that native content width
+plus estimated panel padding, using a panel-owned composition hint. Manual small
+tiles remain supported. This can make the page taller or move neighboring tiles;
+it does not consolidate cards, reveal clamped text, or remove internal scrolling.
+Diagnostics report estimated logical/rendered frame width, host scale, and
+metadata/detail font sizes. At narrow hosts the entire design grid still scales
+down, so a full logical frame does not guarantee native physical text size.
+Document padding and embed overrides can change these estimates. Diagnostics
+expose these internal limits separately from tile fit; they are not readability guarantees.
 
 **Sizes are estimates, not pixel verification or visual QA.** Font metrics,
 responsive chrome, embedded media and complex widgets can differ from these

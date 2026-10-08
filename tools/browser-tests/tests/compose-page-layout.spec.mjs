@@ -67,6 +67,7 @@ for(const width of [800,1200,1440,1920])test('native fit at explicit isolated ho
   if(o.controls)expect(o.controls.clipped,'narrative '+JSON.stringify(state)).toBe(0);
   const camera=o.panels.find(p=>p.id==='camera');expect(camera.overflowY,'camera '+JSON.stringify(state)).toBeLessThanOrEqual(4);
   expect(camera.nestedOverflow).toHaveLength(0);
+  expect(o.panels.find(p=>p.id==='app').nativeContent.width).toBeCloseTo(330,0);
   const phone=o.panels.find(p=>p.id==='phone');expect(phone.nativeContent.width).toBeCloseTo(178,0);
   expect(phone.nestedOverflow.some(p=>p.class==='phonetext')).toBe(true);
  }
@@ -138,4 +139,44 @@ test('Auto resize changes graph height beyond the single composition target',asy
  expect(after.tileHeight).toBeCloseTo(before.tileHeight,1);expect(after.svgHeight/before.svgHeight).toBeCloseTo(after.svgWidth/before.svgWidth,2);
  expect(afterObservation.graph.clipped).toBeGreaterThan(0);
  await fs.writeFile(info.outputPath('resize.json'),JSON.stringify({targetWidth,renderWidth:1920,before,after,beforeObservation,afterObservation},null,2));
+});
+
+// Native content sizing is a composition preference, not a manual resize rule.
+function deviceAppFixture(){
+ const fields=['charge','link','alert','event'].map(id=>({id,label:id,kind:'text'}));
+ return {nodes:{a:{title:'Sensor'},b:{title:'Processor'}},rows:[[]],floats:[{id:'a',side:'below'},{id:'b',side:'below'}],edges:[{from:'a',to:'b'}],storyTime:{start:'2026-10-08T10:00'},
+  panels:[{id:'app',type:'deviceapp',device:'Inspection sensor',showSources:false,fields,initial:{phoneScreen:'app',...Object.fromEntries(fields.map(f=>[f.id,{value:'Review '+f.id,status:'ready',reportedAt:'now',detail:'Recorded evidence requires confirmation before the next inspection. '.repeat(3)}]))}},
+   {id:'phone',type:'phone',initial:{notifications:[{app:'Inspection',title:'Reading recorded',text:'Review the latest reading before continuing.'}]}}],
+  steps:[{id:'begin',text:'Read each recorded value.'},{id:'review',text:'Review the later report.',time:'+15m',panels:{app:{event:{value:'Inspection complete',reportedAt:'now'}}}}]};
+}
+async function deviceAppGeometry(page){return page.evaluate(()=>{
+ const tile=document.querySelector('[data-layout-key="panel:app"]'),frame=tile.querySelector('.da-phone'),screen=tile.querySelector('.da-screen'),grid=tile.closest('.section-layout-grid'),scale=grid.getBoundingClientRect().width/grid.offsetWidth;
+ const rect=frame.getBoundingClientRect(),meta=frame.querySelector('.da-meta'),detail=frame.querySelector('.da-detail');
+ return {tileWidth:tile.getBoundingClientRect().width,frameWidth:rect.width,logicalWidth:rect.width/scale,hostScale:scale,metadataFontPx:parseFloat(getComputedStyle(meta).fontSize)*scale,detailFontPx:parseFloat(getComputedStyle(detail).fontSize)*scale,cards:frame.querySelectorAll('.da-field').length,screenOverflow:screen.scrollHeight-screen.clientHeight,legacyPhoneWidth:document.querySelector('.phoneframe').getBoundingClientRect().width};
+ });}
+for(const width of [800,1200,1440,1920])test('composition retains native device-app content size at '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:1000});await page.setContent(payload({fullDocument:true}));
+ const raw=deviceAppFixture(),before=JSON.stringify(raw),result=await A.arrange(raw,{...defaults,width}),d=result.raw.page.sections[0].diagram;
+ expect(JSON.stringify(raw)).toBe(before);expect(d.panels).toEqual(raw.panels);expect(d.steps).toEqual(raw.steps);
+ const initial=await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d),observations=[];
+ for(const state of initial.states){await page.evaluate(s=>arrangementNative.observe(s),state);observations.push(await deviceAppGeometry(page));}
+ const estimate=result.diagnostics[0].panels.find(p=>p.id==='app').estimatedNativeContent;
+ expect(estimate.estimatedLogicalWidth).toBe(330);
+ for(const actual of observations){
+  expect(actual.cards).toBe(4);expect(actual.logicalWidth).toBeGreaterThanOrEqual(330*.99);expect(actual.logicalWidth).toBeLessThanOrEqual(330.5); // Full document has 110px inset; estimator models 80px.
+  expect(actual.legacyPhoneWidth/actual.hostScale).toBeCloseTo(178,0);
+  expect(actual.metadataFontPx/actual.hostScale).toBeCloseTo(9,1);expect(actual.detailFontPx/actual.hostScale).toBeCloseTo(11,1);
+  expect(actual.screenOverflow).toBeGreaterThan(0); // No claim that width removes native scrolling.
+  if(width>=1200){expect(Math.abs(actual.frameWidth-estimate.estimatedRenderedWidth)).toBeLessThan(2);expect(actual.metadataFontPx).toBeCloseTo(estimate.estimatedFontPx.metadata,1);}
+ }
+ if(width===800){expect(estimate.estimatedScale).toBeLessThan(1);expect(estimate.estimatedFontPx.metadata).toBeLessThan(9);expect(observations[0].metadataFontPx).toBeLessThan(9);}
+ await fs.writeFile(info.outputPath('deviceapp.json'),JSON.stringify({width,estimate,observations,raw:result.raw},null,2));
+ await page.screenshot({path:info.outputPath('deviceapp.png'),fullPage:true});
+});
+test('native device-app manual small tile remains supported',async({page})=>{
+ await page.setViewportSize({width:1440,height:1000});await page.setContent(payload({fullDocument:true}));
+ const result=await A.arrange(deviceAppFixture(),{...defaults,width:1440}),d=result.raw.page.sections[0].diagram,tile=d.sectionLayout.default.find(t=>t.panel==='app');
+ tile.w=5;tile.h=12;const authored=structuredClone(d);
+ await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d);
+ const actual=await deviceAppGeometry(page);expect(actual.logicalWidth).toBeLessThan(270);expect(actual.cards).toBe(4);expect(d).toEqual(authored);
 });

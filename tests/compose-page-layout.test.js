@@ -66,8 +66,8 @@ test('direct CLI works in a clean checkout and source-free kit with subprocesses
  const guard=path.join(base,'guard.cjs');fs.writeFileSync(guard,"const M=require('node:module'),load=M._load;M._load=function(id,...args){if(/playwright|puppeteer|child_process/.test(id))throw Error('Forbidden runtime dependency '+id);return load.call(this,id,...args)};global.fetch=()=>{throw Error('Forbidden network')};");
  for(const directory of [checkout,kit]){
   assert.equal(fs.existsSync(path.join(directory,'tools/arrange/node_modules')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/setup.cjs')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/generated-native.html')),false);
-  const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}}];raw.steps=[{id:'start',text:'Review the charge.',codeRefs:[{id:'evidence',label:'Processing evidence',repository:'https://example.com/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}],conditions:[{kind:'slow',label:'Evidence pending'}]},{id:'normal',text:'Normal outcome.'},{id:'alternative',text:'Alternative outcome.'}];raw.paths=[{id:'normal',steps:['start','normal']},{id:'alternative',steps:['start','alternative']}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
-  const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);assert.ok(JSON.parse(result.stdout).diagrams[0].controls.estimatedTrackHeight>40,'source-free backend exports shared track geometry');
+  const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}},{id:'app',type:'deviceapp',fields:[{id:'reading',label:'Reading'}],initial:{phoneScreen:'app',reading:{value:'Recorded',status:'ready'}}}];raw.steps=[{id:'start',text:'Review the charge.',codeRefs:[{id:'evidence',label:'Processing evidence',repository:'https://example.com/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}],conditions:[{kind:'slow',label:'Evidence pending'}]},{id:'normal',text:'Normal outcome.'},{id:'alternative',text:'Alternative outcome.'}];raw.paths=[{id:'normal',steps:['start','normal']},{id:'alternative',steps:['start','alternative']}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
+  const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);const content=JSON.parse(result.stdout).diagrams[0].panels.find(p=>p.id==='app').estimatedNativeContent;assert.equal(content.estimatedLogicalWidth,330);assert.ok(content.estimatedRenderedWidth<330);assert.ok(content.estimatedFontPx.metadata<9);assert.deepEqual(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.panels,raw.panels);assert.ok(JSON.parse(result.stdout).diagrams[0].controls.estimatedTrackHeight>40,'source-free backend exports shared track geometry');
  }
  assert.equal(fs.existsSync(path.join(kit,'src/source-bundles.json')),false);assert.equal(fs.existsSync(path.join(checkout,'tools/canon/generated-runtime.cjs')),false);
 });
@@ -151,4 +151,33 @@ test('controls reserve independent canon link and runtime rows across path state
  assert.equal(detailed.neededHeight-base.neededHeight,detailed.evidenceHeight+detailed.runtimeHeight);
  d.steps[1].codeRefs[0].repository='javascript:alert(1)';
  assert.equal(E.controlDepth(d,E.states(d),420).evidenceHeight,0,'only actual sanitized links consume rows');
+});
+
+
+test('composition native-width hint is generic and does not alter manual panel limits',()=>{
+ const V=require('../tools/arrange/contracts.cjs'),core=require('../tools/arrange/core.cjs'),registry={get:type=>({layout:core.arrangementLayouts[type]})};
+ const contract=V.contract({type:'deviceapp'},registry);
+ assert.equal(contract.minWidth,230);assert.equal(contract.preferredWidth,290,'manual preferences are unchanged');
+ const raw=diagram();raw.panels=[{id:'report',type:'generic-report'}];
+ const layout={sectionSizing:{minWidth:190,preferredWidth:210,maxWidth:250,aspectPolicy:'fixed',bodyAspect:1,grow:0},composition:{minContentWidth:330,nominalFontPx:{detail:11}}};
+ const source={diagram:A.seed(raw,[])},options={registry:{get:()=>({layout})},geometry:{gridWidth:1120,gridTop:160,scale:1,bounds:{x:0,y:0,w:150,h:90}},measurements:{report:{paddingX:32}}};
+ const first=S.solve(source,options),second=S.solve(source,options);assert.deepEqual(first,second);
+ const tile=M.layout(first.spec).find(t=>t.panel==='report');
+ assert.ok(tile.w*((1120+8)/24)-8-32>=330,'an arbitrary panel can request native content space');
+ assert.equal(layout.sectionSizing.minWidth,190);assert.deepEqual(first.spec.diagram.panels,raw.panels);
+ const impossible={...options,registry:{get:()=>({layout:{...layout,composition:{minContentWidth:4000}}})}};
+ assert.throws(()=>S.solve(source,impossible),/Unsupported: panel dimensions exceed grid/);
+});
+
+test('device-app composition preserves all cards, sibling layouts, hidden tiles and explicit geometry',async()=>{
+ const d=diagram();d.panels=[{id:'app',type:'deviceapp',fields:['one','two','three','four'].map(id=>({id,label:id})),initial:{phoneScreen:'app',one:{value:'Original report'}}},{id:'hidden',type:'deviceapp'},{id:'phone',type:'phone'}];
+ d.steps=[{id:'first',text:'Inspect values.',panels:{app:{four:{value:'Fourth report',status:'ready'}}}}];
+ const hidden={panel:'hidden',hidden:true,x:21,y:21,w:3,h:4};
+ d.sectionLayout={columns:24,default:[{x:0,y:0,w:12,h:8},{panel:'app',x:12,y:0,w:5,h:12},hidden],backstage:[{panel:'app',x:0,y:0,w:5,h:10}]};
+ const before=JSON.stringify(d);await assert.rejects(A.arrange(d,defaults),/already has geometry/);
+ const result=await A.arrange(d,{...defaults,rearrange:true}),out=result.raw.page.sections[0].diagram;
+ assert.equal(JSON.stringify(d),before);assert.deepEqual(out.panels,d.panels);assert.deepEqual(out.steps,d.steps);assert.deepEqual(out.sectionLayout.backstage,d.sectionLayout.backstage);assert.deepEqual(out.sectionLayout.default.find(t=>t.hidden),hidden);
+ const phoneOnly=diagram();phoneOnly.panels=[{id:'phone',type:'phone'}];const baseline=await A.arrange(phoneOnly,defaults);
+ const phone=out.sectionLayout.default.find(t=>t.panel==='phone'),old=baseline.raw.page.sections[0].diagram.sectionLayout.default.find(t=>t.panel==='phone');assert.equal(phone.w,old.w);assert.equal(phone.h,old.h);
+ const limits=result.diagnostics[0].panels.find(p=>p.id==='phone');assert.equal(limits.estimatedNativeContent,null);assert.equal(limits.nativeLimits.contentWidth,178);assert.equal(limits.nativeLimits.estimatedBodyFontPx,8);
 });

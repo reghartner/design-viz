@@ -18,6 +18,12 @@ For live local authoring with a filesystem-only agent, build the workbench and r
 document/selection snapshots and undoable agent proposals. See
 [local design sessions](docs/local-agent-session.md); no browser access is needed.
 
+For a small facilitated study of this workflow, use the
+[pilot operating runbook](docs/pilot-runbook.md) and reusable
+[story/layout scorecard](docs/pilot-scorecard.md). They cover the four authoring
+starts, both connection methods, next-day resume, engineer handoff, observation
+measures, and separate handling of review packages and pilot-research archives.
+
 ## Build or download the workbench
 
 With Python 3.10+ and Node 24 installed, run:

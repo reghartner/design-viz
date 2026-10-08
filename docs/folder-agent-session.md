@@ -87,6 +87,11 @@ can still be selected directly; their transport files remain in place.
 
 ### Pilot capture
 
+Facilitated studies use the [pilot operating runbook](pilot-runbook.md) and
+reusable [story/layout scorecard](pilot-scorecard.md). They define the common
+task, measures, proposed targets, normal review handoff, authorized research
+transfer, and identity-checked capture closeout.
+
 In agent setup, select **Enable pilot capture for this session** to opt in.
 It is off by default for each new setup, including a reopened diagram folder.
 Setup explains the scope and the review screen repeats your choice. The browser

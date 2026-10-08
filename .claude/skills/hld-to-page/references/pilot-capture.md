@@ -2,6 +2,9 @@
 
 Resolve the exact diagram folder through the normal setup. VIZ is the packaged
 `authoring/` directory. Keep the usual spec, ledger, and approval workflow.
+Facilitators use the repository's [pilot runbook](../../../../docs/pilot-runbook.md)
+and [scorecard](../../../../docs/pilot-scorecard.md) for observation, handoff,
+identity-checked closeout, and gap reporting.
 
 **One helper command per Bash call.** Every `pilot_capture.py` invocation must
 be its **own Bash call**, including `--enable`, `--enable --explicit-opt-in`,
@@ -158,6 +161,12 @@ The engineer enrolls their own Claude session. Saved copies of the business
 participant's session remain available even when that machine's native source
 is not; the report marks it `archived_only`. A later write on the original
 machine cannot be refreshed after the folder moves.
+
+The ordinary **Download review package** intentionally excludes pilot capture.
+An authorized pilot-research transfer is separate: inventory and transfer the
+complete folder, verify it on the receiving machine without opening the raw
+transcript, and obtain the new participant's independent consent. Follow
+[pilot handoff and closeout](../../../../docs/pilot-runbook.md#handoff).
 
 ## Monitor and transcript boundaries
 

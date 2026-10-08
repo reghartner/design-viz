@@ -35,5 +35,5 @@ reviewer should be able to see which story decisions were preserved, corrected
 or still await evidence. In pilot mode, the engineer's new Claude session adds
 to the same capture artifacts; it must not replace the business session.
 Each participant authorizes their own session. For a different machine, use the
-[pilot folder handoff](pilot-capture.md#moving-from-a-business-participant-to-an-engineer)
+[pilot folder handoff](pilot-capture.md#business-to-engineer-handoff)
 so the ignored local capture archives accompany the spec and ledger.

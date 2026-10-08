@@ -58,8 +58,8 @@ def save_json(path, value):
 
 
 @contextmanager
-def locked(folder):
-    path = regular(folder / 'capture.lock')
+def locked(folder, name='capture.lock'):
+    path = regular(folder / name)
     with path.open('a+b') as stream:
         os.chmod(path, 0o600)
         if os.name == 'nt':
@@ -554,6 +554,11 @@ def disable(folder, session_id):
         pass  # Unknown setup must not authorize a future plain --enable.
     atomic(private / (session_id + '.capture-stop'), json_bytes(stop))
     try:
+        stop_status(folder.resolve(), session_id)
+    except (OSError, ValueError) as error:
+        result['statusUpdatePending'] = True
+        result['message'] += ' The stop barrier is active, but its health receipt could not be updated: ' + str(error)
+    try:
         with locked(private):
             config = json.loads(regular(config_path).read_bytes())
             validate_config(config)
@@ -570,7 +575,7 @@ def disable(folder, session_id):
     return result
 
 
-def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=None, expected_capture_id=None, explicit_opt_in=False):
+def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=None, expected_capture_id=None, explicit_opt_in=False, after_turn=False, status_job=None):
     if explicit_opt_in and not enable:
         raise ValueError('--explicit-opt-in requires --enable and a direct participant request')
     folder = Path(folder)
@@ -586,205 +591,392 @@ def capture(folder, session_id, enable=False, claude_dir=None, target_turn_id=No
     private.mkdir(mode=0o700, exist_ok=True)
     with locked(private):
         try:
-            gate = setup_capture_gate(folder)
-        except (OSError, ValueError) as error:
+            result = capture_locked(folder, session_id, enable, claude_dir, target_turn_id,
+                                    expected_capture_id, explicit_opt_in)
+        except (OSError, ValueError, KeyError):
+            if not status_job:
+                checkpoint_status(folder, session_id, {'status': 'failed'})
+            raise
+        if not status_job:
+            receipt = checkpoint_status(folder, session_id, result, after_turn)
+            if receipt:
+                result['captureReceipt'] = {key: receipt[key] for key in
+                                            ('jobId', 'sessionId', 'captureId', 'turnId', 'afterNativeLine', 'outcome')}
+                retained = private / (session_id + '.last-after-turn-status.json')
+                if retained.exists():
+                    result['lastAfterTurnReceipt'] = str(retained)
+        return result
+
+
+def capture_locked(folder, session_id, enable, claude_dir, target_turn_id, expected_capture_id, explicit_opt_in):
+    private = folder / PRIVATE
+    config_path = private / 'config.json'
+    try:
+        gate = setup_capture_gate(folder)
+    except (OSError, ValueError) as error:
+        return blocked_capture(error)
+    fresh = not config_path.exists()
+    config = json.loads(regular(config_path).read_bytes()) if not fresh else {'enabledAt': now(), 'sessions': []}
+    validate_config(config)
+    if fresh and any((folder / name).exists() for name in (TRANSCRIPT, USAGE)):
+        raise ValueError('Unmanaged pilot artifacts already exist; refusing to overwrite them')
+    current_entry = next((item for item in config['sessions'] if item['id'] == session_id), None)
+    stop = stop_record(folder, session_id) if session_id and SESSION_ID.fullmatch(session_id) else {}
+    current_stop = stop.get('token')
+    stopped = current_stop is not None and (current_entry is None or current_entry.get('stopToken') != current_stop)
+    fresh_on = gate is not None and gate['choice'] == 'ON' and 'setup' in stop and stop['setup'] != gate
+    if stopped and (not enable or not explicit_opt_in and not fresh_on):
+        return blocked_capture('This session was stopped; a later direct opt-in requires --enable --explicit-opt-in.')
+    if gate is not None and enable and not explicit_opt_in and any(
+            part['id'] != session_id and part.get('setupConsent') == gate
+            for item in config['sessions'] for part in [*item.get('previousCaptures', []), item]):
+        return blocked_capture('Another Claude session already claimed this setup. Use fresh setup or a direct opt-in with --enable --explicit-opt-in.')
+    if gate is not None and not enable and (current_entry is None or not gate_authorized(current_entry, gate)):
+        return blocked_capture()
+    if gate is not None and gate['choice'] == 'OFF' and enable and not explicit_opt_in:
+        return blocked_capture('Setup is OFF. A later explicit user opt-in requires --enable --explicit-opt-in.')
+    if session_id and SESSION_ID.fullmatch(session_id) and not enable and not any(item['id'] == session_id for item in config['sessions']):
+        return {'status': 'consent_required', 'currentSourceAvailable': False,
+                'message': 'This Claude session is new to the pilot folder. Disclose local capture and use --enable only when this participant authorizes pilot mode. Earlier chat will be excluded.'}
+    if (current_entry and current_entry.get('suspended') and not enable or
+            expected_capture_id is not None and (not current_entry or
+                current_entry.get('archive', session_id + '.jsonl') != expected_capture_id)):
+        return {'status': 'disabled', 'currentSourceAvailable': False,
+                'message': 'This capture enrollment is suspended or has been replaced.'}
+    for session in config['sessions']:
+        for part in [*session.get('previousCaptures', []), session]:
+            retained = part.get('suspended') or not gate_authorized(part, gate) or part.get('stopToken') != stop_token(folder, part['id'])
+            if retained and not regular(private / part.get('archive', part['id'] + '.jsonl')).exists():
+                return {'status': 'partial', 'currentSourceAvailable': False,
+                        'errors': ['A retained capture segment is missing; existing combined transcript was preserved.'],
+                        'message': 'Restore the missing private capture segment before capturing again.'}
+    # Preserve unrelated ignore rules. Do this before writing private data.
+    ignore_path = regular(folder / '.gitignore')
+    ignored = ignore_path.read_text() if ignore_path.exists() else ''
+    ignore_block = '# Local Flowview pilot capture\n' + '\n'.join(IGNORE) + '\n'
+    if not ignored.endswith(ignore_block):
+        # Move only our exact managed block behind later negation rules;
+        # preserve unrelated rules without accumulating duplicate blocks.
+        ignored = re.sub(r'(?m)^' + re.escape(ignore_block), '', ignored)
+        atomic(ignore_path, (ignored + ('\n' if ignored and not ignored.endswith('\n') else '') +
+                            '\n' + ignore_block).encode())
+    errors = []
+    owner = folder_owner(folder)
+    root = Path(claude_dir or os.environ.get('CLAUDE_CONFIG_DIR', str(Path.home() / '.claude')))
+    if not session_id or not SESSION_ID.fullmatch(session_id):
+        errors.append('CLAUDE_CODE_SESSION_ID is missing or invalid; no session was guessed.')
+    elif current_entry is None or current_entry.get('suspended') or stopped or not gate_authorized(current_entry, gate):
+        try:
+            check_setup_gate(folder, gate, session_id, current_stop)
+            raw = source_for(session_id, root).read_bytes()
+            check_setup_gate(folder, gate, session_id, current_stop)
+            new_entry = enrollment(raw, session_id, [owner] if owner else [], gate, explicit_opt_in)
+            new_entry['stopToken'] = current_stop
+            if gate is not None:
+                new_entry['setupConsent'] = gate
+            if current_entry is None:
+                config['sessions'].append(new_entry)
+            else:
+                # Keep every old slice immutable. A new archive and boundary
+                # excludes the entire opted-out interval without byte loss.
+                old_archive = regular(private / current_entry.get('archive', session_id + '.jsonl'))
+                old_bytes = old_archive.stat().st_size if old_archive.exists() else 0
+                if new_entry['startOffset'] < current_entry.get('startOffset', 0) + old_bytes:
+                    raise ValueError('Re-enrollment requires a new participant turn after the previous captured segment')
+                previous = {key: value for key, value in current_entry.items() if key != 'previousCaptures'}
+                previous['suspended'] = True
+                previous.setdefault('suspendedAt', now())
+                new_entry['archive'] = session_id + '.' + uuid.uuid4().hex + '.jsonl'
+                new_entry['previousCaptures'] = [*current_entry.get('previousCaptures', []), previous]
+                config['sessions'][config['sessions'].index(current_entry)] = new_entry
+        except SetupCaptureBlocked as error:
             return blocked_capture(error)
-        fresh = not config_path.exists()
-        config = json.loads(regular(config_path).read_bytes()) if not fresh else {'enabledAt': now(), 'sessions': []}
-        validate_config(config)
-        if fresh and any((folder / name).exists() for name in (TRANSCRIPT, USAGE)):
-            raise ValueError('Unmanaged pilot artifacts already exist; refusing to overwrite them')
-        current_entry = next((item for item in config['sessions'] if item['id'] == session_id), None)
-        stop = stop_record(folder, session_id) if session_id and SESSION_ID.fullmatch(session_id) else {}
-        current_stop = stop.get('token')
-        stopped = current_stop is not None and (current_entry is None or current_entry.get('stopToken') != current_stop)
-        fresh_on = gate is not None and gate['choice'] == 'ON' and 'setup' in stop and stop['setup'] != gate
-        if stopped and (not enable or not explicit_opt_in and not fresh_on):
-            return blocked_capture('This session was stopped; a later direct opt-in requires --enable --explicit-opt-in.')
-        if gate is not None and enable and not explicit_opt_in and any(
-                part['id'] != session_id and part.get('setupConsent') == gate
-                for item in config['sessions'] for part in [*item.get('previousCaptures', []), item]):
-            return blocked_capture('Another Claude session already claimed this setup. Use fresh setup or a direct opt-in with --enable --explicit-opt-in.')
-        if gate is not None and not enable and (current_entry is None or not gate_authorized(current_entry, gate)):
-            return blocked_capture()
-        if gate is not None and gate['choice'] == 'OFF' and enable and not explicit_opt_in:
-            return blocked_capture('Setup is OFF. A later explicit user opt-in requires --enable --explicit-opt-in.')
-        if session_id and SESSION_ID.fullmatch(session_id) and not enable and not any(item['id'] == session_id for item in config['sessions']):
-            return {'status': 'consent_required', 'currentSourceAvailable': False,
-                    'message': 'This Claude session is new to the pilot folder. Disclose local capture and use --enable only when this participant authorizes pilot mode. Earlier chat will be excluded.'}
-        if (current_entry and current_entry.get('suspended') and not enable or
-                expected_capture_id is not None and (not current_entry or
-                    current_entry.get('archive', session_id + '.jsonl') != expected_capture_id)):
-            return {'status': 'disabled', 'currentSourceAvailable': False,
-                    'message': 'This capture enrollment is suspended or has been replaced.'}
-        for session in config['sessions']:
-            for part in [*session.get('previousCaptures', []), session]:
-                retained = part.get('suspended') or not gate_authorized(part, gate) or part.get('stopToken') != stop_token(folder, part['id'])
-                if retained and not regular(private / part.get('archive', part['id'] + '.jsonl')).exists():
-                    return {'status': 'partial', 'currentSourceAvailable': False,
-                            'errors': ['A retained capture segment is missing; existing combined transcript was preserved.'],
-                            'message': 'Restore the missing private capture segment before capturing again.'}
-        # Preserve unrelated ignore rules. Do this before writing private data.
-        ignore_path = regular(folder / '.gitignore')
-        ignored = ignore_path.read_text() if ignore_path.exists() else ''
-        ignore_block = '# Local Flowview pilot capture\n' + '\n'.join(IGNORE) + '\n'
-        if not ignored.endswith(ignore_block):
-            # Move only our exact managed block behind later negation rules;
-            # preserve unrelated rules without accumulating duplicate blocks.
-            ignored = re.sub(r'(?m)^' + re.escape(ignore_block), '', ignored)
-            atomic(ignore_path, (ignored + ('\n' if ignored and not ignored.endswith('\n') else '') +
-                                '\n' + ignore_block).encode())
-        errors = []
-        owner = folder_owner(folder)
-        root = Path(claude_dir or os.environ.get('CLAUDE_CONFIG_DIR', str(Path.home() / '.claude')))
-        if not session_id or not SESSION_ID.fullmatch(session_id):
-            errors.append('CLAUDE_CODE_SESSION_ID is missing or invalid; no session was guessed.')
-        elif current_entry is None or current_entry.get('suspended') or stopped or not gate_authorized(current_entry, gate):
+        except (OSError, ValueError) as error:
+            errors.append(str(error))
+    if owner:
+        for item in config['sessions']:
+            if item['id'] == session_id and owner not in item.setdefault('monitorOwners', []):
+                item['monitorOwners'].append(owner)
+    combined, sessions, aggregate_line = [], [], 1
+    writes, authorizations = [], []
+    for item in [part for session in config['sessions'] for part in [*session.get('previousCaptures', []), session]]:
+        archive_name = item.get('archive', item['id'] + '.jsonl')
+        archive = regular(private / archive_name)
+        saved = archive.read_bytes() if archive.exists() else b''
+        source_error = None
+        pending_bytes = None
+        suspended = item.get('suspended', False) or item.get('stopToken') != stop_token(folder, item['id'])
+        setup_blocked = not gate_authorized(item, gate)
+        if not suspended and not setup_blocked:
             try:
-                check_setup_gate(folder, gate, session_id, current_stop)
-                raw = source_for(session_id, root).read_bytes()
-                check_setup_gate(folder, gate, session_id, current_stop)
-                new_entry = enrollment(raw, session_id, [owner] if owner else [], gate, explicit_opt_in)
-                new_entry['stopToken'] = current_stop
-                if gate is not None:
-                    new_entry['setupConsent'] = gate
-                if current_entry is None:
-                    config['sessions'].append(new_entry)
-                else:
-                    # Keep every old slice immutable. A new archive and boundary
-                    # excludes the entire opted-out interval without byte loss.
-                    old_archive = regular(private / current_entry.get('archive', session_id + '.jsonl'))
-                    old_bytes = old_archive.stat().st_size if old_archive.exists() else 0
-                    if new_entry['startOffset'] < current_entry.get('startOffset', 0) + old_bytes:
-                        raise ValueError('Re-enrollment requires a new participant turn after the previous captured segment')
-                    previous = {key: value for key, value in current_entry.items() if key != 'previousCaptures'}
-                    previous['suspended'] = True
-                    previous.setdefault('suspendedAt', now())
-                    new_entry['archive'] = session_id + '.' + uuid.uuid4().hex + '.jsonl'
-                    new_entry['previousCaptures'] = [*current_entry.get('previousCaptures', []), previous]
-                    config['sessions'][config['sessions'].index(current_entry)] = new_entry
+                check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                raw = source_for(item['id'], root).read_bytes()
+                check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                complete = raw[:raw.rfind(b'\n') + 1]
+                offset = item.get('startOffset', 0)
+                if offset > len(complete) or ('prefixSha256' in item and hashlib.sha256(complete[:offset]).hexdigest() != item['prefixSha256']):
+                    raise ValueError('Native transcript prefix changed before the pilot boundary; retained its earlier exact capture')
+                complete = complete[offset:]
+                if not complete.startswith(saved):
+                    raise ValueError('Native transcript was rewritten; retained its earlier exact capture')
+                if complete != saved:
+                    check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
+                    writes.append((archive, complete))
+                    saved = complete
+                pending_bytes = len(raw) - offset - len(complete)
+                authorizations.append((item['id'], item.get('stopToken')))
             except SetupCaptureBlocked as error:
                 return blocked_capture(error)
             except (OSError, ValueError) as error:
-                errors.append(str(error))
-        if owner:
-            for item in config['sessions']:
-                if item['id'] == session_id and owner not in item.setdefault('monitorOwners', []):
-                    item['monitorOwners'].append(owner)
-        combined, sessions, aggregate_line = [], [], 1
-        writes, authorizations = [], []
-        for item in [part for session in config['sessions'] for part in [*session.get('previousCaptures', []), session]]:
-            archive_name = item.get('archive', item['id'] + '.jsonl')
-            archive = regular(private / archive_name)
-            saved = archive.read_bytes() if archive.exists() else b''
-            source_error = None
-            pending_bytes = None
-            suspended = item.get('suspended', False) or item.get('stopToken') != stop_token(folder, item['id'])
-            setup_blocked = not gate_authorized(item, gate)
-            if not suspended and not setup_blocked:
-                try:
-                    check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
-                    raw = source_for(item['id'], root).read_bytes()
-                    check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
-                    complete = raw[:raw.rfind(b'\n') + 1]
-                    offset = item.get('startOffset', 0)
-                    if offset > len(complete) or ('prefixSha256' in item and hashlib.sha256(complete[:offset]).hexdigest() != item['prefixSha256']):
-                        raise ValueError('Native transcript prefix changed before the pilot boundary; retained its earlier exact capture')
-                    complete = complete[offset:]
-                    if not complete.startswith(saved):
-                        raise ValueError('Native transcript was rewritten; retained its earlier exact capture')
-                    if complete != saved:
-                        check_setup_gate(folder, gate, item['id'], item.get('stopToken'))
-                        writes.append((archive, complete))
-                        saved = complete
-                    pending_bytes = len(raw) - offset - len(complete)
-                    authorizations.append((item['id'], item.get('stopToken')))
-                except SetupCaptureBlocked as error:
-                    return blocked_capture(error)
-                except (OSError, ValueError) as error:
-                    source_error = str(error)
-                    errors.append(item['id'] + ': ' + source_error)
-                    pending_bytes = None
-            combined.append(saved)
-            sessions.append({**analyze(saved, item['id'], item.get('monitorOwners', []), item.get('startLine', 1) - 1), 'capturedBytes': len(saved), 'pendingBytes': pending_bytes,
-                             'verifiedMonitorIdentities': item.get('monitorOwners', []),
-                             'captureId': archive_name, 'captureState': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'active',
-                             'sourceAvailable': not suspended and not setup_blocked and source_error is None, 'sourceError': source_error,
-                             'sourceStatus': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'current' if source_error is None else 'archived_only',
-                             'aggregateStartLine': aggregate_line,
-                             'captureStart': {'nativeByteOffset': item.get('startOffset', 0), 'nativeLine': item.get('startLine', 1),
-                                              'participantTurnId': item.get('startTurnId'), 'consentedAt': item.get('consentedAt'),
-                                              'scope': 'pilot_turn_onward' if 'startOffset' in item else 'legacy_full_session'}})
-            aggregate_line += saved.count(b'\n')
-            if sessions[-1]['invalidJsonLines']:
-                errors.append(item['id'] + ': complete native lines contain invalid JSON; raw bytes retained')
-        # Rebuild from exact per-session prefixes. Repeating or resuming capture
-        # cannot duplicate lines; another participant's session is retained.
-        report = {'schema': 'flowview-pilot-v1', 'capturedAt': now(), 'enabledAt': config['enabledAt'],
-                  'transcript': TRANSCRIPT, 'sessions': sessions,
-                  'errors': errors,
-                  'limits': ['The active final response is absent until a later checkpoint or bounded after-turn copy.',
-                             'Separate subagent transcripts are not copied. Per-turn models and tokens cover the main transcript.',
-                             'Each session starts at its participant-authorized pilot turn.']}
-        writes.extend([(config_path, json_bytes(config)), (folder / TRANSCRIPT, b''.join(combined)),
-                       (folder / USAGE, json_bytes(report))])
+                source_error = str(error)
+                errors.append(item['id'] + ': ' + source_error)
+                pending_bytes = None
+        combined.append(saved)
+        sessions.append({**analyze(saved, item['id'], item.get('monitorOwners', []), item.get('startLine', 1) - 1), 'capturedBytes': len(saved), 'pendingBytes': pending_bytes,
+                         'verifiedMonitorIdentities': item.get('monitorOwners', []),
+                         'captureId': archive_name, 'captureState': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'active',
+                         'sourceAvailable': not suspended and not setup_blocked and source_error is None, 'sourceError': source_error,
+                         'sourceStatus': 'suspended' if suspended else 'setup_blocked' if setup_blocked else 'current' if source_error is None else 'archived_only',
+                         'aggregateStartLine': aggregate_line,
+                         'captureStart': {'nativeByteOffset': item.get('startOffset', 0), 'nativeLine': item.get('startLine', 1),
+                                          'participantTurnId': item.get('startTurnId'), 'consentedAt': item.get('consentedAt'),
+                                          'scope': 'pilot_turn_onward' if 'startOffset' in item else 'legacy_full_session'}})
+        aggregate_line += saved.count(b'\n')
+        if sessions[-1]['invalidJsonLines']:
+            errors.append(item['id'] + ': complete native lines contain invalid JSON; raw bytes retained')
+    # Rebuild from exact per-session prefixes. Repeating or resuming capture
+    # cannot duplicate lines; another participant's session is retained.
+    report = {'schema': 'flowview-pilot-v1', 'capturedAt': now(), 'enabledAt': config['enabledAt'],
+              'transcript': TRANSCRIPT, 'sessions': sessions,
+              'errors': errors,
+              'limits': ['The active final response is absent until a later checkpoint or bounded after-turn copy.',
+                         'Separate subagent transcripts are not copied. Per-turn models and tokens cover the main transcript.',
+                         'Each session starts at its participant-authorized pilot turn.']}
+    writes.extend([(config_path, json_bytes(config)), (folder / TRANSCRIPT, b''.join(combined)),
+                   (folder / USAGE, json_bytes(report))])
+    try:
+        publish_capture_batch(folder, gate, authorizations, writes)
+    except SetupCaptureBlocked as error:
+        return blocked_capture(error)
+    current = next((s for s in reversed(sessions) if s['sessionId'] == session_id), None)
+    selected_turn_id = target_turn_id or (current['activeParticipantTurnId'] if current else None)
+    last = (next((t for t in current['turns'] if t['id'] == selected_turn_id or selected_turn_id in t['userMessageAliases']), None)
+            if current and selected_turn_id else current['turns'][-1] if current and current['turns'] else None)
+    return {'status': 'partial' if errors else 'captured', 'transcript': str(folder / TRANSCRIPT),
+            'usage': str(folder / USAGE), 'sessions': len(config['sessions']), 'errors': errors,
+            'captureId': current['captureId'] if current else None,
+            'modelsObserved': current['modelsObserved'] if current else [],
+            'currentSourceAvailable': bool(current and current['sourceAvailable']),
+            'nativeProgress': current['nativeProgress'] if current else None,
+            'turnId': last['id'] if last else None,
+            'finalResponseCaptured': last['finalResponseCaptured'] if last else False,
+            'turnLastAssistantLine': (current['captureStart']['nativeLine'] - 1 + last['lastAssistantLine']
+                                      if current and last and last['lastAssistantLine'] is not None else None)}
+
+
+STATUS_FILE = 'after-turn-status.json'
+HEALTH_FILE = 'pilot-status.json'
+COPY_SECONDS = 45
+
+
+def read_receipt(path):
+    regular(path)
+    if not path.exists():
+        return None
+    if path.stat().st_size > 128 * 1024:
+        raise ValueError('Capture status exceeds the metadata limit')
+    value = json.loads(path.read_text())
+    return value if isinstance(value, dict) else None
+
+
+def status_authorized(folder, receipt):
+    """Metadata only: an old copier can never acquire renewed consent."""
+    try:
+        if (folder_owner(folder) != receipt.get('owner') or
+                setup_capture_gate(folder) != receipt.get('setupConsent') or
+                stop_token(folder, receipt['sessionId']) != receipt.get('stopToken')):
+            return False
+        config = json.loads(regular(folder / PRIVATE / 'config.json').read_text())
+        validate_config(config)
+        item = next((entry for entry in config['sessions'] if entry['id'] == receipt['sessionId']), None)
+        return bool(item and not item.get('suspended') and
+                    item.get('archive', item['id'] + '.jsonl') == receipt.get('captureId') and
+                    gate_authorized(item, receipt.get('setupConsent')) and item.get('stopToken') == receipt.get('stopToken'))
+    except (OSError, ValueError, KeyError):
+        return False
+
+
+def save_health(folder, receipt):
+    """The only browser-readable pilot file contains no native IDs or content."""
+    owner = receipt.get('owner')
+    if not owner or folder_owner(folder) != owner:
+        return
+    support = folder / '.flowview-agent'
+    if not (support / 'session.json').exists():
+        support = folder
+    health = {'schema': 'flowview-pilot-status-v1', **owner,
+              'jobId': receipt['jobId'], 'outcome': receipt['outcome'],
+              'updatedAt': receipt['updatedAt'], 'expiresAt': receipt['expiresAt']}
+    if 'deadlineAt' in receipt:
+        health['deadlineAt'] = receipt['deadlineAt']
+    save_json(support / HEALTH_FILE, health)
+
+
+def save_receipt(folder, receipt, latest=False):
+    private = folder / PRIVATE
+    save_json(private / (receipt['sessionId'] + '.' + STATUS_FILE), receipt)
+    # One bounded after-turn slot survives ordinary turn-start checkpoints.
+    # A later scheduled job replaces it; this is not an accumulating history.
+    if 'deadlineAt' in receipt:
+        retained_path = private / (receipt['sessionId'] + '.last-after-turn-status.json')
+        retained = read_receipt(retained_path)
+        if latest or retained and retained.get('jobId') == receipt['jobId']:
+            save_json(retained_path, receipt)
+    current = read_receipt(private / STATUS_FILE)
+    if latest or current and (current.get('jobId') == receipt['jobId'] or
+                              not current.get('jobId') and current.get('sessionId') == receipt['sessionId']):
+        save_json(private / STATUS_FILE, receipt)
+        save_health(folder, receipt)
+    # The stop barrier does not wait for this lock. Recheck after publication
+    # too, so a stop that interrupts an atomic replace cannot leave success.
+    if receipt['outcome'] in ('pending', 'checkpoint', 'captured', 'partial') and not status_authorized(folder, receipt):
+        receipt.update({'outcome': 'disabled', 'replyCapture': {'finalResponseCaptured': False}, 'result': None})
+        save_receipt(folder, receipt, latest)
+
+
+def checkpoint_status(folder, session_id, result, after_turn=False):
+    if not session_id or not SESSION_ID.fullmatch(session_id):
+        return None
+    private = folder / PRIVATE
+    with locked(private, 'status.lock'):
+        previous = read_receipt(private / STATUS_FILE)
+        available = result.get('currentSourceAvailable', False)
+        # A refused or foreign session must not replace another session's status.
+        if not available and previous and previous.get('sessionId') != session_id:
+            return None
+        at = int(time.time() * 1000)
         try:
-            publish_capture_batch(folder, gate, authorizations, writes)
-        except SetupCaptureBlocked as error:
-            return blocked_capture(error)
-        current = next((s for s in reversed(sessions) if s['sessionId'] == session_id), None)
-        selected_turn_id = target_turn_id or (current['activeParticipantTurnId'] if current else None)
-        last = (next((t for t in current['turns'] if t['id'] == selected_turn_id or selected_turn_id in t['userMessageAliases']), None)
-                if current and selected_turn_id else current['turns'][-1] if current and current['turns'] else None)
-        return {'status': 'partial' if errors else 'captured', 'transcript': str(folder / TRANSCRIPT),
-                'usage': str(folder / USAGE), 'sessions': len(config['sessions']), 'errors': errors,
-                'captureId': current['captureId'] if current else None,
-                'modelsObserved': current['modelsObserved'] if current else [],
-                'currentSourceAvailable': bool(current and current['sourceAvailable']),
-                'nativeProgress': current['nativeProgress'] if current else None,
-                'turnId': last['id'] if last else None,
-                'finalResponseCaptured': last['finalResponseCaptured'] if last else False,
-                'turnLastAssistantLine': (current['captureStart']['nativeLine'] - 1 + last['lastAssistantLine']
-                                          if current and last and last['lastAssistantLine'] is not None else None)}
+            gate = setup_capture_gate(folder)
+            owner = folder_owner(folder)
+            token = stop_token(folder, session_id)
+        except (OSError, ValueError):
+            gate, owner, token = None, None, None
+        outcome = ('pending' if after_turn and result.get('turnId') else
+                   'partial' if result.get('status') == 'partial' else 'checkpoint') if available else (
+                   'disabled' if result.get('status') == 'disabled' else 'failed')
+        receipt = {'jobId': uuid.uuid4().hex, 'sessionId': session_id,
+                   'captureId': result.get('captureId'), 'turnId': result.get('turnId'),
+                   'afterNativeLine': (result.get('nativeProgress') or {}).get('capturedThroughLine'),
+                   'owner': owner, 'setupConsent': gate, 'stopToken': token,
+                   'startedAt': now(), 'updatedAt': at, 'expiresAt': at + 120000,
+                   'outcome': outcome, 'replyCapture': {'finalResponseCaptured': False}}
+        if outcome == 'pending':
+            receipt['deadlineAt'] = at + COPY_SECONDS * 1000
+        # Stop may have arrived after the raw capture committed but before status.
+        if available and not status_authorized(folder, receipt):
+            receipt['outcome'] = 'disabled'
+        save_receipt(folder, receipt, latest=True)
+        return receipt
 
 
-def settle(folder, session_id, turn_id, after_line, seconds=45, capture_id=None):
-    """One bounded final copy, not an installed listener or an authoring agent."""
+def finish_status(folder, receipt, outcome, reply=None, result=None):
+    folder = Path(folder)
+    with locked(folder / PRIVATE, 'status.lock'):
+        current = read_receipt(folder / PRIVATE / (receipt['sessionId'] + '.' + STATUS_FILE))
+        if not current or current.get('jobId') != receipt['jobId'] or current.get('outcome') != 'pending':
+            return False
+        if not status_authorized(folder, current):
+            outcome, reply, result = 'disabled', None, None
+        at = int(time.time() * 1000)
+        current.update({'outcome': outcome, 'finishedAt': now(), 'updatedAt': at, 'expiresAt': at + 120000,
+                        'replyCapture': reply or {'finalResponseCaptured': False}, 'result': result})
+        save_receipt(folder, current)
+        return True
+
+
+def stop_status(folder, session_id):
+    """Separate from capture.lock so a busy copier cannot hide the stop barrier."""
+    with locked(folder / PRIVATE, 'status.lock'):
+        current = read_receipt(folder / PRIVATE / (session_id + '.' + STATUS_FILE))
+        if current and current.get('sessionId') == session_id:
+            current.setdefault('jobId', uuid.uuid4().hex)  # Pre-job receipts can also be stopped safely.
+            at = int(time.time() * 1000)
+            current.update({'outcome': 'disabled', 'finishedAt': now(), 'updatedAt': at, 'expiresAt': at + 120000,
+                            'replyCapture': {'finalResponseCaptured': False}, 'result': None})
+            save_receipt(folder, current)
+        retained_path = folder / PRIVATE / (session_id + '.last-after-turn-status.json')
+        retained = read_receipt(retained_path)
+        if retained and retained.get('outcome') == 'pending':
+            at = int(time.time() * 1000)
+            retained.update({'outcome': 'disabled', 'finishedAt': now(), 'updatedAt': at, 'expiresAt': at + 120000,
+                             'replyCapture': {'finalResponseCaptured': False}, 'result': None})
+            save_json(retained_path, retained)
+
+
+def settle(folder, session_id, turn_id, after_line, seconds=COPY_SECONDS, capture_id=None, job_id=None):
+    """One bounded final copy. Only its still-current receipt can be completed."""
     if not session_id or not SESSION_ID.fullmatch(session_id):
         raise ValueError('Invalid Claude session ID for the bounded final copy')
     if not isinstance(after_line, int) or isinstance(after_line, bool) or after_line < 0:
         raise ValueError('The bounded final copy requires its pre-reply native line boundary')
-    deadline = time.monotonic() + seconds
-    status = None
-    outcome = None
+    folder = Path(folder)
+    if folder.is_symlink() or not folder.is_dir() or (folder / PRIVATE).is_symlink():
+        raise ValueError('Use the existing diagram folder and private directory, not symlinks')
+    receipt = read_receipt(folder / PRIVATE / (session_id + '.' + STATUS_FILE))
+    if (not job_id or not receipt or any(receipt.get(key) != value for key, value in
+            (('jobId', job_id), ('captureId', capture_id), ('turnId', turn_id), ('afterNativeLine', after_line))) or
+            receipt.get('outcome') != 'pending'):
+        return
+    deadline = time.monotonic() + min(max(0, seconds), COPY_SECONDS,
+                                     max(0, (receipt['deadlineAt'] - time.time() * 1000) / 1000))
+    status, outcome = None, None
     reply = {'afterNativeLine': after_line, 'finalResponseCaptured': False}
     while time.monotonic() < deadline:
         time.sleep(1)
+        current = read_receipt(folder / PRIVATE / (session_id + '.' + STATUS_FILE))
+        if not current or current.get('jobId') != job_id or current.get('outcome') != 'pending':
+            return
+        if not status_authorized(folder, receipt):
+            outcome = 'disabled'
+            break
         try:
-            status = capture(folder, session_id, target_turn_id=turn_id, expected_capture_id=capture_id)
+            status = capture(folder, session_id, target_turn_id=turn_id, expected_capture_id=capture_id, status_job=job_id)
             if not status.get('currentSourceAvailable'):
                 outcome = 'disabled' if status.get('status') == 'disabled' else 'failed'
                 break
-            progress = status.get('nativeProgress') or {}
             new_response = bool(status.get('turnId') == turn_id and status.get('finalResponseCaptured') and
                                 (status.get('turnLastAssistantLine') or 0) > after_line)
             reply.update({'finalResponseCaptured': new_response,
                           'nativeAssistantLine': status.get('turnLastAssistantLine'),
                           'participantTurnId': status.get('turnId')})
             if new_response:
-                outcome = 'captured'
+                outcome = 'partial' if status.get('status') == 'partial' else 'captured'
                 break
         except (OSError, ValueError, KeyError) as error:
             status = {'status': 'failed', 'error': str(error)}
             outcome = 'failed'
             break
-    if outcome is None:
-        outcome = 'timeout_response_pending'
-    saved_status = {'finishedAt': now(), 'sessionId': session_id, 'turnId': turn_id, 'outcome': outcome,
-                    'replyCapture': reply, 'result': status}
-    private = Path(folder) / PRIVATE
-    save_json(private / (session_id + '.after-turn-status.json'), saved_status)
-    save_json(private / 'after-turn-status.json', saved_status)
+    finish_status(folder, receipt, outcome or 'timeout_response_pending', reply, status)
+
+
+def launch_copy(folder, session_id, result):
+    receipt = result.get('captureReceipt') or {}
+    if receipt.get('outcome') != 'pending':
+        return
+    folder = Path(folder)
+    try:
+        log_path = regular(folder / PRIVATE / 'after-turn.log')
+        with log_path.open('ab') as log:
+            os.chmod(log_path, 0o600)
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--folder', str(folder.resolve()),
+                              '--session-id', session_id, '--settle-turn', receipt['turnId'],
+                              '--settle-after-line', str(receipt['afterNativeLine']),
+                              '--settle-capture', receipt['captureId'], '--settle-job', receipt['jobId']],
+                             stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
+    except (OSError, ValueError) as error:
+        finish_status(folder, receipt, 'failed', result={'status': 'failed', 'error': str(error)})
+        raise
+    result['afterTurnCopy'] = 'scheduled for up to 45 seconds to copy the final response; completion is not yet confirmed'
 
 
 def main():
@@ -796,14 +988,15 @@ def main():
     parser.add_argument('--explicit-opt-in', action='store_true', help='Only for a direct participant opt-in turn: override stored setup or stopped capture with --enable')
     parser.add_argument('--after-turn', action='store_true', help='Schedule a bounded 45-second final-response copy')
     parser.add_argument('--session-id', default=os.environ.get('CLAUDE_CODE_SESSION_ID'))
+    parser.add_argument('--settle-job', help=argparse.SUPPRESS)
     parser.add_argument('--settle-capture', help=argparse.SUPPRESS)
     parser.add_argument('--settle-turn', help=argparse.SUPPRESS)
     parser.add_argument('--settle-after-line', type=int, help=argparse.SUPPRESS)
     args = parser.parse_args()
     if args.explicit_opt_in and not args.enable:
         parser.error('--explicit-opt-in requires --enable and a later explicit user opt-in')
-    if args.settle_turn and not args.settle_capture:
-        parser.error('The bounded final copy requires its capture enrollment identity')
+    if args.settle_turn and (not args.settle_capture or not args.settle_job):
+        parser.error('The bounded final copy requires its capture enrollment and job identity')
     if args.disable and (args.after_turn or args.settle_turn):
         parser.error('--disable cannot be combined with capture scheduling')
     try:
@@ -811,19 +1004,12 @@ def main():
             print(json.dumps(disable(args.folder, args.session_id)))
             return 0
         if args.settle_turn:
-            settle(args.folder, args.session_id, args.settle_turn, args.settle_after_line, capture_id=args.settle_capture)
+            settle(args.folder, args.session_id, args.settle_turn, args.settle_after_line, capture_id=args.settle_capture, job_id=args.settle_job)
             return
-        result = capture(args.folder, args.session_id, enable=args.enable, explicit_opt_in=args.explicit_opt_in)
-        if args.after_turn and result.get('turnId') and result.get('currentSourceAvailable'):
-            log_path = regular(Path(args.folder) / PRIVATE / 'after-turn.log')
-            with log_path.open('ab') as log:
-                os.chmod(log_path, 0o600)
-                subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--folder', str(Path(args.folder).resolve()),
-                                  '--session-id', args.session_id, '--settle-turn', result['turnId'],
-                                  '--settle-after-line', str(result['nativeProgress']['capturedThroughLine']),
-                                  '--settle-capture', result['captureId']],
-                                 stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
-            result['afterTurnCopy'] = 'scheduled for up to 45 seconds to copy the final response; completion is not yet confirmed'
+        result = capture(args.folder, args.session_id, enable=args.enable, explicit_opt_in=args.explicit_opt_in,
+                         after_turn=args.after_turn)
+        if args.after_turn:
+            launch_copy(args.folder, args.session_id, result)
         print(json.dumps(result))
         return 1 if result['status'] == 'partial' else 0
     except (OSError, ValueError, KeyError) as error:

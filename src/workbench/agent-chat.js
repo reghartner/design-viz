@@ -55,7 +55,7 @@ function initWorkbenchAgentChat(opts){
   var life=createWorkbenchLifetime(),client=null,timer=null,connecting=false,generation=0,releaseLock=null,adoptingProject=false;
   var workflow='external',composeMode='external',setupIntent='adopt',setupUseRemembered=false,freshProject=null,pendingFileChoice=null,copying=false,preparedCopy=null,composed=null,composeEpoch=0;
   var selectionFeedback=null,selectionFeedbackTimer=null;
-  var state={connected:false,pending:null,transcript:[],changes:[],listening:false};
+  var state={connected:false,pending:null,transcript:[],changes:[],listening:false,pilotStatus:null},pilotRequested=false;
   var browserStorage=null,browserDatabase=null;try{browserStorage=window.localStorage;}catch(ignored){}try{browserDatabase=window.indexedDB;}catch(ignored){}
   var recovery=createWorkbenchAgentRecovery({storage:browserStorage,indexedDB:browserDatabase}),remembered=recovery.read(),rememberedHandle=null,activeFolder=null,lastSaved='',accessLost=false,seenProject=null,cacheReady=false;
   var get=function(id){return doc.getElementById('folder-agent-'+id);};
@@ -74,6 +74,7 @@ function initWorkbenchAgentChat(opts){
   stageStatus.id='folder-agent-stage';stageStatus.setAttribute('role','status');stageStatus.setAttribute('aria-live','polite');stageStatus.setAttribute('aria-atomic','true');
   stageIcon.setAttribute('viewBox','0 0 24 24');stageIcon.setAttribute('aria-hidden','true');stageIcon.appendChild(stagePath);stageStatus.append(stageIcon,stageText);
   var headerControls=element('div','folder-agent-header-controls');header.append(stageStatus,get('connection'),get('folder'));headerControls.append(actions,get('panel-status'));header.append(headerControls);
+  var pilotHealth=element('p','folder-agent-hint');pilotHealth.id='folder-agent-pilot-health';pilotHealth.setAttribute('role','status');pilotHealth.hidden=true;header.appendChild(pilotHealth);
   var recoveryCard=element('section','folder-agent-recovery'),recoveryTitle=element('b'),recoveryText=element('p'),continueButton=button('continue','Reopen diagram folder');
   recoveryCard.id='folder-agent-recovery';recoveryCard.hidden=true;recoveryCard.append(recoveryTitle,recoveryText,continueButton);
   var activity=get('activity'),activityDetails=element('details'),activitySummary=element('summary','', 'Activity from the latest turn');
@@ -381,6 +382,14 @@ function initWorkbenchAgentChat(opts){
       status('Claude is connected. Describe the story in your own words.');
     }
     if(update.status)status(update.status);
+    var health=state.connected && !accessLost?state.pilotStatus:null,stamp=health?new Date(health.updatedAt).toLocaleTimeString():'';
+    pilotHealth.hidden=!state.connected;
+    setText('pilot-health','Pilot capture · '+(accessLost?'Status unavailable while folder access is lost.':!health?
+      (pilotRequested?'Requested; not yet verified.':'Setup choice: Off. No current capture verification.'):
+      {pending:'Final reply copy pending since '+stamp+'.',checkpoint:'Last verified checkpoint '+stamp+'. Final reply not verified.',
+        captured:'Last verified final reply '+stamp+'. Later replies are unverified.',partial:'Last checkpoint '+stamp+' needs attention; capture is incomplete.',
+        failed:'Helper failed at '+stamp+'. Capture needs attention.',disabled:'Stopped at '+stamp+'.',
+        timeout_response_pending:'Final reply copy timed out; completion unverified.',stale:'Status is stale; current capture is unverified.'}[health.outcome]));
     get('connection').textContent=accessLost?'Folder access needs attention':state.connected?(workflow==='external'?'Shared folder ready':state.listening?'Claude listener active':'Waiting for Claude listener'):'Not connected';
     paintCompose();
     get('copy').disabled=connecting || !state.connected || !get('instructions').value;
@@ -484,6 +493,7 @@ function initWorkbenchAgentChat(opts){
       throw Error('Your draft changed while opening the folder. Choose the diagram folder again.');
   }
   async function beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture){
+    pilotRequested=pilotCapture===true;state.pilotStatus=null;
     var files=projectFolder?projectFolder.files:createFolderAgentFiles(directory);
     if(!life.alive() || token!==generation)return;
     var choice;
@@ -531,7 +541,7 @@ function initWorkbenchAgentChat(opts){
     await files.write('authoring-kit.json',{gzip:kit.gzip,sha256:kit.sha256});
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     var instructions=folderAgentInstructions(directory.name,get('level').value,resume,identity,workflow,pilotCapture);
-    setText('pilot-review',pilotCapture?'Pilot capture: On for this session. After you paste these instructions into Claude Code, the agent saves the raw conversation from that turn onward, observed models, and token usage locally. Dollar cost is collected manually by the pilot owner.':'Pilot capture: Off for this session. The instructions tell your agent not to capture your transcript or usage, even if this folder was used for a pilot before. To enable it later, type “Use pilot mode for this session” directly in Claude Code.');
+    setText('pilot-review',pilotCapture?'Pilot capture: On for this session (requested, not yet verified). After you paste these instructions into Claude Code, the agent is instructed to save the raw conversation from that turn onward, observed models, and token usage locally. Dollar cost is collected manually by the pilot owner.':'Pilot capture: Off for this session. The instructions tell your agent not to capture your transcript or usage, even if this folder was used for a pilot before. To enable it later, type “Use pilot mode for this session” directly in Claude Code.');
     await files.write('CONNECT.md',instructions+'\n');
     if(!life.alive() || token!==generation){try{await connectingClient.disconnect();}catch(ignored){}connectingClient.destroy();return;}
     await files.write('README.md',instructions+'\n');

@@ -454,7 +454,9 @@ test('measure 50 file-only exchanges separately from model work',async({page},in
     await page.locator('#welcome-agent').click();await expect(page.locator('#folder-agent-guide')).toBeVisible();await page.locator('#folder-agent-setup-mode-embedded').click();
     await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await expect(page.locator('#folder-agent-send')).toBeDisabled();
     const events=new Map(),waiting=new Map();
-    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','1'],{stdio:['ignore','pipe','pipe']});
+    // Keep the measurement watcher alive for the entire 90-second test budget.
+    // A one-minute watcher can expire before exchange 50 and strand its event wait.
+    watcher=spawn('python3',[path.join(h.session,'folder-agent.py'),'watch','--minutes','2'],{stdio:['ignore','pipe','pipe']});
     createInterface({input:watcher.stdout}).on('line',line=>{
       const event=JSON.parse(line);if(event.event!=='flowview_request')return;
       const at=Date.now();events.set(event.id,at);waiting.get(event.id)?.(at);
@@ -1281,6 +1283,48 @@ test('disconnected recovery actions remain reachable in a short window',async({p
       expect(await button.evaluate(node=>{const r=node.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return node===hit || node.contains(hit);})).toBe(true);
     }
     expect(await page.locator('.folder-agent-header').evaluate(node=>node.clientHeight)).toBeGreaterThan(100);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+test('pilot health verifies synthetic helper receipts and retires them across reconnects',async({page},info)=>{
+  const h=await setup(page);
+  const nativeId='12345678-1234-1234-1234-123456789abc';
+  try{
+    await page.locator('#welcome-agent').click();await page.locator('#folder-agent-pilot-capture').check();
+    await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    await closeGuide(page);
+    const health=page.locator('#folder-agent-pilot-health');
+    await expect(health).toBeVisible();await expect(health).toContainText('Requested; not yet verified');
+    const nativeRoot=path.join(h.folder,'synthetic-native'),nativeProject=path.join(nativeRoot,'projects','fixture');
+    await mkdir(nativeProject,{recursive:true});
+    const transcript=path.join(nativeProject,nativeId+'.jsonl'),diagram=path.dirname(h.session);
+    const user={type:'user',uuid:'synthetic-turn',sessionId:nativeId,message:{role:'user',content:await readFile(path.join(h.session,'CONNECT.md'),'utf8')}};
+    const assistant=stop=>({type:'assistant',uuid:'synthetic-'+stop,sessionId:nativeId,message:{id:'synthetic-'+stop,model:'synthetic-model',stop_reason:stop,content:[{type:'text',text:'synthetic private answer'}],usage:{input_tokens:4,output_tokens:8}}});
+    let raw=[user,assistant('tool_use')].map(row=>JSON.stringify(row)+'\n').join('');await writeFile(transcript,raw);
+    const run=(...args)=>JSON.parse(execFileSync('python3',[path.join(root,'.claude/skills/hld-to-page/scripts/pilot_capture.py'),'--folder',diagram,...args],{encoding:'utf8',env:{...process.env,CLAUDE_CODE_SESSION_ID:nativeId,CLAUDE_CONFIG_DIR:nativeRoot}}));
+    run('--enable');await expect(health).toContainText('Last verified checkpoint');
+    run('--after-turn');await expect(health).toContainText('Final reply copy pending');
+    raw+=JSON.stringify(assistant('end_turn'))+'\n';await writeFile(transcript,raw);
+    await expect(health).toContainText('Last verified final reply');await expect(health).toContainText('Later replies are unverified');
+    const receipt=await h.read('pilot-status.json');
+    expect(Object.keys(receipt).sort()).toEqual(['connectionId','deadlineAt','expiresAt','jobId','outcome','schema','sessionId','updatedAt'].sort());
+    expect(JSON.stringify(receipt)).not.toMatch(/synthetic|input_tokens|output_tokens/);
+    await page.screenshot({path:info.outputPath('pilot-health-verified.png')});
+    run('--disable');await expect(health).toContainText('Stopped at');
+    await disconnect(page);await expect(health).toBeHidden();
+    await page.locator('#folder-agent-continue').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    await expect(health).toContainText('Setup choice: Off. No current capture verification');
+    const owner=await h.read('session.json'),at=Date.now();
+    const publish=extra=>writeFile(path.join(h.session,'pilot-status.json'),JSON.stringify({...receipt,...owner,updatedAt:at,expiresAt:at+120000,...extra}));
+    await publish({outcome:'pending',updatedAt:at-46000,deadlineAt:at-1000,expiresAt:at+74000});
+    await expect(health).toContainText('timed out; completion unverified');
+    await publish({outcome:'captured',updatedAt:at-130000,expiresAt:at-10000});
+    await expect(health).toContainText('Status is stale');
+    await publish({outcome:'failed'});await expect(health).toContainText('Helper failed');
+    await publish({outcome:'captured',connectionId:receipt.connectionId});
+    await expect(health).toContainText('No current capture verification');
     expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });

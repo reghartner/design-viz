@@ -704,3 +704,45 @@ test('only an accepted publication pins its base for proposals after many edits'
   h.proposal({id:'late',requestId:stopped,baseRevision:published.revision,source:'{"a":44,"b":3}'});await h.client.poll();
   assert.equal(h.writes.length,0);assert.equal(h.last.review,null);
 });
+
+function pilotReceipt(h,extra={}){return h.envelope({schema:'flowview-pilot-status-v1',jobId:'a'.repeat(32),outcome:'pending',updatedAt:100000,expiresAt:220000,deadlineAt:145000,...extra});}
+test('pilot health starts unknown and only admits current connection metadata',async()=>{
+  const h=harness();await h.client.start();assert.equal(h.last.pilotStatus,null);
+  const reads=[];h.gate(name=>reads.push(name));
+  h.disk.set('pilot-status.json',pilotReceipt(h,{transcript:'private',tokens:{input:44},model:'private-model',nativeSessionId:'private-native'}));
+  await h.client.poll();assert.deepEqual(h.last.pilotStatus,{jobId:'a'.repeat(32),updatedAt:100000,outcome:'pending'});
+  assert.equal(reads.some(name=>/agent\.(usage|transcript)|flowview-pilot|after-turn/.test(name)),false);
+  h.disk.set('pilot-status.json',pilotReceipt(h,{connectionId:'old',outcome:'captured'}));await h.client.poll();assert.equal(h.last.pilotStatus,null);
+  h.disk.set('pilot-status.json',pilotReceipt(h,{sessionId:'foreign',outcome:'captured'}));await h.client.poll();assert.equal(h.last.pilotStatus,null);
+});
+test('pending pilot receipt expires as unverified and old checkpoints become stale',async()=>{
+  const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h));await h.client.poll();
+  h.advance(45001);await h.client.poll();assert.equal(h.last.pilotStatus.outcome,'timeout_response_pending');
+  h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));await h.client.poll();assert.equal(h.last.pilotStatus.outcome,'captured');
+  h.advance(75000);await h.client.poll();assert.equal(h.last.pilotStatus.outcome,'stale');
+});
+test('invalid or missing pilot receipt clears prior observation without breaking folder work',async()=>{
+  const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));await h.client.poll();
+  for(const invalid of [null,new SyntaxError('partial write'),Error('pilot-status.json exceeds limit'),pilotReceipt(h,{updatedAt:106000}),pilotReceipt(h,{expiresAt:500000}),pilotReceipt(h,{deadlineAt:160000}),pilotReceipt(h,{jobId:'bad'}),pilotReceipt(h,{outcome:'active'})]){
+    h.disk.set('pilot-status.json',invalid);await h.client.poll();assert.equal(h.last.pilotStatus,null);assert.equal(h.last.connected,true);
+  }
+});
+test('disconnect and reconnect clear pilot observation even if old receipt stays on disk',async()=>{
+  const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));await h.client.poll();
+  await h.client.disconnect();assert.equal(h.last.pilotStatus,null);
+  await h.client.start(true);assert.equal(h.last.pilotStatus,null);await h.client.poll();assert.equal(h.last.pilotStatus,null);
+});
+test('held pilot read cannot revive health after disconnect or lost ownership',async()=>{
+  const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));
+  let release,entered;const waiting=new Promise(resolve=>entered=resolve);
+  h.gate(name=>name==='pilot-status.json'?new Promise(resolve=>{release=resolve;entered();}):undefined);
+  const polling=h.client.poll();await waiting;const disconnecting=h.client.disconnect();release();await polling;await disconnecting;assert.equal(h.last.pilotStatus,null);
+  h.gate(null);await h.client.start(true);h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));
+  h.gate(name=>{if(name==='pilot-status.json')h.disk.set('session.json',{...h.disk.get('session.json'),connectionId:'new-owner'});});
+  await h.client.poll();assert.equal(h.last.connected,false);assert.equal(h.last.pilotStatus,null);
+});
+test('lost folder access clears last verified pilot health',async()=>{
+  const h=harness();await h.client.start();h.disk.set('pilot-status.json',pilotReceipt(h,{outcome:'captured'}));await h.client.poll();
+  h.disk.set('session.json',Object.assign(Error('Permission lost'),{name:'NotAllowedError'}));
+  await assert.rejects(h.client.poll(),/Permission lost/);assert.equal(h.last.pilotStatus,null);
+});

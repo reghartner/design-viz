@@ -2,7 +2,7 @@
 function createFolderAgentFiles(directory){
   // Recovery holds before/after copies of both artifacts. JSON escaping can
   // double each 4 MiB spec and expand each 256 KiB ledger up to sixfold.
-  function limit(name){return (name==='artifact-write.json'?20:8)*1024*1024;}
+  function limit(name){return name==='pilot-status.json'?4096:(name==='artifact-write.json'?20:8)*1024*1024;}
   async function readText(name,maxBytes){
     if(!/^[\w .-]+$/.test(name) || name==='.' || name==='..')throw Error('Use a plain session filename.');
     try{
@@ -86,9 +86,22 @@ async function inspectFolderAgentSession(files,snapshot,now){
     lease:{connected:!!(ownsLease && lease.connected),active:!!claiming || !!(ownsLease && lease.connected && Number.isFinite(lease.at) && at-lease.at<15000),at:ownsLease?lease.at:null}};
 }
 
+// Whitelist this small metadata receipt; private pilot files never enter the browser.
+function folderAgentPilotHealth(value,identity,now){
+  if(!value || value.schema!=='flowview-pilot-status-v1' || !identity ||
+      value.sessionId!==identity.sessionId || value.connectionId!==identity.connectionId ||
+      typeof value.jobId!=='string' || !/^[a-f0-9]{32}$/.test(value.jobId) ||
+      !['pending','checkpoint','captured','partial','failed','disabled','timeout_response_pending'].includes(value.outcome) ||
+      !Number.isFinite(value.updatedAt) || value.updatedAt>now+5000 || !Number.isFinite(value.expiresAt) ||
+      value.expiresAt<value.updatedAt || value.expiresAt>value.updatedAt+120000)return null;
+  if(value.outcome==='pending' && (!Number.isFinite(value.deadlineAt) || value.deadlineAt<value.updatedAt || value.deadlineAt>value.updatedAt+45000))return null;
+  return {jobId:value.jobId,updatedAt:value.updatedAt,outcome:value.expiresAt<=now?'stale':
+    value.outcome==='pending' && value.deadlineAt<=now?'timeout_response_pending':value.outcome};
+}
+
 function createFolderAgentClient(opts){
   var files=opts.files,now=opts.now || Date.now,uuid=opts.uuid || function(){return crypto.randomUUID();};
-  var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null;
+  var connected=false,disposed=false,epoch=0,manifest=null,exchange=null,project=null,pilotStatus=null;
   var lastState='',lastHeartbeat=-Infinity,pending=null,transcript=[],seen=new Set(),nativeSeen=new Set(),chain=Promise.resolve();
   var activity=[],activitySeen=new Set(),requestAt=null,lastAgentAt=null,turnEpoch=0,changes=[],preflight=null,changesDirty=false,reviewMode=opts.reviewMode!==false,reviewCandidate=null,reviewDecision=null,pendingReviewResult=null,reviewVersion=0;
   function serial(action){var job=chain.then(action);chain=job.catch(function(){});return job;}
@@ -96,7 +109,7 @@ function createFolderAgentClient(opts){
     var quietSeconds=pending?Math.max(0,Math.floor((now()-(lastAgentAt===null?requestAt:lastAgentAt))/1000)):0;
     var phase=!connected?'disconnected':!pending?(activity.length?'complete':'idle'):activity.length && activity[activity.length-1].phase==='permission-needed'?'permission-needed':quietSeconds>=30?'quiet':lastAgentAt===null?'waiting':'responding';
     if(!disposed && opts.changed)opts.changed(Object.assign({connected:connected,pending:pending,transcript:transcript.slice(),
-      activity:activity.slice(),activityPhase:phase,quietSeconds:quietSeconds,agentResponded:lastAgentAt!==null,changes:changes.slice(),preflight:preflight,reviewMode:reviewMode,review:connected && reviewCandidate?reviewCandidate.public:null},state));
+      pilotStatus:connected?pilotStatus:null,activity:activity.slice(),activityPhase:phase,quietSeconds:quietSeconds,agentResponded:lastAgentAt!==null,changes:changes.slice(),preflight:preflight,reviewMode:reviewMode,review:connected && reviewCandidate?reviewCandidate.public:null},state));
   }
   function envelope(value){return Object.assign({sessionId:manifest.sessionId,connectionId:manifest.connectionId},value);}
   function belongs(value){return value && value.sessionId===manifest.sessionId && value.connectionId===manifest.connectionId;}
@@ -213,6 +226,13 @@ function createFolderAgentClient(opts){
   async function poll(){
     if(!connected || disposed)return;
     var token=epoch,turn=turnEpoch,requestId=pending,sent=await snapshot(token);if(!sent || !alive(token) || turn!==turnEpoch)return;
+    var health=null;try{health=await files.read('pilot-status.json');}catch(ignored){}
+    if(!alive(token) || turn!==turnEpoch)return;
+    pilotStatus=folderAgentPilotHealth(health,manifest,now());
+    if(pilotStatus){
+      var healthOwner=await files.read('session.json');if(!alive(token) || turn!==turnEpoch)return;
+      if(!belongs(healthOwner)){pilotStatus=null;connected=false;epoch++;publish({status:'Another connection owns this folder. Reconnect explicitly.'});return;}
+    }
     if(opts.workflow==='external'){
       var incoming=await readOptional('agent-request.json');if(!alive(token) || turn!==turnEpoch)return;
       if(pending && nativeSeen.has(pending) && belongs(incoming) && incoming.id===pending && incoming.withdrawn===true){
@@ -367,7 +387,7 @@ function createFolderAgentClient(opts){
       }
       manifest={protocol:'flowview-folder-v1',workflow:opts.workflow || 'embedded',sessionId:existing?existing.sessionId:uuid(),connectionId:uuid(),createdAt:preview?preview.createdAt:now()};
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
-      project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
+      pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
       exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
@@ -502,7 +522,7 @@ function createFolderAgentClient(opts){
       return {text:text,filename:files.artifacts?files.artifacts.ledger:'story.ledger.md',sessionId:manifest.sessionId,connectionId:manifest.connectionId,
         sourceRevision:null,sharedRevision:sent.snapshot.revision,sourceMatches:null,verified:false,at:now(),readAt:now()};
     });},
-    poll:function(){return serial(poll).catch(function(ex){publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},
+    poll:function(){return serial(poll).catch(function(ex){pilotStatus=null;publish({status:'Folder unavailable: '+ex.message,listening:false,accessError:ex.name==='NotAllowedError'?'permission':'unavailable'});throw ex;});},
     disconnect:function(){
       connected=false;pending=null;epoch++;clearReview();publish({status:'Disconnected. Files and conversation remain in your folder.',listening:false});
       return serial(async function(){if(manifest && belongs(await files.read('session.json')))await files.write('editor.json',envelope({connected:false,at:now()}));});

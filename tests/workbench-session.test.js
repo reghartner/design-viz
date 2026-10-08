@@ -35,6 +35,75 @@ function harness({initial='{"title":"initial"}',storage=new Map(),deferInitialSa
     get text(){return text;},type(value){text=value;},get renders(){return renders;},get invalidations(){return invalidations;},
     flush(){const pending=[...timers.values()];timers.clear();pending.forEach(fn=>fn());}};
 }
+function archiveHarness(initial){
+  const storage=new Map(initial==null?[]:[['dv-workbench-earlier-drafts',initial]]);
+  let at=0,blocked=false,writes=0,failures=0;
+  const persistence=context.createBuilderPersistence({
+    storage:()=>({getItem:key=>storage.get(key)||null,setItem(key,value){
+      if(blocked)throw Error('quota');writes++;storage.set(key,value);
+    }}),now:()=>++at,archiveFailure:()=>failures++
+  });
+  return {persistence,storage,get writes(){return writes;},get failures(){return failures;},block(){blocked=true;}};
+}
+test('earlier drafts retain only two distinct exact source and artifact snapshots',()=>{
+  const h=archiveHarness(),p=h.persistence;
+  const stories=[
+    {text:' \n{ unfinished A',baseline:'{"title":"A baseline"}',ledger:'A ledger',topologyContext:{id:'A',specs:[{name:'first'}]}},
+    {text:'{"title":"B"}',baseline:'{"title":"B baseline"}',ledger:'B ledger',topologyContext:{id:'B',specs:[{name:'second'}]}},
+    {text:'{"title":"C"}',baseline:'{"title":"C baseline"}',ledger:'C ledger',topologyContext:{id:'C',specs:[{name:'third'}]}}
+  ];
+  stories.forEach(story=>p.preserve(story.text,story.baseline,{ledger:story.ledger,topologyContext:story.topologyContext}));
+  const retained=plain(p.archived());
+  assert.deepEqual(retained,stories.slice(1).reverse().map((story,index)=>({...story,at:3-index})));
+  assert.deepEqual(JSON.parse(h.storage.get('dv-workbench-earlier-drafts')),retained);
+});
+test('re-preserving an older duplicate moves it to newest without making a third entry',()=>{
+  const h=archiveHarness(),p=h.persistence;
+  p.preserve('A','baseline A',{ledger:'ledger A',topologyContext:{id:'A'}});
+  p.preserve('B','baseline B',{ledger:'ledger B',topologyContext:{id:'B'}});
+  p.preserve('A','baseline A',{ledger:'ledger A',topologyContext:{id:'A'}});
+  assert.deepEqual(plain(p.archived()),[
+    {text:'A',baseline:'baseline A',at:3,ledger:'ledger A',topologyContext:{id:'A'}},
+    {text:'B',baseline:'baseline B',at:2,ledger:'ledger B',topologyContext:{id:'B'}}
+  ]);
+  const writes=h.writes;p.preserve('A','baseline A',{ledger:'ledger A',topologyContext:{id:'A'}});
+  assert.equal(h.writes,writes,'already newest duplicate is idempotent');
+});
+test('quota on two earlier drafts falls back to a durable outgoing draft',()=>{
+  const key='dv-workbench-earlier-drafts',old={text:'older',baseline:'old baseline',at:1};
+  const storage=new Map([[key,JSON.stringify([old])]]),attempts=[];
+  const persistence=context.createBuilderPersistence({storage:()=>({
+    getItem:name=>storage.get(name)||null,
+    setItem(name,value){attempts.push(JSON.parse(value).length);if(JSON.parse(value).length>1)throw Error('quota');storage.set(name,value);}
+  }),now:()=>2,archiveFailure(){assert.fail('one-copy recovery should not report a failure');}});
+  persistence.preserve(' \n{ unfinished','new baseline',{ledger:'new ledger',topologyContext:{id:'new'}});
+  assert.deepEqual(attempts,[2,1]);
+  assert.deepEqual(JSON.parse(storage.get(key)),[{text:' \n{ unfinished',baseline:'new baseline',at:2,ledger:'new ledger',topologyContext:{id:'new'}}]);
+});
+test('reading a valid legacy archive compacts it, while malformed or unwritable archives remain untouched',()=>{
+  const legacy=[
+    {text:'A',baseline:'base A',ledger:'ledger A',topologyContext:{id:'A'},at:5},
+    {text:'B',baseline:'base B',ledger:'ledger B',topologyContext:{id:'B'},at:4},
+    {text:'A',baseline:'base A',ledger:'ledger A',topologyContext:{id:'A'},at:3},
+    {text:'C',baseline:'base C',ledger:'ledger C',topologyContext:{id:'C'},at:2}
+  ];
+  const h=archiveHarness(JSON.stringify(legacy));
+  assert.deepEqual(plain(h.persistence.archived()),legacy.slice(0,2));
+  assert.deepEqual(JSON.parse(h.storage.get('dv-workbench-earlier-drafts')),legacy.slice(0,2));
+  h.persistence.preserve('C','base C',{ledger:'ledger C',topologyContext:{id:'C'}});
+  assert.deepEqual(plain(h.persistence.archived()).map(entry=>entry.text),['C','A']);
+  const malformed='[{"text":"first"},null,{"broken":true},{"text":"second"}]',invalid=archiveHarness(malformed);
+  assert.deepEqual(plain(invalid.persistence.archived()),[{text:'first'},{text:'second'}]);
+  assert.equal(invalid.writes,0,'reading malformed legacy data must not compact or rewrite it');
+  assert.throws(()=>invalid.persistence.preserve('new','baseline'),/earlier draft could not be saved/);
+  assert.equal(invalid.storage.get('dv-workbench-earlier-drafts'),malformed);
+  const full=archiveHarness(JSON.stringify(legacy)),before=full.storage.get('dv-workbench-earlier-drafts');
+  full.block();
+  assert.deepEqual(plain(full.persistence.archived()),legacy,'failed read-time compaction keeps all entries visible');
+  assert.throws(()=>full.persistence.preserve('new','baseline'),/earlier draft could not be saved/);
+  assert.equal(full.storage.get('dv-workbench-earlier-drafts'),before);
+  assert.equal(full.failures,1);
+});
 test('session snapshots exact source, accepts one action and captures intervening invalid handwriting on Redo',()=>{
   const h=harness(),s=h.session,before=h.text;
   s.target={kind:'node',section:0,id:'a'};s.insertSection=2;
@@ -202,6 +271,17 @@ test('replacement refuses to lose the current draft when its archive cannot be s
   assert.throws(()=>s.replaceProject('{"title":"different file"}'),/earlier draft could not be saved/);
   assert.equal(h.text,edited);assert.equal(s.snapshot().project,snapshot.project);assert.equal(s.historyVersion(),version);
   assert.equal(h.invalidations,0);assert.equal(s.undo(),true);assert.equal(h.text,before);
+});
+
+test('malformed earlier drafts never get overwritten to make room for a project switch',()=>{
+  const stored='{"unexpected":"shape"}',storage=new Map([['dv-workbench-earlier-drafts',stored]]);
+  const h=harness({storage}),s=h.session;
+  s.accept({text:'{"title":"valuable edit"}'});
+  const before=s.snapshot(),version=s.historyVersion();
+  assert.throws(()=>s.replaceProject('{"title":"next"}'),/earlier draft could not be saved/);
+  assert.equal(storage.get('dv-workbench-earlier-drafts'),stored);
+  assert.equal(h.text,before.text);assert.equal(s.snapshot().project,before.project);
+  assert.equal(s.historyVersion(),version);assert.equal(s.canUndo(),true);
 });
 
 test('restoring a recovery draft establishes a fresh project boundary even when the boot editor has history',()=>{

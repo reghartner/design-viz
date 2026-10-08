@@ -112,6 +112,9 @@ body.welcome-active{background:#f7f8fc;margin:0;}
 .welcome-button-primary:hover{background:#5c54aa;border-color:#5c54aa;}
 .welcome-note{font-size:12px;line-height:1.6;color:var(--welcome-sub);}
 .welcome-error{background:#fff2f0;border:1px solid #e4b6b1;border-radius:8px;padding:12px 15px;color:#9b3d3c;font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;}
+.workbench-draft-recovery{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;background:#fff2f0;border-bottom:1px solid #e4b6b1;color:#9b3d3c;flex-wrap:wrap;}
+.workbench-draft-recovery[hidden]{display:none;}
+.workbench-draft-recovery p{margin:0;flex:1 1 300px;}
 .welcome-narrow{max-width:800px;margin:auto;}
 .welcome-paste-form{margin-top:26px;}
 .welcome label:not(.welcome-prompt-kinds label){display:block;font-size:12px;font-weight:600;color:#525c72;margin:18px 0 8px;}

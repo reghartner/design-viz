@@ -39,7 +39,7 @@ function initSectionLayoutEditor(opts){
     var rec=sections.get(section);if(!rec){rec={life:createWorkbenchLifetime(),fields:createWorkbenchLifetime(),viewFields:createWorkbenchLifetime(),optionsOpen:false};sections.set(section,rec);}return rec;
   }
   var view=opts.view,editing=null,drag=null,selected='diagram',profile='default',pathsOpen=false,stepsOpen=false,widths={backstage:1080,confluence:760},arrangementDisclosure=createSectionArrangementDisclosureState();
-  function endEditing(){editing=null;arrangementDisclosure.reset();}
+  function endEditing(){editing=null;arrangementDisclosure.reset();if(stage)stage.style.minHeight='';}
   function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text)n.textContent=text;return n;}
   function button(label,fn){var b=el('button','bbtn',label);b.type='button';controlsLife.listen(b,'click',fn);return b;}
   var toolbar=el('div','layout-preview-tools'),label=el('label',null,'Preview '),target=el('select');
@@ -53,6 +53,13 @@ function initSectionLayoutEditor(opts){
   if(appearance)appearance.appendChild(toolbar);else view.parentNode.insertBefore(toolbar,view);
   view.parentNode.insertBefore(stage,view);stage.appendChild(frame);frame.appendChild(view);
   function feedback(text){note.textContent=text;note.title=text;}
+  // Saving an upward move can shorten the last grid and clamp a scrolled page.
+  // Keep the largest extent for this Arrange session; scrolling still works.
+  function holdViewport(){
+    if(editing===null)return;
+    var height=stage.getBoundingClientRect().height,current=parseFloat(stage.style.minHeight)||0;
+    if(height>current)stage.style.minHeight=Math.ceil(height)+'px';
+  }
   function rawDiagram(index){
     try{var raw=JSON.parse(opts.src.value),rec=specSectionPaths(raw)[index];return rec&&specValueAt(raw,rec.diagram);}catch(ex){return null;}
   }
@@ -64,6 +71,8 @@ function initSectionLayoutEditor(opts){
   function persist(index,items,expectedLayout){
     if(!ready())return false;
     if(expectedLayout!==undefined && expectedLayout!==activeLayout(index)){feedback('The selected layout changed. Use its current visibility controls.');return false;}
+    var definition=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));
+    if(editing===index && (!definition || definition.presentation!=='explore'))holdViewport();
     var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' chapter arrangement · Undo restores the previous arrangement.');
     return ok;
   }

@@ -1,10 +1,61 @@
 import {test,expect,paste} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
+import {readFile} from 'node:fs/promises';
 
 const home=page=>page.locator('#welcome-home');
 const editor=page=>page.locator('#workbench-workspace');
 const screen=(page,name)=>page.locator('#welcome-'+name+'-screen');
+
+async function blockDraftArchive(page){
+  await page.evaluate(()=>{
+    const original=Storage.prototype.setItem;
+    Storage.prototype.setItem=function(key,value){
+      if(key==='dv-workbench-earlier-drafts')throw new DOMException('Archive full','QuotaExceededError');
+      return original.call(this,key,value);
+    };
+  });
+}
+
+test('failed Build archive keeps source and Undo, shows recovery, and downloads exact draft',async({page,server},testInfo)=>{
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);
+  await page.locator('[data-dv-node="a"]').click();
+  const title=page.locator('#guide').getByLabel('title',{exact:true});
+  await title.fill('Retained camera');await title.press('Enter');
+  const edited=source.replace('"title": "Doorbell"','"title": "Retained camera"');
+  await expect(page.locator('#src')).toHaveValue(edited);
+  await expect(page.locator('#undo-builder')).toBeEnabled();
+  await page.locator('#workspace-home').click();await page.locator('#welcome-new').click();
+  await page.evaluate(()=>localStorage.setItem('dv-workbench-earlier-drafts',JSON.stringify([{text:'{"title":"older"}',at:1}])));
+  const earlier=await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'));
+  await blockDraftArchive(page);
+  await page.locator('#welcome-new-agent').click();
+  await expect(screen(page,'new')).toBeVisible();await expect(editor(page)).toBeHidden();
+  await expect(page.locator('#workbench-draft-recovery [role="alert"]')).toContainText('earlier draft could not be saved');
+  await expect(page.locator('#workbench-draft-recovery-download')).toBeVisible();
+  await expect(page.locator('#src')).toHaveValue(edited);
+  await expect(page.locator('#undo-builder')).toBeEnabled();
+  expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBe(earlier);
+  await testInfo.attach('failed-archive-visible-alert',{body:await page.screenshot(),contentType:'image/png'});
+  const downloadPromise=page.waitForEvent('download');await page.locator('#workbench-draft-recovery-download').click();
+  const download=await downloadPromise;
+  expect(download.suggestedFilename()).toBe('flowview-draft-recovery.spec.json');
+  expect(await readFile(await download.path(),'utf8')).toBe(edited);
+  await page.locator('#welcome-header-resume').click();await expect(editor(page)).toBeVisible();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
+});
+
+test('failed Resume archive keeps recovered draft on Welcome with a direct download',async({page,server})=>{
+  await page.addInitScript(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:1})),source);
+  await page.goto(server.origin+'/workbench.html');await expect(page.locator('#welcome-resume')).toBeVisible();
+  await blockDraftArchive(page);
+  await page.locator('#welcome-resume').click();
+  await expect(home(page)).toBeVisible();await expect(editor(page)).toBeHidden();
+  await expect(page.locator('#workbench-draft-recovery [role="alert"]')).toContainText('earlier draft could not be saved');
+  const downloadPromise=page.waitForEvent('download');await page.locator('#workbench-draft-recovery-download').click();
+  const download=await downloadPromise;
+  expect(await readFile(await download.path(),'utf8')).toBe(source);
+});
 
 test('the Flowview brand is a real workbench navigation target and still returns home in-app',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const homeLink=page.locator('#workbench-home');

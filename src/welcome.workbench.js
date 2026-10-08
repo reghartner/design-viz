@@ -186,6 +186,17 @@ function initWorkbenchWelcome(opts){
     spec:welcomeBlankSpec()};
   function el(id){ return document.getElementById(id); }
   function error(id, message){ var target = el(id); target.textContent = message || ''; target.hidden = !message; }
+  var recovery=el('workbench-draft-recovery');
+  function recoveryError(ex){
+    el('workbench-draft-recovery-message').textContent=ex && ex.message || String(ex);
+    recovery.hidden=false;
+    recovery.scrollIntoView({block:'nearest'});
+  }
+  document.addEventListener('dv:draftarchiveerror',function(event){recoveryError(event.detail.message);});
+  el('workbench-draft-recovery-download').addEventListener('click',function(){
+    try{builder.downloadRecoveryDraft();}
+    catch(ex){recoveryError('The draft could not be downloaded: '+(ex.message || ex));}
+  });
   function projectTitle(){
     try { var raw = JSON.parse(opts.src.value); return (raw.page || raw).title || 'Untitled project'; }
     catch (ex){ return 'Unfinished diagram'; }
@@ -204,7 +215,7 @@ function initWorkbenchWelcome(opts){
       var name='Unfinished diagram';try{var raw=JSON.parse(entry.text);name=(raw.page || raw).title || name;}catch(ex){}
       var button=document.createElement('button');button.type='button';button.className='welcome-button';
       button.textContent=name+' · '+new Date(entry.at).toLocaleString();
-      button.addEventListener('click',function(){try{builder.restoreEarlierDraft(entry);enterEditor();}catch(ex){error('welcome-file-error',ex.message);}});
+      button.addEventListener('click',function(){try{if(builder.restoreEarlierDraft(entry))enterEditor();}catch(ex){recoveryError(ex);}});
       list.appendChild(button);
     });
   }
@@ -213,6 +224,7 @@ function initWorkbenchWelcome(opts){
     screen = name;
     Object.keys(screens).forEach(function(key){ el(screens[key]).hidden = key !== name; });
     error('welcome-file-error', '');
+    recovery.hidden=true;
     updateResume();
     if (name === 'new') loadManifest();
     if(library && (name==='library' || name==='reader'))library.show(name,navigation.diagram());
@@ -224,6 +236,7 @@ function initWorkbenchWelcome(opts){
   }
   function displayEditor(focus){
     retireRead();screen='editor';
+    recovery.hidden=true;
     root.hidden = true; editor.hidden = false; headerResume.hidden = true;
     document.body.classList.remove('welcome-active');
     window.dispatchEvent(new Event('resize'));
@@ -242,15 +255,21 @@ function initWorkbenchWelcome(opts){
     if(screen==='build'){buildWithAgent('external',false,true);return;}
     if(screen==='editor'){
       if(builder.isProjectOpen() || (opts.skipWelcome && !navigation.retired()))displayEditor(focus);
-      else if(builder.restoreDraft()){navigation.localProject();displayEditor(focus);}
-      else navigation.replace('home',focus);
+      else{
+        try{
+          if(builder.restoreDraft()){navigation.localProject();displayEditor(focus);}
+          else navigation.replace('home',focus);
+        }catch(ex){navigation.replace('home',focus);recoveryError(ex);}
+      }
     }else displayWelcome(screen,focus);
   }
   function enterEditor(){navigation.go('editor');}
   function show(){navigation.go('home');}
   function resumeProject(){
-    if (builder.isProjectOpen() || builder.restoreDraft()) enterEditor();
-    else { updateResume(); error('welcome-file-error', 'This draft is no longer available. Open a file or start a new project.'); }
+    try{
+      if (builder.isProjectOpen() || builder.restoreDraft()) enterEditor();
+      else { updateResume(); recoveryError('This draft is no longer available. Open a file or start a new project.'); }
+    }catch(ex){recoveryError(ex);}
   }
   function openSpec(spec, failureId){
     try { builder.loadSpec(JSON.parse(JSON.stringify(spec))); error(failureId, ''); enterEditor(); }
@@ -275,10 +294,14 @@ function initWorkbenchWelcome(opts){
   });
   ['welcome-agent-prompt','welcome-new-prompt'].forEach(function(id){el(id).addEventListener('click',function(){navigation.go('agent');});});
   function buildWithAgent(mode,fresh,replace){
-    if(fresh===undefined)fresh=false;
-    if(fresh || !builder.isProjectOpen() && !builder.restoreDraft())builder.loadSpec(welcomeBlankSpec('My story'));
-    if(replace)navigation.replace('editor',false);else enterEditor();
-    builder.startAgent(mode,{newProject:fresh});
+    try{
+      if(fresh===undefined)fresh=false;
+      if(fresh || !builder.isProjectOpen() && !builder.restoreDraft()){
+        if(!builder.loadSpec(welcomeBlankSpec('My story')))throw Error('Could not start a new story. Your draft has not changed.');
+      }
+      if(replace)navigation.replace('editor',false);else enterEditor();
+      builder.startAgent(mode,{newProject:fresh});
+    }catch(ex){recoveryError(ex);}
   }
   document.addEventListener('dv:agentnew',function(event){buildWithAgent(event.detail && event.detail.workflow==='embedded'?'embedded':'external',true);});
   ['welcome-agent','welcome-new-agent','welcome-agent-live'].forEach(function(id){el(id).addEventListener('click',function(){

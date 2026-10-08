@@ -26,6 +26,10 @@
     <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><details id="workspace-export" class="workspace-export"><summary id="workspace-export-trigger" class="rbtn">Export</summary><div class="workspace-help-body workspace-export-body" role="group" aria-label="Export format"><button class="bbtn" type="button" id="file-save">JSON only</button><button class="bbtn" type="button" id="file-export-html" title="Download an offline HTML snapshot with imported topology included">Static HTML</button><button class="bbtn" type="button" id="file-export-both">Both</button></div></details></div>
   </div>
 </header>
+<div id="workbench-draft-recovery" class="workbench-draft-recovery" hidden>
+  <p id="workbench-draft-recovery-message" role="alert"></p>
+  <button type="button" class="welcome-button" id="workbench-draft-recovery-download">Download current draft</button>
+</div>
 <section id="agent-update-banner" class="agent-update-banner" role="status" hidden><div><strong id="agent-update-banner-title">Agent updates are ready</strong><p id="agent-update-banner-summary"></p></div><button type="button" class="rbtn" id="agent-update-open">Preview Agent Updates</button></section>
 
 {{HUMAN_GUIDE}}

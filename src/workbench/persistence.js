@@ -46,7 +46,11 @@ function createBuilderPersistence(options){
           entries.unshift(Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{}));
           storage.setItem(archiveKey,JSON.stringify(entries));
         }
-      }catch(ex){throw Error('Your earlier draft could not be saved. Save it to a file or free browser storage, then try again.');}
+      }catch(ex){
+        var failure=Error('Your earlier draft could not be saved. Download the current draft or free browser storage, then try again.');
+        if(options.archiveFailure)options.archiveFailure(failure);
+        throw failure;
+      }
     },
     clear:function(){
       if(disposed)return;

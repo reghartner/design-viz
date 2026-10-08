@@ -466,6 +466,7 @@ function initWorkbenchBuilder(opts){
     persistence:createBuilderPersistence({storage:function(){return opts.practice?opts.practice.storage:localStorage;},
       schedule:function(fn,ms){return life.delay(fn,ms);},
       cancel:function(timer){life.cancelDelay(timer);},now:function(){return Date.now();},
+      archiveFailure:function(error){document.dispatchEvent(new CustomEvent('dv:draftarchiveerror',{detail:{message:error.message}}));},
       status:function(state){
         var status=document.getElementById('workbench-recovery-status');if(!status)return;
         status.textContent={saved:'Draft saved in this browser',pending:'Saving browser recovery…',unavailable:'Browser recovery unavailable. Export → JSON only to keep your changes.'}[state];
@@ -644,7 +645,7 @@ function initWorkbenchBuilder(opts){
     var restore = document.createElement('button');
     restore.type = 'button'; restore.className = 'bbtn'; restore.textContent = 'restore';
     life.listen(restore,'click', function(){
-      restoreDraft();
+      try{restoreDraft();}catch(ex){inspectorMessage(ex.message);}
     });
     var discard = document.createElement('button');
     discard.type = 'button'; discard.className = 'bbtn'; discard.textContent = 'discard';
@@ -1366,6 +1367,10 @@ function initWorkbenchBuilder(opts){
     },selected:function(){return session.target?Object.assign({},session.target):null;},
     edit:function(raw){return agentOptions.apply(JSON.stringify(raw,null,2),agentOptions.snapshot());},agent:agentChat.practice}:null,
     preserveDraft:life.guard(session.preserveDraft),
+    downloadRecoveryDraft:life.guard(function(){
+      var draft=session.isProjectOpen()?session.text():session.draft();
+      return io.download('flowview-draft-recovery.spec.json',typeof draft==='string'?draft:draft?draft.text:session.text(),'application/json');
+    }),
     earlierDrafts:session.earlierDrafts,
     restoreEarlierDraft:life.guard(function(entry){var ok=session.restoreEarlierDraft(entry,projectHooks());if(ok){sourceOrigin=null;refreshProvenance();}return ok;}),
     navigate:navigateWorkspace,

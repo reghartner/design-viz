@@ -204,6 +204,17 @@ test('replacement refuses to lose the current draft when its archive cannot be s
   assert.equal(h.invalidations,0);assert.equal(s.undo(),true);assert.equal(h.text,before);
 });
 
+test('malformed earlier drafts never get overwritten to make room for a project switch',()=>{
+  const stored='{"unexpected":"shape"}',storage=new Map([['dv-workbench-earlier-drafts',stored]]);
+  const h=harness({storage}),s=h.session;
+  s.accept({text:'{"title":"valuable edit"}'});
+  const before=s.snapshot(),version=s.historyVersion();
+  assert.throws(()=>s.replaceProject('{"title":"next"}'),/earlier draft could not be saved/);
+  assert.equal(storage.get('dv-workbench-earlier-drafts'),stored);
+  assert.equal(h.text,before.text);assert.equal(s.snapshot().project,before.project);
+  assert.equal(s.historyVersion(),version);assert.equal(s.canUndo(),true);
+});
+
 test('restoring a recovery draft establishes a fresh project boundary even when the boot editor has history',()=>{
   const draft=' {"title":"recovered"} ',baseline='{"title":"saved"}',storage=new Map([
     ['dv-workbench-draft',JSON.stringify({text:draft})],['dv-workbench-baseline',JSON.stringify({text:baseline,draftText:draft})]

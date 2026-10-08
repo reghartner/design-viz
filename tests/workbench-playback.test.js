@@ -339,26 +339,17 @@ test('live view focus survives edits to the primary panel and authored opening f
 });
 
 
-test('layout diagram visibility survives editor rerenders without writing a spec field',()=>{
-  const h=previewHarness(),before=pageFixture(),old=h.controller(before,1,'step');
-  old.sections[0].presentation={mode:()=> 'layout',diagramVisible:()=>false};
-  const saved=h.context.workbenchPreviewSnapshot(before,old),after=copy(before),source=JSON.stringify(after);
-  const next=h.controller(after,0,'ambient');let visible=true;
-  next.sections[0].presentation={setMode:()=>{},setDiagramVisible:v=>{visible=v;}};
-  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(visible,false);
-  assert.equal(next.sections[0].stepper.current().n,1);assert.equal(JSON.stringify(after),source);
-});
-
-test('named layout selection survives a story edit but saved visibility edits take precedence over reader preferences',()=>{
+test('preview retention restores chapter selection without overriding authored diagram visibility',()=>{
   const h=previewHarness(),before=pageFixture(),old=h.controller(before,1,'step');
   diagramOf(before).layouts=[{id:'home',name:'Home',sectionLayout:{default:[{x:0,y:0,w:8,h:12,hidden:true}]}},{id:'flow',name:'Flow',sectionLayout:{default:[{x:0,y:0,w:8,h:12}]}}];
   old.sections[0].presentation={mode:()=> 'layout',layoutId:()=> 'flow',diagramVisible:()=>true};
   const saved=h.context.workbenchPreviewSnapshot(before,old),after=copy(before),next=h.controller(after,0,'ambient');
-  let id='home',visible=false;
-  next.sections[0].presentation={layoutId:()=>id,setLayout:v=>{id=v;},setMode:()=>{},setDiagramVisible:v=>{visible=v;}};
-  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(id,'flow');assert.equal(visible,true);
-  diagramOf(after).layouts[1].sectionLayout.default[0].hidden=true;visible=false;
-  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(id,'flow');assert.equal(visible,false,'authored visibility wins');
+  assert.equal(Object.hasOwn(saved.sections[0],'layoutFlowVisible'),false);
+  diagramOf(after).layouts[1].sectionLayout.default[0].hidden=true;
+  const source=JSON.stringify(after);let id='home';
+  next.sections[0].presentation={layoutId:()=>id,setLayout:v=>{id=v;},setMode:()=>{},setDiagramVisible:()=>assert.fail('reader retention must not override saved visibility')};
+  h.context.restoreWorkbenchPreview(after,next,saved);assert.equal(id,'flow');
+  assert.equal(next.sections[0].stepper.current().n,1);assert.equal(JSON.stringify(after),source);
 });
 
 test('view steps skip playback stops while keeping full-path indices for state, source editing and links',()=>{

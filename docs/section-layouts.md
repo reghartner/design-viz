@@ -97,14 +97,24 @@ and apply across that layout's host profiles. A legacy single view
 stores its name as `diagram.layoutName`; clearing it restores **Layout**. Named
 views store it in `layouts[].name` and require a nonempty name. Renaming is one undoable edit and survives JSON/HTML export.
 
-In the named layout, **Hide data flow** hides only the diagram. Panels and step
-controls remain available, including controls in an older combined tile.
-Rows occupied only by the diagram are reclaimed; panels sharing its rows keep
-their dimensions and columns. **Show data flow** restores the exact saved
-arrangement. This visibility choice is temporary: it survives view switches
-and workbench edits, but does not rewrite the spec. Arrange section returns the diagram to its authored visibility. Hidden elements
-remain selectable in **Layout element**, so they can be shown or swapped without
-removing their declarations.
+Use **Chapter → Show diagram in this chapter** to save whether the selected
+Chapter shows its diagram. The choice applies to all of that Chapter's saved
+host profiles and is one Undo/Redo operation. Panels, prose and step controls
+remain available when the diagram is hidden; Standard reclaims rows used only
+by the diagram. Explore keeps its canvas, panels and controls available without
+drawing the graph. Reopen Chapter to show the diagram again.
+
+This setting survives JSON, HTML, Backstage and Confluence export. Readers see
+the authored visibility; there is no temporary Show/Hide data flow button.
+**Arrange chapter and saved visibility… → Visible elements** still supports
+profile-specific visibility for the diagram and each panel. A chapter checkbox
+reflects the current profile; using it sets the same diagram choice for every
+saved profile. Hidden elements remain selectable in **Layout element**.
+
+The first visibility edit of a legacy Home / Data flow or Layout / Data flow
+presentation saves those choices as separate named Chapters, preserving the
+selected choice and opening default. The **Data flow** chapter remains a
+separate destination; it does not reveal the graph in a hidden Chapter.
 
 ## Multiple Chapters in one story
 

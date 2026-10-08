@@ -970,7 +970,6 @@ body.sk-aurora.sk-blueprint{
 .section-arrange-fields .layout-step-options label{align-items:flex-start;line-height:1.4;}
 .section-arrange-fields .layout-step-options input{width:16px;height:16px;min-height:16px;flex:none;margin:2px 0 0;}
 .section-arranging .section-layout-tile{outline:1px dashed var(--acc);padding-top:30px;box-sizing:border-box;}
-.section-arranging .layout-flow-toggle{display:none;}
 .section-arranging .section-layout-tile.layout-selected{outline:2px solid var(--acc);}
 .section-tile-move,.section-tile-resize{display:none;position:absolute;z-index:4;touch-action:none;user-select:none;background:var(--card);color:var(--ink);border:1px solid var(--line);font:12px 'IBM Plex Sans',sans-serif;cursor:grab;}
 .section-arranging .section-tile-move{display:block;top:0;left:0;right:0;height:28px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -1321,7 +1320,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .section-view-options-body label{flex-direction:column;align-items:stretch;margin-bottom:10px;}
 .section-view-options-body .fnote{margin:10px 0 0;line-height:1.5;}
 @media(max-width:700px){.section-view-settings{position:relative;}.section-view-options{position:static;}.section-view-options-body{max-width:100%;}}
-.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="Expand"],.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="expanded"],.workspace-diagram:not(.welcome-active) :where(#docview) .layout-flow-toggle{display:none;}
+.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="Expand"],.workspace-diagram:not(.welcome-active) :where(#docview) .viewport-actions>[aria-label*="expanded"]{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools{left:auto;right:12px;top:10px;bottom:auto;padding:0;background:none;border:0;box-shadow:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools>.mbtn,.workspace-diagram:not(.welcome-active) :where(#docview) .explore-zoom,.workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools .board-size{display:none;}
 .workspace-diagram:not(.welcome-active) :where(#docview) .explore-tools>.explore-zoom-group{display:none;}
@@ -1448,7 +1447,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 .workspace-canvas #docview .section-arranger{display:none;}
 .workspace-canvas #docview .section-arranging>.section-arranger{display:block!important;position:fixed;inset:auto;margin:0;box-sizing:border-box;top:var(--workspace-content-top);right:12px;z-index:150;width:min(480px,calc(100vw - 96px));max-height:calc(100dvh - var(--workspace-content-top) - 30px);overflow:auto;background:var(--card);border:1px solid var(--line);padding:12px;border-radius:10px;}
 .workspace-canvas #docview .explore-tools{display:none!important;}
-.workspace-canvas #docview .viewport-actions>.mbtn,.workspace-canvas #docview .viewport-status,.workspace-canvas #docview .layout-flow-toggle{display:none;}
+.workspace-canvas #docview .viewport-actions>.mbtn,.workspace-canvas #docview .viewport-status{display:none;}
 .workspace-canvas-controls .workspace-zoom-label{display:none;}
 .workspace-canvas-controls{padding:5px;}
 .page-preview{width:calc(100vw - 32px);max-width:none;height:calc(100dvh - 32px);max-height:none;padding:0;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);}
@@ -1512,3 +1511,6 @@ body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:fo
 .workspace-export{position:relative;font-size:12px;}
 .workspace-export>summary{cursor:pointer;white-space:nowrap;}
 .workspace-export-body .bbtn{text-align:left;}
+
+.section-view-options-body .chapter-diagram-visibility{display:flex;flex-direction:row;align-items:center;gap:8px;}
+.section-view-options-body .chapter-diagram-visibility input{width:auto;}

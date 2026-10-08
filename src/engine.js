@@ -2084,7 +2084,7 @@ function createExploreNavigation(ctl,options){
     if(!rec || !rec.sectionEl)return false;
     if(current===rec && nav.isConnected){var pending=rec.sectionEl.querySelector('.section-viewport>.diagram-views>.section-view-settings');if(pending)move(pending,actions);return true;}
     var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false);
-    var host=rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice'),flow=host && host.querySelector(':scope > .layout-flow-toggle');
+    var host=rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice');
     if(!host){host=rec.sectionEl.querySelector('.diagram-views');if(!host){host=doc.createElement('div');host.className='diagram-views';rec.sectionEl.prepend(host);}}
     host.prepend(nav);current=rec;navigationSize.observe(nav);
     var movedTabs=false,embedded=ctl.view.querySelector('.dv-embed-target');
@@ -2103,7 +2103,7 @@ function createExploreNavigation(ctl,options){
     move(rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
     move(host.querySelector('.section-view-settings'),actions);
     move(host.querySelector('.viewport-actions'),actions);
-    move(flow,actions);actions.hidden=false;
+    actions.hidden=false;
     // Selection can unhide its section only after the navigation is mounted.
     // Reveal the selected chips after that layout, while retaining their real DOM.
     revealFrame=requestAnimationFrame(function(){
@@ -2150,12 +2150,10 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   Object.keys(buttons).reverse().forEach(function(id){group.insertBefore(buttons[id],group.firstChild);});
   var homeChoice=group.querySelector('[data-view-focus="panel"]');if(homeChoice)homeChoice.remove();
   if(named)group.querySelectorAll('[data-view-focus]').forEach(function(b){b.remove();});
-  var flowToggle=document.createElement('button');flowToggle.type='button';flowToggle.className='mbtn layout-flow-toggle';
-  flowToggle.setAttribute('data-layout-flow','');group.parentNode.insertBefore(flowToggle,group.nextSibling);
   var standard;
   if(!base && !named){standard=document.createElement('button');standard.type='button';standard.className='mbtn';standard.textContent='Data flow';standard.setAttribute('data-view-focus','flow');group.appendChild(standard);}
   var grid=document.createElement('div');grid.className='section-layout-grid';grid.hidden=true;
-  grid.id=box.id+'-layout';flowToggle.setAttribute('aria-controls',grid.id);
+  grid.id=box.id+'-layout';
   grid.setAttribute('data-layout-target',target || 'default');box.insertBefore(grid,layout.grid);
   var viewport=createSectionViewport(box,group.parentNode,grid,board,bar,d,boardSize,prose);
   /* A Standard arrangement has a stable 1000px design canvas. CSS zoom scales
@@ -2171,10 +2169,8 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     grid.style.setProperty('--section-layout-width',width<1000?'1000px':'auto');
   }):null;
   if(layoutSizeObserver)layoutSizeObserver.observe(grid.parentNode);
-  var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden,visibility=Object.create(null);
+  var active=false, saved=[], oldHidden, flowHidden,showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}),boardHidden=board.hidden;
   function paintFlow(){
-    flowToggle.hidden=!active;flowToggle.textContent=showDiagram?'Hide data flow':'Show data flow';
-    flowToggle.setAttribute('aria-expanded',String(showDiagram));
     viewport.setBoardHidden(active && !showDiagram ? true : boardHidden);
     if(!active)return;
     var controlsRows=bar && !bar.hidden && !separateSteps ? sectionLayoutControlsRows(d,items) : 0;
@@ -2186,8 +2182,6 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       if(it){tile.style.setProperty('--tile-y',it.y+1);tile.style.setProperty('--tile-h',it.h);}
     });
   }
-  function setDiagramVisible(value){if(typeof value!=='boolean')return;showDiagram=value;visibility[layoutId]=value;paintFlow();}
-  flowToggle.addEventListener('click',function(){setDiagramVisible(!showDiagram);});
   var visibilityObserver=bar && typeof MutationObserver!=='undefined' ? new MutationObserver(function(){if(active && !showDiagram)paintFlow();}) : null;
   if(visibilityObserver)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
   function move(node,host){
@@ -2259,7 +2253,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     if(id!==layoutId){
       restore(true);layoutId=id;items=sectionLayoutItems(d,target || 'default',id);
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
-      showDiagram=Object.prototype.hasOwnProperty.call(visibility,id)?visibility[id]:!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
+      showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
     }
     if(active && stepper){var activeDefinition=sectionLayoutDefinition(d,id);stepper.setViewFilter(activeDefinition.paths,activeDefinition.steps);}
     activate();
@@ -2271,14 +2265,14 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     layoutId:function(){return layoutId;},setLayout:setLayout,
     setLayoutTarget:function(value){
       value=value || 'default';if(value===(target || 'default'))return;
-      restore(true);target=value;visibility=Object.create(null);items=sectionLayoutItems(d,target,layoutId);
+      restore(true);target=value;items=sectionLayoutItems(d,target,layoutId);
       dock=sectionLayoutDock(items);separateSteps=items.some(function(it){return sectionLayoutKey(it)==='steps';}) && dock!=='diagram';
       showDiagram=!items.some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;});
       grid.setAttribute('data-layout-target',target);activate();
     },
     views:function(){return views.map(function(v){return {id:v.legacy?'layout':v.id,presentation:v.presentation};});},
-    snapshotReaderState:function(){return {visibility:Object.assign({},visibility),showDiagram:showDiagram,viewport:viewport.snapshotReaderState()};},
-    restoreReaderState:function(saved){if(saved){visibility=Object.assign(Object.create(null),saved.visibility);showDiagram=saved.showDiagram;paintFlow();viewport.restoreReaderState(saved.viewport);}},
+    snapshotReaderState:function(){return {viewport:viewport.snapshotReaderState()};},
+    restoreReaderState:function(saved){if(saved)viewport.restoreReaderState(saved.viewport);},
     viewId:function(){return active?(named?layoutId:'layout'):'flow';},
     defaultView:function(){return defaultView;},
     setView:function(id){
@@ -2287,7 +2281,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
       if(id==='flow'){setMode('flow');return true;}
       return false;
     },
-    diagramVisible:function(){return showDiagram;},setDiagramVisible:setDiagramVisible,viewport:viewport,
+    diagramVisible:function(){return active?showDiagram:true;},viewport:viewport,
     setArranging:viewport.setArranging,refreshViewport:viewport.refresh,setExploreAuthor:viewport.setAuthor,adoptExploreLayout:viewport.adoptLayout,resetExplore:viewport.reset,
     destroy:function(){if(layoutSizeObserver)layoutSizeObserver.disconnect();viewport.destroy();if(visibilityObserver)visibilityObserver.disconnect();if(base)base.destroy();}};
 }

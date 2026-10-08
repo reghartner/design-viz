@@ -99,7 +99,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var sp=frame.rec.stepper,presentation=frame.rec.presentation;
     var state=sp?{path:sp.path(),step:sp.current().id || String(sp.current().n+1),mode:sp.mode()}:{};
     if(frame.rec.boardSize)state.size=frame.rec.boardSize.mode();
-    if(presentation){if(presentation.viewId)state.view=presentation.viewId();state.focus=presentation.mode();if(presentation.layoutId)state.layout=presentation.layoutId();if(presentation.diagramVisible)state.diagramVisible=presentation.diagramVisible();}
+    if(presentation){if(presentation.viewId)state.view=presentation.viewId();state.focus=presentation.mode();if(presentation.layoutId)state.layout=presentation.layoutId();}
     else if(frame.section.diagram)state.view='flow';
     return state;
   }
@@ -114,7 +114,6 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
         if(target.layout && presentation.setLayout)presentation.setLayout(target.layout);
         if(target.focus)presentation.setMode(target.focus);
       }
-      if(typeof target.diagramVisible==='boolean' && presentation.setDiagramVisible)presentation.setDiagramVisible(target.diagramVisible);
     }
     if(target && target.size && frame.rec.boardSize)frame.rec.boardSize.setMode(target.size);
     var sp=frame.rec.stepper;if(!sp)return;

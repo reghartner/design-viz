@@ -69,7 +69,6 @@ function initSectionLayoutEditor(opts){
     var p=presentation(index);if(!p)return;
     if(p.setLayoutTarget)p.setLayoutTarget(profile);
     p.setMode('layout');
-    if(p.setDiagramVisible)p.setDiagramVisible(!(currentItems(index) || []).some(function(it){return sectionLayoutKey(it)==='diagram' && it.hidden;}));
   }
   function viewSettings(section,d){
     var host=section.querySelector('.section-viewport>.diagram-views');if(!host)return;
@@ -106,7 +105,17 @@ function initSectionLayoutEditor(opts){
     name.disabled=!definition || definition.legacy;
     function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="Chapter name"]');}
     fieldLife.listen(name,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();renameView();}});
-    body.appendChild(label);body.appendChild(opening);nameLabel.appendChild(name);body.appendChild(nameLabel);
+    body.appendChild(label);
+    var diagramLabel=el('label','chapter-diagram-visibility'),diagramCheck=el('input');diagramCheck.type='checkbox';
+    diagramCheck.setAttribute('aria-label','Show diagram in this chapter');diagramCheck.title='Save this choice for every host profile in this chapter.';
+    var p=presentation(index),diagramShown=p && p.diagramVisible?p.diagramVisible():id!=='home';diagramCheck.checked=diagramShown;
+    diagramLabel.appendChild(diagramCheck);diagramLabel.appendChild(el('span',null,'Show diagram in this chapter'));body.appendChild(diagramLabel);
+    fieldLife.listen(diagramCheck,'change',function(){
+      if(!current()){diagramCheck.checked=diagramShown;return;}
+      cancel();var nextId=opts.setDiagramVisibility(index,id,diagramCheck.checked);
+      if(nextId){activate(nextId);focusControl('[aria-label="Show diagram in this chapter"]');}else diagramCheck.checked=diagramShown;
+    });
+    body.appendChild(opening);nameLabel.appendChild(name);body.appendChild(nameLabel);
     var rename=button('Rename chapter',renameView);rename.disabled=name.disabled;body.appendChild(rename);
     body.appendChild(button('Duplicate chapter',function(){
       if(!current())return;rec.optionsOpen=true;
@@ -282,7 +291,6 @@ function initSectionLayoutEditor(opts){
           if(!Array.isArray(rawDiagram(index).layouts)){opts.ensureView(index,profile);return;}
           var current=rawDiagram(index),items=currentItems(index,current),p=presentation(index);
           if(sectionLayoutDefinition(current,activeLayout(index)).presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}
-          if(p && p.mode()==='layout' && p.diagramVisible && !p.diagramVisible())items=items.map(function(it){return sectionLayoutKey(it)==='diagram'?Object.assign({},it,{hidden:true}):it;});
           persist(index,sectionLayoutOptimize(current,profile,items));
         }));
         controls.appendChild(button('Reset layout',function(){if(!ready())return;var p=presentation(index),v=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));if(v && v.presentation==='explore'){if(p && p.resetExplore)p.resetExplore();return;}editing=null;persist(index,null);}));

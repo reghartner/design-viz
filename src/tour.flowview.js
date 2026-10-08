@@ -135,7 +135,6 @@ function wireTour(ctl, view, win, config, options){
        filter before the path, the path before the step. */
     if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
     if(ds.diagramVisible === true){
-      if(pres && pres.setDiagramVisible)pres.setDiagramVisible(true);
       var board=sec.sectionEl.querySelector('.board');
       for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
         if(parent.tagName==='DETAILS' && !parent.open){parent.open=true;openedDetails.push(parent);}

@@ -1,22 +1,22 @@
 #!/usr/bin/env node
 'use strict';
 // One transactional authoring operation: production graph arrangement followed
-// by native measured panel/control composition. No source writes until all pass.
+// by deterministic estimated panel/control composition. No source writes until all pass.
 const fs=require('node:fs');
+const core=require('./arrange/core.cjs');
 const graph=require('./auto-arrange-spec.cjs');
-const core=require('./canon/core.cjs');
 const {clone,stable}=require('./arrange/model.cjs');
-const HELP='Usage: node tools/arrange-spec.cjs [--section INDEX ... | --all] [--width 800..1920] [--profile default|backstage|confluence] [--rearrange] input.json output.json\n'+
+const HELP='Usage: node tools/compose-page-layout.cjs [--section INDEX ... | --all] [--width 800..1920] [--profile default|backstage|confluence] [--rearrange] input.json output.json\n'+
  'Arranges nodes, panels and step controls; existing geometry requires --rearrange.\n'+
  'Input is preserved. Output refreshes system-owned compatibility metadata; bare diagrams become a page wrapper with the same diagram content. Failures write nothing.\n'+
- 'One-time setup: node tools/arrange/setup.cjs\nSee docs/auto-arrange.md for supported inputs and measurement limits.\n';
+ 'No browser or package installation is needed. Sizes are estimates; see docs/auto-arrange.md for supported inputs and limits.\n';
 function parseArgs(args){
  const rest=[],options={width:1200,profile:'default',rearrange:false};
  for(let i=0;i<args.length;i++){
   const a=args[i];if(a==='--rearrange'){options.rearrange=true;continue;}
   if(['--width','--profile'].includes(a)){const value=args[++i];if(value==null)throw Error(a+' requires a value');options[a.slice(2)]=a==='--width'?Number(value):value;continue;}rest.push(a);
  }
- try{Object.assign(options,graph.parseArgs(rest));}catch(e){throw Error(e.message.replace('auto-arrange-spec.cjs','arrange-spec.cjs'));}
+ try{Object.assign(options,graph.parseArgs(rest));}catch(e){throw Error(e.message.replace('auto-arrange-spec.cjs','compose-page-layout.cjs'));}
  if(!Number.isInteger(options.width)||options.width<800||options.width>1920)throw Error('--width must be an integer from 800 to 1920 pixels');
  if(!['default','backstage','confluence'].includes(options.profile))throw Error('--profile must be default, backstage, or confluence');
  return options;
@@ -43,7 +43,7 @@ function preflight(d,options){
  if(section&&section.columns!==24&&['default','backstage','confluence'].some(k=>k!==options.profile&&section[k]))throw Error('Unsupported: legacy 12-column sibling profiles; migrate them in Workbench before explicit rearrangement');
  const tiles=section?.[options.profile]||section?.default||[];
  if(tiles.some(t=>t.controls&&t.attachTo))throw Error('Unsupported: explicitly attached controls; preserve this diagram or detach them in Workbench before rearranging');
- if((d.steps||[]).length>100||(d.paths||[]).length>20||(d.panels||[]).length>24)throw Error('Unsupported: native measurement limit is 100 steps, 20 paths, and 24 panels per diagram');
+ if((d.steps||[]).length>100||(d.paths||[]).length>20||(d.panels||[]).length>24)throw Error('Unsupported: estimation limit is 100 steps, 20 paths, and 24 panels per diagram');
  return tiles;
 }
 function seed(d,originalTiles){
@@ -72,12 +72,12 @@ async function arrange(raw,options){
     const result=await measurer.arrange(work,skin);
     if(result.spec.diagram.graphFrame!==undefined)record.diagram.graphFrame=clone(result.spec.diagram.graphFrame);
     record.diagram.sectionLayout={...clone(layoutBefore||{}),columns:24,[options.profile]:result.spec.diagram.sectionLayout.default};
-    // Measurement works on a separate diagram; arbitrary semantic fields,
+    // Estimation works on a separate diagram; arbitrary semantic fields,
     // unselected profiles and panel/step declaration order cannot be rewritten.
     const expected=clone(record.diagram);delete expected.sectionLayout;
     const measured=clone(result.spec.diagram);delete measured.sectionLayout;
     if(before.panels===undefined)delete measured.panels;
-    if(stable(expected)!==stable(measured))throw Error('Native arrangement changed diagram semantics');
+    if(stable(expected)!==stable(measured))throw Error('Arrangement changed diagram semantics');
     diagnostics.push({section:record.section,profile:options.profile,width:options.width,...result.diagnostics});
    }catch(e){throw Error(record.path+': '+e.message);}
   }

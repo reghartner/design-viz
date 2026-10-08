@@ -31,8 +31,8 @@ bottleneck. Explain one observed request without presenting it as the complete
 system design. Record design explanations separately from measurements.
 
 The importer produces a validated semantic/timing draft; for a wholly new
-diagram run the common skill's pure Node graph arranger, then author its
-panel/control layout before validating and proposing.
+diagram run the common skill's pure Node `tools/compose-page-layout.cjs` command
+before validating and proposing.
 Preserve placement when enriching an existing diagram. Validate the candidate,
 reconcile the ledger, and use the same workbench preview/approval process.
 Do not run `page_build.py` for the shared-folder route.

@@ -220,18 +220,15 @@ Validate the candidate spec with the bundled authoring kit, and reconcile ledger
 claims with that spec. The helper does not grant browser access or establish
 visual QA.
 
-For a wholly new diagram, author unpositioned nodes and semantic connections,
-then run the bundled pure Node
-`node tools/auto-arrange-spec.cjs --section <zero-based-section> <draft> <different-output>`
-and use its graph layout. Repeat `--section` for multiple new diagrams; use
-`--all` only when every diagram is new. Author the 24-column `sectionLayout`
-rectangles for the diagram, panels and step controls yourself. The graph CLI
-does not compose them and needs no browser or dependency install. Preserve
-unrelated existing layout and routes during ordinary edits; use an unpositioned
-`{id,side:"below",noSpread:true}` for a new node, or rearrange when the request
-calls for it. Validate and state-walk the result, then propose it for the full
-Workbench preview and explicit approval. This protocol provides no screenshot
-or visual QA, so report those checks as pending instead of claiming them.
+For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
+`node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
+from the authoring kit (or checkout) and propose its output. The command handles
+node placement, panel sizes and step controls; do not choose coordinates or
+rectangles. Preserve existing layouts and routes during ordinary edits; a new
+node uses `{id,side:"below",noSpread:true}`. Use `--rearrange` only when explicitly
+requested. Validate and state-walk the result, then submit it for paired
+Workbench preview and explicit approval. See `docs/auto-arrange.md` for supported
+inputs and estimation limits. This browserless session cannot establish visual QA.
 
 If the agent's file reader cannot return the long `source` or `ledger` line, it
 reads the state identity and revision, then the complete current spec and ledger

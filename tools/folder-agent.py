@@ -154,7 +154,8 @@ def prepare(folder):
         os.chmod(target, 0o600)
     # Refreshing an existing session removes retired bundle-owned files without
     # touching authored files. The arrange entries were the Chromium-backed
-    # participant tool; pure Node auto-arrange-spec.cjs remains in the kit.
+    # participant tool. Current browser-free composition modules are retained
+    # by the kit membership check below, alongside the graph-only CLI.
     for name in ('docs/agent-operations.md', 'docs/agent-intent-testing.md',
                  'src/workbench/agent-operations.js', 'tools/arrange-spec.cjs',
                  'tools/arrange/generated-native.html', 'tools/arrange/contracts.cjs',

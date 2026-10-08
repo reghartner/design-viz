@@ -62,10 +62,12 @@ test('context-only copy works with a selection and no message, but not with an e
   assert.equal(c.workbenchAgentMessage({...current,previewCurrent:false},{contextOnly:true}),'');
   assert.equal(c.workbenchAgentMessage(current,{message:''}),'','the message composer still requires a request');
 });
-test('prepared edit requests split pure Node graph arrangement from manual panel layout',()=>{
+test('prepared edit requests compose new diagrams and preserve existing layout for paired preview',()=>{
   const message=c.workbenchAgentMessage(snapshot([{section:1,kind:'node',id:'camera'}]),{message:'Add a relay after the camera.'});
-  assert.ok(message.includes('bundled pure Node Auto Arrange CLI for wholly new graph topology'));
-  assert.ok(message.includes('manually author panel and controls rectangles'));
+  assert.ok(message.includes('For a wholly new diagram'));
+  assert.ok(message.includes('node tools/compose-page-layout.cjs'));
+  assert.ok(message.includes('nodes, panels and step controls without a browser or dependency install'));
+  assert.doesNotMatch(message,/manually author panel/);
   assert.ok(message.includes('Preserve unrelated existing placement, routes and panel rectangles unless this request asks for rearrangement.'));
   assert.ok(message.includes('unpositioned {id,side:"below",noSpread:true} float'));
   assert.ok(message.includes('submit it for Workbench preview'));

@@ -1,10 +1,10 @@
 'use strict';
 // Generic packing promoted from the reviewed step-context experiment. Inputs
-// are native measurements and contracts; historical training code stays frozen.
+// are spec-derived estimates and contracts; historical training code stays frozen.
 const L = require('./model.cjs');
 const V1 = require('./contracts.cjs');
 
-const VERSION = 'native-packing-1';
+const VERSION = 'estimated-packing-1';
 const clone = value => JSON.parse(JSON.stringify(value));
 const overlaps = (a,b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
 
@@ -33,7 +33,7 @@ function controlBands(base, controlHeight=3, minWidth=10, heights={}) {
   }
   for(const cut of [...new Set([0,end,...values.flatMap(r=>[r.y,r.y+r.h])])].sort((a,b)=>a-b))insert(cut);
   // Existing column cavities offer a central control band without moving or
-  // truncating a long neighboring report. The native renderer measures wrap.
+  // truncating a long neighboring report. The estimator accounts for wrapping.
   for(const y of [...new Set([0,...values.map(r=>r.y+r.h)])]) {
     let x=0;
     while(x<24){while(x<24&&values.some(r=>overlaps({x,y,w:1,h:controlHeight},r)))x++;const start=x;
@@ -46,8 +46,7 @@ function controlBands(base, controlHeight=3, minWidth=10, heights={}) {
 }
 function graphWaste(bounds,w,h,pitch,scale) {
   // Node geometry, not the surrounding graph tile, is occupied visual area.
-  // Estimate occupied area conservatively. Final native checks independently
-  // enforce containment and readability in the default reopened camera.
+  // Estimate occupied area conservatively. The estimate is not a native readability check.
   const width=w*pitch-8,height=h*40-133;
   const fit=Math.min((width-64)/Math.max(1,bounds.w),height/Math.max(1,bounds.h));
   const usedWidth=Math.min(width,bounds.w*Math.max(0,fit)+64);
@@ -55,7 +54,7 @@ function graphWaste(bounds,w,h,pitch,scale) {
 }
 function solve(source,{registry,geometry,measurements={},minimums={},excludeLayout=null,controlPolicy=null}={}) {
   if(controlPolicy&&!['above-group','below-group','interior-band','column-band'].includes(controlPolicy))throw Error('Unsupported: unknown control policy');
-  if(!registry||!geometry||!(geometry.gridWidth>0&&geometry.scale>0))throw Error('Native geometry and registry required');
+  if(!registry||!geometry||!(geometry.gridWidth>0&&geometry.scale>0))throw Error('Estimated geometry and registry required');
   const d=L.diagram(source),old=L.layout(source),g=old.find(t=>!t.panel&&!t.controls),ct=old.find(t=>t.controls==='steps');
   if(!ct||ct.hidden||ct.attachTo)throw Error('Unsupported: detached controls required');
   const pitch=(geometry.gridWidth+8)/24,bounds=geometry.bounds,graphVisible=!g.hidden;

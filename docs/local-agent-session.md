@@ -57,17 +57,15 @@ Preview restoration
 uses the existing view/step identity rules. If an agent removes the current view
 or step, the renderer uses its normal fallback.
 
-For a wholly new diagram, author unpositioned nodes and semantic connections,
-then run the bundled pure Node
-`node tools/auto-arrange-spec.cjs --section <zero-based-section> <draft> <different-output>`
-and use its graph layout. Repeat `--section` for multiple new diagrams; use
-`--all` only when every diagram is new. Author the 24-column `sectionLayout`
-rectangles for the diagram, panels and step controls yourself; the graph CLI
-does not compose them and needs no browser or dependency install. Preserve
-unrelated existing layout and routes during ordinary edits; add a node with an
-unpositioned `{id,side:"below",noSpread:true}` or rearrange when the request calls
-for it. Validate and state-walk the result before proposing it for Workbench
-preview. This file session cannot claim screenshots or visual QA.
+For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
+`node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
+from the authoring kit (or checkout) and propose its output. The command handles
+node placement, panel sizes and step controls; do not choose coordinates or
+rectangles. Preserve existing layouts and routes during ordinary edits; a new
+node uses `{id,side:"below",noSpread:true}`. Use `--rearrange` only when explicitly
+requested. Validate and state-walk the result, then submit it for paired
+Workbench preview and explicit approval. See `docs/auto-arrange.md` for supported
+inputs and estimation limits. This browserless session cannot establish visual QA.
 
 Updates wait while a text field is focused, a dialog is open, or a supported
 editor gesture is active. Finish the edit and click outside the field. An update

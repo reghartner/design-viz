@@ -4,7 +4,6 @@ import gzip
 import json
 from pathlib import Path
 import re
-import runpy
 import shlex
 import shutil
 import subprocess
@@ -16,20 +15,14 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 class DockerSourceBuildTests(unittest.TestCase):
-    def test_native_payload_failure_reports_the_missing_module(self):
-        build = runpy.run_path(str(ROOT / 'tools/folder_agent_kit.py'))['native_payload']
-        with tempfile.TemporaryDirectory(prefix='flowview-missing-payload-') as temporary:
-            with self.assertRaisesRegex(RuntimeError, r"(?s)Cannot find module .*tools/arrange/build-payload.cjs"):
-                build(temporary)
-
     def test_actual_copy_inputs_build_complete_portable_authoring_kit(self):
         tracked = set(subprocess.check_output(
-            ['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0'))
+            ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'], cwd=ROOT).decode().split('\0'))
         with tempfile.TemporaryDirectory(prefix='flowview-docker-source-') as temporary:
             context = Path(temporary)
             stages = 0
             # Follow the actual build-stage COPY declarations, including globs
-            # and directory contents. Only tracked inputs are eligible: an old
+            # and directory contents. Only authored inputs are eligible: an old
             # generated runtime or local dependency must not rescue this test.
             for line in (ROOT / 'deploy/workbench/Dockerfile').read_text().splitlines():
                 if line.startswith('FROM '):
@@ -63,10 +56,11 @@ class DockerSourceBuildTests(unittest.TestCase):
             self.assertIsNotNone(match)
             envelope = json.loads(match.group(1))
             files = json.loads(gzip.decompress(base64.b64decode(envelope['gzip'])))['files']
-            self.assertNotIn('tools/arrange-spec.cjs', files)
-            self.assertFalse(any(name.startswith('tools/arrange/') for name in files))
-            self.assertTrue((context / 'tools/arrange/generated-native.html').is_file())
-            self.assertIn('window.arrangementNative', (context / 'tools/arrange/generated-native.html').read_text())
+            for name in ['tools/compose-page-layout.cjs', 'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
+                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs']:
+                self.assertEqual(files[name], (ROOT / name).read_text(), name)
+            self.assertIn('state', json.loads(files['tools/arrange/layouts.json']))
+            self.assertFalse(any(name.endswith(('generated-native.html', 'setup.cjs', 'package-lock.json')) for name in files))
             self.assertIn('module.exports', files['tools/canon/generated-runtime.cjs'])
             self.assertFalse(any('node_modules' in name or name.endswith('package.json') or
                                  name.endswith('package-lock.json') for name in files))

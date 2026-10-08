@@ -30,7 +30,9 @@ a 24-column grid. Overlapping tiles move down to remain visible. Choose
 **Hide arrangement controls** to tuck away the fields while you drag tiles. They stay hidden through moves, resizes, Undo, Redo, and arrangement rerenders until you choose **Show arrangement controls** or finish with **Done arranging**. Diagram nodes and Home elements
 retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
-map or elsewhere in the section. They move as one live group.
+map or elsewhere in the section. They move as one live group. A scrolled Standard
+arrangement keeps its current viewport through drag, release, save, Undo, and
+Redo. Wheel and trackpad scrolling remain available while arranging.
 When the caption sits beside the controls, the control groups stay aligned to
 the top as text wraps onto more lines. Narrow layouts still put the caption below.
 

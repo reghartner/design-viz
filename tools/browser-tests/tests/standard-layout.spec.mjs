@@ -93,3 +93,46 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   await page.getByRole('button',{name:'Done arranging',exact:true}).click();await arrangeChapter(page);
   await expect(disclosure).toHaveText('Hide arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','true');await expect(fields).toBeVisible();
 });
+
+test('Standard arrangement drag keeps the scrolled desktop viewport stable',async({page,server},testInfo)=>{
+  await page.setViewportSize({width:1280,height:720});
+  const raw=fixture(),d=raw.page.blocks[0].diagram;
+  d.layouts[0].sectionLayout.default.find(it=>it.panel==='home').y=34;
+  const source=JSON.stringify(raw);
+  await page.goto(server.origin+'/workbench.html');await paste(page,source);await arrangeChapter(page);
+  await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
+  const tile=page.locator('[data-layout-key="panel:home"]'),handle=tile.locator('.section-tile-move');
+  await handle.scrollIntoViewIfNeeded();await page.locator('.workmain').evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle(page);
+  const sample=async(label,pointer)=>{
+    const value=await page.evaluate(({label,pointer})=>{
+      const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};
+      const tile=document.querySelector('[data-layout-key="panel:home"]'),grid=tile.closest('.section-layout-grid'),main=document.querySelector('.workmain');
+      return {label,pointer,windowY:window.scrollY,documentY:document.documentElement.scrollTop,bodyY:document.body.scrollTop,
+        workmainY:main.scrollTop,tile:rect(tile),grid:rect(grid),gridHeight:grid.style.minHeight};
+    },{label,pointer});
+    await testInfo.attach(label,{body:JSON.stringify(value,null,2),contentType:'application/json'});return value;
+  };
+  const box=await handle.boundingBox();
+  const start={x:box.x+box.width/2,y:box.y+box.height/2};
+  const before=await sample('before-drag',start);await testInfo.attach('before-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  await page.mouse.move(start.x,start.y);await page.mouse.down();
+  await page.mouse.move(start.x,start.y-160,{steps:8});await settle(page);
+  const during=await sample('during-drag',{x:start.x,y:start.y-160});await testInfo.attach('during-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  await page.mouse.up();await settle(page);
+  const after=await sample('after-drag',{x:start.x,y:start.y-160});await testInfo.attach('after-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  expect({during:[during.windowY,during.workmainY],after:[after.windowY,after.workmainY]}).toEqual({during:[before.windowY,before.workmainY],after:[before.windowY,before.workmainY]});
+  expect(during.pointer.y-during.tile.y).toBeCloseTo(before.pointer.y-before.tile.y,0);
+  expect(after.pointer.y-after.tile.y).toBeCloseTo(during.pointer.y-during.tile.y,0);
+  expect(after.tile.y).toBeCloseTo(during.tile.y,0);
+  const savedText=await page.locator('#src').inputValue();
+  expect(JSON.parse(savedText).page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home').y).toBe(30);
+  await expect(page.locator('[data-arrange-disclosure]')).toHaveText('Show arrangement controls');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+  expect(await page.locator('.workmain').evaluate(el=>el.scrollTop)).toBe(before.workmainY);
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(savedText);
+  expect(await page.locator('.workmain').evaluate(el=>el.scrollTop)).toBe(before.workmainY);
+  const beforeWheel=await page.locator('.workmain').evaluate(el=>el.scrollTop);await handle.hover();await page.mouse.wheel(0,-240);
+  await expect.poll(()=>page.locator('.workmain').evaluate(el=>el.scrollTop)).toBeLessThan(beforeWheel);
+  await page.getByRole('button',{name:'Done arranging',exact:true}).click();
+  expect(await page.locator('.layout-preview-stage').evaluate(el=>el.style.minHeight)).toBe('');
+});

@@ -13,7 +13,11 @@ async function stageDeveloperArranger(destination){
   expect(await fs.stat(path.join(destination,file)).catch(()=>null),file+' must stay out of the participant kit').toBeNull();
  await fs.copyFile(path.join(repo,'tools/arrange-spec.cjs'),path.join(destination,'tools/arrange-spec.cjs'));
  await fs.cp(path.join(repo,'tools/arrange'),path.join(destination,'tools/arrange'),{
-  recursive:true,filter:source=>path.basename(source)!=='node_modules'});
+  recursive:true,filter:source=>!['node_modules','generated-native.html'].includes(path.basename(source))});
+ const generated=path.join(destination,'tools/arrange/generated-native.html');
+ expect(await fs.stat(generated).catch(()=>null),'developer payload must start absent like a clean checkout').toBeNull();
+ const html=require(path.join(repo,'tools/arrange/build-payload.cjs')).payload();
+ expect(html).toContain('window.arrangementNative');await fs.writeFile(generated,html);
 }
 test.beforeAll(async()=>{
  kit=await fs.mkdtemp(path.join(os.tmpdir(),'flowview-native-kit-'));

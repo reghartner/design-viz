@@ -313,9 +313,12 @@ optional highlight labels to explain the emphasis. See
 the field reference with `python3 tools/widget_doc.py data-contract`.
 The `table` panel remains the record-snapshot view and accepts fixed column widths.
 
-For messaging architecture cost comparisons, use the `cost` panel and
-[messaging cost recipe](../../../cookbook/messaging-cost.md). Compare two routes
-at the same one-way volume, link cost lines to engineering nodes, separate fixed
+For operation cost breakdowns or architecture comparisons, use the `cost` panel and
+[cost recipe](../../../cookbook/messaging-cost.md). Declare 1–6 entries; one shows
+component amounts and shares, exactly two also compare baseline and alternative.
+For one operation use `messages:1`, `unit:"operation"`, `period:"per operation"`,
+zero `perMillion` and actual component amounts as `fixed`; start from
+`src/starters/operation-cost.json`. Link cost lines to engineering nodes, separate fixed
 charges from per-million rates, and state pricing assumptions and exclusions.
 Its stacked bars share a zero baseline; use Auto density for responsive panels
 or Compact for a short horizontal comparison beside the diagram. The recipe

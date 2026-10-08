@@ -1,5 +1,5 @@
 import {test,expect,pastePage,inspectPageElement,openInspectorGroup} from '../helpers/test.mjs';
-import {readFile} from 'node:fs/promises';
+import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -95,7 +95,7 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   await expect(root.locator('.cost-total')).toHaveText(['USD 3.20','USD 13.40']);
   await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
   await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
-  const rate=guide.getByLabel('Cost per 1M messages',{exact:true}).nth(1);
+  const rate=guide.getByLabel('Cost per 1M units',{exact:true}).nth(1);
   await rate.fill('3.8');await rate.press('Tab');
   await expect(root.locator('.cost-total')).toHaveText(['USD 42.00','USD 26.00']);
   expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.panels[0].items[1].node).toBe('bus');
@@ -116,4 +116,78 @@ test('cost editor changes starting volume and rates with exact Undo/Redo',async(
   expect(await root.locator('.cost-plot').first().evaluate(el=>parseFloat(getComputedStyle(el).height))).toBeCloseTo(230,0);
   const baselines=await root.locator('.cost-plot').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().bottom));
   expect(Math.abs(baselines[0]-baselines[1])).toBeLessThanOrEqual(1);
+});
+
+test('single operation keeps component amounts visible in auto, compact, expanded, narrow and print views',async({page,server},testInfo)=>{
+  const input=path.join(repo,'src/starters/operation-cost.json');
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'operation-cost.html')]);
+  await page.goto(server.origin+'/operation-cost.html');
+  await page.evaluate(()=>document.fonts.ready);
+  const panel=page.locator('.cost-panel');
+  await expect(panel.locator('.cost-total')).toHaveText('USD 0.10');
+  await expect(panel.locator('.cost-components b')).toHaveText(['USD 0.06','USD 0.01','USD 0.03']);
+  await expect(panel.locator('.cost-component-share')).toHaveText(['60.0%','10.0%','30.0%']);
+  await expect(panel.locator('.cost-delta,.cost-flow,.cost-nodes')).toHaveCount(0);
+  await expect(panel.locator('.cost-details')).not.toHaveAttribute('open');
+  await expect(panel.getByRole('region',{name:'Operation: Process one document',exact:true})).toBeVisible();
+  for(const density of ['auto','compact','expanded']){
+    await panel.evaluate((el,d)=>{el.classList.remove('cost-auto','cost-compact','cost-expanded');el.classList.add('cost-'+d);},density);
+    for(const width of [1800,390]){
+      await page.setViewportSize({width,height:1000});
+      await expect(panel.locator('.cost-components')).toBeVisible();
+      for(const label of ['Compute','Storage','External API'])await expect(panel.locator('.cost-component-label').filter({hasText:new RegExp('^'+label+'$')})).toBeVisible();
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+      const route=await panel.locator('.cost-route').boundingBox(),components=await panel.locator('.cost-components').boundingBox();
+      expect(components.x).toBeGreaterThanOrEqual(route.x);
+      expect(components.x+components.width).toBeLessThanOrEqual(route.x+route.width+1);
+      expect(components.y+components.height).toBeLessThanOrEqual(route.y+route.height+1);
+      await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('operation-'+density+'-'+width+'.png')});
+    }
+  }
+  await page.setViewportSize({width:1800,height:1200});await page.emulateMedia({media:'print'});
+  await expect(panel.locator('.cost-total')).toHaveText('USD 0.10');
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await page.screenshot({path:testInfo.outputPath('operation-print.png'),fullPage:true});
+});
+
+test('operation editor roundtrips fixed component edits and three-entry following state',async({page,server},testInfo)=>{
+  const raw=JSON.parse(await readFile(path.join(repo,'src/starters/operation-cost.json'),'utf8'));
+  const original=JSON.stringify(raw,null,2);
+  await page.goto(server.origin+'/workbench.html');await pastePage(page,original);
+  const root=page.locator('#docview'),guide=page.locator('#guide'),source=page.locator('#src');
+  await inspectPageElement(page,root.locator('.pt-cost .ptitle'));
+  const fixed=guide.getByLabel('Fixed cost per period',{exact:true}).first();
+  await fixed.fill('0.16');await fixed.press('Tab');
+  await expect(root.locator('.cost-total')).toHaveText('USD 0.20');
+  await expect(root.locator('.cost-component-share')).toHaveText(['80.0%','5.0%','15.0%']);
+  const changed=await source.inputValue();
+  await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);
+  await expect(root.locator('.cost-total')).toHaveText('USD 0.10');
+  await page.locator('#redo-builder').click();await expect(source).toHaveValue(changed);
+  const p=raw.page.sections[0].diagram.panels[0];
+  p.routes.push({id:'second',label:'Second operation'},{id:'third',label:'Third operation'});
+  p.items.push({route:'second',label:'Compute',perMillion:0,fixed:.2},{route:'third',label:'Compute',perMillion:0,fixed:.3});
+  p.initial.activeRoute='third';
+  const file=path.join(server.root,'three.json');await writeFile(file,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),file,path.join(repo,'template/flowview.html'),path.join(server.root,'three.html')]);
+  await page.goto(server.origin+'/three.html');
+  const panel=page.locator('.cost-panel');
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 0.10','USD 0.20','USD 0.30']);
+  await expect(panel.getByRole('region',{name:'Operation: Third operation. Following',exact:true})).toBeVisible();
+  await expect(panel.locator('.cost-delta')).toHaveCount(0);
+  const bars=await panel.locator('.cost-stack').evaluateAll(elements=>elements.map(el=>el.getBoundingClientRect().height));
+  expect(bars[0]/bars[2]).toBeCloseTo(1/3,2);expect(bars[1]/bars[2]).toBeCloseTo(2/3,2);
+  await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('three-entries.png')});
+  await panel.locator('.cost-route-2 .cost-components').scrollIntoViewIfNeeded();
+  await expect(panel.locator('.cost-route-2 .cost-components')).toBeInViewport();
+  await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('three-entries-scrolled.png')});
+  await panel.evaluate(el=>{el.classList.remove('cost-auto');el.classList.add('cost-compact');});
+  await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  await expect(panel.locator('.cost-component-label')).toHaveText(['Compute','Storage','External API','Compute','Compute']);
+  for(const media of ['screen','print']){
+    await page.setViewportSize({width:390,height:844});await page.emulateMedia({media});
+    expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    await expect(panel.getByRole('region',{name:'Operation: Third operation. Following',exact:true})).toBeVisible();
+  }
 });

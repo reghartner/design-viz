@@ -10,7 +10,7 @@ topology, notification or outcome without evidence.
 | Phone home screen, device app cards, notifications, backend sources, freshness | `cookbook/device-app-sources.md`, `python3 tools/widget_doc.py deviceapp phone` |
 | Shared icons, per-step card icons, company branding | `docs/shared-icons.md`, `examples/shared-icons/shared-icons.spec.json` |
 | Battery drain, low battery, charging | `cookbook/battery-level.md`, `python3 tools/widget_doc.py battery` |
-| Messaging architecture costs, alternative buses, visual cost differences, compact cost charts | `cookbook/messaging-cost.md`, `python3 tools/widget_doc.py cost`; start from `src/starters/messaging-cost.json` |
+| Operation cost breakdowns, messaging costs, visual cost differences, compact cost charts | `cookbook/messaging-cost.md`, `python3 tools/widget_doc.py cost`; start from `src/starters/operation-cost.json` for one operation or `src/starters/messaging-cost.json` for two routes |
 | Hot/cold devices, protective shutdown, temperature recovery | `cookbook/thermal-protection.md`, `cookbook/temperature.md`; `homemap`, `thermo`, `screen`, `battery` widget docs |
 | Physical home, outside grounds, doors | `cookbook/home-story.md`, `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
 | Camera state versus scene event | `cookbook/camera-events.md`, `python3 tools/widget_doc.py screen` |

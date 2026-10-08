@@ -29,6 +29,17 @@ async function open(page,server,surface,raw){
   await page.goto(server.origin+'/legend.html');return page.locator('#docview');
 }
 
+async function expectLegendWithin(legend,containerBounds){
+  // Viewport/host resize acknowledgement can precede the navigation's
+  // ResizeObserver callback. Retry the original bounds until that update arrives.
+  await expect(async()=>{
+    const container=await containerBounds(),bounds=await legend.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds.x).toBeGreaterThanOrEqual(container.x);
+    expect(bounds.x+bounds.width).toBeLessThanOrEqual(container.x+container.width);
+  }).toPass({timeout:10000});
+}
+
 for(const surface of ['standalone','workbench','native'])test(surface+' Explore exposes the same edge samples and restores Standard legend',async({page,server},info)=>{
   const raw=fixture(),root=await open(page,server,surface,raw),source=surface==='workbench'?await page.locator('#src').inputValue():null;
   const standard=root.locator('.explore-edge-legend .li'),expected=await standard.evaluateAll(nodes=>nodes.map(node=>node.outerHTML));
@@ -54,14 +65,13 @@ for(const surface of ['standalone','workbench','native'])test(surface+' Explore 
   const legend=root.getByRole('group',{name:'Edge legend',exact:true});await expect(legend).toBeVisible();
   for(const width of [640,480,375,320]){
     await page.setViewportSize({width,height:800});
-    const bounds=await legend.boundingBox();expect(bounds.x).toBeGreaterThanOrEqual(0);expect(bounds.x+bounds.width).toBeLessThanOrEqual(width);
+    await expectLegendWithin(legend,()=>({x:0,width}));
     for(const sample of await legend.locator('.li').all())await expect(sample).toBeInViewport();
   }
   if(surface==='native'){
     await page.setViewportSize({width:900,height:900});
     await root.evaluate(el=>Object.assign(el.style,{left:'36px',top:'24px',width:'360px',height:'700px',right:'auto',bottom:'auto'}));
-    const host=await root.boundingBox(),bounds=await legend.boundingBox();
-    expect(bounds.x).toBeGreaterThanOrEqual(host.x);expect(bounds.x+bounds.width).toBeLessThanOrEqual(host.x+host.width);
+    await expectLegendWithin(legend,()=>root.boundingBox());
   }
   await page.screenshot({path:info.outputPath('explore-edge-legend-'+surface+'.png')});
   if(source!==null){await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();}

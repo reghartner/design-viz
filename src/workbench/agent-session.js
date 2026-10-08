@@ -44,7 +44,7 @@ function createWorkbenchAgentExchange(opts){
       return validated();
     },
     request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},
-    receive:function(reply,sent,context){
+    receive:function receive(reply,sent,context,guard){
       if(pending && sent.result && pending.id===sent.result.id && reply.acknowledged===pending.id)pending=null;
       if(reply.occupied)return 'Another tab is connected. Disconnect it or close it and wait a few seconds.';
       if(reply.fileError)return 'Proposal file: '+reply.fileError;
@@ -61,6 +61,23 @@ function createWorkbenchAgentExchange(opts){
       var source=proposal.source;
       if(typeof source!=='string' || source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
       if(source===current.source && (!opts.requireLedger || proposal.ledger===current.ledger))return result('unchanged','Agent proposal matches the current document.');
+      // The automatic local transport supplies its lifetime guard. Prepare
+      // only an exact-current replacement: never merge or adopt a new revision.
+      // Folder review instead passes its already-approved private context.
+      if(guard && opts.prepare){
+        var revision=current.revision;
+        function prepared(nextContext,error){
+          if(!guard())return null;
+          current=snapshot();
+          if(!current.open || current.revision!==revision)return result('rejected','Your document changed while preparing the proposal. Reread state.json and revise it.');
+          if(error)return result('rejected','Could not prepare proposal: '+error.message);
+          try{var validation=opts.validate && opts.validate(source,nextContext);if(validation)return result('rejected','Proposal failed validation: '+validation);}
+          catch(ex){return result('rejected','Proposal failed validation: '+ex.message);}
+          // Recheck focus/gestures and all normal acceptance rules after I/O.
+          return receive(reply,sent,nextContext);
+        }
+        return Promise.resolve().then(function(){if(guard())return opts.prepare(source);}).then(function(value){return prepared(value);},function(error){return prepared(null,error);});
+      }
       var outcome;
       try{outcome=opts.apply(source,current,proposal,context);}
       catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}
@@ -90,7 +107,7 @@ function initWorkbenchAgentSession(opts){
   doc.getElementById('editor-company').appendChild(details);
   var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);
   var clientId=Array.from(bytes,function(byte){return byte.toString(16).padStart(2,'0');}).join('');
-  var exchange=createWorkbenchAgentExchange({clientId:clientId,snapshot:opts.snapshot,busy:function(){return pointerHeld || opts.busy();},apply:opts.apply});
+  var exchange=createWorkbenchAgentExchange({clientId:clientId,snapshot:opts.snapshot,busy:function(){return pointerHeld || opts.busy();},apply:opts.apply,prepare:opts.prepare,validate:opts.validate});
   function label(message){status.textContent=message;button.title=message;}
   function send(payload,signal){
     return fetch('/__flowview_agent/sync',{method:'POST',headers:{'Content-Type':'application/json','X-Flowview-Session':config.token},
@@ -105,7 +122,9 @@ function initWorkbenchAgentSession(opts){
     try{
       var sent=exchange.request(),reply=await send(sent,requestController.signal);
       if(!running || !life.alive() || epoch!==generation)return;
-      var message=exchange.receive(reply,sent);
+      life.cancelDelay(deadline);
+      var message=await exchange.receive(reply,sent,undefined,function(){return running && life.alive() && epoch===generation;});
+      if(!running || !life.alive() || epoch!==generation)return;
       if(message)label(message);
       else if(!sent.snapshot.open)label('Connected — open a project to share it with the agent.');
       else if(!status.textContent || /Connecting|unavailable|open a project|Another tab/.test(status.textContent))label('Connected — document and selection are shared through local files.');

@@ -211,13 +211,16 @@ the complete candidate with `FlowTopology.resolveSource`. It accepts the same
 subset and placement fields, never writes provider hardcopy, and reports invalid
 closure/collisions before publication. UI applies this plan through the normal
 session transaction; agents can author equivalent reference JSON and validate
-the complete approved batch using the Canon publisher. In a connected Workbench,
+the complete approved batch using the Canon publisher. In a connected Workbench folder session,
 submitting an agent proposal loads missing providers and their dependencies from
 the same pinned catalog before validation. The review renders against this staged
 context; only **Commit** publishes the provider context and authored spec/ledger
 pair. Stop, disconnect, project changes, and changed proposals retire pending
 loads without changing the document or its frozen context. Genuine merge conflicts
 and unavailable or revision-mismatched providers still block the update.
+The optional localhost helper uses the same pinned-provider preparation before
+its automatic acceptance, retaining its exact-current-revision requirement and
+one Undo transaction. It does not merge stale proposals or open a review dialog.
 
 A brand-new or local draft uses the same picker. Choose **Connect repository
 catalog** to explicitly pin the deployed v3 index, then browse approved providers

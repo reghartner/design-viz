@@ -1,15 +1,15 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),{webcrypto}=require('node:crypto');
-const {composeSources}=require('../tools/source-loader.cjs');
+const {composeSources,readSource}=require('../tools/source-loader.cjs');
 const copy=value=>JSON.parse(JSON.stringify(value));
 const diagram=spec=>spec.page.sections[0].diagram;
 function provider(id){return {page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};}
-async function harness(){
+async function harness(origin='https://test.invalid/flowspec.html'){
   const {digest}=await import('../tools/canon/drift.mjs'),leaf=provider('leaf'),nested=provider('nested');
   diagram(nested).topologyImports=[{spec:'leaf',export:'public',as:'inner'}];diagram(nested).topologyExports.public.nodes.push('inner::api');
   const providers=[leaf,nested],catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   const disk=new Map(),hits=[],updates=[];let gate=null,text=JSON.stringify({page:{title:'Draft',sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']]}}]}}),ledger='Before',saved,number=0,applies=0;
-  const c={TextEncoder,URL,Response,SyntaxError,location:{href:'https://test.invalid/flowspec.html'},window:{crypto:webcrypto},fetch:async url=>{
+  const c={TextEncoder,URL,Response,SyntaxError,location:new URL(origin),window:{crypto:webcrypto},fetch:async url=>{
     const name=new URL(url).pathname.slice(1);hits.push(name);if(gate)await gate(name);
     return new Response(JSON.stringify(name==='diagrams.json'?catalog:providers.find(spec=>name===spec.page.canon.id+'.json')));
   }};
@@ -93,4 +93,60 @@ test('context changes after preview require a fresh explicit approval, while an 
   const hits=h.hits.slice();diagram(h.providers[0]).nodes.api.title='Later remote deployment';
   await h.client.acceptReview(refreshed.review.version);assert.equal(h.applies,1);assert.deepEqual(h.hits,hits);
   assert.equal(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api'].title,'leaf API');
+});
+
+async function localHarness({connect=true,providerGate}={}){
+  const h=await harness('http://127.0.0.1/flowspec.html');h.client.destroy();if(connect)await h.connect();
+  if(providerGate)h.gate(providerGate);
+  class Element extends EventTarget{constructor(){super();this.children=[];this.style={};this.textContent='';}appendChild(child){this.children.push(child);}remove(){}setAttribute(){}click(){this.dispatchEvent(new Event('click'));}}
+  const host=new Element(),company=new Element(),config=new Element(),timers=new Map();let clock=0,applied=0,open=true,busy=false,receipt,arrived;
+  const ready=new Promise(resolve=>arrived=resolve),sent=[];
+  config.textContent=JSON.stringify({protocolVersion:1,token:'a'.repeat(64),scratch:'/test'});
+  h.c.document={getElementById:id=>id==='flowview-local-agent'?config:company,querySelector:()=>host,createElement:()=>new Element()};
+  h.c.window=Object.assign(new EventTarget(),{crypto:webcrypto});h.c.crypto=webcrypto;h.c.AbortController=AbortController;
+  h.c.setTimeout=(fn,ms)=>{const id=++clock;timers.set(id,{fn,ms});return id;};h.c.clearTimeout=id=>timers.delete(id);
+  vm.runInContext(readSource('workbench/lifetime.js'),h.c);
+  const fetchProvider=h.c.fetch;h.c.fetch=async(url,opts)=>{
+    if(url!=='/__flowview_agent/sync')return fetchProvider(url,opts);
+    const request=JSON.parse(opts.body);sent.push(request);
+    return new Response(JSON.stringify(request.disconnect?{}:{proposal:{...h.proposal,baseRevision:request.snapshot.revision,topologyContext:{catalogURL:'https://untrusted.invalid/catalog.json'}}}));
+  };
+  // Observe the returned promise at the public exchange seam; initialization,
+  // polling, lifetime, provider loading, validation and acceptance remain real.
+  const create=h.c.createWorkbenchAgentExchange;
+  h.c.createWorkbenchAgentExchange=opts=>{const exchange=create(opts),receive=exchange.receive;exchange.receive=(...args)=>{receipt=Promise.resolve(receive(...args));arrived();return receipt;};return exchange;};
+  const local=h.c.initWorkbenchAgentSession({document:h.c.document,
+    snapshot(){const snap=h.session.snapshot();return {source:snap.text,project:snap.project,topologyRevision:snap.topologyRevision,open};},busy:()=>busy,
+    prepare:source=>h.c.prepareTopologyProposal(JSON.parse(source),h.session.topologyContext()),
+    validate:(source,context)=>h.session.validate(JSON.parse(source),context).errors.join('\n'),
+    apply(source,expected,proposal,context){assert.equal(h.session.validate(JSON.parse(source),context).errors.length,0);const ok=h.session.accept({text:source},{snapshot:h.session.snapshot(),topologyContext:context});if(ok)applied++;return {ok};}});
+  await ready;
+  return {...h,local,sent,host,get applied(){return applied;},done:()=>receipt,setOpen:value=>open=value,setBusy:value=>busy=value};
+}
+test('local transport initialization prepares and validates a pinned provider before automatic acceptance',async()=>{
+  const h=await localHarness();await h.done();assert.equal(h.applied,1);
+  assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);assert.equal(h.session.text(),h.proposal.source);
+  assert.equal(h.session.undo(),true);assert.equal(h.session.text(),h.original);assert.equal(h.session.canUndo(),false);
+  assert.equal(h.session.redo(),true);assert.equal(diagram(h.session.resolve(JSON.parse(h.session.text()))).nodes['shared::inner::api'].title,'leaf API');h.local.destroy();
+});
+test('local transport rejects a missing catalog without trusting proposal context or fetching providers',async()=>{
+  const h=await localHarness({connect:false});assert.match(await h.done(),/Connect repository catalog/);assert.equal(h.applied,0);assert.deepEqual(h.hits,[]);h.local.destroy();
+});
+for(const change of ['disconnect','pagehide','destroy','source','project','context','closed','busy'])test('local transport retires prepared providers after '+change,async()=>{
+  // Hold the preparation callback before any provider can finish. This also
+  // ensures the test observes the actual init-to-exchange callback wiring.
+  let release,reached;const hit=new Promise(resolve=>reached=resolve),gate=new Promise(resolve=>release=resolve);
+  const h=await localHarness({providerGate:name=>name==='nested.json'?(reached(),gate):null});
+  await hit;const before=JSON.stringify(h.session.topologyContext());
+  if(change==='disconnect')h.host.children[0].click();
+  if(change==='pagehide')h.c.window.dispatchEvent(new Event('pagehide'));
+  if(change==='destroy')h.local.destroy();
+  if(change==='source')h.session.importText(h.original.replace('Draft','Human draft'));
+  if(change==='project')h.session.replaceProject(h.original);
+  if(change==='context')h.session.connectTopology(h.session.topologyContext(),h.session.snapshot());
+  if(change==='closed')h.setOpen(false);
+  if(change==='busy')h.setBusy(true);
+  release();await h.done();assert.equal(h.applied,0);
+  assert.equal(h.session.text(),change==='source'?h.original.replace('Draft','Human draft'):h.original);
+  assert.equal(JSON.stringify(h.session.topologyContext()),change==='project'?'null':before);h.local.destroy();
 });

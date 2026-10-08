@@ -105,8 +105,10 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});const original=await source(page);
   const toolbarFit=page.locator('#workspace-fit-selection'),inspectorFit=page.locator('#guide').getByRole('button',{name:'Fit selection',exact:true});
   await expect(toolbarFit).toBeDisabled();await expect(toolbarFit).toHaveAttribute('title',/only in Explore/);await expect(inspectorFit).toBeDisabled();await expect(inspectorFit).toHaveAttribute('title',/only in Explore/);
+  await expect(page.locator('#guide').getByRole('button',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(0);
   await node(page,'b').click({button:'right'});await expect(menu(page)).toBeVisible();await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
   for(const name of ['Inspect','Delete','Duplicate','Align horizontally','Align vertically'])await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeVisible();
+  await expect(menu(page).getByRole('menuitem',{name:/^Distribute (horizontally|vertically)/})).toHaveCount(2);
   const menuFit=menu(page).getByRole('menuitem',{name:/^Fit selection/});await expect(menuFit).toHaveAttribute('aria-disabled','true');await expect(menuFit).toContainText('only in Explore');
   await page.screenshot({path:'/tmp/standard-node-actions-1280.png'});await info.attach('Standard node actions 1280',{body:await page.screenshot(),contentType:'image/png'});
   await menu(page).getByRole('menuitem',{name:'Align horizontally',exact:true}).click();let changed=await source(page),d=await diagram(page);

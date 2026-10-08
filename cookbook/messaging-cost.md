@@ -4,7 +4,15 @@ Use the **Cost breakdown / comparison** panel (`type:"cost"`) for 1–6 entries.
 The picker starts with one operation and visible component amounts and percentage
 shares. Exactly two entries retain baseline/alternative differences, percentages,
 break-even volume and the chart gap. Three to six entries show independent totals
-and component breakdowns on a shared scale.
+and component breakdowns on a shared scale. At native panel widths above 760 px,
+all declared entries use one equal-width row in Auto, Compact and Expanded
+density. Narrower panels wrap three to six entries into two columns; every entry,
+component amount and percentage remains present. Print keeps the wide authored row.
+
+The [runnable six-operation example](../src/starters/cost-six-operations.json)
+uses a 24-column section and a full-width cost panel to show image preprocessing,
+text extraction, embeddings, model inference, database writes, and audit delivery
+in one row.
 
 ## One operation
 
@@ -26,6 +34,8 @@ enter the appropriate per-million rate and set `fixed:0` or omit it.
 python3 tools/build.py
 node tools/validate.js src/starters/operation-cost.json
 python3 tools/inject.py src/starters/operation-cost.json template/flowview.html /tmp/operation-cost.html
+node tools/validate.js src/starters/cost-six-operations.json
+python3 tools/inject.py src/starters/cost-six-operations.json template/flowview.html /tmp/cost-six-operations.html
 ```
 
 ## Messaging comparison

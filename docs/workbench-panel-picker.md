@@ -45,6 +45,11 @@ amounts and percentage shares. Set **Workload unit** to `operation`, starting
 and enter each component’s amount as **Fixed cost per period**. Add or remove
 **Operations / routes** and their **Components & cost lines** together.
 Exactly two entries show baseline/alternative differences and break-even volume.
+Three to six entries use equal-width cards in one row when the panel is wider
+than 760 px; narrower native panels wrap them into two columns so component
+labels, amounts and shares remain readable. The
+[six-operation example](../src/starters/cost-six-operations.json) demonstrates
+the full-width 24-column layout.
 In Inspect, set **Display density** to **Auto**, **Compact** or **Expanded**.
 Auto uses horizontal bars at panel widths up to 520 px; Compact keeps that layout
 at any width. **Following route** can highlight any declared entry. Expand

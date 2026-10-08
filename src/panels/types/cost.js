@@ -124,11 +124,14 @@ function costHTML(panel, state) {
   var money = function (value) { return esc(costAmount(value, model.currency)); };
   var comparison = model.routes.length === 2 && Array.isArray(panel.routes) && panel.routes.length === 2;
   var density = ['compact','expanded'].indexOf(panel.density) >= 0 ? panel.density : 'auto';
-  var h = '<div class="cost-panel cost-' + density + (comparison ? ' cost-comparison' : ' cost-breakdown') + (model.routes.length === 1 ? ' cost-single' : '') + '"><div class="cost-basis"><span>AUTHORED COST ESTIMATE</span><strong>' +
+  var routeCount = model.routes.length;
+  var h = '<div class="cost-panel cost-' + density + (comparison ? ' cost-comparison' : ' cost-breakdown') + (routeCount === 1 ? ' cost-single' : '') +
+    (routeCount >= 3 ? ' cost-many' : '') + ' cost-count-' + routeCount + '"><div class="cost-basis"><span>AUTHORED COST ESTIMATE</span><strong>' +
     (model.messages === null ? 'Unknown volume' : costCount(model.messages) + ' ' + esc(model.unit)) +
     '</strong><span>' + esc(panel.period || 'per month') + '</span></div>';
   if (!model.valid) h += '<p class="cost-invalid">Totals unavailable. Declare 1–6 unique entries and 1–24 cost lines, with at least one line per entry and a valid currency.</p>';
-  h += '<div class="cost-chart-caption"><span>COST BREAKDOWN</span><span>' + (model.routes.length > 1 ? 'Same scale · ' : '') + 'stacked by component</span></div><div class="cost-routes">';
+  h += '<div class="cost-chart-caption"><span>COST BREAKDOWN</span><span>' + (routeCount > 1 ? 'Same scale · ' : '') +
+    'stacked by component</span></div><div class="cost-routes" style="--cost-route-count:' + Math.max(1, routeCount) + '">';
   chart.routes.forEach(function (entry, index) {
     var route = entry.route;
     var gap = model.delta !== null && model.delta !== 0 && ((model.delta > 0 && index === 0) || (model.delta < 0 && index === 1));
@@ -199,6 +202,7 @@ function costCompactStyles(scope) {
 .C .cost-chart-caption,.C .cost-nodes{display:none}
 .C .cost-route-heading{position:absolute;width:1px;height:1px;min-height:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .C .cost-routes{grid-template-columns:minmax(0,1fr);gap:5px}
+.C.cost-many .cost-routes{grid-template-columns:repeat(var(--cost-route-count),minmax(0,1fr))}
 .C .cost-route{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 22px auto;grid-row:auto;gap:4px 8px;padding:6px 4px;border-radius:5px}
 .C .cost-route h4{grid-column:1;grid-row:1;min-height:0;font-size:11px;margin:0;align-self:center}
 .C.cost-comparison .cost-route-0 h4::before{content:'A · ';color:var(--dfaint)}.C.cost-comparison .cost-route-1 h4::before{content:'B · ';color:var(--dfaint)}
@@ -209,6 +213,10 @@ function costCompactStyles(scope) {
 .C .cost-gap{height:100%;width:var(--cost-gap-pct);left:auto;right:0;top:0;border:1px dashed color-mix(in srgb,var(--dtext) 35%,transparent);border-left:0;border-radius:0 4px 4px 0}
 .C .cost-no-bar{bottom:3px;font-size:10px}
 .C .cost-components{grid-column:1/-1;grid-row:3}.C .cost-components li{font-size:10px;padding:3px 0}
+.C.cost-many .cost-route{grid-template-columns:minmax(0,1fr);grid-template-rows:auto auto 22px auto;gap:2px;padding:7px 5px}
+.C.cost-many .cost-route h4{grid-column:1;grid-row:1;min-height:30px;align-self:start}
+.C.cost-many .cost-total{grid-column:1;grid-row:2;font-size:13px;white-space:normal}
+.C.cost-many .cost-plot{grid-column:1;grid-row:3}.C.cost-many .cost-components{grid-column:1;grid-row:4}
 .C .cost-flow{grid-column:1/-1;grid-row:3;gap:3px 5px;flex-wrap:nowrap;overflow:hidden}
 .C .cost-flow li{gap:3px;font-size:9px;flex-shrink:1}.C .cost-flow li:not(:last-child)::after{margin-left:2px}.C .cost-node-dot{width:7px;height:7px;border-radius:2px}
 .C .cost-chart-key{font-size:9px;margin:6px 0 0;gap:4px}.C .cost-key-solid,.C .cost-key-fixed{width:8px;height:8px}
@@ -232,13 +240,26 @@ PanelRegistry.define('cost', {
 .cost-basis>span:last-child{font-size:11px;color:var(--dfaint)}
 .cost-chart-caption{display:flex;justify-content:space-between;gap:8px;padding-bottom:8px;border-bottom:1px solid color-mix(in srgb,var(--dtext) 18%,transparent)}
 .cost-chart-caption>span:last-child{font-weight:400;letter-spacing:0;text-align:right}
-.cost-routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:0}
+.cost-routes{display:grid;grid-template-columns:repeat(var(--cost-route-count),minmax(0,1fr));column-gap:20px;row-gap:0}
 .cost-route{display:grid;grid-template-rows:subgrid;grid-row:span 6;position:relative;min-width:0;padding:14px 10px 10px;border-radius:8px;border:1px solid transparent}
 .cost-single .cost-routes,.cost-single .cost-detail-routes{grid-template-columns:minmax(0,1fr)}
 .cost-breakdown .cost-route{grid-row:span 5}
 .cost-components{list-style:none;padding:0;margin:12px 0 0;align-self:start}
 .cost-components li{display:grid;grid-template-columns:11px minmax(0,1fr) auto 42px;align-items:center;gap:7px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--dtext) 12%,transparent);font-size:11px}
 .cost-components b{font-variant-numeric:tabular-nums;font-weight:600}.cost-component-share{text-align:right;color:var(--dfaint)}
+.cost-many .cost-routes{column-gap:8px}
+.cost-many .cost-route{padding:10px 7px 8px}
+.cost-many .cost-route-heading{min-height:15px}.cost-many .cost-tag{font-size:8px;letter-spacing:.7px}
+.cost-many .cost-route h4{font-size:12px;line-height:1.25;min-height:45px;margin:3px 0 4px}
+.cost-many .cost-total{font-size:17px;margin-bottom:9px;white-space:normal}
+.cost-many .cost-plot{height:145px}.cost-many .cost-stack{left:12%;width:76%}
+.cost-many .cost-segment>span{display:none}
+.cost-many .cost-components{margin-top:8px}
+.cost-many .cost-components li{grid-template-columns:8px minmax(0,1fr) auto;grid-template-rows:auto auto;align-items:start;gap:1px 5px;padding:5px 0;font-size:10px}
+.cost-many .cost-components .cost-node-dot{grid-column:1;grid-row:1/3;width:8px;height:8px;margin-top:3px}
+.cost-many .cost-component-label{grid-column:2/4;grid-row:1;line-height:1.25}
+.cost-many .cost-components b{grid-column:2;grid-row:2}
+.cost-many .cost-component-share{grid-column:3;grid-row:2;min-width:34px}
 .cost-active{border-color:color-mix(in srgb,var(--dtext) 32%,transparent);background:color-mix(in srgb,var(--dtext) 3%,transparent)}
 .cost-route-heading{display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px;min-height:19px}
 .cost-following{font-size:9px;color:var(--dink);font-weight:600}
@@ -269,7 +290,8 @@ PanelRegistry.define('cost', {
 .cost-tradeoff{font-size:10px;margin:9px 0 0}.cost-assumptions{margin-top:13px;font-size:10px;color:var(--dfaint)}.cost-assumptions b{color:var(--dtext)}.cost-assumptions p{margin:3px 0 0}.cost-note{font-size:11px;margin:10px 0 0}
 @container(max-width:420px){.cost-routes{column-gap:8px}.cost-route{padding:12px 3px 8px}.cost-route h4{font-size:12px}.cost-total{font-size:18px}.cost-stack,.cost-gap{left:10%;width:80%}.cost-segment{font-size:11px}.cost-gap{font-size:11px}.cost-delta{gap:8px;padding:12px}.cost-delta strong{font-size:19px}.cost-delta-icon{font-size:32px}.cost-detail-routes{grid-template-columns:1fr}}
 @media print{.pt-cost{background:#fff!important;--dink:#172033;--dtext:#334155;--dfaint:#526175}.pt-cost .ptitle{color:#334155!important}.cost-routes,.cost-delta{break-inside:avoid}.cost-panel{container-type:normal}.cost-segment,.cost-node-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-` + costCompactStyles('.cost-compact') + '@container(max-width:520px){' + costCompactStyles('.cost-auto') + '}',
+` + costCompactStyles('.cost-compact') + '@container(max-width:520px){' + costCompactStyles('.cost-auto') + '}' +
+    '@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}',
   authoring: {
     initialFields: true,
     template: {
@@ -290,12 +312,12 @@ PanelRegistry.define('cost', {
       return [['messages','num'],['activeRoute','enum',panelCollectionItems(panel,'routes',6).map(function (route) { return route.id; })],['note','text']];
     },
     fieldMeta: {
-      density:{label:'Display density',help:'Auto uses compact horizontal bars in panels up to 520 px wide. Compact keeps the small layout at any width; Expanded keeps the tall chart.'},
+      density:{label:'Display density',help:'Auto uses compact horizontal bars in panels up to 520 px wide. Compact keeps the small layout at any width; Expanded keeps the tall chart. Three to six entries share one row in wide panels and wrap to two columns below 760 px.'},
       currency:{label:'Currency',help:'One three-letter code for all entries; default USD. No currency conversion.'},
       unit:{label:'Workload unit',help:'Display label for the volume and per-million rates; defaults to messages. Use operation with volume 1 for a single-operation breakdown.'},
       period:{label:'Cost period',help:'Use the same period for workload volume and every fixed charge, e.g. per month.'},
       assumptions:{label:'Basis & exclusions',help:'Describe workload units, included operations, region, rate date and excluded charges. Label fictional rates.'},
-      routes:{label:'Operations / routes',help:'Declare 1–6 entries with unique ids. One shows a breakdown; exactly two compare baseline first and alternative second. Remove an entry’s cost lines when removing it.'},
+      routes:{label:'Operations / routes',help:'Declare 1–6 entries with unique ids. One shows a breakdown; exactly two compare baseline first and alternative second. Three to six use equal-width cards on one row in wide panels. Remove an entry’s cost lines when removing it.'},
       items:{label:'Components & cost lines',help:'List each entry’s components. Route is its id; node optionally links an existing diagram node. Rate is the aggregate cost per million workload units, including all billable operations; explicit zero is free / excluded. Fixed cost defaults to zero.'},
       messages:{label:'Workload volume',help:'Non-negative whole number for the authored period; default 1,000,000. Applies to every entry. For one operation use 1 and enter component amounts as fixed costs.'},
       activeRoute:{label:'Following route',help:'Highlight the route being explained by this step. Does not change any estimate.',nullLabel:'No route highlighted'},

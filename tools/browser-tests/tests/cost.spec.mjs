@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 const repo=fileURLToPath(new URL('../../..',import.meta.url));
 const fixture=path.join(repo,'src/starters/messaging-cost.json');
+const sixFixture=path.join(repo,'src/starters/cost-six-operations.json');
 
 test('portable cost comparison follows alternate paths, resets volume, and fits narrow/print layouts',async({page,server},testInfo)=>{
   execFileSync('python3',[path.join(repo,'tools/inject.py'),fixture,path.join(repo,'template/flowview.html'),path.join(server.root,'cost.html')]);
@@ -35,6 +36,7 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
   await expect(panel.getByRole('region',{name:'Alternative: Queue + relay. Following',exact:true})).toBeVisible();
   await expect(panel.getByRole('region',{name:'Baseline: Managed event bus',exact:true})).toBeVisible();
   await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(1);
   await expect(panel.locator('.cost-total')).toHaveText(['USD 320.00','USD 152.00']);
   const consumer=await page.locator('[data-dv-node="consumer"] .card').boundingBox();
   const transport=await page.locator('.step-transport').boundingBox();
@@ -149,6 +151,93 @@ test('single operation keeps component amounts visible in auto, compact, expande
   await expect(panel.locator('.cost-total')).toHaveText('USD 0.10');
   expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({path:testInfo.outputPath('operation-print.png'),fullPage:true});
+});
+
+test('six operations render as one readable row at wide widths and wrap without clipping when narrow',async({page,server},testInfo)=>{
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),sixFixture,path.join(repo,'template/flowview.html'),path.join(server.root,'cost-six.html')]);
+  await page.goto(server.origin+'/cost-six.html');
+  await page.evaluate(()=>document.fonts.ready);
+  const panel=page.locator('.cost-panel'),routes=panel.locator('.cost-route');
+  const labels=['Image preprocessing','Document text extraction','Embedding generation','Model inference','Database writes','Audit and notification'];
+  await expect(routes).toHaveCount(6);
+  await expect(panel.locator('.cost-route h4')).toHaveText(labels);
+  await expect(panel.locator('.cost-total')).toHaveText(['USD 0.04','USD 0.06','USD 0.03','USD 0.14','USD 0.05','USD 0.03']);
+  await expect(panel.locator('.cost-component-label')).toHaveCount(18);
+  await expect(panel.locator('.cost-components b')).toHaveCount(18);
+  await expect(panel.locator('.cost-component-share')).toHaveCount(18);
+
+  const geometry=async()=>routes.evaluateAll(cards=>cards.map(card=>{
+    const outer=card.getBoundingClientRect();
+    const content=[...card.querySelectorAll('h4,.cost-total,.cost-component-label,.cost-components b,.cost-component-share')].map(el=>{
+      const box=el.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top,bottom:box.bottom,text:el.textContent.trim()};
+    });
+    return {left:outer.left,right:outer.right,top:outer.top,bottom:outer.bottom,content};
+  }));
+  const expectUnclipped=cards=>{
+    for(const card of cards)for(const item of card.content){
+      expect(item.text.length).toBeGreaterThan(0);
+      expect(item.left).toBeGreaterThanOrEqual(card.left-1);
+      expect(item.right).toBeLessThanOrEqual(card.right+1);
+      expect(item.top).toBeGreaterThanOrEqual(card.top-1);
+      expect(item.bottom).toBeLessThanOrEqual(card.bottom+1);
+    }
+  };
+  const expectOneRow=cards=>{
+    expect(cards).toHaveLength(6);expectUnclipped(cards);
+    for(let i=0;i<cards.length;i++){
+      expect(Math.abs(cards[i].top-cards[0].top)).toBeLessThanOrEqual(1);
+      if(i)expect(cards[i].left).toBeGreaterThanOrEqual(cards[i-1].right-1);
+    }
+  };
+
+  for(const density of ['auto','compact','expanded']){
+    await panel.evaluate((el,d)=>{el.classList.remove('cost-auto','cost-compact','cost-expanded');el.classList.add('cost-'+d);},density);
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    expectOneRow(await geometry());
+    expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+    await panel.screenshot({path:testInfo.outputPath('six-'+density+'-wide.png')});
+  }
+
+  await panel.evaluate(el=>{el.classList.remove('cost-expanded');el.classList.add('cost-auto');el.style.width='1100px';});
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  expectOneRow(await geometry());
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await panel.screenshot({path:testInfo.outputPath('six-auto-1100.png')});
+
+  await panel.evaluate(el=>el.style.width='700px');
+  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2);
+  let narrow=await geometry();expectUnclipped(narrow);
+  expect(Math.abs(narrow[0].top-narrow[1].top)).toBeLessThanOrEqual(1);
+  expect(narrow[2].top).toBeGreaterThan(narrow[0].bottom-1);
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+
+  await panel.evaluate(el=>el.style.width='500px');
+  await expect(panel.locator('.cost-plot').first()).toHaveCSS('height','22px');
+  await expect.poll(()=>panel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(2);
+  narrow=await geometry();expectUnclipped(narrow);
+  expect(await panel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+  await panel.screenshot({path:testInfo.outputPath('six-auto-500.png')});
+
+  await panel.evaluate(el=>{el.style.width='';el.classList.remove('cost-auto');el.classList.add('cost-expanded');});
+  await page.emulateMedia({media:'print'});
+  expectOneRow(await geometry());
+  await expect(panel.locator('.cost-total')).toHaveCount(6);
+  await page.locator('.pt-cost').screenshot({path:testInfo.outputPath('six-print.png')});
+
+  const large=JSON.parse(await readFile(sixFixture,'utf8'));
+  large.page.sections[0].diagram.panels[0].items[0].fixed=12345.648;
+  const largeFile=path.join(server.root,'cost-six-large.json');
+  await writeFile(largeFile,JSON.stringify(large));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),largeFile,path.join(repo,'template/flowview.html'),path.join(server.root,'cost-six-large.html')]);
+  await page.emulateMedia({media:'screen'});await page.goto(server.origin+'/cost-six-large.html');
+  const largePanel=page.locator('.cost-panel');
+  await largePanel.evaluate(el=>el.style.width='770px');
+  await expect(largePanel.locator('.cost-total').first()).toHaveText('USD 12,345.67');
+  await expect.poll(()=>largePanel.locator('.cost-routes').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length)).toBe(6);
+  const largeCard=largePanel.locator('.cost-route').first();
+  const [cardBox,totalBox]=await Promise.all([largeCard.boundingBox(),largeCard.locator('.cost-total').boundingBox()]);
+  expect(totalBox.x).toBeGreaterThanOrEqual(cardBox.x-1);expect(totalBox.x+totalBox.width).toBeLessThanOrEqual(cardBox.x+cardBox.width+1);
+  expect(await largePanel.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
 });
 
 test('operation editor roundtrips fixed component edits and three-entry following state',async({page,server},testInfo)=>{

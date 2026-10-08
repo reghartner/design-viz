@@ -273,7 +273,10 @@ function initWorkbenchWelcome(opts){
   }
   function openSpec(spec, failureId){
     try { builder.loadSpec(JSON.parse(JSON.stringify(spec))); error(failureId, ''); enterEditor(); }
-    catch (ex){ error(failureId, ex.message || 'This project could not be opened.'); el(failureId).scrollIntoView({block:'nearest'}); }
+    catch (ex){
+      if(ex && ex.code==='DRAFT_ARCHIVE_FAILED'){error(failureId, '');return;}
+      error(failureId, ex.message || 'This project could not be opened.');el(failureId).scrollIntoView({block:'nearest'});
+    }
   }
   var homeLink=el('workbench-home');
   /* Keep a real, rename-safe navigation target for open-in-new-tab and for

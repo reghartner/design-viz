@@ -48,6 +48,7 @@ function createBuilderPersistence(options){
         }
       }catch(ex){
         var failure=Error('Your earlier draft could not be saved. Download the current draft or free browser storage, then try again.');
+        failure.code='DRAFT_ARCHIVE_FAILED';
         if(options.archiveFailure)options.archiveFailure(failure);
         throw failure;
       }

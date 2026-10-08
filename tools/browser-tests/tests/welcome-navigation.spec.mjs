@@ -36,6 +36,9 @@ test('failed Build archive keeps source and Undo, shows recovery, and downloads 
   await expect(page.locator('#src')).toHaveValue(edited);
   await expect(page.locator('#undo-builder')).toBeEnabled();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-earlier-drafts'))).toBe(earlier);
+  await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();
+  await expect(page.locator('#welcome-template-error')).toBeHidden();
+  await expect(page.locator('#workbench-draft-recovery [role="alert"]')).toContainText('earlier draft could not be saved');
   await testInfo.attach('failed-archive-visible-alert',{body:await page.screenshot(),contentType:'image/png'});
   const downloadPromise=page.waitForEvent('download');await page.locator('#workbench-draft-recovery-download').click();
   const download=await downloadPromise;

@@ -1,5 +1,29 @@
 import {test,expect,paste,pointerTo} from '../helpers/test.mjs';
 import {source} from '../fixtures/editor-spec.mjs';
+
+for(const canvas of [false,true])test(`Undo and Redo preserve closed and open Inspector state in ${canvas?'Canvas':'Standard'}`,async({page,server})=>{
+  const raw=JSON.parse(source);if(canvas)raw.page.blocks[0].diagram.layouts[0].presentation='explore';
+  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,original);
+  const src=page.locator('#src'),inspect=page.locator('#workspace-window-inspect'),json=page.locator('#workspace-window-json');
+  const node=page.locator('[data-dv-node="a"]');await node.click();
+  const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited camera');await title.press('Enter');
+  const edited=await src.inputValue();expect(edited).not.toBe(original);
+  if(await inspect.isVisible())await inspect.locator('.workspace-window-close').click();await page.locator('#editor-tab-json').click();
+  await expect(inspect).toBeHidden();await expect(json).toBeVisible();await expect(page.locator('#editor-tab-json')).toHaveAttribute('aria-pressed','true');
+
+  await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+  await expect(inspect).toBeHidden();await expect(json).toBeVisible();await expect(page.locator('#builder-history-status')).toBeVisible();await expect(page.locator('#builder-history-status')).toHaveText('Undo complete');
+  await page.locator('#redo-builder').click();await expect(src).toHaveValue(edited);
+  await expect(inspect).toBeHidden();await expect(json).toBeVisible();await expect(page.locator('#builder-history-status')).toHaveText('Redo complete');
+
+  await page.locator('#editor-tab-inspect').click();await node.click();
+  const openTitle=page.locator('#guide').getByLabel('title',{exact:true});await openTitle.fill('Second edit');await openTitle.press('Enter');
+  await page.locator('#undo-builder').click();await expect(inspect).toBeVisible();await expect(page.locator('#guide')).toContainText('undid the last builder action');
+  await expect(page.locator('.dv-sel')).toHaveCount(0);await expect(page.locator('#editor-tab-inspect')).toHaveAttribute('aria-pressed','true');
+  await page.locator('#redo-builder').click();await expect(inspect).toBeVisible();await expect(page.locator('#guide')).toContainText('redid the builder action');
+  await expect(page.locator('.dv-sel')).toHaveCount(0);await expect(page.locator('#editor-tab-inspect')).toHaveAttribute('aria-pressed','true');
+});
+
 test('committed editor preserves exact source, focused edits, hidden paths, pointer Undo and retired file reads',async({page,server})=>{
   await page.addInitScript(()=>{
     const Native=FileReader;

@@ -164,96 +164,63 @@ Positions and any retained native paths are stored in the spec, so opening or
 exporting never reruns Graphviz or WebCola. Moving nodes updates natural routes
 and deforms retained curves through the shared viewer geometry.
 
-## Browserless graph authoring
+## Headless authoring
 
-For a wholly new diagram, agents write unpositioned nodes and semantic edges,
-then use the bundled pure Node graph arranger:
-
-```sh
-node tools/auto-arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
-```
-
-Repeat `--section` for each new diagram in a mixed page, or use `--all` only
-when every diagram is new. This uses the same graph arranger as the Workbench
-button and needs no browser, npm install or downloaded dependency. It arranges
-node and edge topology only. Agents author the 24-column `sectionLayout`
-rectangles for the diagram, panels and step controls separately, then validate
-and submit the whole spec for paired Workbench preview. Existing diagrams retain
-their placement and routes during bounded edits unless the user requests a
-rearrangement.
-
-## Optional measured full arrangement tool
-
-The normal agent workflow above does not require a browser runtime. Developers
-who intentionally want the measured graph, panel and controls arranger can run:
+Write semantic nodes, edges, panels and steps, then run one command:
 
 ```sh
-node tools/arrange-spec.cjs --section 0 draft.spec.json arranged.spec.json
+node tools/compose-page-layout.cjs --section 0 draft.spec.json arranged.spec.json
 ```
 
-The command arranges nodes and measures native panels and step captions before
-packing them into a 24-column Standard layout. No placeholder rectangles are
-needed. Use `rows:[[]]` and unpositioned floats for a new graph. Existing geometry
-is protected; `--rearrange` is only for an explicitly requested rearrangement.
-Repeat `--section` for each new diagram in a mixed page; use `--all` only when all
-are new. A one-diagram input needs no selector. Input/output must be different
-files (including symlinks and hard links). All selected diagrams must succeed
-before one atomic output write; errors preserve both files.
+The command composes the complete page diagram: nodes, panels and step controls
+in a 24-column Standard layout. Write semantic content, `rows:[[]]` and
+unpositioned floats; do not author placeholder panel rectangles. Existing
+geometry is protected; use `--rearrange` only for an explicitly requested
+rearrangement. Repeat `--section` for selected new diagrams in a mixed page.
+Input/output must be distinct files, including symlinks and hard links. All
+selected diagrams must succeed before one atomic output write. Validate and
+state-walk the result, then submit the full spec for paired Workbench preview.
 
-**One-time developer setup** (complete checkout only):
+**No setup, browser, npm install or browser download is needed.** The command
+runs directly with Node in a source checkout or an exported authoring kit.
+The checkout compiles trusted repository sources in memory; the kit includes
+the backend and panel layout descriptors statically. Browser tests are only a
+development check, never part of the authoring command.
 
-```sh
-node tools/arrange/setup.cjs
-```
-
-This explicitly installs locked `playwright-core` and its pinned Chromium
-headless shell for the optional developer tool. Arrangement never downloads
-dependencies or falls back to an ambient browser. Builds package the native
-renderer, styles, icons and fonts. The source-free authoring kit omits this
-browser-dependent tool; it supports pure Node graph arrangement, manual section
-layout and validation with the system Python and Node runtimes and no dependency installation. In a checkout,
-setup also generates both required runtimes from current sources; rerun setup
-after renderer source changes.
-The command reports measurements, not visual QA or a Workbench button click.
-
-`--width` is the host viewport width (800–1920 pixels; default 1200).
+`--width` selects an estimated host viewport (800–1920px, default 1200).
 `--profile default|backstage|confluence` selects the arrangement profile.
-The page skin is used, defaulting to pastel when absent. Every native path/step
-and ambient state is measured; zero-step diagrams get no detached controls.
-The generic solver uses panel-owned sizing contracts, measured content, graph
-bounds and narrative depth. It packs small panels together and places controls
-near relevant evidence. It is a deterministic heuristic, not a learned model.
-Final checks reopen the native default camera without capture-only zoom/fit.
-The arranger saves a measured `diagram.graphFrame` around complete graph content,
-including groups, routes, labels and step decorations. This framing survives
-reopening and exports; unmarked diagrams keep the legacy drawing area. The
-sizing target is 10px graph labels and the hard admission floor is 8px, matching
-the reviewed experiments. Difficult graphs can still fail with a precise error.
-Framing is shared graph geometry like node positions; explicitly rearranging a
-diagram may change graph framing in sibling profiles, whose tile arrays remain
-unchanged.
-Controls may require scrolling in a tall document; diagnostics report their
-position in an isolated section’s initial 1000px viewport, not the absolute
-scroll position of a section within a multi-section document. Native scrollable panel content
-remains scrollable. Hidden clipping or unreadable graph labels fails explicitly.
+The solver retains the reviewed packing and control-placement heuristics; it is
+not a statistically learned model. Panel-owned size/aspect contracts are combined
+with deterministic type-specific content and text-wrap estimates. The real
+path/state folders supply ambient and every path step, including inherited and
+transient state. The longest caption at each candidate width sizes the controls.
+Small indicators can share rows; content-dense tables, logs and reports receive
+larger widths/heights. Native scrollable content retains a bounded viewport,
+reported separately from its estimated full content height.
 
-The initial adapter supports Standard diagrams with at most 24 panels, 100 steps
-and 20 paths (at most 200 rendered path/step states). Selected named views, Explore, explicitly attached controls,
-legacy 12-column sibling profiles, external media assets and content that cannot
-fit the bounded geometry are unsupported with an actionable error. Embed media
-as data URLs, or preserve the existing diagram. Unselected sections and their
-views remain unchanged. Existing explicit 24-column sibling profiles are
-preserved; graph positions remain shared across profiles. The tool changes
-arrangement geometry while preserving semantic content, state and declarations.
-It also refreshes system-owned compatibility metadata through the standard
-stamping helper, retaining prior requirements; a bare diagram is wrapped in a
-page so older hosts can read its required capabilities. Malformed compatibility
-metadata fails before any write.
-Native fitting stops after at most eight passes rather than emitting partial
-or clipped output. This does not add a new Workbench action.
+**Sizes are estimates, not pixel verification or visual QA.** Font metrics,
+responsive chrome, embedded media and complex widgets can differ from these
+conservative models. Diagnostics identify estimated dimensions and scrolling.
+The saved `graphFrame` uses pure node/group/routing bounds with conservative
+label/step-marker allowances. The model targets 10px graph labels with an 8px
+estimated floor; it does not claim a measured native minimum. Controls may
+require scrolling; their reported position is an estimated isolated section,
+not the section's position in a complete document. Review the rendered result
+when a visual review is available.
 
-The pure Node `tools/auto-arrange-spec.cjs` is the agent authoring command for new
-graph topology. The Chromium-backed full arranger remains optional developer tooling.
+Supported scope is Standard diagrams with at most 24 panels, 100 steps and
+20 paths (200 path/step states). Selected named views, Explore, attached controls,
+legacy 12-column sibling profiles and content beyond bounded geometry fail with
+an error. Image sizing reads embedded raster dimensions without fetching URLs.
+Unknown panel types fail; registered extensions use their size contract plus a
+conservative content fallback. Unselected sections remain unchanged. Explicit
+24-column sibling tile arrays remain unchanged; node positions and framing are
+shared graph geometry across profiles. Semantic content/state/declaration order
+are preserved. Only system-owned compatibility metadata is refreshed, retaining
+prior requirements; bare diagrams become a page wrapper. Errors write nothing.
+
+For graph-only tasks, the lighter `tools/auto-arrange-spec.cjs` remains unchanged.
+The complete authoring workflow uses `compose-page-layout.cjs`.
 
 ## Distribution and maintenance
 

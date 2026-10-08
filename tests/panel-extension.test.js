@@ -197,7 +197,7 @@ test('the real build packages the added panel into viewer, editor and the headle
     fs.mkdirSync(path.join(temp,name),{recursive:true});
   for (const name of ['LICENSE','tools/build.py','tools/folder_agent_kit.py','tools/folder-agent.py','tools/widget_doc.py','tools/validate.js','tools/compatibility.js','tools/auto-arrange-spec.cjs','tools/trace2spec.js','tools/source-loader.cjs','tools/canon/library.mjs','tools/canon/manifest.cjs','tools/canon/entity-diagrams.mjs','tools/canon/registry.mjs','tools/canon/drift.mjs','tools/canon/core.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
     fs.copyFileSync(path.join(ROOT,name),path.join(temp,name));
-  fs.copyFileSync(path.join(ROOT,'tools/arrange-spec.cjs'),path.join(temp,'tools/arrange-spec.cjs'));
+  fs.copyFileSync(path.join(ROOT,'tools/compose-page-layout.cjs'),path.join(temp,'tools/compose-page-layout.cjs'));
   fs.mkdirSync(path.join(temp,'tools/arrange'),{recursive:true});
   for(const name of fs.readdirSync(path.join(ROOT,'tools/arrange')).filter(name=>/\.(?:cjs|js|json)$/.test(name)))
     fs.copyFileSync(path.join(ROOT,'tools/arrange',name),path.join(temp,'tools/arrange',name));
@@ -210,7 +210,7 @@ test('the real build packages the added panel into viewer, editor and the headle
   const entry=JSON.parse(fs.readFileSync(path.join(temp,'workbench/diagrams.json'))).diagrams[0];
   assert.equal(entry.spec,undefined);assert.equal(entry.specUrl,'../diagrams/extension/extension.spec.json');
   assert.deepEqual(entry.canon,published.page.canon);
-  for (const name of ['template/flowview.html','workbench/flowspec.html','tools/arrange/generated-native.html']) {
+  for (const name of ['template/flowview.html','workbench/flowspec.html']) {
     const html=fs.readFileSync(path.join(temp,name),'utf8');
     assert.ok(html.includes("PanelRegistry.define('extension-meter'"),name);
     const styles=Array.from(html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g),match=>match[1]).join('\n');

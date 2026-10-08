@@ -4,7 +4,6 @@
   template/flowview.html = standalone entrypoint + skeleton + demo spec
   workbench/flowspec.html = workbench entrypoint + skeleton + curated templates
   tools/canon/generated-runtime.cjs = static DOM-free backend entrypoint
-  tools/arrange/generated-native.html = portable native measurement renderer
   workbench/diagrams.json = metadata index for folders listed in root canon.json
 
 The source loader owns entrypoint expansion, exports and asset inventory.
@@ -16,9 +15,9 @@ import pathlib
 import sys
 import subprocess
 try:
-    from folder_agent_kit import folder_agent_kit, native_payload
+    from folder_agent_kit import folder_agent_kit
 except ModuleNotFoundError:
-    from tools.folder_agent_kit import folder_agent_kit, native_payload
+    from tools.folder_agent_kit import folder_agent_kit
 from functools import lru_cache
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -192,8 +191,6 @@ def main() -> int:
     runtime_path = ROOT / "tools/canon/generated-runtime.cjs"
     runtime_path.parent.mkdir(parents=True, exist_ok=True)
     runtime_path.write_text(runtime)
-    native_path = ROOT / 'tools/arrange/generated-native.html'
-    native_path.write_text(native_payload(ROOT))
     if args.runtime_only:
         print("built tools/canon/generated-runtime.cjs (%d bytes)" % len(runtime))
         return 0

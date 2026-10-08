@@ -49,12 +49,11 @@ test('image source fixture builds without Docker or preexisting generated arrang
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-source-'));
   t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
   prepareImageContext(directory);
-  for(const file of ['tools/arrange-spec.cjs','tools/arrange/build-payload.cjs','tools/arrange/native.js','tools/arrange/setup.cjs','tools/arrange/package.json','tools/arrange/package-lock.json'])
+  for(const file of ['tools/compose-page-layout.cjs','tools/arrange/core.cjs','tools/arrange/estimate.cjs'])
     assert.equal(fs.readFileSync(path.join(directory,file),'utf8'),fs.readFileSync(path.join(ROOT,file),'utf8'));
   for(const file of ['tools/arrange/generated-native.html','tools/arrange/node_modules','tools/canon/generated-runtime.cjs','workbench/flowspec.html'])
     assert.equal(fs.existsSync(path.join(directory,file)),false,file);
   execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
-  assert.match(fs.readFileSync(path.join(directory,'tools/arrange/generated-native.html'),'utf8'),/window\.arrangementNative/);
   assert.match(fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8'),/id="flowview-folder-kit"/);
 });
 

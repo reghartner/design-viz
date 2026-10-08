@@ -59,13 +59,11 @@ class PageBuildTest(unittest.TestCase):
                     shutil.copyfile(source, checkout / folder / source.name)
         runtime = checkout / 'tools/canon/generated-runtime.cjs'
         self.assertFalse(runtime.exists())
-        self.assertFalse((checkout / 'tools/arrange/generated-native.html').exists())
         self.assertFalse((checkout / 'template/flowview.html').exists())
         result = subprocess.run(['python3', str(checkout / 'tools/page_build.py'), str(self.spec),
                                  '--root', str(self.root)], capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(runtime.is_file())
-        self.assertTrue((checkout / 'tools/arrange/generated-native.html').is_file())
         self.assertTrue((checkout / 'template/flowview.html').is_file())
         self.assertTrue((self.root / 'temp.html').is_file())
 

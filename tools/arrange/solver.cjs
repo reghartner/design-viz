@@ -1,6 +1,6 @@
 'use strict';
 const L=require('./model.cjs'),V2=require('./packing.cjs');
-const VERSION='native-composition-1',clone=x=>JSON.parse(JSON.stringify(x)),key=t=>t.panel?'panel:'+t.panel:t.controls||'diagram';
+const VERSION='estimated-composition-1',clone=x=>JSON.parse(JSON.stringify(x)),key=t=>t.panel?'panel:'+t.panel:t.controls||'diagram';
 function unpack(spec){const rows=L.layout(spec).filter(t=>!t.controls&&!t.hidden),end=Math.max(0,...rows.map(t=>t.y+t.h)),empty=[];for(let y=0;y<end;y++)if(!rows.some(t=>t.y<=y&&t.y+t.h>y))empty.push(y);return new Map(rows.map(t=>[key(t),{x:t.x,y:t.y-empty.filter(y=>y<t.y).length,w:t.w,h:t.h}]));}
 function packingScore(map){const a=[...map.values()],end=Math.max(0,...a.map(t=>t.y+t.h)),unused=end*24-a.reduce((n,t)=>n+t.w*t.h,0);let cavity=0;for(let x=0;x<24;x++){let run=0;for(let y=0;y<end;y++){if(a.some(t=>x>=t.x&&x<t.x+t.w&&y>=t.y&&y<t.y+t.h))run=0;else cavity+=++run;}}return {height:end,unused,cavity,score:end*6+unused*.45+cavity*.06};}
 function planControls(source,{geometry,packing=unpack(source),stepDepth={},controlPolicy=null,excludeLayout=null}={}){
@@ -14,7 +14,7 @@ function planControls(source,{geometry,packing=unpack(source),stepDepth={},contr
   if(excludeLayout){const previous=JSON.parse(excludeLayout),distance=L.layout(spec).reduce((sum,t,i)=>sum+['x','y','w','h'].reduce((n,k)=>n+Math.abs(t[k]-previous[i][k]),0),0);if(distance<6)continue;}
   const content=[...b.placed.values()],edge=V2.edgeMetrics(content,b.control),pack=packingScore(placed),depth=stepDepth[b.control.w]||{},bottom=geometry.gridTop+(b.control.y+b.control.h)*40*geometry.scale;
   const relevant=[...b.placed].filter(([id])=>touched.size?touched.has(id):id!=='diagram'),distance=relevant.reduce((n,[,r])=>n+Math.min(Math.abs(b.control.y+b.control.h-r.y),Math.abs(b.control.y-r.y-r.h)),0)/Math.max(1,relevant.length);
-  // Narrative depth is measured in native rendered lines across every step.
+  // Narrative depth is measured in estimated wrapped lines across every step.
   // Deep narrow text is a reading task, not merely another button-sized tile.
   const lines=depth.maxLines||1,readingCost=Math.max(0,lines-3)*6+Math.max(0,(depth.neededHeight||110)-160)*.12;
   const topEdgeBonus=b.kind==='above-group'?edge.belowEdge*(pack.height<24?28:8):0;

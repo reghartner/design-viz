@@ -116,7 +116,10 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn('tools/source-loader.cjs', files)
         self.assertFalse(any(name.startswith('src/') and name.endswith('.js') for name in files))
         self.assertNotIn('tools/arrange-spec.cjs', files)
-        self.assertFalse(any(name.startswith('tools/arrange/') for name in files))
+        self.assertIn('tools/compose-page-layout.cjs', files)
+        self.assertIn('tools/arrange/layouts.json', files)
+        self.assertNotIn('tools/arrange/setup.cjs', files)
+        self.assertNotIn('tools/arrange/generated-native.html', files)
         self.assertFalse(any(name.endswith('package.json') or name.endswith('package-lock.json') for name in files))
         with tempfile.TemporaryDirectory(prefix='flowview-kit-') as directory:
             root = pathlib.Path(directory)
@@ -157,6 +160,21 @@ class BuildTests(unittest.TestCase):
             result = subprocess.run(['node', 'tools/validate.js', '--quiet', str(arranged)],
                                     cwd=root, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+
+
+            fresh = json.loads(draft.read_text())
+            del fresh['sectionLayout']
+            draft.write_text(json.dumps(fresh))
+            composed = root / 'composed.spec.json'
+            result = subprocess.run(['node', 'tools/compose-page-layout.cjs', str(draft), str(composed)],
+                                    cwd=root, capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
+            full = json.loads(composed.read_text())['page']['sections'][0]['diagram']
+            self.assertEqual(full['sectionLayout']['columns'], 24)
+            self.assertEqual(full['panels'], fresh['panels'])
+            self.assertEqual(full['steps'], fresh['steps'])
+            self.assertTrue(any(tile.get('controls') == 'steps' for tile in full['sectionLayout']['default']))
+            self.assertEqual(json.loads(draft.read_text()), fresh)
 
     def test_workbench_has_no_spec_block(self):
         self.assertEqual(len(BLOCK_RE.findall(self.texts["flowspec.html"])), 0)

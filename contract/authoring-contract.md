@@ -2231,12 +2231,12 @@ alternate steps and the reference approval workflow.
 
 ### Saved graph content framing
 
-`diagram.graphFrame: {x,y,w,h}` is optional SVG framing geometry. Values must be finite and bounded to ±100000, with
+`diagram.graphFrame: {x,y,w,h}` is optional SVG framing geometry emitted by
+`tools/compose-page-layout.cjs`. Values must be finite and bounded to ±100000, with
 positive `w` and `h`. Normalization preserves the field. The renderer expands
 these bounds for cards, groups, routed paths, labels and decorations; it never
 moves nodes or routes to fit the frame. Unmarked or malformed values use the
 legacy drawing area (malformed values also produce a validation warning).
 The frame is shared across host profiles, survives native export/reopening and
-requires capability `layout.graph-frame`. Automatic arrangement tooling may
-measure and save it; manual authors can omit it and use the legacy drawing area.
-This is saved geometry, not reader zoom.
+requires capability `layout.graph-frame`. Agents should let the command estimate
+it rather than author coordinates. This is saved geometry, not reader zoom.

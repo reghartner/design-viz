@@ -7,7 +7,7 @@ COPY LICENSE LICENSE
 COPY src/ src/
 COPY tools/*.py tools/*.cjs tools/*.js tools/
 COPY tools/canon/ tools/canon/
-COPY tools/arrange/*.cjs tools/arrange/*.js tools/arrange/*.json tools/arrange/
+COPY tools/arrange/*.cjs tools/arrange/
 COPY contract/ contract/
 COPY cookbook/ cookbook/
 COPY docs/ docs/

@@ -1,8 +1,9 @@
 'use strict';
-// Panel-owned contracts; native measurements override the conservative fallback.
+// Panel-owned contracts; spec-derived estimates override the conservative fallback.
 function contract(panel,registry){
  const layout=registry.get(panel.type)?.layout||{},declared=layout.sectionSizing;
- const result={minWidth:190,preferredWidth:layout.large?480:280,maxWidth:layout.large?1000:600,aspectPolicy:layout.canvasSizing?.mode==='fixed-aspect'?'fixed':'content',bodyAspect:layout.canvasSizing?.aspect,grow:layout.canvasSizing?.mode==='fixed-aspect'?0:1,...declared};
+ const typed={table:{minWidth:360,preferredWidth:520,maxWidth:1000},'data-contract':{minWidth:420,preferredWidth:650,maxWidth:1200},trace:{minWidth:380,preferredWidth:560,maxWidth:1000},log:{minWidth:240,preferredWidth:400,maxWidth:850},waterfall:{minWidth:320,preferredWidth:480,maxWidth:900}}[panel.type]||{};
+ const result={minWidth:190,preferredWidth:layout.large?480:280,maxWidth:layout.large?1000:600,aspectPolicy:layout.canvasSizing?.mode==='fixed-aspect'?'fixed':'content',bodyAspect:layout.canvasSizing?.aspect,grow:layout.canvasSizing?.mode==='fixed-aspect'?0:1,...typed,...declared};
  const rows=Math.max(panel.fields?.length||0,panel.checks?.length||0,panel.tiles?.length||0,panel.initial?.rows?.length||0,panel.initial?.log?.length||0);
  if(result.aspectPolicy==='content'&&rows>4){result.preferredWidth=Math.max(result.preferredWidth,360);result.minWidth=Math.max(result.minWidth,250);result.maxWidth=Math.max(result.maxWidth,result.preferredWidth);}
  return {...result,rows,fallback:!declared};

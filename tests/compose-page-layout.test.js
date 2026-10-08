@@ -1,0 +1,104 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+const A=require('../tools/compose-page-layout.cjs'),M=require('../tools/arrange/model.cjs'),S=require('../tools/arrange/solver.cjs');
+const diagram=()=>({nodes:{a:{title:'A'}},rows:[[]],floats:[{id:'a',side:'below'}],edges:[],steps:[],panels:[]});
+const defaults={width:1200,profile:'default',rearrange:false};
+test('complete CLI selects explicitly and protects authored geometry and profile boundaries',()=>{
+ assert.equal(A.parseArgs(['--section','2','--width','1000','--profile','confluence','in','out']).width,1000);
+ assert.throws(()=>A.parseArgs(['--width','640','in','out']),/800 to 1920/);
+ const d=diagram();A.preflight(d,defaults);d.rows=[['a']];assert.throws(()=>A.preflight(d,defaults),/already has geometry/);A.preflight(d,{...defaults,rearrange:true});
+ d.layouts=[{id:'main'}];assert.throws(()=>A.preflight(d,{...defaults,rearrange:true}),/named views/);delete d.layouts;
+ d.sectionLayout={backstage:[{x:0,y:0,w:12,h:8}]};assert.throws(()=>A.preflight(d,{...defaults,rearrange:true}),/legacy 12-column sibling/);
+ d.sectionLayout.columns=24;A.preflight(d,{...defaults,rearrange:true});
+ assert.throws(()=>A.select({page:{sections:[{diagram:d},{diagram:diagram()}]}},[]),/Multiple diagrams/);
+});
+test('adapter creates rectangles without author input and preserves hidden tile geometry',()=>{
+ const d=diagram();d.panels=[{id:'steps',type:'battery'},{id:'diagram',type:'battery'}];const hidden={panel:'steps',hidden:true,x:19,y:20,w:5,h:4};
+ const seeded=A.seed(d,[hidden]);assert.deepEqual(seeded.sectionLayout.default.find(t=>t.panel==='steps'),hidden);assert.equal(seeded.sectionLayout.columns,24);assert.equal(d.sectionLayout,undefined);
+});
+test('every graph-arranger-owned marker requires explicit rearrangement',async t=>{
+ const fields={diagram:['routing','graphFrame','sectionLayout'],float:['x','y','dx','dy','noSpread'],edge:['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt']};
+ for(const [kind,keys] of Object.entries(fields))for(const key of keys)await t.test(kind+'.'+key,()=>{
+  const d=diagram();d.edges=[{from:'a',to:'a'}];const target=kind==='diagram'?d:kind==='float'?d.floats[0]:d.edges[0];
+  target[key]=key==='routing'?'curves':key==='graphFrame'?{x:0,y:0,w:100,h:100}:key==='sectionLayout'?{}:key==='noSpread'?false:key==='fromPort'||key==='toPort'?{side:'right'}:key==='curvePoints'||key==='curveControls'?[]:0;
+  const before=JSON.stringify(d);assert.throws(()=>A.preflight(d,defaults),/already has geometry/);A.preflight(d,{...defaults,rearrange:true});assert.equal(JSON.stringify(d),before);
+ });
+ const d=diagram();d.edges=[{from:'a',to:'a',id:'request',label:'Read state',color:'blue',dashed:true,delta:true}];d.nodes.a.subtitle='Semantic detail';A.preflight(d,defaults);
+});
+test('composition solver handles panel IDs colliding with graph/controls, determinism and zero steps',()=>{
+ const d=diagram();d.panels=[{id:'diagram',type:'battery'},{id:'steps',type:'battery'}];
+ const source={diagram:A.seed(d,[])},options={registry:{get:()=>({layout:{sectionSizing:{minWidth:180,preferredWidth:210,maxWidth:300,aspectPolicy:'content',grow:1}}})},geometry:{gridWidth:1150,gridTop:100,scale:1,bounds:{x:0,y:0,w:180,h:80}}};
+ const first=S.solve(source,options),second=S.solve(source,options);assert.deepEqual(first,second);M.check(first.spec);assert.equal(M.layout(first.spec).filter(t=>t.controls).length,0);assert.equal(M.layout(first.spec).filter(t=>t.panel).length,2);assert.deepEqual(first.spec.diagram.panels,d.panels);
+});
+test('failures are dependency-free and preserve source and existing destination',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arrange-atomic-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const input=path.join(dir,'in.json'),output=path.join(dir,'out.json');
+ const d=diagram();d.rows=[['a']];fs.writeFileSync(input,JSON.stringify({page:{title:'Test',sections:[{diagram:d}]}}));fs.writeFileSync(output,'retained');const before=fs.readFileSync(input,'utf8');
+ const result=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/compose-page-layout.cjs'),input,output],{encoding:'utf8'});assert.notEqual(result.status,0);assert.match(result.stderr,/already has geometry/);assert.equal(fs.readFileSync(output,'utf8'),'retained');assert.equal(fs.readFileSync(input,'utf8'),before);
+ const same=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/compose-page-layout.cjs'),input,input],{encoding:'utf8'});assert.notEqual(same.status,0);assert.match(same.stderr,/different|distinct/i);
+ for(const marker of ['edge','float']){
+  const routed=diagram();if(marker==='edge')routed.edges=[{from:'a',to:'a',fromPort:{side:'right'},curveControls:[{t:0,dx:0,dy:0},{t:1,dx:0,dy:0}]}];else routed.floats[0].dx=0;
+  const bytes=JSON.stringify({page:{title:'Preserved',flowview:{authoredWith:'0.1.0',minVersion:'0.1.0',features:[]},sections:[{diagram:routed}]}});fs.writeFileSync(input,bytes);
+  const rejected=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/compose-page-layout.cjs'),input,output],{encoding:'utf8'});assert.notEqual(rejected.status,0);assert.match(rejected.stderr,/already has geometry/);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(fs.readFileSync(output,'utf8'),'retained');
+ }
+});
+const E=require('../tools/arrange/estimate.cjs');
+test('estimates account for wrapping, distinct content models and inherited path state',()=>{
+ assert.ok(E.lines('wide narrative '.repeat(20),150)>E.lines('wide narrative '.repeat(20),600));
+ const p={id:'s',type:'state',states:['ready','done'],title:'State'},small=E.panelSize(p,{state:'ready'},250),dense=E.panelSize({...p,states:Array.from({length:18},(_,i)=>'Detailed state '+i)},{state:'An unusually verbose operational state requiring attention'},250);assert.ok(dense.intrinsicHeight>small.intrinsicHeight*2);
+ const table={id:'table',type:'table',columns:[{id:'a'},{id:'b'}]};const row={id:'a',cells:{a:'Long code block\nconst first = require("example");\nreturn importantData;',b:'context '.repeat(25)}};
+ assert.ok(E.panelSize(table,{rows:[row]},300).intrinsicHeight>E.panelSize(table,{rows:[row]},800).intrinsicHeight);
+ const d=diagram();d.panels=[{id:'log',type:'log',initial:{log:[{text:'Initial'}]}}];d.steps=[{id:'a',text:'Start',panels:{log:{log:[{text:'First'}]}}},{id:'b',text:'Continue',panels:{log:{log:[{text:'Second'}]}}},{id:'c',text:'Alternative',panels:{log:{log:[{text:'Other'}]}}}];d.paths=[{id:'normal',steps:['a','b']},{id:'other',steps:['a','c']}];
+ const all=E.states(d);assert.equal(all.length,5);assert.deepEqual(all[2].panels.log.log.map(x=>x.text),['Initial','First','Second']);assert.deepEqual(all[4].panels.log.log.map(x=>x.text),['Initial','First','Other']);
+ d.steps[1].text='Detailed instruction and evidence. '.repeat(50);const input=E.inputs({diagram:A.seed(d,[])},1000);assert.ok(input.stepDepth[12].neededHeight>input.stepDepth[24].neededHeight);assert.ok(input.stepDepth[24].maxLines>10);
+});
+test('complete composition is deterministic and preserves profile/state semantics',async()=>{
+ const d=diagram();d.nodes.b={title:'B'};d.floats.push({id:'b',side:'below'});d.edges=[{from:'a',to:'b',label:'Request'}];d.panels=[{id:'state',type:'state',states:['ready','done'],initial:{state:'ready'}}];d.steps=[{id:'a',text:'Review the state.',panels:{state:{state:'done'}}}];d.sectionLayout={columns:24,backstage:[{x:0,y:0,w:24,h:10}]};
+ const raw={page:{title:'Pure composition',flowview:{authoredWith:'0.1.0',minVersion:'0.1.0',features:['flow.failures']},sections:[{diagram:d},{heading:'Untouched',text:'Keep this exact.'}]}},options={...defaults,width:800,sections:[0],profile:'confluence',rearrange:true},before=JSON.stringify(raw);
+ const a=await A.arrange(raw,options),b=await A.arrange(raw,options);assert.deepEqual(a,b);assert.equal(JSON.stringify(raw),before);const output=a.raw.page.sections[0].diagram;assert.deepEqual(output.steps,d.steps);assert.deepEqual(output.panels,d.panels);assert.deepEqual(output.sectionLayout.backstage,d.sectionLayout.backstage);assert.deepEqual(a.raw.page.sections[1],raw.page.sections[1]);assert.ok(a.raw.page.flowview.features.includes('flow.failures'));M.check({diagram:{...output,sectionLayout:{columns:24,default:output.sectionLayout.confluence}}});assert.match(a.diagnostics[0].measurement,/estimates/);
+});
+test('direct CLI works in a clean checkout and source-free kit with subprocesses, network and browser packages forbidden',t=>{
+ const root=path.resolve(__dirname,'..'),base=fs.mkdtempSync(path.join(os.tmpdir(),'compose-portable-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
+ const checkout=path.join(base,'checkout');fs.mkdirSync(checkout);fs.cpSync(path.join(root,'src'),path.join(checkout,'src'),{recursive:true});fs.mkdirSync(path.join(checkout,'tools/canon'),{recursive:true});
+ for(const file of ['compose-page-layout.cjs','auto-arrange-spec.cjs','source-loader.cjs','canon/core.cjs'])fs.copyFileSync(path.join(root,'tools',file),path.join(checkout,'tools',file));fs.cpSync(path.join(root,'tools/arrange'),path.join(checkout,'tools/arrange'),{recursive:true});
+ assert.equal(fs.existsSync(path.join(checkout,'tools/canon/generated-runtime.cjs')),false);
+ const kit=path.join(base,'kit');fs.mkdirSync(kit);
+ const built=spawnSync('python3',['-c',"import sys,json,base64,gzip,pathlib;sys.path.insert(0,'tools');from folder_agent_kit import folder_agent_kit;from build import canon_runtime;files=json.loads(gzip.decompress(base64.b64decode(json.loads(folder_agent_kit('.',canon_runtime()))['gzip'])))['files'];root=pathlib.Path(sys.argv[1]);[(root.joinpath(k).parent.mkdir(parents=True,exist_ok=True),root.joinpath(k).write_text(v)) for k,v in files.items()]",kit],{cwd:root,encoding:'utf8'});assert.equal(built.status,0,built.stderr);
+ const guard=path.join(base,'guard.cjs');fs.writeFileSync(guard,"const M=require('node:module'),load=M._load;M._load=function(id,...args){if(/playwright|puppeteer|child_process/.test(id))throw Error('Forbidden runtime dependency '+id);return load.call(this,id,...args)};global.fetch=()=>{throw Error('Forbidden network')};");
+ for(const directory of [checkout,kit]){
+  assert.equal(fs.existsSync(path.join(directory,'tools/arrange/node_modules')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/setup.cjs')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/generated-native.html')),false);
+  const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}}];raw.steps=[{text:'Review the charge.'}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
+  const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);
+ }
+ assert.equal(fs.existsSync(path.join(kit,'src/source-bundles.json')),false);assert.equal(fs.existsSync(path.join(checkout,'tools/canon/generated-runtime.cjs')),false);
+});
+
+test('type models reserve native structure and grow for detailed report content',()=>{
+ const tiny=E.panelSize({id:'s',type:'state',states:['ready']},{state:'ready'},340);
+ const title=E.panelSize({id:'s',type:'state',states:['ready'],title:'A long wrapping operational status title '.repeat(4)},{state:'ready'},180);
+ assert.ok(title.chrome>tiny.chrome,'wrapped title must reserve more than one-line chrome');
+ const signal=E.panelSize({id:'links',type:'signal',links:[{id:'uplink',type:'wifi'}]}, {},340),many=E.panelSize({id:'links',type:'signal',links:[{id:'uplink'},{id:'backup'},{id:'mesh'}]}, {},340);
+ assert.ok(signal.minimumWidth>=320,'native link row has several minimum-width columns');assert.ok(many.intrinsicHeight>signal.intrinsicHeight);
+ const replica=E.panelSize({id:'r',type:'replicas',replicas:[{id:'a'},{id:'b'}]},{replicas:{a:{series:['history '.repeat(20)]}}},300);
+ assert.ok(replica.intrinsicHeight>tiny.intrinsicHeight*3,'replica detail includes per-replica status and history');
+ const cost={id:'c',type:'cost',items:[{id:'storage',label:'Storage',value:15}]},sparse=E.panelSize(cost,{},500),dense=E.panelSize({...cost,items:Array.from({length:12},(_,i)=>({id:'item'+i,label:'Detailed infrastructure cost '+i})),assumptions:'Operational assumptions '.repeat(30)},{},500);
+ assert.ok(sparse.intrinsicHeight>tiny.intrinsicHeight*3,'cost report has a substantial fixed body');assert.ok(dense.intrinsicHeight>sparse.intrinsicHeight*1.5,'authored report detail grows the estimate');
+});
+test('late unsupported estimates preserve both input and an existing output atomically',t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'compose-estimate-failure-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const d=diagram();d.steps=[{text:'Verbose narrative. '.repeat(5000)}];const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),bytes=JSON.stringify(d);fs.writeFileSync(input,bytes);fs.writeFileSync(output,'retained');
+ const result=spawnSync(process.execPath,[path.resolve(__dirname,'../tools/compose-page-layout.cjs'),'--width','800',input,output],{encoding:'utf8'});
+ assert.notEqual(result.status,0);assert.match(result.stderr,/Unsupported: no bounded/);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(fs.readFileSync(output,'utf8'),'retained');
+});
+
+test('URL-like visible content is sized as text while image assets stay outside text estimates',()=>{
+ const panel={id:'table',type:'table',columns:[{id:'value',label:'Value'}]};
+ const short=E.panelSize(panel,{rows:[{id:'row',cells:{value:'Short'}}]},650);
+ for(const prefix of ['https://example.com/','http://example.com/','data:text/plain,']){
+  const value=prefix+'very-long-visible-path/'.repeat(80);
+  assert.equal(E.text(value),value);assert.ok(E.lines(value,300)>20);
+  const sized=E.panelSize(panel,{rows:[{id:'row',cells:{value}}]},650);assert.ok(sized.intrinsicHeight>short.intrinsicHeight*2);assert.ok(sized.fullHeight>short.fullHeight*2);
+ }
+ const src='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4m8AAAAASUVORK5CYII=';
+ const image=E.panelSize({id:'image',type:'image',src,caption:'Reference'}, {},300);
+ assert.ok(image.intrinsicHeight>200);assert.equal(image.text.includes(src),false,'encoded pixels are not visible prose');
+});

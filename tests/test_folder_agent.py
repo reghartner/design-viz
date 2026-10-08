@@ -118,11 +118,18 @@ class FolderAgentTests(unittest.TestCase):
         helper.prepare(self.folder)
         note = self.folder/'authoring/operator-notes.md'
         note.write_text('Keep my notes')
-        self.kit({skill: 'Restored full-document skill'})
+        current = {name: (ROOT/name).read_text() for name in [
+            'tools/compose-page-layout.cjs', 'tools/arrange/core.cjs',
+            'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs',
+            'tools/arrange/contracts.cjs', 'tools/arrange/model.cjs',
+            'tools/arrange/packing.cjs', 'tools/arrange/estimate.cjs']}
+        self.kit({skill: 'Restored full-document skill', **current})
         helper.prepare(self.folder)
         self.assertEqual((self.folder/'authoring'/skill).read_text(), 'Restored full-document skill')
         self.assertTrue(all(not (self.folder/'authoring'/name).exists() for name in retired))
         self.assertEqual(note.read_text(), 'Keep my notes')
+        for name, content in current.items():
+            self.assertEqual((self.folder/'authoring'/name).read_text(), content, name)
         # Cleanup cannot follow a retired file or parent symlink outside the kit.
         link = self.folder/'authoring/docs/agent-operations.md'
         link.symlink_to(note)
@@ -141,7 +148,8 @@ class FolderAgentTests(unittest.TestCase):
         (self.folder/'authoring-kit.json').write_text(kit_builder.folder_agent_kit(ROOT, runtime))
         helper.prepare(self.folder)
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'tools/widget_doc.py',
-                     'tools/auto-arrange-spec.cjs', 'tools/validate.js',
+                     'tools/auto-arrange-spec.cjs', 'tools/compose-page-layout.cjs',
+                     'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
                      '.claude/skills/hld-to-page/scripts/pilot_capture.py']:
             self.assertEqual((self.folder/'authoring'/name).read_bytes(), (ROOT/name).read_bytes(), name)
         for name in ['tools/arrange-spec.cjs', 'tools/arrange/setup.cjs',

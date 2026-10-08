@@ -18,6 +18,12 @@ async function canvasCamera(dialog){
       y:(el.scrollTop+el.clientHeight/2-my)/(width*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width)};
   });
 }
+async function directBuildUrl(page){
+  const edit=page.getByRole('link',{name:'Edit in Workbench',exact:true});
+  const url=new URL(await edit.getAttribute('href')),address=new URLSearchParams(url.hash.slice(1));
+  const handoff=JSON.parse(address.get('fv'));handoff.action='build';address.set('fv',JSON.stringify(handoff));url.hash=address.toString();
+  return url;
+}
 
 test('expanded canvas owns the full browser and returns to the same curated viewer',async({page,server},info)=>{
   await page.setViewportSize({width:1600,height:1000});await page.addInitScript(trackResources);
@@ -27,6 +33,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   const alpha=page.locator('#alpha');
   await expect(alpha.locator('.preadout')).toHaveText('Success');
   const original=await alpha.locator('[data-flowview-native]').elementHandle();
+  await expect(alpha.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
   await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   await expect(dialog).toBeVisible();
@@ -35,6 +42,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
   expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
+  await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
   expect(desktop.actions.y).toBe(desktop.nav.y);expect(overlaps(desktop.actions,desktop.nav)).toBe(false);
   expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
   const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
@@ -76,18 +84,21 @@ test('expanded canvas owns the full browser and returns to the same curated view
   expect(new URL(page.url()).hash).toBe('#company-route');
 });
 
-test('Build with Claude carries the actual view and step into a checked workbench draft',async({page,server})=>{
+test('Edit carries the actual view and step while a direct Build opens a checked workbench draft',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
   await page.getByRole('button',{name:'Service flow',exact:true}).click();
   const viewer=page.getByRole('region',{name:/Flowview:/});
   await viewer.getByRole('button',{name:'Next step',exact:true}).click();
-  const url=new URL(await page.getByRole('link',{name:'Build with Claude',exact:true}).getAttribute('href'));
-  const address=new URLSearchParams(url.hash.slice(1));
+  const edit=page.getByRole('link',{name:'Edit in Workbench',exact:true});
+  await expect(edit).toHaveAttribute('target','_blank');await expect(edit).toHaveAttribute('rel','noopener noreferrer');
+  await expect(page.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
+  const editUrl=new URL(await edit.getAttribute('href')),address=new URLSearchParams(editUrl.hash.slice(1));
   expect(address.get('v')).toBe('service-flow');
   expect(address.get('s')).not.toBe('quiet');
-  expect(JSON.parse(address.get('fv')).revision).toMatch(/^[a-f0-9]{64}$/);
+  expect(JSON.parse(address.get('fv'))).toMatchObject({revision:expect.stringMatching(/^[a-f0-9]{64}$/),action:'edit'});
+  const url=await directBuildUrl(page);
   const source=await page.evaluate(()=>JSON.stringify(__backstage.spec));
-  const popupPromise=page.waitForEvent('popup');await page.getByRole('link',{name:'Build with Claude',exact:true}).click();const editor=await popupPromise;
+  const editor=await page.context().newPage();await editor.goto(url.href);
   await expect(editor.locator('#workbench-workspace')).toBeVisible();
   await expect(editor.locator('#editor-agent')).toBeVisible();
   await expect(editor.locator('#editor-agent [role=tab]')).toHaveCount(0);
@@ -99,17 +110,17 @@ test('Build with Claude carries the actual view and step into a checked workbenc
   await expect(editor.locator('#docview .stepid')).toHaveText(address.get('s'));
   expect(await editor.evaluate(()=>new URLSearchParams(location.hash.slice(1)).has('fv'))).toBe(false);
   expect(await page.evaluate(()=>__backstage.requests.length)).toBe(1);
+  await editor.close();
 });
 
 test('a changed published story fails the handoff without replacing the existing draft',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
-  const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
-  const url=await link.getAttribute('href'),before='saved draft sentinel';
+  const url=await directBuildUrl(page),before='saved draft sentinel';
   await page.evaluate(value=>localStorage.setItem('dv-workbench-draft',value),before);
   await page.route('**/backstage-story.spec.json',async route=>{
     const response=await route.fetch(),data=await response.json();data.page.title='Changed publication';await route.fulfill({json:data});
   });
-  await page.goto(url);
+  await page.goto(url.href);
   await expect(page.locator('#canon-reader-error')).toContainText('revision mismatch');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();
   expect(await page.evaluate(()=>localStorage.getItem('dv-workbench-draft'))).toBe(before);
@@ -117,8 +128,7 @@ test('a changed published story fails the handoff without replacing the existing
 
 test('the canon adapter opens Build directly and reload restores the draft without another fetch',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
-  const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
-  const url=new URL(await link.getAttribute('href')),spec=await page.evaluate(()=>__backstage.spec);
+  const url=await directBuildUrl(page),spec=await page.evaluate(()=>__backstage.spec);
   url.search='?canon=backstage-story';
   const reads=[];
   await page.route('**/api/canon/context?*',route=>{reads.push(route.request().url());return route.fulfill({json:{spec,catalog:{version:1,services:[]}}});});
@@ -136,10 +146,10 @@ test('the canon adapter opens Build directly and reload restores the draft witho
 
 test('direct Build preserves an earlier draft through reload and makes it recoverable from Home',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
-  const url=await page.getByRole('link',{name:'Build with Claude',exact:true}).getAttribute('href');
+  const url=await directBuildUrl(page);
   const before=' {"page":{"title":"Earlier customer story","blocks":[]}}\n';
   await page.evaluate(text=>localStorage.setItem('dv-workbench-draft',JSON.stringify({text,at:1})),before);
-  await page.goto(url);await expect(page.locator('#folder-agent-guide')).toBeVisible();
+  await page.goto(url.href);await expect(page.locator('#folder-agent-guide')).toBeVisible();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-earlier-drafts'))[0].text)).toBe(before);
   await page.reload();await page.locator('#workspace-home').click();
   await page.locator('#welcome-earlier-drafts summary').click();
@@ -149,8 +159,7 @@ test('direct Build preserves an earlier draft through reload and makes it recove
 
 test('an unavailable Build target fails visibly before replacing the saved draft',async({page,server})=>{
   await page.goto(server.origin+'/backstage/index.html');
-  const link=page.getByRole('link',{name:'Build with Claude',exact:true});await expect(link).toBeVisible();
-  const url=new URL(await link.getAttribute('href')),hash=new URLSearchParams(url.hash.slice(1));
+  const url=await directBuildUrl(page),hash=new URLSearchParams(url.hash.slice(1));
   hash.set('d','missing-section');url.hash=hash.toString();
   const before=JSON.stringify({text:'unfinished JSON {',at:1});
   await page.evaluate(value=>localStorage.setItem('dv-workbench-draft',value),before);

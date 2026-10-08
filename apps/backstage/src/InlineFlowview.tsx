@@ -71,7 +71,6 @@ export function InlineFlowview({
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Expand canvas'}
           </button>
-          <EvidenceLink prominent url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'build')}>Build with Claude</EvidenceLink>
           <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in Workbench</EvidenceLink>
           <details style={{position:'relative'}}><summary style={{cursor:'pointer'}}>More</summary><div style={{position:'absolute',right:0,top:'100%',zIndex:120,minWidth:190,display:'grid',gap:12,padding:14,border:'1px solid #dce1f1',borderRadius:8,background:'#fff',boxShadow:'0 4px 18px #14244212'}}>
             <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>

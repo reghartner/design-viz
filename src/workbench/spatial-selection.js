@@ -59,12 +59,13 @@ function createBuilderSpatialSelection(opts){
     var geometry=rects(targets,shell);if(geometry.length!==targets.length || geometry.some(function(r){return !r || r.w<=0 || r.h<=0;}))return null;
     return {targets:targets,shell:shell,s:s,id:layoutId(shell),geometry:geometry};
   }
+  function fitReason(c){return !c?'Select visible nodes, canvas panels or canvas step controls to fit.':c.shell.classList.contains('viewport-explore')?null:'Fit selection is available only in Explore.';}
   function fitSelection(){
-    var c=context();if(!active() || !c)return;
+    var c=context();if(!active() || fitReason(c))return;
     var rs=c.geometry,x=Math.min.apply(null,rs.map(function(r){return r.x;})),y=Math.min.apply(null,rs.map(function(r){return r.y;}));
     view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
-  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null;fitButton.disabled=!c;fitButton.title=c?'Frame selected canvas objects':'Select visible nodes, canvas panels or canvas step controls to fit.';}}
+  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null,reason=fitReason(c);fitButton.disabled=!!reason;fitButton.title=reason || 'Frame selected canvas objects';}}
   function distribute(direction){var c=context();if(!active() || !c)return;opts.apply(planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry),null,c.s);}
   function actions(host,lifetime){
     var c=context();sync();if(!c)return;
@@ -73,7 +74,7 @@ function createBuilderSpatialSelection(opts){
     var entries=[];
     ['horizontal','vertical'].forEach(function(direction){var button=doc.createElement('button');button.type='button';button.className='bbtn';button.textContent='Distribute '+(direction==='horizontal'?'horizontally':'vertically');box.appendChild(button);entries.push({button:button,direction:direction});lifetime.listen(button,'click',function(){distribute(direction);});});
     var note=doc.createElement('p');note.className='fnote';box.appendChild(note);
-    function update(){var current=context(),reasons=[];fit.disabled=!current;entries.forEach(function(entry){var reason=current?planDistributeSpatial(current.s.text,current.s.raw,current.targets,current.id,entry.direction,current.geometry).error:'Render and select the objects again.';entry.button.disabled=!!reason;entry.button.title=reason || 'Keep outer bounds and equalize visual gaps.';if(reason && reasons.indexOf(reason)<0)reasons.push(reason);});note.textContent='Tab to an object; Enter selects, Shift+Enter adds or removes. Arrows move 10 graph units; Shift+arrows move 50. Release arrows for one Undo action. '+reasons.join(' ');}
+    function update(){var current=context(),reasons=[],fitError=fitReason(current);fit.disabled=!!fitError;fit.title=fitError || 'Frame selected canvas objects';if(fitError)reasons.push(fitError);entries.forEach(function(entry){var reason=current?planDistributeSpatial(current.s.text,current.s.raw,current.targets,current.id,entry.direction,current.geometry).error:'Render and select the objects again.';entry.button.disabled=!!reason;entry.button.title=reason || 'Keep outer bounds and equalize visual gaps.';if(reason && reasons.indexOf(reason)<0)reasons.push(reason);});note.textContent='Tab to an object; Enter selects, Shift+Enter adds or removes. Arrows move 10 graph units; Shift+arrows move 50. Release arrows for one Undo action. '+reasons.join(' ');}
     update();lifetime.listen(opts.src,'input',update);
   }
   function announce(message,shell){if(status)status.remove();status=doc.createElement('div');status.className='dv-spatial-status';status.setAttribute('role','status');status.textContent=message;shell.appendChild(status);}
@@ -128,7 +129,7 @@ function createBuilderSpatialSelection(opts){
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},spatial?null:'Duplicate supports nodes and canvas panels.');
     ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex),null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
-    item('Fit selection',fitSelection,context()?null:'Select visible nodes, canvas panels or canvas step controls to fit.');
+    item('Fit selection',fitSelection,fitReason(context()));
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;
     menu.style.left=Math.max(8,bounds.left,Math.min(x,Math.min(win.innerWidth,bounds.right)-r.width-8))+'px';menu.style.top=Math.max(8,bounds.top,Math.min(y,Math.min(win.innerHeight,bounds.bottom)-r.height-8))+'px';
     var items=Array.from(menu.querySelectorAll('button'));items[0].tabIndex=0;items[0].focus({preventScroll:true});

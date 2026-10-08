@@ -102,7 +102,7 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   await page.goto(server.origin+'/workbench.html');await paste(page,source);await arrangeChapter(page);
   await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
   const tile=page.locator('[data-layout-key="panel:home"]'),handle=tile.locator('.section-tile-move');
-  await handle.scrollIntoViewIfNeeded();await page.locator('.workmain').evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle(page);
+  await handle.scrollIntoViewIfNeeded();await page.locator('.workmain').evaluate(el=>{el.scrollTop=el.scrollHeight-el.clientHeight-120;});await settle(page);
   const sample=async(label,pointer)=>{
     const value=await page.evaluate(({label,pointer})=>{
       const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};

@@ -193,19 +193,34 @@ The solver retains the reviewed packing and control-placement heuristics; it is
 not a statistically learned model. Panel-owned size/aspect contracts are combined
 with deterministic type-specific content and text-wrap estimates. The real
 path/state folders supply ambient and every path step, including inherited and
-transient state. The longest caption at each candidate width sizes the controls.
+transient state. Controls reserve the longest wrapped caption at each candidate width, transport
+and chip rows, and the native shared-path track geometry. Track sizing uses the
+same pure path graph and row packer as the viewer.
 Small indicators can share rows; content-dense tables, logs and reports receive
 larger widths/heights. Native scrollable content retains a bounded viewport,
-reported separately from its estimated full content height.
+reported separately from its estimated full content height. Camera estimates
+include the video aspect ratio and separate audio direction, status, caption,
+source and reason rows. Phone notification cards keep their native three-card
+and two-line limits; allocating a larger tile cannot reveal clamped text or
+enlarge the fixed 178px frame. Device-app portraits fit both body dimensions up
+to a native 330px cap. Diagnostics expose these internal limits separately from
+tile fit; they are not readability guarantees.
 
 **Sizes are estimates, not pixel verification or visual QA.** Font metrics,
 responsive chrome, embedded media and complex widgets can differ from these
 conservative models. Diagnostics identify estimated dimensions and scrolling.
 The saved `graphFrame` uses pure node/group/routing bounds with conservative
-label/step-marker allowances. The model targets 10px graph labels with an 8px
+label/step-marker allowances. Graph height follows the native width-scaled SVG aspect ratio at each candidate
+width, with a conservative legend/chrome allowance. An over-height width
+candidate is skipped without discarding narrower candidates. The model targets
+10px graph labels with an 8px
 estimated floor; it does not claim a measured native minimum. Controls may
 require scrolling; their reported position is an estimated isolated section,
-not the section's position in a complete document. Review the rendered result
+not the section's position in a complete document. `--width` models an isolated
+host with 80px total horizontal inset and the native 1000px minimum design grid;
+the enclosing document's skin width cap, embed overrides, nested padding and
+later host resizing can change the rendered width. It does not apply a global
+document cap, because standalone and embedded hosts can override one. Review the rendered result
 when a visual review is available.
 
 ### Repairing a rendered layout

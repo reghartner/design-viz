@@ -26,10 +26,39 @@ function rasterAspect(src){
  else if(b.length>=25&&b.toString('ascii',12,16)==='VP8L'){const bits=b.readUInt32LE(21);w=1+(bits&16383);h=1+((bits>>>14)&16383);}
  if(!(w>0&&h>0&&w<=16384&&h<=16384))throw Error('Unsupported: cannot estimate embedded raster dimensions');return w/h;
 }
+// screenAudioHTML / FlowAudio.render stack: direction, bordered header,
+// wrapping channel badges, caption/source, optional detection and reason.
+function screenAudioHeight(s,width){
+ const a=s.audio;
+ if(!a||!Object.keys(a).length||s.siren==='on'||a.output==='siren'||['smoke-alarm','co-alarm'].includes(a.detection))return 0;
+ const content=Math.max(50,width-26),caption=Math.max(40,content-22);
+ return 7+24+22+22+48+(a.text?24+lines(a.text,caption,11)*16+(a.source?lines(a.source,caption,9)*14+2:0):a.source?6+lines(a.source,content,10)*14:0)+
+   (a.detection&&a.detection!=='none'?24:0)+(a.reason?6+lines(a.reason,content,10)*14:0);
+}
+function controlDepth(d,all,width){
+ const paths=R.diagramPathList(d),available=Math.max(1,width-30),delta=(d.steps||[]).some(s=>s.delta),chipPitch=delta?38:29;
+ let tracks=0,captionWidth=available,overhead;
+ if(paths.length>1){
+  const graph=R.pathTimelineGraph(paths);
+  if(graph.hasShared){const rows=R.pathTimelineRows(paths,graph);tracks=44+32*Math.max(...rows.lanes.values(),...rows.shared.values());}
+  else tracks=paths.reduce((n,p)=>n+Math.max(32,lines(p.label,190,11)*16+12)+8,0);
+  // Transport, separate path track, gaps, frame and horizontal-scroll gutter.
+  overhead=36+20+tracks+16+(delta?14:4)+30;
+ }else{
+  const chips=Math.max(1,paths[0]?.indices.length||0)*chipPitch;
+  const remaining=available-290-Math.min(chips,available)-20;
+  if(remaining>=200){captionWidth=remaining;overhead=50;}
+  else {tracks=Math.ceil(chips/available)*36;overhead=30+36+10+tracks+10;}
+ }
+ // Include the number, optional lane/id/source and shared-step suffix around
+ // narrative text. Monospace controls wrap differently from body prose.
+ const maxLines=Math.max(1,...all.filter(s=>s.step).map(s=>lines([s.step.text,s.step.lane,s.step.id,s.step.source,paths.length>1?'Shared step in other paths':''].filter(Boolean).join(' '),Math.max(1,captionWidth-40),14)));
+ return {neededHeight:overhead+maxLines*22,maxLines,trackHeight:tracks,captionWidth,unsupported:available<200};
+}
 function panelSize(p,s,width,layout={}){
  const inner=Math.max(70,width-32),row=(v,w=inner)=>Math.max(1,lines(v,w,13))*19+12,rows=list=>(Array.isArray(list)?list:[]).reduce((n,v)=>n+row(v),0);
- const note=lines(s.note||p.note,inner)*20,foot=note+(s.audio?40+lines(s.audio.caption||s.audio.text,inner)*19:0);
- let h,extra=foot,model=p.type,scroll=false;
+ const note=lines(s.note||p.note,inner)*20;let foot=note+(s.audio?40+lines(s.audio.caption||s.audio.text,inner)*19:0);
+ let h,extra=foot,model=p.type,scroll=false,nativeLimits=null,bodyWidthCap;
  switch(p.type){
  case 'state':h=Math.max(28,lines(s.state||'—',inner,20)*26)+Math.max(1,Math.ceil((p.states||[]).reduce((n,v)=>n+text(v).length*7+22,0)/inner))*28;break;
  case 'leds':h=rows(p.leds||p.items||p.labels||Object.keys(s).filter(k=>k!=='note'));break;
@@ -43,7 +72,13 @@ function panelSize(p,s,width,layout={}){
   const columns=s.columns||p.columns||[],items=s.rows||s.fields||p.fields||[],cellWidth=Math.max(55,(inner-65)/Math.max(1,columns.length));
   h=55+items.slice(0,p.type==='table'?12:64).reduce((n,r)=>n+Math.max(1,...Object.values(r.cells||r).map(v=>lines(v,cellWidth,13)))*19+22,0);scroll=true;break;}
  case 'checks':h=42+(p.checks||[]).reduce((n,c)=>n+row(c.label||c.id)+lines(s.results?.[c.id]?.detail||c.detail,inner)*20,0);break;
- case 'phone':h=Math.max(252,85+rows(s.notifications||s.stack||[])+lines(s.title,150,16)*22+lines(s.text||s.body,150,12)*18+(s.call?150:0));break;
+ case 'phone':{
+  foot=0;extra=0;
+  const cards=(s.notifications||[]).slice(0,3),audio=s.audio?180+Math.min(2,lines(s.audio.text,130,8))*12:0;
+  h=Math.max(270,80+cards.length*64+audio)+(s.notifications?.length>3?14:0);
+  nativeLimits={kind:'fixed-width',contentWidth:178,notificationLimit:3,notificationTextLines:2,nominalBodyFontPx:8,warning:'Native notification titles and bodies are clamped; larger tiles do not reveal or enlarge them.'};break;}
+ case 'deviceapp':h=80;bodyWidthCap=330;nativeLimits={kind:'capped-aspect',maxContentWidth:330,warning:'Native phone fits both body dimensions up to 330px; internal scrolling, truncation and compact text remain native limits.'};break;
+ case 'screen':h=80;extra=screenAudioHeight(s,inner);break;
  case 'appscreens':{const selected=(p.screens||[]).find(x=>x.id===s.screen),first=(p.screens||[]).find(x=>x.width&&x.height);const aspect=first?first.width/first.height:p.frame==='none'?1.6:9/19.5;h=inner/aspect+rows(selected?[selected.label,selected.caption]:[]);break;}
  case 'image':h=p.src?inner/rasterAspect(p.src):160;extra+=lines(p.caption,inner)*20+(p.link?28:0);break;
  case 'security':h=520+lines(s.operator,inner)*20;break;
@@ -57,16 +92,16 @@ function panelSize(p,s,width,layout={}){
  case 'tiles':h=Math.ceil((p.tiles||p.items||[]).length/Math.max(1,Math.floor(inner/130)))*85;break;
  case 'xray':h=70+rows(p.layers||s.layers);break;
  case 'chime':h=190+lines(s.caption||s.text,inner)*20;break;
- case 'deviceapp':case 'homemap':case 'screen':case 'orbit':case 'radar':case 'zoneframe':h=80;break; // body aspect owned by the panel contract
+ case 'homemap':case 'orbit':case 'radar':case 'zoneframe':h=80;break; // body aspect owned by the panel contract
  default:h=Math.max(80,rows(p.fields||p.items||[])+row(s));model='conservative fallback';
  }
- if(['homemap','screen','deviceapp'].includes(p.type))extra+=lines(s.caption||s.statusText,inner)*20;
+ if(['homemap','deviceapp'].includes(p.type))extra+=lines(s.caption||s.statusText,inner)*20;
  h=Math.max(48,h)+foot;
  // These native widgets already scroll bounded details. Do not pretend that
  // every row is visible: preserve a useful viewport and report the full estimate.
  const fullHeight=h;if(scroll)h=Math.min(h,600);
  const titleLines=lines(p.title,inner,13),chrome=64+Math.max(0,titleLines-1)*18;
- return {intrinsicHeight:Math.ceil(h*1.08+8),chrome,paddingX:32,extraHeight:extra,nativeContent:layout.sectionSizing?.aspectPolicy==='intrinsic'?{height:h,width:inner}:null,text:text([p.title,s,p.fields,p.checks,p.columns]),minimumWidth:p.type==='signal'?340:p.type==='replicas'?280:0,model,scroll,fullHeight};
+ return {nativeLimits,bodyWidthCap,intrinsicHeight:Math.ceil(h*1.08+8),chrome,paddingX:32,extraHeight:extra,nativeContent:layout.sectionSizing?.aspectPolicy==='intrinsic'?{height:h,width:inner}:null,text:text([p.title,s,p.fields,p.checks,p.columns]),minimumWidth:p.type==='signal'?340:p.type==='replicas'?280:0,model,scroll,fullHeight};
 }
 function graphBounds(d){
  if(!Object.keys(d.nodes||{}).length)return {x:0,y:0,w:1,h:1};
@@ -90,7 +125,7 @@ function inputs(source,width){
  for(const p of d.panels||[]){if(!registry.get(p.type))throw Error('Unsupported: unregistered panel type '+p.type);const byWidth={};for(let w=1;w<=24;w++){
   const samples=all.map(s=>panelSize(p,s.panels[p.id]||{},w*pitch-8,layouts[p.type]));byWidth[w]={...samples[0],intrinsicHeight:Math.max(...samples.map(s=>s.intrinsicHeight)),chrome:Math.max(...samples.map(s=>s.chrome)),extraHeight:Math.max(...samples.map(s=>s.extraHeight)),fullHeight:Math.max(...samples.map(s=>s.fullHeight)),text:samples.reduce((a,b)=>a.length>b.text.length?a:b.text,'')};
  }measurements[p.id]={...byWidth[24],byWidth};minimums[p.id]={w:Math.ceil(((byWidth[24].minimumWidth||0)+8)/pitch)};}
- const stepDepth={};for(let w=1;w<=24;w++){const captionWidth=w*pitch-8-180,maxLines=Math.max(0,...all.map(s=>lines(s.step?.text||'',captionWidth,14))),paths=R.diagramPathList(d).length;stepDepth[w]={neededHeight:70+maxLines*22+(paths>1?32:0),maxLines,unsupported:captionWidth<100};}
+ const stepDepth={};for(let w=1;w<=24;w++)stepDepth[w]=controlDepth(d,all,w*pitch-8);
  return {registry,geometry,measurements,minimums,stepDepth,states:all};
 }
-module.exports={text,lines,states,rasterAspect,panelSize,graphBounds,inputs};
+module.exports={text,lines,states,rasterAspect,panelSize,screenAudioHeight,controlDepth,graphBounds,inputs};

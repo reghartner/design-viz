@@ -230,15 +230,19 @@ standalone-output workflows with ordinary local specs.
     diagrams: each diagram resets to its initial state. Separate diagrams are
     fine when they are independent: an overview and its drilldown details, or
     unrelated scenarios.
-12. **Write content, then arrange once.** For a new diagram, write semantic
+12. **Write content, then compose.** For a new diagram, write semantic
     nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
     run `node <VIZ>/tools/compose-page-layout.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
-    The command arranges nodes, panels and step controls; do not choose their
-    coordinates or panel rectangles. For existing edits, preserve layout and
-    routes; add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}`
-    floats. Rearrange only when explicitly requested, using `--rearrange`.
-    Validate and submit the spec for paired Workbench preview.
-    Report actual tool results; the command alone is not visual QA. See `docs/auto-arrange.md` for
+    This is the initial layout and default, not visual proof. Preserve unrelated
+    existing geometry. For ordinary existing edits, preserve layout and routes;
+    add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats.
+    User feedback that the rendered candidate clips content or is hard to read
+    authorizes scoped candidate layout repair, including tile sizing, without
+    another permission question or handing arrangement back to the user. Keep
+    the repair to the affected section and preserve semantics; use `--rearrange`
+    when the requested repair requires structural node rearrangement. Validate
+    and submit the full candidate for paired Workbench preview, and report the
+    actual tool results. See `docs/auto-arrange.md` for sizing guidance,
     supported inputs and estimation limits.
 
 And always: honesty. No invented facts. Unknown is not failed. End each path

@@ -27,8 +27,12 @@ skin choice or hosting preference can override it.
 
 Use **← New / open** in the workspace toolbar, or the Flowview wordmark, to return
 to welcome. **Continue** returns to the current project with its undo history.
-Opening another project starts a fresh Undo/Redo history. The outgoing draft is
-kept in **Earlier drafts**; Undo never changes which file is open. Welcome
+Opening another project starts a fresh Undo/Redo history. The two most recent
+distinct outgoing drafts are kept in **Earlier drafts** in this browser; older
+browser snapshots are removed, so save files to disk for longer-term recovery.
+If browser storage cannot fit two snapshots, Workbench keeps only the newest
+outgoing draft. If even that copy cannot be saved, the project switch stops.
+Undo never changes which file is open. Welcome
 navigation cancels temporary editor modes and pauses playback while retaining
 the current project's source and panel history.
 

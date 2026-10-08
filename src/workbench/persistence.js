@@ -3,6 +3,23 @@
 function createBuilderPersistence(options){
   var draftKey='dv-workbench-draft', baselineKey='dv-workbench-baseline', archiveKey='dv-workbench-earlier-drafts';
   var timer=null, generation=0, disposed=false;
+  function sameDraft(a,b){
+    return a.text===b.text && a.baseline===b.baseline && a.ledger===b.ledger &&
+      JSON.stringify(a.topologyContext)===JSON.stringify(b.topologyContext);
+  }
+  function archiveEntries(storage){
+    var entries=JSON.parse(storage.getItem(archiveKey) || '[]');
+    if(!Array.isArray(entries) || !entries.every(function(entry){return entry && typeof entry.text==='string';}))
+      throw Error('Invalid earlier drafts');
+    return entries;
+  }
+  function recentDrafts(entries){
+    var recent=[];
+    entries.forEach(function(entry){
+      if(recent.length<2 && !recent.some(function(saved){return sameDraft(saved,entry);}))recent.push(entry);
+    });
+    return recent;
+  }
   function read(){
     var draft=null, baseline=null;
     try {
@@ -33,19 +50,27 @@ function createBuilderPersistence(options){
   return {
     read:read,save:save,
     archived:function(){
-      try{var entries=JSON.parse(options.storage().getItem(archiveKey) || '[]');return Array.isArray(entries)?entries.filter(function(entry){return entry && typeof entry.text==='string';}):[];}catch(ex){return [];}
+      try{
+        var storage=options.storage(),entries=archiveEntries(storage),recent=recentDrafts(entries);
+        if(recent.length===entries.length)return recent;
+        try{storage.setItem(archiveKey,JSON.stringify(recent));return recent;}
+        catch(ex){return entries;} // Keep every recoverable entry visible if compaction cannot be saved.
+      }catch(ex){return [];} // Malformed archives are never overwritten.
     },
     preserve:function(text,baseline,artifacts){
       if(disposed || typeof text!=='string')return;
       // A direct Build handoff must not overwrite recovery data unless this
       // durable copy succeeds. Keep the exact text, including unfinished JSON.
       try{
-        var storage=options.storage(),entries=JSON.parse(storage.getItem(archiveKey) || '[]');
-        if(!Array.isArray(entries))throw Error('Invalid earlier drafts');
-        if(!entries.some(function(entry){return entry && entry.text===text && entry.baseline===baseline && entry.ledger===(artifacts && artifacts.ledger!==undefined?artifacts.ledger:undefined) && JSON.stringify(entry.topologyContext)===JSON.stringify(artifacts && artifacts.topologyContext);})){
-          entries.unshift(Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{}));
-          storage.setItem(archiveKey,JSON.stringify(entries));
-        }
+        var storage=options.storage(),entries=archiveEntries(storage);
+        var incoming=Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{});
+        var recent=recentDrafts(entries);
+        if(recent.length===entries.length && recent.length && sameDraft(recent[0],incoming))return;
+        var previous=entries.find(function(entry){return !sameDraft(entry,incoming);});
+        if(previous){
+          try{storage.setItem(archiveKey,JSON.stringify([incoming,previous]));}
+          catch(ex){storage.setItem(archiveKey,JSON.stringify([incoming]));} // A full browser may fit only the outgoing draft.
+        }else storage.setItem(archiveKey,JSON.stringify([incoming]));
       }catch(ex){
         var failure=Error('Your earlier draft could not be saved. Download the current draft or free browser storage, then try again.');
         failure.code='DRAFT_ARCHIVE_FAILED';

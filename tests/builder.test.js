@@ -398,7 +398,7 @@ const MERMAID_SEQ = 'sequenceDiagram\nparticipant A as Alpha Svc\nparticipant B\
 
 
 /* Minimal event DOM: exercise the real import/history/mode handlers without a browser. */
-function importHarness(ctl, boardSpec, extraGlobals){
+function importHarness(ctl, boardSpec, extraGlobals, builderOptions){
   const scheduled = [], cancelled = [];
   const elements = {}, listeners = {}, windowListeners = {}, doc = {activeElement: null};
   function element(tag = 'div', id = ''){
@@ -525,14 +525,14 @@ function importHarness(ctl, boardSpec, extraGlobals){
   if(extraGlobals)Object.assign(sandbox,extraGlobals);
   let renders = 0;
   let builder;
-  function mount(){return builder=sandbox.initWorkbenchBuilder({view: elements.docview, src: elements.src, ctl:()=>ctl, render(request){
+  function mount(){return builder=sandbox.initWorkbenchBuilder(Object.assign({view: elements.docview, src: elements.src, ctl:()=>ctl, render(request){
     builder.beforePreviewReplace(request);renders++;
     elements.msgs.innerHTML = '';
     const finding = element('li'); finding.textContent = 'existing validator warning';
     elements.msgs.appendChild(finding);
     const outcome={ok:true,replaced:true,text:elements.src.value,origin:request.origin};
     builder.previewRendered(outcome);return outcome;
-  }});}
+  }},builderOptions));}
   mount();
   return {mount,get builder(){return builder;},listeners,windowListeners,elements, doc, element, saved, scheduled, cancelled, cards, svg, sandbox, get renders(){ return renders; },
     rerender(){builder.beforePreviewReplace({origin:'manual'});builder.previewRendered({ok:true,replaced:true,text:elements.src.value});},
@@ -612,6 +612,28 @@ test('actual step, section and tabs insertion keep their selected source ranges 
     assert.ok(h.elements.src.selectionEnd>h.elements.src.selectionStart);
     assertOneBuilderUndo(h,before);
   }
+});
+
+test('source Undo and Redo keep the active workspace tool and publish visible history feedback', () => {
+  let active='json';const open={inspect:false,json:true},shown=[];
+  const workspace={tool:()=>active,isOpen:name=>!!open[name],setHistory(){},canvas:{select(){}},
+    showTool(name){shown.push(name);active=name;open[name]=true;return true;}};
+  const h=importHarness(null,null,null,{workspace}),e=h.elements,before=e.src.value;
+  h.click('add-section');const changed=e.src.value;
+  shown.length=0;active='json';open.inspect=false;open.json=true;
+
+  h.click('undo-builder');
+  assert.equal(e.src.value,before);assert.equal(active,'json');assert.equal(open.inspect,false);assert.deepEqual(shown,[]);
+  const status=h.doc.getElementById('builder-history-status');
+  assert.equal(status.textContent,'Undo complete');assert.equal(status.hidden,false);assert.match(status.getAttribute('title'),/^undid/);
+
+  h.click('redo-builder');
+  assert.equal(e.src.value,changed);assert.equal(active,'json');assert.equal(open.inspect,false);assert.deepEqual(shown,[]);
+  assert.equal(status.textContent,'Redo complete');assert.match(status.getAttribute('title'),/^redid/);
+
+  active='inspect';open.inspect=true;h.click('undo-builder');
+  assert.equal(active,'inspect');assert.equal(open.inspect,true);assert.deepEqual(shown,[]);
+  assert.equal(e.guide.hidden,false);assert.match(e.guide.children[0].textContent,/undid the last builder action/);
 });
 
 test('Mermaid import UI opens focuses cancels and preserves editor and history on failure', () => {

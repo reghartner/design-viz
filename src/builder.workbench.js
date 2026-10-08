@@ -421,6 +421,14 @@ function initWorkbenchBuilder(opts){
   var targetLabel = document.getElementById('btarget');
   var addModeExit = document.getElementById('addmode-exit');
   var undoBtn = document.getElementById('undo-builder');
+  var redoBtn = document.getElementById('redo-builder');
+  var historyStatus = null;
+  if(undoBtn && undoBtn.parentNode){
+    historyStatus=document.createElement('span');historyStatus.id='builder-history-status';
+    historyStatus.className='workspace-history-feedback';historyStatus.hidden=true;
+    historyStatus.setAttribute('role','status');historyStatus.setAttribute('aria-live','polite');historyStatus.setAttribute('aria-atomic','true');
+    undoBtn.parentNode.appendChild(historyStatus);life.own(function(){historyStatus.remove();});
+  }
   var secInsert = document.getElementById('sec-insert');
   var secInspect = document.getElementById('sec-inspect');
   var secSource = document.getElementById('sec-source');
@@ -477,10 +485,15 @@ function initWorkbenchBuilder(opts){
     historyChanged:function(undo,redo){
       if(undoBtn)undoBtn.disabled=!undo;
       if(redoBtn)redoBtn.disabled=!redo;
+      if(historyStatus){historyStatus.textContent='';historyStatus.hidden=true;historyStatus.removeAttribute('title');}
     },
     afterHistory:function(message){
       sourceOrigin=null;refreshProvenance();
-      setSelected(null);clearMultiSelect();clearStepMarkers();inspectorMessage(message);
+      setSelected(null);clearMultiSelect();clearStepMarkers();
+      if(historyStatus){historyStatus.textContent=message.indexOf('undid')===0?'Undo complete':'Redo complete';historyStatus.setAttribute('title',message);historyStatus.hidden=false;}
+      /* Refresh the now-unselected Inspector without navigating to it. The
+         toolbar status keeps the same feedback visible when Inspect is closed. */
+      inspectorMessage(message,true,true);
     },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
@@ -564,7 +577,7 @@ function initWorkbenchBuilder(opts){
   function applyRowGrabs(){if(interactions)return interactions.applyRowGrabs.apply(null,arguments); }
   function renderInspector(){return inspector.render();}
   function refreshFormSoon(){return inspector.refresh();}
-  function inspectorMessage(text,keepTool){return inspector.message(text,keepTool);}
+  function inspectorMessage(text,keepTool,keepDisclosure){return inspector.message(text,keepTool,keepDisclosure);}
   function formError(text){return inspector.error(text);}
   function commitCascade(planFor,opt){return inspector.transact(planFor,opt);}
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
@@ -621,13 +634,8 @@ function initWorkbenchBuilder(opts){
     scrollTextareaTo(loc.start);
   }
   /* Session owns history and persistence; controls retain DOM/focus policy. */
-  var redoBtn = document.getElementById('redo-builder');
-  function agentHistory(action){
-    var tool=opts.workspace && opts.workspace.tool(),result=action();
-    if(tool)opts.workspace.showTool(tool);return result;
-  }
-  function doUndo(){return session.historyType()==='view'?session.undo():agentHistory(function(){return session.undo();});}
-  function doRedo(){return session.historyType(true)==='view'?session.redo():agentHistory(function(){return session.redo();});}
+  function doUndo(){return session.undo();}
+  function doRedo(){return session.redo();}
   if (undoBtn) life.listen(undoBtn,'click', doUndo);
   if (redoBtn) life.listen(redoBtn,'click', doRedo);
   life.listen(src,'input', function(){
@@ -1307,7 +1315,7 @@ function initWorkbenchBuilder(opts){
     undoChange:function(receipt){
       var change=agentChanges.get(receipt.id),snapshot=session.snapshot();
       if(!change || change.project!==snapshot.project || change.after!==snapshot.text || change.historyVersion!==session.historyVersion() || !session.canUndo())return {ok:false,error:'Later edits or a reload prevent safe Undo of this receipt. Use history or compare the changes first.'};
-      var ok=agentHistory(function(){return session.undo();});if(ok)agentChanges.delete(receipt.id);return {ok:ok};
+      var ok=session.undo();if(ok)agentChanges.delete(receipt.id);return {ok:ok};
     }
   };
   var agentSession=typeof initWorkbenchAgentSession==='function'?initWorkbenchAgentSession(agentOptions):null;

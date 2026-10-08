@@ -131,12 +131,12 @@ function flashPositionLine(){
 
 /* ================= inspector: forms that write the JSON ================= */
 
-  function inspectorMessage(text, keepTool){
+  function inspectorMessage(text, keepTool, keepDisclosure){
     if(disposed)return;
     cancelRefresh();retireForm();
     if (!guide) return;
     opts.surface.show(keepTool);
-    revealInspector();
+    if(!keepDisclosure)revealInspector();
     guide.hidden = false;
     guide.innerHTML = '';
     var n = document.createElement('div');

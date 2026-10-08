@@ -1,0 +1,84 @@
+{
+  "page": {
+    "title": "What does one operation cost?",
+    "subtitle": "One document \u00b7 three cost components \u00b7 an authored estimate",
+    "skin": "pastel",
+    "sections": [
+      {
+        "heading": "Process one document",
+        "diagram": {
+          "view": "ambient",
+          "nodes": {
+            "document": {
+              "title": "Process document",
+              "sub": "One operation \u00b7 illustrative costs",
+              "icon": "server"
+            }
+          },
+          "rows": [
+            [
+              "document"
+            ]
+          ],
+          "panels": [
+            {
+              "id": "costs",
+              "type": "cost",
+              "title": "Operation cost breakdown",
+              "currency": "USD",
+              "unit": "operation",
+              "period": "per operation",
+              "assumptions": "Illustrative estimates, not vendor quotes. Fixed amounts are allocated to one operation. Excludes tax and engineering labor.",
+              "routes": [
+                {
+                  "id": "operation",
+                  "label": "Process one document"
+                }
+              ],
+              "items": [
+                {
+                  "route": "operation",
+                  "label": "Compute",
+                  "perMillion": 0,
+                  "fixed": 0.06
+                },
+                {
+                  "route": "operation",
+                  "label": "Storage",
+                  "perMillion": 0,
+                  "fixed": 0.01
+                },
+                {
+                  "route": "operation",
+                  "label": "External API",
+                  "perMillion": 0,
+                  "fixed": 0.03
+                }
+              ],
+              "initial": {
+                "messages": 1
+              }
+            }
+          ],
+          "sectionLayout": {
+            "default": [
+              {
+                "x": 0,
+                "y": 0,
+                "w": 4,
+                "h": 10
+              },
+              {
+                "panel": "costs",
+                "x": 4,
+                "y": 0,
+                "w": 8,
+                "h": 20
+              }
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

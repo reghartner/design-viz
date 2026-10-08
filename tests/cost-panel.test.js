@@ -22,7 +22,7 @@ test('cost template, picker, example and metadata use ordinary discovery', () =>
   assert.deepEqual(validate(d), {errors:[],warnings:[]});
   assert.ok(C.PANEL_CATALOG.some(item => item.type === 'cost'));
   assert.equal(C.panelPickerExample('cost').panel.type, 'cost');
-  assert.equal(panelAssets().features['panel.cost'].label, 'Messaging cost panel');
+  assert.equal(panelAssets().features['panel.cost'].label, 'Cost breakdown / comparison panel');
   assert.match(readStyles('style.core.css'), /\.cost-routes/);
 });
 test('one million and scale scenarios include usage and fixed charges exactly once', () => {
@@ -121,4 +121,59 @@ test('typed authoring and node rename/delete/paste use shared commands', () => {
   const paste=C.planPasteBuilderClipboard(JSON.stringify(dest),dest,copy.data,{section:0});assert.equal(paste.error,undefined);
   const pasted=JSON.parse(paste.text).page.sections[0].diagram.panels[0];
   assert.equal(pasted.items[0].node,'producer');assert.equal(pasted.items[5].node,undefined);near(C.costModel(pasted,{}).routes[1].total,13.4);
+});
+
+const operation = () => JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/operation-cost.json')));
+const single = () => operation().page.sections[0].diagram.panels[0];
+test('single operation has visible priced components and no comparison story', () => {
+  assert.deepEqual(validate(operation()),{errors:[],warnings:[]});
+  const p=single(),m=C.costModel(p,p.initial),html=C.costHTML(p,p.initial);
+  near(m.routes[0].total,.1);assert.equal(m.delta,null);assert.equal(m.crossover,null);
+  assert.match(html,/1 operation/);assert.match(html,/cost-single/);
+  const visible=html.split('<details')[0];
+  for(const label of ['Compute','Storage','External API','60.0%','10.0%','30.0%'])assert.ok(visible.includes(label));
+  assert.doesNotMatch(visible,/Comparison unavailable|BASELINE|ALTERNATIVE|cost-delta|cost-gap|engineering path|linked engineering nodes/);
+  p.items[0].perMillion=20000;near(C.costModel(p,p.initial).routes[0].total,.12);
+  assert.match(C.costHTML(p,p.initial),/66.7%/);
+});
+test('three through six entries share a scale and allow following every entry', () => {
+  for(const count of [3,6]){
+    const p=single();p.routes=Array.from({length:count},(_,i)=>({id:'r'+i,label:'Operation '+i}));
+    p.items=p.routes.map((r,i)=>({route:r.id,label:'Compute',perMillion:0,fixed:i+1}));
+    const d={nodes:{n:{}},rows:[['n']],panels:[p]};assert.deepEqual(validate(d),{errors:[],warnings:[]});
+    const m=C.costModel(p,{messages:1,activeRoute:'r2'}),chart=C.costChartModel(m);
+    assert.deepEqual(plain(m.routes.map(r=>r.total)),Array.from({length:count},(_,i)=>i+1));
+    near(chart.max,count);near(chart.routes[2].pct,3/count*100);assert.equal(m.delta,null);
+    const html=C.costHTML(p,{messages:1,activeRoute:'r2'});
+    assert.match(html,/cost-route-2 cost-active/);assert.doesNotMatch(html,/BASELINE|ALTERNATIVE|Comparison unavailable|cost-gap/);
+    assert.ok(plain(C.panelPatchFields(p)).some(field=>field[0]==='activeRoute' && field[2].includes('r2')));
+  }
+});
+test('invalid cardinalities and declarations never produce credible partial totals', () => {
+  for(const mutate of [p=>p.routes=[],p=>p.routes=null,p=>p.routes.push(null),p=>p.routes.push({id:'operation'}),
+    p=>{p.routes=Array.from({length:7},(_,i)=>({id:'r'+i}));p.items=p.routes.map(r=>({route:r.id,perMillion:1}));},
+    p=>{p.items=Array.from({length:25},()=>p.items[0]);},p=>p.items.push({route:'absent',perMillion:1}),
+    p=>p.routes.push({id:'unpriced-entry'})]){
+    const p=single();mutate(p);const m=C.costModel(p,p.initial),html=C.costHTML(p,p.initial);
+    assert.equal(m.valid,false);assert.ok(m.routes.every(r=>r.total===null));
+    assert.ok(m.routes.every(r=>r.rows.every(row=>row.total===null)));
+    assert.match(html,/Totals unavailable/);assert.doesNotMatch(html,/NaN|Infinity/);
+    assert.ok(validate({nodes:{n:{}},rows:[['n']],panels:[p]}).warnings.length);
+  }
+});
+test('single zero, unpriced, overflow and unit text stay truthful and escaped', () => {
+  for(const kind of ['zero','unpriced','overflow']){
+    const p=single();p.items.forEach(row=>row.fixed=0);
+    if(kind==='unpriced')delete p.items[0].perMillion;
+    if(kind==='overflow'){p.items[0].fixed=Number.MAX_VALUE;p.items[1].fixed=Number.MAX_VALUE;}
+    const html=C.costHTML(p,p.initial);
+    assert.doesNotMatch(html,/class="cost-component-share">[0-9]|NaN|Infinity|Comparison unavailable/);
+    assert.match(html,kind==='zero'?/No charge/:/Unpriced/);
+  }
+  const p=single();p.unit='<img src=x onerror=bad()>';
+  assert.doesNotMatch(C.costHTML(p,p.initial),/<img/);assert.match(C.costHTML(p,p.initial),/&lt;img/);
+  for(const unit of [null,12,{},'']){
+    p.unit=unit;assert.match(C.costHTML(p,p.initial),/1 messages/);
+    assert.match(validate({nodes:{n:{}},rows:[['n']],panels:[p]}).warnings.join('\n'),/unit: expected/);
+  }
 });

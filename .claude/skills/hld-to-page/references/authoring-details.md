@@ -31,7 +31,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Company service/API choices, repository catalog sync, or nginx-bundled service references | `docs/workbench-catalog-sync.md`; use the approved `workbench/catalog.json` identities, never infer bindings from display labels |
 | Left editor rail (Inspect, Steps, Outline, JSON, File), resizing, focus, or diagram fit controls | `docs/workbench-workspace.md`; global Add/Undo/Redo/Save are in the project toolbar; catalog and import/export controls are in File |
 | Database/payload state, checks, budgets, retry/circuit behavior, replicas, or rollout decisions | Matching recipes in `cookbook/README.md` and the corresponding widget docs |
-| Compare messaging routes, engineering components and costs at one workload | `cookbook/messaging-cost.md`, `python3 tools/widget_doc.py cost`; use its stacked bars and Auto/Compact/Expanded density controls |
+| Break down one operation or show 1–6 route costs at one workload | `cookbook/messaging-cost.md`, `python3 tools/widget_doc.py cost`; use its stacked bars and Auto/Compact/Expanded density controls |
 
 Paths, failed communications, centerpiece views, scene-event controls, and
 fit controls need no schema-version flag. An old self-contained HTML page

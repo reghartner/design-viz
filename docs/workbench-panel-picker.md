@@ -38,15 +38,19 @@ or **This step only** duration. Undo restores the edit, including removed
 fields and their highlights. **Data table** remains available for record
 snapshots; its **Columns → Width (px)** controls stabilize column widths.
 
-Choose **Software & data → Messaging cost comparison** to compare two routes
-with stacked bars and matching engineering components. In Inspect, set
-**Display density** to **Auto**, **Compact** or **Expanded**. Auto uses horizontal
-bars at panel widths up to 520 px; Compact keeps that short layout at any width.
-Set the starting **One-way messages** volume, then change it on steps to compare
-scenarios. **Following route** highlights a route without changing either cost.
-Expand **Rates, assumptions & tradeoffs** in the panel for the pricing detail.
-The [messaging cost recipe](../cookbook/messaging-cost.md) explains authored
-rates, exclusions and the **Messaging cost tradeoffs** template's two views.
+Choose **Software & data → Cost breakdown / comparison** for one operation or
+up to six entries. The default shows a single operation with three component
+amounts and percentage shares. Set **Workload unit** to `operation`, starting
+**Workload volume** to `1` and **Cost period** to `per operation`; use zero rates
+and enter each component’s amount as **Fixed cost per period**. Add or remove
+**Operations / routes** and their **Components & cost lines** together.
+Exactly two entries show baseline/alternative differences and break-even volume.
+In Inspect, set **Display density** to **Auto**, **Compact** or **Expanded**.
+Auto uses horizontal bars at panel widths up to 520 px; Compact keeps that layout
+at any width. **Following route** can highlight any declared entry. Expand
+**Rates, assumptions & tradeoffs** for rates and exclusions. The
+[cost recipe](../cookbook/messaging-cost.md) includes the runnable single-operation
+example and the **Messaging cost tradeoffs** template’s original two views.
 
 ## Implementation and verification
 

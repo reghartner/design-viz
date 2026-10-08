@@ -6,25 +6,27 @@ function costMessages(value) {
   return costNumber(value) && Number.isSafeInteger(value);
 }
 function costDeclarationWarnings(panel, path, warnings, errors, diagram) {
-  var routes = panelCollectionItems(panel, 'routes', 2);
+  var routes = panelCollectionItems(panel, 'routes', 6);
   if (panel.density !== undefined && ['auto','compact','expanded'].indexOf(panel.density) < 0)
     warnings.push(path + '.density: expected auto, compact or expanded; using auto');
-  panelCollectionWarnings(panel, path, warnings, 'routes', 2);
-  if (routes.length !== 2 || !Array.isArray(panel.routes) || panel.routes.length !== 2)
-    warnings.push(path + '.routes: declare exactly two routes; comparison unavailable otherwise');
+  panelCollectionWarnings(panel, path, warnings, 'routes', 6);
+  if (!Array.isArray(panel.routes) || !routes.length || panel.routes.length > 6 || routes.length !== panel.routes.length)
+    warnings.push(path + '.routes: declare 1–6 entries with unique string ids; totals unavailable otherwise');
+  if (panel.unit !== undefined && (typeof panel.unit !== 'string' || !panel.unit.trim()))
+    warnings.push(path + '.unit: expected a non-empty workload label; using messages');
   if (panel.currency !== undefined && (typeof panel.currency !== 'string' || !/^[A-Z]{3}$/.test(panel.currency)))
-    warnings.push(path + '.currency: expected a three-letter currency code; comparison unavailable');
+    warnings.push(path + '.currency: expected a three-letter currency code; totals unavailable');
   if (!Array.isArray(panel.items) || !panel.items.length || panel.items.length > 24)
-    warnings.push(path + '.items: expected 1–24 cost lines; comparison unavailable');
+    warnings.push(path + '.items: expected 1–24 cost lines; totals unavailable');
   (Array.isArray(panel.items) ? panel.items : []).forEach(function (item, i) {
     var at = path + '.items[' + i + ']';
-    if (!panelObject(item)) { warnings.push(at + ': expected a cost line; comparison unavailable'); return; }
+    if (!panelObject(item)) { warnings.push(at + ': expected a cost line; totals unavailable'); return; }
     if (!routes.some(function (route) { return route.id === item.route; }))
-      warnings.push(at + '.route: unknown route; comparison unavailable');
+      warnings.push(at + '.route: unknown route; totals unavailable');
     if (!costNumber(item.perMillion))
       warnings.push(at + '.perMillion: expected a finite non-negative rate; route is unpriced');
     if (item.fixed !== undefined && !costNumber(item.fixed))
-      warnings.push(at + '.fixed: expected a finite non-negative cost for the comparison period; route is unpriced');
+      warnings.push(at + '.fixed: expected a finite non-negative cost for the authored period; route is unpriced');
     if (item.node !== undefined && (typeof item.node !== 'string' || (diagram && !panelOwn(diagram.nodes, item.node))))
       warnings.push(at + '.node: expected an existing engineering node id');
   });
@@ -40,7 +42,7 @@ function costPatchWarnings(state, path, panel, warnings) {
   if (panelOwn(state, 'messages') && !costMessages(state.messages))
     warnings.push(path + '.messages: expected a non-negative safe integer; totals unavailable');
   if (panelOwn(state, 'activeRoute') && state.activeRoute !== null && state.activeRoute !== '' &&
-      !panelCollectionItems(panel, 'routes', 2).some(function (route) { return route.id === state.activeRoute; }))
+      !panelCollectionItems(panel, 'routes', 6).some(function (route) { return route.id === state.activeRoute; }))
     warnings.push(path + '.activeRoute: unknown route; no route highlighted');
   if (panelOwn(state, 'enterOnce')) costPatchWarnings(state.enterOnce, path + '.enterOnce', panel, warnings);
 }
@@ -48,11 +50,13 @@ function costModel(panel, state) {
   state = panelObject(state) ? state : {};
   var messages = panelOwn(state, 'messages') ? state.messages : 1000000;
   if (!costMessages(messages)) messages = null;
-  var declarations = panelCollectionItems(panel, 'routes', 2);
+  var declarations = panelCollectionItems(panel, 'routes', 6);
   var items = Array.isArray(panel.items) ? panel.items : [];
-  var valid = Array.isArray(panel.routes) && panel.routes.length === 2 && declarations.length === 2 &&
+  var valid = Array.isArray(panel.routes) && panel.routes.length >= 1 && panel.routes.length <= 6 && declarations.length === panel.routes.length &&
     items.length > 0 && items.length <= 24 && items.every(function (item) {
       return panelObject(item) && declarations.some(function (route) { return route.id === item.route; });
+    }) && declarations.every(function (route) {
+      return items.some(function (item) { return panelObject(item) && item.route === route.id; });
     }) && (panel.currency === undefined || (typeof panel.currency === 'string' && /^[A-Z]{3}$/.test(panel.currency)));
   var routes = declarations.map(function (route) {
     var lines = items.slice(0, 24).filter(function (item) { return panelObject(item) && item.route === route.id; });
@@ -63,7 +67,7 @@ function costModel(panel, state) {
       if (typeof item.node === 'string' && item.node && nodes.indexOf(item.node) < 0) nodes.push(item.node);
       if (priced) { rate += item.perMillion; fixed += item.fixed === undefined ? 0 : item.fixed; }
       else known = false;
-      var total = priced && messages !== null ? item.perMillion * (messages / 1000000) + (item.fixed || 0) : null;
+      var total = valid && priced && messages !== null ? item.perMillion * (messages / 1000000) + (item.fixed || 0) : null;
       if (!costNumber(total)) { total = null; known = false; }
       return {label: item.label || item.node || 'Cost line', node: item.node, rate: priced ? item.perMillion : null,
         fixed: priced ? (item.fixed || 0) : null, total: total};
@@ -83,7 +87,7 @@ function costModel(panel, state) {
     var crossing = (routes[1].fixed - routes[0].fixed) / (routes[0].rate - routes[1].rate) * 1000000;
     if (costNumber(crossing) && crossing > 0 && crossing <= Number.MAX_SAFE_INTEGER) crossover = crossing;
   }
-  return {messages: messages, currency: panel.currency || 'USD', routes: routes, delta: delta,
+  return {messages: messages, valid: valid, unit: typeof panel.unit === 'string' && panel.unit.trim() ? panel.unit : 'messages', currency: panel.currency || 'USD', routes: routes, delta: delta,
     percent: comparable && routes[0].total > 0 ? Math.abs(delta) / routes[0].total * 100 : null, crossover: crossover};
 }
 function costAmount(value, currency) {
@@ -96,7 +100,7 @@ function costCount(value) {
 function costChartModel(model) {
   var colors = ['#7d9bc6', '#8b7fd5', '#55a896', '#d7a34f', '#d67e82', '#839c60'];
   var keys = [];
-  var max = Math.max.apply(null, model.routes.map(function (route) { return route.total || 0; }));
+  var max = Math.max.apply(null, [0].concat(model.routes.map(function (route) { return route.total || 0; })));
   return {max: max, routes: model.routes.map(function (route) {
     var flow = [], seen = [];
     var segments = [];
@@ -118,17 +122,19 @@ function costChartModel(model) {
 function costHTML(panel, state) {
   var model = costModel(panel, state), chart = costChartModel(model);
   var money = function (value) { return esc(costAmount(value, model.currency)); };
+  var comparison = model.routes.length === 2 && Array.isArray(panel.routes) && panel.routes.length === 2;
   var density = ['compact','expanded'].indexOf(panel.density) >= 0 ? panel.density : 'auto';
-  var h = '<div class="cost-panel cost-' + density + '"><div class="cost-basis"><span>ONE-WAY DELIVERY · AUTHORED ESTIMATE</span><strong>' +
-    (model.messages === null ? 'Unknown volume' : costCount(model.messages) + ' messages') +
+  var h = '<div class="cost-panel cost-' + density + (comparison ? ' cost-comparison' : ' cost-breakdown') + (model.routes.length === 1 ? ' cost-single' : '') + '"><div class="cost-basis"><span>AUTHORED COST ESTIMATE</span><strong>' +
+    (model.messages === null ? 'Unknown volume' : costCount(model.messages) + ' ' + esc(model.unit)) +
     '</strong><span>' + esc(panel.period || 'per month') + '</span></div>';
-  h += '<div class="cost-chart-caption"><span>DELIVERY COST</span><span>Same scale · stacked by component</span></div><div class="cost-routes">';
+  if (!model.valid) h += '<p class="cost-invalid">Totals unavailable. Declare 1–6 unique entries and 1–24 cost lines, with at least one line per entry and a valid currency.</p>';
+  h += '<div class="cost-chart-caption"><span>COST BREAKDOWN</span><span>' + (model.routes.length > 1 ? 'Same scale · ' : '') + 'stacked by component</span></div><div class="cost-routes">';
   chart.routes.forEach(function (entry, index) {
     var route = entry.route;
     var gap = model.delta !== null && model.delta !== 0 && ((model.delta > 0 && index === 0) || (model.delta < 0 && index === 1));
     h += '<section class="cost-route cost-route-' + index + (route.active ? ' cost-active' : '') + '" aria-label="' +
-      esc((index ? 'Alternative: ' : 'Baseline: ') + route.label + (route.active ? '. Following' : '')) + '">' +
-      '<div class="cost-route-heading"><span class="cost-tag">' + (index ? 'B · ALTERNATIVE' : 'A · BASELINE') +
+      esc((comparison ? (index ? 'Alternative: ' : 'Baseline: ') : 'Operation: ') + route.label + (route.active ? '. Following' : '')) + '">' +
+      '<div class="cost-route-heading"><span class="cost-tag">' + (comparison ? (index ? 'B · ALTERNATIVE' : 'A · BASELINE') : 'OPERATION') +
       '</span>' + (route.active ? '<span class="cost-following">Following</span>' : '') + '</div>' +
       '<h4>' + esc(route.label) + '</h4><div class="cost-total">' + money(route.total) + '</div>';
     h += '<div class="cost-plot" role="img" aria-label="' + esc(route.label + ': ' + costAmount(route.total, model.currency) +
@@ -146,26 +152,37 @@ function costHTML(panel, state) {
         (segment.pct > 13 ? '<span>' + money(segment.cost) + (segment.fixed ? '<small>fixed</small>' : '') + '</span>' : '') + '</div>';
     });
     h += '</div>' + (route.total === null ? '<span class="cost-no-bar">Rate needed</span>' : route.total === 0 ? '<span class="cost-no-bar">No charge</span>' : '') + '</div>';
-    h += '<div class="cost-nodes">' + route.nodes.length + ' linked engineering nodes</div><ol class="cost-flow" aria-label="' + esc(route.label + ' engineering path') + '">';
-    entry.flow.forEach(function (node) {
+    if (!comparison) {
+      h += '<ol class="cost-components" aria-label="' + esc(route.label + ' cost components') + '">';
+      route.rows.forEach(function (row) {
+        var color = entry.flow.find(function (component) { return component.label === (row.node || row.label); }).color;
+        h += '<li><span class="cost-node-dot" style="--cost-color:' + color + '" aria-hidden="true"></span><span class="cost-component-label">' + esc(row.label) + '</span><b>' + money(row.total) + '</b><span class="cost-component-share">' +
+          (route.total > 0 && row.total !== null ? (row.total / route.total * 100).toFixed(1) + '%' : '—') + '</span></li>';
+      });
+      h += '</ol>';
+    }
+    if (comparison) h += '<div class="cost-nodes">' + route.nodes.length + ' linked engineering nodes</div><ol class="cost-flow" aria-label="' + esc(route.label + ' engineering path') + '">';
+    if (comparison) entry.flow.forEach(function (node) {
       h += '<li style="--cost-color:' + node.color + '"><span class="cost-node-dot" aria-hidden="true"></span><span title="' + esc(node.label) + '">' + esc(node.label) + '</span></li>';
     });
-    h += '</ol></section>';
+    h += (comparison ? '</ol>' : '') + '</section>';
   });
   h += '</div><div class="cost-chart-key"><span class="cost-key-solid" aria-hidden="true"></span> Usage <span class="cost-key-fixed" aria-hidden="true"></span> Fixed charge</div>';
-  h += '<div class="cost-delta"><span class="cost-delta-icon" aria-hidden="true">' + (model.delta === null ? '?' : model.delta === 0 ? '=' : model.delta < 0 ? '↘' : '↗') +
-    '</span><div><span class="cost-tag">ALTERNATIVE VS BASELINE</span><strong>';
-  if (model.delta === null) h += 'Comparison unavailable';
-  else if (model.delta === 0) h += 'Same estimated cost';
-  else h += money(Math.abs(model.delta)) + (model.delta < 0 ? ' less' : ' more') +
-    (model.percent !== null && Number.isFinite(model.percent) ? ' <small>(' + model.percent.toFixed(1) + '%)</small>' : '');
-  h += '</strong>' + (model.crossover !== null ? '<span>Break-even ≈ ' + costCount(model.crossover) + ' messages ' + esc(panel.period || 'per month') + '</span>' : '') + '</div></div>';
+  if (comparison) {
+    h += '<div class="cost-delta"><span class="cost-delta-icon" aria-hidden="true">' + (model.delta === null ? '?' : model.delta === 0 ? '=' : model.delta < 0 ? '↘' : '↗') +
+      '</span><div><span class="cost-tag">ALTERNATIVE VS BASELINE</span><strong>';
+    if (model.delta === null) h += 'Comparison unavailable';
+    else if (model.delta === 0) h += 'Same estimated cost';
+    else h += money(Math.abs(model.delta)) + (model.delta < 0 ? ' less' : ' more') +
+      (model.percent !== null && Number.isFinite(model.percent) ? ' <small>(' + model.percent.toFixed(1) + '%)</small>' : '');
+    h += '</strong>' + (model.crossover !== null ? '<span>Break-even ≈ ' + costCount(model.crossover) + ' ' + esc(model.unit) + ' ' + esc(panel.period || 'per month') + '</span>' : '') + '</div></div>';
+  }
   h += '<details class="cost-details"><summary>Rates, assumptions &amp; tradeoffs</summary><div class="cost-detail-routes">';
   model.routes.forEach(function (route) {
     h += '<section><h4>' + esc(route.label) + '</h4><ol class="cost-lines">';
     route.rows.forEach(function (row) {
       h += '<li><div class="cost-line-title"><span>' + esc(row.label) + '</span><b>' + money(row.total) + '</b></div>' +
-        '<div class="cost-line-rate">' + (row.rate === null ? 'Rate needed' : money(row.rate) + ' / 1M' + (row.fixed ? ' + ' + money(row.fixed) + ' fixed' : '')) + '</div></li>';
+        '<div class="cost-line-rate">' + (row.rate === null ? 'Rate needed' : money(row.rate) + ' / 1M ' + esc(model.unit) + (row.fixed ? ' + ' + money(row.fixed) + ' fixed' : '')) + '</div></li>';
     });
     h += '</ol>' + (route.tradeoff ? '<p class="cost-tradeoff">' + esc(route.tradeoff) + '</p>' : '') + '</section>';
   });
@@ -184,13 +201,14 @@ function costCompactStyles(scope) {
 .C .cost-routes{grid-template-columns:minmax(0,1fr);gap:5px}
 .C .cost-route{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto 22px auto;grid-row:auto;gap:4px 8px;padding:6px 4px;border-radius:5px}
 .C .cost-route h4{grid-column:1;grid-row:1;min-height:0;font-size:11px;margin:0;align-self:center}
-.C .cost-route-0 h4::before{content:'A · ';color:var(--dfaint)}.C .cost-route-1 h4::before{content:'B · ';color:var(--dfaint)}
+.C.cost-comparison .cost-route-0 h4::before{content:'A · ';color:var(--dfaint)}.C.cost-comparison .cost-route-1 h4::before{content:'B · ';color:var(--dfaint)}
 .C .cost-total{grid-column:2;grid-row:1;font-size:14px;margin:0;align-self:center}
 .C .cost-plot{grid-column:1/-1;grid-row:2;height:22px;border:0;border-radius:4px;background:repeating-linear-gradient(to right,transparent 0 calc(25% - 1px),color-mix(in srgb,var(--dtext) 10%,transparent) calc(25% - 1px) 25%)}
 .C .cost-stack{height:100%;width:var(--cost-pct);left:0;bottom:0;flex-direction:row;border-radius:4px;box-shadow:none}
 .C .cost-segment{height:100%;width:var(--cost-share)}.C .cost-segment>span,.C .cost-gap>span{display:none}
 .C .cost-gap{height:100%;width:var(--cost-gap-pct);left:auto;right:0;top:0;border:1px dashed color-mix(in srgb,var(--dtext) 35%,transparent);border-left:0;border-radius:0 4px 4px 0}
 .C .cost-no-bar{bottom:3px;font-size:10px}
+.C .cost-components{grid-column:1/-1;grid-row:3}.C .cost-components li{font-size:10px;padding:3px 0}
 .C .cost-flow{grid-column:1/-1;grid-row:3;gap:3px 5px;flex-wrap:nowrap;overflow:hidden}
 .C .cost-flow li{gap:3px;font-size:9px;flex-shrink:1}.C .cost-flow li:not(:last-child)::after{margin-left:2px}.C .cost-node-dot{width:7px;height:7px;border-radius:2px}
 .C .cost-chart-key{font-size:9px;margin:6px 0 0;gap:4px}.C .cost-key-solid,.C .cost-key-fixed{width:8px;height:8px}
@@ -199,7 +217,7 @@ function costCompactStyles(scope) {
 `.replace(/\.C\b/g, scope);
 }
 PanelRegistry.define('cost', {
-  label: 'Messaging cost', since: '0.1.0', order: 26,
+  label: 'Cost breakdown / comparison', since: '0.1.0', order: 26,
   validateDeclaration: costDeclarationWarnings, validatePatch: costPatchWarnings,
   render: function (host, panel, state) { return {html: costHTML(panel, state)}; },
   references: {nodes: ['items.*.node']},
@@ -216,6 +234,11 @@ PanelRegistry.define('cost', {
 .cost-chart-caption>span:last-child{font-weight:400;letter-spacing:0;text-align:right}
 .cost-routes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:20px;row-gap:0}
 .cost-route{display:grid;grid-template-rows:subgrid;grid-row:span 6;position:relative;min-width:0;padding:14px 10px 10px;border-radius:8px;border:1px solid transparent}
+.cost-single .cost-routes,.cost-single .cost-detail-routes{grid-template-columns:minmax(0,1fr)}
+.cost-breakdown .cost-route{grid-row:span 5}
+.cost-components{list-style:none;padding:0;margin:12px 0 0;align-self:start}
+.cost-components li{display:grid;grid-template-columns:11px minmax(0,1fr) auto 42px;align-items:center;gap:7px;padding:6px 0;border-top:1px solid color-mix(in srgb,var(--dtext) 12%,transparent);font-size:11px}
+.cost-components b{font-variant-numeric:tabular-nums;font-weight:600}.cost-component-share{text-align:right;color:var(--dfaint)}
 .cost-active{border-color:color-mix(in srgb,var(--dtext) 32%,transparent);background:color-mix(in srgb,var(--dtext) 3%,transparent)}
 .cost-route-heading{display:flex;justify-content:space-between;flex-wrap:wrap;gap:5px;min-height:19px}
 .cost-following{font-size:9px;color:var(--dink);font-weight:600}
@@ -250,33 +273,32 @@ PanelRegistry.define('cost', {
   authoring: {
     initialFields: true,
     template: {
-      title: 'Messaging cost comparison', currency: 'USD', period: 'per month',
-      assumptions: 'Illustrative rates, not vendor quotes. One-way messages, one consumer, one billing unit per operation; no retries. Rates include the operations named in each line. Excludes egress, storage, free tiers, tax and engineering labor. Fixed relay cost covers the same month.',
-      routes: [{id:'bus',label:'Managed event bus',tradeoff:'Managed routing; fewer components to operate.'},
-        {id:'queue',label:'Queue + relay',tradeoff:'Lower usage rate; operate a relay and its retry / dead-letter handling.'}],
-      items: [{route:'bus',label:'Producer',perMillion:0},{route:'bus',label:'Publish + delivery',perMillion:2.8},
-        {route:'bus',label:'Consumer',perMillion:0.4},{route:'queue',label:'Producer',perMillion:0},
-        {route:'queue',label:'Queue operations',perMillion:0.8},{route:'queue',label:'Relay',perMillion:0.2,fixed:12},
-        {route:'queue',label:'Consumer',perMillion:0.4}],
-      initial: {messages:1000000}
+      title: 'Operation cost breakdown', currency: 'USD', unit: 'operation', period: 'per operation',
+      assumptions: 'Illustrative estimates, not vendor quotes. Fixed amounts are allocated to one operation. Excludes tax and engineering labor.',
+      routes: [{id:'operation',label:'Process one document'}],
+      items: [{route:'operation',label:'Compute',perMillion:0,fixed:0.06},
+        {route:'operation',label:'Storage',perMillion:0,fixed:0.01},
+        {route:'operation',label:'External API',perMillion:0,fixed:0.03}],
+      initial: {messages:1}
     },
-    setupFields: [['density','text'],['currency','text'],['period','text'],['assumptions','text'],
-      ['routes','rows',{wide:true,max:2,cols:[{k:'id',req:true},{k:'label'},{k:'tradeoff'}]}],
+    setupFields: [['density','text'],['currency','text'],['unit','text'],['period','text'],['assumptions','text'],
+      ['routes','rows',{wide:true,max:6,cols:[{k:'id',req:true},{k:'label'},{k:'tradeoff'}]}],
       ['items','rows',{wide:true,max:24,cols:[{k:'route',req:true},{k:'node'},{k:'label'},
-        {k:'perMillion',label:'Cost per 1M messages',kind:'num',req:true},{k:'fixed',label:'Fixed cost per period',kind:'num'}]}],['initial','json']],
+        {k:'perMillion',label:'Cost per 1M units',kind:'num',req:true},{k:'fixed',label:'Fixed cost per period',kind:'num'}]}],['initial','json']],
     patchFields: [['messages','num'],['activeRoute','text'],['note','text']],
     expandPatchFields: function (panel) {
-      return [['messages','num'],['activeRoute','enum',panelCollectionItems(panel,'routes',2).map(function (route) { return route.id; })],['note','text']];
+      return [['messages','num'],['activeRoute','enum',panelCollectionItems(panel,'routes',6).map(function (route) { return route.id; })],['note','text']];
     },
     fieldMeta: {
       density:{label:'Display density',help:'Auto uses compact horizontal bars in panels up to 520 px wide. Compact keeps the small layout at any width; Expanded keeps the tall chart.'},
-      currency:{label:'Currency',help:'One three-letter code for both routes; default USD. No currency conversion.'},
-      period:{label:'Comparison period',help:'Use the same period for message volume and every fixed charge, e.g. per month.'},
-      assumptions:{label:'Basis & exclusions',help:'Describe payload size, operations per message, retries, region, rate date and excluded charges. Label fictional rates.'},
-      routes:{label:'Routes',help:'Exactly two: baseline first, alternative second.'},
-      items:{label:'Engineering nodes & cost lines',help:'List each route’s components in delivery order. Route is its id; node optionally links an existing diagram node. Rate is the aggregate cost per million delivered messages, including all billable operations; explicit zero is free / excluded. Fixed cost defaults to zero.'},
-      messages:{label:'One-way messages',help:'Volume for the comparison period; default 1,000,000. Applies to both routes.'},
-      activeRoute:{label:'Following route',help:'Highlight the route being explained by this step. Does not change either estimate.',nullLabel:'No route highlighted'},
+      currency:{label:'Currency',help:'One three-letter code for all entries; default USD. No currency conversion.'},
+      unit:{label:'Workload unit',help:'Display label for the volume and per-million rates; defaults to messages. Use operation with volume 1 for a single-operation breakdown.'},
+      period:{label:'Cost period',help:'Use the same period for workload volume and every fixed charge, e.g. per month.'},
+      assumptions:{label:'Basis & exclusions',help:'Describe workload units, included operations, region, rate date and excluded charges. Label fictional rates.'},
+      routes:{label:'Operations / routes',help:'Declare 1–6 entries with unique ids. One shows a breakdown; exactly two compare baseline first and alternative second. Remove an entry’s cost lines when removing it.'},
+      items:{label:'Components & cost lines',help:'List each entry’s components. Route is its id; node optionally links an existing diagram node. Rate is the aggregate cost per million workload units, including all billable operations; explicit zero is free / excluded. Fixed cost defaults to zero.'},
+      messages:{label:'Workload volume',help:'Non-negative whole number for the authored period; default 1,000,000. Applies to every entry. For one operation use 1 and enter component amounts as fixed costs.'},
+      activeRoute:{label:'Following route',help:'Highlight the route being explained by this step. Does not change any estimate.',nullLabel:'No route highlighted'},
       note:{label:'Explanation'}
     },
     editor: function (context) {
@@ -292,7 +314,7 @@ PanelRegistry.define('cost', {
         return context.controls.row('Display density', select);
       }};
     },
-    picker:{order:3,name:'Messaging cost comparison',category:'Software & data',tagline:'Two routes. One workload.',
-      description:'Compare per-million usage and fixed costs, linked engineering nodes and the volume where an alternative becomes cheaper.'}
+    picker:{order:3,name:'Cost breakdown / comparison',category:'Software & data',tagline:'One operation or several routes.',
+      description:'Break down one operation into visible component costs, or show up to six entries on a shared scale. Exactly two entries also show savings and break-even volume.'}
   }
 });

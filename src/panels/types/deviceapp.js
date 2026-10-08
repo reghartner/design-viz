@@ -596,6 +596,8 @@ PanelRegistry.extend('deviceapp', {
   label: 'Device app',
   since: '0.1.0',
   layout: {
+    // Automatic composition only; manual small tiles retain sectionSizing.
+    composition: { minContentWidth: 330, nominalFontPx: { metadata: 9, detail: 11 } },
     sectionSizing: { minWidth: 230, preferredWidth: 290, maxWidth: 364, bodyAspect: 9 / 18.5, aspectPolicy: 'fixed', grow: 0, contentSelector: '.da-phone', bodyInset: 10 },
     large: true,
     height: 23,

@@ -64,7 +64,8 @@ function solve(source,{registry,geometry,measurements={},minimums={},excludeLayo
   const widths=graphVisible?[...new Set([Math.max(6,minGraphW),Math.min(24,Math.max(minGraphW,preferredGraphW)),24])]:[0];
   const touched=new Set((d.steps||[]).flatMap(s=>Object.keys(s.panels||{}).map(id=>'panel:'+id)));
   const panels=d.panels.filter(p=>!old.find(t=>t.panel===p.id)?.hidden).map((p,order)=>{
-    const c=V1.contract(p,registry),m=measurements[p.id]||{},min=minimums[p.id]||{},textLength=m.text?.length||0;
+    const declared=V1.contract(p,registry),m=measurements[p.id]||{},min=minimums[p.id]||{},textLength=m.text?.length||0;
+    const floor=V1.compositionWidth(declared,m),c={...declared,minWidth:Math.max(declared.minWidth,floor),preferredWidth:Math.max(declared.preferredWidth,floor),maxWidth:Math.max(declared.maxWidth,floor)};
     // Actual snapshot content can make a nominally small type a detailed report.
     // Fixed-aspect surfaces retain their contract; they never stretch to fill.
     const preferred=c.grow>0&&textLength>220?Math.min(c.maxWidth,Math.max(c.preferredWidth,240+Math.sqrt(textLength)*7)):c.preferredWidth;

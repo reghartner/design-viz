@@ -196,7 +196,8 @@ or invalid imports leave source and history unchanged.
 The dialog deliberately loads a chosen provider and its dependencies from the
 same v3 index/revision lock captured on Canon entry. It never reloads that index
 or refreshes existing providers. Browsing caches successful fetches for this
-session; only successful insertion extends persisted provider context. Undo
+session; successful insertion or an explicitly committed agent review extends
+persisted provider context. Undo
 removes the import but retains the frozen cache for Redo. Recovery carries that
 context and catalog; JSON downloads contain authored references, while offline HTML
 exports contain a read-only page snapshot without provider context. Offline, legacy v1/v2 and backend
@@ -210,11 +211,19 @@ the complete candidate with `FlowTopology.resolveSource`. It accepts the same
 subset and placement fields, never writes provider hardcopy, and reports invalid
 closure/collisions before publication. UI applies this plan through the normal
 session transaction; agents can author equivalent reference JSON and validate
-the complete approved batch using the Canon publisher.
+the complete approved batch using the Canon publisher. In a connected Workbench,
+submitting an agent proposal loads missing providers and their dependencies from
+the same pinned catalog before validation. The review renders against this staged
+context; only **Commit** publishes the provider context and authored spec/ledger
+pair. Stop, disconnect, project changes, and changed proposals retire pending
+loads without changing the document or its frozen context. Genuine merge conflicts
+and unavailable or revision-mismatched providers still block the update.
 
 A brand-new or local draft uses the same picker. Choose **Connect repository
 catalog** to explicitly pin the deployed v3 index, then browse approved providers
-normally. The Workbench gives the draft a session-only consumer identity for
+normally. The connection is retained even if you close the picker without adding
+a reference, and a previously blocked agent proposal is checked again against it.
+The Workbench gives the draft a session-only consumer identity for
 resolution; browser recovery retains it, but it is never written into the
 document. Local provider files are deliberately unsupported.
 

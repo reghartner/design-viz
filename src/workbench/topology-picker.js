@@ -107,8 +107,9 @@ function initTopologyPicker(opts){
       var nextContext=await opts.connect(snapshot.raw);
       if(!life.alive() || token!==generation || !dialog.open)return;
       if(!same()){invalid=true;refresh();return;}
+      if(opts.connected && !opts.connected(nextContext,snapshot)){invalid=true;refresh();return;}
       catalogContext=nextContext;
-      loaderKey=JSON.stringify([snapshot.project,'local-draft']);
+      loaderKey=JSON.stringify([snapshot.project,nextContext.catalogURL,nextContext.catalog]);
       loader=createTopologyCatalogLoader(catalogContext);el('connect').hidden=true;el('search').disabled=false;provider.disabled=false;el('search').focus();browse();
     }catch(ex){if(life.alive() && token===generation && dialog.open)message(ex.message);}
     finally{if(life.alive() && token===generation && dialog.open)el('connect').disabled=false;}

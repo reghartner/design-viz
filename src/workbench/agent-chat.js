@@ -527,7 +527,7 @@ function initWorkbenchAgentChat(opts){
     if(projectFolder && opts.setLedger)opts.setLedger(projectFolder.ledger,true);
     if(!kit)kit=JSON.parse(kitNode.textContent);
     var connectionProject=opts.snapshot().project;
-    client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,workflow:workflow,requireLedger:!!files.artifacts,
+    client=createFolderAgentClient({files:files,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,workflow:workflow,requireLedger:!!files.artifacts,
       level:function(){return get('level').value;},changed:function(update){if(life.alive() && token===generation && opts.snapshot().project===connectionProject)paint(update);}});
 
     var connectingClient=client,identity=await connectingClient.start(resume,choice);

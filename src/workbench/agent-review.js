@@ -167,8 +167,10 @@ function initWorkbenchAgentReview(opts){
     if(!source){el('view').textContent='Resolve the issues above with your agent to get a complete, valid preview.';return;}
     try{
       // Resolve a fresh render copy; source, change highlights and commit keep
-      // the authored declarations and the session owns frozen provider context.
-      var raw=JSON.parse(source),page=normalize(opts.resolve?opts.resolve(raw):raw),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
+      // the authored declarations. A prepared review may have additional pinned
+      // providers that are not published into the session until Commit.
+      var raw=JSON.parse(source),resolved=opts.resolve?(shown.topologyContext?opts.resolve(raw,shown.topologyContext):opts.resolve(raw)):raw;
+      var page=normalize(resolved),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});
       canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll')});rendered=true;decorate();
       var Observer=doc.defaultView && doc.defaultView.MutationObserver;

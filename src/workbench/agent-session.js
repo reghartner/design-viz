@@ -1,11 +1,11 @@
 /* Optional local-file transport. No browser-control or script-execution commands. */
 function createWorkbenchAgentExchange(opts){
-  var lastSource=null,lastLedger=null,lastProject=null,sequence=0,pending=null,baselines=new Map(),baselineBytes=0,pinned=null,reviewBase=null;
+  var lastSource=null,lastLedger=null,lastProject=null,lastTopology=null,sequence=0,pending=null,baselines=new Map(),baselineBytes=0,pinned=null,reviewBase=null;
   function snapshot(){
     var value=opts.snapshot();
-    if(value.source!==lastSource || value.ledger!==lastLedger || value.project!==lastProject){
+    if(value.source!==lastSource || value.ledger!==lastLedger || value.project!==lastProject || value.topologyRevision!==lastTopology){
       if(value.project!==lastProject){baselines.clear();baselineBytes=0;pinned=null;reviewBase=null;}
-      lastSource=value.source;lastLedger=value.ledger;lastProject=value.project;sequence++;
+      lastSource=value.source;lastLedger=value.ledger;lastProject=value.project;lastTopology=value.topologyRevision;sequence++;
       baselines.set(opts.clientId+'-'+sequence,{source:value.source,ledger:value.ledger,project:value.project});baselineBytes+=value.source.length;
       while(baselines.size>32 || baselineBytes>16*1024*1024 && baselines.size>1){var key=baselines.keys().next().value;baselineBytes-=baselines.get(key).source.length;baselines.delete(key);}
     }
@@ -24,20 +24,27 @@ function createWorkbenchAgentExchange(opts){
       reviewBase={revision:proposal.baseRevision,source:base.source,ledger:base.ledger,project:base.project};
       try{outcome=mergeWorkbenchAgentSource(base.source,current.source,proposal.source);}catch(ex){return blocked('The document is too complex to merge safely. Ask for a revised proposal.');}outcome.current=current;
       if(outcome.ok && new TextEncoder().encode(outcome.source).length>4*1024*1024)return blocked('The combined story exceeds the 4 MiB size limit.');
-      if(outcome.ok && opts.validate){
-        try{var error=opts.validate(outcome.source);if(error)return blocked('The combined story failed validation: '+error);}
-        catch(ex){return blocked('The combined story failed validation: '+ex.message);}
-      }
       if(outcome.ok && opts.requireLedger){
         if(typeof proposal.ledger!=='string' || !proposal.ledger.trim() || new TextEncoder().encode(proposal.ledger).length>256*1024)return blocked('Include the complete coverage ledger (up to 256 KiB) with this spec.');
         var before=base.ledger || '',local=current.ledger || '',incoming=proposal.ledger;
         if(local!==before && incoming!==before && local!==incoming)return {ok:false,current:current,conflicts:[{path:'/ledger',reason:'Both changed the coverage ledger. Reread the accepted pair and reconcile it.'}]};
         outcome.ledger=incoming===before?local:incoming;
       }
-      return outcome;
+      function validated(context){
+        if(outcome.ok && opts.validate){
+          try{var error=opts.prepare?opts.validate(outcome.source,context):opts.validate(outcome.source);if(error)return blocked('The combined story failed validation: '+error);}
+          catch(ex){return blocked('The combined story failed validation: '+ex.message);}
+        }
+        if(opts.prepare)outcome.topologyContext=context;
+        return outcome;
+      }
+      // Remain synchronous for transports without asynchronous preparation.
+      // This context comes only from the editor callback, never proposal fields.
+      if(outcome.ok && opts.prepare)return Promise.resolve().then(function(){return opts.prepare(outcome.source);}).then(validated,function(ex){return blocked('The combined story failed validation: '+ex.message);});
+      return validated();
     },
     request:function(){return {clientId:opts.clientId,snapshot:snapshot(),result:pending};},
-    receive:function(reply,sent){
+    receive:function(reply,sent,context){
       if(pending && sent.result && pending.id===sent.result.id && reply.acknowledged===pending.id)pending=null;
       if(reply.occupied)return 'Another tab is connected. Disconnect it or close it and wait a few seconds.';
       if(reply.fileError)return 'Proposal file: '+reply.fileError;
@@ -55,7 +62,7 @@ function createWorkbenchAgentExchange(opts){
       if(typeof source!=='string' || source.length>4*1024*1024)return result('rejected','Invalid or oversized source.');
       if(source===current.source && (!opts.requireLedger || proposal.ledger===current.ledger))return result('unchanged','Agent proposal matches the current document.');
       var outcome;
-      try{outcome=opts.apply(source,current,proposal);}
+      try{outcome=opts.apply(source,current,proposal,context);}
       catch(ex){return result('rejected','Could not apply proposal: '+ex.message);}
       if(!outcome || !outcome.ok)return result('rejected',outcome && outcome.error || 'Document changed before the proposal could apply.');
       current=snapshot();

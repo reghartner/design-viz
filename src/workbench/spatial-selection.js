@@ -71,6 +71,7 @@ function createBuilderSpatialSelection(opts){
     var c=context();sync();if(!c)return;
     var box=doc.createElement('div');box.className='iactions dv-spatial-actions';host.appendChild(box);
     var fit=doc.createElement('button');fit.type='button';fit.className='bbtn';fit.textContent='Fit selection';box.appendChild(fit);lifetime.listen(fit,'click',fitSelection);
+    if(!c.shell.classList.contains('viewport-explore')){fit.disabled=true;fit.title=fitReason(c);return;}
     var entries=[];
     ['horizontal','vertical'].forEach(function(direction){var button=doc.createElement('button');button.type='button';button.className='bbtn';button.textContent='Distribute '+(direction==='horizontal'?'horizontally':'vertically');box.appendChild(button);entries.push({button:button,direction:direction});lifetime.listen(button,'click',function(){distribute(direction);});});
     var note=doc.createElement('p');note.className='fnote';box.appendChild(note);
@@ -111,6 +112,11 @@ function createBuilderSpatialSelection(opts){
   life.listen(doc,'pointerdown',cancelNudge,true);
   life.listen(doc,'focusin',function(ev){if(nudge && ev.target!==nudge.focus.el)cancelNudge();},true);
   function open(ev){
+    /* Renderer-owned node references keep their established whole-node
+       right-click entry. Keyboard focus on the node still opens actions, while
+       the dedicated references trigger owns its own keyboard menu. */
+    var referenced=ev.type==='contextmenu' && ev.target.closest && ev.target.closest('.node[data-dv-node]');
+    if(referenced && referenced.querySelector('.nrefs-trigger'))return;
     if(!active() || opts.busy())return;var t=target(ev.target);if(!t)return;
     ev.preventDefault();ev.stopPropagation();close(false);cancel();cancelNudge();
     var targets=currentTargets();if(!targets.some(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);})) {opts.select([t]);targets=currentTargets();}

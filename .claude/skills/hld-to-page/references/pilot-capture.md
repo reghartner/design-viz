@@ -3,13 +3,30 @@
 Resolve the exact diagram folder through the normal setup. VIZ is the packaged
 `authoring/` directory. Keep the usual spec, ledger, and approval workflow.
 
+**One helper command per Bash call.** Every `pilot_capture.py` invocation must
+be its **own Bash call**, including `--enable`, `--enable --explicit-opt-in`,
+turn-start refresh, `--after-turn`, and `--disable`. Include only the helper
+command in that call: no `;`, `&&`, pipes, `cat`, `ls`, other commands, or file
+reads. Run folder preparation separately. Replace the example placeholders with
+absolute paths; keep the paths quoted so a separate `cd` is unnecessary.
+
+Use **Read** in a separate tool call to inspect `editor.json` or `story.agent.*`;
+do not use `cat` or combine inspection with capture. After scheduling a final
+copy, inspect `.flowview-pilot/after-turn-status.json` with **Read** separately,
+preferably on the next turn when the bounded copy has had time to finish.
+
+In one observed pilot run, Claude Code auto mode denied a bundled call with
+“Sensitive-Source Provenance”; standalone enable and after-turn calls succeeded.
+That observation does not identify which bundled component caused the denial
+or guarantee approval in another session. Report any actual denial accurately.
+
 **Check the current participant's choice first.** “Pilot capture: OFF for this
 session” in the setup prompt or current `CONNECT.md` overrides an existing
 `.flowview-pilot/config.json` and any prior enrollment. After resolving the
 folder and running `folder-agent.py prepare` when connected, run only:
 
 ```sh
-python3 <VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py --folder /path/to/diagram --disable
+python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram" --disable
 ```
 
 This updates registry metadata only and never discovers or reads a transcript.
@@ -32,7 +49,7 @@ If the participant directly pastes their ON setup prompt in this conversation,
 its explanation and authorization are sufficient; run without a second question:
 
 ```sh
-python3 <VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py --folder /path/to/diagram --enable
+python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram" --enable
 ```
 
 The helper verifies that the current native participant turn contains the ON
@@ -48,7 +65,7 @@ do not prove enrollment consent. Explain the local raw conversation, observed mo
 token usage scope while proceeding; dollar cost is collected manually. Run:
 
 ```sh
-python3 <VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py --folder /path/to/diagram --enable --explicit-opt-in
+python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram" --enable --explicit-opt-in
 ```
 
 Use that flag only for the participant's direct current request. The helper
@@ -75,7 +92,13 @@ sessions. Explain capture and obtain direct consent before enrolling anyone
 else. Do not invoke capture checkpoints to discover consent.
 
 While this participant remains opted in, at the beginning of every later user
-turn, run the same command without `--enable`. It refreshes all active enrolled
+turn, run this refresh in its own Bash call:
+
+```sh
+python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram"
+```
+
+It refreshes all active enrolled
 sessions and retains suspended captures without reading their native sources.
 The helper uses
 `CLAUDE_CODE_SESSION_ID` to find the matching native JSONL under
@@ -83,17 +106,18 @@ The helper uses
 participant to locate or export a transcript.
 
 While opted in, immediately before every reply, including questions, approval
-waits, errors, and completion, run:
+waits, errors, and completion, run this command in its own Bash call:
 
 ```sh
-python3 <VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py --folder /path/to/diagram --after-turn
+python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram" --after-turn
 ```
 
 This checkpoints the available transcript and schedules a local process for up
 to 45 seconds to copy the final response after it appears. It does not start
 another Claude session, make a model call, install hooks, or run a permanent
-listener. A scheduled copy is not verified completion. Check
-`.flowview-pilot/after-turn-status.json` for `captured`,
+listener. A scheduled copy is not verified completion. Afterwards, preferably
+on the next turn, use a separate **Read** call on
+`.flowview-pilot/after-turn-status.json` to check for `captured`,
 `timeout_response_pending`, `disabled` (opted out or replaced enrollment), or
 `failed`; a later turn also refreshes the copy.
 A crash, unavailable native file, or delayed write can leave a gap. Report the

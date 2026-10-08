@@ -11,6 +11,8 @@ new-session consent. Follow [pilot capture](../.claude/skills/hld-to-page/refere
 for consent checks, later opt-in and stopping; while opted in, checkpoint at
 entry and before every reply, including bounded edits.
 
+Run each capture command alone in its own Bash call. Inspect status/editor/transcript with separate Read calls.
+
 ## Scope
 
 For bounded fact, label, status and time corrections. Preserve story meaning,

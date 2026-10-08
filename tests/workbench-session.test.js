@@ -92,8 +92,9 @@ test('reading a valid legacy archive compacts it, while malformed or unwritable 
   assert.deepEqual(JSON.parse(h.storage.get('dv-workbench-earlier-drafts')),legacy.slice(0,2));
   h.persistence.preserve('C','base C',{ledger:'ledger C',topologyContext:{id:'C'}});
   assert.deepEqual(plain(h.persistence.archived()).map(entry=>entry.text),['C','A']);
-  const malformed='[{"text":"valid"},{"broken":true}]',invalid=archiveHarness(malformed);
-  assert.deepEqual(plain(invalid.persistence.archived()),[]);
+  const malformed='[{"text":"first"},null,{"broken":true},{"text":"second"}]',invalid=archiveHarness(malformed);
+  assert.deepEqual(plain(invalid.persistence.archived()),[{text:'first'},{text:'second'}]);
+  assert.equal(invalid.writes,0,'reading malformed legacy data must not compact or rewrite it');
   assert.throws(()=>invalid.persistence.preserve('new','baseline'),/earlier draft could not be saved/);
   assert.equal(invalid.storage.get('dv-workbench-earlier-drafts'),malformed);
   const full=archiveHarness(JSON.stringify(legacy)),before=full.storage.get('dv-workbench-earlier-drafts');

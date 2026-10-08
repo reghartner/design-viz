@@ -7,9 +7,10 @@ function createBuilderPersistence(options){
     return a.text===b.text && a.baseline===b.baseline && a.ledger===b.ledger &&
       JSON.stringify(a.topologyContext)===JSON.stringify(b.topologyContext);
   }
+  function validDraft(entry){return entry && typeof entry.text==='string';}
   function archiveEntries(storage){
     var entries=JSON.parse(storage.getItem(archiveKey) || '[]');
-    if(!Array.isArray(entries) || !entries.every(function(entry){return entry && typeof entry.text==='string';}))
+    if(!Array.isArray(entries) || !entries.every(validDraft))
       throw Error('Invalid earlier drafts');
     return entries;
   }
@@ -51,7 +52,11 @@ function createBuilderPersistence(options){
     read:read,save:save,
     archived:function(){
       try{
-        var storage=options.storage(),entries=archiveEntries(storage),recent=recentDrafts(entries);
+        var storage=options.storage(),entries=JSON.parse(storage.getItem(archiveKey) || '[]');
+        if(!Array.isArray(entries))return [];
+        var readable=entries.filter(validDraft);
+        if(readable.length!==entries.length)return readable; // Show valid legacy drafts without rewriting malformed bytes.
+        var recent=recentDrafts(entries);
         if(recent.length===entries.length)return recent;
         try{storage.setItem(archiveKey,JSON.stringify(recent));return recent;}
         catch(ex){return entries;} // Keep every recoverable entry visible if compaction cannot be saved.

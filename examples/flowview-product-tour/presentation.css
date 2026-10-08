@@ -1,0 +1,78 @@
+/* Tour-only presentation. Keep the authored grid, let the page grow, and give
+   captions normal reading size instead of squeezing them into the viewport. */
+body .doc-heading, body .doc-sub, body .generated-from,
+body .sec-eyebrow, body .dv-tour-discovery, body .dv-tour-replay,
+body .explore-navigation-actions, body .prosetoggle {
+  display: none !important;
+}
+body .docview { max-width: 1500px !important; padding: 12px 20px 28px !important; }
+body .doc-sec { width: 100% !important; box-sizing: border-box; margin-top: 0 !important; padding: 16px !important; }
+body .sec-h { font-size: 24px !important; }
+body .sec-prose { max-width: none; font-size: 14px; line-height: 1.5; margin: 6px 0 12px; }
+body .presentbtn { position: absolute; top: 16px; right: 28px; }
+/* There is one authored view per tab; a second "Chapters" picker adds no choice. */
+body .explore-navigation-chapters { display: none; }
+body .section-layout-grid { grid-auto-rows: 22px !important; gap: 8px !important; margin-top: 12px !important; }
+body .section-layout-tile > .pwidget { border-radius: 12px; }
+body .section-layout-tile[data-layout-key="steps"] > .termbar {
+  display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch;
+  gap: 12px; padding: 14px; height: 100%; max-height: none; overflow: auto;
+}
+body [data-layout-key="steps"] :is(.playback-mode-rail, .playback-status, .stepid, .stepcopy) { display: none; }
+body [data-layout-key="steps"] .step-transport { flex-wrap: nowrap; }
+body [data-layout-key="steps"] .schips { flex: 0 0 auto !important; width: 100%; max-width: none; box-sizing: border-box; gap: 6px; overflow: visible; }
+body [data-layout-key="steps"] .schip { width: 30px; height: 30px; min-width: 30px; padding: 0; box-sizing: border-box; font-size: 12px; }
+body [data-layout-key="steps"] .stepline {
+  flex: 0 0 auto !important; min-width: 0; width: 100%; font: 400 16px/1.5 'IBM Plex Sans', sans-serif;
+  color: var(--dink); overflow: visible;
+}
+body [data-layout-key="steps"] .stepnum { font-size: 12px; }
+body .path-matrix { display: flex; flex-direction: row; flex-wrap: wrap; gap: 6px; width: 100%; align-items: stretch; }
+body .path-matrix::after { content: ""; flex-basis: 100%; order: 0; }
+body .path-row { display: contents; }
+body .path-matrix .path-chip { order: 0; flex: 1 1 28%; max-width: none; min-width: 0; justify-content: center; padding: 5px 7px; font: 600 12px/1.4 'IBM Plex Sans',sans-serif; }
+body .path-matrix .schip { order: 1; }
+body .path-row[data-selected="false"] .schip { display: none; }
+body .termbar.has-paths .path-row[data-selected="false"] .path-chip { opacity: .75; filter: none; }
+/* The graph is a compact map above the evidence, always read left to right.
+   Review alone adds a correction loop under the direct acceptance route. */
+body .board { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+body .board-size { display: none; }
+body .boardcanvas { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+body .board:not(.board-zoomed) .boardcanvas > svg { height: 100%; width: auto; max-width: 100%; min-width: 0; }
+body .board g.node:not(.lit) { opacity: .8 !important; }
+body .board :is(path.edge,text.lbl):not(.lit) { opacity: .65 !important; }
+/* Screen labels carry provenance; captions below the controls carry the story. */
+body .ptitle { font-size: 11px !important; letter-spacing: .07em; }
+body .pt-appscreens { padding: 12px; }
+body .appscreens figcaption { display: none; }
+body .appscreen-stage, body .appscreen-viewport { width: 100%; height: 100%; min-height: 0; }
+body .appscreen-viewport { background: transparent; }
+body .appscreen-image img { object-fit: contain; transform: none; }
+/* Show the newest exchange; the stored log still retains the full dialogue. */
+body .pt-log .plogline:nth-last-child(n+3) { display: none; }
+body .stepline.dv-caption-old { display: none; }
+body .stepline.dv-caption-new { animation: none; }
+body .pt-log .pbody { height: calc(100% - 28px); min-height: 0; }
+body .pt-log .plog { height: 100%; box-sizing: border-box; font: 400 14px/1.5 'IBM Plex Sans',sans-serif; color: var(--dink); }
+body .pt-log .plogline { padding: 4px 0; gap: 10px; }
+body .pt-log .plogtag { min-width: 52px; font-size: 11px; padding-top: 2px; }
+/* Build's source choices need room above the caption. */
+body #section-build [data-layout-key="steps"] > .termbar { gap: 6px; padding: 10px; }
+@media (max-width: 900px) {
+  body .docview { padding: 8px !important; }
+  body .doc-sec { padding: 12px !important; }
+  body .sec-h { font-size: 21px !important; white-space: normal; }
+  body .presentbtn { display: none; }
+  body .section-layout-grid { zoom: 1 !important; width: 100% !important; display: flex !important; flex-direction: column; gap: 12px !important; }
+  body .section-layout-tile { width: 100%; height: auto; }
+  body [data-layout-key="diagram"] { order: 3; height: 190px; }
+  body :is(#section-review,#section-backstage) [data-layout-key="diagram"] { height: 280px; }
+  body [data-layout-key="steps"] { order: 0; }
+  body .section-layout-tile:has(> .pt-appscreens) { order: 1; height: 380px; }
+  body .section-layout-tile:has(> .pt-log) { order: 2; min-height: 160px; }
+  body .section-layout-tile > .pwidget { height: 100%; }
+  body .pt-log .plog { height: auto; }
+  body .boardcanvas { overflow-x: auto; justify-content: flex-start; }
+  body .board:not(.board-zoomed) .boardcanvas > svg { flex: none; width: 1000px; min-width: 1000px; max-width: none; height: auto; }
+}

@@ -213,7 +213,8 @@ not open the accepted files or all of `state.json` just to recreate the
 candidates; read `state.json` only for context the request and candidates lack.
 Full rereads of the current pair are for requests without `candidate` and for
 stale, rejected or conflicting proposals. Update the ledger copy when
-coverage, evidence or decisions change. Each request has its own filenames;
+coverage, evidence or decisions change. Finalize and verify the ledger's claims
+against the candidate before proposing it. Each request has its own filenames;
 never write another request's candidates. Flowview never reseeds a pending
 request's candidates.
 
@@ -228,10 +229,13 @@ visual QA.
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
 from the authoring kit (or checkout) and propose its output. The command handles
-node placement, panel sizes and step controls; do not choose coordinates or
-rectangles. Preserve existing layouts and routes during ordinary edits; a new
-node uses `{id,side:"below",noSpread:true}`. Use `--rearrange` only when explicitly
-requested. Validate and state-walk the result, then submit it for paired
+the initial node placement, panel sizes and step controls. Preserve unrelated
+existing layouts and routes during ordinary edits; a new node uses
+`{id,side:"below",noSpread:true}`. User feedback that the rendered candidate
+clips content or is hard to read authorizes scoped candidate tile sizing without
+another permission round or asking the user to arrange it. Use `--rearrange`
+when that requested repair needs structural node placement, limited to the
+affected section. Validate and state-walk the result, then submit it for paired
 Workbench preview and explicit approval. See `docs/auto-arrange.md` for supported
 inputs and estimation limits. This browserless session cannot establish visual QA.
 
@@ -285,8 +289,13 @@ edit the proposed source. Neither candidate is
 accepted until **Commit update**. One Undo/Redo restores both. This saves local
 artifacts; it does not make a Git commit. The agent should reread the accepted
 pair after approval, especially after a merge, and submit a correction if the
-ledger no longer describes the accepted diagram. Commit or publish only with
-user authorization. A missing ledger is unfinished work, not a successful delivery.
+ledger no longer describes the accepted diagram. Record routine acceptance and
+closed-review bookkeeping in the completion reply rather than submitting another
+spec/ledger proposal solely for that bookkeeping. If merged edits or verification
+reveal an actual spec/ledger mismatch, submit a real correction proposal and wait
+for its paired approval and matching result. Never write accepted files directly
+or release the request before its result. Commit or publish only with user
+authorization. A missing ledger is unfinished work, not a successful delivery.
 
 Separate object fields and stable-ID items can merge against their original
 revision. Overlapping changes, deletion/edit collisions, ambiguous ordering,

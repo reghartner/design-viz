@@ -208,6 +208,33 @@ require scrolling; their reported position is an estimated isolated section,
 not the section's position in a complete document. Review the rendered result
 when a visual review is available.
 
+### Repairing a rendered layout
+
+The composed layout is the starting point. If the user supplies the host
+viewport, pass it with `--width`; otherwise keep the default rather than
+inventing a presentation width. A later report of clipping or unreadable
+content authorizes a scoped repair to the candidate, including affected tile
+sizes. Preserve semantics and unrelated sections. Use `--rearrange` only when
+the requested repair needs structural node placement, and limit it to the
+selected section.
+
+Use the rendered preview, or the user's specific preview feedback when the
+agent has no browser, to diagnose the constraint before changing geometry:
+
+- Changing the host width can change the graph's rendered height while saved
+  grid-row heights remain fixed.
+- A camera or other aspect-ratio panel needs height for both its media and
+  status chrome.
+- Enlarging a tile does not enlarge a phone or other widget whose interior has
+  its own maximum width. Keep a bounded repair to geometry and composition, or
+  make the important evidence readable elsewhere in the existing composition.
+  Changing the panel type requires support from the source or request and the
+  full paired authoring workflow.
+
+Treat calculated sizes as estimates. Do not present guessed pixels as visual
+verification, copy dimensions from a benchmark fixture, or ask the user to
+finish a repair that can be made and reviewed through the candidate workflow.
+
 Supported scope is Standard diagrams with at most 24 panels, 100 steps and
 20 paths (200 path/step states). Selected named views, Explore, attached controls,
 legacy 12-column sibling profiles and content beyond bounded geometry fail with

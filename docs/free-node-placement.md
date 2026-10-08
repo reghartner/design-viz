@@ -11,9 +11,13 @@ drag saves a position; it never swaps cards or inserts the node into a row.
 Dragging an automatic **above/below** float also pins it at the dropped position.
 The ghost and connected-edge previews show the proposed placement before release.
 
-Shift-click floating nodes in the same section, then choose **Align horizontal**
-or **Align vertical** in Inspect. Horizontal sets every selected center to the
-first selected node's Y; vertical sets their X. Automatic floats become pinned.
+Shift-click floating nodes in the same section, or hold **Alt/Option** and drag
+from empty diagram space to marquee them in either Standard or Explore. Choose
+**Align horizontal** or **Align vertical** in Inspect, or right-click a selected
+node and use the object menu. Horizontal sets every selected center to the first
+selected node's Y in Inspect; the object menu uses the right-clicked node as its
+anchor. Vertical alignment follows the same rule for X. Automatic floats become
+pinned.
 Drag any selected node to move the whole selection together, with or without
 Shift held. Spacing and selection are retained, so you can align a row and then
 move it. A modifier-click without dragging still adds or removes a node.

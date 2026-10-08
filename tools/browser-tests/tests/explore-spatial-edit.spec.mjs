@@ -87,6 +87,20 @@ test('Reader and Backstage keep native context menus and have no marquee editing
  }
 });
 
+test('Standard Reader and Backstage nodes keep native context menus and no workbench selection chrome',async({page,server})=>{
+ for(const host of ['reader','backstage']){
+  const raw=fixture();raw.page.sections[0].diagram.layouts[0].presentation='standard';
+  if(host==='reader'){
+   const input=path.join(server.root,'standard-spatial-reader.json'),output=path.join(server.root,'standard-spatial-reader.html');await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);await page.goto(server.origin+'/standard-spatial-reader.html');
+  }else{
+   await writeFile(path.join(server.root,'standard-spatial-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'standard-spatial-native.html'),'<style>body{margin:0}#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./standard-spatial-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/standard-spatial-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);},raw);
+  }
+  const target=node(page);await expect(target).toBeVisible();await expect(target).not.toHaveAttribute('tabindex','0');await expect(target).not.toHaveAttribute('data-dv-object-menu','');
+  await page.evaluate(()=>document.addEventListener('contextmenu',e=>{window.standardContextPrevented=e.defaultPrevented;},{once:true}));await target.click({button:'right'});expect(await page.evaluate(()=>window.standardContextPrevented)).toBe(false);await expect(menu(page)).toHaveCount(0);
+  const r=await target.boundingBox();await page.keyboard.down('Alt');await page.mouse.move(r.x+r.width+10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width-4,r.y+6,{steps:5});await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-sel')).toHaveCount(0);
+ }
+});
+
 test('plain Explore nodes expose a keyboard entry point and return focus after menu dismissal',async({page,server})=>{
  await open(page,server);const original=await source(page),anchor=node(page);
  await expect(anchor).toHaveAttribute('tabindex','0');await expect(anchor).toHaveAttribute('role','group');await expect(anchor).toHaveAccessibleName('Anchor node');

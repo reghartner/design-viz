@@ -1,4 +1,4 @@
-import {test,expect,pastePage as paste} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,closeTools} from '../helpers/test.mjs';
 const fixture=()=>({page:{title:'Align and move',blocks:[{heading:'Services',diagram:{view:'ambient',autoplay:false,
   nodes:{a:{title:'First'},b:{title:'Second'},c:{title:'Stay'},row:{title:'Row'}},rows:[['row']],
   floats:[{id:'a',side:'below',x:260,y:210},{id:'b',side:'below',x:650,y:330},{id:'c',side:'below',x:950,y:230}],
@@ -6,6 +6,7 @@ const fixture=()=>({page:{title:'Align and move',blocks:[{heading:'Services',dia
 const source=page=>page.locator('#src').inputValue();
 const diagram=async page=>JSON.parse(await source(page)).page.blocks[0].diagram;
 const node=(page,id)=>page.locator('#docview g.node[data-dv-node="'+id+'"]');
+const menu=page=>page.getByRole('menu',{name:'Object actions'});
 async function select(page){await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});await expect(page.locator('#guide')).toContainText('2 nodes selected');}
 async function drag(page,id,dx,dy){
   await node(page,id).hover();
@@ -97,4 +98,47 @@ test('group alignment and dragging work in Explore and refuse stale source align
   await page.evaluate(text=>{const src=document.querySelector('#src');src.value=text;src.dispatchEvent(new Event('input',{bubbles:true}));},edited);
   const align=page.getByRole('button',{name:'Align vertical',exact:true});await expect(align).toBeDisabled();await expect(align).toHaveAttribute('title',/Render it before aligning/);await expect(page.locator('#src')).toHaveValue(edited);
   await expect(page.locator('#guide')).toContainText('Render it before aligning');
+});
+
+test('Standard object menu keeps a selected set, anchors the invoked node, and supports node actions',async({page,server},info)=>{
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
+  await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});const original=await source(page);
+  await node(page,'b').click({button:'right'});await expect(menu(page)).toBeVisible();await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
+  for(const name of ['Inspect','Delete','Duplicate','Align horizontally','Align vertically'])await expect(menu(page).getByRole('menuitem',{name,exact:true})).toBeVisible();
+  await page.screenshot({path:'/tmp/standard-node-actions-1280.png'});await info.attach('Standard node actions 1280',{body:await page.screenshot(),contentType:'image/png'});
+  await menu(page).getByRole('menuitem',{name:'Align horizontally',exact:true}).click();let changed=await source(page),d=await diagram(page);
+  expect(d.floats.find(f=>f.id==='b')).toEqual(fixture().page.blocks[0].diagram.floats.find(f=>f.id==='b'));
+  expect(d.floats.find(f=>f.id==='a').y).toBeCloseTo(d.floats.find(f=>f.id==='b').y,3);await history(page,original,changed);const aligned=changed;
+
+  await closeTools(page);await node(page,'c').click({button:'right'});await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);await expect(node(page,'c')).toHaveClass(/dv-sel/);
+  await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveValue('Stay');
+  await node(page,'c').focus();await page.keyboard.press('Shift+F10');await expect(menu(page).getByRole('menuitem',{name:'Inspect',exact:true})).toBeFocused();
+  await page.keyboard.press('ArrowDown');await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Duplicate',exact:true})).toBeFocused();await page.keyboard.press('Enter');
+  changed=await source(page);expect(Object.keys((await diagram(page)).nodes)).toHaveLength(5);await history(page,aligned,changed);const duplicated=changed;
+
+  await closeTools(page);await node(page,'c').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();changed=await source(page);expect((await diagram(page)).nodes.c).toBeUndefined();await history(page,duplicated,changed);
+  await closeTools(page);await node(page,'row').click();await node(page,'a').click({modifiers:['Shift']});await node(page,'row').click({button:'right'});const align=menu(page).getByRole('menuitem',{name:/^Align horizontally/});await expect(align).toHaveAttribute('aria-disabled','true');await expect(align).toContainText('Free placement');await page.keyboard.press('Escape');
+});
+
+async function marqueeCorner(page,id){
+  const r=await node(page,id).boundingBox();
+  await page.keyboard.down('Alt');await page.mouse.move(r.x+r.width+10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width-4,r.y+6,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
+}
+test('Standard Alt marquee follows fitted, zoomed, and scrolled node geometry without panning or editing',async({page,server},info)=>{
+  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture()));const board=page.locator('#docview .board'),svg=board.locator('.boardcanvas>svg');const original=await source(page),fittedWidth=(await svg.boundingBox()).width;
+  for(const state of ['fitted','zoomed','scrolled']){
+    if(state==='zoomed'){await board.getByRole('button',{name:'Readable',exact:true}).click();await expect(board).toHaveClass(/board-size-readable/);expect((await svg.boundingBox()).width).toBeGreaterThan(fittedWidth);}
+    if(state==='scrolled')await board.evaluate(el=>{el.scrollLeft=Math.min(el.scrollWidth-el.clientWidth,el.scrollLeft+120);});
+    const scroll=await board.evaluate(el=>[el.scrollLeft,el.scrollTop]);await marqueeCorner(page,'b');
+    await expect(node(page,'b')).toHaveClass(/dv-sel/);await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(1);expect(await source(page)).toBe(original);
+    expect(await board.evaluate(el=>[el.scrollLeft,el.scrollTop])).toEqual(scroll);await page.keyboard.press('Escape');await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(0);
+  }
+  await info.attach('Standard marquee geometry',{body:await page.screenshot(),contentType:'image/png'});
+});
+
+test('Standard keyboard decorations and menu retire with the builder',async({page,server})=>{
+  await page.goto(server.origin+'/lifetime/index.html');await paste(page,JSON.stringify(fixture()));const anchor=node(page,'a');
+  await expect(anchor).toHaveAttribute('tabindex','0');await anchor.focus();await page.keyboard.press('ContextMenu');await expect(menu(page)).toBeVisible();await page.keyboard.press('Escape');await expect(anchor).toBeFocused();
+  await page.evaluate(()=>__editorTest.builder.destroy());await expect(menu(page)).toHaveCount(0);await expect(anchor).not.toHaveAttribute('tabindex','0');await expect(anchor).not.toHaveAttribute('aria-haspopup','menu');await expect(anchor).not.toHaveAttribute('role','group');
+  await page.evaluate(()=>__editorTest.remount());await expect(anchor).toHaveAttribute('tabindex','0');
 });

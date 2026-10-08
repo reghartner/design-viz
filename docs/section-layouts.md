@@ -26,8 +26,8 @@ scrolling lets you inspect a preview wider than your editor split.
 
 To arrange a Standard view, choose **Chapter → Arrange chapter and saved visibility…**, then choose **Arrangement profile**: **Responsive**, **Backstage**, or **Confluence**. The editor displays and edits that profile independently of **Preview host**. Editing an inherited arrangement creates that profile without changing its fallback. Each panel, the data-flow diagram, and any detached step controls
 get a grab bar and a lower-right resize handle. Drag either handle to snap to
-a 24-column grid. Overlapping tiles move down to remain visible. Click
-**Hide arrangement controls** tucks away the fields while you drag tiles. Choose **Done arranging** to finish. Diagram nodes and Home elements
+a 24-column grid. Overlapping tiles move down to remain visible. Choose
+**Hide arrangement controls** to tuck away the fields while you drag tiles. They stay hidden through moves, resizes, Undo, Redo, and arrangement rerenders until you choose **Show arrangement controls** or finish with **Done arranging**. Diagram nodes and Home elements
 retain their existing separate editing controls. Drag **Step controls** to put
 play/pause, alternate-path chips, step buttons, and the caption beside the Home
 map or elsewhere in the section. They move as one live group.

@@ -52,6 +52,8 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   if(stacked){items[0].h=24;items[1].x=0;items[1].w=8;}
   const source=await open(page,server,raw);
   await page.getByRole('button',{name:'Hide arrangement controls',exact:true}).click();
+  const disclosure=page.locator('[data-arrange-disclosure]'),fields=page.locator('.section-arrange-fields');
+  await expect(disclosure).toHaveText('Show arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','false');await expect(fields).toBeHidden();
   const tile=page.locator('[data-layout-key="panel:home"]'),handle=tile.locator('.section-tile-move');
   await handle.scrollIntoViewIfNeeded();
   await page.locator('.workmain').evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle(page);
@@ -67,6 +69,13 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   await page.mouse.up();
   const saved=JSON.parse(await page.locator('#src').inputValue());
   expect(saved.page.blocks[0].diagram.layouts[0].sectionLayout.default.find(it=>it.panel==='home').y).toBe(18);
+  const savedText=await page.locator('#src').inputValue();
+  await expect(disclosure).toHaveText('Show arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','false');await expect(fields).toBeHidden();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(disclosure).toHaveText('Show arrangement controls');await expect(fields).toBeHidden();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(savedText);await expect(disclosure).toHaveText('Show arrangement controls');await expect(fields).toBeHidden();
+  await handle.focus();await page.keyboard.press('ArrowUp');const nudged=await page.locator('#src').inputValue();expect(nudged).not.toBe(savedText);
+  await expect(disclosure).toHaveText('Show arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','false');await expect(fields).toBeHidden();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(savedText);await expect(fields).toBeHidden();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
   await expect(page.locator('#undo-builder')).toBeDisabled();
   // Escape restores geometry and removes the temporary scroll-range floor.
@@ -78,4 +87,9 @@ for(const stacked of [false,true])test(`bottom panel ${stacked?'overlapping anot
   expect(await tile.evaluate(el=>Number(el.style.getPropertyValue('--tile-y')))).toBe(25);
   expect(await page.locator('.section-layout-grid').evaluate(el=>el.style.minHeight)).toBe('');
   await expect(page.locator('.layout-dragging')).toHaveCount(0);
+  await disclosure.click();await expect(disclosure).toHaveText('Hide arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','true');await expect(fields).toBeVisible();
+  await handle.focus();await page.keyboard.press('ArrowUp');await expect(disclosure).toHaveText('Hide arrangement controls');await expect(fields).toBeVisible();
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(fields).toBeVisible();
+  await page.getByRole('button',{name:'Done arranging',exact:true}).click();await arrangeChapter(page);
+  await expect(disclosure).toHaveText('Hide arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','true');await expect(fields).toBeVisible();
 });

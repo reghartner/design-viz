@@ -8,12 +8,22 @@ import os from 'node:os';
 import {fileURLToPath} from 'node:url';
 const run=promisify(execFile),require=createRequire(import.meta.url),repo=fileURLToPath(new URL('../../..',import.meta.url));
 let kit;
+async function stageDeveloperArranger(destination){
+ for(const file of ['tools/arrange-spec.cjs','tools/arrange/setup.cjs','tools/arrange/generated-native.html'])
+  expect(await fs.stat(path.join(destination,file)).catch(()=>null),file+' must stay out of the participant kit').toBeNull();
+ await fs.copyFile(path.join(repo,'tools/arrange-spec.cjs'),path.join(destination,'tools/arrange-spec.cjs'));
+ await fs.cp(path.join(repo,'tools/arrange'),path.join(destination,'tools/arrange'),{
+  recursive:true,filter:source=>path.basename(source)!=='node_modules'});
+}
 test.beforeAll(async()=>{
  kit=await fs.mkdtemp(path.join(os.tmpdir(),'flowview-native-kit-'));
- // Build and extract the actual distributed kit, not a hand-picked test copy.
+ // Extract the actual participant kit first, then explicitly add checkout-owned
+ // developer tooling for this native-arranger contract. The participant payload
+ // must remain browserless even though this fixture exercises the optional tool.
  await run('python3',['-c',`import sys,json,gzip,base64,pathlib;sys.path.insert(0,'tools');from folder_agent_kit import folder_agent_kit;from build import canon_runtime;r=json.loads(folder_agent_kit('.',canon_runtime()));files=json.loads(gzip.decompress(base64.b64decode(r['gzip'])))['files'];root=pathlib.Path(sys.argv[1]);[(root.joinpath(k).parent.mkdir(parents=True,exist_ok=True),root.joinpath(k).write_text(v)) for k,v in files.items()]`,kit],{cwd:repo,maxBuffer:5e6});
+ await stageDeveloperArranger(kit);
  // Reuse only the exact CI-installed Playwright package; the CLI itself has no
- // fallback. Source-free runtime resolution is entirely inside this test kit.
+ // fallback. Source-free runtime resolution is entirely inside this developer fixture.
  const pkg=require.resolve('playwright-core/package.json');expect(JSON.parse(await fs.readFile(pkg,'utf8')).version).toBe('1.63.0');
  await fs.mkdir(path.join(kit,'tools/arrange/node_modules'),{recursive:true});await fs.cp(path.dirname(pkg),path.join(kit,'tools/arrange/node_modules/playwright-core'),{recursive:true});
  expect(await fs.stat(path.join(kit,'src/source-bundles.json')).catch(()=>null)).toBeNull();

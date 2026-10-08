@@ -130,10 +130,16 @@ standalone-output workflows with ordinary local specs.
 
 1. **Questions first, always.** For a new diagram or a changed story, your
    first deliverable is a written batch of questions (Phase 2); small edits
-   are covered under Special situations. Unless the request already states
-   them, confirm the technical level (story, mixed or engineering),
-   audience, takeaway, time span and starting state. If the request and
-   source settle every decision, say so in one line and continue. Match the questions to
+   are covered under Special situations. Count independently answerable
+   decisions, not numbered items: the batch may ask for at most 7. If two
+   clauses could reasonably get different answers, they are two decisions.
+   Treat facts stated by either the request or the source as settled; do not
+   ask the operator to repeat or approve them. Confirm only missing story
+   decisions such as the technical level (story, mixed or engineering),
+   audience, takeaway, time span or starting state. Declare reasonable
+   cosmetic defaults without requiring an answer, and record them in the
+   ledger. If the request and source settle every decision, say so in one
+   line and continue. Match the questions to
    that level: never ask a business reader about SHAs, anchors or protocols.
    If the environment gives any way to reach the operator (a questions file,
    chat), send the batch and stop until the answers arrive. Record the
@@ -343,16 +349,26 @@ While you read, list: candidate paths (happy, failure, alternate endings),
 physical actors and devices, services, any stated times or durations, any
 stated battery, temperature or signal values, and which facts are missing.
 
-## Phase 2: Ask the operator (one batch, then wait)
+## Phase 2: Ask the operator (bounded batches, wait after each)
 
-Do this before the worksheet. Write one numbered batch of questions to
-`<OUT>/QUESTIONS.md` (or the file or channel the request names), and copy it
-into the ledger's Amendments table. Ask at most 7 questions, in plain
-language, each with your proposed default so the operator can answer "ok".
-Do not ask what the request already answers.
+Do this before the worksheet. Write one numbered batch at a time to
+`<OUT>/QUESTIONS.md` (or the file or channel the request names), append any
+later batch, and copy each into the ledger's Amendments table. Ask for at most
+7 independently answerable decisions, in plain language, each with your proposed default so the operator
+can answer "ok". A numbered item may give context, but it asks for one decision.
+If parts could be answered differently, split and count them separately. If
+more than 7 real decisions remain, ask the 7 that most affect an honest
+storyboard and wait; do not hide the rest in compound questions.
 
-**Question 1 is always the technical level** (skip it only if the request
-states it):
+Before writing the batch, sort the unknowns into three groups: facts already
+supplied by the request or source, reasonable cosmetic defaults you will declare
+under **Decisions I made**, and missing story decisions the operator must make.
+Never re-ask supplied facts. Defaults such as clock/date formatting or visual
+appearance do not need approval, but a default must not disguise a missing
+story decision; ask that decision and wait.
+
+**The first question is the technical level** when neither the request nor the
+source states it:
 
 | Level | What the diagram shows | Who it suits |
 |---|---|---|
@@ -360,20 +376,24 @@ states it):
 | Mixed | The story plus the main services by name, with plain captions. | Mixed rooms |
 | Engineering | Every service hop, API, failure mode and code reference. | Engineers and reviewers |
 
-**Right after the level, the first time question is the story's span**
-(skip it only if the request states it): when it starts (date and time),
-when it ends or how long it lasts, and the clock and date style
-(default: 12-hour clock, short date such as "Fri, Oct 2"). **Then battery
-rates**, for each battery device the source gives no rate for: at
-engineering level ask its drain (and charge, if it charges) per hour; at
-story or mixed level choose them yourself (an illustrative estimate, or 0
-for a wired device) and list them under **Decisions I made**.
+**Right after the level, ask the first unresolved time decision about the
+story's span.** Keep it to one choice, for example, "May I stage this from
+Friday evening through Saturday morning?" If an exact start or end is a
+story-critical missing fact, ask it separately and count it separately.
+Choose clock and date formatting as a declared cosmetic default unless the
+request makes that presentation choice material. **Then battery rates**, for
+each battery device the source gives no rate for: at engineering level, each
+unknown drain or charge rate that affects the story is one decision; at story
+or mixed level choose it yourself (an illustrative estimate, or 0 for a wired
+device) and list it under **Decisions I made**.
 
 Then ask only what the source and request leave open, from this list:
-audience and the one-sentence takeaway; the moments the viewer must see;
-which outcomes (paths) to show; the starting situation (battery,
-connectivity, what is already on the phone). At engineering level you may
-also ask about thresholds, missing catalog services and code locations.
+audience; the one-sentence takeaway; the moments the viewer must see;
+which outcomes (paths) to show; and story-critical parts of the starting
+situation (battery, connectivity, what is already on the phone). Count each
+independently selectable outcome or starting-state choice separately. At
+engineering level you may also ask about thresholds, missing catalog services
+and code locations, with each independently answerable gap counted separately.
 
 **Do not ask a story-level or mixed-level operator technical questions**
 (catalog entries, code SHAs or anchors, protocols, battery rates, report
@@ -396,7 +416,13 @@ If the request says how questions reach the operator
 building anything. Proceed on defaults only when the operator has explicitly
 said no answers will come; then record each one in the Amendments table as
 `no answer; assumed: <default>`. When answers arrive, record them and apply
-them before starting the worksheet.
+them, then reassess the deferred unknowns. If any material story decision
+remains unresolved, send the next batch of at most 7 independently answerable
+decisions and wait again. Do not start the worksheet until every material
+story decision is resolved by an answer or by the operator explicitly declining
+to answer and accepting the recorded assumption. Cosmetic presentation choices
+remain declared author defaults; do not create repeated batches merely to ask
+the operator to approve them.
 
 ## Phase 3: Fill the storyboard worksheet
 

@@ -229,6 +229,16 @@ test('visibility checklist binds each checkbox to its own tile, exposes hidden p
   assert.equal(JSON.stringify(items),before,'UI changes are committed by the owning layout editor, never mutated in place');
 });
 
+test('arrangement disclosure state survives control replacement until its Arrange session ends',()=>{
+  const context=commandContext(['layout']);vm.runInContext(readSource('layout.workbench.js'),context);
+  const disclosure=context.createSectionArrangementDisclosureState();
+  assert.equal(disclosure.collapsed(),false);
+  assert.equal(disclosure.toggle(),true);assert.equal(disclosure.collapsed(),true);
+  assert.equal(disclosure.collapsed(),true,'reading retained state for replacement controls does not reopen them');
+  assert.equal(disclosure.toggle(),false);assert.equal(disclosure.collapsed(),false);
+  disclosure.toggle();disclosure.reset();assert.equal(disclosure.collapsed(),false,'a new Arrange session starts expanded');
+});
+
 test('optimization preserves hidden elements without reserving their space or changing other views/profiles',()=>{
   for(const target of ['default','backstage','confluence']){
     const d=diagram(),items=plain(ctx.sectionLayoutPreset(d,target));

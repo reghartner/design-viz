@@ -170,8 +170,11 @@ Per step:
   that flows back into shared steps). **An unresolvable path/step token skips the step at entry**
   — same warning and pass-through as a missing target — so rejoin copy can
   never show over a path that does not rejoin. An explicit view or step ID that does not resolve also skips the lesson.
-  `diagramVisible: true` temporarily reveals the graph, including an enclosing
-  disclosure; leaving the tour restores its previous visibility.
+  The legacy `diagramVisible: true` hint is accepted for compatibility, but
+  revealing an authored-hidden graph is deprecated and has no effect. The hint
+  can still open an enclosing disclosure; leaving the tour restores that
+  disclosure. For a graph lesson, select a chapter whose diagram is authored
+  visible. The tour never overrides saved diagram visibility.
   `view` names an authored view ID. For a portable lesson, `presentation`
   selects the first matching named view; an ordinary diagram without named
   views already uses Standard. An explicit `view` takes precedence. A
@@ -237,7 +240,8 @@ in `exploreLayout.canvas.controls`. Explore chapter buttons
 carry an **EXPLORE** marker, and a document tab carries the same marker when
 its primary diagram's current chapter uses Explore viewing mode. The marker's tooltip and
 accessible description explain that the canvas can be panned and zoomed.
-Both viewing modes present the same underlying story.
+Both viewing modes present the same underlying story and honor its chapter
+visibility settings, including a hidden diagram.
 
 The built-in Explore pair declares `presentation: "explore"`. Its first
 lesson highlights a visible floating panel and explains moving, resizing

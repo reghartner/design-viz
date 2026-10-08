@@ -134,7 +134,6 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
  .docview .viewer-diagram-canvas .explore-board{background-image:radial-gradient(color-mix(in srgb,var(--dtext) 16%,transparent) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
  .viewer-diagram-canvas .explore-board::-webkit-scrollbar{display:none;}
  .viewer-diagram-canvas:fullscreen{padding:0;}
- .viewer-diagram-canvas .layout-flow-toggle{background:var(--explore-bg);}
 }
 
 @media screen and (max-width:1024px){
@@ -236,3 +235,5 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 }
 
 .explore-notes-size-hint{padding:0 0 10px 23px;}
+
+.docview .explore-board.authored-diagram-hidden .boardcanvas>svg{visibility:hidden;pointer-events:none;}

@@ -243,28 +243,30 @@ test('nodes without references retain native context menus and path replacement 
 });
 
 
-test('named layouts hide only the diagram, retain playback, and restore exact positions',async t=>{
+test('authored chapter visibility hides only the diagram, retains playback, and restores exact positions',async t=>{
   for(const detached of [true,false])for(const panels of [true,false]){
     const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
     if(!panels){delete d.panels;delete d.primaryPanel;d.steps.forEach(st=>delete st.panels);}
-    d.layoutName='Front door <safe>';
-    d.sectionLayout={confluence:[{x:0,y:0,w:12,h:12},...(detached?[{controls:'steps',x:0,y:12,w:12,h:6}]:[])]};
+    const tiles=[{x:0,y:0,w:12,h:12},...(detached?[{controls:'steps',x:0,y:12,w:12,h:6}]:[])];
+    d.layouts=[{id:'shown',name:'Data flow',sectionLayout:{confluence:tiles}},
+      {id:'hidden',name:'Front door <safe>',sectionLayout:{confluence:tiles.map(it=>it.controls?{...it}:{...it,hidden:true})}}];
     const specJson=JSON.stringify(raw),s=await setup(t,{configuring:false,config:{specJson}}),view=s.el('docview');
-    const choices=view.querySelector('.diagram-view-choice'),layout=choices.querySelector('[data-view-layout]'),toggle=view.querySelector('[data-layout-flow]');
+    const choices=view.querySelector('.diagram-view-choice'),layout=choices.querySelector('[data-layout-id=hidden]'),shown=choices.querySelector('[data-layout-id=shown]');
+    assert.equal(view.querySelector('[data-layout-flow]'),null,'reader has no diagram visibility override');
     assert.equal(choices.children.length,2);assert.equal(layout.textContent,'Front door <safe>');assert.equal(layout.querySelector('safe'),null);
     const grid=view.querySelector('.section-layout-grid'),board=view.querySelector('.board'),bar=view.querySelector('.termbar');
     const positions=[...grid.children].map(el=>el.getAttribute('style'));
     view.querySelector('[aria-label="Go to step 3 on Internet down"]').click();const caption=bar.querySelector('.stepline').textContent;
-    toggle.click();assert.equal(board.hidden,true);assert.equal(toggle.textContent,'Show data flow');assert.equal(toggle.getAttribute('aria-expanded'),'false');
+    layout.click();assert.equal(board.hidden,true);assert.equal(layout.getAttribute('aria-pressed'),'true');
     assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);assert.equal(bar.querySelector('.stepline').textContent,caption);
     assert.equal(grid.querySelector('[data-layout-key="diagram"]').hidden,detached);
     if(detached)assert.equal(grid.querySelector('[data-layout-key="steps"]').style.getPropertyValue('--tile-y'),'1');
-    choices.querySelector('button:not([data-view-layout])').click();assert.equal(board.hidden,false);assert.equal(toggle.hidden,true);
-    layout.click();assert.equal(board.hidden,true);assert.equal(toggle.hidden,false);assert.equal(view.querySelector('.termbar'),bar);
+    shown.click();assert.equal(board.hidden,false);
+    layout.click();assert.equal(board.hidden,true);assert.equal(view.querySelector('.termbar'),bar);
     [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='AMBIENT').click();await settle();assert.equal(bar.hidden,true);
     if(!detached)assert.equal(grid.querySelector('[data-layout-key="diagram"]').hidden,true);
     [...view.querySelectorAll('.mtoggle button')].find(b=>b.textContent==='STEP').click();await settle();assert.equal(bar.hidden,false);assert.equal(bar.closest('.section-layout-tile').hidden,false);
-    toggle.click();assert.equal(board.hidden,false);assert.deepEqual([...grid.children].map(el=>el.getAttribute('style')),positions);
+    shown.click();assert.equal(board.hidden,false);assert.deepEqual([...grid.children].map(el=>el.getAttribute('style')),positions);
     assert.equal(view.querySelector('.board'),board);assert.equal(view.querySelectorAll('.termbar').length,1);assert.equal(s.calls.submits.length,0);
     assert.equal(JSON.stringify(raw),specJson);
   }
@@ -320,15 +322,21 @@ test('attached transport heights follow the active host profile and hiding the d
   const raw=JSON.parse(home),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'map',name:'Map',sectionLayout:{default:[{panel:'home',x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'panel:home',x:0,y:20,w:8,h:7}]}},
     {id:'flow',name:'Flow',sectionLayout:{default:[{x:0,y:0,w:8,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:20},{controls:'steps',attachTo:'diagram',x:0,y:20,w:12,h:8}]}},
+    {id:'hidden-flow',name:'Hidden flow',sectionLayout:{default:[{x:0,y:0,w:8,h:20,hidden:true},{controls:'steps',attachTo:'diagram',x:0,y:20,w:8,h:6}],confluence:[{x:0,y:0,w:12,h:20,hidden:true},{controls:'steps',attachTo:'diagram',x:0,y:20,w:12,h:8}]}},
     {id:'detached',name:'Detached',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{controls:'steps',x:0,y:12,w:8,h:5}]}}];
-  const s=await setup(t,{configuring:false,config:{specJson:JSON.stringify(raw)}}),view=s.el('docview'),bar=view.querySelector('.termbar');
+  const specJson=JSON.stringify(raw),s=await setup(t,{configuring:false,config:{specJson}}),view=s.el('docview'),bar=view.querySelector('.termbar');
   const host=()=>bar.closest('.section-layout-tile');
   assert.ok(host().classList.contains('layout-has-attached-controls'));assert.equal(host().style.getPropertyValue('--attached-controls-height'),'272px');
   view.querySelector('[data-layout-id="flow"]').click();assert.equal(host().style.getPropertyValue('--attached-controls-height'),'312px');
   Object.defineProperty(bar,'scrollHeight',{value:1200,configurable:true});
-  view.querySelector('[data-layout-flow]').click();assert.equal(host().style.getPropertyValue('--tile-h'),'8');assert.equal(host().hidden,false);
+  assert.equal(view.querySelector('[data-layout-flow]'),null);
+  view.querySelector('[data-layout-id=hidden-flow]').click();assert.equal(view.querySelector('.board').hidden,true);
+  assert.equal(host().style.getPropertyValue('--tile-h'),'8');assert.equal(host().hidden,false);assert.equal(bar.hidden,false);
+  assert.equal(host().getAttribute('data-layout-key'),'steps','hidden attachment retains controls in their saved fallback tile');
   view.querySelector('[data-layout-id="detached"]').click();assert.equal(host().classList.contains('layout-has-attached-controls'),false);assert.equal(host().style.getPropertyValue('--attached-controls-height'),'');
   view.querySelector('[data-layout-id="map"]').click();assert.equal(host().style.getPropertyValue('--attached-controls-height'),'272px');
+  assert.equal(view.querySelector('.termbar'),bar);assert.equal(view.querySelectorAll('.termbar').length,1);
+  assert.equal(JSON.stringify(raw),specJson);assert.equal(s.calls.submits.length,0);
 });
 
 test('all row routing modes expose sizing without changing the drawing or requiring steps',async t=>{

@@ -20,9 +20,10 @@ stay intact. In Home view, you can also expand **Data flow** below for a quick
 look at the supporting diagram.
 
 If the section has a saved arrangement, its named layout replaces Home in the
-view switch. Use **Hide data flow** there to keep the map, other panels and
-timeline visible while hiding the diagram. Name it with **Arrange section →
-Layout name**; see [section layouts](section-layouts.md).
+view switch. In the workbench, clear **Chapter → Show diagram in this chapter**
+to save a view with the map, other panels and timeline visible while hiding the
+diagram. Name it with **Chapter → Chapter name**; see
+[section layouts](section-layouts.md).
 
 Home view keeps the map as large as its height limit allows (70% of the
 viewport height; 560px in the content-sized Confluence iframe). Its width

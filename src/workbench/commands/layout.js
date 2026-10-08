@@ -412,6 +412,31 @@ function planSectionViewPresentation(text,raw,section,layoutId,value){
   var plan=planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
   if(!plan.error)plan.layoutId=layoutId;return plan;
 }
+/* A chapter-level visibility choice applies to every saved host profile.
+   Keep tile geometry and profile-specific panel visibility intact. Legacy
+   choices become named chapters through the same promotion as Viewing mode. */
+function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(typeof visible!=='boolean')return {error:'Choose whether to show the diagram.'};
+  var selected=layoutId,plan=builderRewrite(text,raw,got.path,function(d){
+    if(!Array.isArray(d.layouts)){
+      var promoted=builderPromoteSectionViews(d,layoutId);if(promoted.error)return promoted;
+      selected=promoted.layoutId;
+    }
+    var view=d.layouts.find(function(v){return v.id===selected;});
+    if(!view)return {error:'Reselect the chapter before changing diagram visibility.'};
+    var profiles=builderSectionLayout24(view.sectionLayout);
+    if(!Array.isArray(profiles.default))profiles.default=sectionLayoutItems(d,'default',selected) || sectionLayoutPreset(d,'default');
+    view.sectionLayout=profiles;
+    ['default','backstage','confluence'].forEach(function(target){
+      if(!Array.isArray(profiles[target]))return;
+      var tile=profiles[target].find(function(item){return sectionLayoutKey(item)==='diagram';});
+      if(!tile){tile=sectionLayoutItems(d,target,selected).find(function(item){return sectionLayoutKey(item)==='diagram';});profiles[target].push(tile);}
+      if(visible)delete tile.hidden;else tile.hidden=true;
+    });
+  });
+  if(!plan.error)plan.layoutId=selected;return plan;
+}
 function planSectionExploreLayout(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;

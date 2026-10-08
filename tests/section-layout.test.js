@@ -688,3 +688,38 @@ test('invalid grid markers and profile shapes warn and cannot silently become24-
     const warnings=[];ctx.sectionLayoutWarnings({...diagram(),sectionLayout:profiles},'diagram',warnings);assert.ok(warnings.length);
   }
 });
+
+test('chapter diagram visibility saves all host profiles while preserving sibling chapters, geometry and story',()=>{
+  const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{columns:24,default:[{...board},{...phone,hidden:true}],backstage:[{...board,h:16}],confluence:[{...board,w:24}]}},{id:'technical',name:'Technical',presentation:'explore',sectionLayout:{columns:24,default:[board]}}];d.defaultLayout='business';
+  const raw={page:{blocks:[{tabs:[{label:'First',sections:[{diagram:diagram()}]},{label:'Second',sections:[{diagram:d}]}]}]}},text=JSON.stringify(raw,null,2);
+  const plan=ctx.planSectionDiagramVisibility(text,raw,1,'business',false);assert.ok(!plan.error,plan.error);assert.equal(plan.layoutId,'business');
+  const nextRaw=JSON.parse(plan.text),next=ctx.builderDiagram(plan.text,nextRaw,1).d;
+  assert.deepEqual(nextRaw.page.blocks[0].tabs[0],raw.page.blocks[0].tabs[0]);assert.deepEqual(next.layouts[1],d.layouts[1]);
+  assert.deepEqual(next.steps,d.steps);assert.deepEqual(next.panels,d.panels);assert.equal(next.defaultLayout,'business');
+  for(const host of ['default','backstage','confluence']){
+    const tile=next.layouts[0].sectionLayout[host].find(it=>ctx.sectionLayoutKey(it)==='diagram');
+    assert.deepEqual(tile,{...d.layouts[0].sectionLayout[host][0],hidden:true});
+    assert.deepEqual(next.layouts[0].sectionLayout[host].filter(it=>ctx.sectionLayoutKey(it)!=='diagram'),d.layouts[0].sectionLayout[host].filter(it=>ctx.sectionLayoutKey(it)!=='diagram'));
+  }
+  assert.equal(next.layouts[0].sectionLayout.default.find(it=>it.panel==='phone').hidden,true);
+  const restored=ctx.planSectionDiagramVisibility(plan.text,nextRaw,1,'business',true);assert.ok(!restored.error,restored.error);
+  for(const host of ['default','backstage','confluence'])assert.equal(ctx.sectionLayoutItems(ctx.builderDiagram(restored.text,JSON.parse(restored.text),1).d,host,'business').find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,undefined);
+  assert.ok(ctx.planSectionDiagramVisibility(text,raw,1,'missing',false).error);
+  assert.ok(ctx.planSectionDiagramVisibility(text,raw,1,'business','false').error);
+});
+test('legacy visibility edits promote the selected automatic chapter without losing its sibling or source default',()=>{
+  for(const view of ['home','flow','layout']){
+    const d=diagram();if(view==='layout')d.sectionLayout={default:[board,phone]};
+    const text=JSON.stringify(d),plan=ctx.planSectionDiagramVisibility(text,d,0,view,false);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text);assert.equal(plan.layoutId,view);assert.equal(next.defaultLayout,view==='layout'?'layout':'home');
+    assert.equal(ctx.sectionLayoutItems(next,'backstage',view).find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
+    assert.equal(next.layouts.length,2);assert.deepEqual(next.steps,d.steps);assert.equal(JSON.stringify(d),text);
+  }
+});
+
+test('chapter visibility creates a default when only a host-specific profile exists',()=>{
+  const d=diagram();d.layouts=[{id:'only-host',name:'Host',sectionLayout:{columns:24,confluence:[board]}}];
+  const plan=ctx.planSectionDiagramVisibility(JSON.stringify(d),d,0,'only-host',false);assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text);
+  for(const host of ['default','backstage','confluence'])assert.equal(ctx.sectionLayoutItems(next,host,'only-host').find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
+});

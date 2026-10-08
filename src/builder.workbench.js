@@ -904,6 +904,9 @@ function initWorkbenchBuilder(opts){
     setExploreLayout:function(section,id,value){
       return commitCascade(function(raw){return planSectionExploreLayout(session.text(),raw,section,id,value);},{exploreLayout:{section:section,id:id}});
     },
+    setDiagramVisibility:function(section,id,value){
+      var nextId,ok=commitCascade(function(raw){var plan=planSectionDiagramVisibility(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
+    },
     setPresentation:function(section,id,value){
       var nextId,ok=commitCascade(function(raw){var plan=planSectionViewPresentation(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },

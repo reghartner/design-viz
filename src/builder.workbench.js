@@ -492,7 +492,7 @@ function initWorkbenchBuilder(opts){
       if(historyStatus){historyStatus.textContent=message.indexOf('undid')===0?'Undo complete':'Redo complete';historyStatus.setAttribute('title',message);historyStatus.hidden=false;}
       /* Refresh the now-unselected Inspector without navigating to it. The
          toolbar status keeps the same feedback visible when Inspect is closed. */
-      inspectorMessage(message,true);
+      inspectorMessage(message,true,true);
     },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
@@ -576,7 +576,7 @@ function initWorkbenchBuilder(opts){
   function applyRowGrabs(){if(interactions)return interactions.applyRowGrabs.apply(null,arguments); }
   function renderInspector(){return inspector.render();}
   function refreshFormSoon(){return inspector.refresh();}
-  function inspectorMessage(text,keepTool){return inspector.message(text,keepTool);}
+  function inspectorMessage(text,keepTool,keepDisclosure){return inspector.message(text,keepTool,keepDisclosure);}
   function formError(text){return inspector.error(text);}
   function commitCascade(planFor,opt){return inspector.transact(planFor,opt);}
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}

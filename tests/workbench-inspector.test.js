@@ -108,6 +108,13 @@ const home=()=>({nodes:{},rows:[],panels:[{id:'home',type:'homemap',outline:{w:3
 const named=(guide,name)=>guide.querySelectorAll('.obj-field').find(label=>label.textContent===name)?.querySelector('input');
 const aria=(guide,label)=>guide.querySelector('[aria-label="'+label+'"]');
 
+test('messages can refresh Inspector content without revealing its disclosure',()=>{
+  const e=environment(),h=e.mount(home());
+  h.inspector.message('ordinary message');assert.equal(h.reveals,1);
+  h.inspector.message('history message',true,true);assert.equal(h.reveals,1);
+  assert.equal(h.guide.hidden,false);assert.equal(h.guide.children[0].textContent,'history message');
+});
+
 test('palette-created simple panels expose typed starting state with sparse exact history',()=>{
   const e=environment(),empty={nodes:{},rows:[[]]},added=e.C.planAddPanel(JSON.stringify(empty),empty,0,'gauge');
   assert.equal(added.error,undefined);

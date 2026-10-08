@@ -98,7 +98,8 @@ Editor-tool geometry remains temporary and its Undo does not reopen closed
 tools. Opening or closing a tool does not add history entries.
 Source Undo and Redo likewise preserve every open or closed tool and keep the
 current tool active. Their completion status appears beside the history controls;
-an already-open Inspector refreshes to a non-stale history message.
+an already-open Inspector refreshes to a non-stale history message without
+expanding a collapsed Inspector disclosure.
 A movement that hits an edge
 without changing the panel leaves Undo/Redo unchanged. Dragging or resizing a
 panel moves keyboard focus to its handle, so the next keyboard Undo targets the

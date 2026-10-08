@@ -117,9 +117,28 @@ to 45 seconds to copy the final response after it appears. It does not start
 another Claude session, make a model call, install hooks, or run a permanent
 listener. A scheduled copy is not verified completion. Afterwards, preferably
 on the next turn, use a separate **Read** call on
-`.flowview-pilot/after-turn-status.json` to check for `captured`,
-`timeout_response_pending`, `disabled` (opted out or replaced enrollment), or
-`failed`; a later turn also refreshes the copy.
+`.flowview-pilot/after-turn-status.json`. Match its `jobId`, native `sessionId`,
+`captureId`, `turnId`, and `afterNativeLine` to the command's `captureReceipt`
+before interpreting the outcome. Scheduling immediately replaces the prior
+receipt with `pending`; `captured` confirms only that job's final response.
+`checkpoint` confirms a foreground copy, not a later final reply. `partial`,
+`timeout_response_pending`, `disabled` (opted out or replaced enrollment), and
+`failed` require an honest explanation; `pending` past `deadlineAt` is unverified,
+including if the copier died. A later checkpoint gets a new receipt.
+For closeout after a turn-start checkpoint, read the path in `lastAfterTurnReceipt`
+(`.flowview-pilot/<native-session-id>.last-after-turn-status.json`). This keeps
+one most recent after-turn attempt per session across ordinary checkpoints.
+A newly scheduled after-turn attempt replaces that slot; match its job identity
+before counting it as final-reply evidence.
+
+The workbench shows the setup choice separately from observed capture health.
+It reads only `.flowview-agent/pilot-status.json` (or `pilot-status.json` in a
+legacy session folder): current connection identity, an opaque job ID, outcome,
+and timestamps. It never reads the private receipt, transcript, models, or usage.
+The display describes the last verified checkpoint or reply; it does not claim
+continuous capture. Pending copies expire after 45 seconds; observations become
+stale after two minutes. Disconnecting or reconnecting clears displayed health;
+a different connection's receipt cannot verify the new connection.
 A crash, unavailable native file, or delayed write can leave a gap. Report the
 actual capture status separately from diagram authoring success.
 

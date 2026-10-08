@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -147,9 +148,9 @@ class CaptureTests(unittest.TestCase):
         self.native = self.project / (SID + '.jsonl')
         self.native.write_bytes(encoded(user(), assistant()))
 
-    def run_capture(self, session_id=SID, enable=True, folder=None, claude_dir=None, explicit_opt_in=False):
+    def run_capture(self, session_id=SID, enable=True, folder=None, claude_dir=None, explicit_opt_in=False, after_turn=False):
         return capture.capture(folder or self.folder, session_id, enable=enable,
-                               claude_dir=claude_dir or self.claude, explicit_opt_in=explicit_opt_in)
+                               claude_dir=claude_dir or self.claude, explicit_opt_in=explicit_opt_in, after_turn=after_turn)
 
     def usage(self):
         return json.loads((self.folder / capture.USAGE).read_text())
@@ -297,7 +298,7 @@ class CaptureTests(unittest.TestCase):
             self.assertEqual(self.run_capture(OTHER, enable=False)['status'], 'disabled')
             self.assertEqual(self.run_capture(OTHER)['status'], 'disabled', 'another stale --enable cannot override OFF')
             with patch.object(capture.time, 'sleep'):
-                capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=first['captureId'])
+                capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=first['captureId'], job_id=first['captureReceipt']['jobId'])
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), before)
         self.assertEqual((self.folder / capture.USAGE).read_bytes(), usage_before)
         self.assertEqual((self.folder / capture.PRIVATE / (SID + '.jsonl')).read_bytes(), archive_before)
@@ -491,11 +492,11 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), kept)
 
     def test_pending_final_copy_stops_after_disable_without_reading_native_source(self):
-        enrolled = self.run_capture()
+        enrolled = self.run_capture(after_turn=True)
         capture.disable(self.folder, SID)
         with patch.object(capture, 'source_for', side_effect=AssertionError('disabled copier must not read source')), \
              patch.object(capture.time, 'sleep'):
-            capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=enrolled['captureId'])
+            capture.settle(self.folder, SID, 'turn-1', after_line=2, capture_id=enrolled['captureId'], job_id=enrolled['captureReceipt']['jobId'])
         status = json.loads((self.folder / capture.PRIVATE / 'after-turn-status.json').read_text())
         self.assertEqual(status['outcome'], 'disabled')
         self.assertFalse(status['replyCapture']['finalResponseCaptured'])
@@ -581,17 +582,21 @@ class CaptureTests(unittest.TestCase):
         self.assertIn('scheduled', json.loads(run.stdout)['afterTurnCopy'])
         status = self.folder / capture.PRIVATE / 'after-turn-status.json'
         time.sleep(1.2)
-        self.assertFalse(status.exists(), 'An earlier completed response must not satisfy this copy')
+        pending = json.loads(status.read_text())
+        self.assertEqual(pending['outcome'], 'pending', 'An earlier completed response must not satisfy this copy')
+        self.assertEqual(pending['turnId'], 'next')
+        self.assertEqual(pending['jobId'], json.loads(run.stdout)['captureReceipt']['jobId'])
         self.native.write_bytes(self.native.read_bytes() + encoded(assistant('final')))
         deadline = time.monotonic() + 8
-        while not status.exists() and time.monotonic() < deadline:
+        while json.loads(status.read_text())['outcome'] == 'pending' and time.monotonic() < deadline:
             time.sleep(.05)
         self.assertTrue(status.exists())
         self.assertEqual(json.loads(status.read_text())['outcome'], 'captured')
         self.assertEqual((self.folder / capture.TRANSCRIPT).read_bytes(), self.native.read_bytes())
 
     def test_final_copy_does_not_accept_another_turns_reply(self):
-        self.run_capture()
+        self.native.write_bytes(encoded(user('target'), assistant(stop='tool_use')))
+        result = self.run_capture(after_turn=True)
         unrelated = {'currentSourceAvailable': True, 'turnId': 'target',
                      'finalResponseCaptured': False, 'turnLastAssistantLine': 2,
                      'nativeProgress': {'lastAssistantLine': 4, 'lastAssistantTurnId': 'other',
@@ -599,10 +604,206 @@ class CaptureTests(unittest.TestCase):
         with patch.object(capture, 'capture', return_value=unrelated), \
              patch.object(capture.time, 'sleep'), \
              patch.object(capture.time, 'monotonic', side_effect=[0, 0, 1]):
-            capture.settle(self.folder, SID, 'target', after_line=2, seconds=1)
+            capture.settle(self.folder, SID, 'target', after_line=2, seconds=1, capture_id=result['captureId'], job_id=result['captureReceipt']['jobId'])
         status = json.loads((self.folder / capture.PRIVATE / 'after-turn-status.json').read_text())
         self.assertEqual(status['outcome'], 'timeout_response_pending')
         self.assertFalse(status['replyCapture']['finalResponseCaptured'])
+
+
+    def receipt(self, session_id=None):
+        name = (session_id + '.' if session_id else '') + capture.STATUS_FILE
+        return json.loads((self.folder / capture.PRIVATE / name).read_text())
+
+    def test_new_turn_replaces_captured_receipt_before_launch(self):
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        self.assertTrue(capture.finish_status(self.folder, first, 'captured', {'finalResponseCaptured': True}))
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('next-turn'), assistant('tool', stop='tool_use')))
+        second = self.run_capture(enable=False, after_turn=True)['captureReceipt']
+        self.assertEqual(second['outcome'], 'pending')
+        self.assertNotEqual(first['jobId'], second['jobId'])
+        self.assertEqual(self.receipt()['turnId'], 'next-turn')
+        self.assertEqual(self.receipt()['afterNativeLine'], 4)
+        self.assertFalse(self.receipt()['replyCapture']['finalResponseCaptured'])
+        with patch.object(capture, 'capture', side_effect=AssertionError('superseded worker must not capture')):
+            capture.settle(self.folder, SID, first['turnId'], first['afterNativeLine'],
+                           capture_id=first['captureId'], job_id=first['jobId'])
+        self.assertFalse(capture.finish_status(self.folder, first, 'captured'))
+        self.assertEqual(self.receipt()['jobId'], second['jobId'])
+        self.assertEqual(self.receipt()['outcome'], 'pending')
+
+    def test_worker_finishing_during_new_capture_cannot_regress_receipt(self):
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        self.native.write_bytes(self.native.read_bytes() + encoded(assistant('first-final')))
+        captured, release = threading.Event(), threading.Event()
+        original = capture.capture
+        failures = []
+        def hold_worker(*args, **kwargs):
+            result = original(*args, **kwargs)
+            if kwargs.get('status_job'):
+                captured.set()
+                if not release.wait(5):
+                    raise AssertionError('worker was not released')
+            return result
+        def run_worker():
+            try:
+                capture.settle(self.folder, SID, first['turnId'], first['afterNativeLine'],
+                               capture_id=first['captureId'], job_id=first['jobId'])
+            except BaseException as error:
+                failures.append(error)
+        with patch.object(capture, 'capture', side_effect=hold_worker), \
+             patch.dict(os.environ, {'CLAUDE_CONFIG_DIR': str(self.claude)}):
+            worker = threading.Thread(target=run_worker)
+            worker.start()
+            try:
+                self.assertTrue(captured.wait(5))
+                self.native.write_bytes(self.native.read_bytes() + encoded(user('next'), assistant('tool', stop='tool_use')))
+                second = self.run_capture(enable=False, after_turn=True)['captureReceipt']
+            finally:
+                release.set()
+                worker.join(5)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(failures, [])
+        self.assertEqual(self.receipt()['jobId'], second['jobId'])
+        self.assertEqual(self.receipt(SID)['outcome'], 'pending')
+
+    def test_stop_during_status_replace_cannot_leave_success(self):
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        atomic = capture.atomic
+        fired = False
+        def stop_at_replace(path, data):
+            nonlocal fired
+            if path.name == capture.STATUS_FILE and not fired:
+                fired = True
+                atomic(self.folder / capture.PRIVATE / (SID + '.capture-stop'), b'b' * 32)
+            atomic(path, data)
+        with patch.object(capture, 'atomic', side_effect=stop_at_replace):
+            capture.finish_status(self.folder, first, 'captured', {'finalResponseCaptured': True})
+        self.assertTrue(fired)
+        self.assertEqual(self.receipt()['outcome'], 'disabled')
+        self.assertEqual(self.receipt(SID)['outcome'], 'disabled')
+        self.assertFalse(self.receipt()['replyCapture']['finalResponseCaptured'])
+
+    def test_same_turn_new_boundary_and_repeat_job_cannot_finish_new_receipt(self):
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        self.native.write_bytes(self.native.read_bytes() + encoded(assistant('more-tools', stop='tool_use')))
+        second = self.run_capture(enable=False, after_turn=True)['captureReceipt']
+        self.assertEqual(first['turnId'], second['turnId'])
+        self.assertGreater(second['afterNativeLine'], first['afterNativeLine'])
+        self.assertFalse(capture.finish_status(self.folder, first, 'failed'))
+        self.assertTrue(capture.finish_status(self.folder, second, 'timeout_response_pending'))
+        self.assertFalse(capture.finish_status(self.folder, second, 'captured'))
+        self.assertEqual(self.receipt()['outcome'], 'timeout_response_pending')
+
+    def test_foreign_worker_and_disable_cannot_overwrite_latest_participant_status(self):
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        (self.project / (OTHER + '.jsonl')).write_bytes(encoded({**user('other-turn'), 'sessionId': OTHER}))
+        second = self.run_capture(OTHER, after_turn=True)['captureReceipt']
+        self.assertTrue(capture.finish_status(self.folder, first, 'captured'))
+        self.assertEqual(self.receipt(SID)['outcome'], 'captured')
+        self.assertEqual(self.receipt()['jobId'], second['jobId'])
+        capture.disable(self.folder, SID)
+        self.assertEqual(self.receipt(SID)['outcome'], 'disabled')
+        self.assertEqual(self.receipt()['jobId'], second['jobId'])
+
+    def test_spawn_failure_marks_matching_job_failed(self):
+        result = self.run_capture(after_turn=True)
+        with patch.object(capture.subprocess, 'Popen', side_effect=OSError('synthetic launch failure')):
+            with self.assertRaisesRegex(OSError, 'synthetic launch failure'):
+                capture.launch_copy(self.folder, SID, result)
+        self.assertEqual(self.receipt()['outcome'], 'failed')
+        self.assertEqual(self.receipt()['jobId'], result['captureReceipt']['jobId'])
+        self.assertFalse(self.receipt()['replyCapture']['finalResponseCaptured'])
+
+    def test_old_launch_failure_cannot_replace_new_pending_job(self):
+        first = self.run_capture(after_turn=True)
+        second = self.run_capture(enable=False, after_turn=True)['captureReceipt']
+        with patch.object(capture.subprocess, 'Popen', side_effect=OSError('late launch failure')):
+            with self.assertRaises(OSError):
+                capture.launch_copy(self.folder, SID, first)
+        self.assertEqual(self.receipt()['jobId'], second['jobId'])
+        self.assertEqual(self.receipt()['outcome'], 'pending')
+
+    def test_expired_job_records_timeout_without_reading_native_source(self):
+        result = self.run_capture(after_turn=True)['captureReceipt']
+        with patch.object(capture, 'source_for', side_effect=AssertionError('expired job must not read')):
+            capture.settle(self.folder, SID, result['turnId'], result['afterNativeLine'], seconds=0,
+                           capture_id=result['captureId'], job_id=result['jobId'])
+        self.assertEqual(self.receipt()['outcome'], 'timeout_response_pending')
+
+    def test_reenrollment_and_new_connection_reject_old_worker_and_health(self):
+        prompt = self.write_setup('ON')
+        self.native.write_bytes(encoded(user(content=prompt), assistant()))
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        support = self.folder / '.flowview-agent'
+        capture.disable(self.folder, SID)
+        prompt = self.write_setup('ON', connection='new-connection')
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('new-opt-in', content=prompt)))
+        second = self.run_capture(after_turn=True)['captureReceipt']
+        with patch.object(capture, 'capture', side_effect=AssertionError('replaced worker must not capture')):
+            capture.settle(self.folder, SID, first['turnId'], first['afterNativeLine'],
+                           capture_id=first['captureId'], job_id=first['jobId'])
+        self.assertFalse(capture.finish_status(self.folder, first, 'captured'))
+        health = json.loads((support / capture.HEALTH_FILE).read_text())
+        self.assertEqual(health['connectionId'], 'new-connection')
+        self.assertEqual(health['jobId'], second['jobId'])
+        self.assertEqual(health['outcome'], 'pending')
+
+    def test_health_is_allowlisted_and_foreign_failure_cannot_replace_it(self):
+        prompt = self.write_setup('ON')
+        self.native.write_bytes(encoded(user(content=prompt), assistant()))
+        first = self.run_capture(after_turn=True)['captureReceipt']
+        health_path = self.folder / '.flowview-agent' / capture.HEALTH_FILE
+        before = health_path.read_bytes()
+        health = json.loads(before)
+        self.assertEqual(set(health), {'schema', 'sessionId', 'connectionId', 'jobId', 'outcome', 'updatedAt', 'expiresAt', 'deadlineAt'})
+        for private_value in [SID, 'turn-1', 'claude-a', 'output_tokens', 'Response']:
+            self.assertNotIn(private_value, before.decode())
+        self.assertEqual(self.run_capture(OTHER)['status'], 'disabled')
+        self.assertEqual(health_path.read_bytes(), before)
+        self.assertEqual(self.receipt()['jobId'], first['jobId'])
+
+    def test_disable_publishes_status_even_while_registry_lock_is_busy(self):
+        self.run_capture(after_turn=True)
+        locked = capture.locked
+        def busy_registry(folder, name='capture.lock'):
+            if name == 'capture.lock':
+                raise OSError('busy registry')
+            return locked(folder, name)
+        with patch.object(capture, 'locked', side_effect=busy_registry), \
+             patch.object(capture, 'source_for', side_effect=AssertionError('stop is metadata only')):
+            result = capture.disable(self.folder, SID)
+        self.assertTrue(result['registryUpdatePending'])
+        self.assertEqual(self.receipt()['outcome'], 'disabled')
+
+    def test_turn_start_checkpoint_retains_one_prior_final_receipt_for_closeout(self):
+        first = self.run_capture(after_turn=True)
+        retained = Path(first['lastAfterTurnReceipt'])
+        capture.finish_status(self.folder, first['captureReceipt'], 'captured', {'finalResponseCaptured': True})
+        proof = retained.read_bytes()
+        self.native.write_bytes(self.native.read_bytes() + encoded(user('closeout')))
+        checkpoint = self.run_capture(enable=False)
+        self.assertEqual(checkpoint['lastAfterTurnReceipt'], str(retained))
+        self.assertEqual(self.receipt()['outcome'], 'checkpoint')
+        self.assertEqual(retained.read_bytes(), proof)
+        self.assertEqual(json.loads(proof)['jobId'], first['captureReceipt']['jobId'])
+        newer = self.run_capture(enable=False, after_turn=True)
+        self.assertEqual(json.loads(retained.read_bytes())['jobId'], newer['captureReceipt']['jobId'])
+        self.assertEqual(json.loads(retained.read_bytes())['outcome'], 'pending')
+        self.assertEqual(len(list(retained.parent.glob('*.last-after-turn-status.json'))), 1)
+
+    def test_disable_retires_retained_pending_copy_after_a_checkpoint(self):
+        first = self.run_capture(after_turn=True)
+        self.run_capture(enable=False)
+        capture.disable(self.folder, SID)
+        self.assertEqual(json.loads(Path(first['lastAfterTurnReceipt']).read_text())['outcome'], 'disabled')
+        self.assertEqual(self.receipt()['outcome'], 'disabled')
+
+    def test_failed_checkpoint_replaces_old_verified_status(self):
+        self.run_capture()
+        self.native.unlink()
+        result = self.run_capture(enable=False)
+        self.assertEqual(result['status'], 'partial')
+        self.assertEqual(self.receipt()['outcome'], 'failed')
 
 
 if __name__ == '__main__':

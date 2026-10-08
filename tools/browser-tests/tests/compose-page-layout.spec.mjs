@@ -44,3 +44,98 @@ test('long visible URLs in a table fit in ambient and step states',async({page},
  await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,observations},null,2));
  await page.screenshot({path:info.outputPath('composed.png'),fullPage:true});
 });
+
+// Generic engineering fixture, independent of authoring benchmark artifacts.
+function fitFixture(){
+ const ids=Array.from({length:5},(_,i)=>'n'+i);
+ return {nodes:Object.fromEntries(ids.map(id=>[id,{title:'Stage '+id}])),rows:[[]],floats:ids.map(id=>({id,side:'below'})),edges:ids.slice(1).map((id,i)=>({from:ids[i],to:id})),
+  panels:[{id:'camera',type:'screen',title:'Camera evidence',initial:{mode:'live',audio:{connection:'connected',microphone:'capturing',output:'speech',playback:'playing',text:'Please leave the parcel near the entrance and confirm the delivery.',source:'Visitor at entrance',reason:'Connection verified'}}},
+   {id:'phone',type:'phone',initial:{notify:{app:'Dispatch',title:'Delivery notification',text:'A detailed delivery notification that is intentionally long enough to exceed the native two line notification card.'}}},
+   {id:'app',type:'deviceapp',initial:{screen:'home'}}],
+  steps:Array.from({length:6},(_,i)=>({id:'s'+i,text:'Review the recorded evidence before confirming the next processing stage. '.repeat(i===5?9:2),...(i===1?{panels:{camera:{audio:{connection:'connected',microphone:'capturing',output:'speech',playback:'playing',text:'Delivery confirmed.',source:'Visitor at entrance',reason:'Connection verified; recording is retained for review. '.repeat(3)}}}}:{})})),
+  paths:Array.from({length:4},(_,i)=>({id:'p'+i,label:'Outcome '+i,steps:['s0','s1','s'+(i+2)]}))};
+}
+for(const width of [800,1200,1440,1920])test('native fit at explicit isolated host width '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:1000});await page.setContent(payload({isolatedHost:true}));
+ const raw=fitFixture(),result=await A.arrange(raw,{...defaults,width}),d=result.raw.page.sections[0].diagram;
+ expect(d.steps).toEqual(raw.steps);expect(d.paths).toEqual(raw.paths);expect(d.panels).toEqual(raw.panels);
+ const initial=await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d),observations=[];
+ expect(initial.geometry.gridWidth).toBeCloseTo(Math.max(1000,width-80),0);
+ for(const state of initial.states){
+  const o=await page.evaluate(s=>arrangementNative.observe(s),state);observations.push(o);
+  expect(o.graph.clipped,'graph '+JSON.stringify(state)).toBe(0);expect(o.graph.minimumLabelPx).toBeGreaterThanOrEqual(8);
+  if(o.controls)expect(o.controls.clipped,'narrative '+JSON.stringify(state)).toBe(0);
+  const camera=o.panels.find(p=>p.id==='camera');expect(camera.overflowY,'camera '+JSON.stringify(state)).toBeLessThanOrEqual(4);
+  expect(camera.nestedOverflow).toHaveLength(0);
+  const phone=o.panels.find(p=>p.id==='phone');expect(phone.nativeContent.width).toBeCloseTo(178,0);
+  expect(phone.nestedOverflow.some(p=>p.class==='phonetext')).toBe(true);
+ }
+ const limits=result.diagnostics[0].panels.find(p=>p.id==='phone').nativeLimits;
+ expect(limits.contentWidth).toBe(178);expect(limits.notificationTextLines).toBe(2);
+ expect(result.diagnostics[0].panels.find(p=>p.id==='app').nativeLimits.maxContentWidth).toBe(330);
+ // Check footer and prose text rectangles themselves, including clipping by
+ // ancestors, not merely the outer widget's scrollHeight.
+ const visible=await page.evaluate(()=>{
+  function cut(e){const range=document.createRange();range.selectNodeContents(e);return [...range.getClientRects()].filter(r=>r.width&&r.height).some(r=>{for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p),b=p.getBoundingClientRect();if(/auto|scroll|hidden/.test(s.overflowY)&& (r.top<b.top-2||r.bottom>b.bottom+2))return true;}return false;});}
+  return [...document.querySelectorAll('.screen-audio-direction,.fva-heading,.fva-caption,.fva-reason,.step-text')].filter(e=>e.getBoundingClientRect().height).map(e=>({text:e.textContent,clipped:cut(e)}));
+ });
+ expect(visible.every(v=>!v.clipped),JSON.stringify(visible)).toBe(true);
+ await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,observations,visible},null,2));
+ await page.screenshot({path:info.outputPath('composed.png'),fullPage:true});
+});
+
+for(const width of [800,1200,1440,1920])test('width-sized graph SVG fits its tile at '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:1000});await page.setContent(payload({isolatedHost:true}));
+ // Exercise composition after graph positioning, with a tall engineering graph.
+ // Width candidate rounding must not crop the lower stage of a narrow frame.
+ const raw={nodes:{a:{title:'Receive'},b:{title:'Process'},c:{title:'Store'}},rows:[[]],floats:[{id:'a',x:100,y:60},{id:'b',x:100,y:300},{id:'c',x:100,y:540}],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{text:'Inspect every processing stage.'}],panels:[]};
+ const measurer=await require('../../arrange/measure.cjs').createMeasurer(width),result=await measurer.arrange({diagram:A.seed(raw,[])},'pastel'),d=result.spec.diagram;
+ await measurer.close();
+ const initial=await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),d),observations=[];
+ for(const state of initial.states){const o=await page.evaluate(s=>arrangementNative.observe(s),state);observations.push(o);expect(o.graph.clipped).toBe(0);expect(o.graph.minimumLabelPx).toBeGreaterThanOrEqual(8);}
+ const geometry=await page.evaluate(()=>{const svg=document.querySelector('[data-layout-key="diagram"] .boardcanvas>svg'),board=svg.closest('.board');return {svgBottom:svg.getBoundingClientRect().bottom,boardBottom:board.getBoundingClientRect().bottom};});
+ expect(geometry.svgBottom).toBeLessThanOrEqual(geometry.boardBottom+2);
+ await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,observations,geometry},null,2));
+ await page.screenshot({path:info.outputPath('composed.png'),fullPage:true});
+});
+
+function documentFixture(){
+ const d=fitFixture();
+ d.steps[5].codeRefs=Array.from({length:4},(_,i)=>({id:'ref'+i,label:'Processing evidence implementation '+i,repository:'https://example.com/team/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}));
+ d.steps[5].conditions=[{kind:'slow',label:'Processing is delayed while evidence is verified',nodeId:'n2'},{kind:'retry',label:'Retry scheduled for the next processing interval',nodeId:'n3'}];
+ return {page:{title:'Processing evidence review',sections:[{title:'Validation pipeline',text:'Inspect the recorded processing evidence before approving the next stage. '.repeat(5),bullets:['Review the service catalog and code references.','Compare delayed processing with the other outcomes.'],diagram:d}]}};
+}
+for(const width of [800,1200,1440,1920])test('full document contains narrative evidence at target width '+width,async({page},info)=>{
+ await page.setViewportSize({width,height:1000});await page.setContent(payload({fullDocument:true}));
+ const raw=documentFixture(),result=await A.arrange(raw,{...defaults,width});
+ expect(result.raw.page.sections[0].diagram.steps).toEqual(raw.page.sections[0].diagram.steps);
+ const initial=await page.evaluate(raw=>arrangementNative.paint({raw,skin:'pastel'}),result.raw),observations=[];
+ expect(initial.geometry.gridWidth).toBeCloseTo(Math.max(1000,width-110),0);
+ for(const state of initial.states)observations.push(await page.evaluate(s=>arrangementNative.observe(s),state));
+ const visible=await page.evaluate(()=>{
+  const elements=[...document.querySelectorAll('.sec-text,.sec-bullets li,.canon-step-links a,.runtime-chip')].filter(e=>e.getBoundingClientRect().height);
+  return elements.map(e=>{const range=document.createRange();range.selectNodeContents(e);return {text:e.textContent,clipped:[...range.getClientRects()].some(r=>{for(let p=e;p;p=p.parentElement){const s=getComputedStyle(p),b=p.getBoundingClientRect();if(/auto|scroll|hidden|clip/.test(s.overflowY)&&(r.top<b.top-2||r.bottom>b.bottom+2)||/auto|scroll|hidden|clip/.test(s.overflowX)&&(r.left<b.left-2||r.right>b.right+2))return true;}return false;})};});
+ });
+ await fs.writeFile(info.outputPath('measurements.json'),JSON.stringify({estimates:result.diagnostics,geometry:initial.geometry,observations,visible},null,2));
+ await page.screenshot({path:info.outputPath('composed.png'),fullPage:true});
+ expect(visible.some(v=>v.text.includes('Code ·'))).toBe(true);expect(visible.some(v=>v.text.includes('Retry scheduled'))).toBe(true);
+ for(const o of observations){expect(o.graph.clipped,'graph '+JSON.stringify(o.state)).toBe(0);if(o.controls)expect(o.controls.clipped,JSON.stringify(o.controls)).toBe(0);}
+ expect(visible.every(v=>!v.clipped),JSON.stringify(visible)).toBe(true);
+});
+
+test('Auto resize changes graph height beyond the single composition target',async({page},info)=>{
+ const targetWidth=1200;
+ await page.setViewportSize({width:targetWidth,height:1000});await page.setContent(payload({fullDocument:true}));
+ const raw={nodes:{a:{title:'Receive'},b:{title:'Process'},c:{title:'Store'}},rows:[[]],floats:[{id:'a',x:100,y:60},{id:'b',x:100,y:300},{id:'c',x:100,y:540}],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{text:'Inspect every processing stage.'}],panels:[]};
+ const measurer=await require('../../arrange/measure.cjs').createMeasurer(targetWidth),result=await measurer.arrange({diagram:A.seed(raw,[])},'pastel');await measurer.close();
+ expect(result.diagnostics.targetWidth).toBe(targetWidth);expect(result.diagnostics.resizeScope).toContain('single target width');
+ await page.evaluate(diagram=>arrangementNative.paint({diagram,skin:'pastel'}),result.spec.diagram);
+ const dimensions=()=>page.evaluate(()=>{const tile=document.querySelector('[data-layout-key="diagram"]'),svg=tile.querySelector('.boardcanvas>svg');return {tileHeight:tile.getBoundingClientRect().height,svgWidth:svg.getBoundingClientRect().width,svgHeight:svg.getBoundingClientRect().height};});
+ const before=await dimensions(),beforeObservation=await page.evaluate(()=>arrangementNative.observe({mode:'step',index:0}));
+ expect(beforeObservation.graph.clipped).toBe(0);
+ await page.setViewportSize({width:1920,height:1000});
+ const afterObservation=await page.evaluate(()=>arrangementNative.observe({mode:'step',index:0})),after=await dimensions();
+ expect(after.tileHeight).toBeCloseTo(before.tileHeight,1);expect(after.svgHeight/before.svgHeight).toBeCloseTo(after.svgWidth/before.svgWidth,2);
+ expect(afterObservation.graph.clipped).toBeGreaterThan(0);
+ await fs.writeFile(info.outputPath('resize.json'),JSON.stringify({targetWidth,renderWidth:1920,before,after,beforeObservation,afterObservation},null,2));
+});

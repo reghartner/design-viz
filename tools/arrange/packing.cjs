@@ -4,7 +4,7 @@
 const L = require('./model.cjs');
 const V1 = require('./contracts.cjs');
 
-const VERSION = 'estimated-packing-1';
+const VERSION = 'estimated-packing-2';
 const clone = value => JSON.parse(JSON.stringify(value));
 const overlaps = (a,b) => a.x < b.x+b.w && a.x+a.w > b.x && a.y < b.y+b.h && a.y+a.h > b.y;
 
@@ -44,13 +44,14 @@ function controlBands(base, controlHeight=3, minWidth=10, heights={}) {
   }
   return result;
 }
+// Standard SVGs have width:100%;height:auto. Tile height never scales them down.
+// Reserve the full width-derived viewBox height plus legend/chrome allowance.
+function graphHeight(bounds,w,pitch,minimum=0) {
+  return Math.max(4,Math.ceil(((w*pitch-8)*bounds.h/Math.max(1,bounds.w)+133)/40),minimum);
+}
 function graphWaste(bounds,w,h,pitch,scale) {
-  // Node geometry, not the surrounding graph tile, is occupied visual area.
-  // Estimate occupied area conservatively. The estimate is not a native readability check.
-  const width=w*pitch-8,height=h*40-133;
-  const fit=Math.min((width-64)/Math.max(1,bounds.w),height/Math.max(1,bounds.h));
-  const usedWidth=Math.min(width,bounds.w*Math.max(0,fit)+64);
-  return {horizontalFraction:Math.max(0,1-usedWidth/width),emptyGridCells:Math.max(0,(width-usedWidth)/pitch*h),labelEstimate:12*fit*scale};
+  const fit=Math.max(0,(w*pitch-10)/Math.max(1,bounds.w));
+  return {horizontalFraction:0,emptyGridCells:0,labelEstimate:12*fit*scale,oversizePenalty:Math.max(0,12*fit*scale-20)*10};
 }
 function solve(source,{registry,geometry,measurements={},minimums={},excludeLayout=null,controlPolicy=null}={}) {
   if(controlPolicy&&!['above-group','below-group','interior-band','column-band'].includes(controlPolicy))throw Error('Unsupported: unknown control policy');
@@ -59,8 +60,7 @@ function solve(source,{registry,geometry,measurements={},minimums={},excludeLayo
   if(!ct||ct.hidden||ct.attachTo)throw Error('Unsupported: detached controls required');
   const pitch=(geometry.gridWidth+8)/24,bounds=geometry.bounds,graphVisible=!g.hidden;
   const graphScale=10/12/geometry.scale,minGraphW=Math.ceil((bounds.w*(8/12/geometry.scale)+64)/pitch),preferredGraphW=Math.ceil((bounds.w*graphScale+64)/pitch);
-  const graphH=Math.max(4,Math.ceil((bounds.h*graphScale+133)/40),minimums.diagram?.h||0);
-  if(graphVisible&&(minGraphW>24||graphH>40))throw Error('Unsupported: graph exceeds default-camera readable bounds; try a larger --width (up to 1920), or preserve the diagram for manual review');
+  if(graphVisible&&minGraphW>24)throw Error('Unsupported: graph exceeds default-camera readable bounds; try a larger --width (up to 1920), or preserve the diagram for manual review');
   const widths=graphVisible?[...new Set([Math.max(6,minGraphW),Math.min(24,Math.max(minGraphW,preferredGraphW)),24])]:[0];
   const touched=new Set((d.steps||[]).flatMap(s=>Object.keys(s.panels||{}).map(id=>'panel:'+id)));
   const panels=d.panels.filter(p=>!old.find(t=>t.panel===p.id)?.hidden).map((p,order)=>{
@@ -72,6 +72,8 @@ function solve(source,{registry,geometry,measurements={},minimums={},excludeLayo
   });
   const candidates=[];
   for(const strategy of ['minimum','preferred'])for(const ordering of ['prominent','tall-first','short-first'])for(const gw of widths) {
+    const graphH=graphVisible?graphHeight(bounds,gw,pitch,minimums.diagram?.h||0):0;
+    if(graphH>40)continue;
     const entries=panels.map(p=>{
       const target=strategy==='preferred'?p.c.preferredWidth:p.c.minWidth;
       const w=Math.max(Math.ceil((p.c.minWidth+8)/pitch),Math.round(((p.c.grow?target:p.c.preferredWidth)+8)/pitch),p.min.w||0);
@@ -111,7 +113,7 @@ function solve(source,{registry,geometry,measurements={},minimums={},excludeLayo
       let cavityDepth=0;for(let x=0;x<24;x++){let run=0;for(let y=0;y<totalRows;y++){if(all.some(r=>x>=r.x&&x<r.x+r.w&&y>=r.y&&y<r.y+r.h))run=0;else{run++;cavityDepth+=run;}}}
       const narrowControlPenalty=band.control.w<24?(24-band.control.w)/24*(totalRows<15?150:24):0;
       const graphInterior=graphVisible?graphWaste(bounds,gw,graphH,pitch,geometry.scale):{horizontalFraction:0,emptyGridCells:0,labelEstimate:null};
-      const score=Math.max(0,10-(graphInterior.labelEstimate||10))*20+graphInterior.emptyGridCells*.85+narrowControlPenalty+totalRows*6+unused*.45+cavityDepth*.06+compression*80+growth*3+aspectWaste*12+(1-edge.solidEdge)*24+distance*1.5+Math.max(0,controlBottom-1000)*.25-edge.balance*(totalRows>18?65:8);
+      const score=(graphInterior.oversizePenalty||0)+Math.max(0,10-(graphInterior.labelEstimate||10))*20+graphInterior.emptyGridCells*.85+narrowControlPenalty+totalRows*6+unused*.45+cavityDepth*.06+compression*80+growth*3+aspectWaste*12+(1-edge.solidEdge)*24+distance*1.5+Math.max(0,controlBottom-1000)*.25-edge.balance*(totalRows>18?65:8);
       candidates.push({spec,metadata:{version:VERSION,policy:band.kind,strategy,ordering,graph:{bounds,width:gw,height:graphH,labelTarget:10},contracts:Object.fromEntries(entries.map(e=>[e.id,e.c])),metrics:{score,graphInterior,narrowControlPenalty,totalRows,unusedGridCells:unused,cavityDepth,compression,growth,aspectWaste,controlBottomEstimate:controlBottom,relevanceDistanceRows:distance,...edge},relevanceRule:touched.size?'current-step panel patches':'all visible evidence, balanced around control band'}});
     }
   }
@@ -121,4 +123,4 @@ function solve(source,{registry,geometry,measurements={},minimums={},excludeLayo
   if(L.semantic(result.spec)!==L.semantic(source))throw Error('Frozen semantic identity changed');
   result.metadata.alternatives=ranked.slice(0,12).map(c=>({policy:c.metadata.policy,...c.metadata.metrics}));result.metadata.selectionRule=(excludeLayout?'Best generic candidate excluding identical baseline geometry':'Best generic candidate')+(controlPolicy?' constrained to '+controlPolicy+' for explicit experiment':'');return result;
 }
-module.exports={VERSION,solve,edgeMetrics,controlBands,graphWaste};
+module.exports={VERSION,solve,edgeMetrics,controlBands,graphWaste,graphHeight};

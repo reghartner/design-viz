@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const vm=require('node:vm');
 const {readSource}=require('../tools/source-loader.cjs');
 const context={};vm.createContext(context);
-vm.runInContext(readSource('core/paths.js')+'\n'+readSource('viewer/path-timeline.js'),context);
+vm.runInContext(readSource('core/paths.js'),context);
 const paths=(...sequences)=>sequences.map((indices,index)=>({id:String(index),indices}));
 function layout(routes,shown){
   const graph=context.pathTimelineGraph(routes,shown),rows=context.pathTimelineRows(routes,graph);

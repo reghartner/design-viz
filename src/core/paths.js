@@ -243,3 +243,33 @@ function pathTimelineGraph(paths,shownPaths){
   }
   return {nodes:nodes,edges:edges,blocks:blocks,hasShared:nodes.some(function(node){return node.shared;}),columns:columns};
 }
+
+/* Pack shared tracks into existing rows where unrelated routes leave room.
+   Reserve whole track spans, not just circles, so a common track cannot appear
+   to join an unrelated path passing through the same columns. */
+function pathTimelineRows(paths,graph){
+  var lanes=new Map(paths.map(function(path,index){return [path.id,index];}));
+  var byId=new Map(graph.nodes.map(function(node){return [node.id,node];}));
+  var occupied=[],shared=new Map();
+  paths.forEach(function(path){
+    var columns=graph.nodes.filter(function(node){return node.pathIds.indexOf(path.id)>=0;}).map(function(node){return node.column;});
+    if(columns.length)occupied.push({pathId:path.id,row:lanes.get(path.id),first:Math.min.apply(null,columns),last:Math.max.apply(null,columns)});
+  });
+  graph.blocks.forEach(function(block){
+    var members=block.nodeIds.map(function(id){return byId.get(id);});
+    var columns=members.map(function(node){return node.column;});
+    var participating=block.pathIds.filter(function(id){return members.every(function(node){return node.pathIds.indexOf(id)>=0;});});
+    var first=Math.min.apply(null,columns),last=Math.max.apply(null,columns);
+    var ideal=block.pathIds.reduce(function(sum,id){return sum+lanes.get(id);},0)/block.pathIds.length;
+    function clear(row){return !occupied.some(function(track){
+      if(track.pathId!==undefined && participating.indexOf(track.pathId)>=0)return false;
+      return track.first<=last && first<=track.last && Math.abs(track.row-row)<1;
+    });}
+    var candidates=[ideal];
+    for(var row=0;row<=paths.length+graph.blocks.length;row+=.5)candidates.push(row);
+    candidates.sort(function(a,b){return Math.abs(a-ideal)-Math.abs(b-ideal) || a-b;});
+    var chosen=candidates.find(clear);
+    shared.set(block.id,chosen);occupied.push({row:chosen,first:first,last:last});
+  });
+  return {lanes:lanes,shared:shared};
+}

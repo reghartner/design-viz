@@ -11,7 +11,7 @@ function contract(panel,registry){
 function dimensions(c,w,pitch,measurement={},minimum={}){
  measurement=measurement.byWidth?.[w]||measurement;
  const nativeWidth=w*pitch-8,chrome=measurement.chrome||42,padding=measurement.paddingX||24;
- const available=Math.max(1,nativeWidth-padding-(c.bodyInset||0));
+ const available=Math.min(measurement.bodyWidthCap||Infinity,Math.max(1,nativeWidth-padding-(c.bodyInset||0)));
  let bodyHeight=c.aspectPolicy==='fixed'&&c.bodyAspect?available/c.bodyAspect+Math.max(c.bodyInset||0,measurement.extraHeight||0):measurement.intrinsicHeight||Math.max(58,c.rows*24);
  if(c.aspectPolicy==='intrinsic'&&measurement.nativeContent)bodyHeight=measurement.intrinsicHeight||measurement.nativeContent.height;
  return {w,h:Math.max(3,Math.ceil((bodyHeight+chrome+8)/40),minimum.h||0),nativeWidth,bodyHeight,chrome};

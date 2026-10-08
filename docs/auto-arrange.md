@@ -194,8 +194,10 @@ not a statistically learned model. Panel-owned size/aspect contracts are combine
 with deterministic type-specific content and text-wrap estimates. The real
 path/state folders supply ambient and every path step, including inherited and
 transient state. Controls reserve the longest wrapped caption at each candidate width, transport
-and chip rows, and the native shared-path track geometry. Track sizing uses the
-same pure path graph and row packer as the viewer.
+and chip rows, the separate mode strip, and the native shared-path track geometry.
+Code evidence links and runtime condition chips reserve their own
+wrapping rows using their visible labels; URLs and code anchors do not count as
+caption prose. Track sizing uses the same pure path graph and row packer as the viewer.
 Small indicators can share rows; content-dense tables, logs and reports receive
 larger widths/heights. Native scrollable content retains a bounded viewport,
 reported separately from its estimated full content height. Camera estimates
@@ -219,9 +221,14 @@ require scrolling; their reported position is an estimated isolated section,
 not the section's position in a complete document. `--width` models an isolated
 host with 80px total horizontal inset and the native 1000px minimum design grid;
 the enclosing document's skin width cap, embed overrides, nested padding and
-later host resizing can change the rendered width. It does not apply a global
-document cap, because standalone and embedded hosts can override one. Review the rendered result
-when a visual review is available.
+later host resizing can change the rendered width. Diagnostics report the single
+target width: composing at 1200px does not establish fit when rendered at 1440px.
+Native Auto scales the graph with available width, while saved tile row heights
+stay fixed; it does not automatically fit the saved tile height. Recompose for
+the actual host width or inspect and repair the saved layout after resizing.
+The viewer’s separate Fit diagram action fits both viewport dimensions. The
+composer does not apply a global document cap, because standalone and embedded
+hosts can override one. Review the rendered result when a visual review is available.
 
 ### Repairing a rendered layout
 

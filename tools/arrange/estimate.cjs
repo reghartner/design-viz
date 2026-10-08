@@ -50,10 +50,30 @@ function controlDepth(d,all,width){
   if(remaining>=200){captionWidth=remaining;overhead=50;}
   else {tracks=Math.ceil(chips/available)*36;overhead=30+36+10+tracks+10;}
  }
- // Include the number, optional lane/id/source and shared-step suffix around
- // narrative text. Monospace controls wrap differently from body prose.
- const maxLines=Math.max(1,...all.filter(s=>s.step).map(s=>lines([s.step.text,s.step.lane,s.step.id,s.step.source,paths.length>1?'Shared step in other paths':''].filter(Boolean).join(' '),Math.max(1,captionWidth-40),14)));
- return {neededHeight:overhead+maxLines*22,maxLines,trackHeight:tracks,captionWidth,unsupported:available<200};
+ // Evidence links and runtime chips occupy independent wrapping rows beneath
+ // the narrative. Resolve actual link labels/URL validity through the canon
+ // helper. The native stepper forwards codeRefs, not node/API bindings; URL
+ // payloads and code anchors are not visible caption text.
+ const captionSamples=all.filter(s=>s.step).map(({step})=>{
+  const maxLines=Math.max(1,lines([step.text,step.lane,step.id,step.link?'source':'',paths.length>1?'Shared step · also in '+paths.map(p=>p.label||p.id).join(', '):''].filter(Boolean).join(' '),Math.max(1,captionWidth-40),14));
+  const evidenceHeight=inlineRows(core.links({codeRefs:step.codeRefs}).map(l=>l.label+' ↗'),captionWidth,14,22,12,8,0);
+  const runtimeHeight=inlineRows((step.conditions||[]).map(c=>'! '+c.label),captionWidth,12,18,20,12,7);
+  return {maxLines,evidenceHeight,runtimeHeight:runtimeHeight?runtimeHeight+8:0,height:maxLines*22+evidenceHeight+(runtimeHeight?runtimeHeight+8:0)};
+ });
+ const maxLines=Math.max(1,...captionSamples.map(s=>s.maxLines)),contentHeight=Math.max(22,...captionSamples.map(s=>s.height));
+ // The native mode strip is outside the termbar, inside the saved steps tile.
+ return {neededHeight:36+overhead+contentHeight,maxLines,trackHeight:tracks,captionWidth,evidenceHeight:Math.max(0,...captionSamples.map(s=>s.evidenceHeight)),runtimeHeight:Math.max(0,...captionSamples.map(s=>s.runtimeHeight)),unsupported:available<200};
+}
+// Approximate inline-block/flex wrapping with conservative monospace advances.
+// Long labels wrap within an item; short links/chips share the same row.
+function inlineRows(labels,width,font,lineHeight,paddingX,paddingY,gap){
+ let used=0,row=0,total=0;
+ for(const label of labels){
+  const length=[...label].reduce((n,c)=>n+(/[\u2e80-\uffff]/u.test(c)?font:font*.65),0),w=Math.min(width,length+paddingX),h=Math.max(1,lines(label,width-paddingX,font),Math.ceil(length/Math.max(1,width-paddingX)))*lineHeight+paddingY;
+  if(used&&used+gap+w>width){total+=row+gap;used=0;row=0;}
+  used+=(used?gap:0)+w;row=Math.max(row,h);
+ }
+ return total+row;
 }
 function panelSize(p,s,width,layout={}){
  const inner=Math.max(70,width-32),row=(v,w=inner)=>Math.max(1,lines(v,w,13))*19+12,rows=list=>(Array.isArray(list)?list:[]).reduce((n,v)=>n+row(v),0);

@@ -66,7 +66,7 @@ test('direct CLI works in a clean checkout and source-free kit with subprocesses
  const guard=path.join(base,'guard.cjs');fs.writeFileSync(guard,"const M=require('node:module'),load=M._load;M._load=function(id,...args){if(/playwright|puppeteer|child_process/.test(id))throw Error('Forbidden runtime dependency '+id);return load.call(this,id,...args)};global.fetch=()=>{throw Error('Forbidden network')};");
  for(const directory of [checkout,kit]){
   assert.equal(fs.existsSync(path.join(directory,'tools/arrange/node_modules')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/setup.cjs')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/generated-native.html')),false);
-  const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}}];raw.steps=[{id:'start',text:'Review the charge.'},{id:'normal',text:'Normal outcome.'},{id:'alternative',text:'Alternative outcome.'}];raw.paths=[{id:'normal',steps:['start','normal']},{id:'alternative',steps:['start','alternative']}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
+  const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}}];raw.steps=[{id:'start',text:'Review the charge.',codeRefs:[{id:'evidence',label:'Processing evidence',repository:'https://example.com/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}],conditions:[{kind:'slow',label:'Evidence pending'}]},{id:'normal',text:'Normal outcome.'},{id:'alternative',text:'Alternative outcome.'}];raw.paths=[{id:'normal',steps:['start','normal']},{id:'alternative',steps:['start','alternative']}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
   const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);assert.ok(JSON.parse(result.stdout).diagrams[0].controls.estimatedTrackHeight>40,'source-free backend exports shared track geometry');
  }
  assert.equal(fs.existsSync(path.join(kit,'src/source-bundles.json')),false);assert.equal(fs.existsSync(path.join(checkout,'tools/canon/generated-runtime.cjs')),false);
@@ -138,4 +138,17 @@ test('screen footers wrap independently and capped phone content stays bounded',
  const V=require('../tools/arrange/contracts.cjs'),c=V.contract({id:'app',type:'deviceapp'},E.inputs({diagram:A.seed(diagram(),[])},1200).registry);
  const a=V.dimensions(c,12,50,E.panelSize({type:'deviceapp'}, {},592)),b=V.dimensions(c,20,50,E.panelSize({type:'deviceapp'}, {},992));
  assert.equal(a.bodyHeight,b.bodyHeight,'330px portrait cap bounds height as outer tile grows');
+});
+
+
+test('controls reserve independent canon link and runtime rows across path states',()=>{
+ const d=diagram();d.steps=[{id:'begin',text:'Begin review.'},{id:'detail',text:'Confirm the evidence.',codeRefs:[{id:'evidence',label:'Processing service evidence '.repeat(12),repository:'https://example.com/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}],conditions:[{kind:'slow',label:'Processing is delayed '.repeat(8)}]},{id:'other',text:'Other outcome.'}];
+ d.paths=[{id:'normal',steps:['begin','detail']},{id:'other',steps:['begin','other']}];
+ const detailed=E.controlDepth(d,E.states(d),420),wide=E.controlDepth(d,E.states(d),1200);
+ assert.ok(detailed.evidenceHeight>wide.evidenceHeight);assert.ok(detailed.runtimeHeight>wide.runtimeHeight);
+ const plain=structuredClone(d);delete plain.steps[1].codeRefs;delete plain.steps[1].conditions;
+ const base=E.controlDepth(plain,E.states(plain),420);
+ assert.equal(detailed.neededHeight-base.neededHeight,detailed.evidenceHeight+detailed.runtimeHeight);
+ d.steps[1].codeRefs[0].repository='javascript:alert(1)';
+ assert.equal(E.controlDepth(d,E.states(d),420).evidenceHeight,0,'only actual sanitized links consume rows');
 });

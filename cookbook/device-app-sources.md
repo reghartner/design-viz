@@ -163,9 +163,10 @@ Without `storyTime`, keep authoring `detail` as above.
 
 New picker tiles start with **Badge → Hidden**. Existing diagrams keep their
 status badges until you change them. In **fields**, choose **Hidden**, **Custom**
-or **Status**; Custom uses **Badge text** and a hex **Badge color**. For example:
+or **Status**; Custom uses **Badge text** and a hex **Badge color**. This panel
+declaration fragment shows all three choices:
 
-```json
+```
 "fields": [
   {"id": "battery", "label": "Battery", "kind": "battery", "badgeMode": "none"},
   {"id": "power", "label": "Power", "badgeMode": "custom", "badgeText": "Solar connected", "badgeColor": "#168878"},

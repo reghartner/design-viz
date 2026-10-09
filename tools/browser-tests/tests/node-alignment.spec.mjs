@@ -139,6 +139,7 @@ for(const presentation of ['standard','explore'])for(const direction of ['horizo
     d.nodes[badgeId].delta=true;d.nodes[badgeId].deltaDetails={summary:'Badge extends outside the card'};
     d.nodes.b.title='A deliberately long selected anchor title that must not own alignment geometry';
     if(presentation==='explore'){
+      raw.page.presentation='explore';
       d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
     }
     await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));

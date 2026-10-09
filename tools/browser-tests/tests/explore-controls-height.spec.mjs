@@ -90,3 +90,21 @@ for(const position of ['below','above','left','right'])test('step text changes r
  await expect.poll(async()=>(await metrics(page)).height).toBeGreaterThan(before);
  expect(await player(page).locator('.stepline:not(.dv-caption-old)').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
 });
+
+test('authored floating controls grow without moving when content fits near the stage bottom',async({page,server})=>{
+ const raw=fixture('floating'),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
+ layout.controls={x:.08,y:.64,w:.6,h:.1};
+ await page.setViewportSize({width:1280,height:1100});await open(page,server,raw,'workbench');
+ const source=page.locator('#src'),original=await source.inputValue();
+ for(const height of [1100,1400,1100]){
+  await page.setViewportSize({width:1280,height});
+  await expect.poll(()=>player(page).evaluate((el,saved)=>{
+   const r=el.getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect();
+   return Math.max(Math.abs(r.x-stage.x-saved.x*stage.width),Math.abs(r.y-stage.y-saved.y*stage.height),Math.abs(r.width-saved.w*stage.width));
+  },layout.controls)).toBeLessThan(1);
+  const geometry=await player(page).evaluate(el=>{const r=el.getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect();return {height:r.height/stage.height,bottom:r.bottom-stage.bottom};});
+  expect(geometry.height).toBeGreaterThan(layout.controls.h);expect(geometry.bottom).toBeLessThanOrEqual(-12);
+  const m=await metrics(page);expect(m.overflow).toBeLessThanOrEqual(1);expect(m.captionVisible).toBe(true);
+  await expect(source).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
+ }
+});

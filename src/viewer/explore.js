@@ -415,7 +415,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
     var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):tracks;
     player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
-    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-insets.bottom));
+    // Authored positions use the normal stage boundary. Only automatic docks
+    // reserve the Workbench toolbar inset when paint anchors them below.
+    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-12));
     return r;
   }
   function paint(){

@@ -62,7 +62,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var zoomOut=button('−',function(){changeZoom(.8);},diagramZoom);zoomOut.setAttribute('aria-label','Zoom out');
   var zoomLabel=document.createElement('span');zoomLabel.className='explore-zoom';diagramZoom.appendChild(zoomLabel);
   var zoomIn=button('+',function(){changeZoom(1.25);},diagramZoom);zoomIn.setAttribute('aria-label','Zoom in');
-  var fitButton=button('Fit diagram',function(){fitCanvas();},diagramZoom);
+  var fitButton=button('Fit diagram',function(){memory.cameraNavigated=true;fitCanvas();},diagramZoom);
   var overlayZoom=zoomGroup('Panels & controls','explore-overlay-zoom');
   var overlayOut=button('−',function(){changeOverlayScale(sizingScale()-.1);},overlayZoom);overlayOut.setAttribute('aria-label','Shrink panels and controls');
   var overlayLabel=button('100%',function(){changeOverlayScale(1);},overlayZoom,'mbtn explore-overlay-value');overlayLabel.setAttribute('aria-label','Reset panels and controls size');overlayLabel.title='Reset panels and controls to 100%';
@@ -257,6 +257,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function saveCamera(token){
     if(!active || retired)return;
+    memory.cameraNavigated=true;
     // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
     // authorable layout also prevents a later panel move from exporting it.
     if(!workbenchCanvas)memory.layout.camera=camera();
@@ -265,6 +266,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || retired || gesture)return false;
+    memory.cameraNavigated=true;
     if(!author)return true;
     if(!scrollEdit){var token=beginEdit();if(token===false)return false;scrollEdit={token:token};}
     if(scrollTimer!==null)window.clearTimeout(scrollTimer);
@@ -723,7 +725,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     cancel();var previousWidth=lastWidth;fitHeight();paint();
     // Keep newly placed canvas notes readable when the desktop viewport changes.
     // Authored camera and manually positioned notes retain their chosen view.
-    if(previousWidth && previousWidth!==lastWidth && lastWidth>=800 && !memory.layout.camera && windows.some(function(w){return w.prose && canvasWindow(w) && w.state.automatic && visible(w);}))fitCanvas();
+    if(previousWidth && previousWidth!==lastWidth && lastWidth>=800 && !memory.layout.camera && !memory.cameraNavigated && windows.some(function(w){return w.prose && canvasWindow(w) && w.state.automatic && visible(w);}))fitCanvas();
   }
   function panStart(ev){
     if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,.explore-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
@@ -800,7 +802,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     currentCamera:function(){return camera();},
     panelPlacement:function(){return onCanvas()?'canvas':'floating';},
     canvasCommand:function(){return expand;},
-    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
+    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();memory.cameraNavigated=true;zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
     fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},

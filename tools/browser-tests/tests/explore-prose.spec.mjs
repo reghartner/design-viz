@@ -272,3 +272,15 @@ test('saved and newly authored canvas notes retain their rectangle on live brows
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
 });
+
+test('pristine Workbench canvas notes preserve live camera navigation on resize',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ const board=page.locator('.explore-board');
+ const camera=()=>board.evaluate(el=>{const width=parseFloat(el.style.getPropertyValue('--explore-width')),margin=parseFloat(el.style.getPropertyValue('--explore-margin-x'));return {zoom:width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width,x:(el.scrollLeft+el.clientWidth/2-margin)/width};});
+ await page.getByRole('button',{name:'Zoom canvas in',exact:true}).click();
+ const beforePan=await camera(),area=await board.boundingBox();await page.mouse.move(area.x+area.width*.45,area.y+area.height*.5);await page.mouse.down();await page.mouse.move(area.x+area.width*.45+120,area.y+area.height*.5,{steps:6});await page.mouse.up();
+ const navigated=await camera();expect(navigated.x).not.toBeCloseTo(beforePan.x,2);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(camera).toEqual(expect.objectContaining({zoom:navigated.zoom}));
+ expect((await camera()).x).toBeCloseTo(navigated.x,2);
+});

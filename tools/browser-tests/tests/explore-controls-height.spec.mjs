@@ -88,7 +88,15 @@ for(const position of ['below','above','left','right'])test('step text changes r
  const before=(await metrics(page)).height;
  await player(page).getByRole('button',{name:'Next step',exact:true}).click();
  await expect.poll(async()=>(await metrics(page)).height).toBeGreaterThan(before);
- expect(await player(page).locator('.stepline:not(.dv-caption-old)').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
+ const caption=player(page).locator('.stepline:not(.dv-caption-old)');
+ const overflow=await caption.evaluate(el=>el.scrollHeight-el.clientHeight);
+ if(overflow>1){
+  // At readable Explore sizes a long side caption can exceed the viewport.
+  // Its own scrollport must retain every line inside the fitted frame.
+  await expect(caption).toHaveCSS('overflow-y','auto');await caption.evaluate(el=>{el.scrollTop=el.scrollHeight;});
+  expect(await caption.evaluate(el=>el.scrollHeight-el.clientHeight-el.scrollTop)).toBeLessThanOrEqual(1);
+ }else expect(overflow).toBeLessThanOrEqual(1);
+ expect((await metrics(page)).captionVisible).toBe(true);
 });
 
 test('authored floating controls grow without moving when content fits near the stage bottom',async({page,server})=>{

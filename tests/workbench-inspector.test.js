@@ -665,3 +665,19 @@ test('path label width inspector is shared by Standard and Explore with exact un
     width.value='';width.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].pathLabelWidth,undefined);
   }
 });
+
+test('Explore notes and controls use independent percent text controls with exact Undo and reset',()=>{
+  const e=environment(),spec={page:{sections:[{text:'Readable section notes',diagram:{nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
+    id:'chapter',name:'Chapter',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},
+    exploreLayout:{overlayScale:.8,prose:{x:.1,y:.1,w:.3,h:.4},steps:{textPosition:'above'}}
+  }]}}]}};
+  for(const [kind,label,key] of [['prose','Section notes text size','prose'],['step-controls','Step controls text size','controls']]){
+    const h=e.mount(spec);h.session.target={kind,section:0,layoutId:'chapter'};h.inspector.render();
+    let control=aria(h.guide,label);assert.equal(control.value,'100');const before=h.text;
+    control.value='125';control.fire('change');h.flush();const after=h.text,layout=JSON.parse(after).page.sections[0].diagram.layouts[0].exploreLayout;
+    assert.deepEqual(layout,{...spec.page.sections[0].diagram.layouts[0].exploreLayout,textScale:{[key]:1.25}});
+    h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,after);
+    h.inspector.render();control=aria(h.guide,label);control.value='200';control.fire('change');assert.equal(h.text,after);
+    control.value='';control.fire('change');h.flush();assert.equal(JSON.parse(h.text).page.sections[0].diagram.layouts[0].exploreLayout.textScale,undefined);
+  }
+});

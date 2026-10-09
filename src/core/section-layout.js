@@ -65,6 +65,14 @@ function sectionLayoutPreset(d, target, excludedKeys){
 }
 /* Explore defaults are viewport fractions; camera center is in SVG coordinates.
    Recover malformed optional entries independently without modifying source. */
+function sectionExploreTextScale(value,warnings,path){
+  if(value===undefined)return 1;
+  if(!Number.isFinite(value) || value<.75 || value>1.75){
+    if(warnings)warnings.push((path || 'textScale')+': use a text scale from 0.75 to 1.75');
+    return 1;
+  }
+  return value;
+}
 function sectionExploreLayout(d,value,warnings,path){
   var out={},used=Object.create(null);path=path || 'exploreLayout';
   function warn(at,message){if(warnings)warnings.push(at+': '+message);}
@@ -75,6 +83,15 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   if(value===undefined)return out;
   if(!object(value)){warn(path,'expected an object');return out;}
+  if(value.textScale!==undefined){
+    if(!object(value.textScale))warn(path+'.textScale','expected an object with optional prose and controls scales');
+    else{
+      out.textScale={};
+      ['prose','controls'].forEach(function(key){
+        if(value.textScale[key]!==undefined)out.textScale[key]=sectionExploreTextScale(value.textScale[key],warnings,path+'.textScale.'+key);
+      });
+    }
+  }
   if(value.prosePlacement!==undefined){
     if(['floating','canvas'].indexOf(value.prosePlacement)<0)warn(path+'.prosePlacement','use floating or canvas');
     else out.prosePlacement=value.prosePlacement;

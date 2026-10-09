@@ -16,7 +16,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
   if(value.canvasPanels)saved.canvasPanels=JSON.parse(JSON.stringify(value.canvasPanels));else delete saved.canvasPanels;
   saved.controls=value.controls?JSON.parse(JSON.stringify(value.controls)):null;
   if(value.layout){
-    ['panels','prose','controls','overlayScale','prosePlacement','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
+    ['panels','prose','controls','textScale','overlayScale','prosePlacement','controlsPlacement','panelPlacement','panelPlacements','canvas'].forEach(function(key){
       if(value.layout[key]===undefined)delete saved.layout[key];else saved.layout[key]=JSON.parse(JSON.stringify(value.layout[key]));
     });
   }
@@ -102,7 +102,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function copy(value){return JSON.parse(JSON.stringify(value));}
   function panelGeometry(value){
     var panels={};Object.keys(value.panels).forEach(function(id){var state=value.panels[id];panels[id]={x:state.x,y:state.y,w:state.w,h:state.h,stacked:state.stacked===true};});
-    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,prosePlacement:value.layout.prosePlacement,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
+    return {panels:panels,canvasPanels:value.canvasPanels?copy(value.canvasPanels):undefined,prose:value.prose?{x:value.prose.x,y:value.prose.y,w:value.prose.w,h:value.prose.h,stacked:value.prose.stacked===true}:null,controls:value.controls?copy(value.controls):null,layout:{textScale:value.layout.textScale?copy(value.layout.textScale):undefined,panels:value.layout.panels?copy(value.layout.panels):undefined,prose:value.layout.prose?copy(value.layout.prose):undefined,controls:value.layout.controls?copy(value.layout.controls):undefined,overlayScale:value.layout.overlayScale,prosePlacement:value.layout.prosePlacement,controlsPlacement:value.layout.controlsPlacement,panelPlacement:value.layout.panelPlacement,panelPlacements:value.layout.panelPlacements?copy(value.layout.panelPlacements):undefined,canvas:value.layout.canvas?copy(value.layout.canvas):undefined}};
   }
   function beginEdit(panels){
     if(!active || retired)return false;
@@ -151,6 +151,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   // Notes retain readable text and independent geometry when panels are scaled.
   // Dormant canvas controls sizing must never resize floating panel content.
+  function controlsContentScale(){return (definition && definition.presentation==='explore' || canvasWindow(playerWindow))?1:overlayScale();}
   function windowScale(w){return w.prose?1:w===playerWindow?overlayScale():floatingOverlayScale();}
   function zoomFloor(){
     if(!onCanvas())return workbenchCanvas && fitFloor!==null?Math.min(.15,fitFloor):.15;
@@ -323,7 +324,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function sizingScale(){return hasFloatingPanels()?floatingOverlayScale():overlayScale();}
   function latchOverlayScale(){if(memory.layout.overlayScale===undefined && !savedOverlayGeometry(memory.layout))memory.layout.overlayScale=floatingOverlayScale();}
   // Panel dimensions and control height describe the size at 100%. Controls
-  // retain their chosen horizontal span so smaller text exposes more steps.
+  // retain their chosen horizontal span; Explore type has its own scale.
   // Positions stay in viewport coordinates; the diagram camera is independent.
   function scaledRect(w,r,inverse){
     if(canvasWindow(w))return graphRect(r);
@@ -383,7 +384,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     apply(w,constrain(w,scaledRect(w,w.state)));
     var overflow=Math.ceil(w.body.scrollHeight-w.body.clientHeight);
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
-    // Pristine notes keep fitting fluid type through viewport changes.
+    // Pristine notes keep fitting text through viewport and text-size changes.
     // Gestures and authored rectangles leave automatic sizing explicitly.
   }
   function fittedControlsRect(r,insets){
@@ -406,7 +407,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var compact=style.display==='flex',beside=!compact && /^(left|right)$/.test(player.getAttribute('data-step-text-position'));
     var gap=parseFloat(style.rowGap)||0,padding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
     var rail=player.querySelector('.playback-mode-rail'),railHeight=rail?rail.offsetHeight:0;
-    var scale=canvasWindow(playerWindow)?1:overlayScale();
+    var scale=controlsContentScale();
     var contentHeight=compact?transportHeight+tracks+captionHeight+gap*2:beside?Math.max(transportHeight,tracks,captionHeight):Math.max(transportHeight,tracks)+captionHeight+gap;
     var room=Math.max(104,bounds().h-insets.top-insets.bottom);
     r.h=Math.min(Math.max(r.h,railHeight+(contentHeight+padding)*scale+2),room);
@@ -424,7 +425,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(!active || retired)return;
     var b=bounds();if(!b.w || !b.h)return;
     if(selectedCanvasWindow && (!canvasWindow(selectedCanvasWindow) || !visible(selectedCanvasWindow)))selectCanvasWindow(null);
-    var contentScale=overlayScale();player.style.setProperty('--explore-overlay-scale',String(canvasWindow(playerWindow)?1:contentScale));stage.style.setProperty('--explore-overlay-scale',String(contentScale));
+    var contentScale=overlayScale();player.style.setProperty('--explore-overlay-scale',String(controlsContentScale()));
+    player.style.setProperty('--explore-text-scale',String(sectionExploreTextScale(memory.layout.textScale && memory.layout.textScale.controls)));stage.style.setProperty('--explore-overlay-scale',String(contentScale));
     var textPosition=memory.layout.steps && memory.layout.steps.textPosition || 'below';
     player.setAttribute('data-step-text-position',textPosition);
     player.setAttribute('data-explore-layout',definition.id);
@@ -440,7 +442,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // State changes can replace panel content without changing the viewport.
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
-    windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
+    windows.forEach(function(w){if(w.prose)w.el.style.setProperty('--explore-text-scale',String(sectionExploreTextScale(memory.layout.textScale && memory.layout.textScale.prose)));w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
     var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
@@ -644,7 +646,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     active=true;choices.replaceChildren();memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
     zoom=memory.zoom!==null?memory.zoom:memory.layout.camera?memory.layout.camera.zoom:null;
     fitFloor=memory.fitFloor!==undefined?memory.fitFloor:memory.layout.camera?memory.layout.camera.zoom:null;
-    stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');menu.hidden=focus.hidden=stack.hidden=false;
+    stage.hidden=false;grid.hidden=true;shell.classList.add('viewport-explore');shell.classList.toggle('explore-text-sizing',definition.presentation==='explore');menu.hidden=focus.hidden=stack.hidden=false;
     var cards=Array.prototype.slice.call(panelSource.querySelectorAll('.pwidget[data-dv-panel]'));
     var modeRail=box.querySelector('.playback-mode-rail');if(modeRail)move(modeRail,player);
     if(bar)move(bar,player);move(board,canvas);board.querySelector('.boardcanvas').appendChild(objectLayer);if(legend)move(legend,tools);overlayZoom.hidden=false;syncTools();
@@ -677,7 +679,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(prose)prose.setFloating(false);
     stage.appendChild(player);controlsPlacementLabel.hidden=true;objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
     stage.hidden=true;grid.hidden=false;board.hidden=canvasBoardHidden;board.classList.remove('explore-board','authored-diagram-hidden');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
-    shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
+    shell.classList.remove('viewport-explore','explore-text-sizing');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
   function isFullscreen(){return document.fullscreenElement===shell;}
@@ -812,7 +814,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     reset:function(){
       if(!active)return;var token=beginEdit(true);if(token===false)return;
-      var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};leave();delete memories[id];
+      var id=definition.id,defaults=memory.layout.prose && memory.layout.prose.hidden?{prose:{hidden:true}}:{};if(memory.layout.textScale)defaults.textScale=copy(memory.layout.textScale);leave();delete memories[id];
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
     },
     scrollTarget:function(){return active?stage:grid;},

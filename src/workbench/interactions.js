@@ -518,7 +518,7 @@ function createBuilderInteractions(opts){
     // must never turn Delete into removal of the enclosing diagram section.
     var notesEl = ev.target.closest('[data-explore-content="prose"], .sec-prose');
     if (notesEl && secEl.contains(notesEl))
-      return {section: gi, kind: 'prose', el: findTargetEl({section:gi,kind:'prose'})};
+      return {section: gi, kind: 'prose', layoutId:secEl.getAttribute('data-view-id'), el: findTargetEl({section:gi,kind:'prose'})};
     return {section: gi, kind: 'section', el: secEl};
   }
 

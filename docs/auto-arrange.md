@@ -215,6 +215,16 @@ down, so a full logical frame does not guarantee native physical text size.
 Document padding and embed overrides can change these estimates. Diagnostics
 expose these internal limits separately from tile fit; they are not readability guarantees.
 
+`diagrams[].warnings` reports supported concerns as spec-derived estimates:
+graph labels below the 10 CSS px target, panel text below the 8 CSS px estimated
+floor, and step controls below the isolated section's estimated 1000 CSS px
+initial viewport. Each warning names its target, actual estimate, threshold,
+units, and a scoped remedy. These records still require rendered review. A
+controls warning means normal page scrolling may be needed; it does not claim
+clipping. Native font roles warn only when their content is visible in at least
+one reachable folded state. Hidden tiles, hidden or empty fields, and intentionally
+bounded panel scrolling do not warn. An empty warning list is not visual approval.
+
 **Sizes are estimates, not pixel verification or visual QA.** Font metrics,
 responsive chrome, embedded media and complex widgets can differ from these
 conservative models. Diagnostics identify estimated dimensions and scrolling.

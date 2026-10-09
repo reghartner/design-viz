@@ -1,5 +1,6 @@
 import base64
 import gzip
+import hashlib
 import importlib.util
 import json
 import re
@@ -21,7 +22,7 @@ def simple_spec():
     return {'page': {'sections': [{'id': 'story', 'heading': 'Story', 'diagram': {
         'nodes': {'n': {'title': 'Device'}}, 'rows': [['n']],
         'panels': [{'id': 'app', 'type': 'deviceapp', 'fields': [{'id': 'battery', 'kind': 'battery'}],
-                    'initial': {'phoneScreen': 'home', 'battery': {'value': 20}}}],
+                    'initial': {'phoneScreen': 'home', 'battery': {'value': 20, 'icon': 'battery-low'}}}],
         'steps': [{'id': 'open', 'text': 'Open', 'panels': {'app': {'phoneScreen': 'app'}}}]}}]}}
 
 
@@ -62,9 +63,34 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertTrue({'steps', 'time', 'visibility', 'icons', 'paths', 'layouts'} <= set(meta['selected']['features']))
         self.assertLess(meta['size']['bytes'], meta['size']['baselineBytes'] * .6)
         self.assertEqual(meta['size']['bytes'], len(text.encode()))
+        self.assertEqual(meta['size']['characters'], len(text))
+        baseline = '\n\n'.join((ROOT / name).read_text() for name in meta['size']['baselinePaths'])
+        self.assertEqual(meta['size']['baselineBytes'], len(baseline.encode()))
+        self.assertEqual(meta['size']['baselineCharacters'], len(baseline))
         for entry in meta['provenance']:
             self.assertTrue((ROOT / entry['path']).is_file())
-            self.assertEqual(len(entry['sha256']), 64)
+            self.assertEqual(entry['sha256'], hashlib.sha256((ROOT / entry['path']).read_bytes()).hexdigest())
+
+    def test_entry_packet_carries_required_workflow_without_full_reference_preload(self):
+        for mode in ('new', 'edit'):
+            text, meta = packet.generate(['state'], ['steps'], mode=mode)
+            sources = [(item['path'], item['section']) for item in meta['provenance']]
+            self.assertIn((packet.WORKFLOW, 'The rules that matter most'), sources)
+            self.assertIn(('docs/visibility-evidence.md', 'Required author evidence before proposing'), sources)
+            self.assertIn(('docs/visibility-evidence.md', 'Expectation format and eligibility'), sources)
+            self.assertNotIn((packet.WORKFLOW, None), sources)
+            self.assertNotIn((packet.REFS + 'worked-example.md', None), sources)
+            self.assertNotIn((packet.REFS + 'use-case-honeycomb.md', None), sources)
+            self.assertEqual((packet.WORKFLOW, 'Phase 3: Fill the storyboard worksheet') in sources, mode == 'new')
+            for requirement in ('Never re-ask supplied facts', 'Retain source-required icons',
+                                'compose-page-layout.cjs', 'occlusion and legibility unverified',
+                                'N/A to automated', 'spec_walk.py', 'visibility-check.cjs'):
+                if mode == 'edit' and requirement == 'Never re-ask supplied facts':
+                    self.assertIn('do not\n   ask the operator to repeat or approve them', text)
+                else:
+                    self.assertIn(requirement, text)
+            self.assertNotIn('Install the locked', text)
+            self.assertLess(len((ROOT / packet.SKILL).read_text()), 6000)
 
     def test_inference_unions_explicit_selection_and_handles_topology_without_resolving(self):
         raw = simple_spec()
@@ -107,10 +133,25 @@ class AuthoringPacketTests(unittest.TestCase):
             result = subprocess.run(['node', str(kit / 'tools/visibility-check.cjs'), str(source), str(expect)], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
             self.assertTrue(json.loads(result.stdout)['ok'])
-            raw = json.loads(source.read_text()); raw['page']['sections'][0]['diagram']['steps'][0]['panels']['app']['phoneScreen'] = 'home'; source.write_text(json.dumps(raw))
-            result = subprocess.run(['node', str(kit / 'tools/visibility-check.cjs'), str(source), str(expect)], text=True, capture_output=True)
-            self.assertEqual(result.returncode, 1, result.stderr)
-            self.assertFalse(json.loads(result.stdout)['ok'])
+            for hidden_state in ({'phoneScreen': 'home'}, {'phoneScreen': 'app', 'battery': {'visible': False}}):
+                raw = simple_spec()
+                raw['page']['sections'][0]['diagram']['steps'][0]['panels']['app'] = hidden_state
+                source.write_text(json.dumps(raw))
+                result = subprocess.run(['node', str(kit / 'tools/visibility-check.cjs'), str(source), str(expect)], text=True, capture_output=True)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse(json.loads(result.stdout)['ok'])
+                walk = subprocess.run([sys.executable, str(kit / '.claude/skills/hld-to-page/scripts/spec_walk.py'), str(source),
+                                       '--expect', 'happy/open:app.battery.value=20', '--expect', 'happy/open:app.battery.icon=battery-low'], text=True, capture_output=True)
+                self.assertEqual(walk.returncode, 0, walk.stderr + walk.stdout)
+                self.assertNotIn('WARN', walk.stdout)
+            # Unsupported internals and missing stops cannot be rescued by a false expectation.
+            for patch in ({'field': 'battery.value'}, {'step': 'missing', 'visible': False}):
+                assertion = json.loads(expect.read_text())
+                assertion['expectations'][0].update(patch)
+                invalid = kit / 'invalid.json'; invalid.write_text(json.dumps(assertion))
+                result = subprocess.run(['node', str(kit / 'tools/visibility-check.cjs'), str(source), str(invalid)], text=True, capture_output=True)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertFalse(json.loads(result.stdout)['ok'])
             output = kit / 'packet.md'
             result = subprocess.run([sys.executable, str(kit / 'tools/authoring-packet.py'), '--spec', str(source), '--mode', 'edit', '--out', str(output)], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stderr)

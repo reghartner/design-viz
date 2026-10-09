@@ -20,7 +20,7 @@ test('both setups load the existing-edit guide first instead of the full skill a
   const legacy={sessionId:'session',connectionId:'connection'},stampNote=/Commit does not itself refresh compatibility metadata;[^\n]*verify the actual accepted metadata before claiming it was stamped\./;
   for(const workflow of ['external','embedded'])for(const resume of [false,true]){
     const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow);
-    assert.ok(prompt.includes('Read .flowview-agent/CONNECT.md and folder-agent.py before running anything.'),workflow);
+    assert.ok(prompt.includes('Read .flowview-agent/CONNECT.md for the connection protocol.'),workflow);
     assert.ok(prompt.includes('Run python3 "<diagram folder>/.flowview-agent/folder-agent.py" prepare. Read .flowview-agent/authoring/docs/folder-agent-existing-edit.md first'),workflow);
     assert.doesNotMatch(prompt,/hld-to-page\/SKILL\.md|docs\/folder-agent-session\.md/);
     assert.match(prompt,stampNote,workflow);
@@ -66,13 +66,24 @@ test('all pilot entry guidance honors explicit OFF before saved folder settings'
     assert.match(guide,/later explicit|later.*explicit/);
   }
 });
-test('the existing-edit guide escalates to the full skill and widget_doc, where the clip cue lives',()=>{
-  // The clip-evidence cue reaches connected agents only through SKILL.md (new diagrams, via escalation)
-  // and widget_doc.py deviceapp/screen (positional lookups); tests/test_folder_agent.py checks both texts.
-  const guide=require('node:fs').readFileSync(require('node:path').join(__dirname,'../docs/folder-agent-existing-edit.md'),'utf8'),escalate=guide.split('## Escalate')[1].split('## Protocol')[0];
-  assert.match(escalate,/\(\.\.\/\.claude\/skills\/hld-to-page\/SKILL\.md\)/);
-  assert.match(escalate,/a new diagram/);
-  assert.match(guide,/python3 tools\/widget_doc\.py <type>/);
+test('connected entry routes new and edited stories through a packet before JSON',()=>{
+  const guide=require('node:fs').readFileSync(require('node:path').join(__dirname,'../docs/folder-agent-existing-edit.md'),'utf8');
+  assert.match(guide,/authoring-packet\.py --spec/);
+  assert.match(guide,/--mode edit/);assert.match(guide,/--mode new/);
+  assert.match(guide,/inference unions them/);
+  assert.match(guide,/Do not preload the full workflow/);
+  for(const workflow of ['external','embedded']){
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',false,identity,workflow);
+    assert.match(prompt,/authoring-packet\.py --spec <candidate spec> --mode edit/);
+    assert.match(prompt,/new or materially changed story use --mode new/);
+    assert.match(prompt,/explicit selections union with inference/);
+    assert.match(prompt,/Fully specified edits need no fresh questions or worksheet/);
+    assert.doesNotMatch(prompt,/read[^.]*folder-agent\.py before|load the full skill/i);
+    assert.match(prompt,/visibility-check\.cjs <candidate\.spec\.json> <candidate\.visibility\.json>/);
+    assert.match(prompt,/spec_walk\.py --expect value\/icon checks/);
+    assert.match(prompt,/Hidden, unsupported or unreachable targets are not proved/);
+    assert.match(prompt,/unverified pending real Workbench human preview/);
+  }
 });
 test('the existing-edit guide prefers seeded request candidates and keeps the no-seed fallback',()=>{
   const guide=require('node:fs').readFileSync(require('node:path').join(__dirname,'../docs/folder-agent-existing-edit.md'),'utf8').replace(/\s+/g,' ');

@@ -240,9 +240,19 @@ A request without `candidate` uses the earlier flow: read
 `.flowview-agent/state.json` immediately before planning, retain its revision,
 and write complete `candidate.spec.json` and `candidate.ledger.md` files. While
 connected, the agent must not directly overwrite either accepted artifact.
-Validate the candidate spec with the bundled authoring kit, and reconcile ledger
-claims with that spec. The helper does not grant browser access or establish
-visual QA.
+After inspecting the request/source and candidate context, generate the focused
+[authoring packet](authoring-packets.md) before JSON edits. Use `--mode edit --spec`
+for scoped edits, `--mode new` for new or materially changed stories, and add planned
+panels/features. Read the packet instead of preloading the full workflow or
+contract. Fully specified edits need no new questions or worksheet.
+Validate the candidate spec and reconcile ledger claims with it. Before proposing,
+follow [visibility evidence](visibility-evidence.md): record required visible beats
+at exact section/view/path/step and panel/card with expected state/value/icon,
+run supported `visibility-check.cjs` assertions alongside `spec_walk.py --expect`,
+and summarize actual results and remaining rendered review. Hidden, unsupported
+or unreachable content never counts as proof. File-only agents report rendered
+fit, occlusion and legibility unverified pending real Workbench human preview.
+The helper grants no browser, installation, server or delegation permission.
 
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`

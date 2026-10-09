@@ -66,6 +66,14 @@ project/source changes, or a changed repository context during loading prevent
 application. Source and provider context are published together as one Undo action;
 saved JSON keeps authored references, and Undo retains the frozen providers for Redo.
 
+After source/request inspection, use the [packet entry](authoring-packets.md)
+before JSON edits. New or materially changed stories use `--mode new`; scoped
+edits infer from the existing spec with `--mode edit --spec`. Before proposing,
+follow [visibility evidence](visibility-evidence.md): map required beats to exact
+views/paths/steps and panels/cards, pair supported visibility checks with
+value/icon expectations, and report actual checks and remaining rendered review.
+File-only agents cannot verify fit, occlusion or legibility.
+
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
 from the authoring kit (or checkout) and propose its output. The command handles

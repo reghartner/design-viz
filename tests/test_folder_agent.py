@@ -161,7 +161,9 @@ class FolderAgentTests(unittest.TestCase):
         self.assertEqual((self.folder/'authoring/tools/trace-import.js').read_text(),
                          (ROOT/'src/trace-import.js').read_text())
         skill = (self.folder/'authoring/.claude/skills/hld-to-page/SKILL.md').read_text()
-        self.assertIn(widget_doc.CLIP_CUE, ' '.join(skill.split()))
+        self.assertIn('tools/authoring-packet.py', skill)
+        workflow = (self.folder/'authoring/.claude/skills/hld-to-page/references/authoring-workflow.md').read_text()
+        self.assertIn(widget_doc.CLIP_CUE, ' '.join(workflow.split()))
         result = subprocess.run([sys.executable, str(self.folder/'authoring/tools/widget_doc.py'), 'deviceapp'],
                                 text=True, capture_output=True, timeout=10, cwd=self.folder)
         self.assertEqual(result.returncode, 0, result.stderr)

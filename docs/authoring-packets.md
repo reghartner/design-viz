@@ -36,19 +36,22 @@ preservation rules still apply. No packet grants publication permission.
 
 `packet.md.json` records explicit/inferred/final selection, source paths and
 SHA-256 hashes, excerpt sizes and emitted characters/UTF-8 bytes. The comparison
-baseline is the complete contract, authoring skill, worked example and cookbook
+baseline is the complete contract, compact skill, detailed workflow reference, worked example and cookbook
 index, joined with blank lines. This measures **document size**, not observed
 model tokens, cost, speed or quality savings. Output order and provenance are
 deterministic for the same maintained sources and choices. Source files are
 never rewritten. Without `--out`, Markdown is stdout and metadata is stderr.
 
-Representative emitted document sizes (current maintained sources; regenerate
-with the two explicit-selection commands above when comparing another revision):
+Generate size measurements from `packet.md.json` for the current sources rather
+than relying on a fixed historical table. The compact SKILL entry routes both new
+and edited diagrams here before JSON; connected Workbench instructions do the
+same after identity/protocol setup and source/candidate inspection. Full session
+manuals and helper implementations are not prerequisite reading.
 
-| Selection | Characters | UTF-8 bytes | Baseline bytes | Reduction in bytes |
-| --- | ---: | ---: | ---: | ---: |
-| `state` + `steps` | 55,872 | 56,078 | 231,733 | 75.8% |
-| `deviceapp` + `screen` + `paths` + `layouts` | 96,128 | 96,419 | 231,733 | 58.4% |
-
-The baseline contains 231,126 characters. These are document-size measurements,
-not a model trial or evidence of token/cost savings.
+Packets include the maintained workflow's essential story/state/placement rules,
+selected contracts, validation and explicit visible-beat evidence. New-story mode
+also includes inventory, unresolved-question handling and the worksheet route.
+Use `--mode new --spec ...` for a materially changed story. No mode re-asks source
+facts or drops required icons, animation or richness to reduce reading context.
+See [visibility evidence](visibility-evidence.md) for the authored ledger mapping,
+value/icon and eligibility checks, honest N/A, and pending Workbench visual review.

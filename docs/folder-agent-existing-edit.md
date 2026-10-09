@@ -9,18 +9,21 @@ not. Follow [pilot capture](../.claude/skills/hld-to-page/references/pilot-captu
 While opted in, checkpoint at entry and before every reply. Run capture commands
 alone; inspect status/editor/transcript with separate Read calls.
 
-## Scope
+## Packet entry for new and edited diagrams
 
-For bounded fact, label, status or time corrections, plus scoped tile sizing
-when preview feedback identifies clipping or unreadability. Preserve story,
-schema, panel types, IDs, paths, steps, evidence, coverage and unrelated placement.
+Inspect the request, relevant source and candidate/ledger context first. From VIZ,
+run `python3 tools/authoring-packet.py --spec <candidate.spec.json> --mode edit
+--out <scratch>/packet.md` and read that packet before JSON edits. For a new or
+materially changed story use `--mode new`; without a spec, select planned
+`--panel` and `--feature` options. Add selections for new source requirements:
+inference unions them. See [packet options](authoring-packets.md).
 
-## Escalate
-
-Load the [skill](../.claude/skills/hld-to-page/SKILL.md) and
-[folder session](folder-agent-session.md) for a new diagram; structural, schema,
-panel-type or binding work; changed evidence, sources, coverage or decisions;
-untraceable state; or doubt this guide suffices.
+The [compact skill router](../.claude/skills/hld-to-page/SKILL.md) covers other
+starting materials. Do not preload the full workflow, contract, examples, session
+manual or helper implementation. The packet includes essential story, state,
+placement, evidence and verification rules. Fully specified edits need no fresh
+question batch or worksheet. Use the [folder session](folder-agent-session.md)
+only for protocol uncertainty or recovery.
 
 ## Protocol
 
@@ -45,7 +48,7 @@ untraceable state; or doubt this guide suffices.
 ## Semantics
 
 - State carries forward. Check the change on every inheriting path against
-  prior/next steps; clear anything no longer true (skill rules 4 and 7–9).
+  prior/next steps; clear anything no longer true (packet state rules).
 - Put critical visible facts in panel fields, labels and statuses; update every occurrence.
 - Ledger anchor/fact/`covered @` rows must agree with the spec. Keep row IDs; new
   rows use the next unused ID. See [evidence and updates](../.claude/skills/hld-to-page/references/evidence-and-updates.md).
@@ -59,10 +62,16 @@ untraceable state; or doubt this guide suffices.
   `node tools/validate.js ../SPEC` and
   `python3 .claude/skills/hld-to-page/scripts/spec_walk.py ../SPEC --state`.
   Compare affected steps with the ledger; fix every `WARN`, and fix or justify
-  each `CHECK`. Never claim visual QA.
+  each `CHECK`. Follow the packet's [visibility evidence](visibility-evidence.md):
+  ledger requirement → section/view/path/step → panel/card → expected state/value/icon;
+  run `node tools/visibility-check.cjs <candidate.spec.json> <candidate.visibility.json>`
+  and value/icon `--expect` checks for supported targets. Hidden or unreachable
+  content is not proved. Record honest N/A for unsupported internals/diagram-only
+  beats. Summarize actual checks and rendered fit, occlusion and legibility
+  unverified pending real Workbench human preview. No browser or installation is required.
 - Clipping/readability feedback authorizes scoped tile sizing without another
   permission round or handing work back. Structural node
-  rearrangement uses the full skill's documented `--rearrange` flow.
+  rearrangement uses the packet's documented `--rearrange` flow.
 - Submit `propose` with your candidate pair and base revision per `CONNECT.md`. Every proposal needs
   full preview and explicit **Commit update**; wait for matching `result.json`.
 - After acceptance, check the accepted pair including merged edits. Put routine

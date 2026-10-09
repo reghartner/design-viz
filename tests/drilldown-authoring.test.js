@@ -329,6 +329,22 @@ test('transient detail frames cannot select, drag, decorate or delete authored e
   assert.equal(JSON.stringify(h.session.target),before);assert.equal(h.text,text);assert.equal(h.renders,0);assert.equal(errors,0);assert.equal(decorations,0);assert.equal(rendered,afterArm);
 });
 
+test('viewer path changes follow the selected route without repainting its current step',()=>{
+  const spec={nodes:{a:{},b:{}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
+    steps:[{id:'one',edge:'a->b'},{id:'two',nodes:['b']}],paths:[{id:'happy',steps:['one','two']}]};
+  const h=ui(spec),section=h.view.appendChild(h.element('section'));section.className='doc-sec';section.setAttribute('data-dv-section','0');
+  h.session.target={kind:'step',section:0,index:1,pathId:'happy'};
+  let jumps=0,rendered=0;
+  const player={pause(){},mode:()=> 'step',sourceIndex:()=>0,path:()=> 'happy',jumpSource(){jumps++;}};
+  const inspector={render(){rendered++;},retire(){},panelForCard(){return {};},panelForTarget(){return {};},error(){},transact(){}};
+  const interactions=h.C.createBuilderInteractions({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,guide:h.guide,inspector,
+    refreshLayout(){},refreshInsertion(){},syncStory(){},apply(){},selectRange(){},dismissOverlay(){return false;},ctl:()=>({sections:[{number:1,stepper:player}]})});
+  h.view.fire('dv:pathchange',{target:section});
+  assert.equal(jumps,0,'the viewer already owns path-chip versus step paint');
+  assert.deepEqual({...h.session.target},{section:0,kind:'step',id:undefined,index:0,card:undefined,bulletPath:undefined,block:undefined,tab:undefined,layoutId:undefined,pathId:'happy'});
+  assert.equal(rendered,1);interactions.destroy();
+});
+
 test('Explore caption and keyboard handles select view step controls while numbered chips still select steps',()=>{
   const spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}]};
   const h=ui(spec),section=h.view.appendChild(h.element('section')),player=section.appendChild(h.element()),line=player.appendChild(h.element()),grip=player.appendChild(h.element('button')),chip=player.appendChild(h.element('button'));

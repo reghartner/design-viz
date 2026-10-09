@@ -522,7 +522,7 @@ function createBuilderInteractions(opts){
     return {section: gi, kind: 'section', el: secEl};
   }
 
-  function selectTarget(target, focusEditor, keepTool){
+  function selectTarget(target, focusEditor, keepTool, preservePlayerPaint){
     clipboardHomeTarget=null;
     pausePreview();
     if (opts.workspace && !keepTool) opts.workspace.showTool('inspect', {closeUtilities:true});
@@ -535,7 +535,10 @@ function createBuilderInteractions(opts){
     if (target.kind !== 'tab' && target.kind !== 'document') session.insertSection = target.section;
     var parsed = parseEditor();
     if (!parsed.error) updateTargetLabel(parsed.raw);
-    syncBoardToSelectedStep();
+    /* Viewer navigation has already selected the path/step and painted the
+       requested gesture before dv:pathchange reaches the editor. Re-running
+       jumpSource() here would replace a path-chip overview with step 1. */
+    if (!preservePlayerPaint) syncBoardToSelectedStep();
     if (session.target.kind === 'step'){
       var sp = stepperFor(session.target.section);
       if (sp && sp.path) session.target.pathId = sp.path();
@@ -572,7 +575,7 @@ function createBuilderInteractions(opts){
     var section = ev.target.closest('.doc-sec');
     if (followStep && section){
       var ordinal = Number(section.getAttribute('data-dv-section')), player = stepperFor(ordinal);
-      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false, true);
+      if (player) selectTarget({section:ordinal, kind:'step', index:player.sourceIndex()}, false, true, true);
     }
     else if(followControls && section)selectTarget({section:previousTarget.section,kind:'step-controls',layoutId:previousTarget.layoutId,el:findTargetEl(previousTarget)},false,true);
   });

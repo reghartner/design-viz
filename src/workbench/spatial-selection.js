@@ -47,7 +47,12 @@ function createBuilderSpatialSelection(opts){
   function layoutId(shell){var p=shell.querySelector('[data-explore-layout]');return p && p.getAttribute('data-explore-layout');}
   function rects(targets,shell){
     var svg=shell.querySelector('.boardcanvas > svg'),matrix=svg && svg.getScreenCTM();if(!matrix)return [];
-    var inverse=matrix.inverse();return targets.map(function(t){var el=t.el,r=el && el.getBoundingClientRect();if(!r)return null;var a=new win.DOMPoint(r.left,r.top).matrixTransform(inverse),b=new win.DOMPoint(r.right,r.bottom).matrixTransform(inverse);return {x:a.x,y:a.y,w:b.x-a.x,h:b.y-a.y};});
+    var inverse=matrix.inverse();return targets.map(function(t){
+      // The authored float center owns the card, while badges, links and long
+      // label ink can extend the renderer's node group in one direction.
+      var el=t.kind==='node' && t.el && t.el.querySelector('.card') || t.el,r=el && el.getBoundingClientRect();if(!r)return null;
+      var a=new win.DOMPoint(r.left,r.top).matrixTransform(inverse),b=new win.DOMPoint(r.right,r.bottom).matrixTransform(inverse);return {x:a.x,y:a.y,w:b.x-a.x,h:b.y-a.y};
+    });
   }
   function close(focus){if(menuLife)menuLife.destroy();menuLife=null;if(menu)menu.remove();menu=null;var el=opener;opener=null;if(focus && el && el.isConnected)el.focus({preventScroll:true});}
   function cancel(){if(!marquee)return;var m=marquee;marquee=null;if(m.box)m.box.remove();try{if(m.board.hasPointerCapture(m.id))m.board.releasePointerCapture(m.id);}catch(_){} }
@@ -133,7 +138,7 @@ function createBuilderSpatialSelection(opts){
     item('Inspect',function(){opts.inspect();});
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the chapter and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},spatial?null:'Duplicate supports nodes and canvas panels.');
-    ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex),null,s);},alignment.error);});
+    ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex);if(!plan.noop)opts.apply(plan,null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,fitReason(context()));
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;

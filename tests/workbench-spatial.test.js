@@ -10,6 +10,44 @@ test('mixed alignment anchors first center, canonicalizes fitted panel size, and
  assert.equal(raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0].h,900);
  assert.match(B.planAlignSpatial(text,raw,[{kind:'node',section:0,id:'b'},targets[1]],'explore','horizontal',rects).error,/Free placement/);
 });
+test('alignment preserves the other node axis and an aligned repeat is a source no-op',()=>{
+ const raw=fixture(),nodeRects=[{x:40,y:50,w:120,h:60},{x:360,y:210,w:120,h:60}],nodeTargets=[targets[0],{kind:'node',section:0,id:'b'}];
+ raw.page.sections[0].diagram.rows=[[]];raw.page.sections[0].diagram.floats.push({id:'b',x:420,y:240,dx:7,dy:9});
+ const text=JSON.stringify(raw);
+ for(const direction of ['horizontal','vertical']){
+  const current=JSON.stringify(raw),plan=B.planAlignSpatial(current,raw,nodeTargets,'explore',direction,nodeRects,1);assert.ok(!plan.error,plan.error);const next=JSON.parse(plan.text),floats=next.page.sections[0].diagram.floats;
+  assert.deepEqual(floats.find(f=>f.id==='b'),raw.page.sections[0].diagram.floats.find(f=>f.id==='b'));
+  const moved=floats.find(f=>f.id==='a');assert.equal(moved[direction==='horizontal'?'x':'y'],raw.page.sections[0].diagram.floats[0][direction==='horizontal'?'x':'y']);
+  const alignedRects=direction==='horizontal'?[{x:40,y:210,w:120,h:60},nodeRects[1]]:[{x:360,y:50,w:120,h:60},nodeRects[1]];
+  const repeat=B.planAlignSpatial(plan.text,next,nodeTargets,'explore',direction,alignedRects,1);assert.equal(repeat.noop,true);assert.equal(repeat.error,undefined);assert.equal(repeat.text,undefined);
+ }
+ assert.equal(JSON.stringify(raw),text);
+});
+test('alignment pins both effective centers for an automatic float before clearing its offsets',()=>{
+ for(const direction of ['horizontal','vertical']){
+  const raw=fixture(),d=raw.page.sections[0].diagram;d.rows=[[]];d.floats[0]={id:'a',side:'above',dx:30,dy:20,custom:'keep'};d.floats.push({id:'b',x:420,y:240});
+  const text=JSON.stringify(raw),nodeTargets=[targets[0],{kind:'node',section:0,id:'b'}],nodeRects=[{x:70,y:110,w:120,h:60},{x:360,y:210,w:120,h:60}];
+  const plan=B.planAlignSpatial(text,raw,nodeTargets,'explore',direction,nodeRects,1);assert.ok(!plan.error,plan.error);const next=JSON.parse(plan.text),moved=next.page.sections[0].diagram.floats[0];
+  assert.deepEqual(moved,direction==='horizontal'?{id:'a',side:'above',custom:'keep',x:130,y:240}:{id:'a',side:'above',custom:'keep',x:420,y:140});
+  const alignedRects=direction==='horizontal'?[{x:70,y:210,w:120,h:60},nodeRects[1]]:[{x:360,y:110,w:120,h:60},nodeRects[1]];
+  const repeat=B.planAlignSpatial(plan.text,next,nodeTargets,'explore',direction,alignedRects,1);assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
+ }
+});
+test('alignment pins an automatic clicked anchor only when another object changes',()=>{
+ for(const direction of ['horizontal','vertical']){
+  const raw=fixture(),d=raw.page.sections[0].diagram;d.nodes.r={};d.nodes.c={};d.rows=[['r']];d.floats=[{id:'a',side:'below',noSpread:true},{id:'b',side:'below',noSpread:true},{id:'c',side:'below',noSpread:true}];
+  const text=JSON.stringify(raw),nodeTargets=[{kind:'node',section:0,id:'a'},{kind:'node',section:0,id:'b'}];
+  const nodeRects=direction==='horizontal'?[{x:1265,y:42,w:150,h:44},{x:1265,y:126,w:150,h:44}]:[{x:1125,y:42,w:150,h:44},{x:1265,y:126,w:150,h:44}];
+  const plan=B.planAlignSpatial(text,raw,nodeTargets,'explore',direction,nodeRects,1);assert.ok(!plan.error,plan.error);const next=JSON.parse(plan.text),floats=next.page.sections[0].diagram.floats;
+  assert.deepEqual(floats,direction==='horizontal'?[{id:'a',side:'below',noSpread:true,x:1340,y:148},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true,x:1340,y:232}]:[{id:'a',side:'below',noSpread:true,x:1340,y:64},{id:'b',side:'below',noSpread:true,x:1340,y:148},{id:'c',side:'below',noSpread:true}]);
+  const laid=B.layout(next.page.sections[0].diagram);assert.equal(laid.pos.b.cx,1340);assert.equal(laid.pos.b.cy,148);assert.equal(laid.pos.a[direction==='horizontal'?'cy':'cx'],direction==='horizontal'?148:1340);
+  assert.equal(laid.pos.c.cx,1340);assert.equal(laid.pos.c.cy,232);
+  const repeat=B.planAlignSpatial(plan.text,next,nodeTargets,'explore',direction,nodeRects.map((r,i)=>i?{...r}:{...r,[direction==='horizontal'?'y':'x']:direction==='horizontal'?126:1265}),1);assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
+ }
+ const raw=fixture(),d=raw.page.sections[0].diagram;d.rows=[[]];d.floats=[{id:'a',x:100,y:80},{id:'b',side:'below',noSpread:true}];const text=JSON.stringify(raw);
+ const noop=B.planAlignSpatial(text,raw,[{kind:'node',section:0,id:'a'},{kind:'node',section:0,id:'b'}],'explore','vertical',[{x:40,y:50,w:120,h:60},{x:40,y:180,w:120,h:60}],1);
+ assert.equal(noop.noop,true);assert.deepEqual(raw.page.sections[0].diagram.floats[1],{id:'b',side:'below',noSpread:true});
+});
 test('mixed alignment accepts a nonfirst visual anchor without rewriting its authored placement',()=>{
  const raw=fixture(),text=JSON.stringify(raw),authored=raw.page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0];
  for(const direction of ['horizontal','vertical']){

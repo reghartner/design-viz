@@ -2380,6 +2380,13 @@ function renderMultiInspector(multiSel){
 
   function stepControlsForm(val){
     var target=Object.assign({},session.target),layout=val.exploreLayout && typeof val.exploreLayout==='object' && !Array.isArray(val.exploreLayout)?val.exploreLayout:{};
+    var width=numberControl(sectionPathLabelWidth(val.pathLabelWidth),function(value){
+      return commitCascade(function(raw){return planSectionPathLabelWidth(session.text(),raw,target.section,target.layoutId,value);},{after:refreshFormSoon});
+    });
+    width.setAttribute('aria-label','Path label width');width.setAttribute('inputmode','numeric');
+    var widthRow=frow('Path label width (px)',width);
+    var widthNote=document.createElement('p');widthNote.className='fnote';widthNote.textContent='160–360 px for this Chapter. Empty restores 230 px. Labels wrap to two lines; hover for the full name.';
+    if(val.presentation!=='explore')return [widthRow,widthNote];
     var placement=selectControl(['floating','canvas'],layout.controlsPlacement || 'floating',function(value){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
@@ -2405,7 +2412,7 @@ function renderMultiInspector(multiSel){
     position.setAttribute('aria-label','Caption position');
     Array.prototype.forEach.call(position.options,function(option){option.textContent=option.value.charAt(0).toUpperCase()+option.value.slice(1)+' steps';});
     var note=document.createElement('p');note.className='fnote';note.textContent='Resize the controls to give side captions more room. Path tracks keep scrolling when their content exceeds the window.';
-    return [frow('Placement',placement),frow('Caption position',position),note];
+    return [widthRow,widthNote,frow('Placement',placement),frow('Caption position',position),note];
   }
 
 function renderInspector(){

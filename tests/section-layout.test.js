@@ -733,3 +733,28 @@ test('chapter visibility creates a default when only a host-specific profile exi
   const next=JSON.parse(plan.text);
   for(const host of ['default','backstage','confluence'])assert.equal(ctx.sectionLayoutItems(next,host,'only-host').find(it=>ctx.sectionLayoutKey(it)==='diagram').hidden,true);
 });
+
+test('path label width is bounded, chapter-local, duplicated and reset without changing story or presentation',()=>{
+  const d=diagram();d.layouts=['standard','explore'].map(id=>({id,name:id,presentation:id,sectionLayout:{default:[board]}}));
+  const before=JSON.stringify(d);
+  for(const value of [160,230,360]){
+    const plan=ctx.planSectionPathLabelWidth(before,d,0,'standard',value);assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text);assert.equal(ctx.sectionLayoutDefinition(next,'standard').pathLabelWidth,value);
+    assert.deepEqual(next.layouts[1],d.layouts[1]);assert.deepEqual(next.steps,d.steps);assert.deepEqual(next.paths,d.paths);
+    const copy=ctx.planDuplicateSectionLayout(plan.text,next,0,'standard');assert.equal(JSON.parse(copy.text).layouts[2].pathLabelWidth,value);
+    const reset=ctx.planSectionPathLabelWidth(plan.text,next,0,'standard',null);assert.deepEqual(JSON.parse(reset.text),d);
+  }
+  for(const value of [null,'260',159,361,-1,{},[],NaN,Infinity]){
+    const warnings=[];assert.equal(ctx.sectionPathLabelWidth(value,warnings),230);assert.equal(warnings.length,1);
+    const bad={...d,layouts:[{...d.layouts[0],pathLabelWidth:value}]};const original=JSON.stringify(bad);
+    const validation=[];ctx.sectionLayoutWarnings(bad,'diagram',validation);assert.ok(validation.some(w=>w.includes('.pathLabelWidth')));
+    assert.equal(ctx.diagramLayoutViews(bad)[0].pathLabelWidth,230);assert.equal(JSON.stringify(bad),original);
+    if(value!==null)assert.ok(ctx.planSectionPathLabelWidth(before,d,0,'standard',value).error);
+  }
+  assert.equal(ctx.sectionPathLabelWidth(undefined),230);
+  for(const legacy of ['flow','layout']){
+    const old=diagram();if(legacy==='layout')old.sectionLayout={default:[board]};
+    const plan=ctx.planSectionPathLabelWidth(JSON.stringify(old),old,0,legacy,300);assert.ok(!plan.error,plan.error);
+    assert.equal(JSON.parse(plan.text).layouts.find(v=>v.id===plan.layoutId).pathLabelWidth,300);
+  }
+});

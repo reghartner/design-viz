@@ -633,3 +633,9 @@ to the view across all host profiles. For example:
 Deleting a selected step updates all view selections; the editor prevents deleting
 the only selected step or path in a view until another is selected. Panel rename updates
 attachments across profiles; deleting a Home map detaches its controls.
+
+### Path label width
+
+Select empty space in the step controls, then use **Inspect → Path label width (px)** in Standard or Explore. The width belongs to the selected Chapter and applies to both ordinary path rows and shared-path timelines. Enter 160–360 logical pixels; clear the field to restore the 230 px default. Labels wrap to at most two lines, with the complete name available on hover and to assistive technology. Narrow control windows reserve room for scrollable step circles.
+
+The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported values warn and render at the default width. Chapter duplication, Undo/Redo, and JSON or standalone HTML export preserve the setting.

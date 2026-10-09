@@ -437,6 +437,21 @@ function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
   });
   if(!plan.error)plan.layoutId=selected;return plan;
 }
+function planSectionPathLabelWidth(text,raw,section,layoutId,value){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var warnings=[];if(value!==null)sectionPathLabelWidth(value,warnings);
+  if(warnings.length)return {error:warnings.join('\n')};
+  var selected=layoutId,plan=builderRewrite(text,raw,got.path,function(d){
+    if(!Array.isArray(d.layouts)){
+      var promoted=builderPromoteSectionViews(d,layoutId);if(promoted.error)return promoted;
+      selected=promoted.layoutId;
+    }
+    var view=d.layouts.find(function(v){return v.id===selected;});
+    if(!view)return {error:'Reselect the chapter before changing path label width.'};
+    if(value===null)delete view.pathLabelWidth;else view.pathLabelWidth=value;
+  });
+  if(!plan.error)plan.layoutId=selected;return plan;
+}
 function planSectionExploreLayout(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
@@ -544,6 +559,7 @@ function planDuplicateSectionLayout(text,raw,section,layoutId){
   var copy={id:id,name:name,sectionLayout:profiles};if(source.paths)copy.paths=builderClone(source.paths);if(source.steps)copy.steps=builderClone(source.steps);
   var original=d.layouts.find(function(v){return v.id===source.id;});
   if(original && original.presentation!==undefined)copy.presentation=original.presentation;
+  if(original && original.pathLabelWidth!==undefined)copy.pathLabelWidth=original.pathLabelWidth;
   if(original && original.exploreLayout!==undefined)copy.exploreLayout=builderClone(original.exploreLayout);
   d.layouts.push(copy);
   var plan=planReplaceValue(text,raw,got.path,JSON.stringify(d));plan.layoutId=id;return plan;

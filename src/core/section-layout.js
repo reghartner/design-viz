@@ -165,6 +165,16 @@ function sectionExploreLayout(d,value,warnings,path){
   }
   return out;
 }
+/* Width of the path-name column in logical CSS pixels, shared by both
+   renderers and both presentations. Invalid imported values use the default. */
+function sectionPathLabelWidth(value,warnings,path){
+  if(value===undefined)return 230;
+  if(!Number.isFinite(value) || value<160 || value>360){
+    if(warnings)warnings.push((path || 'pathLabelWidth')+': use a number from 160 to 360 pixels');
+    return 230;
+  }
+  return value;
+}
 function diagramLayoutViews(d){
   var used=Object.create(null), views=[];
   (Array.isArray(d.layouts)?d.layouts:[]).forEach(function(v){
@@ -172,7 +182,7 @@ function diagramLayoutViews(d){
       typeof v.name!=='string' || !v.name.trim() || v.name.trim().length>40 ||
       !v.sectionLayout || typeof v.sectionLayout!=='object' || Array.isArray(v.sectionLayout) ||
       !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))return;
-    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
+    used[v.id]=true;views.push({id:v.id,name:v.name.trim(),presentation:v.presentation==='explore'?'explore':'standard',pathLabelWidth:sectionPathLabelWidth(v.pathLabelWidth),exploreLayout:sectionExploreLayout(d,v.exploreLayout),sectionLayout:v.sectionLayout,
       paths:Array.isArray(v.paths)?v.paths:undefined,steps:Array.isArray(v.steps)?v.steps:undefined});
   });
   if(views.length)return views;

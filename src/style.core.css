@@ -54,7 +54,7 @@
   color:var(--dtext); font-size:14px;}
 .teasermore{flex:none; color:var(--dfaint); font:500 11px 'IBM Plex Mono',monospace; letter-spacing:.02em;}
 .sec-teaser:hover .teasermore{color:var(--dtext);}
-.sec-text{color:var(--dtext); font-size:14px; max-width:88ch; margin:0 0 8px;}
+.sec-text{color:var(--dtext); font-size:14px; margin:0 0 8px;}
 .sec-bullets{color:var(--dtext); font-size:13.5px; margin:0 0 8px; padding-left:20px;}
 .sec-bullets li{margin:3px 0;}
 .sec-bullets .sec-bullets{margin:3px 0 5px;}
@@ -979,7 +979,6 @@ body.sk-editorial .prosetoggle{
 }
 body.sk-editorial .prosetoggle:hover{color:var(--ed-accent-deep); border-color:var(--ed-accent); background:var(--ed-accent-soft);}
 body.sk-editorial .sec-text{
-  max-width:76ch;
   margin:0 0 12px;
   color:var(--ed-text);
   font:400 16.5px/1.7 'Source Sans 3', sans-serif;
@@ -996,7 +995,6 @@ body.sk-editorial .sec-bullets code:not(.prose-block-code){
   font:500 .82em/1.2 'IBM Plex Mono', monospace;
 }
 body.sk-editorial .sec-bullets{
-  max-width:76ch;
   margin:4px 0 12px;
   color:var(--ed-text);
   font:400 15.5px/1.62 'Source Sans 3', sans-serif;
@@ -2168,7 +2166,6 @@ body.sk-editorial .errbox{
 @media screen {
   body.sk-pastel .sec-text {
     color:#536178;
-    max-width:92ch;
     font-size:15px;
     line-height:1.66;
     margin-bottom:9px;
@@ -2959,7 +2956,6 @@ body.sk-editorial .errbox{
     font-size:13.5px;
     line-height:1.48;
     margin:0 0 6px;
-    max-width:96ch;
   }
 }
 @media screen {
@@ -3765,7 +3761,7 @@ body.sk-daylight .docview,body.sk-pastel .docview,body.sk-editorial .docview{--t
 .detail-head .detail-context{float:right;font-size:11px;color:var(--dfaint);margin:3px 0 7px 14px;line-height:1.5}
 .detail-head .sec-heading-row{margin-top:4px;clear:both}
 .detail-head .sec-heading-row .sec-h{font-size:23px;line-height:1.35;letter-spacing:-.035em;overflow-wrap:anywhere}
-.detail-head .sec-text{font-size:14px;line-height:1.7;max-width:75ch}
+.detail-head .sec-text{font-size:14px;line-height:1.7}
 .detail-notice{font-size:12px;line-height:1.5;opacity:.85}
 .detail-notice:empty{display:none}
 .detail-overview{--detail-map-bg:#101a2c;color-scheme:dark;color:var(--dtext);flex:0 1 332px;min-width:0;max-width:100%;box-sizing:border-box;border:1px solid color-mix(in srgb,var(--dtext) 18%,transparent);border-radius:14px;background:color-mix(in srgb,var(--acc) 3%,var(--detail-map-bg));box-shadow:0 4px 16px #00000006;overflow:hidden;animation:detail-map-enter .24s ease-out}

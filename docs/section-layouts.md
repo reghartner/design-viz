@@ -644,6 +644,10 @@ The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported 
 
 Select empty space in **Section notes** or the **step controls**, then use **Inspect → Text size (%)**. Each has an independent setting from 75% to 175%; clearing it or choosing **Reset text size** restores 100%. The Chapter saves these settings with Undo/Redo, duplication, JSON, standalone HTML and Backstage rendering. Standard typography is unchanged.
 
-At 100%, Explore uses 18px notes, 16px captions, 13px path names and transport labels, and 12px step numbers. These logical sizes are consistent at 1280, 1440 and 1920 desktop widths. Floating content keeps its physical text size when panel/frame scale changes. Canvas content follows graph zoom, including Fit; zooming out reduces its physical text size. Resize frames for room; text wraps or scrolls within constrained frames instead of silently shrinking.
+At 100%, Explore uses 18px notes with a 10px window heading, 16px captions, 13px path names and transport labels, and 12px step numbers. These logical sizes are consistent at 1280, 1440 and 1920 desktop widths. Floating content keeps its physical text size when panel/frame scale changes. Canvas content follows graph zoom, including Fit; zooming out reduces its physical text size. Resize frames for room; text wraps or scrolls within constrained frames instead of silently shrinking.
 
 Use `exploreLayout.textScale: {prose: 1.25, controls: 1.5}` for 125% notes and 150% step-control text. Each optional multiplier defaults to 1 and accepts 0.75–1.75. Malformed imported values warn and independently use 1. Placement and frame geometry are separate settings. Resetting the arrangement retains text sizes.
+
+The notes text setting also scales the **Section notes** window heading, which stays within its 32px header and truncates with an ellipsis when narrow. The chapter heading and chapter navigation keep their existing sizes: they are shared navigation chrome, independent of either content surface.
+
+Typed widget panels retain their existing per-widget content sizing and overlay scaling; these notes/control text settings do not change widget text or panel headings. Use a widget’s own content options where available, enlarge its frame for more room, or adjust **Panels & controls** to scale floating widgets. On-canvas widgets follow diagram zoom.

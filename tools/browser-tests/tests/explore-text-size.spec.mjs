@@ -86,3 +86,23 @@ for(const placement of ['floating','canvas'])for(const position of ['left','righ
  await page.setViewportSize({width:1280,height:1000});const spec=fixture(placement,1.75),layout=spec.page.sections[0].diagram.layouts[0].exploreLayout;layout.steps={textPosition:position};layout.controls.w=.58;
  await open(page,server,spec);await checkControls(page);
 });
+
+for(const placement of ['floating','canvas'])test(`${placement} notes heading scales within its fixed header`,async({page,server})=>{
+ await page.setViewportSize({width:1280,height:800});
+ let chapterHeadingSize;
+ for(const scale of [.75,1,1.75]){
+  const spec=fixture(placement,scale),layout=spec.page.sections[0].diagram.layouts[0].exploreLayout;
+  layout.prose.w=.15;layout.canvas.prose.w=180;
+  await open(page,server,spec);
+  if(placement==='canvas')await notes(page).focus();
+  const grip=notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true});
+  await expect(grip).toBeVisible();await expect(grip).toHaveCSS('font-size',`${10*scale}px`);
+  const metrics=await grip.evaluate(el=>{
+   const header=el.parentElement,hide=header.querySelector('.explore-window-hide'),r=el.getBoundingClientRect(),h=header.getBoundingClientRect(),c=hide.getBoundingClientRect();
+   return {headerHeight:header.offsetHeight,contentFits:el.scrollHeight<=el.clientHeight,inside:r.top>=h.top && r.bottom<=h.bottom,apart:r.right<=c.left,hideInside:c.top>=h.top && c.bottom<=h.bottom};
+  });
+  expect(metrics).toEqual({headerHeight:32,contentFits:true,inside:true,apart:true,hideInside:true});
+  const headingSize=await page.locator('.sec-h').first().evaluate(el=>getComputedStyle(el).fontSize);
+  chapterHeadingSize??=headingSize;expect(headingSize).toBe(chapterHeadingSize);
+ }
+});

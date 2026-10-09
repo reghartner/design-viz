@@ -241,6 +241,9 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 
 /* Explore text has its own authored scale. Frame resizing and overlay scale
    never change these logical sizes; the canvas camera scales its whole layer. */
+/* Notes headings share prose sizing; navigation and widget chrome stay independent. */
+.docview .section-viewport.explore-text-sizing .explore-prose-window .explore-window-header{box-sizing:border-box;flex:0 0 32px;}
+.docview .section-viewport.explore-text-sizing .explore-prose-window .explore-window-grip{font-size:calc(10px * var(--explore-text-scale,1));line-height:1.2;padding-top:4px;padding-bottom:4px;max-height:100%;box-sizing:border-box;}
 .docview .section-viewport.explore-text-sizing .explore-prose-window .sec-prose,
 .docview .section-viewport.explore-text-sizing .explore-prose-window .sec-text,
 .docview .section-viewport.explore-text-sizing .explore-prose-window .sec-bullets{font-size:calc(18px * var(--explore-text-scale,1));line-height:1.55;}

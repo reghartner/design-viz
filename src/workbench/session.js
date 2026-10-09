@@ -7,8 +7,20 @@ function createBuilderSession(options){
   var baselineText=options.source.read(), projectOpen=!options.deferInitialSave;
   var undoStack=[], redoStack=[], target=null, insertSection=0,historyVersion=0;
   var importedText=null, project=0, disposed=false;
-  var topologyContext=null;
+  var topologyContext=null,topologyRevision=0;
   function resolve(raw,context){return typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,arguments.length>1?context:topologyContext);}
+  function checkTopologyContext(nextContext){
+    if(nextContext===topologyContext)return;
+    if(!topologyContext){
+      if(!nextContext || nextContext.ephemeral!==true)throw Error('The frozen Canon session changed. Reopen the picker.');
+    }else{
+      if(!nextContext || nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
+      topologyContext.specs.forEach(function(spec){
+        var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
+        if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
+      });
+    }
+  }
   function artifacts(){return Object.assign({},options.artifacts?options.artifacts():{},topologyContext?{topologyContext:topologyContext}:{});}
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;
   function text(){return options.source.read();}
@@ -61,6 +73,7 @@ function createBuilderSession(options){
     // Archive first: failure must leave the current document and history intact.
     preserveDraft();invalidateProject();persistence.cancel();
     topologyContext=hooks && hooks.topologyContext?JSON.parse(JSON.stringify(hooks.topologyContext)):null;
+    topologyRevision++;
     options.source.write(value);baselineText=baseline==null?value:baseline;
     initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
@@ -74,11 +87,16 @@ function createBuilderSession(options){
     text:text,
     resolve:resolve,
     topologyContext:function(){return topologyContext?JSON.parse(JSON.stringify(topologyContext)):null;},
-    validate:function(raw){try{return validate(normalize(resolve(raw)));}catch(ex){return {errors:[ex.message],warnings:[]};}},
+    connectTopology:function(context,expected){
+      if(disposed || !expected || expected.text!==text() || expected.project!==project)return false;
+      checkTopologyContext(context);resolve(JSON.parse(text()),context);
+      topologyContext=JSON.parse(JSON.stringify(context));topologyRevision++;save();return true;
+    },
+    validate:function(raw,context){try{return validate(normalize(resolve(raw,arguments.length>1?context:topologyContext)));}catch(ex){return {errors:[ex.message],warnings:[]};}},
     parse:function(){return parse(text());},
     snapshot:function(){
       var value=text(),parsed=parse(value);
-      return {text:value,raw:parsed.raw,error:parsed.error,project:project,
+      return {text:value,raw:parsed.raw,error:parsed.error,project:project,topologyRevision:topologyRevision,
         renderedText:options.renderedText?options.renderedText():null};
     },
     get target(){return target;},set target(value){if(!disposed)target=value;},
@@ -90,17 +108,7 @@ function createBuilderSession(options){
       var nextContext=hooks && hooks.topologyContext || topologyContext;
       if(nextContext){
         try{
-          if(nextContext!==topologyContext){
-            if(!topologyContext){
-              if(nextContext.ephemeral!==true)throw Error('The frozen Canon session changed. Reopen the picker.');
-            }else{
-              if(nextContext.id!==topologyContext.id || nextContext.catalogURL!==topologyContext.catalogURL || JSON.stringify(nextContext.catalog)!==JSON.stringify(topologyContext.catalog))throw Error('The frozen Canon session changed. Reopen the picker.');
-              topologyContext.specs.forEach(function(spec){
-                var next=nextContext.specs.find(function(item){return item.page.canon.id===spec.page.canon.id;});
-                if(JSON.stringify(next)!==JSON.stringify(spec))throw Error('An existing frozen provider cannot be replaced.');
-              });
-            }
-          }
+          checkTopologyContext(nextContext);
           resolve(JSON.parse(plan.text),nextContext);
         }catch(ex){plan.error=ex.message;if(options.editError)options.editError(plan.error);return false;}
       }
@@ -109,7 +117,7 @@ function createBuilderSession(options){
         if(topologyError){plan.error=topologyError;if(options.editError)options.editError(topologyError);return false;}
       }
       pushUndo(hooks && hooks.history || before);
-      if(nextContext!==topologyContext)topologyContext=JSON.parse(JSON.stringify(nextContext));
+      if(nextContext!==topologyContext){topologyContext=JSON.parse(JSON.stringify(nextContext));topologyRevision++;}
       if(hooks && hooks.beforePublish)hooks.beforePublish();
       options.source.write(plan.text);var outcome=render('edit',hooks && hooks.retention);save();
       if(hooks && hooks.afterRender)hooks.afterRender(plan,outcome);

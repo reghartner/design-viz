@@ -57,6 +57,15 @@ Preview restoration
 uses the existing view/step identity rules. If an agent removes the current view
 or step, the renderer uses its normal fallback.
 
+For referenced topology, first use **Add → Referenced topology → Connect repository
+catalog** to pin the approved catalog, or open a published Canon diagram. The local
+helper then loads missing providers from that pinned catalog before validating
+and automatically applying a proposal. Provider revisions must match; proposal
+JSON cannot supply a replacement catalog or provider context. Disconnect,
+project/source changes, or a changed repository context during loading prevent
+application. Source and provider context are published together as one Undo action;
+saved JSON keeps authored references, and Undo retains the frozen providers for Redo.
+
 For a wholly new diagram, write semantic nodes, edges, panels and steps, then run
 `node tools/compose-page-layout.cjs --section <zero-based-section> <draft> <different-output>`
 from the authoring kit (or checkout) and propose its output. The command handles

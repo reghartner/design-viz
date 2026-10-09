@@ -72,3 +72,22 @@ test('stale and invalid edits are rejected, focused typing waits, disconnect sto
   await expect(page.locator('#src')).toHaveValue(next+'\n');
   await disconnect();
 });
+
+test('local helper automatically acquires an unloaded pinned topology provider with one Undo and no materialized source',async({page,server,disconnect})=>{
+  const {digest}=await import('../../../tools/canon/drift.mjs');
+  const providers=['browsed','submitted'].map(id=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:id+' API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}}));
+  const catalog={version:3,diagrams:providers.map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))},hits=[];
+  await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
+  for(const spec of providers)await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
+  await page.goto(server.origin+'/workbench/flowspec.html');await paste(page,source);
+  await page.locator('#diagram-add').click();await page.locator('#add-topology').click();await page.locator('#topology-connect').click();
+  await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-cancel').click();
+  const current=await state(server,s=>s.open && s.source===source && s.topologyRevision>1);
+  const raw=JSON.parse(source);raw.page.blocks[0].diagram.topologyImports=[{spec:'submitted',export:'public',as:'shared'}];const edited=JSON.stringify(raw,null,2);
+  await propose(server,{id:'topology',baseRevision:current.revision,source:edited,topologyContext:{catalogURL:'https://untrusted.invalid/diagrams.json'}});
+  await result(server,'topology','applied');await expect(page.locator('#src')).toHaveValue(edited);
+  await expect(page.locator('#docview [data-dv-node="shared::api"]')).toBeVisible();expect(hits).toEqual(['browsed','submitted']);
+  expect(edited).not.toContain('shared::api');expect(edited).not.toContain('topologyProvenance');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);await disconnect();
+});

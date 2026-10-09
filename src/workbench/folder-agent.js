@@ -127,13 +127,22 @@ function createFolderAgentClient(opts){
     publish({});
   }
   function clearReview(){reviewCandidate=null;reviewDecision=null;}
-  function reviewProposal(proposal){
+  async function reviewProposal(proposal,token,turn){
     var current=exchange.request().snapshot,signature=JSON.stringify(proposal)+'\n'+current.revision;
     if(reviewDecision && reviewDecision.signature===signature)return reviewDecision.action;
     if(!reviewMode && !reviewCandidate && !reviewDecision)return 'accept';
     if(reviewCandidate && reviewCandidate.signature===signature)return 'wait';
-    reviewDecision=null;
-    var preview=exchange.preview(proposal);
+    clearReview();
+    var preview=await exchange.preview(proposal);
+    // Provider acquisition may outlive this request, project, connection or
+    // proposal file. It stages only private data and cannot publish after them.
+    function valid(){
+      if(!alive(token) || turn!==turnEpoch || pending!==proposal.requestId)return false;
+      var next=exchange.request().snapshot;return next.open && next.project===project && next.revision===current.revision;
+    }
+    if(!valid())return 'stale';
+    var owner=await files.read('session.json');if(!valid() || !belongs(owner))return 'stale';
+    var latest=await readOptional('proposal.json');if(!valid() || JSON.stringify(latest)!==JSON.stringify(proposal))return 'stale';
     reviewCandidate={signature:signature,proposal:proposal,preview:preview,public:{version:++reviewVersion,id:proposal.id,requestId:proposal.requestId,
       summary:String(proposal.summary || 'Your agent proposed a story update.').slice(0,1000),baseRevision:String(proposal.baseRevision || '').slice(0,160),
       revision:preview.current.revision,artifacts:files.artifacts,kind:'replacement',ok:preview.ok,merged:!!preview.merged,conflicts:preview.conflicts || []}};
@@ -280,7 +289,8 @@ function createFolderAgentClient(opts){
       // Retry a failed receipt write before considering the same proposal again.
       var ack=exchange.request(),message;
       if(pendingReviewResult)ack.result=pendingReviewResult;
-      var decision=ack.result?'accept':reviewProposal(proposal);
+      var decision=ack.result?'accept':await reviewProposal(proposal,token,turn);
+      if(decision==='stale' || !alive(token) || turn!==turnEpoch)return;
       if(decision!=='wait'){
         if(decision==='reject'){
           message=reviewDecision && reviewDecision.message || 'Change declined in the editor. The agent can revise its proposal.';
@@ -291,7 +301,7 @@ function createFolderAgentClient(opts){
           if(typeof proposal.source==='string' && new TextEncoder().encode(proposal.source).length>4*1024*1024)proposal.source=null;
           var accepted=reviewDecision && reviewDecision.preview;
           var applying=accepted?Object.assign({},proposal,{source:accepted.source,ledger:accepted.ledger,baseRevision:accepted.current.revision}):proposal;
-          message=exchange.receive({proposal:applying},sent);ack=exchange.request();
+          message=exchange.receive({proposal:applying},sent,accepted && accepted.topologyContext);ack=exchange.request();
           if(ack.result)ack.result.baseRevision=proposal.baseRevision;
         }else message=ack.result.message;
         if(ack.result){
@@ -389,7 +399,7 @@ function createFolderAgentClient(opts){
       if(files.artifacts){manifest.artifacts=files.artifacts;manifest.pairedArtifacts=true;manifest.claimAt=now();}
       pilotStatus=null;project=snap.project;connected=true;epoch++;turnEpoch++;clearReview();pendingReviewResult=null;lastHeartbeat=-Infinity;lastState='';pending=null;seen.clear();
       activity=[];activitySeen.clear();requestAt=null;lastAgentAt=null;preflight=null;
-      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,requireLedger:opts.requireLedger});
+      exchange=createWorkbenchAgentExchange({clientId:manifest.connectionId,snapshot:opts.snapshot,busy:opts.busy,apply:opts.apply,validate:opts.validate,prepare:opts.prepare,requireLedger:opts.requireLedger});
       var recoveryState='state-'+manifest.connectionId+'.json';
       manifest.recoveryState=recoveryState;
       try{
@@ -484,7 +494,7 @@ function createFolderAgentClient(opts){
       }
     });},
     reviewContent:function(){return reviewCandidate && reviewCandidate.preview.ok?reviewCandidate.preview.source:reviewCandidate && reviewCandidate.proposal.source || '';},
-    reviewSnapshot:function(){return connected && reviewCandidate?{review:reviewCandidate.public,source:reviewCandidate.preview.source || null,current:reviewCandidate.preview.current.source,ledger:reviewCandidate.preview.ledger!=null?reviewCandidate.preview.ledger:reviewCandidate.proposal.ledger || '',currentLedger:reviewCandidate.preview.current.ledger || ''}:null;},
+    reviewSnapshot:function(){return connected && reviewCandidate?{review:reviewCandidate.public,source:reviewCandidate.preview.source || null,current:reviewCandidate.preview.current.source,topologyContext:reviewCandidate.preview.topologyContext,ledger:reviewCandidate.preview.ledger!=null?reviewCandidate.preview.ledger:reviewCandidate.proposal.ledger || '',currentLedger:reviewCandidate.preview.current.ledger || ''}:null;},
     setReviewMode:function(value){reviewMode=value===true;publish({});},
     acceptReview:function(version){
       if(!connected || disposed || !reviewCandidate || !reviewCandidate.preview.ok || reviewCandidate.public.requestId!==pending || version!==undefined && version!==reviewCandidate.public.version)return Promise.resolve(false);

@@ -111,6 +111,20 @@ function createTopologyCatalogLoader(context){
   }};
 }
 
+/* Prepare a private review context from the browser's approved catalog only.
+   Proposal JSON supplies provider IDs, never catalog addresses or snapshots. */
+async function prepareTopologyProposal(raw,context){
+  var source=raw && !raw.page && (raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:raw;
+  var dependencies=FlowTopology.dependencies(source);
+  if(!dependencies.length)return context;
+  if(!context)throw Error('Connect repository catalog in Add → Referenced topology, then review this update again.');
+  var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
+  if(!missing.length)return context;
+  var loader=createTopologyCatalogLoader(context),prepared=context;
+  for(var id of missing)prepared=(await loader.load(id,prepared)).context;
+  return prepared;
+}
+
 /* A local draft may explicitly pin the deployed authored-source catalog.
    Its synthetic consumer membership exists only in this auxiliary context;
    saved JSON remains an ordinary local document with topologyImports. */

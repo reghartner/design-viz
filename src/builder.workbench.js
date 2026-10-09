@@ -1102,6 +1102,7 @@ function initWorkbenchBuilder(opts){
   var topologyPicker=initTopologyPicker({document:document,src:src,pause:pausePreview,
     context:function(){return Object.assign(additionContext(),{topologyContext:session.topologyContext()});},
     connect:function(raw){return connectTopologyRepository(raw);},
+    connected:function(context,snapshot){return session.connectTopology(context,snapshot);},
     insert:function(plan,snapshot,context){
       if(!session.accept(plan,{snapshot:snapshot,topologyContext:context,beforePublish:clearMultiSelect}))return false;
       session.insertSection=plan.section;
@@ -1245,7 +1246,7 @@ function initWorkbenchBuilder(opts){
       var snap=session.snapshot(),open=session.isProjectOpen() && (!opts.isActive || opts.isActive());
       var previewCurrent=snap.renderedText===snap.text;
       var ctl=opts.ctl && opts.ctl();
-      return {project:snap.project,open:!!open,source:open?snap.text:'',ledger:agentLedgerProject===snap.project?agentLedger:null,parseError:open?snap.error || null:null,
+      return {project:snap.project,topologyRevision:snap.topologyRevision,open:!!open,source:open?snap.text:'',ledger:agentLedgerProject===snap.project?agentLedger:null,parseError:open?snap.error || null:null,
         previewCurrent:previewCurrent,selection:open && previewCurrent?clipboardSelection().map(function(target){
           var clean={};['kind','section','id','index','block','tab','card','pathId','field','item'].forEach(function(key){
             if(typeof target[key]==='string' || typeof target[key]==='number')clean[key]=target[key];
@@ -1273,12 +1274,13 @@ function initWorkbenchBuilder(opts){
       return interactions.busy() || inspector.busy(view) || !!document.querySelector('dialog[open]') ||
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
-    validate:function(text){var findings=session.validate(JSON.parse(text));return findings.errors.join('\n');},
-    apply:function(text,expected,proposal){
+    prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
+    validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
+    apply:function(text,expected,proposal,context){
       var snapshot=session.snapshot();
-      if(snapshot.text!==expected.source || snapshot.project!==expected.project)return {ok:false,error:'Document changed.'};
+      if(snapshot.text!==expected.source || snapshot.project!==expected.project || snapshot.topologyRevision!==expected.topologyRevision)return {ok:false,error:'Document changed.'};
       var raw;try{raw=JSON.parse(text);}catch(ex){return {ok:false,error:'Proposal is not valid JSON: '+ex.message};}
-      var findings=session.validate(raw);
+      var findings=context?session.validate(raw,context):session.validate(raw);
       if(findings.errors.length)return {ok:false,error:findings.errors.join('\n')};
       var ledgerEpoch=agentLedgerEpoch,outcome,paired=proposal && typeof proposal.ledger==='string',history;
       if(paired){
@@ -1288,7 +1290,7 @@ function initWorkbenchBuilder(opts){
           var restored=session.restoreHistoryText(value.source);rehighlight();if(stepList)stepList.sync();if(storyBrief)storyBrief.refresh();return restored;
         }};
       }
-      var accepted=session.accept({text:text},{snapshot:snapshot,history:history,beforePublish:function(){
+      var accepted=session.accept({text:text},{snapshot:snapshot,history:history,topologyContext:context,beforePublish:function(){
         if(paired)agentOptions.setLedger(proposal.ledger);
         clearMultiSelect();session.target=null;clearStepMarkers();inspector.retire();if(guide)guide.hidden=true;
       },afterRender:function(plan,result){

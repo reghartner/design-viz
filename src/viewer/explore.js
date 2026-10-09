@@ -804,8 +804,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     canvasCommand:function(){return expand;},
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();memory.cameraNavigated=true;zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
-    fitCanvas:fitCanvas,
-    fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},
+    fitCanvas:function(insets,automatic){if(!automatic)memory.cameraNavigated=true;fitCanvas(insets);},
+    fitSelection:function(extent,insets,obstacles){if(workbenchCanvas){memory.cameraNavigated=true;fitCanvas(insets,extent,obstacles);}},
     restoreInitialCamera:function(force){
       if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
       sizeGraph(false);positionCamera(memory.layout.camera);return true;

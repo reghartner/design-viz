@@ -284,3 +284,12 @@ test('pristine Workbench canvas notes preserve live camera navigation on resize'
  await page.setViewportSize({width:1280,height:1000});await expect.poll(camera).toEqual(expect.objectContaining({zoom:navigated.zoom}));
  expect((await camera()).x).toBeCloseTo(navigated.x,2);
 });
+
+test('Workbench Fit selection keeps its camera framing on resize with pristine notes',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ const board=page.locator('.explore-board'),camera=()=>board.evaluate(el=>{const width=parseFloat(el.style.getPropertyValue('--explore-width')),margin=parseFloat(el.style.getPropertyValue('--explore-margin-x'));return {zoom:width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width,x:(el.scrollLeft+el.clientWidth/2-margin)/width};});
+ const beforeFit=await camera(),node=page.locator('.explore-canvas [data-dv-node="camera"]');await node.focus();await node.press('Enter');await expect(page.locator('#workspace-fit-selection')).toBeEnabled();
+ await page.locator('#workspace-fit-selection').click();const fitted=await camera();expect(fitted.zoom).not.toBeCloseTo(beforeFit.zoom,2);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(camera).toEqual(expect.objectContaining({zoom:fitted.zoom}));expect((await camera()).x).toBeCloseTo(fitted.x,2);
+});

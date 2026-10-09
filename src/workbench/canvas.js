@@ -113,7 +113,7 @@ function initWorkbenchCanvas(){
     var percent=(value || 1)*100;document.getElementById('workspace-zoom').textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
     document.getElementById('workspace-fit').textContent=vp && vp.panelPlacement()==='canvas'?'Fit canvas':'Fit diagram';
   }
-  function fit(selection){
+  function fit(selection,automatic){
     if(!selection || !Number.isFinite(selection.w))selection=null;
     var vp=viewport();if(!diagramMode() || !vp)return;
     var target=board(),bounds=target && target.getBoundingClientRect(),left=20,right=24,top=20,bottom=24,width=bounds?bounds.width:innerWidth;
@@ -128,7 +128,7 @@ function initWorkbenchCanvas(){
       var obstacles=[];
       document.querySelectorAll('.workspace-window:not([hidden]),.workspace-canvas-controls').forEach(function(el){var r=el.getBoundingClientRect();if(bounds && r.width && r.height)obstacles.push({x:r.left-bounds.left,y:r.top-bounds.top,w:r.width,h:r.height});});
       vp.fitSelection(selection,{left:24,right:24,top:24,bottom:24},obstacles);
-    }else vp.fitCanvas(insets);
+    }else vp.fitCanvas(insets,automatic);
     paintZoom();
   }
   function cancelFit(){cancelAnimationFrame(fitPending);fitPending=0;fitObserver.disconnect();}
@@ -138,7 +138,7 @@ function initWorkbenchCanvas(){
     var rec=current(),vp=viewport(),definition=vp && vp.viewDefinition(),target=board();
     if(!target || !target.clientWidth || !target.clientHeight){if(target)fitObserver.observe(target);return;}
     fitObserver.disconnect();fitRequests.delete(fitIdentity(rec));if(rec)rec.canvasVisited=true;
-    if(!(definition && definition.exploreLayout && definition.exploreLayout.camera))fit();
+    if(!(definition && definition.exploreLayout && definition.exploreLayout.camera))fit(null,true);
   }
   function select(index){
     if(selecting)return;selecting=true;cancelFit();

@@ -57,6 +57,11 @@ change of audience does not start a new project or erase its evidence.
   [authoring details](references/authoring-details.md) when editing document
   settings, presentation modes, prose, specialized panels, handoffs, or
   user-directed layout details. Do not load unrelated guides.
+- **Independent visual review:** Read
+  [independent visual review](references/independent-visual-review.md) only
+  when delegation is available and already authorized, and actual rendered
+  captures can be supplied before the first user-facing preview. This route
+  does not authorize a reviewer or require one for ordinary authoring.
 
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its
@@ -224,6 +229,10 @@ rates (your estimate or the built-in placeholders) are allowed as
 stated value), and the ledger must label them illustrative; when they show
 on the page, one line in the section description says so. Details:
 [honesty rules](references/honesty-rules.md).
+Real behavior, UI actions and physical placement that changes the story's
+meaning also need source or operator evidence. An illustrative label in the
+ledger does not make an unsupported mechanism factual. Cosmetic geometry and
+staging remain author choices.
 
 ## Phase 1: Inventory the source
 
@@ -319,7 +328,8 @@ the operator to approve them.
 Copy the template from [storyboard worksheet](references/storyboard-worksheet.md)
 into the ledger and fill every section in order:
 
-A. Story paragraph, audience, takeaway
+A. Story paragraph, audience, takeaway, and a concise brief for each view
+   actually authored
 B. Panel plan: panel -> question it answers -> best moment -> what it must never show
 C. Paths table
 D. Time table (story time, step times, battery rates, anchors and extra drain, freshness) per path
@@ -461,6 +471,10 @@ path in Workbench. Ordinary local specs use the script as shown.
 4. Render the page in a browser. Walk every path, including the switch from
    one ending to another. Check that the panels show what the captions say.
    If you cannot render, say exactly which visual checks remain undone.
+5. When the conditional independent-review route above applies, run its one
+   critique and repair pass now. Otherwise finish the existing self-audit and
+   report unverified visuals honestly; lack of a critic does not block ordinary
+   authoring.
 
 ## Phase 7: Deliver
 

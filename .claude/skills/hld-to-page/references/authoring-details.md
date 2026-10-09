@@ -246,18 +246,29 @@ layouts are optional unless the user requests mobile support.
 **Facts vs authoring geometry.** Story numbers — anything the reader sees
 or that drives a computed outcome: durations, thresholds, counts,
 capacities, temperatures, stated geometry like a 130° field of view — go in
-VERBATIM with a ledger row. Where a widget takes real units, enter them in
-the HLD's units (radar `scale:{pxPerUnit,unit}`; sector zones in real
-units; polygon `points` stay pixels — prefer sectors when the HLD gives
-real geometry). Cartesian subject positions and polygon points remain in
-pixels; draw them proportionally and put any sourced physical figure verbatim
-in visible text. Never type feet into a pixel field. Authoring geometry is what
-the HLD does NOT state (pixel placement, sensor origin, subject paths): choose
-it to represent the source faithfully. Geometric occupancy is not evidence
-that a real sensor detected a person or raised an alarm. Never invent business identifiers,
-sequence numbers, or finer breakdowns than the document gives. Internal
-node/panel/step/path IDs are authoring references: choose stable, unique
-ones without presenting them as identifiers from the source system.
+VERBATIM with a ledger row. Real behavior and meaningful placement are facts
+too: a person taps or acknowledges something, a control exists, a system
+switches automatically, a subject enters a room or zone, or one object is
+within a stated sensing relationship only when the source or an operator
+answer supports it. Calling one of these actions or relationships illustrative
+in the ledger does not make it factual; ask when it changes the story, otherwise
+omit it or stage a neutral alternative.
+
+Where a widget takes real units, enter them in the HLD's units (radar
+`scale:{pxPerUnit,unit}`; sector zones in real units; polygon `points` stay
+pixels — prefer sectors when the HLD gives real geometry). Cartesian subject
+positions and polygon points remain in pixels; draw sourced relationships
+proportionally and put any sourced physical figure verbatim in visible text.
+Never type feet into a pixel field. Cosmetic geometry — spacing, card and
+window placement, route curvature, and coordinates that do not add story
+meaning — remains an authoring choice. Use it for clear staging, animation and
+reading order without turning it into a mechanism claim. Choose sensible
+defaults and record material choices; do not ask the operator to approve every
+coordinate. Geometric occupancy is not evidence that a real sensor detected a
+person or raised an alarm. Never invent business identifiers, sequence numbers,
+or finer breakdowns than the document gives. Internal node/panel/step/path IDs
+are authoring references: choose stable, unique ones without presenting them as
+identifiers from the source system.
 
 **Distinguish geometry from authored decisions.** Radar computes distance and
 zone occupancy. Its `alert` is manual state: default false, explicitly true

@@ -486,8 +486,8 @@ def clip_expression(section_reference: str, margin: int) -> str:
 
     The rect covers the visible Explore canvas, custom composition or legacy
     board grid, plus step controls wherever they are attached or detached. Explore
-    keeps its navigation, graph, floating panels and pinned controls inside the
-    full-browser canvas shell. Custom layouts
+    includes its active document navigation above the full-browser canvas shell.
+    Custom layouts
     relocate panels out of ``.boardgrid`` and hide that old container, so both
     grid types must be considered. Zero-area hidden elements contribute nothing.
     Expand by ``margin`` CSS pixels and clamp to the document. Return null when
@@ -500,6 +500,17 @@ def clip_expression(section_reference: str, margin: int) -> str:
         "var pad = %d;"
         "var parts = Array.prototype.slice.call(sec.querySelectorAll("
         "'.viewer-diagram-canvas, .explore-stage, .section-layout-grid, .boardgrid, .termbar'));"
+        # The navigation is document-owned. Include only the live bar for this
+        # section's Explore canvas; ordinary Standard crops remain section-local.
+        "var canvas = sec.querySelector('.viewer-diagram-canvas');"
+        "var reader = sec.closest('.docview');"
+        "if (canvas && reader) {"
+        "var canvasRect = canvas.getBoundingClientRect();"
+        "var nav = reader.querySelector(':scope > .explore-navigation');"
+        "if (canvasRect.width > 0 && canvasRect.height > 0 && nav && "
+        "nav.getAttribute('data-navigation-section') === "
+        "String(Number(sec.getAttribute('data-dv-section')) + 1)) parts.push(nav);"
+        "}"
         "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
         "parts.forEach(function(el){"
         "var r = el.getBoundingClientRect();"

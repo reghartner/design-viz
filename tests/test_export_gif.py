@@ -516,6 +516,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
 
     def test_explore_capture_includes_graph_floating_panels_and_pinned_steps(self):
         spec = json.loads((ROOT / "src/starters/named-layouts.json").read_text())
+        spec["page"]["presentation"] = "explore"
         spec["page"]["sections"][0]["id"] = "front-door"
         spec["page"]["sections"][0]["diagram"]["autoplay"] = False
         target = export_gif.choose_target(spec, view="service-flow")
@@ -544,7 +545,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                   graph:rect(sec.querySelector('.explore-canvas')),
                   bar:rect(sec.querySelector('.termbar')),grid:rect(grid),
                   heading:rect(sec.querySelector('.sec-h')),
-                  toolbar:rect(sec.querySelector('.diagram-views')),
+                  toolbar:rect(document.querySelector('.explore-navigation')),
                   notes:rect(sec.querySelector('[data-explore-content="prose"]')),
                   panels:Array.from(sec.querySelectorAll('[data-explore-panel]'))
                     .filter(function(el){return el.getBoundingClientRect().height>0;})
@@ -564,7 +565,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
             clip = state["clip"]
             self.assertIsNotNone(clip)
-            parts = [state["canvas"], state["stage"], state["graph"], state["bar"]]
+            parts = [state["toolbar"], state["canvas"], state["stage"], state["graph"], state["bar"]]
             # Full-size stacks may extend below or left of the stage. Export
             # captures their visible intersection with its overflow:hidden
             # boundary, not the off-canvas portion of each DOM rectangle.
@@ -583,11 +584,14 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                 self.assertLessEqual(clip["y"], part["top"])
                 self.assertGreaterEqual(clip["x"] + clip["width"], part["right"])
                 self.assertGreaterEqual(clip["y"] + clip["height"], part["bottom"])
-            # Explore now owns the browser canvas, including its floating toolbar.
+            # The persistent document toolbar and the canvas together fill
+            # the browser. Export includes both, without clipping the toolbar.
             self.assertEqual(clip["x"], 0)
+            self.assertEqual(clip["y"], state["toolbar"]["top"])
             self.assertEqual(clip["y"], 0)
-            self.assertLessEqual(clip["y"], state["toolbar"]["top"])
-            self.assertLessEqual(clip["height"], state["canvas"]["height"] + 33)
+            self.assertEqual(state["toolbar"]["bottom"], state["canvas"]["top"])
+            self.assertEqual(clip["height"],
+                             state["toolbar"]["height"] + state["canvas"]["height"])
             # Exercise the production frame path too: view verification must
             # accept a hidden authored grid, and capture more than the step bar.
             frames = export_gif.capture_frames(

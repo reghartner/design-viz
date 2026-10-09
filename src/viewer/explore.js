@@ -719,7 +719,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Escape still cancel first; losing capture while held also cancels.
     finish((ev.buttons&1)!==0);
   }
-  function resized(){cancel();fitHeight();paint();}
+  function resized(){
+    cancel();var previousWidth=lastWidth;fitHeight();paint();
+    // Keep newly placed canvas notes readable when the desktop viewport changes.
+    // Authored camera and manually positioned notes retain their chosen view.
+    if(previousWidth && previousWidth!==lastWidth && lastWidth>=800 && !memory.layout.camera && windows.some(function(w){return w.prose && canvasWindow(w) && w.state.automatic && visible(w);}))fitCanvas();
+  }
   function panStart(ev){
     if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,.explore-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
     clearScrollEdit();var token=beginEdit();if(token===false)return;

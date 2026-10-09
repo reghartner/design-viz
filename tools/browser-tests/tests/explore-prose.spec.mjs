@@ -253,8 +253,9 @@ for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live
  await page.setViewportSize({width:1920,height:1000});const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
  await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);
  const wide=await notesGeometry(page);expect(await notesOverflow(page)).toBe(0);
- await page.setViewportSize({width:1280,height:1000});await expect.poll(async()=>(await notesGeometry(page)).h).toBeGreaterThan(wide.h);await expect.poll(()=>notesOverflow(page)).toBe(0);
- await page.getByRole('button',{name:'Fit canvas',exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
+ // Explore uses fixed 18px notes text, so width and intrinsic height stay stable across desktop widths.
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);await expect.poll(()=>notesOverflow(page)).toBe(0);await expect(notes(page)).toBeInViewport();
+ await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);expect(await notesOverflow(page)).toBe(0);
  await notes(page).focus();await notes(page).getByRole('button',{name:gesture+' Section notes; use arrow keys',exact:true}).press('ArrowRight');const manual=await notesGeometry(page);expect(manual).not.toEqual(wide);
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(manual);

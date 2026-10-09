@@ -512,10 +512,10 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});await expect(edit).toBeInViewport();
     await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
-    await nav.getByRole('button',{name:'Overview',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
-    await nav.getByRole('tab',{name:'Second tab',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeInViewport();
-    await nav.getByRole('tab',{name:'First tab',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
-    await nav.getByRole('button',{name:'Engineering',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+    await nav.getByRole('button',{name:'Overview',exact:true}).click();await expect(page.locator('#canon-reader')).toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
+    await nav.getByRole('tab',{name:'Second tab',exact:true}).click();await expect(page.locator('#canon-reader')).toHaveClass(/viewer-exploring/);await expect(edit).toBeInViewport();
+    await nav.getByRole('tab',{name:'First tab',exact:true}).click();await expect(page.locator('#canon-reader')).toHaveClass(/viewer-exploring/);
+    await nav.getByRole('button',{name:'Engineering',exact:true}).click();await expect(page.locator('#canon-reader')).toHaveClass(/viewer-exploring/);
     expect(await original.evaluate(el=>el===document.querySelector('#canon-reader-edit'))).toBe(true);
     await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
   }

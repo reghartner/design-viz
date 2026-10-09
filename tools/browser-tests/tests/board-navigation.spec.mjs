@@ -65,7 +65,7 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   await page.screenshot({path:testInfo.outputPath('regular-navigation.png'),fullPage:true});
 });
 
-for(const surface of ['standalone','workbench'])test(surface+' keeps regular navigation separate from Explore camera',async({page,server})=>{
+for(const surface of ['standalone','workbench'])test(surface+' keeps regular navigation separate from Explore camera',async({page,server},info)=>{
   const raw=spec(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}},
     {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}}];d.defaultLayout='standard';
@@ -96,6 +96,7 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
     }
     await page.getByRole('tab',{name:'Standard',exact:true}).click();
     expect(await width(board)).toBeCloseTo(initial.width,0);expect(await scroll(board),'after source edit='+edit).toEqual(initial.scroll);
+    if(edit && surface==='workbench')await info.attach('standard-camera-restored-after-edit',{body:await page.screenshot(),contentType:'image/png'});
   }
 });
 

@@ -165,7 +165,7 @@ test('handoffs resolve duplicate tab labels across blocks and diagrams without s
  raw.page.blocks=[{heading:'Notes',text:'A prose section before both blocks.'},{tabs:[tabs[0]]},{tabs:[{...tabs[1],label:tabs[0].label}]}];
  await standalone(page,server,raw);
  await section(page,'orders').getByRole('button',{name:'Open Delivery diagram in this spec',exact:true}).click();
- await expect(section(page,'delivery').getByRole('button',{name:'Back to Order intake',exact:false})).toBeVisible();
+ await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false})).toBeVisible();
  expect(page.url()).toContain('d=delivery');
  await page.reload();await expect(section(page,'delivery')).toBeInViewport();
  await section(page,'delivery').getByRole('button',{name:'Open Order intake diagram in this spec',exact:true}).click();

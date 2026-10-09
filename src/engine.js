@@ -2090,7 +2090,9 @@ function createExploreNavigation(ctl,options){
   function restore(refocus,keepDocument){
     var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});
     nav.querySelectorAll('details[open]').forEach(function(details){details.open=false;syncNavigationPopover(details);});
-    moved.slice().reverse().filter(function(entry){return !keepDocument || !entry.persistent;}).forEach(function(entry){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();if(entry.anchor)entry.anchor.remove();});
+    // Dynamic controls may already have been retired or reparented by their owner.
+    // Restore only nodes that this navigation still owns.
+    moved.slice().reverse().filter(function(entry){return !keepDocument || !entry.persistent;}).forEach(function(entry){if(nav.contains(entry.node)){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();}if(entry.anchor)entry.anchor.remove();});
     moved=keepDocument?moved.filter(function(entry){return entry.persistent;}):[];current=null;cancelAnimationFrame(revealFrame);revealFrame=0;
     if(!keepDocument){navigationSize.disconnect();nav.remove();spacer.remove();ctl.view.classList.remove('has-document-navigation');ctl.view.style.removeProperty('--flowview-navigation-height');ctl.view.style.removeProperty('--flowview-navigation-bottom');}
     tabs.hidden=diagrams.hidden=chapters.hidden=false;
@@ -2588,7 +2590,9 @@ function createBoardNavigation(board, group, legend, changed){
     if(!state || retired)return;
     if(paused)paused=state;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
-    if(enabled()){pendingRestore=state;changed();refresh();}
+    // Keep a hidden tab's reading position until its board becomes measurable.
+    pendingRestore=state;
+    if(enabled()){changed();refresh();}
   }
   return {refresh:refresh,reset:reset,
     snapshot:snapshot,restore:restore,

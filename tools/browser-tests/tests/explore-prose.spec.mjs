@@ -249,6 +249,11 @@ for(const width of [1280,1440,1920])test('notes remain readable and independentl
 
 async function notesGeometry(page){return notes(page).evaluate(el=>({x:parseFloat(el.style.getPropertyValue('--float-x')),y:parseFloat(el.style.getPropertyValue('--float-y')),w:parseFloat(el.style.getPropertyValue('--float-w')),h:parseFloat(el.style.getPropertyValue('--float-h'))}));}
 async function notesOverflow(page){return notes(page).locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight);}
+test('standalone initial Fit keeps pristine canvas notes visible on desktop resize',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(await build(server,raw,'standalone-notes-resize'));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const wide=await notesGeometry(page);await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);await expect(notes(page)).toBeInViewport();
+});
 for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live desktop resize until '+gesture.toLowerCase(),async({page,server},info)=>{
  await page.setViewportSize({width:1920,height:1000});const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
  await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);

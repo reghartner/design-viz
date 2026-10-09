@@ -14,6 +14,7 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
   var root=element('div','path-timeline',host);
   root.setAttribute('role','group');root.setAttribute('aria-label','Paths with shared processing');
   root.style.width=width+'px';root.style.height=height+'px';
+  var labels=element('div','path-timeline-labels',root);
   var canvas=document.createElementNS(SVGNS,'svg');canvas.setAttribute('class','path-timeline-lines');
   canvas.setAttribute('width',width);canvas.setAttribute('height',height);canvas.setAttribute('viewBox','0 0 '+width+' '+height);
   canvas.setAttribute('aria-hidden','true');root.appendChild(canvas);
@@ -23,15 +24,14 @@ function createPathTimeline(host, source, paths, shownPaths, graph, pick){
       y:node.blockId?sharedPositions.get(node.blockId):lanePositions.get(node.pathIds[0])});
   });
   paths.forEach(function(path){
-    var row=element('div','path-timeline-route',root);row.setAttribute('data-path-row',path.id);
+    var row=element('div','path-timeline-route',labels);row.setAttribute('data-path-row',path.id);
     var choice=element('button','path-chip',row);choice.type='button';choice.title=path.label;
     element('span','path-timeline-label',choice).textContent=path.label;
     choice.setAttribute('data-dv-path',path.id);choice.style.setProperty('--path-color',path.color);
-    choice.style.width=(labelWidth-10)+'px';
     position(choice,0,lanePositions.get(path.id)-14);
     choice.disabled=!shownPaths.find(function(p){return p.id===path.id;}).indices.length;
     if(choice.disabled)choice.title='No steps from this path are shown in this view.';
-    choice.addEventListener('click',function(event){event.stopPropagation();if(!retired)pick(path.id,0,true);});
+    choice.addEventListener('click',function(event){event.stopPropagation();if(!retired){host.scrollLeft=0;pick(path.id,0,true);}});
     choices.push({button:choice,row:row,path:path});
   });
   var sharing=pathStepSharing(paths);

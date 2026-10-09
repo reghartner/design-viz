@@ -113,22 +113,34 @@ test('arranger stays above Inspect and retires cleanly on Escape, chapter, tab a
 });
 
 
-test('passive Standard scroll preserves the selected object and insertion section',async({page,server})=>{
+test('passive Standard scroll preserves the selected object and insertion section',async({page,server},info)=>{
  const raw={page:{title:'Separate reading and editing position',sections:[
-  {id:'first',heading:'First section',text:Array(50).fill('Opening section notes.').join('\n\n'),diagram:{nodes:{shared:{title:'First node'}},rows:[['shared']]}},
+  {id:'first',heading:'First section',bullets:Array(32).fill('Opening section notes.'),diagram:{nodes:{shared:{title:'First node'}},rows:[['shared']]}},
   {id:'last',heading:'Last section',text:'Later notes',diagram:{nodes:{shared:{title:'Last node'}},rows:[['shared']]}}
  ]}};
+ // List items retain vertical extent when prose uses the full canvas width.
+ // Verify a real scroll: a no-op cannot exercise passive navigation tracking.
+ async function scrollToLast(){
+  const movement=await page.locator('#workspace-canvas').evaluate(async el=>{
+   el.scrollTop=0;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+   const from=el.scrollTop;el.scrollTop=el.scrollHeight;
+   return {from,to:el.scrollTop,extent:el.scrollHeight-el.clientHeight};
+  });
+  expect(movement.extent).toBeGreaterThan(0);expect(movement.to).toBeGreaterThan(movement.from);
+ }
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
  const first=page.locator('#section-first [data-dv-node="shared"]');await first.click();
  await page.locator('#editor-tab-inspect').click();
  const title=page.locator('#guide').getByLabel('title',{exact:true});await expect(title).toHaveValue('First node');
- await page.locator('#docview').evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement){if(/auto|scroll/.test(getComputedStyle(p).overflowY) && p.scrollHeight>p.clientHeight){p.scrollTop=p.scrollHeight;break;}}});
+ await scrollToLast();
  await expect(nav(page).getByRole('button',{name:'Last section',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(title).toHaveValue('First node');await title.fill('Edited first');await title.press('Enter');
  let result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections[0].diagram.nodes.shared.title).toBe('Edited first');expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
  await page.locator('#undo-builder').click();await closeTools(page);await first.click();await first.focus();
- await page.locator('#docview').evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement){if(/auto|scroll/.test(getComputedStyle(p).overflowY) && p.scrollHeight>p.clientHeight){p.scrollTop=p.scrollHeight;break;}}});
+ await scrollToLast();
  await expect(nav(page).getByRole('button',{name:'Last section',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(first).toBeFocused();
+ await info.attach('passive-scroll-selection',{body:await page.screenshot(),contentType:'image/png'});
  await page.keyboard.press('Delete');
  result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections[0].diagram.nodes.shared).toBeUndefined();expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
 });

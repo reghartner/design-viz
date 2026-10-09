@@ -49,9 +49,9 @@ untraceable state; or doubt this guide suffices.
 - Put critical visible facts in panel fields, labels and statuses; update every occurrence.
 - Ledger anchor/fact/`covered @` rows must agree with the spec. Keep row IDs; new
   rows use the next unused ID. See [evidence and updates](../.claude/skills/hld-to-page/references/evidence-and-updates.md).
-- Read panel source and documented fields via [recipe routing](../.claude/skills/hld-to-page/references/recipe-routing.md),
-  [cookbook](../cookbook/README.md) or
-  `python3 tools/widget_doc.py <type>` (`--list` for names).
+- Load selected contracts with `python3 tools/authoring-packet.py --spec SPEC
+  --mode edit --out packet.md`. Read its on-demand routes only when needed;
+  `python3 tools/widget_doc.py <type>` still provides individual panel details.
 
 ## Verify and submit
 

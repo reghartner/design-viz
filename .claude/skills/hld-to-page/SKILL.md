@@ -339,8 +339,8 @@ G. Icon state plan (set step, restore step)
 H. Bindings and code table (plus gaps)
 I. Checkable expectations
 
-Read the [worked example](references/worked-example.md) (a garage door sensor)
-before your first worksheet. Use the
+Use the [worked example](references/worked-example.md) only when a concrete
+worksheet example would resolve uncertainty; it is not a prerequisite read. Use the
 [panel time and icon guide](references/panel-time-and-icons.md) for the exact
 fields and icon IDs each panel supports. Use
 [bindings and code](references/bindings-and-code.md) for the catalog and
@@ -351,10 +351,16 @@ changes the story later, update the worksheet first, then the spec.
 
 ## Phase 4: Translate the worksheet into a spec
 
-Read `contract/authoring-contract.md` (skip the panel catalog and complete
-example unless needed) and the recipe table in `cookbook/README.md`. Fetch the
-docs for your panels together: `python3 <VIZ>/tools/widget_doc.py <types>`.
-Start from the closest cookbook example and replace its facts with yours. The
+Generate the focused packet instead of reading the full contract, cookbook,
+and worked example. Before a new spec exists, select the planned panels and
+features, for example:
+`python3 <VIZ>/tools/authoring-packet.py --panel deviceapp --feature paths --out <scratch>/packet.md`.
+For an existing spec, use `--spec <spec.json> --mode edit`; explicit selections
+are added to inferred requirements. Read the emitted Markdown. Its `.md.json`
+records selection, source hashes and document size. Follow only the on-demand
+routes the task needs; the full docs remain available offline. See
+[authoring packets](../../../docs/authoring-packets.md) for feature names.
+Use a relevant cookbook example when helpful and replace its facts with yours. The
 [routing table](references/recipe-routing.md) says which recipe or doc to read
 for special needs (drilldowns, security/dispatch, audio, trace import,
 Confluence, named views, and explicit manual-placement requests). Follow rule 12
@@ -453,7 +459,8 @@ path in Workbench. Ordinary local specs use the script as shown.
    each path as steps x panels (P = patched, . = holds), the resolved story
    time, each battery's rates and where they come from, edges, icons,
    code references, every numeric change with its rate per hour, and (with
-   `--state`) the full visible state after each step. It needs Node, because
+   `--state`) the full folded state after each step, not proof of rendered
+   visibility. It needs Node, because
    it folds each path with the engine's own code. Its `WARN`, `CHECK` and
    `NOTE` lines are listed in [self-audit](references/self-audit.md). Fix every
    `WARN` (or correct a wrong `--rate`/`--expect` you passed); a `WARN` is a
@@ -468,7 +475,16 @@ path in Workbench. Ordinary local specs use the script as shown.
    say which.
 3. Reverse audit: every edge kind, tone, notification, icon, value and link in
    the spec must trace to a ledger row or an illustrative label.
-4. Render the page in a browser. Walk every path, including the switch from
+4. Declare required visible panels/cards in a companion expectations file;
+   follow [visibility evidence](../../../docs/visibility-evidence.md). Run
+   `node <VIZ>/tools/visibility-check.cjs <spec.json> <expectations.json>`
+   for presentation eligibility. A coordinator with the full checkout and
+   browser dependencies also runs `node <VIZ>/tools/browser-tests/visibility-audit.mjs
+   <spec.json> <expectations.json>` for measured rendered evidence. `--expect`
+   checks folded values only; a passing value can still be hidden. These checks
+   do not prove legibility or source truth. Browser unavailability remains an
+   explicit unverified check.
+   Render the page in a browser. Walk every path, including the switch from
    one ending to another. Check that the panels show what the captions say.
    If you cannot render, say exactly which visual checks remain undone.
 5. When the conditional independent-review route above applies, run its one

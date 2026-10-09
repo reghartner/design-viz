@@ -290,3 +290,9 @@ hardest beats. Include one per operator anchor ("the 5:00 AM step shows 35%"). E
 Closed." "The clock reads 7:10 AM Sat at the last step." "The low-battery icon
 appears at the same step the charge crosses 20." "Every step on the happy path
 lights both the request and its response."
+
+For source-required visible evidence, also declare a companion visibility file
+as described in `docs/visibility-evidence.md`: section, view, path, step, panel,
+optional DeviceApp card ID, and whether it must be visible. A carried value is
+not evidence that the app screen or card is shown. Include critical branch
+switches and named views. Keep value anchors in the existing walk expectations.

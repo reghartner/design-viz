@@ -57,7 +57,18 @@ class DockerSourceBuildTests(unittest.TestCase):
             envelope = json.loads(match.group(1))
             files = json.loads(gzip.decompress(base64.b64decode(envelope['gzip'])))['files']
             for name in ['tools/compose-page-layout.cjs', 'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
-                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs']:
+                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs',
+                         'tools/authoring-packet.py', 'tools/visibility-check.cjs',
+                         'examples/contract-blocks/contract-blocks.spec.json',
+                         'examples/data-contract/data-contract.spec.json',
+                         'examples/doorbell-chime/doorbell-chime.spec.json',
+                         'examples/independent-extraction/README.md',
+                         'examples/independent-extraction/before.spec.json',
+                         'examples/canon/topology/registry.json',
+                         'examples/canon/topology/platform.json',
+                         'examples/canon/topology/checkout.json',
+                         'examples/canon/topology/checkout-positioned.json',
+                         'examples/canon/topology/checkout-subset.json']:
                 self.assertEqual(files[name], (ROOT / name).read_text(), name)
             self.assertIn('state', json.loads(files['tools/arrange/layouts.json']))
             self.assertFalse(any(name.endswith(('generated-native.html', 'setup.cjs', 'package-lock.json')) for name in files))

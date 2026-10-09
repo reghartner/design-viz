@@ -11,6 +11,7 @@
     "core/story-time.js",
     "core/section-layout.js",
     "core/state.js",
+    "core/visibility-evidence.js",
     "core/geometry.js",
     "core/details.js",
     "core/handoffs.js",

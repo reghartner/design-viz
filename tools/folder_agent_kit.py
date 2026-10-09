@@ -12,6 +12,12 @@ def folder_agent_kit(root, runtime):
     files = {}
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
                                  ('cookbook', ('*.md',)), ('docs', ('*.md',)),
+                                 # Small maintained examples linked by focused contracts.
+                                 ('examples/contract-blocks', ('*.spec.json',)),
+                                 ('examples/data-contract', ('*.spec.json',)),
+                                 ('examples/doorbell-chime', ('*.spec.json',)),
+                                 ('examples/canon/topology', ('*.json',)),
+                                 ('examples/independent-extraction', ('*.md', '*.spec.json')),
                                  ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs'))]:
         for pattern in patterns:
             for path in sorted((root / directory).rglob(pattern)):
@@ -19,7 +25,7 @@ def folder_agent_kit(root, runtime):
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
-                 'tools/auto-arrange-spec.cjs',
+                 'tools/auto-arrange-spec.cjs', 'tools/authoring-packet.py', 'tools/visibility-check.cjs',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()
     trace_cli = (root / 'tools/trace2spec.js').read_text()

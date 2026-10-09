@@ -13,6 +13,10 @@ COPY cookbook/ cookbook/
 COPY docs/ docs/
 COPY .claude/skills/hld-to-page/ .claude/skills/hld-to-page/
 COPY examples/canon/ examples/canon/
+COPY examples/contract-blocks/ examples/contract-blocks/
+COPY examples/data-contract/ examples/data-contract/
+COPY examples/doorbell-chime/ examples/doorbell-chime/
+COPY examples/independent-extraction/ examples/independent-extraction/
 COPY canon.json canon.json
 COPY diagrams/ diagrams/
 COPY workbench/ workbench/

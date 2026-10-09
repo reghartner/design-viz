@@ -15,7 +15,7 @@ python3 <VIZ>/.claude/skills/hld-to-page/scripts/spec_walk.py <stamped.spec.json
 `--catalog` is the supplied catalog snapshot. Give one `--rate
 <panel>[.<field>]=<min>:<max>` (change per hour, from the source) for each
 battery panel, thermo panel and numeric device-app card. `--state` prints the
-full visible state of every panel after each step (`*` marks panels that
+full folded state of every panel after each step (`*` marks panels that
 changed).
 
 (The script is in this skill's `scripts/` folder; use its actual location if
@@ -29,7 +29,9 @@ the skill is installed elsewhere.) For every path it prints one line per step:
 `panels` has one letter per declared panel, in declaration order: `P` =
 patched at this step, `.` = holds. After each path it lists every numeric change with its elapsed time and rate
 per hour. The script needs Node: it folds each path with the engine's own
-code (`scripts/fold_states.cjs`), so `--state` shows what the viewer shows.
+code (`scripts/fold_states.cjs`), so `--state` reports carried state, not
+rendered visibility. Use the companion checks in [visibility evidence](../../../../docs/visibility-evidence.md)
+for presentation eligibility and browser-observed evidence.
 Pass `--viz <VIZ>` if the skill is installed outside VIZ.
 
 Output lines have three levels:

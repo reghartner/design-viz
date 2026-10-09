@@ -661,13 +661,16 @@ function visibilityControl(val,ctx){
   }
 
 function edgeForm(val, ctx){
-    var t = session.target;
+    var t = session.target, expected = session.snapshot();
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
     function endpoint(field){
       return selectControl(ids, val[field], function(v){
         if (v == null) return true; /* endpoint kept — nothing to commit */
         return commitCascade(function(raw){
-          return planSetEdgeEndpoint(session.text(), raw, t.section, t.index, field, v);
+          var current=session.snapshot();
+          if(current.text!==expected.text || current.project!==expected.project || current.renderedText!=null && current.renderedText!==current.text)
+            return {error:'Source changed. Render and reselect this connection.'};
+          return planSetEdgeEndpoint(current.text, raw, t.section, t.index, field, v, session.resolve ? session.resolve(raw) : null);
         });
       });
     }
@@ -2440,6 +2443,12 @@ function renderInspector(){
       var note=document.createElement('p');note.className='fnote';
       note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Drag any imported node to move the whole floating block. Only this import’s position is saved; internal structure stays provider-owned. Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
+      if(t.kind==='node'){
+        var connectImported=actionButton('Connect from this node',function(){modes.connectFrom(t);});
+        connectImported.className+=' node-connect-button';
+        connectImported.title='Alt/Option-click a node, then click its destination. Escape cancels.';
+        guide.appendChild(connectImported);
+      }
       var importedError=document.createElement('div');importedError.className='gerr ierr';importedError.hidden=true;guide.appendChild(importedError);
       var removeImport=actionButton('Remove referenced topology',function(){
         var namespace=imported.as,section=t.section;

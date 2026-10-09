@@ -339,14 +339,19 @@ function builderRetargetStepKeys(steps, oldKey, newKey){
 
 var BUILDER_ID_RE = /^[A-Za-z0-9_-]+$/;
 
-function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId){
+function planSetEdgeEndpoint(text, raw, sectionIdx, edgeIdx, field, nodeId, resolved){
   /* Change an edge's from/to and retarget every step reference to the
      edge's old "from->to" key. */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
   var e = (got.d.edges || [])[edgeIdx];
   if (!e) return {error: 'edge not found — reselect and try again'};
-  if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, nodeId))
+  if (field !== 'from' && field !== 'to') return {error: 'unknown edge endpoint'};
+  /* Imported nodes are valid references; the edge and rewritten narrative
+     still come exclusively from the authored consumer. */
+  var known = resolved ? builderDiagram(text, resolved, sectionIdx) : got;
+  if (known.error) return known;
+  if (!known.d.nodes || !Object.prototype.hasOwnProperty.call(known.d.nodes, nodeId))
     return {error: 'unknown node id "' + nodeId + '"'};
   var oldKey = builderEdgeKey(e);
   return builderRewrite(text, raw, got.path, function(d){
@@ -567,8 +572,9 @@ function planAddEdgeBetween(text, raw, sectionIdx, fromId, toId, resolved){
   /* Connect mode: the operator clicked the exact source and target. */
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;
-  var known=resolved?builderDiagram(text,resolved,sectionIdx).d:got.d;
-  var nodes = known.nodes || {};
+  var reference=resolved?builderDiagram(text,resolved,sectionIdx):got;
+  if(reference.error)return reference;
+  var known=reference.d,nodes = known.nodes || {};
   if (!Object.prototype.hasOwnProperty.call(nodes, fromId))
     return {error: 'unknown node id "' + fromId + '"'};
   if (!Object.prototype.hasOwnProperty.call(nodes, toId))

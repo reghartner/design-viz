@@ -99,6 +99,39 @@ test('file-open reports a replacement failure and leaves the current source inta
   assert.match(h.messages.at(-1),/earlier draft could not be saved/);
 });
 
+for(const phase of ['native read','provider load'])for(const retire of ['source','project','context','new file','destroy'])test('prepared file opening retires '+phase+' after '+retire,async()=>{
+  let h,alive=true,calls=0;const held=deferred(),context={version:1,id:'draft',ephemeral:true,specs:[{page:{...JSON.parse(INITIAL).page,canon:{version:1,id:'draft',kind:'design',owner:'group:default/test'}}}]};
+  h=harness({}, {beginFileOpen(current){return C.createBuilderFileOpening({session:h.session,alive:()=>alive,
+    prepare:async()=>{calls++;return held.promise;},publish:(text,context)=>h.session.replaceProject(text,null,{topologyContext:context})},current);}});
+  const reader=h.file('file-input');if(phase==='provider load')reader.load(INITIAL.replace('Original','Late source'));
+  if(retire==='source')h.type('src',INITIAL+' ');
+  if(retire==='project')h.session.replaceProject(INITIAL+'\n');
+  if(retire==='context')h.session.connectTopology(context,h.session.snapshot());
+  if(retire==='new file')h.file('file-input','new.json');
+  if(retire==='destroy'){alive=false;h.io.destroy();}
+  const before=h.text,savedContext=JSON.stringify(h.session.topologyContext());
+  if(phase==='native read')reader.load(INITIAL.replace('Original','Late source'));
+  held.resolve(context);await settle();reader.fail();
+  assert.equal(h.text,before);assert.equal(JSON.stringify(h.session.topologyContext()),savedContext);assert.deepEqual(h.messages,[]);assert.equal(calls,phase==='native read'?0:1);
+});
+test('prepared file errors preserve source/history and a superseded failure cannot replace newer feedback',async()=>{
+  let h;const pending=[];
+  h=harness({}, {beginFileOpen(current){return C.createBuilderFileOpening({session:h.session,alive:()=>true,
+    prepare:()=>{const d=deferred();pending.push(d);return d.promise;},publish:text=>h.session.replaceProject(text)},current);}});
+  h.session.accept({text:INITIAL+' '});const before=h.text;
+  h.file('file-input','old.json').load('{}');h.file('file-input','new.json').load('{}');
+  pending[1].reject(Error('Current provider unavailable'));await settle();const message=h.messages.at(-1);
+  pending[0].reject(Error('Old provider failed'));await settle();
+  assert.match(message,/new.json.*Current provider unavailable/);assert.deepEqual(h.messages,[message]);assert.equal(h.text,before);assert.equal(h.session.canUndo(),true);
+});
+test('prepared file publication retains exact authored bytes and its separate provider context',async()=>{
+  let h;const context={version:1,id:'private',ephemeral:true,specs:[]},text=INITIAL+'\r\n';
+  h=harness({}, {beginFileOpen(current){return C.createBuilderFileOpening({session:h.session,alive:()=>true,prepare:async()=>context,
+    publish:(text,context)=>h.session.replaceProject(text,null,{topologyContext:context})},current);}});
+  h.session.accept({text:INITIAL+' '});h.file('file-input').load(text);await settle();
+  assert.equal(h.text,text);assert.deepEqual(JSON.parse(JSON.stringify(h.session.topologyContext())),context);assert.equal(h.session.baseline(),text);assert.equal(h.session.canUndo(),false);
+});
+
 test('project replacement, close and fresh input retire trace preview, search callbacks and pending file loads',()=>{
   for(const retire of ['project','close','input']){
     const h=harness();h.click('import-trace');h.type('trace-text',TRACE);h.click('trace-preview');

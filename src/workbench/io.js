@@ -1,4 +1,21 @@
 /* Import/export controls and their independent asynchronous lifetimes. */
+function createBuilderFileOpening(opts,current){
+  // Capture before the native read, so neither a slow reader nor provider fetch
+  // can replace a newer draft. The caller owns file selection/navigation lifetime.
+  var expected=opts.session.snapshot();
+  function active(){
+    if(!opts.alive() || !current())return false;
+    var now=opts.session.snapshot();
+    return now.project===expected.project && now.text===expected.text && now.topologyRevision===expected.topologyRevision;
+  }
+  return {current:active,open:async function(source){
+    if(!active())return false;
+    var context=await opts.prepare(source);
+    if(!active())return false;
+    return opts.publish(source,context);
+  }};
+}
+
 function createBuilderIO(opts){
   var document=opts.document,src=opts.sourceElement,session=opts.session,browser=opts.browser;
   var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null;
@@ -54,18 +71,23 @@ function createBuilderIO(opts){
       if (!f) return;
       cancelFileRead();
       var readVersion=fileReadVersion,reader=browser.reader();fileReader=reader;
-      reader.onload = function(){
-        if(disposed || readVersion!==fileReadVersion)return;
+      function current(){return !disposed && readVersion===fileReadVersion;}
+      var opening=opts.beginFileOpen?opts.beginFileOpen(current,true):null;
+      function active(){return current() && (!opening || opening.current());}
+      reader.onload = async function(){
+        if(!active())return;
         fileReader=null;
-        try{opts.replaceProject(String(reader.result));} /* invalid source remains repairable in the editor */
-        catch(ex){inspectorMessage('could not open "' + f.name + '": ' + errorText(ex));}
+        try{
+          if(opening)await opening.open(String(reader.result));
+          else opts.replaceProject(String(reader.result)); /* invalid source remains repairable in the editor */
+        }catch(ex){if(active())inspectorMessage('could not open "' + f.name + '": ' + errorText(ex));}
       };
       reader.onerror = function(){
-        if(disposed || readVersion!==fileReadVersion)return;
+        if(!active())return;
         fileReader=null;
         inspectorMessage('could not read "' + f.name + '" — the editor is unchanged');
       };
-      try{reader.readAsText(f);}catch(ex){fileReader=null;inspectorMessage('could not read "'+f.name+'" — the editor is unchanged');}
+      try{reader.readAsText(f);}catch(ex){fileReader=null;if(active())inspectorMessage('could not read "'+f.name+'" — the editor is unchanged');}
       fileInput.value = ''; /* allow re-opening the same file */
     });
   }

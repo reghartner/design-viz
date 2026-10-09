@@ -324,20 +324,22 @@ function initWorkbenchWelcome(opts){
     if (!selected) return;
     retireRead();
     var token = operation, reader = new FileReader();activeReader=reader;
+    function current(){return token===operation && root.isConnected && file.isConnected;}
+    var opening=builder.beginFileOpen(current,false);
     error('welcome-file-error', '');
-    reader.onload = function(){
-      if (token !== operation) return;
+    reader.onload = async function(){
+      if (!opening.current()) return;
       activeReader=null;
-      try { builder.loadText(String(reader.result)); enterEditor(); }
-      catch (ex){ error('welcome-file-error', 'Could not open “' + selected.name + '”. ' + (ex.message || 'Check the JSON and try again.')); el('welcome-file-error').scrollIntoView({block:'nearest'}); }
+      try { if(await opening.open(String(reader.result)) && current())enterEditor(); }
+      catch (ex){ if(opening.current()){error('welcome-file-error', 'Could not open “' + selected.name + '”. ' + (ex.message || 'Check the JSON and try again.')); el('welcome-file-error').scrollIntoView({block:'nearest'});} }
     };
     reader.onerror = function(){
-      if (token !== operation) return;
+      if (!opening.current()) return;
       activeReader=null;
       error('welcome-file-error', 'Could not read “' + selected.name + '”. Choose the file again.');
       el('welcome-file-error').scrollIntoView({block:'nearest'});
     };
-    reader.readAsText(selected);
+    try{reader.readAsText(selected);}catch(ex){reader.onerror();}
   });
   function artwork(entry){
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');

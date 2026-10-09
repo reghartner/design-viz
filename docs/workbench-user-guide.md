@@ -36,7 +36,8 @@ read-only HTML snapshot of the current page. Shared topology stays referenced
 in JSON; the HTML contains the visible resolved nodes and edges with no provider
 context or topology declarations/provenance. Local providers can export offline
 once the viewer template is available. Imported consumers require their approved
-frozen providers already loaded in Workbench; reopen from Canon to acquire them.
+frozen providers already loaded in Workbench; **Open file**, opening an agent
+diagram folder, or opening from Canon acquires them from the approved catalog.
 The exported HTML then opens without those sources and never refreshes itself.
 
 **Work with an agent** walks through the Recommended copy/paste and Beta Monitor

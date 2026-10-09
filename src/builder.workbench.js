@@ -669,7 +669,7 @@ function initWorkbenchBuilder(opts){
   function closeInsertMenu(){if(addMenu)addMenu.close(false);}
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
-    replaceProject:replaceProject,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
+    replaceProject:replaceProject,beginFileOpen:beginFileOpen,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
     isActive:opts.isActive,canUndoImport:function(){return !interactions.adding();},
     beforeImport:function(kind){
       setSelected(null);session.target=null;session.insertSection=0;
@@ -1192,6 +1192,20 @@ function initWorkbenchBuilder(opts){
     if (findings.errors.length) throw new Error(findings.errors.join('\n'));
     return replaceProject(text,undefined,topologyContext);
   }
+  function beginFileOpen(current,repairable){
+    return createBuilderFileOpening({session:session,alive:function(){return life.alive() && src.isConnected;},
+      prepare:async function(text){
+        var raw;
+        try{raw=JSON.parse(text);}catch(ex){if(repairable)return null;throw new Error('JSON parse: '+ex.message);}
+        var context=await prepareAuthoredTopology(raw,session.topologyContext());
+        if(!repairable || authoredTopologyDependencies(raw).length){
+          var findings=session.validate(raw,context);if(findings.errors.length)throw new Error(findings.errors.join('\n'));
+        }
+        return context;
+      },
+      publish:function(text,context){return replaceProject(text,undefined,context);}
+    },current);
+  }
   function restoreDraft(){
     var restored=session.restoreDraft(projectHooks());
     if(!restored)return false;
@@ -1275,7 +1289,7 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
-    prepareFolder:function(text){return prepareFolderTopology(JSON.parse(text),session.topologyContext());},
+    prepareFolder:function(text){return prepareAuthoredTopology(JSON.parse(text),session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal,context){
       var snapshot=session.snapshot();
@@ -1392,7 +1406,7 @@ function initWorkbenchBuilder(opts){
     destroy:destroy,
     refreshCatalog:function(){inspector.refreshCatalog();if(catalogPicker)catalogPicker.refresh();},
     openCatalog:life.guard(function(options){if(catalogPicker)catalogPicker.open(options);}),
-    loadText:loadText, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
+    loadText:loadText,beginFileOpen:beginFileOpen, restoreDraft:life.guard(restoreDraft), prepareWelcome:life.guard(prepareWelcome),
     beforePreviewReplace:life.guard(beforePreviewReplace),previewRendered:life.guard(previewRendered),
     isProjectOpen:session.isProjectOpen,
     draft:session.draft,

@@ -56,6 +56,9 @@ in the editor, or pins the deployed v3 catalog and verifies missing provider
 revisions before validating the saved source. The source and ledger stay authored;
 provider copies and temporary consumer identity are kept only in browser recovery.
 Ordinary diagrams without imports do not trigger repository requests.
+The same provider preparation is used by Welcome **Open file** and the editor's
+**File → open…**. You can open an imported spec first, then connect its diagram
+folder; the frozen providers carry through to the connected session.
 
 Closing setup or changing the draft during provider loading cancels the open.
 Missing catalogs, unavailable providers and revision mismatches leave the draft

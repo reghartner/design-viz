@@ -12,6 +12,16 @@ points lead to the same editor:
   diagram**. The blank has one diagram section with no nodes, edges, or steps.
   Use **Add to diagram** to add the first elements.
 
+**Open file**, including **File → open…** inside the editor, loads shared topology
+references from the workbench site's approved authored-source catalog. No Canon
+visit is required. Already loaded provider revisions stay frozen; missing
+providers and their dependencies are checked against the pinned catalog before
+replacing your draft. The JSON keeps its authored imports, with provider copies
+stored separately in browser recovery. Import-free files make no provider requests.
+Unavailable catalogs or invalid providers leave your current project and Undo
+history intact. The editor's **File → open…** still accepts unfinished JSON and
+invalid diagrams without imports for repair; Welcome requires a valid diagram.
+
 **User guide** opens the bundled human walkthrough, including alternates and
 shared-step editing. **Canon diagrams** opens the [published library](workbench-canon-library.md)
 read-only; choose **Edit in Workbench** to start a local edit at the reader's
@@ -48,7 +58,9 @@ Reloading the same tab restores its screen. An editor reload recovers the saved
 local draft when available, or returns safely to welcome; Undo/Redo history and
 unfinished welcome forms are not persisted across reloads. Leaving the editor
 flushes its current draft before the normal autosave delay. Navigating away also
-retires pending file reads, so a late import cannot reopen the editor. This works
+retires pending file reads and provider loading, so a late import cannot reopen
+the editor. Selecting another file or changing the draft also retires the earlier
+open operation. This works
 for hosted and downloaded workbenches. Screen routes use small browser history
 metadata, keeping the existing URL, query, fragment and unrelated history state;
 specs, briefs and credentials are not placed in history URLs.

@@ -111,11 +111,15 @@ function createTopologyCatalogLoader(context){
   }};
 }
 
+function authoredTopologyDependencies(raw){
+  var source=raw && !raw.page && (raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:raw;
+  return FlowTopology.dependencies(source);
+}
+
 /* Prepare a private review context from the browser's approved catalog only.
    Proposal JSON supplies provider IDs, never catalog addresses or snapshots. */
 async function prepareTopologyProposal(raw,context){
-  var source=raw && !raw.page && (raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:raw;
-  var dependencies=FlowTopology.dependencies(source);
+  var dependencies=authoredTopologyDependencies(raw);
   if(!dependencies.length)return context;
   if(!context)throw Error('Connect repository catalog in Add → Referenced topology, then review this update again.');
   var missing=dependencies.filter(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});});
@@ -125,12 +129,11 @@ async function prepareTopologyProposal(raw,context){
   return prepared;
 }
 
-/* Opening a diagram folder explicitly authorizes acquisition from this site's
-   repository. Reuse approved frozen providers, never folder-supplied context.
+/* Opening a diagram file/folder authorizes acquisition from this site's
+   repository. Reuse approved frozen providers, never file-supplied context.
    A different consumer gets private membership instead of borrowing Canon's ID. */
-async function prepareFolderTopology(raw,context){
-  var source=raw && !raw.page && (raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:raw;
-  var page=source && (source.page || source),dependencies=FlowTopology.dependencies(source);
+async function prepareAuthoredTopology(raw,context){
+  var page=raw && (raw.page || raw),dependencies=authoredTopologyDependencies(raw);
   var sameConsumer=context && (context.ephemeral===true || page && page.canon && page.canon.id===context.id);
   if(!dependencies.length)return sameConsumer?context:null;
   var scaffold={page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}};

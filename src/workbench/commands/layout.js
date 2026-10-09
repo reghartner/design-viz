@@ -685,24 +685,35 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
   if(anchorIndex==null)anchorIndex=0;
   if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
-  return builderRewrite(text,raw,got.path,function(d){
+  var changed=false,plan=builderRewrite(text,raw,got.path,function(d){
     // Context-menu alignment can anchor a later selection member. Leave its
     // authored placement intact while the other rendered centers move to it.
-    var anchor=rects[anchorIndex],cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h/2;
+    function coordinate(value){var tenth=Math.round(value*10)/10;return Math.abs(value-tenth)<.0001?tenth:value;}
+    function assign(object,key,value){value=coordinate(value);if(!Number.isFinite(object[key]) || Math.abs(object[key]-value)>=.0001){object[key]=value;changed=true;}}
+    function remove(object,key){if(Object.prototype.hasOwnProperty.call(object,key)){delete object[key];changed=true;}}
+    var anchor=rects[anchorIndex],anchorTarget=targets[anchorIndex],anchorFloat=anchorTarget.kind==='node' && d.floats.find(function(f){return f.id===anchorTarget.id;});
+    var cx=positionedFloat(anchorFloat)?anchorFloat.x:coordinate(anchor.x+anchor.w/2),cy=positionedFloat(anchorFloat)?anchorFloat.y:coordinate(anchor.y+anchor.h/2);
     var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
     for(var i=0;i<targets.length;i++){
       if(i===anchorIndex)continue;
-      var t=targets[i],r=rects[i],x=direction==='vertical'?cx:r.x+r.w/2,y=direction==='horizontal'?cy:r.y+r.h/2;
+      var t=targets[i],r=rects[i],x=direction==='vertical'?cx:coordinate(r.x+r.w/2),y=direction==='horizontal'?cy:coordinate(r.y+r.h/2);
       if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
       if(t.kind==='node'){
-        var f=d.floats.find(function(f){return f.id===t.id;});f.x=x;f.y=y;delete f.dx;delete f.dy;
+        var f=d.floats.find(function(f){return f.id===t.id;});
+        if(!positionedFloat(f)){
+          // Once one automatic axis is aligned, pin both rendered centers so
+          // the layout continues to honor the edit and retains its other axis.
+          assign(f,'x',x);assign(f,'y',y);remove(f,'dx');remove(f,'dy');
+        }else if(direction==='vertical'){assign(f,'x',x);remove(f,'dx');}
+        else {assign(f,'y',y);remove(f,'dy');}
       }else{
         var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),panels=canvas.panels || (canvas.panels=[]);
-        var p=panels.find(function(p){return p.panel===t.id;});if(!p){p={panel:t.id};panels.push(p);}
-        Object.assign(p,{x:x-r.w/2,y:y-r.h/2,w:r.w,h:r.h});
+        var p=panels.find(function(p){return p.panel===t.id;});if(!p){p={panel:t.id};panels.push(p);changed=true;}
+        assign(p,'x',direction==='vertical'?x-r.w/2:r.x);assign(p,'y',direction==='horizontal'?y-r.h/2:r.y);assign(p,'w',r.w);assign(p,'h',r.h);
       }
     }
   });
+  return (plan.error || changed)?plan:{noop:true};
 }
 /* Shared placement validation for measured selection actions. */
 function builderMovableSpatial(text,raw,targets,layoutId,rects){

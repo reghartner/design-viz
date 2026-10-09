@@ -1,4 +1,5 @@
 import {test,expect,pastePage as paste,closeTools} from '../helpers/test.mjs';
+import {writeFile} from 'node:fs/promises';
 const fixture=()=>({page:{title:'Align and move',blocks:[{heading:'Services',diagram:{view:'ambient',autoplay:false,
   nodes:{a:{title:'First'},b:{title:'Second'},c:{title:'Stay'},row:{title:'Row'}},rows:[['row']],
   floats:[{id:'a',side:'below',x:260,y:210},{id:'b',side:'below',x:650,y:330},{id:'c',side:'below',x:950,y:230}],
@@ -7,6 +8,13 @@ const source=page=>page.locator('#src').inputValue();
 const diagram=async page=>JSON.parse(await source(page)).page.blocks[0].diagram;
 const node=(page,id)=>page.locator('#docview g.node[data-dv-node="'+id+'"]');
 const menu=page=>page.getByRole('menu',{name:'Object actions'});
+async function cardCenters(page,ids){
+  return page.locator(ids.map(id=>'#docview g.node[data-dv-node="'+id+'"] .card').join(',')).evaluateAll(cards=>cards.map(card=>{
+    const inverse=card.ownerSVGElement.getScreenCTM().inverse(),r=card.getBoundingClientRect();
+    const a=new DOMPoint(r.left,r.top).matrixTransform(inverse),b=new DOMPoint(r.right,r.bottom).matrixTransform(inverse);
+    return {x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+  }));
+}
 async function select(page){await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});await expect(page.locator('#guide')).toContainText('2 nodes selected');}
 async function drag(page,id,dx,dy){
   await node(page,id).hover();
@@ -124,6 +132,40 @@ test('Standard object menu keeps a selected set, anchors the invoked node, and s
   await closeTools(page);await node(page,'c').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();changed=await source(page);expect((await diagram(page)).nodes.c).toBeUndefined();await history(page,duplicated,changed);
   await closeTools(page);await node(page,'row').click();await node(page,'a').click({modifiers:['Shift']});await node(page,'row').click({button:'right'});const align=menu(page).getByRole('menuitem',{name:/^Align horizontally/});await expect(align).toHaveAttribute('aria-disabled','true');await expect(align).toContainText('Free placement');await page.keyboard.press('Escape');
 });
+
+for(const presentation of ['standard','explore'])for(const direction of ['horizontal','vertical']){
+  test(presentation+' '+direction+' context-menu alignment uses card centers and repeated operations are exact no-ops',async({page,server},info)=>{
+    const raw=fixture(),d=raw.page.blocks[0].diagram,badgeId=(presentation==='standard')===(direction==='horizontal')?'a':'b';
+    d.nodes[badgeId].delta=true;d.nodes[badgeId].deltaDetails={summary:'Badge extends outside the card'};
+    d.nodes.b.title='A deliberately long selected anchor title that must not own alignment geometry';
+    if(presentation==='explore'){
+      d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
+    }
+    await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
+    if(presentation==='standard')await page.locator('#docview .board').getByRole('button',{name:'Readable',exact:true}).click();
+    else {await closeTools(page);await page.locator('#workspace-fit').click();await page.locator('.explore-board').dispatchEvent('wheel',{clientX:520,clientY:400,deltaY:-180,ctrlKey:true,bubbles:true,cancelable:true});}
+    await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});
+    const before=await source(page),authored=JSON.parse(before).page.blocks[0].diagram.floats,beforeGeometry=await cardCenters(page,['a','b']);
+    await node(page,'b').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align '+direction+'ly',exact:true}).click();
+    const aligned=await source(page),after=JSON.parse(aligned).page.blocks[0].diagram.floats,centers=await cardCenters(page,['a','b']);
+    expect(after.find(f=>f.id==='b')).toEqual(authored.find(f=>f.id==='b'));
+    expect(after.find(f=>f.id==='a')[direction==='horizontal'?'x':'y']).toBe(authored.find(f=>f.id==='a')[direction==='horizontal'?'x':'y']);
+    expect(centers[0][direction==='horizontal'?'y':'x']).toBeCloseTo(centers[1][direction==='horizontal'?'y':'x'],5);
+    await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
+    const repeated=[];
+    for(let repeat=0;repeat<3;repeat++){
+      const geometry=await cardCenters(page,['a','b']);await node(page,'b').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align '+direction+'ly',exact:true}).click();
+      expect(await source(page)).toBe(aligned);const nextGeometry=await cardCenters(page,['a','b']);expect(nextGeometry).toEqual(geometry);repeated.push(nextGeometry);
+    }
+    await writeFile('/tmp/design-viz-alignment-'+presentation+'-'+direction+'-geometry.json',JSON.stringify({badgeId,before:beforeGeometry,after:centers,repeated},null,2));
+    await closeTools(page);
+    if(presentation==='explore')await page.locator('#workspace-fit-selection').click();
+    else await page.locator('#docview .board').getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await page.screenshot({path:'/tmp/design-viz-alignment-'+presentation+'-'+direction+'-1280.png'});
+    await info.attach(presentation+' '+direction+' alignment',{body:await page.screenshot(),contentType:'image/png'});
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+  });
+}
 
 async function marqueeCorner(page,id){
   const r=await node(page,id).boundingBox();

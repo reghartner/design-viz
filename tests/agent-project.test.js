@@ -114,3 +114,27 @@ test('folder inspection identifies prior artifacts and connection metadata befor
     assert.equal((await h.open()).existing,true);
   }finally{await h.close();}
 });
+
+test('cancelled preparation and changed saved artifacts cannot initialize folder metadata',async()=>{
+  for(const change of ['cancel','source','ledger']){
+    const h=await setup();try{
+      await h.write('story.spec.json','{"title":"Original"}');await h.write('story.ledger.md','# Original');const found=await h.open();
+      if(change==='source')await h.write('story.spec.json','{"title":"Outside"}');
+      if(change==='ledger')await h.write('story.ledger.md','# Outside');
+      await assert.rejects(found.initialize(()=>{if(change==='cancel')throw Error('Cancelled');}),change==='cancel'?/Cancelled/:/changed while opening/);
+      await assert.rejects(fs.stat(path.join(h.folder,'.flowview-agent')),/ENOENT/);
+      assert.equal(await h.read('story.spec.json'),change==='source'?'{"title":"Outside"}':'{"title":"Original"}');
+    }finally{await h.close();}
+  }
+});
+test('interrupted artifacts expose their exact approved target for validation before recovery writes',async()=>{
+  const h=await setup();try{
+    const opened=await (await h.open()).initialize();await opened.files.flushArtifacts('{}','# Before');h.fail('story.ledger.md');
+    const after='{"title":"Approved target"}';await assert.rejects(opened.files.flushArtifacts(after,'# After'),/disk full/);
+    const found=await h.open();assert.equal(found.recovering,true);assert.equal(found.source,after);
+    await assert.rejects(found.initialize(()=>{throw Error('Invalid approved provider');}),/Invalid approved provider/);
+    assert.equal(await h.read('story.ledger.md'),'# Before');
+    const journal=JSON.parse(await h.read('.flowview-agent/artifact-write.json'));journal.after.source='{"title":"Changed target"}';await h.write('.flowview-agent/artifact-write.json',JSON.stringify(journal));
+    await assert.rejects(found.initialize(),/saved recovery changed/);assert.equal(await h.read('story.ledger.md'),'# Before');
+  }finally{await h.close();}
+});

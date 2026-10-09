@@ -48,6 +48,20 @@ and requires its own explicit Monitor connection.
 
 ## Open or create a diagram folder
 
+Folders whose specs contain `topologyImports` can be opened directly; you do not
+need to visit Canon or connect the topology picker first. Opening the folder
+authorizes loading its referenced providers from this workbench site's approved
+repository catalog. Flowview reuses applicable frozen providers already loaded
+in the editor, or pins the deployed v3 catalog and verifies missing provider
+revisions before validating the saved source. The source and ledger stay authored;
+provider copies and temporary consumer identity are kept only in browser recovery.
+Ordinary diagrams without imports do not trigger repository requests.
+
+Closing setup or changing the draft during provider loading cancels the open.
+Missing catalogs, unavailable providers and revision mismatches leave the draft
+and saved artifacts unchanged. Reopening a folder preserves the current frozen
+provider revisions; it never silently refreshes them from a later deployment.
+
 The setup first asks whether you are adding an agent to the open diagram,
 continuing an existing agent build, or starting a new diagram with an agent.
 Adding an agent selects the folder containing the existing spec and ledger, or
@@ -60,7 +74,8 @@ One existing `*.spec.json` is detected automatically. Its matching `*.ledger.md`
 is used; for example `payments.spec.json` and `payments.ledger.md`. If several
 specs exist, the setup lists them after folder selection so the user can pick one
 without typing a filename. An empty folder receives the current diagram and ledger
-as a new project and defaults to `story.spec.json` and `story.ledger.md`. An existing ledger is preserved even when the
+and defaults to `story.spec.json` and `story.ledger.md`; it keeps the open diagram's
+selection and preview while starting fresh Undo/Redo history. An existing ledger is preserved even when the
 spec has not been created yet. Invalid JSON or validation errors stop opening;
 they do not overwrite the saved artifact.
 

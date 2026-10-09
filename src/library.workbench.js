@@ -66,11 +66,11 @@ async function readCanonLibraryJSON(response,label){
   return JSON.parse(text);
 }
 
-/* Explicit authoring acquisition only. The catalog is captured on Canon entry;
-   never reload it or replace an already-frozen provider during this session. */
+/* Explicit authoring acquisition only. Canon entry, repository connection, or
+   folder opening pins the catalog; never reload it or replace frozen providers. */
 function createTopologyCatalogLoader(context){
   var catalog=context && context.catalog;
-  if(!catalog || catalog.version!==3 || !context.catalogURL || !/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology is unavailable. Open a diagram from a deployed Canon v3 library. Offline and legacy libraries do not provide an authored-source catalog.');
+  if(!catalog || catalog.version!==3 || !context.catalogURL || !/^https?:$/.test(new URL(location.href).protocol))throw new Error('Referenced topology is unavailable. Loading missing providers requires a deployed version 3 authored-source repository catalog. Offline and legacy libraries do not provide one.');
   var entries=parseCanonLibrary(catalog),base=new URL(context.catalogURL);
   if(base.origin!==new URL(location.href).origin || !/\.json$/.test(base.pathname) || base.search || base.hash)throw new Error('The frozen catalog address is unavailable at this origin. Reopen Canon here.');
   context=JSON.parse(JSON.stringify(context));
@@ -82,7 +82,7 @@ function createTopologyCatalogLoader(context){
         var response=await fetch(canonLibrarySpecURL(entry.specUrl,base),{cache:'no-cache',redirect:'error'});
         var raw=canonLibrarySpec(await readCanonLibraryJSON(response,'Provider '+entry.id),entry);
         try{await verifyWorkspaceHandoff(raw,{id:entry.id,revision:entry.revision},window.crypto);}
-        catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen Canon after deployment; your draft has not changed.');}
+        catch(ex){throw new Error('Source revision mismatch for '+entry.id+'. Reopen the diagram after deployment to pin the updated catalog; your draft has not changed.');}
         return raw;
       })().catch(function(ex){
         // Share in-flight work, but cache only verified successful sources.
@@ -123,6 +123,35 @@ async function prepareTopologyProposal(raw,context){
   var loader=createTopologyCatalogLoader(context),prepared=context;
   for(var id of missing)prepared=(await loader.load(id,prepared)).context;
   return prepared;
+}
+
+/* Opening a diagram folder explicitly authorizes acquisition from this site's
+   repository. Reuse approved frozen providers, never folder-supplied context.
+   A different consumer gets private membership instead of borrowing Canon's ID. */
+async function prepareFolderTopology(raw,context){
+  var source=raw && !raw.page && (raw.nodes || raw.rows || raw.topologyImports || raw.topologyExports)?{page:{sections:[{diagram:raw}]}}:raw;
+  var page=source && (source.page || source),dependencies=FlowTopology.dependencies(source);
+  var sameConsumer=context && (context.ephemeral===true || page && page.canon && page.canon.id===context.id);
+  if(!dependencies.length)return sameConsumer?context:null;
+  var scaffold={page:{sections:[{diagram:{nodes:{},rows:[[]]}}]}};
+  if(!context)context=await connectTopologyRepository(scaffold);
+  else if((!context.catalog || context.catalog.version!==3) && dependencies.some(function(id){return !context.specs.some(function(spec){return spec.page.canon.id===id;});})){
+    // A backend snapshot may be complete without a catalog. Only a missing
+    // provider needs this site's index; all prior provider bytes stay frozen.
+    var repository=await connectTopologyRepository(scaffold);
+    context=Object.assign({},context,{catalog:repository.catalog,catalogURL:repository.catalogURL});
+  }
+  if(!sameConsumer && !context.ephemeral){
+    context=JSON.parse(JSON.stringify(context));
+    var ids=new Set(context.specs.map(function(spec){return spec.page.canon.id;}));
+    ((context.catalog || {}).diagrams || []).forEach(function(entry){ids.add(entry.id);});
+    var id='workbench-draft',suffix=2;while(ids.has(id))id='workbench-draft-'+suffix++;
+    context.id=id;context.ephemeral=true;
+    context.specs.push({page:{canon:{version:1,id:id,kind:'design',owner:'group:default/workbench-draft'},sections:[{diagram:{nodes:{},rows:[[]]}}]}});
+  }
+  // The auxiliary consumer is already resolvable while each missing dependency
+  // loads; the complete authored folder source is validated only after closure.
+  return prepareTopologyProposal(raw,context);
 }
 
 /* A local draft may explicitly pin the deployed authored-source catalog.

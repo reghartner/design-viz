@@ -24,16 +24,32 @@ async function openFolderAgentProject(directory, filename){
   var source=await root.readText(spec,4*1024*1024),notes=await root.readText(ledger,256*1024);
   var recovery=metadata?await createFolderAgentFiles(metadata).read('artifact-write.json'):null;
   if(source!==null && !recovery)JSON.parse(source);
-  // Do not create support files until the caller has validated and opened the spec.
-  async function initialize(){
+  if(recovery){
+    if(recovery.version!==1 || recovery.spec!==spec || recovery.ledger!==ledger || !recovery.before || !recovery.after ||
+      typeof recovery.after.source!=='string' || typeof recovery.after.ledger!=='string')throw Error('An interrupted artifact write needs recovery. Keep this folder intact.');
+    JSON.parse(recovery.after.source);
+    if(new TextEncoder().encode(recovery.after.source).length>4*1024*1024 || new TextEncoder().encode(recovery.after.ledger).length>256*1024)throw Error('Interrupted artifacts exceed the size limit.');
+  }
+  // Do not create support files until the caller has validated the source and
+  // any provider context it needs, including an interrupted write's target pair.
+  async function initialize(guard){
+    if(guard)await guard();
+    // Provider preparation may take time. Refuse changed saved artifacts before
+    // creating metadata or completing an interrupted, previously approved pair.
+    var savedSource=await root.readText(spec,4*1024*1024),savedNotes=await root.readText(ledger,256*1024);
+    if(guard)await guard();
+    if(savedSource!==source || savedNotes!==notes)throw Error('The diagram files changed while opening this folder. Choose it again; no external edits were overwritten.');
     if(!metadata)metadata=await directory.getDirectoryHandle('.flowview-agent',{create:true});
+    if(guard)await guard();
     var files=createFolderAgentFiles(metadata),expected={source:source,ledger:notes};
     var owner=await files.read('session.json'),lease=await files.read('editor.json');
     if(owner && owner.recoveryState && Number.isFinite(owner.claimAt) && Date.now()-owner.claimAt<15000)throw Error('Another editor is opening this folder. Wait a few seconds and try again.');
     if(!owner && lease && lease.connected && Date.now()-lease.at<15000)throw Error('Another editor may be opening this folder. Wait a few seconds and try again.');
     if(owner && lease && lease.sessionId===owner.sessionId && lease.connectionId===owner.connectionId && lease.connected && Date.now()-lease.at<15000)throw Error('This folder is still connected to another editor. Disconnect it there first.');
     async function openingGuard(){
+      if(guard)await guard();
       var latest=await files.read('session.json'),active=await files.read('editor.json');
+      if(guard)await guard();
       if(JSON.stringify(latest)!==JSON.stringify(openingOwner))throw Error('The saved session identity changed while opening this diagram folder. Choose it again.');
       if(latest && latest.recoveryState && Number.isFinite(latest.claimAt) && Date.now()-latest.claimAt<15000)throw Error('Another editor is opening this folder. Wait a few seconds and try again.');
       if(latest && active && active.sessionId===latest.sessionId && active.connectionId===latest.connectionId && active.connected && Date.now()-active.at<15000)throw Error('This folder is still connected to another editor. Disconnect it there first.');
@@ -41,6 +57,8 @@ async function openFolderAgentProject(directory, filename){
     await openingGuard();
     var mapping={version:1,spec:spec,ledger:ledger};
     var pending=await files.read('artifact-write.json');
+    if(guard)await guard();
+    if(JSON.stringify(pending)!==JSON.stringify(recovery))throw Error('The saved recovery changed while opening this folder. Choose it again.');
     async function actual(){return {source:await root.readText(spec,4*1024*1024),ledger:await root.readText(ledger,256*1024)};}
     function same(a,b){return a.source===b.source && a.ledger===b.ledger;}
     async function check(write){var found=await actual();if(write && write.created){var key=write.name===spec?'source':write.name===ledger?'ledger':null;if(key && expected[key]===null && found[key]==='')found[key]=null;}if(!same(found,expected))throw Error('The diagram files changed outside the workbench. Disconnect and reopen this folder to review those changes; no external edits were overwritten.');}
@@ -53,10 +71,6 @@ async function openFolderAgentProject(directory, filename){
       }
     }
     if(pending){
-      if(pending.version!==1 || pending.spec!==spec || pending.ledger!==ledger || !pending.before || !pending.after ||
-        typeof pending.after.source!=='string' || typeof pending.after.ledger!=='string')throw Error('An interrupted artifact write needs recovery. Keep this folder intact.');
-      JSON.parse(pending.after.source);
-      if(new TextEncoder().encode(pending.after.source).length>4*1024*1024 || new TextEncoder().encode(pending.after.ledger).length>256*1024)throw Error('Interrupted artifacts exceed the size limit.');
       var found=await actual();
       if(!['source','ledger'].every(function(key){return found[key]===pending.before[key] || found[key]===pending.after[key] || pending.before[key]===null && found[key]==='';}))throw Error('An interrupted write and outside edits both exist. Preserve the files and resolve artifact-write.json before reconnecting.');
       expected=found;
@@ -80,5 +94,5 @@ async function openFolderAgentProject(directory, filename){
       }});
     return {files:result,source:source,ledger:notes || '',hasLedger:notes!==null,legacy:legacy};
   }
-  return {existing:!!metadata || source!==null || notes!==null,source:recovery?null:source,recovering:!!recovery,ledger:notes || '',spec:spec,hasSession:!!openingOwner,initialize:initialize};
+  return {existing:!!metadata || source!==null || notes!==null,source:recovery?recovery.after.source:source,recovering:!!recovery,ledger:notes || '',spec:spec,hasSession:!!openingOwner,initialize:initialize};
 }

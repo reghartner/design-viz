@@ -45,6 +45,19 @@ function archiveHarness(initial){
   });
   return {persistence,storage,get writes(){return writes;},get failures(){return failures;},block(){blocked=true;}};
 }
+test('sharing a current draft keeps its project, baseline, selection and fresh preview while publishing context and resetting history',()=>{
+  const h=harness(),s=h.session;s.accept({text:'{"title":"Edited"}'});s.target={kind:'node',id:'selected'};
+  const before=s.snapshot(),baseline=s.baseline(),renders=h.renders,ctx={version:1,id:'private',ephemeral:true,specs:[]};
+  assert.equal(s.openFolder(ctx,before),true);assert.equal(s.text(),before.text);assert.equal(s.snapshot().project,before.project);
+  assert.equal(s.baseline(),baseline);assert.deepEqual(plain(s.target),{kind:'node',id:'selected'});assert.equal(h.renders,renders);
+  assert.equal(s.canUndo(),false);assert.equal(s.canRedo(),false);assert.deepEqual(plain(s.topologyContext()),ctx);
+  assert.deepEqual(JSON.parse(h.storage.get('dv-workbench-draft')).topologyContext,ctx);
+  const frozen=JSON.stringify(s.topologyContext());assert.equal(s.openFolder(null,before),false);assert.equal(JSON.stringify(s.topologyContext()),frozen);
+});
+test('sharing invalid handwritten source refuses before changing history or context',()=>{
+  const h=harness(),s=h.session;s.accept({text:'{"title":"Edited"}'});h.type('{invalid');const before=s.snapshot();
+  assert.throws(()=>s.openFolder(null,before));assert.equal(s.canUndo(),true);assert.equal(s.text(),'{invalid');assert.equal(s.topologyContext(),null);
+});
 test('earlier drafts retain only two distinct exact source and artifact snapshots',()=>{
   const h=archiveHarness(),p=h.persistence;
   const stories=[

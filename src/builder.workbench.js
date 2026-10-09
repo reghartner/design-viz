@@ -1275,6 +1275,7 @@ function initWorkbenchBuilder(opts){
         !!(active && !(active.closest && active.closest('#editor-agent')) && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)));
     },
     prepare:function(text){return prepareTopologyProposal(JSON.parse(text),session.topologyContext());},
+    prepareFolder:function(text){return prepareFolderTopology(JSON.parse(text),session.topologyContext());},
     validate:function(text,context){var findings=arguments.length>1?session.validate(JSON.parse(text),context):session.validate(JSON.parse(text));return findings.errors.join('\n');},
     apply:function(text,expected,proposal,context){
       var snapshot=session.snapshot();
@@ -1304,14 +1305,15 @@ function initWorkbenchBuilder(opts){
       if(accepted && storyBrief)storyBrief.refresh();refreshProvenance();
       return {ok:accepted,rendered:!!(outcome && outcome.ok)};
     },
-    openEmptyFolder:function(expected){
-      var current=agentOptions.snapshot();if(current.project!==expected.project || current.source!==expected.source)return {ok:false,error:'Your draft changed while opening the folder.'};
-      session.preserveDraft();session.resetHistory();agentLedgerEpoch++;return {ok:true,project:current.project};
+    openEmptyFolder:function(expected,context){
+      var current=session.snapshot();
+      if(current.project!==expected.project || current.text!==expected.source || current.topologyRevision!==expected.topologyRevision)return {ok:false,error:'Your draft changed while opening the folder.'};
+      var ok=session.openFolder(context,current);if(ok){agentLedgerEpoch++;refreshProvenance();}return {ok:ok,project:current.project};
     },
-    restoreSavedStory:function(source,expected){
+    restoreSavedStory:function(source,expected,context){
       var current=agentOptions.snapshot();
-      if(expected && (current.project!==expected.project || current.source!==expected.source))return {ok:false,error:'Your draft changed while opening the folder. Choose the diagram folder again.'};
-      var ok=loadText(source);return {ok:ok,project:session.snapshot().project};
+      if(expected && (current.project!==expected.project || current.source!==expected.source || current.topologyRevision!==expected.topologyRevision))return {ok:false,error:'Your draft changed while opening the folder. Choose the diagram folder again.'};
+      var ok=loadText(source,context);return {ok:ok,project:session.snapshot().project};
     },
     showChanges:showAgentChanges,
     undoChange:function(receipt){

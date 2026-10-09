@@ -367,6 +367,12 @@ function initWorkbenchAgentChat(opts){
   }
   function closeGuide(){
     if(pendingFileChoice){var pending=pendingFileChoice;pendingFileChoice=null;get('file-choice').hidden=true;pending.reject(new DOMException('Folder selection cancelled.','AbortError'));}
+    if(connecting && !state.connected){
+      generation++;connecting=false;
+      if(client){client.destroy();client=null;}
+      if(releaseLock){releaseLock();releaseLock=null;}
+      status('Folder connection cancelled.');paint({});
+    }
     if(guide.open)guide.close();
   }
   function paint(update){
@@ -489,7 +495,7 @@ function initWorkbenchAgentChat(opts){
   }
   function checkResumeDraft(expected){
     var current=opts.snapshot();
-    if(!current.open || current.project!==expected.project || current.source!==expected.source)
+    if(!current.open || current.project!==expected.project || current.source!==expected.source || current.topologyRevision!==expected.topologyRevision)
       throw Error('Your draft changed while opening the folder. Choose the diagram folder again.');
   }
   async function beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture){
@@ -509,7 +515,7 @@ function initWorkbenchAgentChat(opts){
       // Rendering the restored story can synchronously ask for recoveryInfo.
       // Retire the old chat below without cancelling our own explicit open.
       var restored;adoptingProject=true;
-      try{restored=saved.newFolder && opts.openEmptyFolder?await opts.openEmptyFolder(recovered.current):await opts.restoreSavedStory(saved.savedSource,recovered.current);}
+      try{restored=saved.newFolder && opts.openEmptyFolder?await opts.openEmptyFolder(recovered.current,recovered.topologyContext):await opts.restoreSavedStory(saved.savedSource,recovered.current,recovered.topologyContext);}
       finally{adoptingProject=false;}
       if(restored===false || restored && restored.ok===false)throw Error(restored && restored.error || 'Could not restore the saved story.');
       if(!life.alive() || token!==generation)return;
@@ -584,6 +590,19 @@ function initWorkbenchAgentChat(opts){
     var intent=useRemembered?'resume':setupIntent;
     if(intent==='new' && freshProject!==opts.snapshot().project && opts.newProject){opts.newProject(composeMode);intent='new';}
     connecting=true;get('instructions').value='';paint({});var token=++generation,opening=opts.snapshot(),unlockSetup=null;
+    function checkOpening(){
+      if(!life.alive() || token!==generation)throw new DOMException('Folder connection cancelled.','AbortError');
+      checkResumeDraft(opening);
+    }
+    var preparedSource,preparedContext;
+    async function prepareSource(value){
+      checkOpening();
+      preparedContext=opts.prepareFolder?await opts.prepareFolder(value):undefined;
+      checkOpening();
+      var invalid=opts.validate && (opts.prepareFolder?opts.validate(value,preparedContext):opts.validate(value));
+      if(invalid)throw Error('The saved spec needs repair before opening: '+invalid);
+      preparedSource=value;
+    }
     try{
       var parent,directory;
       // Permission/picker must be the first await, inside this click gesture.
@@ -616,10 +635,10 @@ function initWorkbenchAgentChat(opts){
         if(intent==='new' && (found.existing || found.source!==null || found.recovering || found.ledger))throw Error('This folder already contains a diagram or agent connection. Select a new, empty diagram folder to start fresh. Existing files were not changed.');
         if(intent==='resume' && !found.hasSession)throw Error('This folder does not contain an existing agent build. Select the diagram folder used by the earlier build.');
         if(intent==='adopt' && found.hasSession)throw Error('This folder already belongs to an agent build. Choose Continue an existing agent build, then select it again.');
-        if(opts.validate && (found.source!==null || !found.recovering)){var invalid=opts.validate(found.source===null?opening.source:found.source);if(invalid)throw Error('The saved spec needs repair before opening: '+invalid);}
-        projectFolder=await found.initialize();
+        await prepareSource(found.source===null?opening.source:found.source);
+        projectFolder=await found.initialize(checkOpening);
         if(projectFolder.source===null && !projectFolder.hasLedger)projectFolder.ledger=opening.ledger || '';
-        if(projectFolder.source!==null && opts.validate){var recoveredError=opts.validate(projectFolder.source);if(recoveredError)throw Error('The saved spec needs repair: '+recoveredError);}
+        if((projectFolder.source===null?opening.source:projectFolder.source)!==preparedSource)throw Error('The saved story changed while opening the folder. Choose the diagram folder again.');
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
         resume=found.hasSession;
         if(resume)preview=await inspectFolderAgentSession(projectFolder.files,opts.snapshot());
@@ -628,7 +647,9 @@ function initWorkbenchAgentChat(opts){
       if(preview){
         if(!life.alive() || token!==generation)return;checkResumeDraft(opening);
         if(preview.lease && preview.lease.active)throw Error('This folder is still connected to another editor. Disconnect it there first.');
-        recovered={preview:preview,current:opening};status('Opening the diagram and its ledger…');
+        if(preparedSource===undefined)await prepareSource(preview.savedSource);
+        if(preview.savedSource!==preparedSource)throw Error('The saved story changed while opening the folder. Choose the diagram folder again.');
+        recovered={preview:preview,current:opening,topologyContext:preparedContext};status('Opening the diagram and its ledger…');
       }
       await beginConnection(directory,parent,resume,token,recovered,projectFolder,pilotCapture);
     }catch(ex){await connectionFailure(ex,token);}

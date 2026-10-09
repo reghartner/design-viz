@@ -92,6 +92,18 @@ function createBuilderSession(options){
       checkTopologyContext(context);resolve(JSON.parse(text()),context);
       topologyContext=JSON.parse(JSON.stringify(context));topologyRevision++;save();return true;
     },
+    openFolder:function(context,expected){
+      if(disposed || !expected || expected.text!==text() || expected.project!==project || expected.topologyRevision!==topologyRevision)return false;
+      // Sharing the current draft keeps its project, baseline and fresh preview.
+      // Validate before archival/history changes; context comes from preparation.
+      resolve(JSON.parse(text()),context);preserveDraft();
+      if(JSON.stringify(context || null)!==JSON.stringify(topologyContext)){
+        topologyContext=context?JSON.parse(JSON.stringify(context)):null;topologyRevision++;
+      }
+      undoStack.length=redoStack.length=0;importedText=null;historyVersion++;historyChanged();
+      if(options.renderedText && options.renderedText()!==text())render('edit');
+      save();return true;
+    },
     validate:function(raw,context){try{return validate(normalize(resolve(raw,arguments.length>1?context:topologyContext)));}catch(ex){return {errors:[ex.message],warnings:[]};}},
     parse:function(){return parse(text());},
     snapshot:function(){

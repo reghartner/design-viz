@@ -5,7 +5,7 @@ const layout=steps=>({
  sectionLayout:{default:[{x:0,y:0,w:12,h:12},{panel:'state',x:0,y:12,w:12,h:7},{controls:'steps',x:0,y:19,w:12,h:5}]}
 });
 
-function source(shared){
+function source(shared,presentation){
  const steps=[
   {id:'happy-first',text:'Start the happy route',edge:'a->b',panels:{state:{state:'Happy started'}}},
   {id:'happy-middle',text:'Hidden middle delivery',edge:'b->c',panels:{state:{state:'Happy middle'}}},
@@ -22,7 +22,7 @@ function source(shared){
    {id:'alternate',label:'Alternate path',steps:['alternate-first','alternate-last']}];
  const visible=shared?['shared-first','happy-last','alternate-first','alternate-last']:
   ['happy-first','happy-last','alternate-first','alternate-last'];
- return JSON.stringify({page:{title:'Path overview editor regression',sections:[{heading:'Delivery',diagram:{
+ return JSON.stringify({page:{presentation,title:'Path overview editor regression',sections:[{heading:'Delivery',diagram:{
   view:'step',autoplay:false,
   nodes:{a:{title:'A'},b:{title:'B'},c:{title:'C'},d:{title:'D'},e:{title:'E'},narrator:{title:'Narrator'},orphan:{title:'Orphan'}},
   rows:[['a','b','c','d'],['e','narrator','orphan']],
@@ -42,8 +42,8 @@ async function expectOverview(root,edges,nodes){
  for(const id of ['a','b','c','d','e','narrator','orphan'])await expect(node(root,id)).toHaveClass(nodes.includes(id)?/\blit\b/:/^(?!.*\blit\b)/);
 }
 
-for(const shared of [false,true])test((shared?'shared timeline':'matrix')+' path chips keep the full route highlighted in the editor',async({page,server})=>{
- const input=source(shared),first=0,last=shared?3:2,alternateFirst=shared?4:3;
+for(const presentation of ['standard','explore'])for(const shared of [false,true])test(presentation+' '+(shared?'shared timeline':'matrix')+' path chips keep the full route highlighted in the editor',async({page,server})=>{
+ const input=source(shared,presentation),first=0,last=shared?3:2,alternateFirst=shared?4:3;
  await page.goto(server.origin+'/workbench.html');await paste(page,input);
  const root=page.locator('#docview .doc-sec').first();
  await expect(root.locator(shared?'.path-timeline':'.path-matrix')).toHaveCount(1);

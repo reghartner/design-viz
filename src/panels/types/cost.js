@@ -233,6 +233,7 @@ PanelRegistry.define('cost', {
   layout: {
     sectionSizing: { minWidth: 420, preferredWidth: 570, maxWidth: 1000, aspectPolicy: 'content', grow: 1 },large: true, height: 17, fallbackHeight: 17},
   styles: String.raw`
+.docview .section-layout-tile>.pt-cost{scrollbar-gutter:stable;scrollbar-width:thin}
 .cost-panel{font-size:12px;line-height:1.5;color:var(--dtext);min-width:0;container-type:inline-size;overflow-wrap:anywhere}
 .cost-basis{display:flex;flex-direction:column;gap:3px;margin-bottom:20px}
 .cost-basis>span:first-child,.cost-tag,.cost-chart-caption{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--dfaint)}
@@ -289,8 +290,9 @@ PanelRegistry.define('cost', {
 .cost-line-title{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--dink)}.cost-line-title b{font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}.cost-line-rate{font-size:9px;color:var(--dfaint);margin-top:2px}
 .cost-tradeoff{font-size:10px;margin:9px 0 0}.cost-assumptions{margin-top:13px;font-size:10px;color:var(--dfaint)}.cost-assumptions b{color:var(--dtext)}.cost-assumptions p{margin:3px 0 0}.cost-note{font-size:11px;margin:10px 0 0}
 @container(max-width:420px){.cost-routes{column-gap:8px}.cost-route{padding:12px 3px 8px}.cost-route h4{font-size:12px}.cost-total{font-size:18px}.cost-stack,.cost-gap{left:10%;width:80%}.cost-segment{font-size:11px}.cost-gap{font-size:11px}.cost-delta{gap:8px;padding:12px}.cost-delta strong{font-size:19px}.cost-delta-icon{font-size:32px}.cost-detail-routes{grid-template-columns:1fr}}
-@media print{.pt-cost{background:#fff!important;--dink:#172033;--dtext:#334155;--dfaint:#526175}.pt-cost .ptitle{color:#334155!important}.cost-routes,.cost-delta{break-inside:avoid}.cost-panel{container-type:normal}.cost-segment,.cost-node-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-` + costCompactStyles('.cost-compact') + '@container(max-width:520px){' + costCompactStyles('.cost-auto') + '}' +
+@media print{.docview .section-layout-tile>.pt-cost{scrollbar-gutter:auto;scrollbar-width:auto}.pt-cost{background:#fff!important;--dink:#172033;--dtext:#334155;--dfaint:#526175}.pt-cost .ptitle{color:#334155!important}.cost-routes,.cost-delta{break-inside:avoid}.cost-panel{container-type:normal}.cost-segment,.cost-node-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+` + costCompactStyles('.cost-compact') +
+    '/* The thin stable gutter preserves the original 520px outer breakpoint. */@container(max-width:510px){' + costCompactStyles('.cost-auto') + '}' +
     '@container(max-width:760px){.cost-panel.cost-many .cost-routes{grid-template-columns:repeat(2,minmax(0,1fr))}}',
   authoring: {
     initialFields: true,

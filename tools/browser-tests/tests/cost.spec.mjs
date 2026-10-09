@@ -79,6 +79,47 @@ test('portable cost comparison follows alternate paths, resets volume, and fits 
   await page.screenshot({path:testInfo.outputPath('cost-print.png'),fullPage:true});
 });
 
+test('narrow cost charts stay fixed when details add a scrollbar',async({page,server},testInfo)=>{
+  const raw=JSON.parse(await readFile(fixture,'utf8'));
+  raw.page.sections[0].diagram.defaultLayout='compact';
+  const input=path.join(server.root,'cost-scrollbar.json');
+  await writeFile(input,JSON.stringify(raw));
+  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'cost-scrollbar.html')]);
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(server.origin+'/cost-scrollbar.html');
+  const tile=page.locator('.section-layout-tile',{has:page.locator('.pt-cost')});
+  const card=tile.locator(':scope>.pt-cost'),panel=card.locator('.cost-panel');
+  expect(await panel.locator('.cost-plot').first().evaluate(el=>parseFloat(getComputedStyle(el).height))).toBeCloseTo(22,1);
+  await page.addStyleTag({content:'.section-layout-tile>.pt-cost{scrollbar-width:auto!important}.section-layout-tile>.pt-cost::-webkit-scrollbar{width:16px}'});
+  await tile.evaluate(el=>{
+    const card=el.querySelector('.pt-cost');
+    el.style.height=(el.offsetHeight+Math.max(0,card.scrollHeight-card.clientHeight)+1)+'px';
+    card.scrollTop=0;
+  });
+  await expect.poll(()=>card.evaluate(el=>el.scrollHeight<=el.clientHeight)).toBe(true);
+  const scrollbarReserve=()=>card.evaluate(el=>el.offsetWidth-el.clientWidth);
+  const closedReserve=await scrollbarReserve();
+  const chartGeometry=()=>panel.locator('.cost-plot').evaluateAll(elements=>elements.map(el=>{
+    const box=el.getBoundingClientRect();return {x:box.x,width:box.width};
+  }));
+  const closedCharts=await chartGeometry();
+  await panel.locator('.cost-details summary').click();
+  await expect(panel.locator('.cost-details')).toHaveAttribute('open','');
+  await expect.poll(()=>card.evaluate(el=>el.scrollHeight>el.clientHeight)).toBe(true);
+  const openReserve=await scrollbarReserve();
+  const openCharts=await chartGeometry();
+  await card.screenshot({path:testInfo.outputPath('cost-narrow-details-scrollbar.png')});
+  expect(closedReserve).toBeGreaterThanOrEqual(16);
+  expect(openReserve).toBe(closedReserve);
+  expect(openCharts,JSON.stringify({closedCharts,openCharts})).toEqual(closedCharts);
+  await panel.locator('.cost-assumptions').scrollIntoViewIfNeeded();
+  await expect(panel.locator('.cost-assumptions')).toBeInViewport();
+  await panel.locator('.cost-details summary').click();
+  await expect.poll(()=>card.evaluate(el=>el.scrollHeight<=el.clientHeight)).toBe(true);
+  expect(await chartGeometry()).toEqual(closedCharts);
+  expect(await card.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+});
+
 test('cost editor changes starting volume and rates with exact Undo/Redo',async({page,server})=>{
   const raw=JSON.parse(await readFile(fixture,'utf8'));
   raw.page.sections[0].diagram.panels[0].routes[0].label='Managed bus with regional routing and replay retention';

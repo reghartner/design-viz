@@ -1869,11 +1869,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     paths: function(){ return filteredPaths(); },
     selectPath: selectPath,
     setViewFilter:function(pathIds,stepIds){
-      var nextPaths=Array.isArray(pathIds)?pathIds.filter(function(id,n){return paths.some(function(p){return p.id===id;}) && pathIds.indexOf(id)===n;}):null;
-      if(nextPaths && !nextPaths.length)nextPaths=null;
-      var candidates=nextPaths?paths.filter(function(p){return nextPaths.indexOf(p.id)>=0;}):paths;
-      var nextSteps=Array.isArray(stepIds)?stepIds.filter(function(id,n){return stepIds.indexOf(id)===n && candidates.some(function(p){return p.indices.some(function(i){return source.steps[i].id===id;});});}):null;
-      if(nextSteps && !nextSteps.length)nextSteps=null;
+      var filter=sectionViewFilter(source,pathIds,stepIds),nextPaths=filter.paths,nextSteps=filter.steps;
       if(JSON.stringify(nextPaths)===JSON.stringify(visiblePathIds) && JSON.stringify(nextSteps)===JSON.stringify(visibleStepIds) && editingStep===null && editingPathId===null)return;
       var playing=!!timer,wasMode=mode;stopAuto();visiblePathIds=nextPaths;visibleStepIds=nextSteps;editingStep=null;editingPathId=null;
       var available=filteredPaths(),visible=available.indexOf(selectedPath)>=0?stops():[];
@@ -1938,11 +1934,6 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
 }
 
 /* ---------------- section + page renderers ---------------- */
-function diagramFocusPanel(d){
-  var panels = Array.isArray(d.panels) ? d.panels : [];
-  return panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.id === d.primaryPanel;}) ||
-    panels.find(function(p){return p && typeof p.id === 'string' && p.id && panelCapability(p.type,'focusByDefault',false);}) || null;
-}
 function createBoardGrid(sectionEl, hasPanels, primaryPanel){
   var toolbar, choices, modes;
   if (hasPanels && primaryPanel){

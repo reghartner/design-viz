@@ -17,7 +17,8 @@ test('production and prebuilt images recursively copy the diagram tree',()=>{
 });
 
 function prepareImageContext(directory){
-  for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon']){
+  for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon',
+    'examples/contract-blocks','examples/data-contract','examples/doorbell-chime','examples/independent-extraction']){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }
   fs.copyFileSync(path.join(ROOT,'LICENSE'),path.join(directory,'LICENSE'));
@@ -45,6 +46,18 @@ function prepareImageContext(directory){
   return {source,spec,manifest};
 }
 
+test('image fixture contains every literal Docker COPY source without requiring Docker',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-inputs-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  prepareImageContext(directory);
+  const dockerfile=fs.readFileSync(path.join(ROOT,'deploy/workbench/Dockerfile'),'utf8');
+  for(const line of dockerfile.split('\n').filter(line=>/^COPY\s/.test(line)&&!line.includes('--from='))){
+    for(const source of line.trim().split(/\s+/).slice(1,-1)){
+      if(!/[?*[]/.test(source))assert.ok(fs.existsSync(path.join(directory,source)),`Missing image fixture input: ${source}`);
+    }
+  }
+});
+
 test('image source fixture builds without Docker or preexisting generated arrangement inputs',t=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-source-'));
   t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
@@ -54,7 +67,13 @@ test('image source fixture builds without Docker or preexisting generated arrang
   for(const file of ['tools/arrange/generated-native.html','tools/arrange/node_modules','tools/canon/generated-runtime.cjs','workbench/flowspec.html'])
     assert.equal(fs.existsSync(path.join(directory,file)),false,file);
   execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
-  assert.match(fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8'),/id="flowview-folder-kit"/);
+  const html=fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8');
+  const envelope=JSON.parse(html.match(/<script[^>]+id="flowview-folder-kit"[^>]*>(.*?)<\/script>/s)[1]);
+  const kit=JSON.parse(require('node:zlib').gunzipSync(Buffer.from(envelope.gzip,'base64'))).files;
+  for(const file of ['examples/contract-blocks/contract-blocks.spec.json','examples/data-contract/data-contract.spec.json',
+    'examples/doorbell-chime/doorbell-chime.spec.json','examples/independent-extraction/README.md','examples/independent-extraction/before.spec.json']){
+    assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),`Offline kit reference: ${file}`);
+  }
 });
 
 test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{

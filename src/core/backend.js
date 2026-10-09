@@ -9,7 +9,7 @@ function viewerRouting(){
 function createViewerRouting(){
   return {normalize, blocksOf, sectionRecords, sectionReferences, parseHash, buildHash,
     diagramPathList, diagramForPath, pathTimelineGraph, pathTimelineRows, resolveSourceStep, stepKeys, stepFailures, stepReference,
-    diagramLayoutViews, sectionLayoutItems, foldNodeTones, foldPanelStates, layout, lintPage,
+    diagramLayoutViews, sectionLayoutItems, visibilityEvidence, foldNodeTones, foldPanelStates, layout, lintPage,
     stepNodes, stepPanelPatch, stepTonePatch, storyTimeConfig, storyTimeSequence,
     storyTimeLabel, storyBatteryConstants, storyBatteryConstantSources};
 }

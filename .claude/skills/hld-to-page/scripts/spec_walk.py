@@ -23,12 +23,16 @@ Usage:
              battery it shows); a device-app battery card is then matched to
              it through the card's `source` and that source's `node`.
   --state    after each step, print the folded state of every panel (what the
-             viewer sees). Read it at every state change.
+             engine carries). It does not prove rendered visibility. Read it at every state change.
   --expect   a checkable expectation from worksheet section I, tested against
              the folded state: path id (or * for every path that has the
              step), step id, panel id, then a dotted key. The value is JSON
              when it parses (23, true, null, "Open") and plain text otherwise.
              e.g. --expect 'offline/b-morning:phoneapp.door.value=Open'
+  Visibility expectations are separate: run tools/visibility-check.cjs with a
+  companion file; see docs/visibility-evidence.md. --expect keeps its existing
+  value-only semantics.
+
   --viz      the VIZ checkout whose engine folds the spec. Default: the
              directory four levels above this script.
 

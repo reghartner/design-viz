@@ -31,6 +31,7 @@ See the complete executable [extension fixture](../tests/fixtures/panel-extensio
 | `fold(panel, steps)` | Optional pure specialized folder returning absolute snapshots, including an initial snapshot for an empty story |
 | `storyTime(panel, states, steps, story, diagram)` | Optional pure post-fold step for time-derived fields; `story` is the path's resolved [story time](step-time.md) or null. Must return the states unchanged when it does not apply |
 | `render(host, panel, state, skin, states, stepIndex, animate)` | Describe presentation of an already-folded snapshot |
+| `visibilityEvidence(panel, state, field)` | Optional pure evidence facet; return supported/visible/reason plus trusted DOM address metadata for an internal field. Unsupported fields must say so; whole-panel content is generic. See [visibility evidence](visibility-evidence.md). |
 | `presentation` | Shared traits: `growing`, `ambientInitial`, `historyRequiresSteps` |
 | `authoring` | Template, setup/step fields, picker description/example, provenance and custom editor hooks |
 | `layout` | Default focus, focus label, control attachment, large sizing and preferred height |

@@ -195,8 +195,10 @@ test('styles and compatibility feature metadata are derived from the same added 
 test('the real build packages the added panel into viewer, editor and the headless backend without source edits', () => {
   for (const name of ['template','workbench','tools/canon','docs/diagrams/backstage','docs/diagrams/doorbell-perspectives','examples/canon/specs','diagrams/extension'])
     fs.mkdirSync(path.join(temp,name),{recursive:true});
-  for (const name of ['LICENSE','tools/build.py','tools/folder_agent_kit.py','tools/folder-agent.py','tools/widget_doc.py','tools/validate.js','tools/compatibility.js','tools/auto-arrange-spec.cjs','tools/trace2spec.js','tools/source-loader.cjs','tools/canon/library.mjs','tools/canon/manifest.cjs','tools/canon/entity-diagrams.mjs','tools/canon/registry.mjs','tools/canon/drift.mjs','tools/canon/core.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
+  for (const name of ['LICENSE','tools/build.py','tools/folder_agent_kit.py','tools/folder-agent.py','tools/widget_doc.py','tools/authoring-packet.py','tools/visibility-check.cjs','tools/validate.js','tools/compatibility.js','tools/auto-arrange-spec.cjs','tools/trace2spec.js','tools/source-loader.cjs','tools/canon/library.mjs','tools/canon/manifest.cjs','tools/canon/entity-diagrams.mjs','tools/canon/registry.mjs','tools/canon/drift.mjs','tools/canon/core.cjs','docs/diagrams/backstage/backstage.spec.json','docs/diagrams/doorbell-perspectives/doorbell-perspectives.spec.json','examples/canon/registry.json','examples/canon/specs/doorbell.json'])
     fs.copyFileSync(path.join(ROOT,name),path.join(temp,name));
+  for(const directory of ['examples/contract-blocks','examples/data-contract','examples/doorbell-chime','examples/canon/topology','examples/independent-extraction'])
+    fs.cpSync(path.join(ROOT,directory),path.join(temp,directory),{recursive:true});
   fs.copyFileSync(path.join(ROOT,'tools/compose-page-layout.cjs'),path.join(temp,'tools/compose-page-layout.cjs'));
   fs.mkdirSync(path.join(temp,'tools/arrange'),{recursive:true});
   for(const name of fs.readdirSync(path.join(ROOT,'tools/arrange')).filter(name=>/\.(?:cjs|js|json)$/.test(name)))

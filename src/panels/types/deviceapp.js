@@ -928,3 +928,15 @@ PanelRegistry.extend('deviceapp', {
     },
   },
 });
+
+/* Card evidence is derived from the same model as the renderer. The trusted
+   DOM address is metadata, never a selector supplied by an authored spec. */
+PanelRegistry.extend('deviceapp', {
+  visibilityEvidence:function(panel,state,field){
+    var model=deviceAppModel(panel,state),card=model.fields.find(function(f){return f.id===field;});
+    if(!card)return {supported:false,reason:'Unknown DeviceApp card: '+field};
+    return {supported:true,visible:model.screen==='app' && card.visible,
+      reason:model.screen!=='app'?'phoneScreen=home hides app cards':!card.visible?'Card visible=false':'App card is eligible',
+      address:{attribute:'data-da-field',value:field}};
+  }
+});

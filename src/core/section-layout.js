@@ -215,3 +215,20 @@ function sectionLayoutItems(d, target, id){
   });
   return sectionLayoutPack(items);
 }
+
+function diagramFocusPanel(d){
+  var panels = Array.isArray(d.panels) ? d.panels : [];
+  return panels.find(function(p){return p && typeof p.id === 'string' && p.id && p.id === d.primaryPanel;}) ||
+    panels.find(function(p){return p && typeof p.id === 'string' && p.id && panelCapability(p.type,'focusByDefault',false);}) || null;
+}
+/* Reader filters normalize once for playback and authoring audits. Hidden stops
+   still participate in state folding; this describes reachability only. */
+function sectionViewFilter(d,pathIds,stepIds){
+  var paths=diagramPathList(d);
+  var nextPaths=Array.isArray(pathIds)?pathIds.filter(function(id,n){return paths.some(function(p){return p.id===id;}) && pathIds.indexOf(id)===n;}):null;
+  if(nextPaths && !nextPaths.length)nextPaths=null;
+  var candidates=nextPaths?paths.filter(function(p){return nextPaths.indexOf(p.id)>=0;}):paths;
+  var nextSteps=Array.isArray(stepIds)?stepIds.filter(function(id,n){return stepIds.indexOf(id)===n && candidates.some(function(p){return p.indices.some(function(i){return d.steps[i].id===id;});});}):null;
+  if(nextSteps && !nextSteps.length)nextSteps=null;
+  return {paths:nextPaths,steps:nextSteps};
+}

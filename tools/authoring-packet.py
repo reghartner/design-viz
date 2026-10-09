@@ -176,6 +176,7 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         add(WORKFLOW, 'Phase 3: Fill the storyboard worksheet')
     add(WORKFLOW, 'Phase 4: Translate the worksheet into a spec')
     add(WORKFLOW, 'Phase 5: Validate and preview')
+    add(WORKFLOW, 'Phase 6: Self-audit against the worksheet')
     add('docs/visibility-evidence.md', 'Required author evidence before proposing')
     add('docs/visibility-evidence.md', 'Expectation format and eligibility')
     add(WORKFLOW, 'Phase 7: Deliver')

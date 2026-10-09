@@ -341,7 +341,11 @@ not that the story is right. That is the next phase.
 
 ## Phase 6: Self-audit against the worksheet
 
-Follow [self-audit](self-audit.md). In short:
+Before proposing, run this state and fidelity audit in addition to the visible-beat
+checks. For a scoped edit, audit the affected paths through all inherited steps;
+new or materially changed stories require every path. The expanded
+[self-audit](self-audit.md) is available on demand for diagnostic explanations,
+not a prerequisite read.
 
 For reference-backed topology, use the resolved Canon/Workbench preview for
 the path/state audit below. The standalone walk script expects resolved input;
@@ -369,13 +373,19 @@ path in Workbench. Ordinary local specs use the script as shown.
    the self-audit why it is correct. Add one `--expect`
    per operator anchor (for example `--expect '*/lowbatt:batt.charge=20'`);
    compare anchor times with the walk's clock column yourself.
-2. With the `--state` output, read every step where something changed state
-   (rule 8): does any panel still show the old state? Then compare the output
-   line by line with worksheet sections D to H. Every
-   mismatch is a defect in the spec or in the worksheet; fix one of them and
-   say which.
-3. Reverse audit: every edge kind, tone, notification, icon, value and link in
-   the spec must trace to a ledger row or an illustrative label.
+2. For each audited path, inspect the full folded state at every step, including
+   inherited state. At every transition (rule 8), check all panels for stale
+   banners, screen mode/reason, card value/status/detail, icons and Home device
+   states; check that the caption's claimed hops appear in that step's edge list.
+   Compare path order/endings, time and source anchors, edges, panel patches/holds,
+   tones, coverage, icons, bindings/code and expectations against the applicable
+   worksheet sections C to I and ledger rows. Fix every mismatch in the spec or
+   worksheet and record which changed.
+3. Reverse audit: walk the authored spec, not just the source or asserted beats.
+   Every edge kind, tone, notification, icon, value, number, link, Home signal
+   and subject position, binding and codeRef must trace to a ledger row or a
+   permitted illustrative label. Fix missing evidence or remove the unsupported
+   claim. Record the audited paths, checks and corrections in the ledger.
 4. Follow [visibility evidence](../../../../docs/visibility-evidence.md) for the
    required ledger mapping, supported assertions paired with value/icon checks,
    honest N/A and remaining rendered review. Do not count eligibility as pixel QA.

@@ -76,6 +76,17 @@ class AuthoringPacketTests(unittest.TestCase):
             text, meta = packet.generate(['state'], ['steps'], mode=mode)
             sources = [(item['path'], item['section']) for item in meta['provenance']]
             self.assertIn((packet.WORKFLOW, 'The rules that matter most'), sources)
+            audit_heading = 'Phase 6: Self-audit against the worksheet'
+            self.assertIn((packet.WORKFLOW, audit_heading), sources)
+            audit = packet.normalize_links(packet.section((ROOT / packet.WORKFLOW).read_text(), audit_heading), packet.WORKFLOW)
+            self.assertIn(audit, text)  # Preserve the whole maintained audit, not just its route/title.
+            for requirement in ('full folded state at every step', 'check all panels for stale',
+                                'worksheet sections C to I and ledger rows',
+                                'Every edge kind, tone, notification, icon, value, number, link',
+                                'must trace to a ledger row', 'audit the affected paths through all inherited steps'):
+                self.assertIn(requirement, audit)
+            self.assertNotIn((packet.REFS + 'self-audit.md', None), sources)
+
             self.assertIn(('docs/visibility-evidence.md', 'Required author evidence before proposing'), sources)
             self.assertIn(('docs/visibility-evidence.md', 'Expectation format and eligibility'), sources)
             self.assertNotIn((packet.WORKFLOW, None), sources)
@@ -157,6 +168,9 @@ class AuthoringPacketTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             meta = json.loads(Path(str(output) + '.json').read_text())
             self.assertEqual(meta['selected']['panels'], ['deviceapp'])
+            self.assertIn('## Phase 6: Self-audit against the worksheet', output.read_text())
+            self.assertIn('full folded state at every step', output.read_text())
+            self.assertIn('must trace to a ledger row', output.read_text())
             self.assertTrue((kit / 'contract/authoring-contract.md').is_file())
             self.assertTrue((kit / '.claude/skills/hld-to-page/references/worked-example.md').is_file())
             types = packet.load_sections((kit / packet.CONTRACT).read_text())[3]

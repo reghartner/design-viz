@@ -20,9 +20,9 @@ stay intact. In Home view, you can also expand **Data flow** below for a quick
 look at the supporting diagram.
 
 If the section has a saved arrangement, its named layout replaces Home in the
-view switch. In the workbench, clear **Chapter → Show diagram in this chapter**
+view switch. In the workbench, clear **View → Show diagram in this view**
 to save a view with the map, other panels and timeline visible while hiding the
-diagram. Name it with **Chapter → Chapter name**; see
+diagram. Name it with **View → View name**; see
 [section layouts](section-layouts.md).
 
 Home view keeps the map as large as its height limit allows (70% of the

@@ -6,7 +6,7 @@ export interface DetailViewState {
   size?: string;
   focus?: string;
   layout?: string;
-  /** @deprecated Diagram visibility is authored per chapter. Ignored on restore. */
+  /** @deprecated Diagram visibility is authored per View. Ignored on restore. */
   diagramVisible?: boolean;
 }
 export interface DetailNavigation {

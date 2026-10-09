@@ -6,7 +6,7 @@ into detail, and follow service/code links without opening the editor. Browser
 Back and Forward navigate between the library, reader, and workbench; reloading
 a reader restores its selected diagram from the published index and its selected spec.
 
-**Edit in Workbench** opens a local editable copy at the chapter, view, playback
+**Edit in Workbench** opens a local editable copy at the section, View, playback
 mode, path, and step currently shown in the reader through the normal import
 transaction, with a fresh Undo/Redo history. Browser Back returns to the same reader position.
 If a published update removes that position, the reader and copy use the
@@ -42,10 +42,10 @@ entry makes an old link unavailable.
 Unknown IDs or a missing published snapshot show an error with Retry.
 
 The toolbar **Copy link** shares the document at its authored opening state.
-The chain-link controls beside tabs, chapters, steps, and contract cards keep
+The chain-link controls beside tabs, Views, steps, and contract cards keep
 the same `?diagram=…` document route and add the current composed reader state;
-those links open directly at that target and survive reloads. A chapter link in
-the hosted reader is a normal chapter target. Use a hosted standalone export
+those links open directly at that target and survive reloads. A View link in
+the hosted reader is a normal section/View target. Use a hosted standalone export
 when you specifically need its chrome-free `#embed=…` mode.
 The bundled fictional demo remains available from the library when no snapshot
 exists, but has no public Copy link. Direct `?diagram=…` links never substitute

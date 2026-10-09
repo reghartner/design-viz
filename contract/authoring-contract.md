@@ -57,6 +57,10 @@ for supported capabilities, CI checks and the company fork release workflow.
 ```
 
 - `title` — page heading. Required in practice; short.
+- `presentation` — optional `"standard"` or `"explore"` for sections outside tabs;
+  omission means Standard. Each tab may declare its own `presentation`, applying
+  to all its sections and saved Views. Tab omission means Standard independently
+  of the page setting. Bare diagrams use top-level `presentation`.
 - `generatedFrom` — optional page provenance, shown as one quiet line directly
   under the title and included in print. It usually identifies a Confluence
   page and its version. `url` is required for the line to render; `http`/`https`
@@ -1377,8 +1381,9 @@ perspectives" of one timeline). Types:
   With a saved `diagram.sectionLayout`, the custom arrangement replaces the
   Home choice. Set `diagram.layoutName` to a nonempty string of up to 40
   characters to name that view (default **Layout**); **Data flow** remains the
-  second choice. Hide/Show data flow is a temporary reader control within the
-  arrangement and keeps panels and step controls visible. For several named
+  second choice. Diagram visibility is saved per View. Use **View → Show diagram
+  in this view** in the workbench; readers retain the authored visibility while
+  panels and step controls remain available. For several named
   arrangements, use `diagram.layouts:[{id,name,sectionLayout}]` and optional
   `diagram.defaultLayout` (an ID, otherwise the first layout). Each view owns
   its host profiles; tile `hidden:true` hides a panel or diagram in that view.
@@ -1389,11 +1394,15 @@ perspectives" of one timeline). Types:
   arrangement edit migrates all sibling profiles together exactly once.
   See [section layouts](../docs/section-layouts.md) for examples. Contract-block
   spans remain on their separate 12-column grid; Explore coordinates are unchanged.
-  Optional `layouts[].presentation` is `"standard"` (the default when omitted)
-  or `"explore"`. Standard retains the authored arrangement. Explore provides a
+  Optional `tabs[].presentation` is `"standard"` (the default when omitted)
+  or `"explore"`, and applies to every section and saved View in that tab.
+  Sections outside tabs use `page.presentation`; bare diagrams use top-level
+  `presentation`. A View selection never changes this owner mode. Legacy
+  `layouts[].presentation` is accepted but ignored; there is no automatic migration.
+  Standard retains the authored arrangement. Explore provides a
   full-height graph with independently draggable, resizable, hideable floating
   panels and step controls that default to viewport-pinned Floating placement.
-  Each chapter can instead place the controls On canvas. Section paragraphs and nested bullets share
+  Each View can instead place the controls On canvas. Section paragraphs and nested bullets share
   one floating **Section notes** window; it contains only prose, while the graph
   stays the full Explore canvas. `layouts[].exploreLayout.prose` optionally saves
   its `x/y/w/h` viewport fractions, `stacked` flag and `hidden` flag. Supply all four
@@ -1409,7 +1418,7 @@ perspectives" of one timeline). Types:
   in the workbench with Undo; reader changes remain temporary. The setting belongs to the view across all
   host profiles; reader panel movement and sizing do not rewrite the spec.
 
-  An Explore chapter can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
+  A View in an Explore tab or page can set `exploreLayout.panelPlacement` to `"canvas"` (On canvas)
   or `"floating"` (default). Preserve the separate Floating rectangles when authoring
   canvas placement. Store graph rectangles in `exploreLayout.canvas.panels` as
   `{panel,x,y,w,h}` and notes in `.canvas.prose` as `{x,y,w,h}`. Graph coordinates
@@ -1419,10 +1428,10 @@ perspectives" of one timeline). Types:
   continues to affect Floating objects and viewport playback only. Optional
   `canvas.controlsScale` (0.5–1.25) independently sizes Floating playback while
   canvas objects are present; omission inherits the Floating scale. Panel visibility
-  uses the chapter's sectionLayout items; notes visibility uses
+  uses the View’s sectionLayout items; notes visibility uses
   `exploreLayout.prose.hidden`. Independently set `exploreLayout.controlsPlacement`
   to `"floating"` (default, viewport pinned) or `"canvas"`. The Panels menu and
-  step-controls inspector expose this per-chapter choice. Keep the Floating
+  step-controls inspector expose this per-View choice. Keep the Floating
   rectangle in `exploreLayout.controls` as viewport fractions and store a separate
   `{x,y,w,h}` graph rectangle in `exploreLayout.canvas.controls`, using the bounds
   above. Preserve both rectangles across placement changes. On-canvas controls

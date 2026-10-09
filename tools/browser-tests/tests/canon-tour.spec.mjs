@@ -114,7 +114,7 @@ test('the offline Canon example shares the complete default tour and its styling
 });
 
 test('Canon Explore fills the browser and retires its canvas before editing the story',async({page,server})=>{
-  const data=library(),d=data.diagrams[0].spec.page.blocks[0].diagram;
+  const data=library(),d=data.diagrams[0].spec.page.blocks[0].diagram;data.diagrams[0].spec.page.presentation='explore';
   d.layouts.push({...structuredClone(d.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});d.defaultLayout='explore';
   await publish(page,data);await page.goto(server.origin+'/workbench.html');await paste(page,source);
   await page.locator('#workspace-home').click();await openReader(page);

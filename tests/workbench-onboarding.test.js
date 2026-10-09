@@ -13,7 +13,7 @@ test('the shared example and every tour chapter validate against the shipped con
   const c=harness(),raw=JSON.parse(fs.readFileSync('src/starters/onboarding.json','utf8'));
   const findings=c.validate(c.normalize(raw));assert.deepEqual(plain(findings),{errors:[],warnings:[]});
   const layouts=raw.page.sections[0].diagram.layouts,explore=layouts.find(layout=>layout.id==='explore');
-  assert.equal(explore.name,'System flow');assert.equal(explore.presentation,'explore');
+  assert.equal(explore.name,'System flow');assert.equal(raw.page.presentation,'standard');assert.equal(explore.presentation,undefined);
   assert.equal(raw.page.sections[0].diagram.defaultLayout,'story');
   for(const chapter of ['viewer','agent','manual'])assert.deepEqual(plain(c.tourLintConfig(c.workbenchPracticeLessons(chapter))),[]);
   assert.deepEqual(plain(c.FlowCanon.catalog(c.workbenchTourCatalog()).services.map(s=>s.title)),['Event service','Notifications','Recording service']);

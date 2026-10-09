@@ -528,6 +528,10 @@ function validate(page){
   if (errors.length) return {errors:errors, warnings:warnings};
   if (typeof FlowviewCompatibility !== 'undefined') warnings = warnings.concat(FlowviewCompatibility.metadataWarnings(page));
   if (typeof FlowCanon !== 'undefined') errors = errors.concat(FlowCanon.validate(page));
+  function presentation(value,path){if(value!==undefined && value!=='standard' && value!=='explore')warnings.push(path+': use standard or explore; omitted values use Standard');}
+  presentation(page.presentation,'page.presentation');
+  var presentationBlocks=page.blocks || page.sections;
+  (Array.isArray(presentationBlocks)?presentationBlocks:[]).forEach(function(block,index){if(block && Array.isArray(block.tabs))block.tabs.forEach(function(tab,i){if(tab)presentation(tab.presentation,(page.blocks?'blocks':'sections')+'['+index+'].tabs['+i+'].presentation');});});
   var blocks = blocksOf(page);
   if (!blocks.length){
     errors.push('page.blocks: required — provide at least one section or tabs block');

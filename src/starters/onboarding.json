@@ -450,7 +450,6 @@
             {
               "id": "explore",
               "name": "System flow",
-              "presentation": "explore",
               "sectionLayout": {
                 "default": [
                   {
@@ -571,6 +570,7 @@
           ]
         }
       }
-    ]
+    ],
+    "presentation": "standard"
   }
 }

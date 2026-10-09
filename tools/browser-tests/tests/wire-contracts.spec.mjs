@@ -8,7 +8,7 @@ function fixture(canvas=false){
  const contract=(title,edge,path)=>({title,source:'#source',fields:[{k:'event',v:title,g:'Stable **payload** identity.',link:'#source'},{k:'later',v:'Later',revealAt:1}],wires:[{step:'send',edge,...(path?{path}: {})}]});
  const sec={heading:'Wire story',contract:contract('Request','a->b'),contracts:[contract('Audit','a->b'),contract('Receipt','b->c','happy')],diagram:{nodes:{a:{title:'Device'},b:{title:'Cloud'},c:{title:'Storage'}},rows:[['a','b','c']],edges:[{from:'a',to:'b'},{from:'b',to:'c'}],steps:[{id:'send',edges:['a->b','b->c'],text:'Send the request and receipt.'},{id:'done',edge:'a->b',text:'Done.'}],paths:[{id:'happy',label:'Happy',steps:['send','done']},{id:'alternate',label:'Alternate',steps:['send','done']}],view:'step',autoplay:false}};
  if(canvas){sec.diagram.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];sec.diagram.defaultLayout='canvas';}
- return {page:{title:'Step wire contracts',skin:'pastel',blocks:[{tabs:[{label:'Flow',sections:[sec]},{label:'Other',sections:[{heading:'Other section',text:'Nothing on this wire.'}]}]}]}};
+ return {page:{title:'Step wire contracts',skin:'pastel',blocks:[{tabs:[{label:'Flow',presentation:canvas?'explore':'standard',sections:[sec]},{label:'Other',sections:[{heading:'Other section',text:'Nothing on this wire.'}]}]}]}};
 }
 async function open(page,server,raw,native=false){
  if(native){

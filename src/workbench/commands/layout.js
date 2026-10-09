@@ -397,24 +397,16 @@ function planSectionLayoutName(text,raw,section,name,layoutId){
   return planSetField(text,raw,got.path,'layoutName',name.trim()?JSON.stringify(name.trim()):null);
 }
 function planSectionViewPresentation(text,raw,section,layoutId,value){
-  var got=builderDiagram(text,raw,section);if(got.error)return got;
-  if(value!=='standard' && value!=='explore')return {error:'Choose Standard or Explore for this view.'};
-  if(!Array.isArray(got.d.layouts)){
-    if(value==='standard')return {error:'This view already uses Standard presentation.'};
-    var selected,plan=builderRewrite(text,raw,got.path,function(d){
-      selected=builderPromoteSectionViews(d,layoutId);if(selected.error)return selected;
-      d.layouts.find(function(v){return v.id===selected.layoutId;}).presentation=value;
-    });
-    if(!plan.error)plan.layoutId=selected.layoutId;return plan;
-  }
-  var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
-  if(index<0)return {error:'Select a named view before changing its presentation.'};
-  var plan=planSetField(text,raw,got.path.concat(['layouts',index]),'presentation',JSON.stringify(value));
-  if(!plan.error)plan.layoutId=layoutId;return plan;
+  var path=builderPresentationPath(raw,section);
+  if(!path)return {error:'Select a section before changing its tab or page mode.'};
+  if(value!=='standard' && value!=='explore')return {error:'Choose Standard or Explore.'};
+  var plan=planSetField(text,raw,path,'presentation',JSON.stringify(value));
+  if(!plan.error)plan.layoutId=layoutId || 'flow';return plan;
 }
-/* A chapter-level visibility choice applies to every saved host profile.
+
+/* A View visibility choice applies to every saved host profile.
    Keep tile geometry and profile-specific panel visibility intact. Legacy
-   choices become named chapters through the same promotion as Viewing mode. */
+   choices become named Views when saved visibility is authored. */
 function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   if(typeof visible!=='boolean')return {error:'Choose whether to show the diagram.'};
@@ -424,7 +416,7 @@ function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
       selected=promoted.layoutId;
     }
     var view=d.layouts.find(function(v){return v.id===selected;});
-    if(!view)return {error:'Reselect the chapter before changing diagram visibility.'};
+    if(!view)return {error:'Reselect the view before changing diagram visibility.'};
     var profiles=builderSectionLayout24(view.sectionLayout);
     if(!Array.isArray(profiles.default))profiles.default=sectionLayoutItems(d,'default',selected) || sectionLayoutPreset(d,'default');
     view.sectionLayout=profiles;
@@ -440,7 +432,7 @@ function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
 function planSectionExploreLayout(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;
-  if(index<0 || got.d.layouts[index].presentation!=='explore')return {error:'Select an Explore view before arranging it.'};
+  if(index<0 || got.presentation!=='explore')return {error:'Select an Explore view before arranging it.'};
   var warnings=[];
   if(value!==null)sectionExploreLayout(got.d,value,warnings,'exploreLayout');
   if(warnings.length)return {error:warnings.join('\n')};
@@ -483,7 +475,7 @@ function builderPromoteSectionViews(d,layoutId){
 }
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
-  if(Array.isArray(got.d.layouts))return {error:'This diagram already has Chapters.'};
+  if(Array.isArray(got.d.layouts))return {error:'This diagram already has Views.'};
   return builderRewrite(text,raw,got.path,function(d){
     builderEnsureSectionView(d);
     if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
@@ -681,7 +673,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
   if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose an alignment direction.'};
   if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Use Free placement for every selected node before aligning.'};
   var view=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
-  if(targets.some(function(t){return t.kind==='panel';}) && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
+  if(targets.some(function(t){return t.kind==='panel';}) && (!view || got.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
   if(anchorIndex==null)anchorIndex=0;
   if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
@@ -746,7 +738,7 @@ function builderMovableSpatial(text,raw,targets,layoutId,rects){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
   if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Row nodes follow the row layout. Use Free placement for every selected node to move or distribute them.'};
   var definition=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
-  if(targets.some(function(t){return t.kind==='panel';}) && (!definition || definition.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};
+  if(targets.some(function(t){return t.kind==='panel';}) && (!definition || got.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before moving them.'};
   return got;
 }

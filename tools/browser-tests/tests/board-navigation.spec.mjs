@@ -29,7 +29,7 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
     execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'navigation.html')]);
     await page.goto(server.origin+'/navigation.html');
   }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
-  const board=page.locator('.board');await expect(board).toBeVisible();
+  const board=page.locator('.board:visible');await expect(board).toBeVisible();
   await board.getByRole('button',{name:'Zoom in',exact:true}).focus();
   const before=await width(board),height=(await board.boundingBox()).height,pageY=await page.evaluate(()=>scrollY);
   await board.getByRole('button',{name:'Zoom in',exact:true}).click();
@@ -41,12 +41,12 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x-80,p.y-65,{steps:8});await page.mouse.up();
   const dragged=await scroll(board);expect(dragged.x).toBeGreaterThan(start.x+50);expect(dragged.y).toBeGreaterThan(start.y+40);
   const q=await background(board);await page.mouse.move(q.x,q.y);await page.mouse.down();await page.mouse.move(q.x+40,q.y+30,{steps:4});
-  await page.keyboard.press('Escape');await page.mouse.up();expect(await scroll(board)).toEqual(dragged);
+  await reader.getByRole('tab',{name:'Standard',exact:true}).click();await page.mouse.up();expect(await scroll(board)).toEqual(dragged);
   const preWheel=await width(board);const w=await background(board);await page.mouse.move(w.x,w.y);await page.keyboard.down('Control');await page.mouse.wheel(0,-30);await page.keyboard.up('Control');
   await expect.poll(()=>width(board)).toBeGreaterThan(preWheel);expect(await page.evaluate(()=>scrollY)).toBe(pageY);
   if(surface==='workbench'){
     await expect(page.locator('#src')).toHaveValue(text);
-    const zoomed=await width(board);const edited=text.replace('Regular navigation','Renamed navigation');
+    const zoomed=await width(board);const edited=(await page.locator('#src').inputValue()).replace('Regular navigation','Renamed navigation');
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(edited);await page.locator('#go').click();await closeTools(page);
     await expect(page.getByRole('heading',{name:'Renamed navigation',exact:true})).toBeVisible();
     expect(await width(board)).toBeCloseTo(zoomed,0);
@@ -69,22 +69,23 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
   const raw=spec(),d=raw.page.sections[0].diagram;
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}},
     {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:20}]}}];d.defaultLayout='standard';
+  const standardSection=raw.page.sections[0],exploreSection=structuredClone(standardSection);exploreSection.id='explore-services';raw.page.sections=[{tabs:[{label:'Standard',sections:[standardSection]},{label:'Explore',presentation:'explore',sections:[exploreSection]}]}];
   const text=JSON.stringify(raw);await page.setViewportSize({width:1200,height:1000});
   if(surface==='standalone'){
     const input=path.join(server.root,'navigation-views.json');await writeFile(input,text);
     execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'navigation-views.html')]);
     await page.goto(server.origin+'/navigation-views.html');
   }else{await page.goto(server.origin+'/workbench.html');await paste(page,text);await prepareEditorSurface(page);}
-  const board=page.locator('.board');
+  const board=page.locator('.board:visible');
   await board.getByRole('button',{name:'Zoom in',exact:true}).click();await board.getByRole('button',{name:'Zoom in',exact:true}).click();
   await board.evaluate(el=>{el.scrollLeft=120;el.scrollTop=140;});
   const initial={width:await width(board),scroll:await scroll(board)};
   for(const edit of [false,true]){
-    await page.getByRole('button',{name:'Explore',exact:true}).click();
+    await page.getByRole('tab',{name:'Explore',exact:true}).click();
     await page.getByRole('button',{name:'Fit diagram',exact:true}).click();
     await board.evaluate(el=>{el.scrollLeft+=300;el.scrollTop+=400;});
     if(edit && surface==='workbench'){
-      const edited=text.replace('Regular navigation','Renamed navigation');
+      const edited=(await page.locator('#src').inputValue()).replace('Regular navigation','Renamed navigation');
       // Render through the same public editor action while the reading surface
       // owns fullscreen; do not switch to Standard before snapshotting.
       await page.locator('#src').evaluate((el,text)=>{el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));},edited);
@@ -93,8 +94,8 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
       await expect(page.getByRole('heading',{name:'Renamed navigation',exact:true,includeHidden:true})).toHaveCount(1);
       await expect(board).toHaveClass(/explore-board/);
     }
-    await page.getByRole('button',{name:'Standard',exact:true}).click();
-    expect(await width(board)).toBeCloseTo(initial.width,0);expect(await scroll(board)).toEqual(initial.scroll);
+    await page.getByRole('tab',{name:'Standard',exact:true}).click();
+    expect(await width(board)).toBeCloseTo(initial.width,0);expect(await scroll(board),'after source edit='+edit).toEqual(initial.scroll);
   }
 });
 
@@ -105,16 +106,17 @@ for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Stand
   const tiles=[{x:0,y:0,w:12,h:16},{panel:'below',x:0,y:22,w:12,h:20}];
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:tiles}},
     {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:tiles}}];d.defaultLayout='standard';
+  const standardSection=raw.page.sections[0],exploreSection=structuredClone(standardSection);exploreSection.id='explore-services';raw.page.sections=[{tabs:[{label:'Standard',sections:[standardSection]},{label:'Explore',presentation:'explore',sections:[exploreSection]}]}];
   const input=path.join(server.root,'scroll-boundary.json'),output=path.join(server.root,'scroll-boundary.html');
   await writeFile(input,JSON.stringify(raw));
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
   await page.setViewportSize({width:1280,height:800});
   let reader=page;
   if(embedded){
-    await writeFile(path.join(server.root,'scroll-host.html'),'<!doctype html><style>body{margin:0}iframe{display:block;width:100%;height:740px;border:0}</style><iframe title="Embedded reader" src="scroll-boundary.html#embed=services&tour=0"></iframe>');
+    await writeFile(path.join(server.root,'scroll-host.html'),'<!doctype html><style>body{margin:0}iframe{display:block;width:100%;height:740px;border:0}</style><iframe title="Embedded reader" src="scroll-boundary.html#tour=0"></iframe>');
     await page.goto(server.origin+'/scroll-host.html');reader=page.frameLocator('iframe');
   }else await page.goto(server.origin+'/scroll-boundary.html#tour=0');
-  const board=reader.locator('.board'),panel=reader.locator('[data-dv-panel="0"]');
+  const board=reader.locator('.board:visible'),panel=reader.locator('[data-dv-panel="0"]:visible');
   const pageY=()=>reader.locator('body').evaluate(()=>scrollY);
   const resetPage=()=>reader.locator('body').evaluate(()=>scrollTo(0,0));
   const point=async()=>{const b=await board.boundingBox();return {x:b.x+b.width*.7,y:b.y+Math.min(b.height*.5,240)};};
@@ -156,10 +158,10 @@ for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Stand
   await expect.poll(pageY).toBeLessThan(before-200);expect(await pageY()).toBeGreaterThanOrEqual(before-300);
   await board.evaluate(el=>{document.querySelector('[data-wheel-top-spacer]').remove();el.scrollLeft=0;el.scrollTop=el.scrollHeight;});
   const camera={width:await width(board),scroll:await scroll(board)};
-  await resetPage();await reader.getByRole('button',{name:'Explore',exact:true}).click();
+  await resetPage();await reader.getByRole('tab',{name:'Explore',exact:true}).click();
   await expect(board).toHaveClass(/explore-board/);
   await expect(board).toHaveCSS('overscroll-behavior-y','contain');
-  await reader.getByRole('button',{name:'Standard',exact:true}).click();
+  await reader.getByRole('tab',{name:'Standard',exact:true}).click();
   expect(await width(board)).toBeCloseTo(camera.width,0);expect(await scroll(board)).toEqual(camera.scroll);
   await expect(reader.locator('body')).not.toHaveClass(/viewer-exploring/);
   await resetPage();p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,600);
@@ -180,9 +182,10 @@ test('workbench Standard board routes vertical-dominant wheel at its boundary to
   d.layouts=[{id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[
     {x:0,y:0,w:12,h:16},{panel:'below',x:0,y:22,w:12,h:20}
   ]}}];d.defaultLayout='standard';
+  const standardSection=raw.page.sections[0],exploreSection=structuredClone(standardSection);exploreSection.id='explore-services';raw.page.sections=[{tabs:[{label:'Standard',sections:[standardSection]},{label:'Explore',presentation:'explore',sections:[exploreSection]}]}];
   await page.setViewportSize({width:1280,height:800});
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await prepareEditorSurface(page);await closeTools(page);
-  const board=page.locator('.board'),workspace=page.locator('.workmain'),panel=page.locator('[data-dv-panel="0"]');
+  const board=page.locator('.board:visible'),workspace=page.locator('.workmain'),panel=page.locator('[data-dv-panel="0"]:visible');
   const workspaceY=()=>workspace.evaluate(el=>el.scrollTop);
   await expect(panel).not.toBeInViewport();
   for(let i=0;i<4;i++)await board.getByRole('button',{name:'Zoom in',exact:true}).click();

@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
-function fixture(row=false){return {page:{title:'Spatial edit',skin:'pastel',sections:[{heading:'Explore objects',diagram:{autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Second'}},rows:row?[['a','b']]:[[]],floats:row?[]:[{id:'a',x:180,y:100},{id:'b',x:500,y:320}],edges:[{from:'a',to:'b'}],panels:[{id:'p',type:'state',title:'Canvas status',states:['Ready'],initial:{state:'Ready'}},{id:'q',type:'state',title:'Floating status',states:['Ready'],initial:{state:'Ready'}}],layouts:[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{panel:'p',x:8,y:0,w:4,h:4},{panel:'q',x:8,y:4,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',panelPlacements:[{panel:'q',placement:'floating'}],canvas:{panels:[{panel:'p',x:700,y:80,w:240,h:400}]}}}]}}]}};}
+function fixture(row=false){return {page:{presentation:'explore',title:'Spatial edit',skin:'pastel',sections:[{heading:'Explore objects',diagram:{autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Second'}},rows:row?[['a','b']]:[[]],floats:row?[]:[{id:'a',x:180,y:100},{id:'b',x:500,y:320}],edges:[{from:'a',to:'b'}],panels:[{id:'p',type:'state',title:'Canvas status',states:['Ready'],initial:{state:'Ready'}},{id:'q',type:'state',title:'Floating status',states:['Ready'],initial:{state:'Ready'}}],layouts:[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{panel:'p',x:8,y:0,w:4,h:4},{panel:'q',x:8,y:4,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',panelPlacements:[{panel:'q',placement:'floating'}],canvas:{panels:[{panel:'p',x:700,y:80,w:240,h:400}]}}}]}}]}};}
 async function open(page,server,row=false,skin='pastel'){await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');const raw=fixture(row);raw.page.skin=skin;await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await page.locator('#workspace-fit').click();await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
 const node=page=>page.locator('[data-dv-node=a]');
 const panel=page=>page.locator('[data-explore-panel=p]');
@@ -89,7 +89,7 @@ test('Reader and Backstage keep native context menus and have no marquee editing
 
 test('Standard Reader and Backstage nodes keep native context menus and no workbench selection chrome',async({page,server})=>{
  for(const host of ['reader','backstage']){
-  const raw=fixture();raw.page.sections[0].diagram.layouts[0].presentation='standard';
+  const raw=fixture();raw.page.presentation='standard';
   if(host==='reader'){
    const input=path.join(server.root,'standard-spatial-reader.json'),output=path.join(server.root,'standard-spatial-reader.html');await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);await page.goto(server.origin+'/standard-spatial-reader.html');
   }else{

@@ -12,13 +12,14 @@ function harness() {
   let nextTimer = 0, document;
   function element(tag = 'div') {
     const events = new Map(), attrs = {}, classes = new Set();
-    const node = {tag, events, children: [], parentNode: null, hidden: false, style: {setProperty() {}, removeProperty() {}},
-      className: '', offsetWidth: 260, offsetHeight: 40, focusCount: 0,
+    const node = {tag, events, children: [], parentNode: null, hidden: false, style: {setProperty() {}, removeProperty() {}, getPropertyValue(){return '';}},
+      viewBox:{baseVal:{width:100,height:100}},className: '', offsetWidth: 260, offsetHeight: 40, focusCount: 0,
       classList: {add: name => classes.add(name), remove: name => classes.delete(name),
         contains: name => classes.has(name), toggle(name, on) { if (on) classes.add(name); else classes.delete(name); }},
       addEventListener(type, fn) { if (!events.has(type)) events.set(type, new Set()); events.get(type).add(fn); },
       removeEventListener(type, fn) { events.get(type)?.delete(fn); },
       count(type) { return type ? (events.get(type)?.size || 0) : [...events.values()].reduce((sum, set) => sum + set.size, 0); },
+      dispatchEvent(ev){node.emit(ev.type,ev);return true;},
       emit(type, fields = {}) {
         const ev = {type, target: node, relatedTarget: null, preventDefault() {}, stopPropagation() {}, ...fields};
         for (const fn of [...(events.get(type) || [])]) fn(ev);
@@ -29,6 +30,7 @@ function harness() {
       insertBefore(child, reference) { if (reference == null) return node.appendChild(child); child.remove(); const i=node.children.indexOf(reference); if(i<0)throw new Error('Reference is not a child'); child.parentNode=node; node.children.splice(i,0,child); return child; },
       remove() { if (node.parentNode) node.parentNode.children = node.parentNode.children.filter(child => child !== node); node.parentNode = null; },
       replaceChildren() { for (const child of [...node.children]) child.remove(); },
+      closest(){return null;},
       contains(target) { return target === node || node.children.some(child => child.contains(target)); },
       querySelectorAll(selector) {
         const matches = candidate => selector[0] === '.' ? candidate.className.split(' ').includes(selector.slice(1)) : candidate.tag === selector;
@@ -63,7 +65,7 @@ function harness() {
   document.createElement = element;
   document.getElementById = () => null;
   const window = Object.assign(element('window'), {innerWidth: 1200, innerHeight: 800});
-  const c = vm.createContext({document, window, URL,
+  const c = vm.createContext({document, window, URL,CustomEvent:class{constructor(type,options){this.type=type;Object.assign(this,options);}},
     setTimeout(fn, delay) { const id = nextTimer++; timers.set(id, {fn, delay}); return id; },
     clearTimeout: id => timers.delete(id),
   });

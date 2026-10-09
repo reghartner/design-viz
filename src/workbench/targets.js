@@ -99,7 +99,7 @@ function builderDiagram(text, raw, sectionIdx){
   if (!rec) return {error: 'no section to insert into — click a section first'};
   if (!jsonLocate(text, rec.diagram))
     return {error: 'this section has no diagram yet — add "diagram": {"nodes": {...}, "rows": [[...]]} inside it first'};
-  return {path: rec.diagram, d: specValueAt(raw, rec.diagram)};
+  return {path: rec.diagram, d: specValueAt(raw, rec.diagram),presentation:(specValueAt(raw,builderPresentationPath(raw,sectionIdx)) || {}).presentation==='explore'?'explore':'standard'};
 }
 
 function builderTabPath(raw, blockIdx, tabIdx){
@@ -111,4 +111,10 @@ function builderTabPath(raw, blockIdx, tabIdx){
   var block = (page[key] || [])[blockIdx];
   if (!block || !Array.isArray(block.tabs) || !block.tabs[tabIdx]) return null;
   return base.concat([key, blockIdx, 'tabs', tabIdx]);
+}
+
+function builderPresentationPath(raw,section){
+  var rec=specSectionPaths(raw)[section];if(!rec)return null;
+  var tabs=rec.section.indexOf('tabs');
+  return tabs>=0?rec.section.slice(0,tabs+2):raw && raw.page?['page']:[];
 }

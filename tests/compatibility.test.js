@@ -12,7 +12,7 @@ const spec=()=>({page:{contract:'1',title:'Compatibility test',blocks:[{tabs:[{l
 }]}]}]}});
 const plain=v=>JSON.parse(JSON.stringify(v));
 test('saved Explore scale declares a capability so older viewers can report it',()=>{
-  const raw={page:{sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[{id:'engineering',presentation:'explore',exploreLayout:{overlayScale:.75}}]}}]}};
+  const raw={page:{presentation:'explore',sections:[{diagram:{nodes:{a:{}},rows:[['a']],layouts:[{id:'engineering',presentation:'explore',exploreLayout:{overlayScale:.75}}]}}]}};
   assert.ok(C.detect(raw).includes('layout.explore-scale'));
   const stamped=C.stamp(raw),available={...C.features};delete available['layout.explore-scale'];
   assert.ok(C.check(stamped,{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-scale'));
@@ -162,7 +162,10 @@ test('Explore named views advertise their capability without requiring it for St
   for(const presentation of [undefined,'standard','unknown']){
     d.layouts[0].presentation=presentation;assert.ok(!C.detect(raw).includes('layout.explore'));
   }
-  d.layouts[0].presentation='explore';assert.ok(C.detect(raw).includes('layout.explore'));
+  d.layouts[0].presentation='explore';assert.ok(!C.detect(raw).includes('layout.explore'));
+  raw.page.blocks[0].tabs[0].presentation='explore';assert.ok(C.detect(raw).includes('layout.explore'));assert.ok(C.detect(raw).includes('layout.document-presentation'));
+  const oldModeFeatures={...C.features};delete oldModeFeatures['layout.document-presentation'];
+  assert.deepEqual(plain(C.check(C.stamp(raw),{version:C.version,contract:'1',features:oldModeFeatures}).missingFeatures),['layout.document-presentation']);
   const stamped=C.stamp(raw);assert.ok(stamped.page.flowview.features.includes('layout.explore'));
   const older={...C.features};delete older['layout.explore'];
   const result=C.check(stamped,{version:C.version,contract:'1',features:older});
@@ -183,7 +186,7 @@ test('view-specific paths advertise their capability independently of step subse
 test('floating prose declares a capability for content or saved per-view defaults, including tab sections',()=>{
   const raw=spec(),section=raw.page.blocks[0].tabs[0].sections[0],view=section.diagram.layouts[0];
   section.text=['Explanation'];assert.ok(!C.detect(raw).includes('layout.explore-prose'));
-  view.presentation='explore';assert.ok(C.detect(raw).includes('layout.explore-prose'));
+  raw.page.blocks[0].tabs[0].presentation='explore';assert.ok(C.detect(raw).includes('layout.explore-prose'));
   const available={...C.features};delete available['layout.explore-prose'];
   assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('layout.explore-prose'));
   delete section.text;assert.ok(!C.detect(raw).includes('layout.explore-prose'));

@@ -5,7 +5,7 @@ import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function spec(){
- return {page:{title:'Link controls',skin:'pastel',blocks:[{tabs:[{label:'Story',sections:[{
+ return {page:{title:'Link controls',skin:'pastel',blocks:[{tabs:[{label:'Story',presentation:'standard',sections:[{
   id:'delivery',heading:'Delivery',text:'Reader notes.',contract:{title:'Message',fields:[{k:'id',v:'42'}]},diagram:{
    view:'step',autoplay:false,nodes:{a:{title:'Client'},b:{title:'Service'}},rows:[['a','b']],edges:[{from:'a',to:'b'}],
    steps:[{id:'send',edge:'a->b',text:'Send'},{id:'done',nodes:['b'],text:'Done'}],
@@ -30,7 +30,7 @@ async function build(server,name){
 function controls(root){
  return {
   tab:root.getByRole('button',{name:'Copy link to tab Story',exact:true}),
-  chapter:root.getByRole('button',{name:/^Copy (?:embed link for|link to chapter) Delivery/}),
+  chapter:root.getByRole('button',{name:/^Copy (?:embed link for|link to view) Delivery/}),
   step:root.getByRole('button',{name:'Copy link to this diagram step',exact:true}),
   contract:root.getByRole('button',{name:'Copy link to this contract card',exact:true})
  };

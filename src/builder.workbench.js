@@ -896,6 +896,7 @@ function initWorkbenchBuilder(opts){
     }
   }) : null;
 
+  life.listen(view,'document-presentation-change',function(ev){if(opts.renderedText && opts.renderedText()!==session.text())return;commitCascade(function(raw){return planSectionViewPresentation(session.text(),raw,ev.detail.section,null,ev.detail.value);});});
   life.listen(view,'workbench-view-section',function(ev){
     var parsed=session.snapshot();if(parsed.error || !specSectionPaths(parsed.raw)[ev.detail])return;
     session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();
@@ -914,9 +915,6 @@ function initWorkbenchBuilder(opts){
     },
     setDiagramVisibility:function(section,id,value){
       var nextId,ok=commitCascade(function(raw){var plan=planSectionDiagramVisibility(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
-    },
-    setPresentation:function(section,id,value){
-      var nextId,ok=commitCascade(function(raw){var plan=planSectionViewPresentation(session.text(),raw,section,id,value);nextId=plan.layoutId;return plan;});return ok?nextId:null;
     },
     ensureView:function(section,target){return commitCascade(function(raw){return planEnsureSectionView(session.text(),raw,section,target);});},
     steps:function(section,id,indices){

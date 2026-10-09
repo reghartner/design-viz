@@ -7,6 +7,7 @@ function mountNativeSpec(environment, spec, options){
   environment.body.appendChild(view);applySkinClasses(environment.body,view,skin);
   var records=sectionRecords(page), controller=renderPage(view,page,skin,options.backlinks || {},
     {autoplay:false,layoutTarget:options.layoutTarget || 'backstage',compatibilityNotice:false,loadDetail:options.loadDetail,onDetailNavigate:options.onDetailNavigate,resolveDiagramLink:options.resolveDiagramLink});
+  view.classList.add('navigation-contained');
   function protectLinks(){
     view.querySelectorAll('a[href]').forEach(function(link){
       var url=FlowCanon.http(link.getAttribute('href'));
@@ -23,10 +24,10 @@ function mountNativeSpec(environment, spec, options){
   var navigating=false;
   var canvas=false,canvasSection=null,canvasFrame=0,canvasSeen=new Set(),canvasNavigation=null;
   function createCanvasNavigation(){
-    canvasNavigation=createExploreNavigation(controller,{selectSection:function(rec){
+    canvasNavigation=createExploreNavigation(controller,{isCanvas:function(){return !!canvasSection;},onScrollSection:function(rec){controller.activeTarget={kind:'diagram',section:rec.number};if(options.onChange)options.onChange(snapshot());},selectSection:function(rec){
       if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
       if(controller.details)controller.details.showSection(rec.reference);
-      controller.activeTarget={kind:'diagram',section:rec.number};canvasSync();changed();
+      controller.activeTarget={kind:'diagram',section:rec.number};changed();if(!canvasSection && options.scrollIntoView!==false)rec.sectionEl.scrollIntoView({block:'start'});
     }});
   }
   function tabPrimary(target){
@@ -35,20 +36,19 @@ function mountNativeSpec(environment, spec, options){
     });
   }
   function canvasSync(){
-    if(!canvas && !canvasSection)return;
     if(!canvasNavigation)createCanvasNavigation();
     var target=controller.activeTarget || {};
     var detail=controller.details && controller.details.activeSection && controller.details.activeSection();
-    var selected=target.kind==='tab'?tabPrimary(target):controller.sections.find(function(rec){return rec.viewport && rec.number===target.section;});
-    var next=canvas && (detail || selected || canvasSection || controller.sections.find(function(rec){return rec.viewport && !rec.detailOnly;}));
+    var selected=target.kind==='tab'?(tabPrimary(target) || controller.sections.find(function(rec){return rec.tabBlock===target.tabBlock && rec.tab===target.tab;})):controller.sections.find(function(rec){return rec.number===target.section;});
+    selected=detail || selected || controller.sections.find(function(rec){return !rec.detailOnly && (!rec.tabBlock || controller.tabBlocks[rec.tabBlock-1].active()===rec.tab);});
+    var next=canvas && selected && selected.viewport?selected:null;
     if(canvasSection && canvasSection!==next){
-      canvasNavigation.restore();
       canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
       canvasSection.sectionEl.classList.remove('explore-active-section');
     }
     canvasSection=next || null;view.classList.toggle('explore-full-window',!!canvasSection);
     environment.body.classList.toggle('native-canvas',!!canvasSection);
-    if(!canvasSection){canvasNavigation.restore();return;}
+    if(!canvasSection){canvasNavigation.mount(selected);return;}
     if(canvasSection.tabBlock!=null)controller.tabBlocks[canvasSection.tabBlock-1].select(canvasSection.tab,false,false);
     if(!detail)controller.activeTarget={kind:'diagram',section:canvasSection.number};
     canvasSection.sectionEl.classList.add('explore-active-section');
@@ -82,7 +82,7 @@ function mountNativeSpec(environment, spec, options){
   environment.fontsReady.then(function(){if(!environment.disposed && options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));},function(){
     if(!environment.disposed && options.onWarning)options.onWarning('Bundled viewer fonts could not load.');
   });
-  protectLinks();
+  protectLinks();canvasSync();
   return {
     root:environment.root, controller:controller, warnings:findings.warnings,
     resources:environment.resources,

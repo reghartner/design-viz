@@ -32,8 +32,7 @@ The host's existing `ViewerTarget` extends this type with its request counter.
 
 The optional `view` selects an authored named view before resolving `path` or
 `step`. Omitting it preserves the current view. An unknown ID raises a
-recoverable error rather than silently opening a different view. The view's saved
-Standard or Explore presentation follows that selection. The React hook reacts
+recoverable error rather than silently opening a different view. The containing tab’s (or untabbed page’s) Standard or Explore mode remains in effect when a saved View changes. The React hook reacts
 to a changed `target.view` without reloading the spec and retains the reader's
 latest section/view/step when a changed link resolver requires a fresh mount.
 Revision changes start from the new spec and host target.
@@ -149,3 +148,8 @@ React instances, host CSS conflicts, Home/attached controls, nondefault skins,
 SVG symbols and visible motion, keyboard menus, host scroll, reduced motion,
 revision races and unmount/remount. Test real browser layout and resource cleanup;
 jsdom cannot establish those visual properties.
+
+Document navigation stays mounted in normal and expanded native readers. The
+explicit `setCanvas(true)` host expansion API still opens a temporary canvas;
+closing it restores authored tab/page mode without rewriting the spec. Each
+mount owns its navigation, scroll listeners, controls and cleanup.

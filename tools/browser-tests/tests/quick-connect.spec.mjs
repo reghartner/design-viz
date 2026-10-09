@@ -85,7 +85,7 @@ test('source changes, blur, remount and stale inspector actions cannot publish p
 });
 
 test('modifier selection, ordinary dragging and zoomed connection creation coexist',async({page,server})=>{
-  const raw=initial();raw.page.blocks[0].diagram.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:10}]}}];
+  const raw=initial();raw.page.presentation='explore';raw.page.blocks[0].diagram.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:10}]}}];
   await page.goto(server.origin+'/workbench.html');const original=JSON.stringify(raw);await paste(page,original);
   await node(page,'a').click();await node(page,'b').click({modifiers:['ControlOrMeta']});
   await expect(page.locator('#guide')).toContainText('2 nodes');await clean(page);await expect(page.locator('#src')).toHaveValue(original);

@@ -173,13 +173,13 @@ Per step:
   The legacy `diagramVisible: true` hint is accepted for compatibility, but
   revealing an authored-hidden graph is deprecated and has no effect. The hint
   can still open an enclosing disclosure; leaving the tour restores that
-  disclosure. For a graph lesson, select a chapter whose diagram is authored
+  disclosure. For a graph lesson, select a View whose diagram is authored
   visible. The tour never overrides saved diagram visibility.
   `view` names an authored view ID. For a portable lesson, `presentation`
-  selects the first matching named view; an ordinary diagram without named
-  views already uses Standard. An explicit `view` takes precedence. A
+  selects a View in a section whose containing tab or page owns that mode.
+  Omitted tab/page mode is Standard. An explicit `view` takes precedence. A
   requested presentation that is unavailable warns and skips the lesson.
-  These are reader chapter selections; the tour never changes a chapter's
+  These are reader View selections; the tour never changes a tab’s or page’s
   authored Viewing mode setting. The underlying `view` field and IDs remain
   stable for existing specs and links.
 - `copy` — `eyebrow` (omitted = automatic "TOUR · STEP n OF m"), `heading`,
@@ -226,22 +226,16 @@ Per step:
   keyboard users take part. Do not describe an action as demonstrated
   when the tour only points at its button.
 
-## Authoring a Standard and Explore chapter sequence
+## Authoring a Standard and Explore tab sequence
 
-Teach chapter choice before controls. Named chapters can change the arrangement
-and the visible step stops; they need not be called “Story” and “Data flow.”
-Standard preserves the authored tiles. Explore puts the graph in a larger
-workspace with movable panels and step controls that default to viewport-pinned
-Floating placement. Each chapter can choose **Panels → Step controls → On canvas**
-to move and zoom the controls with the graph. Authors save the choice as
-`exploreLayout.controlsPlacement` (`"floating"` or `"canvas"`), preserving the
-Floating rectangle in `exploreLayout.controls` and the separate graph rectangle
-in `exploreLayout.canvas.controls`. Explore chapter buttons
-carry an **EXPLORE** marker, and a document tab carries the same marker when
-its primary diagram's current chapter uses Explore viewing mode. The marker's tooltip and
-accessible description explain that the canvas can be panned and zoomed.
-Both viewing modes present the same underlying story and honor its chapter
-visibility settings, including a hidden diagram.
+Choose a tab’s Viewing mode before authoring its tour. Standard and Explore
+belong to the containing tab and apply to all its sections and saved Views.
+Use separate tabs when a document needs both modes. Views retain their own
+arrangements, visible elements, panel placement, camera, and step subsets.
+The top Tabs / Sections / Views row stays reachable while scrolling. Section
+buttons choose one active section in Explore. Explore tabs and their Views show
+a monitor marker with an accessible description. A tour may select matching
+sections and Views, but never changes authored mode.
 
 The built-in Explore pair declares `presentation: "explore"`. Its first
 lesson highlights a visible floating panel and explains moving, resizing

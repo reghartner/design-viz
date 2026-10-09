@@ -68,7 +68,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var overlayLabel=button('100%',function(){changeOverlayScale(1);},overlayZoom,'mbtn explore-overlay-value');overlayLabel.setAttribute('aria-label','Reset panels and controls size');overlayLabel.title='Reset panels and controls to 100%';
   var overlayIn=button('+',function(){changeOverlayScale(sizingScale()+.1);},overlayZoom);overlayIn.setAttribute('aria-label','Enlarge panels and controls');
   panelBody.appendChild(focus);panelBody.appendChild(stack);panelBody.appendChild(overlayZoom);
-  if(document.getElementById('workspace-canvas')){button('Saved visibility…',function(){var chapter=box.querySelector('.section-view-options');if(chapter){chapter.open=true;menu.open=false;chapter.querySelector('summary').focus();}},panelBody);}
+  if(document.getElementById('workspace-canvas')){button('Saved visibility…',function(){var chapter=(box.closest('.has-document-navigation') || box).querySelector('.section-view-options');if(chapter){chapter.open=true;menu.open=false;chapter.querySelector('summary').focus();}},panelBody);}
   var playerGrip=button('⠿',function(){},player,'explore-player-grip');
   playerGrip.setAttribute('aria-label','Move step controls; use arrow keys');playerGrip.title='Drag to move step controls; arrow keys also move';
   var playerResize=button('◢',function(){},player,'explore-window-resize');
@@ -679,7 +679,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
-  function isFullscreen(){return document.fullscreenElement===shell;}
+  function fullscreenTarget(){return box.closest('.has-document-navigation') || shell;}
+  function isFullscreen(){return document.fullscreenElement===fullscreenTarget();}
   function setExpanded(value){expanded=value;shell.classList.toggle('viewport-expanded',value);expand.textContent=value?'Exit expanded view':'Expand';expand.setAttribute('aria-label',value?'Exit expanded diagram view':'Expand diagram view');expand.setAttribute('aria-pressed',String(value));paint();}
   function exitExpanded(){
     pendingFullscreen++;setExpanded(false);status.textContent='';
@@ -692,8 +693,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var token=++pendingFullscreen;
     function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
     try{
-      if(!shell.requestFullscreen){failed();return;}
-      var promise=shell.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
+      var target=fullscreenTarget();if(!target.requestFullscreen){failed();return;}
+      var promise=target.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
     }catch(_){failed();}
   }
   function fullscreenChanged(){if(!isFullscreen() && expanded){setExpanded(false);status.textContent='';}}
@@ -786,7 +787,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
       leave();if(on)canvasBoardHidden=board.hidden;var previous=memories;memories=otherMemories;otherMemories=previous;workbenchCanvas=on;shell.classList.toggle('workbench-diagram-canvas',on);
-      if(!definition)definition={id:'flow',presentation:'standard'};
+      if(!definition)definition={id:'flow',presentation:d.presentation || 'standard'};
       enter();
     },
     currentCamera:function(){return camera();},
@@ -800,7 +801,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
       sizeGraph(false);positionCamera(memory.layout.camera);return true;
     },
-    setView:function(view,tiles,sourceGrid){leave(true);definition=view;items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
+    setView:function(view,tiles,sourceGrid){leave(true);definition=Object.assign({},view,{presentation:d.presentation || 'standard'});items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){

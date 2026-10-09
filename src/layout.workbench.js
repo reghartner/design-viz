@@ -61,7 +61,7 @@ function initSectionLayoutEditor(opts){
     if(height>current)stage.style.minHeight=Math.ceil(height)+'px';
   }
   function rawDiagram(index){
-    try{var raw=JSON.parse(opts.src.value),rec=specSectionPaths(raw)[index];return rec&&specValueAt(raw,rec.diagram);}catch(ex){return null;}
+    try{var raw=JSON.parse(opts.src.value),rec=specSectionPaths(raw)[index];return rec&&diagramWithPresentation(specValueAt(raw,rec.diagram),sectionPresentation(normalize(raw),index));}catch(ex){return null;}
   }
   function ready(){
     if(opts.renderedText && opts.renderedText()!==opts.src.value){feedback('Render the current JSON before arranging the section.');return false;}
@@ -73,7 +73,7 @@ function initSectionLayoutEditor(opts){
     if(expectedLayout!==undefined && expectedLayout!==activeLayout(index)){feedback('The selected layout changed. Use its current visibility controls.');return false;}
     var definition=sectionLayoutDefinition(rawDiagram(index),activeLayout(index));
     if(editing===index && (!definition || definition.presentation!=='explore'))holdViewport();
-    var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' chapter arrangement · Undo restores the previous arrangement.');
+    var ok=opts.commit(index,profile,items,activeLayout(index));if(ok)feedback('Saved '+profile+' view arrangement · Undo restores the previous arrangement.');
     return ok;
   }
   function presentation(index){
@@ -90,68 +90,61 @@ function initSectionLayoutEditor(opts){
   }
   function viewSettings(section,d){
     var host=section.querySelector('.section-viewport>.diagram-views');if(!host)return;
-    var rec=sectionScope(section),row=host.querySelector('.section-view-settings');if(row && row.querySelector('details'))rec.optionsOpen=row.querySelector('details').open;
+    var rec=sectionScope(section),row=rec.viewSettings || host.querySelector('.section-view-settings');if(row && row.querySelector('details'))rec.optionsOpen=row.querySelector('details').open;
     rec.viewFields.destroy();rec.viewFields=createWorkbenchLifetime();var fieldLife=rec.viewFields;controlsLife=fieldLife;
-    if(!row){row=el('div','section-view-settings');row.setAttribute('role','group');row.setAttribute('aria-label','Chapter settings');host.appendChild(row);}
-    row.replaceChildren();
+    if(!row){row=el('div','section-view-settings');row.setAttribute('role','group');row.setAttribute('aria-label','View settings');host.appendChild(row);}
+    rec.viewSettings=row;row.replaceChildren();
     var index=Number(section.getAttribute('data-dv-section')),id=selectedView(index),definition=diagramLayoutViews(d).find(function(v){return v.id===id || v.legacy && id==='layout';});
     function current(){return row.isConnected && ready() && selectedView(index)===id;}
     function activate(nextId){var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();}
     var choices=host.querySelector('.diagram-view-choice');
-    if(choices){choices.setAttribute('role','group');choices.setAttribute('aria-label','Chapters');}
-    if(choices && !choices.querySelector('.workbench-views-label'))choices.prepend(el('span','workbench-views-label','Chapters'));
+    if(choices){choices.setAttribute('role','group');choices.setAttribute('aria-label','Views');}
+    if(choices && !choices.querySelector('.workbench-views-label'))choices.prepend(el('span','workbench-views-label','Views'));
     function focusControl(selector){
-      var next=view.querySelector('[data-dv-section="'+index+'"] .section-view-settings '+selector);if(!next)return;
-      var options=next.closest('details');if(options){options.open=true;sectionScope(next.closest('.doc-sec')).optionsOpen=true;syncNavigationPopover(options);}
+      var currentSection=view.querySelector('[data-dv-section="'+index+'"]'),currentSettings=currentSection && sectionScope(currentSection).viewSettings,next=currentSettings && currentSettings.querySelector(selector);if(!next || !next.isConnected)return;
+      var options=next.closest('details');if(options){options.open=true;sectionScope(currentSection).optionsOpen=true;syncNavigationPopover(options);}
       next.focus({preventScroll:true});
     }
-    var label=el('label',null,'Viewing mode '),select=el('select');select.setAttribute('aria-label','Viewing mode');
-    [['standard','Standard'],['explore','Explore']].forEach(function(choice){var option=el('option',null,choice[1]);option.value=choice[0];select.appendChild(option);});
-    select.value=definition?definition.presentation:'standard';select.title='Standard uses a curated page layout. Explore uses the full canvas. The selected chapter keeps this viewing mode in the editor and built HTML.';
-    fieldLife.listen(select,'change',function(){
-      if(!current()){select.value=definition?definition.presentation:'standard';return;}
-      cancel();var nextId=opts.setPresentation(index,id,select.value);if(nextId){activate(nextId);focusControl('[aria-label="Viewing mode"]');}
-    });label.appendChild(select);
     var openingId=d.layouts && d.layouts.length?sectionLayoutDefinition(d).id:d.sectionLayout?'layout':d.primaryPanel?'home':'flow';
     var isDefault=openingId===id;
-    var opening=button(isDefault?'Opening chapter':'Make opening chapter',function(){if(current()){var nextId=opts.makeDefault(index,id);if(nextId)activate(nextId);}});
-    opening.disabled=isDefault;opening.title=isDefault?'This Chapter opens first in the built HTML.':'Open this Chapter first in the built HTML.';
-    var options=el('details','section-view-options');options.open=rec.optionsOpen;options.appendChild(el('summary',null,'Chapter'));
+    var opening=button(isDefault?'Opening view':'Make opening view',function(){if(current()){var nextId=opts.makeDefault(index,id);if(nextId)activate(nextId);}});
+    opening.disabled=isDefault;opening.title=isDefault?'This View opens first in the built HTML.':'Open this View first in the built HTML.';
+    var options=el('details','section-view-options');options.open=rec.optionsOpen;options.appendChild(el('summary',null,'View'));
     fieldLife.listen(options,'toggle',function(){if(options.isConnected)rec.optionsOpen=options.open;});
-    var body=el('div','section-view-options-body'),nameLabel=el('label',null,'Chapter name '),name=el('input');name.type='text';name.maxLength=40;
-    name.setAttribute('aria-label','Chapter name');name.value=definition?definition.name:(id==='home'?'Home':'Data flow');
+    var body=el('div','section-view-options-body'),nameLabel=el('label',null,'View name '),name=el('input');name.type='text';name.maxLength=40;
+    name.setAttribute('aria-label','View name');name.value=definition?definition.name:(id==='home'?'Home':'Data flow');
     name.disabled=!definition || definition.legacy;
-    function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="Chapter name"]');}
+    function renameView(){if(!name.disabled && definition && current() && name.value!==definition.name && opts.rename(index,name.value,id))focusControl('[aria-label="View name"]');}
     fieldLife.listen(name,'keydown',function(ev){if(ev.key==='Enter'){ev.preventDefault();renameView();}});
-    body.appendChild(label);
+
     var diagramLabel=el('label','chapter-diagram-visibility'),diagramCheck=el('input');diagramCheck.type='checkbox';
-    diagramCheck.setAttribute('aria-label','Show diagram in this chapter');diagramCheck.title='Save this choice for every host profile in this chapter.';
+    diagramCheck.setAttribute('aria-label','Show diagram in this view');diagramCheck.title='Save this choice for every host profile in this view.';
     var p=presentation(index),diagramShown=p && p.diagramVisible?p.diagramVisible():id!=='home';diagramCheck.checked=diagramShown;
-    diagramLabel.appendChild(diagramCheck);diagramLabel.appendChild(el('span',null,'Show diagram in this chapter'));body.appendChild(diagramLabel);
+    diagramLabel.appendChild(diagramCheck);diagramLabel.appendChild(el('span',null,'Show diagram in this view'));body.appendChild(diagramLabel);
     fieldLife.listen(diagramCheck,'change',function(){
       if(!current()){diagramCheck.checked=diagramShown;return;}
       cancel();var nextId=opts.setDiagramVisibility(index,id,diagramCheck.checked);
-      if(nextId){activate(nextId);focusControl('[aria-label="Show diagram in this chapter"]');}else diagramCheck.checked=diagramShown;
+      if(nextId){activate(nextId);focusControl('[aria-label="Show diagram in this view"]');}else diagramCheck.checked=diagramShown;
     });
     body.appendChild(opening);nameLabel.appendChild(name);body.appendChild(nameLabel);
-    var rename=button('Rename chapter',renameView);rename.disabled=name.disabled;body.appendChild(rename);
-    body.appendChild(button('Duplicate chapter',function(){
+    var rename=button('Rename view',renameView);rename.disabled=name.disabled;body.appendChild(rename);
+    body.appendChild(button('Duplicate view',function(){
       if(!current())return;rec.optionsOpen=true;
       var nextId=opts.duplicate(index,id);if(!nextId)return;
       var p=presentation(index);if(p && p.setLayout)p.setLayout(nextId);refresh();
       var nextSection=view.querySelector('[data-dv-section="'+index+'"]');if(!nextSection)return;
-      var nextOptions=nextSection.querySelector('.section-view-options');if(nextOptions){nextOptions.open=true;sectionScope(nextSection).optionsOpen=true;}
-      var nextName=nextSection.querySelector('.section-view-settings [aria-label="Chapter name"]');if(nextName){nextName.focus({preventScroll:true});nextName.select();}
+      var nextSettings=sectionScope(nextSection).viewSettings,nextOptions=nextSettings && nextSettings.querySelector('.section-view-options');if(nextOptions){nextOptions.open=true;sectionScope(nextSection).optionsOpen=true;}
+      var nextName=nextSettings && nextSettings.querySelector('[aria-label="View name"]');if(nextName){nextName.focus({preventScroll:true});nextName.select();}
     }));
-    if(definition && !definition.legacy)body.appendChild(button('Delete chapter',function(){if(current()){endEditing();opts.remove(index,id);refresh();}}));
-    body.appendChild(button('Arrange chapter and saved visibility…',function(){options.open=false;rec.optionsOpen=false;syncNavigationPopover(options);var arrange=section.querySelector('[data-arrange-toggle]');if(arrange)arrange.click();}));
+    if(definition && !definition.legacy)body.appendChild(button('Delete view',function(){if(current()){endEditing();opts.remove(index,id);refresh();}}));
+    body.appendChild(button('Arrange view and saved visibility…',function(){options.open=false;rec.optionsOpen=false;syncNavigationPopover(options);var arrange=section.querySelector('[data-arrange-toggle]');if(arrange)arrange.click();}));
     var auto=button('Auto arrange',function(){options.open=false;rec.optionsOpen=false;syncNavigationPopover(options);document.getElementById('auto-arrange').click();});body.appendChild(auto);
     if(definition && definition.presentation==='explore'){
       body.appendChild(button('Use current camera as opening view',function(){if(!current())return;var ctl=opts.ctl(),record=ctl.sections.find(function(r){return r.number===index+1;});var next=JSON.parse(JSON.stringify(definition.exploreLayout || {}));next.camera=record.viewport.currentCamera();opts.setExploreLayout(index,id,next);}));
       body.appendChild(button('Reset opening camera',function(){if(!current())return;var next=JSON.parse(JSON.stringify(definition.exploreLayout || {}));delete next.camera;opts.setExploreLayout(index,id,next);}));
     }
     fieldLife.listen(options,'keydown',function(ev){if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();options.open=false;options.querySelector('summary').focus();}});
-    body.appendChild(el('p','fnote','Chapters share the same story and steps. Each chapter saves its viewing mode, arrangement and opening choice.'));
+    body.appendChild(el('p','fnote','Views share the same story and steps. Each view saves its viewing mode, arrangement and opening choice.'));
     options.appendChild(body);row.appendChild(options);
     fieldLife.listen(row,'click',function(ev){ev.stopPropagation();});fieldLife.listen(row,'pointerdown',function(ev){ev.stopPropagation();});
     section.dispatchEvent(new CustomEvent('workbench-navigation-refresh',{bubbles:true}));
@@ -184,7 +177,7 @@ function initSectionLayoutEditor(opts){
     var index=Number(section.getAttribute('data-dv-section')),id=activeLayout(index),definition=sectionLayoutDefinition(d,id);
     var items=currentItems(index,d);if(!items)return;
     var explore=definition && definition.presentation==='explore';
-    if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this Chapter with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
+    if(explore)row.appendChild(el('p','fnote','Drag floating panel or Section notes headers, or the step grip, to move; drag corners to resize. Pan and zoom the graph. Changes save to this View with Undo. Hide panels is temporary; use Visible elements below to save visibility.'));
     var dock=sectionLayoutDock(items);
     if(!explore){if(dock && selected==='steps')selected=dock;
     var choose=el('select');choose.setAttribute('aria-label','Layout element');
@@ -238,9 +231,9 @@ function initSectionLayoutEditor(opts){
         if(Array.isArray(d.paths) && d.paths.length>1){
           var pathDetail=el('details','layout-step-selection');pathDetail.open=pathsOpen;
           var pathCount=definition.paths?definition.paths.length:d.paths.length;
-          pathDetail.appendChild(el('summary',null,'Paths shown in this Chapter · '+(definition.paths?pathCount+' selected':'All '+pathCount)));
+          pathDetail.appendChild(el('summary',null,'Paths shown in this View · '+(definition.paths?pathCount+' selected':'All '+pathCount)));
           fieldLife.listen(pathDetail,'toggle',function(){if(pathDetail.isConnected)pathsOpen=pathDetail.open;});
-          pathDetail.appendChild(el('p','fnote','Hidden paths stay in the shared story, but readers cannot select or play them in this Chapter.'));
+          pathDetail.appendChild(el('p','fnote','Hidden paths stay in the shared story, but readers cannot select or play them in this View.'));
           pathDetail.appendChild(button('Show all paths',function(){if(ready() && activeLayout(index)===id)opts.paths(index,id,null);}));
           var pathList=el('div','layout-step-options');
           d.paths.forEach(function(path){
@@ -256,7 +249,7 @@ function initSectionLayoutEditor(opts){
         }
         var detail=el('details','layout-step-selection');detail.open=stepsOpen;
         var count=definition.steps?definition.steps.length:(d.steps || []).length;
-        detail.appendChild(el('summary',null,'Steps shown in this Chapter · '+(definition.steps?count+' selected':'All '+count)));
+        detail.appendChild(el('summary',null,'Steps shown in this View · '+(definition.steps?count+' selected':'All '+count)));
         fieldLife.listen(detail,'toggle',function(){if(detail.isConnected)stepsOpen=detail.open;});
         detail.appendChild(el('p','fnote','Skipped steps still affect the story. Each path plays only its selected stops, in story order.'));
         detail.appendChild(button('Show all steps',function(){if(ready() && activeLayout(index)===id)opts.steps(index,id,null);}));
@@ -293,7 +286,7 @@ function initSectionLayoutEditor(opts){
         actions=el('div','section-arranger');actions.setAttribute('popover','manual');var controls=el('div','section-arrange-actions');actions.appendChild(controls);
         var arrange=button('Arrange section',function(){
           if(!ready())return;
-          if(editing===index){endEditing();refresh();var trigger=section.querySelector('.section-view-options>summary');if(trigger)trigger.focus({preventScroll:true});return;}
+          if(editing===index){endEditing();refresh();var trigger=sectionScope(section).viewSettings && sectionScope(section).viewSettings.querySelector('.section-view-options>summary');if(trigger)trigger.focus({preventScroll:true});return;}
           arrangementDisclosure.reset();editing=index;selected='diagram';if(opts.pause)opts.pause();
           var current=rawDiagram(index),items=currentItems(index,current);
           if(!Array.isArray(current.layouts)){opts.ensureView(index,profile);return;}
@@ -315,7 +308,7 @@ function initSectionLayoutEditor(opts){
         var caption=el('span','fnote');caption.setAttribute('data-arrange-target','');controls.appendChild(caption);
         actions.appendChild(el('div','section-arrange-fields'));
         actionsLife.listen(actions,'keydown',function(ev){
-          if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();endEditing();refresh();var trigger=section.querySelector('.section-view-options>summary');if(trigger)trigger.focus({preventScroll:true});}
+          if(ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();endEditing();refresh();var trigger=sectionScope(section).viewSettings && sectionScope(section).viewSettings.querySelector('.section-view-options>summary');if(trigger)trigger.focus({preventScroll:true});}
           else if(!((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();
         });
         actionsLife.listen(actions,'click',function(ev){ev.stopPropagation();});actionsLife.listen(actions,'pointerdown',function(ev){ev.stopPropagation();});
@@ -341,7 +334,7 @@ function initSectionLayoutEditor(opts){
           return {text:opts.src.value,panel:host && host.getAttribute('data-explore-panel'),content:host && host.getAttribute('data-explore-content'),player:host && host.classList.contains('explore-player'),panelMenu:!!(focused && focused.closest('.explore-panel-menu')),label:focused && focused.getAttribute('aria-label')};
         },
         commit:function(id,value,token){
-          if(!ready() || !token || token.text!==opts.src.value || activeLayout(index)!==id){feedback('Source or Chapter changed; Explore adjustment cancelled.');return false;}
+          if(!ready() || !token || token.text!==opts.src.value || activeLayout(index)!==id){feedback('Source or View changed; Explore adjustment cancelled.');return false;}
           var ok=opts.setExploreLayout(index,id,value);
           if(ok){
             feedback('Saved Explore panel positions and sizes · Undo restores the previous arrangement.');

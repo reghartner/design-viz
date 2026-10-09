@@ -63,11 +63,11 @@ for(const [sourcePresentation,destination] of [['explore','explore'],['explore',
 test(`workbench ${sourcePresentation} to ${destination} handoffs keep the destination visible and selected`,async({page,server})=>{
  const raw=structuredClone(example),tabs=raw.page.blocks[0].tabs;
  if(sourcePresentation==='explore'){
-  tabs[0].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tabs[0].presentation='explore';tabs[0].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
   tabs[0].sections[0].diagram.defaultLayout='canvas';
  }
  if(destination==='explore'){
-  tabs[1].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tabs[1].presentation='explore';tabs[1].sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
   tabs[1].sections[0].diagram.defaultLayout='canvas';
  }
  const source=JSON.stringify(raw,null,2),orders=section(page,'orders'),delivery=section(page,'delivery');
@@ -97,7 +97,7 @@ test(`workbench ${sourcePresentation} to ${destination} handoffs keep the destin
 test('workbench handoff Back restores an Explore detail and its source editing context',async({page,server})=>{
  const raw=structuredClone(example),tabs=raw.page.blocks[0].tabs;
  for(const tab of tabs){
-  tab.sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
+  tab.presentation='explore';tab.sections[0].diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];
   tab.sections[0].diagram.defaultLayout='canvas';
  }
  tabs[0].sections[0].diagram.nodes.middle.detail={section:'child'};
@@ -140,7 +140,7 @@ for(const narrow of [false,true])test(`Explore handoff and return preserve the s
  if(narrow)await page.setViewportSize({width:480,height:850});
  const raw=structuredClone(example);
  for(const tab of raw.page.blocks[0].tabs){
-  const d=tab.sections[0].diagram;
+  tab.presentation='explore';const d=tab.sections[0].diagram;
   d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];d.defaultLayout='canvas';
  }
  await standalone(page,server,raw);

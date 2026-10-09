@@ -10,7 +10,7 @@ function fixture(){
   raw.page.protocols={https:{label:'Company API',color:'#123456'},mqtt:{label:'Event stream',color:'#a83d19'}};
   d.edges.push({from:'b',to:'c',kind:'mqtt'},{from:'b',to:'a',kind:'https',ret:true});
   d.layouts.push({...structuredClone(d.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});
-  return raw;
+  raw.page.presentation='explore';return raw;
 }
 async function open(page,server,surface,raw){
   if(surface==='workbench'){

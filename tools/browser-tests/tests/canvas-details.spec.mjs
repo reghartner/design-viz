@@ -6,7 +6,7 @@ import {repo} from '../helpers/prepare.mjs';
 
 const source=await readFile(path.join(repo,'src/starters/domain-drilldown.json'),'utf8');
 function withExploreRoot(raw){
-  const d=raw.page.sections[0].diagram;
+  raw.page.presentation='explore';const d=raw.page.sections[0].diagram;
   d.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:15},{controls:'steps',x:0,y:15,w:12,h:7}]}}];d.defaultLayout='canvas';
   return raw;
 }
@@ -15,10 +15,10 @@ async function childCanvas(root,page){
   const child=root.locator('[data-dv-detail-preview]:visible');
   await expect(child).toHaveCount(1);await expect(child.locator('.explore-board')).toBeVisible();
   const shell=await child.locator('.viewer-diagram-canvas,.workbench-diagram-canvas').boundingBox();
-  const board=await child.locator('.explore-board').boundingBox(),nav=await child.locator('.explore-navigation').boundingBox(),head=await child.locator('.detail-head').boundingBox();
+  const board=await child.locator('.explore-board').boundingBox(),nav=await root.locator('.explore-navigation').boundingBox(),head=await child.locator('.detail-head').boundingBox();
   const viewport=page.viewportSize(),workbench=await page.locator('body').evaluate(el=>el.classList.contains('workspace-diagram'));
   if(workbench){const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(shell.x).toBe(84);expect(shell.y).toBe(contentTop);expect(shell.width).toBe(viewport.width-96);expect(shell.height).toBe(viewport.height-contentTop-12);expect(shell.y).toBeGreaterThanOrEqual(nav.y+nav.height);}
-  else{expect(shell.x).toBe(0);expect(shell.y).toBe(0);expect(shell.width).toBe(viewport.width);expect(shell.height).toBe(viewport.height);}
+  else{expect(shell.x).toBe(0);expect(shell.y).toBe(nav.y+nav.height);expect(shell.width).toBe(viewport.width);expect(shell.height).toBe(viewport.height-shell.y);}
   expect(board.x).toBeGreaterThanOrEqual(shell.x);expect(board.x+board.width).toBeLessThanOrEqual(shell.x+shell.width);
   expect(board.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board.y+board.height).toBeLessThanOrEqual(shell.y+shell.height);
   expect(board.height).toBeGreaterThan(300);
@@ -64,7 +64,7 @@ test('native canvas owns details while keeping root navigation, sibling isolatio
 });
 
 test('standalone Explore keeps detail navigation full-window through reload and Back',async({page,server})=>{
-  const raw=JSON.parse(source),d=raw.page.sections[0].diagram;
+  const raw=JSON.parse(source),d=raw.page.sections[0].diagram;raw.page.presentation='explore';
   d.layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:15},{controls:'steps',x:0,y:15,w:12,h:7}]}}];d.defaultLayout='canvas';
   const input=path.join(server.root,'canvas-details.json'),output=path.join(server.root,'canvas-details.html');await writeFile(input,JSON.stringify(raw));
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);

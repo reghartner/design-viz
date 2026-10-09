@@ -94,7 +94,7 @@ test('row and mixed-section selections refuse group arrangement without a partia
 });
 
 test('group alignment and dragging work in Explore and refuse stale source alignment',async({page,server})=>{
-  const raw=fixture(),d=raw.page.blocks[0].diagram;
+  const raw=fixture(),d=raw.page.blocks[0].diagram;raw.page.presentation='explore';
   d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await select(page);
   await page.getByRole('button',{name:'Align horizontal',exact:true}).click();const aligned=await source(page);

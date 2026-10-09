@@ -108,8 +108,8 @@ the mount calls `jumpSource()` directly, keeping the view filter intact. Path-on
 requests still require visible stops. Canon evidence indexes remain diagram-only.
 
 The native `NativeViewerTarget` and public `ViewerTarget` also accept `view`, the
-authored view ID. It selects that view's saved Standard or Explore presentation
-before path/step navigation; omission retains the active view. `onChange(target)`
+authored View ID. It selects the saved arrangement within the containing tab’s
+Standard or Explore mode before path/step navigation; omission retains the active view. `onChange(target)`
 reports the canonical section/view and active source step/path, with any saved
 drill-down state. Unknown views remain recoverable errors. The Backstage consumer
 router must translate its own URL into these targets and decide how to store

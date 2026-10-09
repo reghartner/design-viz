@@ -31,8 +31,8 @@ var TOUR_DEFAULT_CONFIG = {
       id: 'views',
       target: {selector: '.diagram-view-choice', within: 'section'},
       copy: {
-        heading: 'Choose a chapter',
-        body: 'Tabs organize the document; Chapters choose a saved perspective inside the current tab. A small screen icon on a chapter marks Explore: a canvas you can pan and zoom. The same screen icon on a tab means its primary diagram’s selected chapter uses Explore viewing mode.'
+        heading: 'Choose a view',
+        body: 'Tabs organize the document; Views choose a saved arrangement for the current section. The tab’s Viewing mode applies to all its sections and Views. A small screen icon marks Explore: a canvas you can pan and zoom. Navigation stays pinned in both Standard and Explore.'
       }
     },
     {

@@ -364,109 +364,39 @@ test('hidden attachment fallback and detached controls retain their custom heigh
   }
 });
 
-test('view presentation normalizes independently of host profiles and falls back safely without discarding the view',()=>{
+test('document mode overrides legacy per-View presentation without mutating layouts',()=>{
   const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{default:[board,phone]}},
     {id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone],confluence:[{...board,w:12}]}}];
   const before=JSON.stringify(d);
-  assert.deepEqual(plain(ctx.diagramLayoutViews(d)).map(v=>v.presentation),['standard','explore']);
-  assert.equal(ctx.sectionLayoutDefinition(d,'engineering').presentation,'explore');
-  assert.equal(ctx.sectionLayoutItems(d,'confluence','engineering')[0].w,24);
-  assert.equal(ctx.sectionLayoutItems(d,'backstage','engineering')[0].w,16);
+  assert.deepEqual(plain(ctx.diagramLayoutViews(d)).map(v=>v.presentation),['standard','standard']);
+  const effective=ctx.diagramWithPresentation(d,'explore');
+  assert.deepEqual(plain(ctx.diagramLayoutViews(effective)).map(v=>v.presentation),['explore','explore']);
+  assert.equal(ctx.sectionLayoutItems(effective,'confluence','engineering')[0].w,24);
   assert.equal(JSON.stringify(d),before);
-  for(const value of ['standard','explore']){
-    d.layouts[0].presentation=value;const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
-  }
-  for(const value of [null,'cinema','Explore',true,42,[],{}]){
-    d.layouts[0].presentation=value;const warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);
-    assert.equal(warnings.filter(w=>w.includes('layouts[0].presentation')).length,1);
-    assert.equal(ctx.diagramLayoutViews(d).length,2);assert.equal(ctx.sectionLayoutDefinition(d,'business').presentation,'standard');
-  }
-  assert.equal(ctx.sectionLayoutDefinition({...diagram(),sectionLayout:{default:[board]}}).presentation,'standard');
 });
 
-test('presentation edits patch exactly one named view without altering profiles, state, default or surrounding source',()=>{
-  for(const wrap of [d=>d,d=>({sections:[{diagram:d}]}),d=>({page:{blocks:[{tabs:[{label:'Tab',sections:[{diagram:d}]}]}]}})]){
-    const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{default:[board]}},
-      {id:'engineering',name:'Engineering',presentation:'standard',steps:['one'],sectionLayout:{default:[board,phone],confluence:[phone]}}];
-    d.defaultLayout='business';const raw=wrap(d),text=JSON.stringify(raw,null,3)+'\n';
-    const plan=ctx.planSectionViewPresentation(text,raw,0,'engineering','explore');assert.ok(!plan.error,plan.error);
-    assert.equal(plan.text,text.replace('"presentation": "standard"','"presentation": "explore"'));
-    assert.equal(ctx.sectionLayoutDefinition(ctx.builderDiagram(plan.text,JSON.parse(plan.text),0).d,'engineering').presentation,'explore');
-    const restored=ctx.planSectionViewPresentation(plan.text,JSON.parse(plan.text),0,'engineering','standard');assert.equal(restored.text,text);
-    const next=JSON.parse(plan.text),nextDiagram=ctx.builderDiagram(plan.text,next,0).d;delete nextDiagram.layouts[1].presentation;
-    const original=JSON.parse(text);delete ctx.builderDiagram(text,original,0).d.layouts[1].presentation;assert.deepEqual(next,original);
-    for(const value of ['',null,true,{},'cinema']){
-      const bad=ctx.planSectionViewPresentation(text,raw,0,'engineering',value);assert.ok(bad.error);assert.equal(bad.text,undefined);
-    }
-    assert.ok(ctx.planSectionViewPresentation(text,raw,0,'deleted','explore').error);
-  }
-  const d=diagram();assert.ok(ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'retired-view','explore').error);
+test('presentation edits the containing tab once and preserves every section and saved View',()=>{
+  const d=diagram();d.layouts=[{id:'business',name:'Business',sectionLayout:{default:[board]}},
+    {id:'engineering',name:'Engineering',presentation:'standard',sectionLayout:{default:[board,phone]}}];
+  const raw={page:{presentation:'standard',blocks:[{tabs:[{label:'One',sections:[{diagram:d},{text:'Prose'}]},
+    {label:'Two',presentation:'standard',sections:[{diagram:diagram()}]}]},{diagram:diagram()}]}};
+  const text=JSON.stringify(raw,null,3)+'\n';
+  const plan=ctx.planSectionViewPresentation(text,raw,1,null,'explore');assert.ok(!plan.error,plan.error);
+  const next=JSON.parse(plan.text);assert.equal(next.page.blocks[0].tabs[0].presentation,'explore');
+  assert.deepEqual(next.page.blocks[0].tabs[0].sections,raw.page.blocks[0].tabs[0].sections);
+  assert.deepEqual(plain(ctx.sectionRecords(ctx.normalize(next))).map(r=>r.presentation),['explore','explore','standard','standard']);
+  delete next.page.blocks[0].tabs[0].presentation;assert.deepEqual(next,raw);assert.equal(JSON.stringify(raw,null,3)+'\n',text);
+  for(const value of ['',null,true,{},'cinema'])assert.ok(ctx.planSectionViewPresentation(text,raw,0,null,value).error);
+  assert.ok(ctx.planSectionViewPresentation(text,raw,9,null,'explore').error);
 });
 
-test('choosing Explore preserves the automatic or saved sibling view, default and story in one plan',()=>{
-  for(const saved of [false,true])for(const wrap of [d=>d,d=>({page:{title:'Untouched',sections:[{diagram:d}]}})]){
-    const d=diagram();if(saved){d.layoutName='Resident view';d.sectionLayout={default:[board,phone],confluence:[{...board,w:12,h:9}]};}
-    const raw=wrap(d),text=JSON.stringify(raw,null,3)+'\n',original=structuredClone(d);
-    const plan=ctx.planSectionViewPresentation(text,raw,0,saved?'default':undefined,'explore');assert.ok(!plan.error,plan.error);
-    const next=ctx.builderDiagram(plan.text,JSON.parse(plan.text),0).d;
-    assert.deepEqual(next.layouts.map(v=>v.id),[saved?'layout':'home','flow']);
-    assert.equal(next.defaultLayout,next.layouts[0].id);assert.equal(next.layouts[0].presentation,'explore');
-    assert.equal(plan.layoutId,next.layouts[0].id);assert.equal(ctx.sectionLayoutDefinition(next,'flow').presentation,'standard');
-    if(saved){assert.deepEqual(next.layouts[0].sectionLayout,migrated(original.sectionLayout));assert.equal(next.layouts[0].name,original.layoutName);}
-    for(const key of ['nodes','rows','edges','panels','steps','paths','primaryPanel'])assert.deepEqual(next[key],original[key]);
-    assert.equal(next.sectionLayout,undefined);assert.equal(next.layoutName,undefined);
-    assert.equal(JSON.stringify(raw,null,3)+'\n',text,'planner does not mutate its input');
-    if(raw.page)assert.equal(JSON.parse(plan.text).page.title,'Untouched');
-    assert.ok(ctx.planSectionViewPresentation(text,raw,0,'removed-view','explore').error);
-  }
-});
-
-test('automatic focus views promote the selected Home or Data without changing the original opening view',()=>{
-  for(const explicit of [false,true])for(const active of ['home','flow']){
-    const d=diagram();if(!explicit)delete d.primaryPanel;
-    const text=JSON.stringify(d),plan=ctx.planSectionViewPresentation(text,d,0,active,'explore');assert.ok(!plan.error,plan.error);
-    const next=JSON.parse(plan.text);assert.equal(plan.layoutId,active);assert.equal(next.defaultLayout,explicit?'home':'flow');
-    assert.deepEqual(next.layouts.map(v=>[v.id,v.name,ctx.sectionLayoutDefinition(next,v.id).presentation]),[
-      ['home','Home',active==='home'?'explore':'standard'],['flow','Data flow',active==='flow'?'explore':'standard']]);
-    const home=next.layouts[0].sectionLayout.default,flow=next.layouts[1].sectionLayout.default;
-    assert.equal(home[0].panel,'home');assert.equal(home.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden,true);
-    assert.equal(ctx.sectionLayoutDock(home),'panel:home');assert.equal(ctx.sectionLayoutDock(flow),'diagram');
-    assert.equal(ctx.sectionLayoutKey(flow[0]),'diagram');assert.ok(!flow[0].hidden);
-    for(const items of [home,flow])noOverlap(items.filter(t=>!t.hidden && !t.controls));
-    const warnings=[];ctx.sectionLayoutWarnings(next,'diagram',warnings);assert.deepEqual(warnings,[]);
-    for(const key of ['nodes','rows','edges','panels','steps','paths','primaryPanel'])assert.deepEqual(next[key],d[key]);
-    assert.equal(JSON.stringify(d),text);
-  }
-});
-
-test('saved layout aliases preserve every authored host profile while selected Data gains its own presentation',()=>{
-  const d=diagram();d.layoutName='Resident view';d.sectionLayout={default:[phone,board],backstage:[board],confluence:[{...board,w:12,h:9}]};
-  for(const active of ['layout','home','default','flow']){
-    const text=JSON.stringify(d),plan=ctx.planSectionViewPresentation(text,d,0,active,'explore');assert.ok(!plan.error,plan.error);
-    const next=JSON.parse(plan.text),selected=active==='flow'?'flow':'layout';
-    assert.equal(plan.layoutId,selected);assert.equal(next.defaultLayout,'layout');
-    assert.deepEqual(next.layouts[0].sectionLayout,migrated(d.sectionLayout));assert.equal(next.layouts[0].name,'Resident view');
-    assert.equal(ctx.sectionLayoutDefinition(next,selected).presentation,'explore');
-    assert.equal(ctx.sectionLayoutDefinition(next,selected==='flow'?'layout':'flow').presentation,'standard');
-    assert.equal(ctx.sectionLayoutDock(next.layouts[1].sectionLayout.default),'diagram');
-    assert.equal(JSON.stringify(d),text);
-  }
-});
-
-test('promotion preserves graph-only, step-free and non-docking focus contracts without accepting stale IDs',()=>{
-  const graph={...diagram(),panels:[]};delete graph.primaryPanel;
-  for(const id of [undefined,null,'default','flow']){
-    const p=ctx.planSectionViewPresentation(JSON.stringify(graph),graph,0,id,'explore');assert.ok(!p.error,p.error);
-    const next=JSON.parse(p.text);assert.deepEqual(next.layouts.map(v=>v.id),['flow']);assert.equal(next.defaultLayout,'flow');assert.equal(p.layoutId,'flow');
-  }
-  for(const id of ['home','layout','deleted'])assert.ok(ctx.planSectionViewPresentation(JSON.stringify(graph),graph,0,id,'explore').error);
-  for(const overrides of [{steps:[],paths:[]},{view:'ambient-only'},{primaryPanel:'phone'}]){
-    const d={...diagram(),...overrides},p=ctx.planSectionViewPresentation(JSON.stringify(d),d,0,'home','explore');assert.ok(!p.error,p.error);
-    const next=JSON.parse(p.text),items=next.layouts[0].sectionLayout.default;
-    assert.equal(items[0].panel,d.primaryPanel);assert.equal(items.find(t=>ctx.sectionLayoutKey(t)==='diagram').hidden,true);
-    if(d.primaryPanel==='phone'){assert.ok(items.some(t=>t.controls==='steps'));assert.equal(ctx.sectionLayoutDock(items),null);}
-    else assert.ok(!items.some(t=>t.controls));
-    const warnings=[];ctx.sectionLayoutWarnings(next,'diagram',warnings);assert.deepEqual(warnings,[]);
+test('page mode owns direct sections and bare diagrams without promoting or rewriting Views',()=>{
+  for(const wrap of [d=>d,d=>({sections:[{diagram:d},{diagram:diagram()}]}),d=>({page:{sections:[{diagram:d},{diagram:diagram()}]}})]){
+    const d=diagram(),raw=wrap(d),text=JSON.stringify(raw);
+    const plan=ctx.planSectionViewPresentation(text,raw,0,'home','explore');assert.ok(!plan.error,plan.error);
+    const next=JSON.parse(plan.text),owner=next.page || next;assert.equal(owner.presentation,'explore');
+    assert.ok(plain(ctx.sectionRecords(ctx.normalize(next))).every(r=>r.presentation==='explore'));
+    delete owner.presentation;assert.deepEqual(next,raw);assert.equal(JSON.stringify(raw),text);
   }
 });
 
@@ -498,23 +428,23 @@ test('duplicating a view preserves explicit presentations while older omitted se
     const text=JSON.stringify(d),plan=ctx.planDuplicateSectionLayout(text,d,0,'engineering');assert.ok(!plan.error,plan.error);
     const next=JSON.parse(plan.text);assert.deepEqual(next.layouts[0],view);
     assert.equal(next.layouts[1].presentation,value);assert.deepEqual(next.layouts[1].steps,['one']);
-    assert.equal(ctx.sectionLayoutDefinition(next,plan.layoutId).presentation,value || 'standard');
+    assert.equal(ctx.sectionLayoutDefinition(next,plan.layoutId).presentation,'standard');
     assert.equal(JSON.stringify(d),text);
   }
 });
 
-test('named layouts starter opens Standard and offers Explore for the same technical story',()=>{
+test('named layouts starter defaults to Standard across its saved Views',()=>{
   const spec=JSON.parse(fs.readFileSync(path.join(__dirname,'../src/starters/named-layouts.json'),'utf8'));
   const d=spec.page.sections[0].diagram,warnings=[];ctx.sectionLayoutWarnings(d,'diagram',warnings);assert.deepEqual(warnings,[]);
   assert.equal(ctx.sectionLayoutDefinition(d).presentation,'standard');
-  assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').presentation,'explore');
+  assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').presentation,'standard');
   assert.equal(ctx.sectionLayoutDefinition(d,'service-flow').steps,undefined);
 });
 
 test('Explore defaults validate independently and remain view-local through duplicate, rename and delete',()=>{
-  const d=diagram();d.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone]}}];
+  const d=diagram();d.presentation='explore';d.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[board,phone]}}];
   const value={overlayScale:.75,panels:[{panel:'home',x:.6,y:.05,w:.3,h:.45,stacked:false}],controls:{x:.05,y:.8,w:.7,h:.12},camera:{zoom:1.25,x:.6,y:.4}};
-  const text=JSON.stringify({page:{sections:[{diagram:d}]}} ,null,2),raw=JSON.parse(text);
+  const text=JSON.stringify({page:{presentation:'explore',sections:[{diagram:d}]}} ,null,2),raw=JSON.parse(text);
   const plan=ctx.planSectionExploreLayout(text,raw,0,'engineering',value);assert.ok(!plan.error,plan.error);
   const next=JSON.parse(plan.text),nd=next.page.sections[0].diagram;
   assert.deepEqual(nd.layouts[0].exploreLayout,value);assert.deepEqual(nd.steps,d.steps);assert.deepEqual(nd.layouts[0].sectionLayout,d.layouts[0].sectionLayout);
@@ -527,7 +457,7 @@ test('Explore defaults validate independently and remain view-local through dupl
   assert.deepEqual(JSON.parse(remove.text).page.sections[0].diagram.layouts.map(v=>v.exploreLayout.panels),[[],[]]);
   const reset=ctx.planSectionExploreLayout(plan.text,next,0,'engineering',null);assert.ok(!reset.error,reset.error);assert.equal(JSON.parse(reset.text).page.sections[0].diagram.layouts[0].exploreLayout,undefined);
   assert.ok(ctx.planSectionExploreLayout(text,raw,0,'missing',value).error);
-  d.layouts[0].presentation='standard';assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'engineering',value).error);
+  d.presentation='standard';assert.ok(ctx.planSectionExploreLayout(JSON.stringify(d),d,0,'engineering',value).error);
 });
 test('malformed Explore geometry warns and falls back without hiding the view or altering source',()=>{
   const d=diagram();const value={panels:[{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'home',x:0,y:0,w:.3,h:.4},{panel:'missing',x:0,y:0,w:.3,h:.4},{panel:'phone',x:0,y:0,w:0,h:1}],controls:{x:0,y:0,w:1,h:2},camera:{zoom:0,x:0,y:0}};
@@ -551,10 +481,10 @@ test('Explore overlay scale accepts bounded numeric values and recovers independ
 });
 
 test('Explore prose defaults accept independent visibility and bounded geometry without changing page content',()=>{
-  const d=diagram();d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]}}];
+  const d=diagram();d.presentation='explore';d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]}}];
   for(const prose of [{hidden:true},{x:.6,y:.2,w:.3,h:.4,stacked:false,hidden:false}]){
     const value={prose,overlayScale:.75},warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
-    const raw={page:{sections:[{text:['**Explanation**'],bullets:[{text:'Parent',sub:['Child']}],diagram:d}]}},text=JSON.stringify(raw,null,2);
+    const raw={page:{presentation:'explore',sections:[{text:['**Explanation**'],bullets:[{text:'Parent',sub:['Child']}],diagram:d}]}},text=JSON.stringify(raw,null,2);
     const edit=ctx.planSectionExploreLayout(text,raw,0,'eng',value);assert.ok(!edit.error,edit.error);
     const next=JSON.parse(edit.text);assert.deepEqual(next.page.sections[0].text,raw.page.sections[0].text);assert.deepEqual(next.page.sections[0].bullets,raw.page.sections[0].bullets);
     const duplicate=ctx.planDuplicateSectionLayout(edit.text,next,0,'eng');assert.deepEqual(JSON.parse(duplicate.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
@@ -569,7 +499,7 @@ test('Explore prose defaults accept independent visibility and bounded geometry 
 
 test('Explore step captions accept view-local relative positions and reject unknown placements',()=>{
   const d=diagram(),controls={x:.05,y:.8,w:.8,h:.15};
-  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:{controls}}];
+  d.presentation='explore';d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:{controls}}];
   for(const textPosition of ['below','above','left','right']){
     const value={controls,steps:{textPosition}},warnings=[];
     assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
@@ -586,8 +516,8 @@ test('Explore step captions accept view-local relative positions and reject unkn
 test('Explore canvas placement validates graph rectangles separately and preserves both layouts through panel lifecycle',()=>{
   const d=diagram(),value={panelPlacement:'canvas',panels:[{panel:'home',x:.6,y:.1,w:.3,h:.4,stacked:false}],canvas:{controlsScale:.7,panels:[{panel:'home',x:-380,y:20,w:340,h:300}],prose:{x:900,y:200,w:300,h:180}}};
   const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
-  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
-  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+  d.presentation='explore';d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const raw={page:{presentation:'explore',sections:[{diagram:d}]}},text=JSON.stringify(raw);
   const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',value);assert.ok(!plan.error,plan.error);
   const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
   const renamed=ctx.planRenamePanel(text,raw,0,0,'house'),renamedLayout=JSON.parse(renamed.text).page.sections[0].diagram.layouts[0].exploreLayout;
@@ -611,7 +541,7 @@ test('per-panel Explore placements validate independently and survive chapter an
  const d=diagram(),value={panelPlacement:'canvas',panelPlacements:[{panel:'home',placement:'floating'}],panels:[{panel:'home',x:.5,y:.1,w:.3,h:.4,stacked:false}],canvas:{panels:[{panel:'home',x:-380,y:20,w:340,h:300}]}};
  const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
- const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+ const raw={page:{presentation:'explore',sections:[{diagram:d}]}},text=JSON.stringify(raw);
  const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
  const renamed=ctx.planRenamePanel(text,raw,0,0,'house'),layout=JSON.parse(renamed.text).page.sections[0].diagram.layouts[0].exploreLayout;
  assert.deepEqual(layout.panelPlacements,[{panel:'house',placement:'floating'}]);assert.equal(layout.panels[0].panel,'house');assert.equal(layout.canvas.panels[0].panel,'house');
@@ -630,7 +560,7 @@ test('step controls placement and independent graph geometry validate without ch
  const warnings=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
  assert.deepEqual(plain(ctx.sectionExploreLayout(d,{controls})),{controls});
  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
- const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+ const raw={page:{presentation:'explore',sections:[{diagram:d}]}},text=JSON.stringify(raw);
  const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
  for(const placement of ['floating','canvas']){const next={...value,controlsPlacement:placement};const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',next);assert.ok(!plan.error,plan.error);assert.deepEqual(JSON.parse(plan.text).page.sections[0].diagram.layouts[0].exploreLayout,next);}
  for(const invalid of [null,[],{},'screen']){const input={controls,controlsPlacement:invalid},issues=[];assert.deepEqual(plain(ctx.sectionExploreLayout(d,input,issues)),{controls});assert.equal(issues.length,1);assert.ok(ctx.planSectionExploreLayout(text,raw,0,'eng',input).error);}
@@ -642,8 +572,8 @@ test('Section notes placement validates, preserves both geometries and survives 
  for(const prosePlacement of ['floating','canvas']){
   const value={prosePlacement,prose,canvas},warnings=[];
   assert.deepEqual(plain(ctx.sectionExploreLayout(d,value,warnings)),value);assert.deepEqual(warnings,[]);
-  d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
-  const raw={page:{sections:[{diagram:d}]}},text=JSON.stringify(raw);
+  d.presentation='explore';d.layouts=[{id:'eng',name:'Engineering',presentation:'explore',sectionLayout:{default:[board]},exploreLayout:value}];
+  const raw={page:{presentation:'explore',sections:[{diagram:d}]}},text=JSON.stringify(raw);
   const plan=ctx.planSectionExploreLayout(text,raw,0,'eng',{...value,prosePlacement:prosePlacement==='canvas'?'floating':'canvas'});assert.ok(!plan.error,plan.error);
   const dup=ctx.planDuplicateSectionLayout(text,raw,0,'eng');assert.deepEqual(JSON.parse(dup.text).page.sections[0].diagram.layouts[1].exploreLayout,value);
  }

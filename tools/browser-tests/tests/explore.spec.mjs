@@ -5,7 +5,7 @@ import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 async function build(server,{unstacked=false,oversized=false}={}){
- const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;sec.id='doorbell';d.autoplay=false;
+ const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;sec.id='doorbell';d.autoplay=false;spec.page.presentation='explore';
  delete d.layouts[1].exploreLayout;d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.panels.push({id:'queue',type:'queue',title:'Upload queue',initial:{depth:3}});
  if(unstacked)d.layouts[1].exploreLayout={
@@ -21,7 +21,7 @@ async function buildDynamic(server){
  const columns=[{id:'event',label:'Event'},{id:'status',label:'Status'}];
  const panel=id=>({id,type:'table',title:id[0].toUpperCase()+id.slice(1),columns,initial:{rows:[{id:'ready',cells:{event:'Ready',status:'Waiting'}}]}});
  const rich=Array.from({length:6},(_,index)=>({id:'event-'+index,cells:{event:'Event '+(index+1),status:index<5?'Processed':'Ready'}}));
- const raw={page:{title:'Dynamic Explore panels',sections:[{id:'dynamic',heading:'Dynamic panels',diagram:{autoplay:false,view:'step',defaultLayout:'flow',nodes:{service:{title:'Service'}},rows:[['service']],panels:['dynamic','revealed','authored','manual'].map(panel),steps:[
+ const raw={page:{presentation:'explore',title:'Dynamic Explore panels',sections:[{id:'dynamic',heading:'Dynamic panels',diagram:{autoplay:false,view:'step',defaultLayout:'flow',nodes:{service:{title:'Service'}},rows:[['service']],panels:['dynamic','revealed','authored','manual'].map(panel),steps:[
   {id:'short',text:'Panels begin with one row.',panelVisibility:{revealed:false}},
   {id:'rich',text:'Panels gain a moderate event history.',panelVisibility:{revealed:true},panels:{dynamic:{rows:rich},revealed:{rows:rich},authored:{rows:rich},manual:{rows:rich}}}
  ],layouts:[{id:'flow',name:'Flow',presentation:'explore',exploreLayout:{panels:[{panel:'authored',x:.73,y:.02,w:.25,h:.15,stacked:true}]},sectionLayout:{default:[{x:0,y:0,w:8,h:18},{controls:'steps',x:0,y:18,w:8,h:6},{panel:'dynamic',x:8,y:0,w:4,h:6},{panel:'revealed',x:8,y:6,w:4,h:6},{panel:'authored',x:8,y:12,w:4,h:6},{panel:'manual',x:8,y:18,w:4,h:6}]}}]}}]}};

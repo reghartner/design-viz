@@ -2384,7 +2384,7 @@ function renderMultiInspector(multiSel){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
         var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
-        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
+        if(!view || sectionPresentation(normalize(raw),target.section)!=='explore')return {error:'Reselect the step controls in an Explore view.'};
         var next=JSON.parse(JSON.stringify(view.exploreLayout || {}));next.controlsPlacement=value;
         return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);
       },{exploreLayout:{section:target.section,id:target.layoutId},after:refreshFormSoon});
@@ -2396,7 +2396,7 @@ function renderMultiInspector(multiSel){
       return commitCascade(function(raw){
         var rec=specSectionPaths(raw)[target.section],diagram=rec && specValueAt(raw,rec.diagram);
         var view=diagram && Array.isArray(diagram.layouts) && diagram.layouts.find(function(item){return item && item.id===target.layoutId;});
-        if(!view || view.presentation!=='explore')return {error:'Reselect the step controls in an Explore view.'};
+        if(!view || sectionPresentation(normalize(raw),target.section)!=='explore')return {error:'Reselect the step controls in an Explore view.'};
         var next=view.exploreLayout && typeof view.exploreLayout==='object' && !Array.isArray(view.exploreLayout)?JSON.parse(JSON.stringify(view.exploreLayout)):{};
         if(value==='below')delete next.steps;else next.steps={textPosition:value};
         return planSectionExploreLayout(session.text(),raw,target.section,target.layoutId,next);

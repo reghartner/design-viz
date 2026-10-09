@@ -15,7 +15,7 @@ async function build(server,steps,{explore=true,exploreId="engineering"}={}){
   const layouts=[{id:'business',name:'Business view',presentation:'standard',sectionLayout:{default:tiles}}];
   if(explore)layouts.push({id:exploreId,name:'Engineering view',presentation:'explore',sectionLayout:{default:tiles}},
     {id:'other-engineering',name:'Other engineering view',presentation:'explore',sectionLayout:{default:tiles}});
-  const spec={page:{title:'Tour controls',skin:'pastel',tour:{version:1,steps:[...steps,done]},sections:[{
+  const spec={page:{presentation:explore?'explore':'standard',title:'Tour controls',skin:'pastel',tour:{version:1,steps:[...steps,done]},sections:[{
     id:'flow',heading:'One service story',diagram:{view:'step',autoplay:false,nodes:{a:{title:'Camera'},b:{title:'Service'}},
       rows:[['a','b']],edges:[{from:'a',to:'b'}],layouts,
       panels:[{id:'status',type:'state',title:'Device state',states:['Ready','Uploading','Done'],initial:{state:'Ready'}},
@@ -43,7 +43,7 @@ test('tour selects named presentations, spotlights a visible panel, and honors a
     spot('Explore panels','.panelcol, .pwidget',{presentation:'explore'}),
     spot('Explicit view wins','.pwidget',{presentation:'explore',view:'business'})]);
   await page.goto(url+'#tour=1');
-  await expect(heading(page)).toHaveText('Standard panels');
+  await expect(heading(page)).toHaveText('Explore panels');
   await expect(selectedView(page)).toHaveText('Business view');
   await expect(page.locator('.panelcol')).toBeHidden();
   // A stale sidebar selector must not win over the visible moved widget.
@@ -52,15 +52,14 @@ test('tour selects named presentations, spotlights a visible panel, and honors a
     const card=[...document.querySelectorAll('.pwidget')].find(e=>e.getClientRects().length)?.getBoundingClientRect();
     return !!ring&&!!card&&ring.left<=card.left&&ring.right>=card.right&&ring.top<=card.top&&ring.bottom>=card.bottom;
   })).toBe(true);
-  await page.locator('.dv-tour-next').click();
   await expect(heading(page)).toHaveText('Explore panels');
-  await expect(selectedView(page)).toHaveText('Engineering view');
+  await expect(selectedView(page)).toHaveText('Business view');
   await expect(page.locator('.explore-stage')).toBeVisible();
   await expect(page.locator('.dv-tour-ring')).toBeVisible();
   await page.locator('.dv-tour-next').click();
   await expect(heading(page)).toHaveText('Explicit view wins');
   await expect(selectedView(page)).toHaveText('Business view');
-  await expect(page.locator('.explore-stage')).toBeHidden();
+  await expect(page.locator('.explore-stage')).toBeVisible();
 });
 
 test('an unavailable presentation skips its topic instead of teaching the wrong view',async({page,server})=>{
@@ -121,7 +120,7 @@ test('Try the controls gives keyboard arrows to the highlighted panel grip',asyn
 
 test('Escape restores paused playback, the selected stop, panel geometry and visibility, and zoom',async({page,server})=>{
   await page.emulateMedia({reducedMotion:'no-preference'});
-  const url=await build(server,[spot('Try the workspace','.section-viewport',{presentation:'explore',step:'ready'})]);
+  const url=await build(server,[spot('Try the workspace','.section-viewport',{presentation:'explore',step:'ready'},{secondary:[{target:{selector:'.viewport-actions',within:'section'}}]})]);
   await page.goto(url+'#d=flow&v=engineering&m=step&s=upload');
   const status=panel(page,'status'),queue=panel(page,'queue');
   const grip=status.locator('.explore-window-grip'),resize=status.locator('.explore-window-resize');
@@ -208,7 +207,7 @@ test('leaving a tour restores a section that was already in real fullscreen',asy
   // A real gesture permits the restoration request under browser policy.
   await page.locator('.dv-tour-exit').click();
   await expect(page.locator('.dv-tour')).toBeHidden();
-  await expect.poll(()=>page.evaluate(()=>document.fullscreenElement===document.querySelector('.section-viewport'))).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>document.fullscreenElement===document.querySelector('.docview'))).toBe(true);
   await expect(selectedView(page)).toHaveText('Engineering view');
   await expect(page.getByRole('button',{name:'Exit expanded diagram view',exact:true})).toBeVisible();
 });
@@ -242,7 +241,7 @@ test('restoring an in-page expansion does not upgrade it to browser fullscreen',
 test('the default tour keeps the Explore player and highlighted panel on screen after recentering',async({page,server})=>{
   await page.setViewportSize({width:1500,height:1000});
   const spec=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
-  spec.page.sections[0].diagram.autoplay=false;
+  spec.page.presentation='explore';spec.page.sections[0].diagram.autoplay=false;
   const input=path.join(server.root,'tour-explore-named.json'),output=path.join(server.root,'tour-explore-named.html');
   await writeFile(input,JSON.stringify(spec));
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);

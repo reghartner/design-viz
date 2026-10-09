@@ -10,7 +10,7 @@ function fixture(exploreLayout){
   const standard={...d.layouts[0],id:'standard',name:'Standard story',presentation:'standard'};delete standard.steps;
   const explore={...structuredClone(standard),id:'explore',name:'Explore story',presentation:'explore'};
   if(exploreLayout)explore.exploreLayout=structuredClone(exploreLayout);
-  d.layouts=[standard,explore];d.defaultLayout='explore';return raw;
+  d.layouts=[standard,explore];d.defaultLayout='explore';raw.page.presentation='explore';return raw;
 }
 const section=page=>page.locator('#section-delivery');
 const panel=page=>section(page).locator('[data-explore-panel="home"]');
@@ -100,11 +100,11 @@ test('main canvas Explore gestures author one history entry each and survive sta
   // it or retaining the old runtime's temporary panel memories.
   await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);
   await expect(section(page)).toHaveAttribute('data-view-id','explore');await expectSavedGeometry(page,layout);
-  await section(page).getByRole('button',{name:'Standard story',exact:true}).click();await expect(page.locator('#src')).toHaveValue(saved);
+  await page.locator('.explore-navigation').getByRole('button',{name:'Standard story',exact:true}).click();await expect(page.locator('#src')).toHaveValue(saved);
   // Standard is the curated page, with no floating canvas geometry to edit.
   await expect(section(page).locator('.explore-stage')).toBeHidden();await expect(panel(page)).toHaveCount(0);
   await expect(section(page).locator('.pwidget[data-dv-panel="0"]')).toBeVisible();await expect(page.locator('#undo-builder')).toBeDisabled();
-  await section(page).getByRole('button',{name:'Explore story',exact:true}).click();await expectSavedGeometry(page,layout);
+  await page.locator('.explore-navigation').getByRole('button',{name:'Explore story',exact:true}).click();await expectSavedGeometry(page,layout);
   await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 

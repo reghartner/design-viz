@@ -7,7 +7,7 @@ import {repo} from '../helpers/prepare.mjs';
 function fixture(placement){
  const items=[{x:0,y:0,w:8,h:12},{controls:'steps',x:0,y:12,w:8,h:6},
   {panel:'status',x:8,y:0,w:4,h:6},{panel:'detail',x:8,y:6,w:4,h:6},{panel:'excluded',x:8,y:12,w:4,h:6,hidden:true}];
- return {page:{title:'Explore path panel ownership',sections:[{id:'paths',heading:'Delivery',diagram:{view:'step',autoplay:false,
+ return {page:{presentation:'explore',title:'Explore path panel ownership',sections:[{id:'paths',heading:'Delivery',diagram:{view:'step',autoplay:false,
   nodes:{sender:{title:'Sender'},receiver:{title:'Receiver'}},rows:[['sender','receiver']],edges:[{from:'sender',to:'receiver',kind:'int'}],
   panels:['status','detail','excluded'].map(id=>({id,type:'state',title:id,states:['Ready','Delivered','Failed'],initial:{state:'Ready'}})),
   steps:[{id:'start',text:'Ready to send',nodes:['sender']},

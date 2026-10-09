@@ -83,3 +83,10 @@ instructions here; the [reader tour](tour.md) runs only on read-only diagrams.
 
 The [canon library guide](workbench-canon-library.md) explains how a company
 ships its reviewed diagrams beside the editor.
+
+The document navigation stays pinned above the content in Standard and Explore,
+including the reader preview. Tabs, section buttons and Views remain reachable
+while scrolling. **Viewing mode** changes the whole tab; sections outside tabs
+share a page mode. Switching a section or saved View preserves that mode.
+Old per-View mode fields are ignored; choose Explore in the top row to save the
+new tab or page setting. This is one Undo action and preserves the saved Views.

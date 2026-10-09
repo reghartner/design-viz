@@ -253,7 +253,7 @@ test('diagram routing edits the selected section or bare diagram with exact undo
 });
 
 test('Explore step controls inspector edits caption placement without changing steps or sibling layout defaults',()=>{
-  const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
+  const e=environment(),spec={presentation:'explore',nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
     id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]},
     exploreLayout:{overlayScale:.8,controls:{x:.05,y:.75,w:.8,h:.18}}
   }]};

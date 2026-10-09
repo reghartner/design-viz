@@ -15,7 +15,8 @@ function initViewerExploreCanvas(ctl,view,opts){
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   }
-  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action});
+  view.classList.toggle('navigation-contained',container!==document.body);
+  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action,isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;
@@ -31,7 +32,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     if(previous && previous!==active){
       // Restore focused tab/chapter controls before the viewport changes DOM
       // ownership; otherwise a keyboard mode switch can strand focus on body.
-      navigation.restore();previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);
+      previous.sectionEl.classList.remove('explore-active-section');previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);
     }
     container.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
     if(!active){
@@ -40,7 +41,7 @@ function initViewerExploreCanvas(ctl,view,opts){
       var anchor=container===document.body && view.querySelector('.dv-hash-target');
       if(anchor!==document.activeElement)anchor=null;
       var top=anchor && anchor.getBoundingClientRect().top;
-      if(rec)navigation.mount(rec);else navigation.restore();
+      navigation.mount(rec);
       if(anchor && anchor.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
       return;
     }
@@ -77,7 +78,7 @@ function initViewerExploreCanvas(ctl,view,opts){
         rec.viewport.setWorkbenchCanvas(!explicit && inherited);inherited=rec.viewport.isExplore();
       });
       show(stack[stack.length-1]);
-    }else if(detailRoot){var root=detailRoot;detailRoot=null;show(detailOriginExplore?root:null);}
+    }else if(detailRoot){var root=detailRoot;detailRoot=null;show(root);}
     else if(active){var target=ctl.activeTarget;show(ctl.sections.find(function(r){return target && r.number===target.section;}));}
   }
   view.addEventListener('detail-navigation',detailChanged);
@@ -94,7 +95,7 @@ function initViewerExploreCanvas(ctl,view,opts){
   function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
-  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?tabPrimary(target):null;
+  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?(tabPrimary(target) || ctl.sections.find(function(r){return r.tabBlock===target.tabBlock && r.tab===target.tab;})):null;
   if(!initial && (!target || target.kind!=='tab'))initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && !r.tabBlock;});
   if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
   show(initial);if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();

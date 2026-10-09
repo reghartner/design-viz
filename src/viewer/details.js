@@ -133,11 +133,12 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var host=document.createElement('div');
     root.rec.sectionEl.parentNode.insertBefore(host,root.rec.sectionEl.nextSibling);
     var built;
-    try{built=buildSection(host,section,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
+    var renderedSection=section.diagram?Object.assign({},section,{diagram:diagramWithPresentation(section.diagram,root.rec.viewingMode || (root.rec.viewport && root.rec.viewport.viewDefinition() || {}).presentation)}):section;
+    try{built=buildSection(host,renderedSection,serial++,'detail-'+serial,resolveProtocols(childPage),skinBase(skin),resolveLanes(childPage),backlinks,
       function(){changed(false);},null,Object.assign({},options,{autoplay:false,localHandoffTarget:childPage===page?options.localHandoffTarget:null}));}
     catch(error){host.remove();throw error;}
     var el=built.sectionEl;host.replaceWith(el);
-    built.reference=el.id;built.number=serial;
+    built.reference=el.id;built.number=serial;built.viewingMode=root.rec.viewingMode || (root.rec.viewport && root.rec.viewport.viewDefinition() || {}).presentation || 'standard';
     el.setAttribute('data-dv-detail-preview','');
     var eyebrow=el.querySelector('.sec-eyebrow');if(eyebrow)eyebrow.textContent='Detail flow';
     el.querySelectorAll('.embedcopy').forEach(function(b){b.remove();});

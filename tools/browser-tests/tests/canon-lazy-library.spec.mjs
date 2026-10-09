@@ -129,7 +129,7 @@ test('a referenced block is visibly framed, blocked removal explains consumer re
 for(const canvas of [false,true])test('reference actions navigate, explain blocked deletion, and undo in '+(canvas?'Canvas':'Standard'),async({page,server},info)=>{
   await page.setViewportSize({width:canvas?1280:1440,height:1000});const fixture=await pickerFixture(page,server);
   if(canvas){
-    const raw=JSON.parse(await page.locator('#src').inputValue());raw.page.blocks[0].diagram.layouts=[{...editorSpec().page.blocks[0].diagram.layouts[0],id:'canvas',name:'Canvas',presentation:'explore'}];raw.page.blocks[0].diagram.defaultLayout='canvas';
+    const raw=JSON.parse(await page.locator('#src').inputValue());raw.page.presentation='explore';raw.page.blocks[0].diagram.layouts=[{...editorSpec().page.blocks[0].diagram.layouts[0],id:'canvas',name:'Canvas',presentation:'explore'}];raw.page.blocks[0].diagram.defaultLayout='canvas';
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(JSON.stringify(raw,null,2));await page.locator('#go').click();await prepareEditorSurface(page);
   }
   await openTopology(page);await expect(page.locator('#topology-add')).toBeEnabled();await page.locator('#topology-add').click();await prepareEditorSurface(page);
@@ -502,7 +502,7 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   const source=sources[1],section=source.page.sections[0],d=section.diagram;
   d.layouts=[{id:'canvas',name:'Engineering',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},{id:'standard',name:'Overview',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
   const other=structuredClone(section);other.id='alternate';other.heading='Alternate diagram';
-  source.page.sections=[{tabs:[{label:'First tab',sections:[section]},{label:'Second tab',sections:[other]}]}];
+  source.page.sections=[{tabs:[{label:'First tab',presentation:'explore',sections:[section]},{label:'Second tab',presentation:'explore',sections:[other]}]}];
   const snapshot=prepareCanonSnapshot(sources),spec=snapshot.loadSpec('checkout'),workspace=snapshot.loadWorkspace('checkout');
   await page.route('**/api/canon/context?*',route=>route.fulfill({json:{spec,...workspace,catalog:{version:1,services:[]}}}));
   const handoff={version:1,id:'checkout',revision:digest(spec),action:handoffAction || 'view'};
@@ -512,7 +512,7 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   for(const width of [1440,390]){
     await page.setViewportSize({width,height:1000});await expect(edit).toBeInViewport();
     await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
-    await nav.getByRole('button',{name:'Overview',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
+    await nav.getByRole('button',{name:'Overview',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
     await nav.getByRole('tab',{name:'Second tab',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeInViewport();
     await nav.getByRole('tab',{name:'First tab',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
     await nav.getByRole('button',{name:'Engineering',exact:true}).click();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);

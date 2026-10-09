@@ -10,7 +10,7 @@ async function build(server,spec,name='views'){
  await writeFile(input,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
  return server.origin+'/'+name+'.html';
 }
-const selected=page=>page.locator('#section-front-door [data-view-layout][aria-pressed=true]');
+const selected=page=>page.locator('.explore-navigation [data-view-layout][aria-pressed=true]');
 const viewOf=page=>new URLSearchParams(new URL(page.url()).hash.slice(1)).get('v');
 
 test('named links select host profile, view, alternate and visible step; copying and reload retain them',async({page,server})=>{
@@ -25,9 +25,9 @@ test('named links select host profile, view, alternate and visible step; copying
  await expect(sec.locator('.board')).toBeVisible();await expect(sec.locator('.stepline')).toContainText('Internet service is down');
  await sec.getByRole('button',{name:'Copy link to this diagram step',exact:true}).click();
  const copy=await page.evaluate(()=>__copied.at(-1));expect(new URL(copy).search).toBe('?layout=confluence');expect(new URL(copy).hash).toContain('v=service-flow');expect(new URL(copy).hash).toContain('p=offline&s=offline');
- await sec.getByRole('button',{name:'Home story',exact:true}).click();expect(viewOf(page)).toBe('home-story');
+ await page.locator('.explore-navigation').getByRole('button',{name:'Home story',exact:true}).click();expect(viewOf(page)).toBe('home-story');
  await expect(sec.locator('.board')).toBeHidden();await expect(sec.locator('.stepline')).toContainText('A quiet home');await expect(sec.locator('.stepline')).not.toContainText('Internet service is down');
- await sec.locator('.embedcopy').click();const embed=await page.evaluate(()=>__copied.at(-1));expect(new URL(embed).hash).toBe('#embed=front-door&v=home-story');
+ await page.locator('.explore-navigation .embedcopy').click();const embed=await page.evaluate(()=>__copied.at(-1));expect(new URL(embed).hash).toBe('#embed=front-door&v=home-story');
  await page.reload();await expect(selected(page)).toHaveAttribute('data-layout-id','home-story');
  await page.goto(embed);await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveAttribute('data-view-id','home-story');
  await expect(sec.locator('.board')).toBeHidden();
@@ -67,16 +67,16 @@ test('legacy Home, Data flow and single-layout aliases work, while named IDs tak
 });
 
 test('view-only embeds target their section even without steps or when other sections come first',async({page,server})=>{
- const spec=structuredClone(named),d=spec.page.sections[0].diagram;delete d.steps;delete d.paths;d.layouts.forEach(v=>delete v.steps);
+ const spec=structuredClone(named),d=spec.page.sections[0].diagram;spec.page.presentation='explore';delete d.steps;delete d.paths;d.layouts.forEach(v=>delete v.steps);
  spec.page.sections.unshift({id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}});
  const url=await build(server,spec,'no-step-views');await page.goto(url+'#embed=front-door&v=service-flow');
  await expect(page.locator('#section-other')).toBeHidden();await expect(page.locator('#section-front-door')).toHaveClass(/dv-embed-target/);
  await expect(page.locator('.explore-navigation-diagrams')).toBeHidden();
  const shell=await page.locator('#section-front-door .viewer-diagram-canvas').boundingBox();
- const nav=await page.locator('#section-front-door .explore-navigation').boundingBox();
+ const nav=await page.locator('.docview > .explore-navigation').boundingBox();
  const stage=await page.locator('#section-front-door .explore-stage').boundingBox();
  const board=await page.locator('#section-front-door .explore-board').boundingBox(),viewport=page.viewportSize();
- expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+ expect(shell).toEqual({x:0,y:nav.y+nav.height,width:viewport.width,height:viewport.height-nav.y-nav.height});
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(board.x).toBeGreaterThanOrEqual(stage.x);expect(board.y).toBeGreaterThanOrEqual(stage.y);
  expect(board.x+board.width).toBeLessThanOrEqual(stage.x+stage.width);
@@ -85,14 +85,14 @@ test('view-only embeds target their section even without steps or when other sec
  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');
 });
 
-test('tabbed view-only embeds keep Chapters without an empty document Tabs group',async({page,server})=>{
+test('tabbed view-only embeds keep Views without an empty document Tabs group',async({page,server})=>{
  const spec=structuredClone(named),target=spec.page.sections[0];
  spec.page.blocks=[{tabs:[
   {label:'Other tab',sections:[{id:'other',heading:'Other',diagram:{nodes:{a:{title:'Other'}},rows:[['a']]}}]},
   {label:'Target tab',sections:[target]},
  ]}];delete spec.page.sections;
  const url=await build(server,spec,'tabbed-view-embed');await page.goto(url+'#embed=front-door&v=service-flow');
- const sec=page.locator('#section-front-door'),nav=sec.locator('.explore-navigation');
+ const sec=page.locator('#section-front-door'),nav=page.locator('.docview > .explore-navigation');
  await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveClass(/dv-embed-target/);
  await expect(nav.locator('.explore-navigation-tabs')).toBeHidden();await expect(nav.locator('.explore-navigation-tabs .tabbtn')).toHaveCount(0);await expect(nav.locator('.explore-navigation-diagrams')).toBeHidden();await expect(nav.locator('.explore-diagram-button')).toHaveCount(1);await expect(nav.locator('.explore-diagram-button')).toHaveAttribute('aria-pressed','true');await expect(nav.getByRole('button',{name:'Other',exact:true,includeHidden:true})).toHaveCount(0);
  await expect(nav.locator('.explore-navigation-chapters')).toBeVisible();await expect(selected(page)).toHaveText('Service flow');

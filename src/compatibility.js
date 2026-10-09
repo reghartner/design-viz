@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
+    'layout.document-presentation':['Tab and page viewing mode','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
     'layout.graph-frame':['Saved graph content framing','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
@@ -142,7 +143,6 @@ var FlowviewCompatibility = (function(){
         used['layout.named']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.steps);}))used['layout.step-subsets']=true;
         if(d.layouts.some(function(v){return v && Array.isArray(v.paths);}))used['layout.path-subsets']=true;
-        if(d.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore']=true;
         if(d.layouts.some(function(v){return v && v.exploreLayout!=null;}))used['layout.explore-defaults']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.overlayScale!=null;}))used['layout.explore-scale']=true;
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && (v.exploreLayout.prosePlacement==='canvas' || v.exploreLayout.controlsPlacement==='canvas' || v.exploreLayout.panelPlacement==='canvas' || v.exploreLayout.canvas!=null);}))used['layout.explore-canvas']=true;
@@ -152,23 +152,24 @@ var FlowviewCompatibility = (function(){
         if(d.layouts.some(function(v){return v && object(v.exploreLayout) && v.exploreLayout.prose!=null;}))used['layout.explore-prose']=true;
       }
     }
-    function contracts(s){
+    function contracts(s,presentation){
       if(!object(s))return;
       if(Array.isArray(s.contracts) && s.contracts.length || object(s.contract) && s.contract.span!=null)used['content.contracts']=true;
       [s.contract].concat(Array.isArray(s.contracts)?s.contracts:[]).forEach(function(ct){if(object(ct) && Array.isArray(ct.wires) && ct.wires.length)used['content.wire-contracts']=true;});
       var prose=typeof s.text==='string'?s.text.length>0:Array.isArray(s.text) && s.text.some(function(text){return typeof text==='string' && text.length>0;});
-      if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && Array.isArray(s.diagram.layouts) &&
-        s.diagram.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore-prose']=true;
+      if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && presentation==='explore')used['layout.explore-prose']=true;
     }
     if(!object(page))return [];
+    if(page.presentation==='explore'){used['layout.explore']=true;used['layout.document-presentation']=true;}
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
       if(!object(b))return;
       if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
-      diagram(b.diagram);contracts(b);
+      diagram(b.diagram);contracts(b,page.presentation);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
-        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s);});
+        if(t && t.presentation==='explore'){used['layout.explore']=true;used['layout.document-presentation']=true;}
+        (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s,t.presentation);});
       });
     });
     return Object.keys(used).sort();

@@ -101,6 +101,9 @@ function wireTour(ctl, view, win, config, options){
                (sec && sec.sectionEl ? sec.sectionEl : null);
     if (!root || !target || typeof target.selector !== 'string') return null;
     try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
+      // Section controls retain ownership when mounted in the document bar.
+      var navigation=sec && root===sec.sectionEl && view.querySelector('.explore-navigation[data-navigation-section="'+sec.number+'"]');
+      if(navigation)matches=matches.concat(Array.prototype.slice.call(navigation.querySelectorAll(target.selector)));
       var found=matches.find(isRendered) || matches[0] || null;
       var modal=options.overlayHost && options.overlayHost();
       // Trying a highlighted control can open a native modal. Keep that new
@@ -127,7 +130,8 @@ function wireTour(ctl, view, win, config, options){
     var pres=sec.presentation, requested=ds.view;
     if(requested == null && ds.presentation != null){
       var choices=pres && pres.views ? pres.views() : [];
-      var match=choices.find(function(v){return v.presentation===ds.presentation;});
+      var currentId=pres && pres.viewId && pres.viewId();
+      var match=choices.find(function(v){return v.id===currentId && v.presentation===ds.presentation;}) || choices.find(function(v){return v.presentation===ds.presentation;});
       if(match)requested=match.id;
       else if(ds.presentation!=='standard' || choices.length)return false;
     }
@@ -930,10 +934,10 @@ function wireTour(ctl, view, win, config, options){
               valid=isRendered(target) && branchIsVisible(sec,ds);
               // A story panel may first appear partway through the flow. Start
               // this lesson at an actual visible stop instead of dropping it.
-              if(!valid && target && step.id==='panels' && sec.stepper){
+              if(!valid && step.id==='panels' && sec.stepper){
                 var ids=sec.stepper.ids();
                 for(var k=0;k<ids.length && !valid;k++){
-                  sec.stepper.jump(k);
+                  sec.stepper.jump(k);refreshSectionViewport(sec);
                   target=queryTarget(step,sec,step.target);disclose(target);
                   valid=isRendered(target);
                   if(valid)state.step=sec.stepper.current().id || sec.stepper.current().n+1;

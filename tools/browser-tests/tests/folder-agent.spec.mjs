@@ -686,7 +686,7 @@ test('floating tools preserve drafts, coexist, move, resize, close and restore w
 test('diagram itself fills the browser and pans and zooms without editing source or losing the rendered nodes',async({page},info)=>{
   const h=await setup(page);
   try{
-    const raw=JSON.parse(source);raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');const input=JSON.stringify(raw,null,2);
+    const raw=JSON.parse(source);raw.page.presentation='explore';raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await canvasTools(page);await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
     const canvas=page.locator('.workspace-active-section .explore-board');
@@ -728,7 +728,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
   const h=await setup(page);
   try{
     const raw=JSON.parse(source),d=raw.page.blocks[0].diagram;
-    d.layouts.forEach(view=>view.presentation='explore');
+    raw.page.presentation='explore';d.layouts.forEach(view=>view.presentation='explore');
     d.layouts.push({...structuredClone(d.layouts[0]),id:'technical',name:'Technical',steps:undefined});
     raw.page.blocks.push({tabs:[{label:'More',sections:[{id:'other',heading:'Other story',text:['Page preview prose'],diagram:{view:'step',nodes:{customer:{title:'Customer'},team:{title:'Team'}},rows:[['customer','team']],edges:[{from:'customer',to:'team'}],steps:[{edge:'customer->team',text:'Contact the team'}]}}]}]});
     const otherDiagram=raw.page.blocks[1].tabs[0].sections[0].diagram;
@@ -857,7 +857,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
   const h=await setup(page);
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
-    const raw=JSON.parse(source),diagram=raw.page.blocks[0].diagram;
+    const raw=JSON.parse(source),diagram=raw.page.blocks[0].diagram;raw.page.presentation='explore';
     diagram.layouts.push({...structuredClone(diagram.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});
     delete diagram.layouts[1].steps;
     diagram.defaultLayout='explore';

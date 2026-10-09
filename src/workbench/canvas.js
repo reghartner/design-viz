@@ -1,4 +1,4 @@
-/* The selected Chapter owns the editor surface, just as in the reader. */
+/* The selected section owns the editor surface; its tab or page owns viewing mode. */
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
@@ -85,7 +85,7 @@ function initWorkbenchCanvas(){
   }
   function selectedByEvent(ev){
     if(selecting)return;
-    var element=ev.target.closest('.doc-sec'),rec=records().find(function(r){return r.sectionEl===element;});
+    var element=ev.target.closest('.doc-sec') || (ev.target.closest('.explore-navigation') && navigation && navigation.current() && navigation.current().sectionEl),rec=records().find(function(r){return r.sectionEl===element;});
     if(!rec){var ctl=getController(),child=ctl && ctl.details && ctl.details.activeSection();if(!child || child.sectionEl!==element)return;}
     if(rec && ev.type==='diagram-view-change' && rec.number!==section+1)return;
     if(rec){
@@ -164,7 +164,7 @@ function initWorkbenchCanvas(){
     var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
-    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
+    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{setPresentation:function(target,value){view.dispatchEvent(new CustomEvent('document-presentation-change',{detail:{section:target.number-1,value:value}}));},isCanvas:function(){return document.body.classList.contains('workspace-diagram');},onScrollSection:function(target){section=target.number-1;activeCanvas=target;view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:section}));},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
     // Measure navigation in its selected, visible section before the viewport
     // restores its camera. Hidden navigation reports zero height and would cause
     // an unnecessary resize (and camera rounding) immediately after restoration.
@@ -184,7 +184,7 @@ function initWorkbenchCanvas(){
       if(r.viewport){r.viewport.setWorkbenchCanvas(on);
         if(on && (!r.canvasVisited || requestedFit))scheduleFit();}
     });
-    // A Chapter can enter Explore before the shared navigation is mounted.
+    // A section can enter Explore before the shared navigation is mounted.
     // Reconcile the camera immediately with the stage space the top bar took.
     if(diagramMode() && rec && rec.viewport){rec.viewport.refresh();if(!rec.canvasVisited)rec.viewport.restoreInitialCamera();}
     document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;b.hidden=b.disabled;});

@@ -81,12 +81,12 @@ test('a real entity link passes through shared core and the native mount to a wh
   const controller={sections:core.sectionRecords(raw.page).map(record=>({...record,
       stepper:record.section.diagram?stepper:null,sectionEl:{scrollIntoView(){scrolled++;}}})),
     tabBlocks:[{select(...args){tabSelections.push(args);}}],steppers:[],destroy(){destroyed=true;}};
-  const view={querySelectorAll:()=>[]};
-  const environment={body:{appendChild(){}},root:{},fontsReady:Promise.resolve(),listen(){},resources(){},destroy(){this.disposed=true;}};
+  const view={querySelectorAll:()=>[],classList:{add(){},remove(){},toggle(){}}};
+  const environment={body:{appendChild(){},classList:{toggle(){}}},root:{},fontsReady:Promise.resolve(),listen(){},resources(){},destroy(){this.disposed=true;}};
   const context={document:{createElement:()=>view},ResizeObserver:class {observe(){}},
     normalize:core.normalize,validate:C.validateSpec,sectionRecords:core.sectionRecords,
     resolveSourceStep:core.resolveSourceStep,resolveSkin:()=> 'pastel',
-    applySkinClasses(){},FlowCanon:C,renderPage:()=>controller};
+    applySkinClasses(){},FlowCanon:C,createExploreNavigation:()=>({mount(){},destroy(){}}),renderPage:()=>controller};
   vm.runInNewContext(await fs.readFile(path.join(__dirname,'../src/native/mount.js'),'utf8'),context);
   const viewer=context.mountNativeSpec(environment,raw,{});
   viewer.navigate({section:target.d,path:target.p,step:target.s});

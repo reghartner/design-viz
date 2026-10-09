@@ -33,7 +33,7 @@ test('controlled attempts report one outcome and retain the current preview for 
 test('Explore geometry acceptance keeps the live model and controller only for the verified active view edit',()=>{
   const h=harness(),p=h.preview;
   const source=JSON.parse(SOURCE),diagram=source.page.sections[0].diagram;
-  diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
+  source.page.presentation='explore';diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
   p.render(JSON.stringify(source));
   const page=p.page(),live=page.sections[0].diagram.layouts[0],ctl=p.controller(),adopted=[];
   ctl.sections=[{number:1,presentation:{viewId:()=> 'engineering',adoptExploreLayout:(id,value)=>{adopted.push([id,plain(value)]);return true;}}}];
@@ -48,7 +48,7 @@ test('Explore geometry acceptance keeps the live model and controller only for t
 test('forged Explore hints, unrelated edits and invalid documents cannot bypass normal preview replacement or validation',()=>{
   for(const variant of ['unrelated','inactive','differentGeometry','history','invalid','missing','duplicate']){
     const h=harness(),p=h.preview,source=JSON.parse(SOURCE);
-    source.page.sections[0].diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
+    source.page.presentation='explore';source.page.sections[0].diagram.layouts=[{id:'engineering',name:'Engineering',presentation:'explore',sectionLayout:{default:[{diagram:true,x:0,y:0,w:12,h:8}]}}];
     p.render(JSON.stringify(source));const ctl=p.controller();
     ctl.sections=[{number:1,presentation:{viewId:()=>variant==='inactive'?'other':'engineering',adoptExploreLayout:()=>variant!=='differentGeometry'}}];
     const next=structuredClone(source);next.page.sections[0].diagram.layouts[0].exploreLayout={camera:{zoom:1,x:.3,y:.4}};

@@ -11,7 +11,7 @@ function story(multiple=false){
   const root=section('root'),child=section('child',true),grandchild=section('grandchild',true),other=section('other');
   root.diagram.nodes.service.detail={section:'child'};child.diagram.nodes.service.detail={section:'grandchild'};
   for(const s of [root,other]){s.diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];s.diagram.defaultLayout='canvas';}
-  return {page:{title:'Domain navigation',sections:[root,child,grandchild,...(multiple?[other]:[])]}};
+  return {page:{presentation:'explore',title:'Domain navigation',sections:[root,child,grandchild,...(multiple?[other]:[])]}};
 }
 async function open(page,server,raw,native=false){
   if(native){

@@ -9,7 +9,7 @@ function spec(){
   const raw=editorSpec(),d=raw.page.blocks[0].diagram;raw.page.blocks[0].id='story';
   const standard={...d.layouts[0],id:'standard',name:'Standard',presentation:'standard'};delete standard.steps;
   d.layouts=[standard,{...structuredClone(standard),id:'explore',name:'Explore',presentation:'explore',exploreLayout:{camera:{zoom:1,x:.5,y:.5}}}];
-  d.defaultLayout='explore';return raw;
+  d.defaultLayout='explore';raw.page.presentation='explore';return raw;
 }
 const width=board=>board.evaluate(el=>parseFloat(el.style.getPropertyValue('--explore-width')));
 async function point(board){
@@ -71,9 +71,9 @@ test('editor wheel zoom stays temporary until an explicit camera save, and stale
   expect(camera.zoom).toBeCloseTo(Math.exp(.36),4);expect(await width(board)).toBeCloseTo(initial*Math.exp(.36),0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#redo-builder')).toBeDisabled();
-  await dispatch(board,-30);await page.locator('#section-story').getByRole('button',{name:'Standard',exact:true}).click();
+  await dispatch(board,-30);await page.locator('.explore-navigation').getByRole('button',{name:'Standard',exact:true}).click();
   await page.clock.fastForward(400);await expect(page.locator('#src')).toHaveValue(saved);
-  await page.locator('#section-story').getByRole('button',{name:'Explore',exact:true}).click();await prepareEditorSurface(page);
+  await page.locator('.explore-navigation').getByRole('button',{name:'Explore',exact:true}).click();await prepareEditorSurface(page);
   const invalid=saved+'\n{ unfinished';await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},invalid);
   const staleWidth=await width(board);expect(await dispatch(board,-30)).toBe(true);await page.clock.fastForward(400);
   expect(await width(board)).toBeCloseTo(staleWidth*Math.exp(.18),0);await expect(page.locator('#src')).toHaveValue(invalid);await chapterOptions(page);await page.getByRole('button',{name:'Use current camera as opening view',exact:true}).click();await expect(page.locator('#src')).toHaveValue(invalid);

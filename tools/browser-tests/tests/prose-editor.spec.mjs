@@ -4,7 +4,7 @@ import {paste as pasteDiagram} from '../helpers/test.mjs';
 const add=async(page,kind)=>{await page.locator('#diagram-add').click();await page.locator('[data-add-kind="'+kind+'"]').click();};
 test('blank starter creates, edits, orders and removes prose through the UI with exact Undo/Redo',async({page,server},info)=>{
  const raw=JSON.parse(readFileSync(new URL('../../../src/starters/minimal.json',import.meta.url),'utf8'));
- const section=raw.page.sections[0];section.diagram.layouts=[{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:14}]}}];section.diagram.defaultLayout='explore';
+ raw.page.presentation='explore';const section=raw.page.sections[0];section.diagram.layouts=[{id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:14}]}}];section.diagram.defaultLayout='explore';
  const original=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await pasteDiagram(page,original);
  const src=page.locator('#src'),guide=page.locator('#guide'),field=guide.getByLabel('Prose text',{exact:true}),paragraphs=page.locator('#docview .sec-text');
  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);

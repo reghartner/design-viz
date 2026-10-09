@@ -5,7 +5,7 @@
     "sections": [
       {
         "heading": "A visitor, from home to cloud",
-        "text": "Switch between Home story and Service flow. Home story opens in Standard presentation for the resident-facing moments. Service flow uses Explore for every technical stop: a full-height graph, floating panels and pinned playback. Both follow the same story, including state changes during skipped steps.",
+        "text": "Switch between Home story and Service flow. Home story follows the resident-facing moments; Service flow includes every technical stop. Both share the page’s Viewing mode and the same story, including state changes during skipped steps. Choose Explore in the workbench’s top row to inspect either View on a full-height canvas.",
         "diagram": {
           "primaryPanel": "home",
           "view": "step",
@@ -356,7 +356,6 @@
             {
               "id": "home-story",
               "name": "Home story",
-              "presentation": "standard",
               "paths": [
                 "happy"
               ],
@@ -447,7 +446,6 @@
             {
               "id": "service-flow",
               "name": "Service flow",
-              "presentation": "explore",
               "exploreLayout": {
                 "panels": [
                   {"panel": "outcome", "x": 0.72, "y": 0.02, "w": 0.26, "h": 0.2, "stacked": true},
@@ -537,6 +535,7 @@
           "defaultLayout": "home-story"
         }
       }
-    ]
+    ],
+    "presentation": "standard"
   }
 }

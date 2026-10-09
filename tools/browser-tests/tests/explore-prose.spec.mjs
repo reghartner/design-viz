@@ -7,7 +7,7 @@ import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 function fixture(defaultLayout='business'){
   const tiles=[{x:0,y:0,w:8,h:12},{panel:'queue',x:8,y:0,w:4,h:7},{controls:'steps',x:0,y:12,w:8,h:4}];
-  return {page:{title:'Visitor delivery',skin:'pastel',sections:[{id:'delivery',heading:'Delivery explained',collapsed:true,
+  return {page:{presentation:'explore',title:'Visitor delivery',skin:'pastel',sections:[{id:'delivery',heading:'Delivery explained',collapsed:true,
     text:['**Why this matters.** The visitor gets a recording even when the upload must wait.','The camera sends `recording_id` to the [recording service](https://example.test/design).'],
     bullets:[{text:'Capture locally',sub:['Keep a copy until acknowledged']},{text:'Upload is complete',revealAt:1}],
     diagram:{view:'step',autoplay:false,nodes:{camera:{title:'Doorbell',icon:'camera'},service:{title:'Recording service',icon:'cloud'}},rows:[['camera','service']],edges:[{from:'camera',to:'service'}],
@@ -28,7 +28,7 @@ async function verifySeparation(page,root=page){
   await expect(root.locator('.explore-canvas>.board .boardcanvas>svg')).toHaveCount(1);await expect(root.locator('.explore-player .termbar')).toHaveCount(1);
 }
 
-test('Explore floats only prose, keeps live formatting/reveals and restores the exact standard prose node',async({page,server},info)=>{
+test('Explore floats only prose, keeps live formatting/reveals and retains the exact prose node across Views',async({page,server},info)=>{
   const url=await build(server,fixture());await page.goto(url);await expect(page.locator('.doc-sec>.sec-prose')).toBeHidden();
   await page.evaluate(()=>window.__proseNode=document.querySelector('.sec-prose'));
   await page.getByRole('button',{name:'Explore',exact:true}).click();await verifySeparation(page);await expect(page.locator('.explore-canvas [data-dv-node="camera"]')).toBeInViewport();
@@ -38,14 +38,14 @@ test('Explore floats only prose, keeps live formatting/reveals and restores the 
   await expect(notes(page).locator('[data-dv-bullet-path="1"]')).toHaveClass(/dv-fragment-hidden/);await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(notes(page).locator('[data-dv-bullet-path="1"]')).not.toHaveClass(/dv-fragment-hidden/);
   const shell=await page.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
   const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox(),prose=await notes(page).boundingBox(),viewport=page.viewportSize();
-  expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(shell).toEqual({x:0,y:nav.y+nav.height,width:viewport.width,height:viewport.height-nav.y-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);expect(prose.x).toBeGreaterThanOrEqual(stage.x);expect(prose.y).toBeGreaterThanOrEqual(stage.y);expect(prose.x+prose.width).toBeLessThanOrEqual(stage.x+stage.width);expect(prose.y+prose.height).toBeLessThanOrEqual(stage.y+stage.height);
   const original=await notes(page).boundingBox();await notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowLeft');expect((await notes(page).boundingBox()).x).toBeCloseTo(original.x-8,0);
   await notes(page).getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(notes(page)).toBeHidden();await page.locator('.explore-panel-menu summary').click();await page.getByRole('checkbox',{name:'Section notes',exact:true}).check();await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'Compact',exact:true}).click();await expect(notes(page)).toBeHidden();await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();
   await expect(page.locator('.explore-canvas [data-dv-node="camera"]')).toBeInViewport();await page.screenshot({path:info.outputPath('explore-notes-reader.png')});
-  await page.getByRole('button',{name:'Business',exact:true}).click();await expect(page.locator('.doc-sec>.sec-prose')).toBeHidden();expect(await page.evaluate(()=>document.querySelector('.doc-sec>.sec-prose')===window.__proseNode)).toBe(true);
-  await page.getByRole('button',{name:'Show prose for Delivery explained',exact:true}).click();await expect(page.locator('.doc-sec>.sec-prose')).toBeVisible();await expect(page.locator('.explore-window')).toHaveCount(0);
+  await page.getByRole('button',{name:'Business',exact:true}).click();await expect(page.locator('.doc-sec>.sec-prose')).toBeHidden();expect(await page.evaluate(()=>document.querySelector('.explore-prose-window .sec-prose')===window.__proseNode)).toBe(true);
+  await expect(notes(page)).toBeVisible();
   await page.getByRole('button',{name:'Explore',exact:true}).click();await page.reload();expect((await notes(page).boundingBox()).x).toBeCloseTo(original.x,0);
 });
 
@@ -69,15 +69,15 @@ test('editor notes move/resize/visibility and zoom author one view, keep Explore
 });
 
 test('native notes are isolated, keep exact prose on view switches, and retire with their viewer',async({page,server})=>{
-  await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);await page.evaluate(()=>{__host.left(true);__host.right(true);});
+  await page.goto(server.origin+'/native/index.html?explore=1');await page.waitForFunction(()=>!!window.__host);await page.evaluate(()=>{__host.left(true);__host.right(true);});
   const alpha=page.locator('#alpha'),beta=page.locator('#beta');await expect(alpha.locator('.preadout')).toHaveText('Success');await expect(beta.locator('.preadout')).toHaveText('Success');
   await alpha.getByRole('button',{name:'Explore',exact:true}).click();await beta.getByRole('button',{name:'Explore',exact:true}).click();await verifySeparation(page,alpha);await verifySeparation(page,beta);
   const left=alpha.locator('[data-explore-content="prose"]'),right=beta.locator('[data-explore-content="prose"]'),before=await right.boundingBox();await left.getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowLeft');expect(await right.boundingBox()).toEqual(before);
-  await left.getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(left).toBeHidden();await expect(right).toBeVisible();await alpha.getByRole('button',{name:'Business',exact:true}).click();await expect(alpha.locator('.doc-sec[data-dv-section="1"]>.sec-prose')).toBeVisible();
+  await left.getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(left).toBeHidden();await expect(right).toBeVisible();await alpha.getByRole('button',{name:'Business',exact:true}).click();await expect(alpha.locator('[data-explore-content="prose"]')).toBeVisible();
   await page.evaluate(()=>__host.left(false));await expect(alpha.locator('.docview')).toHaveCount(0);await expect(right).toBeVisible();await page.evaluate(()=>__host.right(false));await expect(beta.locator('.docview')).toHaveCount(0);
 });
 
-test('Standard to Explore frames a short graph after indexing, and preserves a reader camera on return',async({page,server})=>{
+test('Explore frames a short graph after indexing, and preserves a reader camera on return',async({page,server})=>{
   const spec=fixture();delete spec.page.sections[0].text;delete spec.page.sections[0].bullets;
   await page.goto(await build(server,spec,'no-notes'));await page.getByRole('button',{name:'Explore',exact:true}).click();
   const node=page.locator('.explore-canvas [data-dv-node="camera"]');await expect(node).toBeInViewport();await expect(notes(page)).toHaveCount(0);
@@ -127,8 +127,8 @@ test('deleting the notes surface preserves the section, Standard bounds and exac
     return {width:box.width,viewportWidth:viewport.width,viewportHeight:viewport.height,boardWidth:board.width,boardHeight:board.height,
       contained:box.bottom>=viewport.bottom && box.right>=viewport.right,viewBox:svg.getAttribute('viewBox')};
   });
-  await page.getByRole('button',{name:'Business',exact:true}).click();const before=await geometry();
-  await page.getByRole('button',{name:'Explore',exact:true}).click();
+  await page.locator('.document-viewing-mode select').selectOption('standard');const before=await geometry();
+  await page.locator('#undo-builder').click();
   const expected=structuredClone(raw);delete expected.page.sections[0].text;delete expected.page.sections[0].bullets;
   for(const route of ['inspector','keyboard']){
     // Both prose padding and the remaining empty window body used to select
@@ -141,11 +141,12 @@ test('deleting the notes surface preserves the section, Standard bounds and exac
     }else await page.keyboard.press('Delete');
     await expect(notes(page)).toHaveCount(0);const removed=await source(page);expect(JSON.parse(removed)).toEqual(expected);
     await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
-    await page.getByRole('button',{name:'Business',exact:true}).click();await closeTools(page);
+    await page.locator('.document-viewing-mode select').selectOption('standard');await closeTools(page);
     expect(await geometry()).toEqual(before);expect(before.contained).toBe(true);expect(before.boardHeight).toBeGreaterThan(100);
     await page.screenshot({path:info.outputPath('standard-after-notes-deletion-'+route+'.png')});
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);expect(await geometry()).toEqual(before);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(removed);await expect(notes(page)).toHaveCount(0);
     await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
     await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();
   }
@@ -157,9 +158,9 @@ for(const value of ['The last paragraph',['The last paragraph']])test('deleting 
     await inspectPageElement(page,notes(page).locator('[data-dv-para="0"]'));
     await page.getByRole('button',{name:'Delete paragraph',exact:true}).click();await expect(notes(page)).toHaveCount(0);
     expect(JSON.parse(await source(page)).page.sections[0].diagram).toEqual(raw.page.sections[0].diagram);
-    await closeTools(page);await page.getByRole('button',{name:'Business',exact:true}).click();
+    await closeTools(page);await page.locator('.document-viewing-mode select').selectOption('standard');
     await expect(page.locator('.doc-sec .boardcanvas>svg')).toBeVisible();await expect(page.locator('.doc-sec .sec-h')).toContainText('Delivery explained');
-    await page.locator('#undo-builder').click();await page.getByRole('button',{name:'Explore',exact:true}).click();await expect(notes(page)).toBeVisible();
+    await page.locator('#undo-builder').click();await page.locator('#undo-builder').click();await expect(notes(page)).toBeVisible();
 });
 
 for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprint'])test('notes remain readable in '+skin+' in the reader and workbench',async({page,server},info)=>{

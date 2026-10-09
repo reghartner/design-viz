@@ -32,7 +32,10 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   await panelsOptions(page);const zoom=page.locator('.explore-overlay-zoom');await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
   await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
   await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
-  expect((await size(panel(page))).w).toBeCloseTo(start.w*.9,0);expect((await size(player(page))).h).toBeCloseTo(steps.h*.9,0);
+  // Content fitting includes the unscaled playback rail; verify the content
+  // scale directly instead of assuming proportional outer control height.
+  expect((await size(panel(page))).w).toBeCloseTo(start.w*.9,0);expect((await size(player(page))).h).toBeLessThan(steps.h);
+  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(.9,2);
   expect((await size(player(page))).w).toBeGreaterThan(steps.w);
   expect(await graph(page).boundingBox()).toEqual(startGraph);
   const content=await panel(page).locator('.explore-window-body').evaluate(el=>({logical:el.offsetWidth,visual:el.getBoundingClientRect().width}));expect(content.visual/content.logical).toBeCloseTo(.9,2);
@@ -77,7 +80,8 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   await page.locator('#docview .explore-navigation').getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(readout).toHaveText('65%');
   const scaled=await source();expect(JSON.parse(scaled).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(.65);
   expect((await size(panel(page))).w).toBeCloseTo(width*.65/.75,0);expect(await graph(page).boundingBox()).toEqual(graphBefore);
-  expect((await size(player(page))).w).toBeCloseTo(savedControls.w,0);expect((await size(player(page))).h).toBeCloseTo(savedControls.h*.65/.75,0);
+  expect((await size(player(page))).w).toBeCloseTo(savedControls.w,0);expect((await size(player(page))).h).toBeLessThan(savedControls.h);
+  expect(await player(page).locator('.termbar').evaluate(el=>el.getBoundingClientRect().width/el.offsetWidth)).toBeCloseTo(.65,2);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(readout).toHaveText('75%');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(scaled);await expect(readout).toHaveText('65%');
   await panel(page).locator('.explore-window-grip').press('ArrowLeft');

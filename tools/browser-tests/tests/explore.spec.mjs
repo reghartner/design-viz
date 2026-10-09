@@ -52,7 +52,11 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();
  await page.locator('.explore-board').evaluate(el=>{el.scrollLeft=1000;el.scrollTop=900;});
  const after=await rect(play);expect(after.x).toBeCloseTo(pos.x,0);expect(after.y).toBeCloseTo(pos.y,0);
- await play.click();await expect(floats(page)).toHaveCount(4);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeCloseTo(pos.y,0);
+ await play.click();await expect(floats(page)).toHaveCount(4);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeLessThanOrEqual(pos.y);
+ // The automatic dock now grows upward to fit a longer caption while staying
+ // anchored to the bottom; graph pan and zoom still leave it stationary.
+ const player=await rect(page.locator('.explore-player'));expect(player.y+player.height).toBeCloseTo(stage.y+stage.height-12,0);
+ expect(await page.locator('.explore-player .stepline').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);

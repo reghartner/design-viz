@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
-const A=require('../tools/compose-page-layout.cjs'),M=require('../tools/arrange/model.cjs'),S=require('../tools/arrange/solver.cjs');
+const A=require('../tools/compose-page-layout.cjs'),M=require('../tools/arrange/model.cjs'),S=require('../tools/arrange/solver.cjs'),D=require('../tools/arrange/diagnostics.cjs');
 const diagram=()=>({nodes:{a:{title:'A'}},rows:[[]],floats:[{id:'a',side:'below'}],edges:[],steps:[],panels:[]});
 const defaults={width:1200,profile:'default',rearrange:false};
 test('complete CLI selects explicitly and protects authored geometry and profile boundaries',()=>{
@@ -56,6 +56,42 @@ test('complete composition is deterministic and preserves profile/state semantic
  const raw={page:{title:'Pure composition',flowview:{authoredWith:'0.1.0',minVersion:'0.1.0',features:['flow.failures']},sections:[{diagram:d},{heading:'Untouched',text:'Keep this exact.'}]}},options={...defaults,width:800,sections:[0],profile:'confluence',rearrange:true},before=JSON.stringify(raw);
  const a=await A.arrange(raw,options),b=await A.arrange(raw,options);assert.deepEqual(a,b);assert.equal(JSON.stringify(raw),before);const output=a.raw.page.sections[0].diagram;assert.deepEqual(output.steps,d.steps);assert.deepEqual(output.panels,d.panels);assert.deepEqual(output.sectionLayout.backstage,d.sectionLayout.backstage);assert.deepEqual(a.raw.page.sections[1],raw.page.sections[1]);assert.ok(a.raw.page.flowview.features.includes('flow.failures'));M.check({diagram:{...output,sectionLayout:{columns:24,default:output.sectionLayout.confluence}}});assert.match(a.diagnostics[0].measurement,/estimates/);
 });
+test('actionable diagnostics use stable spec-derived targets and CSS-pixel units',()=>{
+ const result=D.warnings({graph:{estimatedLabelPx:9.246}});
+ assert.deepEqual(result,[{
+  code:'estimated-small-graph-label',level:'warning',basis:'spec-derived estimate; not native pixel verification',target:'graph',
+  actual:{value:9.25,unit:'CSS px'},threshold:{comparison:'minimum',value:10,unit:'CSS px'},
+  remedy:'Review the rendered graph at the target host. If labels are too small, recompose for a wider host or simplify the selected graph without changing its meaning.'
+ }]);
+});
+test('composition warnings cover narrow native text and controls below the estimated initial viewport',async()=>{
+ const roomy=await A.arrange(diagram(),defaults);assert.deepEqual(roomy.diagnostics[0].warnings,[]);
+ const narrow=diagram();narrow.panels=[{id:'app',type:'deviceapp',fields:[{id:'reading',label:'Reading'}]}];
+ const panelWarning=(await A.arrange(narrow,{...defaults,width:800})).diagnostics[0].warnings.find(w=>w.code==='estimated-small-panel-text');
+ assert.equal(panelWarning.target,'panel:app');assert.deepEqual(panelWarning.actual,{value:6.48,unit:'CSS px'});assert.deepEqual(panelWarning.threshold,{comparison:'minimum',value:8,unit:'CSS px'});assert.deepEqual(panelWarning.fontRoles,['metadata']);
+ const verbose=diagram();verbose.steps=[{id:'review',text:'Detailed evidence. '.repeat(200)}];
+ const diagnostics=(await A.arrange(verbose,{...defaults,width:800})).diagnostics[0],controlWarning=diagnostics.warnings.find(w=>w.code==='estimated-controls-below-initial-viewport');
+ assert.equal(diagnostics.controls.withinEstimatedInitialViewport,false);assert.equal(controlWarning.target,'controls:steps');assert.ok(controlWarning.actual.value>1000);assert.equal(controlWarning.actual.unit,'CSS px');assert.deepEqual(controlWarning.threshold,{comparison:'maximum',value:1000,unit:'CSS px'});
+});
+test('native text warnings require a painted role in a reachable folded state',async()=>{
+ const empty=diagram();empty.panels=[{id:'app',type:'deviceapp',fields:[],initial:{phoneScreen:'app'}}];
+ const emptyPanel=(await A.arrange(empty,{...defaults,width:930})).diagnostics[0],emptyContent=emptyPanel.panels.find(p=>p.id==='app').estimatedNativeContent;
+ assert.deepEqual(emptyContent.visibleFontRoles,[]);assert.deepEqual(emptyContent.estimatedFontPx,{});assert.equal(emptyPanel.warnings.some(w=>w.target==='panel:app'),false);
+ const hidden=diagram();hidden.panels=[{id:'app',type:'deviceapp',fields:[{id:'reading',label:'Reading'}],initial:{phoneScreen:'app',reading:{visible:false}}}];
+ hidden.steps=[{id:'still-hidden',text:'Review the app.'}];const hiddenPanel=(await A.arrange(hidden,{...defaults,width:930})).diagnostics[0],hiddenContent=hiddenPanel.panels.find(p=>p.id==='app').estimatedNativeContent;
+ assert.deepEqual(hiddenContent.visibleFontRoles,[]);assert.deepEqual(hiddenContent.estimatedFontPx,{});assert.equal(hiddenPanel.warnings.some(w=>w.target==='panel:app'),false);
+ const revealed=structuredClone(hidden);revealed.steps=[{id:'reveal',text:'Review the reading.',panels:{app:{reading:{visible:true,detail:'Fresh evidence'}}}}];
+ const visiblePanel=(await A.arrange(revealed,{...defaults,width:930})).diagnostics[0],visibleContent=visiblePanel.panels.find(p=>p.id==='app').estimatedNativeContent,warning=visiblePanel.warnings.find(w=>w.target==='panel:app');
+ assert.deepEqual(visibleContent.visibleFontRoles,['metadata','detail']);assert.deepEqual(Object.keys(visibleContent.estimatedFontPx),['metadata','detail']);assert.ok(Math.abs(visibleContent.estimatedFontPx.metadata-7.65)<1e-9);assert.equal(visibleContent.estimatedFontPx.detail,9.35);assert.deepEqual(warning.actual,{value:7.65,unit:'CSS px'});assert.deepEqual(warning.fontRoles,['metadata']);
+ const phone=diagram();phone.panels=[{id:'phone',type:'phone'}];const phoneDiagnostics=(await A.arrange(phone,{...defaults,width:930})).diagnostics[0],phoneWarning=phoneDiagnostics.warnings.find(w=>w.target==='panel:phone');
+ assert.equal(phoneWarning.actual.value,6.8,'the renderer always paints the 8px phone empty-state text');assert.deepEqual(phoneWarning.fontRoles,['body']);
+});
+test('hidden panels and intentional bounded scrolling do not produce visible-problem warnings',async()=>{
+ const hidden=diagram();hidden.panels=[{id:'app',type:'deviceapp',fields:[{id:'reading',label:'Reading'}]}];hidden.sectionLayout={columns:24,default:[{x:0,y:0,w:12,h:8},{panel:'app',hidden:true,x:12,y:0,w:12,h:8}]};
+ const hiddenDiagnostics=(await A.arrange(hidden,{...defaults,width:800,rearrange:true})).diagnostics[0];assert.equal(hiddenDiagnostics.panels.some(p=>p.id==='app'),false);assert.equal(hiddenDiagnostics.warnings.some(w=>w.target==='panel:app'),false);
+ const scrolling=diagram();scrolling.panels=[{id:'log',type:'log',initial:{log:Array.from({length:80},(_,i)=>({text:'Entry '+i}))}}];
+ const scrollDiagnostics=(await A.arrange(scrolling,defaults)).diagnostics[0],panel=scrollDiagnostics.panels.find(p=>p.id==='log');assert.equal(panel.boundedScrolling,true);assert.deepEqual(scrollDiagnostics.warnings,[]);
+});
 test('direct CLI works in a clean checkout and source-free kit with subprocesses, network and browser packages forbidden',t=>{
  const root=path.resolve(__dirname,'..'),base=fs.mkdtempSync(path.join(os.tmpdir(),'compose-portable-'));t.after(()=>fs.rmSync(base,{recursive:true,force:true}));
  const checkout=path.join(base,'checkout');fs.mkdirSync(checkout);fs.cpSync(path.join(root,'src'),path.join(checkout,'src'),{recursive:true});fs.mkdirSync(path.join(checkout,'tools/canon'),{recursive:true});
@@ -65,9 +101,9 @@ test('direct CLI works in a clean checkout and source-free kit with subprocesses
  const built=spawnSync('python3',['-c',"import sys,json,base64,gzip,pathlib;sys.path.insert(0,'tools');from folder_agent_kit import folder_agent_kit;from build import canon_runtime;files=json.loads(gzip.decompress(base64.b64decode(json.loads(folder_agent_kit('.',canon_runtime()))['gzip'])))['files'];root=pathlib.Path(sys.argv[1]);[(root.joinpath(k).parent.mkdir(parents=True,exist_ok=True),root.joinpath(k).write_text(v)) for k,v in files.items()]",kit],{cwd:root,encoding:'utf8'});assert.equal(built.status,0,built.stderr);
  const guard=path.join(base,'guard.cjs');fs.writeFileSync(guard,"const M=require('node:module'),load=M._load;M._load=function(id,...args){if(/playwright|puppeteer|child_process/.test(id))throw Error('Forbidden runtime dependency '+id);return load.call(this,id,...args)};global.fetch=()=>{throw Error('Forbidden network')};");
  for(const directory of [checkout,kit]){
-  assert.equal(fs.existsSync(path.join(directory,'tools/arrange/node_modules')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/setup.cjs')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/generated-native.html')),false);
+  assert.equal(fs.existsSync(path.join(directory,'tools/arrange/node_modules')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/setup.cjs')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/generated-native.html')),false);assert.equal(fs.existsSync(path.join(directory,'tools/arrange/diagnostics.cjs')),true);
   const raw=diagram();raw.panels=[{id:'charge',type:'battery',initial:{charge:80}},{id:'app',type:'deviceapp',fields:[{id:'reading',label:'Reading'}],initial:{phoneScreen:'app',reading:{value:'Recorded',status:'ready'}}}];raw.steps=[{id:'start',text:'Review the charge.',codeRefs:[{id:'evidence',label:'Processing evidence',repository:'https://example.com/processor',revision:'a'.repeat(40),path:'src/process.js',anchor:{start:'begin',end:'end'}}],conditions:[{kind:'slow',label:'Evidence pending'}]},{id:'normal',text:'Normal outcome.'},{id:'alternative',text:'Alternative outcome.'}];raw.paths=[{id:'normal',steps:['start','normal']},{id:'alternative',steps:['start','alternative']}];const input=path.join(directory,'in.json'),output=path.join(directory,'out.json'),bytes=JSON.stringify(raw);fs.writeFileSync(input,bytes);
-  const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);const content=JSON.parse(result.stdout).diagrams[0].panels.find(p=>p.id==='app').estimatedNativeContent;assert.equal(content.estimatedLogicalWidth,330);assert.ok(content.estimatedRenderedWidth<330);assert.ok(content.estimatedFontPx.metadata<9);assert.deepEqual(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.panels,raw.panels);assert.ok(JSON.parse(result.stdout).diagrams[0].controls.estimatedTrackHeight>40,'source-free backend exports shared track geometry');
+  const result=spawnSync(process.execPath,['--require',guard,'tools/compose-page-layout.cjs','--width','800','in.json','out.json'],{cwd:directory,encoding:'utf8',env:{...process.env,PATH:'',PLAYWRIGHT_BROWSERS_PATH:path.join(base,'no-browser'),NODE_PATH:''}});assert.equal(result.status,0,result.stderr);assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.sectionLayout.columns,24);assert.match(result.stdout,/estimates/);const diagnostics=JSON.parse(result.stdout).diagrams[0],content=diagnostics.panels.find(p=>p.id==='app').estimatedNativeContent;assert.equal(content.estimatedLogicalWidth,330);assert.ok(content.estimatedRenderedWidth<330);assert.ok(content.estimatedFontPx.metadata<9);const warning=diagnostics.warnings.find(w=>w.code==='estimated-small-panel-text');assert.equal(warning.target,'panel:app');assert.deepEqual(warning.actual,{value:6.48,unit:'CSS px'});assert.deepEqual(JSON.parse(fs.readFileSync(output)).page.sections[0].diagram.panels,raw.panels);assert.ok(diagnostics.controls.estimatedTrackHeight>40,'source-free backend exports shared track geometry');
  }
  assert.equal(fs.existsSync(path.join(kit,'src/source-bundles.json')),false);assert.equal(fs.existsSync(path.join(checkout,'tools/canon/generated-runtime.cjs')),false);
 });

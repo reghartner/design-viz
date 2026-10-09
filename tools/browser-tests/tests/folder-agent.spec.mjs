@@ -77,7 +77,7 @@ async function openAgent(page){
 }
 async function expectWorkbenchCanvas(page){
   const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
-  const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
+  const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('#docview>.explore-navigation').boundingBox();
   const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
   const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:viewport.width-96,height:viewport.height-contentTop-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
@@ -730,7 +730,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     const raw=JSON.parse(source),d=raw.page.blocks[0].diagram;
     raw.page.presentation='explore';d.layouts.forEach(view=>view.presentation='explore');
     d.layouts.push({...structuredClone(d.layouts[0]),id:'technical',name:'Technical',steps:undefined});
-    raw.page.blocks.push({tabs:[{label:'More',sections:[{id:'other',heading:'Other story',text:['Page preview prose'],diagram:{view:'step',nodes:{customer:{title:'Customer'},team:{title:'Team'}},rows:[['customer','team']],edges:[{from:'customer',to:'team'}],steps:[{edge:'customer->team',text:'Contact the team'}]}}]}]});
+    raw.page.blocks.push({tabs:[{label:'More',presentation:'explore',sections:[{id:'other',heading:'Other story',text:['Page preview prose'],diagram:{view:'step',nodes:{customer:{title:'Customer'},team:{title:'Team'}},rows:[['customer','team']],edges:[{from:'customer',to:'team'}],steps:[{edge:'customer->team',text:'Contact the team'}]}}]}]});
     const otherDiagram=raw.page.blocks[1].tabs[0].sections[0].diagram;
     otherDiagram.layouts=[{id:'flow',name:'Data',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',attachTo:'diagram',x:0,y:12,w:12,h:4}]}}];
     const input=JSON.stringify(raw,null,2);
@@ -922,7 +922,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await expect(page.locator('#agent-update-commit')).toBeDisabled();
     await page.locator('#agent-update-proposed').click();await contained();
     await page.locator('#agent-update-ledger-summary').click();
-    await view.getByRole('button',{name:'Business',exact:true}).click();await expect(stage).toBeHidden();
+    await view.getByRole('button',{name:'Business',exact:true}).click();await expect(stage).toBeVisible();await contained();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
     await view.getByRole('button',{name:'Explore',exact:true}).click();await contained();
     await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();

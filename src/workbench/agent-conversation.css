@@ -79,7 +79,7 @@
 /* Contain the reader's fixed canvas, navigation and detail overlays inside the
    review surface, leaving comparison, evidence and approval controls outside. */
 #agent-update-scroll{flex:1;min-height:100px;overflow:auto;background:var(--bg);padding:16px 24px;contain:layout paint;}
-#agent-update-scroll.viewer-exploring{overflow:hidden;}
+#agent-update-dialog #agent-update-scroll.viewer-exploring{overflow:hidden;padding:0;}
 #agent-update-issues{padding:12px 24px;background:#fff3df;max-height:38vh;overflow:auto;color:#493513;}#agent-update-issues[hidden]{display:none;}
 #agent-update-view{max-width:1500px;margin:auto;}#agent-update-view .doc-title{display:block;}
 .agent-update-dialog.agent-update-immersive{width:100vw;height:100dvh;margin:0;border:0;border-radius:0;}

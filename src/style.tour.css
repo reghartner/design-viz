@@ -74,3 +74,8 @@
 .dv-tour-discovery[hidden]{display:none;}
 .dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
 @media print{.dv-tour-discovery{display:none!important;}}
+
+/* Keep reader help reachable below the persistent document navigation. */
+.has-document-navigation:not(.explore-full-window)>.dv-tour-replay,.has-document-navigation:not(.explore-full-window)>.dv-tour-discovery{position:relative;top:var(--flowview-navigation-height,48px);}
+
+.explore-full-window>.dv-tour-discovery{position:fixed;right:60px;bottom:12px;z-index:85;margin:0;}

@@ -282,3 +282,29 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
   for(const message of expected){expect(audit).toContain(message);audit.splice(audit.indexOf(message),1);}
   missing=false;await page.locator('#canon-reader-retry').click();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
 });
+
+
+test('Canon Explore navigation and graph remain inside the reader below app chrome',async({page,server},info)=>{
+ await page.setViewportSize({width:1280,height:800});
+ const data=library();data.diagrams[0].spec.page.presentation='explore';
+ await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+ await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();
+ await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+ const reader=page.locator('#canon-reader'),nav=reader.locator('.explore-navigation'),canvas=reader.locator('.viewer-diagram-canvas');
+ await expect(canvas).toBeVisible();
+ for(const scroll of [false,true]){
+  if(scroll)expect(await reader.evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement){if(/auto|scroll/.test(getComputedStyle(p).overflowY) && p.scrollHeight>p.clientHeight){p.scrollTop=p.scrollHeight;return p.scrollTop;}}window.scrollTo(0,document.documentElement.scrollHeight);return window.scrollY;})).toBeGreaterThan(0);
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const r=await reader.boundingBox(),n=await nav.boundingBox(),c=await canvas.boundingBox(),h=await page.locator('.workbench-header').boundingBox();
+  expect(n.y).toBeGreaterThanOrEqual(0);expect(n.y).toBeGreaterThanOrEqual(h.y+h.height);expect(n.x).toBeGreaterThanOrEqual(r.x);expect(n.x+n.width).toBeLessThanOrEqual(r.x+r.width+1);
+  expect(c.y).toBeGreaterThanOrEqual(n.y+n.height);expect(c.y+c.height).toBeLessThanOrEqual(r.y+r.height+1);
+  if(scroll){
+   expect(c.y+c.height).toBeLessThanOrEqual(page.viewportSize().height+1);
+   const player=await reader.locator('.explore-player').boundingBox();expect(player.y+player.height).toBeLessThanOrEqual(page.viewportSize().height+1);
+   await reader.getByRole('button',{name:'Next step',exact:true}).click({trial:true});
+   await info.attach('canon-explore-scrolled-1280',{body:await page.screenshot(),contentType:'image/png'});
+  }
+  await page.locator('#workbench-home').click({trial:true});
+ }
+ await info.attach('canon-explore-contained',{body:await page.screenshot(),contentType:'image/png'});
+});

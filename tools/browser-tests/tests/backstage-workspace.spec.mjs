@@ -39,7 +39,8 @@ test('expanded canvas owns the full browser and returns to the same curated view
   await expect(dialog).toBeVisible();
   const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
   const board=await dialog.locator('.explore-board').boundingBox();
-  expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
+  await info.attach('expanded-geometry',{body:JSON.stringify(desktop),contentType:'application/json'});
+  expect(shell).toEqual({x:0,y:desktop.nav.y+desktop.nav.height,width:1600,height:1000-desktop.nav.y-desktop.nav.height});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
   expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);

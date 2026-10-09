@@ -17,7 +17,7 @@ async function edgePoint(p,f=.45){return edge(p).evaluate((e,f)=>{const p=e.getP
 
 for(const framed of [false,true])test('Explore manual Auto arrange preserves panels, views and exact Undo: '+(framed?'saved graphFrame':'legacy frame'),async({page,server})=>{
  const raw=structuredClone(named),original=raw.page.sections[0].diagram;
- original.defaultLayout='service-flow';original.autoplay=false;
+ raw.page.presentation='explore';original.defaultLayout='service-flow';original.autoplay=false;
  if(framed)original.graphFrame={x:0,y:0,w:400,h:220};
  raw.page.sections.push({heading:'Untouched other diagram',diagram:structuredClone(simple.page.blocks[0].diagram)});
  const errors=[];page.on('pageerror',error=>errors.push(error.message));

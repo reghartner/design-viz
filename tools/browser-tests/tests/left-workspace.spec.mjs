@@ -15,7 +15,7 @@ async function expectCenterHit(locator,label){
 }
 
 test('floating tools leave the diagram full-window and global actions available',async({page,server})=>{
-  const raw=editorSpec();raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
+  const raw=editorSpec();raw.page.presentation='explore';raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');
   await open(page,server,JSON.stringify(raw,null,2));
   const size=page.viewportSize();
   const shell=await page.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
@@ -37,9 +37,9 @@ test('fresh desktop entry leaves Standard and Explore controls clear until selec
   onboarding.page.sections[0].diagram.panels.flatMap(panel=>panel.screens || []).forEach(screen=>{screen.src=pixel;});
   const onboardingSource=JSON.stringify(onboarding);
   let entry=0;
-  async function fresh(width){
+  async function fresh(width,explore=false){
     await page.setViewportSize({width,height:900});await page.goto(server.origin+'/workbench.html');await page.evaluate(()=>localStorage.clear());
-    await page.goto(server.origin+'/workbench.html?issue-340='+(++entry));await paste(page,onboardingSource);
+    await page.goto(server.origin+'/workbench.html?issue-340='+(++entry));await paste(page,explore?JSON.stringify({...onboarding,page:{...onboarding.page,presentation:'explore'}}):onboardingSource);
     await expect(page.locator('#workspace-window-inspect')).toBeHidden();
   }
   for(const width of [1280,1440,1920]){
@@ -51,7 +51,7 @@ test('fresh desktop entry leaves Standard and Explore controls clear until selec
     await expectCenterHit(story.locator('.ptitle').filter({hasText:'Resident app'}),'Standard Resident app at '+width);
     if(width===1280)await testInfo.attach('fresh-standard-1280',{body:await page.screenshot(),contentType:'image/png'});
 
-    await fresh(width);await page.locator('#docview [data-view-layout][data-layout-id="explore"]').filter({visible:true}).click();
+    await fresh(width,true);await page.locator('#docview [data-view-layout][data-layout-id="explore"]').filter({visible:true}).click();
     const controls=page.locator('.explore-player').filter({visible:true}),device=page.locator('.explore-window').filter({has:page.locator('.pt-deviceapp'),visible:true}),app=page.locator('.explore-window').filter({has:page.locator('.pt-appscreens'),visible:true});
     await expectCenterHit(controls,'Explore story controls at '+width);
     await expectCenterHit(device,'Explore Camera details at '+width);

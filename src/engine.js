@@ -2130,6 +2130,7 @@ function createExploreNavigation(ctl,options){
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
     move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
+    move(host && host.querySelector('.handoff-back'),actions);
     move(host && host.querySelector('.section-view-settings'),actions);
     move(host && host.querySelector('.viewport-actions'),actions);
     actions.hidden=false;
@@ -2484,7 +2485,7 @@ function createBoardNavigation(board, group, legend, changed){
   });
   controls.title='Drag the diagram background to pan. Ctrl/⌘ + wheel or pinch to zoom.';
   group.appendChild(controls);
-  function enabled(){return !retired && !board.classList.contains('explore-board');}
+  function enabled(){return !retired && !board.classList.contains('explore-board') && (!board.getClientRects || !!board.getClientRects().length);}
   function graph(){return canvas.querySelector('svg');}
   function displayScale(){var grid=board.closest('.section-layout-grid');return grid && grid.offsetWidth?grid.getBoundingClientRect().width/grid.offsetWidth:1;}
   function ratio(){var svg=graph();return svg?svg.getBoundingClientRect().width/displayScale()/svg.viewBox.baseVal.width:1;}

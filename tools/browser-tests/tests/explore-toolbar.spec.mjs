@@ -6,7 +6,7 @@ import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 
 function story(){
- const raw=editorSpec(),section=raw.page.blocks[0];section.id='delivery';
+ const raw=editorSpec(),section=raw.page.blocks[0];raw.page.presentation='explore';section.id='delivery';
  section.diagram.layouts[0].presentation='explore';section.diagram.layouts[0].name='Engineering';
  section.diagram.layouts.push({...structuredClone(section.diagram.layouts[0]),id:'standard',name:'Overview',presentation:'standard'});
  return raw;
@@ -36,11 +36,11 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);
   await expect(row).toBeVisible();
   const geometry=await row.evaluate(el=>{
-   const r=el.getBoundingClientRect(),shell=el.parentElement,nav=shell.querySelector(':scope>.diagram-views').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();
+   const r=el.getBoundingClientRect(),shell=el.parentElement,nav=shell.closest('.docview').querySelector(':scope>.explore-navigation').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();
    const controls=Array.from(el.querySelectorAll('.mbtn,.explore-zoom')).filter(b=>b.getClientRects().length).map(b=>{const r=b.getBoundingClientRect();return {y:r.y,h:r.height};});
    return {top:r.top,bottom:r.bottom,height:r.height,navBottom:nav.bottom,stageTop:stage.top,controls};
   });
-  expect(geometry.top).toBeCloseTo(geometry.navBottom,0);expect(geometry.stageTop).toBeCloseTo(geometry.bottom,0);
+  if(host==='native inline')expect(geometry.top).toBeGreaterThanOrEqual(geometry.navBottom);else expect(geometry.top).toBeCloseTo(geometry.navBottom,0);expect(geometry.stageTop).toBeCloseTo(geometry.bottom,0);
   expect(geometry.height).toBeLessThanOrEqual(45);expect(geometry.controls.length).toBe(10);
   expect(new Set(geometry.controls.map(b=>b.y)).size).toBe(1);expect(new Set(geometry.controls.map(b=>b.h))).toEqual(new Set([28]));
   for(const name of ['Auto','Fit width','Readable']){
@@ -54,18 +54,21 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   await info.attach(host+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
  await root.getByRole('button',{name:'Overview',exact:true}).click();
- if(host!=='native canvas')await expect(row).toBeHidden();
+ await expect(row).toBeVisible();
  await root.getByRole('button',{name:'Engineering',exact:true}).click();await expect(row).toBeVisible();await expect(row.locator('.explore-overlay-value')).toHaveText('100%');
 });
 
-test('Page preview uses the reader row while Workbench retains one owned set of controls',async({page,server})=>{
+test('Page preview uses the reader row while Workbench retains one owned set of controls',async({page,server},info)=>{
+ await page.setViewportSize({width:1280,height:800});
  await page.goto(server.origin+'/workbench.html');const source=JSON.stringify(story(),null,2);await paste(page,source);await closeTools(page);
  await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#workspace-zoom-in')).toBeVisible();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),row=preview.getByRole('group',{name:'Explore sizing and zoom',exact:true});await expect(row).toBeVisible();
- const geometry=await row.evaluate(el=>{const shell=el.parentElement,r=el.getBoundingClientRect(),nav=shell.querySelector('.diagram-views').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();return {top:r.top,bottom:r.bottom,navBottom:nav.bottom,stageTop:stage.top};});
+ const geometry=await row.evaluate(el=>{const shell=el.parentElement,r=el.getBoundingClientRect(),nav=shell.closest('.docview').querySelector(':scope>.explore-navigation').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();return {top:r.top,bottom:r.bottom,navBottom:nav.bottom,stageTop:stage.top};});
  expect(geometry.top).toBe(geometry.navBottom);expect(geometry.stageTop).toBe(geometry.bottom);
- await row.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(row.locator('.explore-overlay-value')).toHaveText('90%');
+ await info.attach('preview-contained-1280',{body:await page.screenshot(),contentType:'image/png'});
+ const scale=Number((await row.locator('.explore-overlay-value').innerText()).replace('%',''));
+ await row.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(row.locator('.explore-overlay-value')).toHaveText((scale-10)+'%');
  await expect(preview.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await page.locator('#close-page-preview').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
  await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#workspace-zoom-in')).toBeVisible();

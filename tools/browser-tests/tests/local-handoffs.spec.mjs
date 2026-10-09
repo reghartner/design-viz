@@ -81,7 +81,7 @@ test(`workbench ${sourcePresentation} to ${destination} handoffs keep the destin
  await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
  await expect(page.locator('#diagram-add-target')).toHaveValue('1');
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
- await delivery.getByRole('button',{name:'Back to Order intake',exact:false}).press('Enter');
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false}).press('Enter');
  await expect(orders.locator('[data-dv-node="start"]')).toBeInViewport();
  await expect(orders.locator('.step-text')).toHaveText('Validate hands off to Accept.');
  await expect(page.locator('#diagram-add-target')).toHaveValue('0');
@@ -111,7 +111,7 @@ test('workbench handoff Back restores an Explore detail and its source editing c
  await handoff.focus();await handoff.press('Enter');
  await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
  await expect(page.locator('#diagram-add-target')).toHaveValue('1');
- await delivery.getByRole('button',{name:'Back to Child flow',exact:false}).press('Enter');
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Child flow',exact:false}).press('Enter');
  await expect(child.locator('[data-dv-node="go"]')).toBeInViewport();
  await expect(page.locator('#diagram-add-target')).toHaveValue('0');
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -151,7 +151,7 @@ for(const narrow of [false,true])test(`Explore handoff and return preserve the s
  // Keyboard activation also works for an endpoint beyond the visible canvas.
  await next.focus();await next.press('Enter');
  await expect(delivery.locator('.explore-board')).toBeVisible();
- const back=delivery.getByRole('button',{name:'Back to Order intake',exact:false});
+ const back=page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false});
  await expect(back).toBeInViewport();
  await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
  await page.screenshot({path:testInfo.outputPath('handoff-destination.png')});
@@ -206,10 +206,10 @@ test('browser Back rewinds the return trail before another handoff and preserves
  const next=orders.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true});
  await next.click();await page.goBack();await expect(orders).toBeVisible();
  await next.click();await expect(delivery).toBeVisible();
- await delivery.getByRole('button',{name:'Back to Order intake',exact:false}).click();
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false}).click();
  await expect(orders).toBeVisible();await expect(page.locator('.handoff-back')).toHaveCount(0);
  expect(await page.evaluate(()=>history.state.hostValue)).toBe('keep');
  await page.goBack();await expect(delivery).toBeVisible();
- await expect(delivery.getByRole('button',{name:'Back to Order intake',exact:false})).toBeVisible();
+ await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false})).toBeVisible();
  await page.goForward();await expect(orders).toBeVisible();await expect(page.locator('.handoff-back')).toHaveCount(0);
 });

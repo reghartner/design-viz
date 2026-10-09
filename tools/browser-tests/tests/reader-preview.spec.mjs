@@ -96,7 +96,7 @@ test('read-only page preview is a separate interactive reader and returns withou
 
 test('invalid drafts retain the last usable Explore reader across host and width changes without fragment or author mutations',async({page,server})=>{
   const raw=editorSpec(),diagram=raw.page.blocks[0].diagram;
-  diagram.layouts[0].presentation='explore';delete diagram.layouts[0].steps;
+  raw.page.presentation='explore';diagram.layouts[0].presentation='explore';delete diagram.layouts[0].steps;
   const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
   await page.locator('#docview .path-chip[data-dv-path="happy"]').first().click();
   const author=await page.locator('#docview').elementHandle(),node=await page.locator('#docview .node[data-dv-node="a"]').first().elementHandle();
@@ -145,9 +145,9 @@ test('page preview opens the selected authored Explore chapter as a full canvas 
   await expect(surface).toHaveClass(/viewer-exploring/);await expect(reader).toHaveClass(/explore-full-window/);
   await expect(reader.getByRole('button',{name:'Engineering',exact:true})).toHaveAttribute('aria-pressed','true');
   const geometry=await surface.evaluate(el=>{
-    const canvas=el.querySelector('.viewer-diagram-canvas'),a=el.getBoundingClientRect(),b=canvas.getBoundingClientRect();
-    const hits=[[a.left+12,a.top+12],[a.right-12,a.top+12],[a.left+12,a.bottom-12],[a.right-12,a.bottom-12]].map(([x,y])=>canvas.contains(document.elementFromPoint(x,y)));
-    return {surface:{x:a.x,y:a.y,width:a.width,height:a.height},canvas:{x:b.x,y:b.y,width:b.width,height:b.height},hits};
+    const canvas=el.querySelector('.viewer-diagram-canvas'),nav=el.querySelector('.explore-navigation'),a=el.getBoundingClientRect(),b=canvas.getBoundingClientRect(),n=nav.getBoundingClientRect();
+    const hits=[[a.left+12,a.top+12],[a.right-12,a.top+12],[a.left+12,a.bottom-12],[a.right-12,a.bottom-12]].map(([x,y])=>canvas.contains(document.elementFromPoint(x,y)) || nav.contains(document.elementFromPoint(x,y)));
+    return {surface:{x:a.x,y:a.y+n.height,width:a.width,height:a.height-n.height},canvas:{x:b.x,y:b.y,width:b.width,height:b.height},hits};
   });
   expect(geometry.canvas).toEqual(geometry.surface);expect(geometry.hits).toEqual([true,true,true,true]);
   for(const host of ['backstage','confluence','default']){
@@ -166,7 +166,7 @@ test('page preview opens the selected authored Explore chapter as a full canvas 
   await page.locator('#docview').getByRole('button',{name:'Overview',exact:true}).click();
   if(!await page.locator('#open-page-preview').isVisible())await page.locator('#workspace-appearance>summary').click();
   await page.locator('#open-page-preview').click();
-  await expect(surface).not.toHaveClass(/viewer-exploring/);await expect(reader).not.toHaveClass(/explore-full-window/);
+  await expect(surface).toHaveClass(/viewer-exploring/);await expect(reader).toHaveClass(/explore-full-window/);
   await expect(reader.getByRole('button',{name:'Overview',exact:true})).toHaveAttribute('aria-pressed','true');
   await page.locator('#close-page-preview').click();await expect(page.locator('#src')).toHaveValue(source);
 });

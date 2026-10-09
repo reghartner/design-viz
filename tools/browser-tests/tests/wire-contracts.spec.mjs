@@ -53,7 +53,7 @@ test('wire hover, traversable content, pin, source links, keyboard, dismissal an
 async function avoidsCanvasControls(root){
  const overlaps=await root.evaluate(el=>{
   const scope=el.shadowRoot || el,pop=scope.querySelector('.wire-contract-preview').getBoundingClientRect();
-  return Array.from(scope.querySelectorAll('.diagram-views,.explore-tools,.explore-player')).map(control=>{
+  return Array.from(scope.querySelectorAll('.explore-navigation,.diagram-views,.explore-tools,.explore-player')).map(control=>{
    const r=control.getBoundingClientRect();return {control:control.className,area:Math.max(0,Math.min(pop.right,r.right)-Math.max(pop.left,r.left))*Math.max(0,Math.min(pop.bottom,r.bottom)-Math.max(pop.top,r.top))};
   });
  });
@@ -111,7 +111,9 @@ test('Workbench binds an existing card to an active wire with one Undo/Redo and 
 });
 
 test('native Canvas keeps the full preview above its toolbar when no adjacent card fits',async({page,server})=>{
- await page.setViewportSize({width:1100,height:780});const root=await open(page,server,fixture(true),true);
+ await page.setViewportSize({width:1100,height:780});const raw=fixture(true);
+ raw.page.blocks[0].tabs[0].sections[0].contract.fields.push({k:'version',v:'One',g:'The full contract remains readable.'},{k:'owner',v:'Device',g:'Enough content to require a placement above the sizing row.'});
+ const root=await open(page,server,raw,true);
  await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
  await marker(root).first().click();await geometry(page,preview(root));await avoidsCanvasControls(root);
  expect(await nearMarkerOrAboveToolbar(page,root)).toBe('above-toolbar');

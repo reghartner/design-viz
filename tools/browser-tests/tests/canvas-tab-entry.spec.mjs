@@ -335,7 +335,8 @@ test('persistent workbench navigation tracks document scroll and keeps source un
  const nav=page.locator('#docview > .explore-navigation');await expect(nav).toBeVisible();
  await page.evaluate(()=>document.querySelector('#section-later').scrollIntoView({block:'start'}));
  await expect(nav.getByRole('button',{name:'Later section',exact:true})).toHaveAttribute('aria-pressed','true');
- await expect(page.locator('#diagram-add-target')).toHaveValue('1');
+ await expect(page.locator('#diagram-add-target')).toHaveValue('0');
+ await nav.getByRole('button',{name:'Later section',exact:true}).click();await expect(page.locator('#diagram-add-target')).toHaveValue('1');
  const box=await nav.boundingBox(),header=await page.locator('.workbench-header').boundingBox();expect(box.y).toBeGreaterThanOrEqual(header.y+header.height);
  await nav.getByRole('button',{name:'Standard story',exact:true}).click();await nav.getByRole('tab',{name:'Explore story',exact:true}).click();
  await expect(page.locator('body')).toHaveClass(/workspace-diagram/);expect((await nav.boundingBox()).y).toBe(box.y);

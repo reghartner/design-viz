@@ -51,7 +51,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
       window.domainFrames=[];let remaining=24;const host=el.getRootNode();
       host.addEventListener('click',()=>requestAnimationFrame(function sample(){
         const child=Array.from(host.querySelectorAll('[data-dv-detail-preview]')).find(s=>!s.hidden);
-        if(child){const board=child.querySelector('.explore-board'),shell=child.querySelector('.viewer-diagram-canvas,.workbench-diagram-canvas'),nav=child.querySelector('.explore-navigation'),r=board.getBoundingClientRect(),s=shell.getBoundingClientRect(),n=nav.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,sx:s.x,sy:s.y,sw:s.width,sh:s.height,navBottom:n.bottom,opacity:style.opacity,transform:style.transform});}
+        if(child){const board=child.querySelector('.explore-board'),shell=child.querySelector('.viewer-diagram-canvas,.workbench-diagram-canvas'),nav=child.closest('.docview').querySelector(':scope>.explore-navigation'),r=board.getBoundingClientRect(),s=shell.getBoundingClientRect(),n=nav.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,sx:s.x,sy:s.y,sw:s.width,sh:s.height,navBottom:n.bottom,opacity:style.opacity,transform:style.transform});}
         if(--remaining)requestAnimationFrame(sample);
       }),{once:true,capture:true});
     });
@@ -59,7 +59,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
     const contentTop=host==='workbench'?await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top'))):0;
-    const viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:0,sw:viewport.width,sh:viewport.height};
+    const viewport=page.viewportSize(),navHeight=await root.locator('.explore-navigation').evaluate(el=>el.getBoundingClientRect().height),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:navHeight,sw:viewport.width,sh:viewport.height-navHeight};
     const first=frames[0];
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');

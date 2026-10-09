@@ -249,6 +249,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .has-document-navigation.explore-full-window .viewer-diagram-canvas{top:var(--flowview-navigation-height,48px);}
  .navigation-contained>.explore-navigation{position:sticky;top:0;}
  .navigation-contained>.document-navigation-space{display:none;}
+ body .docview.navigation-contained.explore-full-window.has-document-navigation{margin:0;padding:0;border:0;border-radius:0;max-width:none;width:100%;}
  .explore-navigation .diagram-view-choice{display:flex;flex-wrap:nowrap;padding:0;border:0;box-shadow:none;background:none;}
  .has-document-navigation .diagram-views:not(:has(>.diagram-view-choice)):not(:has(>.viewport-actions)):not(:has(>.section-view-settings)){margin:0;padding:0;}
 }

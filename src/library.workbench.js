@@ -319,7 +319,7 @@ function initWorkbenchLibrary(opts){
       deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
-      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});
+      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit,container:reader});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
       if(opts.savePosition){
         var priorChange=ctl.onChange,wrapped=function(){

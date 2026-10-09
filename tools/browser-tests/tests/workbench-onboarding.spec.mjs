@@ -42,21 +42,20 @@ test('homepage names the practice destination and keeps the System flow chapter 
     }).toBeLessThan(2);
   }
   await fits();await page.screenshot({path:info.outputPath('landing-default-view.png')});
-  const defaultHeight=(await example.boundingBox()).height;
+  const defaultView=await section.getAttribute('data-view-id');
   await section.getByRole('button',{name:'System flow',exact:true}).click();
-  await expect(grid).toBeHidden();await expect(section.locator('.explore-board')).toBeVisible();
-  await expect(section.locator('.explore-zoom')).toHaveText('52%');
-  await fits();expect((await example.boundingBox()).height).not.toBe(defaultHeight);
-  const zoom=await section.locator('.explore-zoom').innerText();
+  await expect(grid).toBeVisible();await expect(section.locator('.explore-stage')).toBeHidden();
+  await fits();expect(await section.getAttribute('data-view-id')).not.toBe(defaultView);
+  const zoom=await section.locator('.board-zoom-value').innerText();
   await section.getByRole('button',{name:'Zoom in',exact:true}).click();
-  await expect(section.locator('.explore-zoom')).not.toHaveText(zoom);
+  await expect(section.locator('.board-zoom-value')).not.toHaveText(zoom);
   await section.getByRole('button',{name:'Go to step 3 on Internet down',exact:true}).click();
   const caption=await section.locator('.stepline').innerText();
   await page.screenshot({path:info.outputPath('landing-explore-view.png')});
   await practiceAction.click();
   const expanded=practice(page).locator('#section-visitor');
-  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(expanded.locator('.explore-board')).toBeVisible();
+  await expect(practice(page).locator('.explore-navigation').getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(expanded.locator('.explore-stage')).toBeHidden();
   await expect.poll(()=>expanded.locator('.stepline').innerText()).toBe(caption);
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
   await section.getByRole('button',{name:'Story',exact:true}).click();
@@ -64,9 +63,8 @@ test('homepage names the practice destination and keeps the System flow chapter 
   const authored=await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8');
   await paste(page,authored);
   const editorSection=page.locator('#docview #section-visitor');
-  await editorSection.getByRole('button',{name:'System flow',exact:true}).click();
-  await editorSection.locator('.section-view-options summary').click();
-  await expect(editorSection.getByLabel('Viewing mode',{exact:true})).toHaveValue('explore');
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'System flow',exact:true}).click();
+  await expect(page.getByLabel('Viewing mode',{exact:true})).toHaveValue('standard');
   await page.screenshot({path:info.outputPath('editor-system-flow.png')});
   await page.locator('#workspace-home').click();
   await page.setViewportSize({width:390,height:844});await fits();
@@ -76,7 +74,7 @@ test('homepage names the practice destination and keeps the System flow chapter 
 
 test('homepage opens an authored Explore default without exposing the Standard grid',async({page,server})=>{
   const sample=JSON.parse(await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8'));
-  sample.page.sections[0].diagram.defaultLayout='explore';
+  sample.page.presentation='explore';sample.page.sections[0].diagram.defaultLayout='explore';
   await page.route(server.origin+'/workbench.html',async route=>{
     const response=await route.fetch(),html=await response.text();
     const body=html.replace(/var WORKBENCH_LANDING = [^\n]*;\n/,'var WORKBENCH_LANDING = '+JSON.stringify({spec:sample,title:'Example',label:'',footer:''}).replace(/</g,'\\u003c')+';\n');
@@ -90,8 +88,8 @@ test('homepage opens an authored Explore default without exposing the Standard g
   await expect(section.locator('.section-layout-grid')).toBeHidden();
   await expect(section.locator('.explore-player')).toBeVisible();
   await section.getByRole('button',{name:'Story',exact:true}).click();
-  await expect(section.locator('.section-layout-grid')).toBeVisible();
-  await expect(section.locator('.explore-board')).toHaveCount(0);
+  await expect(section.locator('.section-layout-grid')).toBeHidden();
+  await expect(section.locator('.explore-board')).toBeVisible();
 });
 
 test('practice chapters conceal homepage chrome before their bootstrap runs',async({page,server})=>{
@@ -191,7 +189,7 @@ test('skipping viewer intro records only visited topics and next entry starts in
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);
   await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose a chapter');
+  await expect(heading(frame)).toHaveText('Choose a view');
   await frame.getByRole('button',{name:'Skip tour',exact:true}).click();
   await expect(heading(practice(page))).toHaveText('Start with your own agent');
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv_tour_features_v1')).seen)).toEqual(['views']);
@@ -265,7 +263,7 @@ test('parent tour chrome blocks edit shortcuts and entering fullscreen works',as
 test('closing the first viewer card keeps the introduction available and expansion retains the selected outcome',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose a chapter');
+  await expect(heading(frame)).toHaveText('Choose a view');
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
   expect(await page.evaluate(()=>localStorage.getItem('dv_tour_v1'))).toBeNull();
   await page.getByRole('button',{name:'Take the tour →',exact:true}).click();
@@ -339,7 +337,7 @@ test('company config owns landing and reader while editing exercises remain fict
   await expect(page.locator('.workbench-tour-header>b')).toHaveText('Company <architecture> · Internal </script> example');
   await expect(practice(page).locator('#docview')).toHaveClass(/sk-blueprint/);
   await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
-  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(practice(page).locator('.explore-navigation').getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect.poll(()=>expanded.locator('.stepline').textContent()).toBe(caption);
   await expect(expanded.getByText('Company ingestion',{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath('company-expanded.png')});

@@ -1,7 +1,7 @@
 import {test,expect,trackResources,resources} from '../helpers/test.mjs';
 test('native Explore targets retain independent panels and fullscreen ownership through destroy',async({page,server})=>{
   await page.setViewportSize({width:1920,height:1400});await page.addInitScript(trackResources);
-  await page.goto(server.origin+'/native/index.html#host-explore-route');await page.waitForFunction(()=>!!window.__host);
+  await page.goto(server.origin+'/native/index.html?explore#host-explore-route');await page.waitForFunction(()=>!!window.__host);
   const baseline=await resources(page);
   await page.evaluate(()=>{__host.left(true);__host.right(true);});
   const alpha=page.locator('#alpha'),beta=page.locator('#beta');
@@ -33,7 +33,7 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   await leftPanel.getByRole('button',{name:'Hide state',exact:true}).click();
   await expect(leftPanel).toBeHidden();await expect(rightPanel).toBeVisible();
   await page.evaluate(()=>__host.navigate({section:'delivery-2',view:'brief',path:'happy',step:'done'}));
-  await expect(alpha.locator('.explore-stage')).toBeHidden();await expect(beta.locator('.explore-stage')).toBeVisible();
+  await expect(alpha.locator('.explore-stage')).toBeVisible();await expect(beta.locator('.explore-stage')).toBeVisible();
   await page.evaluate(()=>__host.navigate({section:'delivery-2',view:'explore',path:'happy',step:'done'}));
   await expect(alpha.locator('.explore-stage')).toBeVisible();await expect(leftPanel).toBeHidden();
   await alpha.locator('.explore-panel-menu summary').click();
@@ -41,19 +41,19 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   await page.keyboard.press('Escape');await expect(leftPanel).toBeVisible();
   expect((await leftPanel.boundingBox()).width).toBeCloseTo(narrow.width,0);
   await alpha.getByRole('button',{name:'Expand diagram view',exact:true}).click();
-  await expect.poll(()=>alpha.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el)).toBe(true);
+  await expect.poll(()=>alpha.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el.closest('.docview'))).toBe(true);
   await expect(beta.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
   expect(await beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement)).toBeNull();
   await page.evaluate(()=>__host.right(false));await expect(beta.locator('.docview')).toHaveCount(0);
-  await expect.poll(()=>alpha.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el)).toBe(true);
+  await expect.poll(()=>alpha.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el.closest('.docview'))).toBe(true);
   await alpha.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
   await page.evaluate(()=>__host.right(true));await beta.getByRole('button',{name:'Explore',exact:true}).click();
   await beta.getByRole('button',{name:'Expand diagram view',exact:true}).click();
-  await expect.poll(()=>beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el)).toBe(true);
+  await expect.poll(()=>beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el.closest('.docview'))).toBe(true);
   await expect(alpha.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
   await page.evaluate(()=>__host.left(false));await expect(alpha.locator('.docview')).toHaveCount(0);
-  await expect.poll(()=>beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el)).toBe(true);
+  await expect.poll(()=>beta.locator('.section-viewport').evaluate(el=>el.getRootNode().fullscreenElement===el.closest('.docview'))).toBe(true);
   await page.evaluate(()=>__host.right(false));await expect(beta.locator('.docview')).toHaveCount(0);
   await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
   await expect.poll(()=>resources(page)).toEqual(baseline);

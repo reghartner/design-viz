@@ -22,7 +22,7 @@ export async function nativeViewerSource(){
     'flowview-root.native-canvas{display:block;position:relative;height:100dvh;overflow:hidden;}'+
     'flowview-root.native-canvas .docview.explore-full-window{padding:0;}'+
     '.native-canvas .viewer-diagram-canvas{position:absolute;inset:var(--flowview-navigation-height,48px) 0 0;}'+
-    '.native-canvas .navigation-contained>.explore-navigation{margin:0;min-height:var(--flowview-host-actions-block-offset,48px);padding-left:calc(12px + var(--flowview-host-actions-inline-offset,0px));}'+
+    '.native-canvas .navigation-contained>.explore-navigation{margin:0 0 0 var(--flowview-host-actions-inline-offset,0px);min-height:var(--flowview-host-actions-block-offset,48px);padding-left:12px;}@media(max-width:1024px){.native-canvas .navigation-contained>.explore-navigation{margin:var(--flowview-host-actions-block-offset,0px) 0 0;min-height:48px;}.native-canvas .docview.explore-full-window .viewer-diagram-canvas{top:calc(var(--flowview-navigation-height,48px) + var(--flowview-host-actions-block-offset,0px));}}'+
     '.native-canvas-story{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;font:12px sans-serif;}'+
     '.native-canvas-story select{font:inherit;max-width:200px;}';
   const assets={css,fonts,icons:shared.icons};

@@ -6,7 +6,7 @@ export async function prepareLanding(repo,output){
   const inputs=path.join(output,'company');await mkdir(inputs);
   const sample=JSON.parse((await readFile(path.join(repo,'src/starters/onboarding.json'),'utf8'))
     .replaceAll('event-detail','company-processing').replaceAll('visitor','company-overview').replaceAll('cloud','company-service'));
-  sample.page.title='Company architecture';sample.page.skin='blueprint';
+  sample.page.presentation='explore';sample.page.title='Company architecture';sample.page.skin='blueprint';
   sample.page.sections.unshift({heading:'Introduction',prose:'Company introduction before the featured diagram.'});
   sample.page.sections[1].diagram.defaultLayout='explore';
   sample.page.sections[1].diagram.nodes['company-service'].title='Company ingestion';

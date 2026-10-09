@@ -101,8 +101,8 @@ test('main canvas Explore gestures author one history entry each and survive sta
   await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);
   await expect(section(page)).toHaveAttribute('data-view-id','explore');await expectSavedGeometry(page,layout);
   await page.locator('.explore-navigation').getByRole('button',{name:'Standard story',exact:true}).click();await expect(page.locator('#src')).toHaveValue(saved);
-  // Standard is the curated page, with no floating canvas geometry to edit.
-  await expect(section(page).locator('.explore-stage')).toBeHidden();await expect(panel(page)).toHaveCount(0);
+  // Saved Views preserve the page-owned Explore mode while selecting their own content.
+  await expect(section(page).locator('.explore-stage')).toBeVisible();
   await expect(section(page).locator('.pwidget[data-dv-panel="0"]')).toBeVisible();await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('.explore-navigation').getByRole('button',{name:'Explore story',exact:true}).click();await expectSavedGeometry(page,layout);
   await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#undo-builder')).toBeDisabled();

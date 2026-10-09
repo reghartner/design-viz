@@ -5,7 +5,7 @@ import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const starter=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 function fixture(canvas=true){
- const raw=structuredClone(starter),s=raw.page.sections[0],d=s.diagram;s.id='canvas-story';s.text='Section notes stay with the diagram.';d.autoplay=false;d.defaultLayout='service-flow';
+ const raw=structuredClone(starter),s=raw.page.sections[0],d=s.diagram;s.id='canvas-story';s.text='Section notes stay with the diagram.';d.autoplay=false;d.defaultLayout='service-flow';raw.page.presentation='explore';
  d.layouts[1].sectionLayout.default.forEach(t=>{if(t.panel)t.hidden=false;});
  d.layouts[1].exploreLayout={panelPlacement:canvas?'canvas':'floating',panels:[{panel:'home',x:.65,y:.1,w:.25,h:.3,stacked:false}],canvas:{panels:[
  {panel:'home',x:-380,y:20,w:340,h:300},{panel:'clip',x:500,y:450,w:340,h:280},{panel:'outcome',x:900,y:20,w:300,h:240}],prose:{x:900,y:310,w:300,h:180}}};
@@ -359,7 +359,7 @@ test('canvas step controls survive chapter, profile, preview and editor reload; 
  // Alt marquee includes the controls, and Fit selection can frame them.
  const r=await player(page).boundingBox();await page.keyboard.down('Alt');await page.mouse.move(r.x-10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width+10,r.y+r.height+10,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
  await expect(player(page)).toHaveClass(/dv-sel/);await expect(player(page).locator('.explore-player-grip')).toHaveCSS('visibility','visible');await expect(page.locator('#workspace-fit-selection')).toBeEnabled();
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  await page.getByRole('button',{name:'Service flow',exact:true}).click();expect(await controlsRect(page)).toEqual(layout.canvas.controls);
  await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
  expect(await controlsRect(page)).toEqual(layout.canvas.controls);await expect(page.locator('#src')).toHaveValue(saved);
@@ -391,12 +391,14 @@ test('step controls inspector reveals a new canvas rectangle',async({page,server
  expect(r.x).toBeGreaterThanOrEqual(b.x);expect(r.y).toBeGreaterThanOrEqual(b.y);expect(r.x+r.width).toBeLessThanOrEqual(b.x+b.width);expect(r.y+r.height).toBeLessThanOrEqual(b.y+b.height);
 });
 
-test('Standard chapters remain usable before and after canvas step controls activate',async({page,server})=>{
- const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
+test('page mode switches preserve Standard Views before and after canvas step controls activate',async({page,server})=>{
+ const raw=fixture(),diagram=raw.page.sections[0].diagram;raw.page.presentation='standard';diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
  await expect(page.locator('.doc-sec[data-view-id=home-story]')).toBeVisible();await expect(page.locator('.explore-stage')).toBeHidden();
  await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');const original=await source(page);
- await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#workspace-fit')).toHaveText('Fit canvas');
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
+ await page.getByRole('combobox',{name:'Viewing mode',exact:true}).selectOption('explore');await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#workspace-fit')).toHaveText('Fit canvas');
+ await page.locator('#undo-builder').click();
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');
  await expect(page.locator('#src')).toHaveValue(original);
 });

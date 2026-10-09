@@ -13,16 +13,16 @@ function story(rootType,childType){
     else if(presentation){diagram.layouts=[{id:'flow',name:id+' view',presentation,sectionLayout:profile}];diagram.defaultLayout='flow';}
     return {id,heading:id+' story',detailOnly:id!=='root',diagram};
   }
-  return {page:{title:'Detail presentation inheritance',sections:[section('root','child',rootType),section('child','grandchild',childType),section('grandchild')]}};
+  return {page:{presentation:rootType,title:'Detail presentation inheritance',sections:[section('root','child',rootType),section('child','grandchild',childType),section('grandchild')]}};
 }
 async function surface(page,section,explore){
   await expect(section).toBeVisible();
   await expect(section.locator('.explore-stage'))[explore?'toBeVisible':'toBeHidden']();
   if(explore){
     await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
-    const shell=await section.locator('.viewer-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
+    const shell=await section.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('#docview>.explore-navigation').boundingBox();
     const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox(),viewport=page.viewportSize();
-    expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+    expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
     expect(board).toEqual(stage);
   }else{
     await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
@@ -32,7 +32,7 @@ async function surface(page,section,explore){
 }
 
 for(const [rootType,childType,childExplore] of [
-  ['explore','standard',false],['standard','explore',true],['explore',undefined,true],['explore','legacy',true]
+  ['explore','standard',true],['standard','explore',false],['explore',undefined,true],['explore','legacy',true]
 ])test(`standalone ${rootType} root respects ${childType || 'implicit'} child, nested inheritance and Back`,async({page,server},info)=>{
   const raw=story(rootType,childType),source=JSON.stringify(raw),input=path.join(server.root,'detail-types.json');
   const output=path.join(server.root,'detail-types.html');await writeFile(input,source);

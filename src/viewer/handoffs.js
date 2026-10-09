@@ -68,7 +68,8 @@ function wireLocalHandoffs(ctl, page){
     if(!trail.length || !rec)return;
     var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
     back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
-    (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+    var nav=ctl.view.querySelector(':scope > .explore-navigation');
+    (nav && nav.getAttribute('data-navigation-section')===String(rec.number)?nav.querySelector('.explore-navigation-actions'):rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
   }
   function activate(rec, saved){
     if(disposed)return;

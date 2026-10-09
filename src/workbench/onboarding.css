@@ -49,3 +49,5 @@
 #folder-agent-setup-mode-embedded:not([aria-pressed="true"]){background:transparent}
 [data-open-human-guide]+.welcome-text-button{margin-left:14px}
 @media(max-width:800px){.welcome-hero{grid-template-columns:1fr}.workbench-tour-header>b{width:100%}}
+
+.practice-viewer #docview>.explore-navigation{top:0;}

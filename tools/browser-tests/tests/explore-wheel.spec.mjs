@@ -41,7 +41,7 @@ for(const surface of ['standalone','workbench','native'])test(surface+' Ctrl-scr
   }else if(surface==='workbench'){
     await page.goto(server.origin+'/workbench.html');await paste(page,text);await closeTools(page);board=page.locator('.explore-board');
   }else{
-    await page.setViewportSize({width:1920,height:1400});await page.goto(server.origin+'/native/index.html#host-wheel');await page.waitForFunction(()=>!!window.__host);
+    await page.setViewportSize({width:1920,height:1400});await page.goto(server.origin+'/native/index.html?explore#host-wheel');await page.waitForFunction(()=>!!window.__host);
     await page.evaluate(()=>{__host.left(true);__host.right(true);});
     await page.locator('#alpha').getByRole('button',{name:'Explore',exact:true}).click();await page.locator('#beta').getByRole('button',{name:'Explore',exact:true}).click();
     board=page.locator('#alpha .explore-board');sibling=page.locator('#beta .explore-board');originalSibling=await width(sibling);hash=new URL(page.url()).hash;
@@ -80,18 +80,16 @@ test('editor wheel zoom stays temporary until an explicit camera save, and stale
 });
 
 test('wheel units and limits are consistent; inactive and destroyed viewports release the gesture',async({page,server})=>{
-  await page.addInitScript(trackResources);await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);const baseline=await resources(page);
+  await page.addInitScript(trackResources);await page.goto(server.origin+'/native/index.html?explore');await page.waitForFunction(()=>!!window.__host);const baseline=await resources(page);
   await page.evaluate(()=>__host.left(true));const host=page.locator('#alpha');await host.getByRole('button',{name:'Explore',exact:true}).click();
   const board=host.locator('.explore-board'),before=await width(board),held=await board.elementHandle();
   expect(await dispatch(board,-1,{deltaMode:1})).toBe(true);await expect.poll(()=>width(board)).toBeCloseTo(before*Math.exp(.096),0);
   expect(await dispatch(board,16)).toBe(true);await expect.poll(()=>width(board)).toBeCloseTo(before,0);
   const ratio=await board.evaluate(el=>el.querySelector('.boardcanvas>svg').viewBox.baseVal.width);
   await dispatch(board,-100000);expect(await width(board)/ratio).toBeCloseTo(4,5);await dispatch(board,100000);expect(await width(board)/ratio).toBeCloseTo(.15,5);
-  await host.getByRole('button',{name:'Business',exact:true}).click();
-  // The regular view now owns Ctrl-wheel after Explore releases the board.
-  const regularGraph=host.locator('.board .boardcanvas>svg'),regularWidth=await regularGraph.evaluate(el=>el.getBoundingClientRect().width);
-  expect(await held.evaluate(el=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-50});el.dispatchEvent(e);return e.defaultPrevented;})).toBe(true);
-  expect(await regularGraph.evaluate(el=>el.getBoundingClientRect().width)).toBeGreaterThan(regularWidth);
+  await host.getByRole('tab',{name:'Notes',exact:true}).click();
+  // A different tab hides the owned canvas and releases its wheel gesture.
+  expect(await held.evaluate(el=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-50});el.dispatchEvent(e);return e.defaultPrevented;})).toBe(false);
   await page.evaluate(()=>__host.left(false));await expect(host.locator('.docview')).toHaveCount(0);
   expect(await held.evaluate(el=>{const e=new WheelEvent('wheel',{bubbles:true,cancelable:true,ctrlKey:true,deltaY:-50});el.dispatchEvent(e);return e.defaultPrevented;})).toBe(false);
   await expect.poll(()=>resources(page)).toEqual(baseline);await held.dispose();

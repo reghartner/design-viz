@@ -70,6 +70,8 @@ function wireStepContracts(host, board, entries, prefix, stepIndex, onPin){
     var rect=active.getBoundingClientRect(),vw=window.innerWidth,vh=window.innerHeight;
     var width=pop.offsetWidth,height=pop.offsetHeight,cx=rect.left+rect.width/2,cy=rect.top+rect.height/2;
     var controls=Array.prototype.map.call(host.querySelectorAll('.diagram-views,.explore-tools,.explore-player,.termbar'),function(el){return el.getBoundingClientRect();}).filter(function(r){return r.width && r.height;});
+    var reader=host.closest('.docview'),navigation=reader && reader.querySelector(':scope>.explore-navigation');
+    if(navigation){var navRect=navigation.getBoundingClientRect();if(navRect.width && navRect.height)controls.push(navRect);}
     var boardRect=board.svg.closest('.board').getBoundingClientRect(),candidates=[];
     function overlap(a,b){return Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));}
     function candidate(x,y){

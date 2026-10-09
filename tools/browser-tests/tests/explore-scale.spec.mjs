@@ -8,7 +8,7 @@ import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 function fixture(scale){
   const spec=structuredClone(named),sec=spec.page.sections[0],d=sec.diagram;
-  sec.id='doorbell';d.autoplay=false;d.defaultLayout='service-flow';
+  sec.id='doorbell';d.autoplay=false;d.defaultLayout='service-flow';spec.page.presentation='explore';
   if(scale!==undefined){
     d.layouts[1].exploreLayout.overlayScale=scale;
     d.layouts[1].exploreLayout.controls={x:.06,y:.76,w:.6,h:.14};
@@ -42,7 +42,7 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   const ps=await size(panel(page));await page.getByRole('button',{name:'Zoom in',exact:true}).click();expect((await graph(page).boundingBox()).width).toBeGreaterThan(startGraph.width);expect(await size(panel(page))).toEqual(ps);
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeHidden();
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeVisible();await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
-  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
+  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
   await page.getByRole('button',{name:'Service flow',exact:true}).click();await panelsOptions(page);await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
   await page.getByRole('button',{name:'Hide panels',exact:true}).click();await page.getByRole('button',{name:'Restore panels',exact:true}).click();expect(await size(panel(page))).toEqual(ps);
   await zoom.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();expect((await size(panel(page))).w).toBeCloseTo(start.w,0);

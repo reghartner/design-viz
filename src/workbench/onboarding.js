@@ -240,6 +240,8 @@ function initWorkbenchPractice(opts){
       if(initial && player){player.jumpSource(initial.step,initial.path);if(initial.mode==='ambient')player.enterAmbient();}
     }
     doc.body.classList.add('practice-viewer');
+    var readerCanvas=initViewerExploreCanvas(reader,readerView);
+    window.addEventListener('pagehide',function(){readerCanvas.destroy();reader.destroy();},{once:true});
   }
   function send(event,id){parent.postMessage({type:'flowview-tour',event:event,id:id},'*');}
   function click(id){var node=doc.getElementById(id);if(node && !node.disabled)node.click();}

@@ -41,7 +41,7 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   await page.mouse.move(p.x,p.y);await page.mouse.down();await page.mouse.move(p.x-80,p.y-65,{steps:8});await page.mouse.up();
   const dragged=await scroll(board);expect(dragged.x).toBeGreaterThan(start.x+50);expect(dragged.y).toBeGreaterThan(start.y+40);
   const q=await background(board);await page.mouse.move(q.x,q.y);await page.mouse.down();await page.mouse.move(q.x+40,q.y+30,{steps:4});
-  await reader.getByRole('tab',{name:'Standard',exact:true}).click();await page.mouse.up();expect(await scroll(board)).toEqual(dragged);
+  await page.keyboard.press('Escape');await page.mouse.up();expect(await scroll(board)).toEqual(dragged);
   const preWheel=await width(board);const w=await background(board);await page.mouse.move(w.x,w.y);await page.keyboard.down('Control');await page.mouse.wheel(0,-30);await page.keyboard.up('Control');
   await expect.poll(()=>width(board)).toBeGreaterThan(preWheel);expect(await page.evaluate(()=>scrollY)).toBe(pageY);
   if(surface==='workbench'){

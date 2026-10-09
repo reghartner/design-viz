@@ -38,7 +38,7 @@ test('copied production Forge resource imports, saves and reloads through only t
 
 test('Forge Explore height converges when the host resizes its iframe to content',async({page,server})=>{
   const raw=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
-  raw.page.sections[0].diagram.defaultLayout='service-flow';raw.page.sections[0].diagram.autoplay=false;
+  raw.page.presentation='explore';raw.page.sections[0].diagram.defaultLayout='service-flow';raw.page.sections[0].diagram.autoplay=false;
   await page.addInitScript(config=>{
     window.__bridge={callBridge:async method=>{if(method==='getContext')return {siteUrl:'https://company.atlassian.net',extension:{config,macro:{isConfiguring:false}}};throw Error('Unexpected bridge call '+method);}};
   },{specJson:JSON.stringify(raw)});

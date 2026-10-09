@@ -6,7 +6,7 @@ import {repo} from '../helpers/prepare.mjs';
 const starter=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 function fixture(placement,count=6,width=720,position='below'){
  const raw=structuredClone(starter),d=raw.page.sections[0].diagram;
- d.autoplay=false;d.defaultLayout='service-flow';
+ d.autoplay=false;d.defaultLayout='service-flow';raw.page.presentation='explore';
  for(let i=2;i<count;i++)d.paths.push({...structuredClone(d.paths[0]),id:'path-'+i,label:'Path '+(i+1)});
  Object.assign(d.layouts[1].exploreLayout,{controlsPlacement:placement,steps:{textPosition:position},canvas:{controls:{x:0,y:500,w:width,h:220}}});
  return raw;

@@ -1,7 +1,7 @@
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 
-function story(title){const raw=editorSpec();raw.page.title=title;raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');return JSON.stringify(raw,null,2);}
+function story(title){const raw=editorSpec();raw.page.title=title;raw.page.presentation='explore';raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');return JSON.stringify(raw,null,2);}
 async function rename(page,value){
   await page.locator('#editor-tab-outline').click();await page.locator('#outline-search').fill('Doorbell');
   await page.locator('.outline-item').filter({hasText:'node · Doorbell'}).click();await page.locator('#outline-inspect').click();

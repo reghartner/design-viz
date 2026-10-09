@@ -111,3 +111,24 @@ test('arranger stays above Inspect and retires cleanly on Escape, chapter, tab a
  await arrangeChapter(page);await nav(page).getByRole('tab',{name:'Notes',exact:true}).click();await expect(arranger).toHaveCount(0);await nav(page).getByRole('tab',{name:'Main story',exact:true}).click();await expect(arranger).toHaveCount(0);
  await arrangeChapter(page);await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(arranger).toHaveCount(0);await page.locator('#editor-tab-json').click();await page.locator('#go').click();await expect(arranger).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original+' ');
 });
+
+
+test('passive Standard scroll preserves the selected object and insertion section',async({page,server})=>{
+ const raw={page:{title:'Separate reading and editing position',sections:[
+  {id:'first',heading:'First section',text:Array(50).fill('Opening section notes.').join('\n\n'),diagram:{nodes:{shared:{title:'First node'}},rows:[['shared']]}},
+  {id:'last',heading:'Last section',text:'Later notes',diagram:{nodes:{shared:{title:'Last node'}},rows:[['shared']]}}
+ ]}};
+ await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
+ const first=page.locator('#section-first [data-dv-node="shared"]');await first.click();
+ await page.locator('#editor-tab-inspect').click();
+ const title=page.locator('#guide').getByLabel('title',{exact:true});await expect(title).toHaveValue('First node');
+ await page.locator('#docview').evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement){if(/auto|scroll/.test(getComputedStyle(p).overflowY) && p.scrollHeight>p.clientHeight){p.scrollTop=p.scrollHeight;break;}}});
+ await expect(nav(page).getByRole('button',{name:'Last section',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(title).toHaveValue('First node');await title.fill('Edited first');await title.press('Enter');
+ let result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections[0].diagram.nodes.shared.title).toBe('Edited first');expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
+ await page.locator('#undo-builder').click();await closeTools(page);await first.click();await first.focus();
+ await page.locator('#docview').evaluate(el=>{for(let p=el.parentElement;p;p=p.parentElement){if(/auto|scroll/.test(getComputedStyle(p).overflowY) && p.scrollHeight>p.clientHeight){p.scrollTop=p.scrollHeight;break;}}});
+ await expect(nav(page).getByRole('button',{name:'Last section',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.keyboard.press('Delete');
+ result=JSON.parse(await page.locator('#src').inputValue());expect(result.page.sections[0].diagram.nodes.shared).toBeUndefined();expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
+});

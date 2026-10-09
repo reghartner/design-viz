@@ -92,6 +92,176 @@ async function connectExternal(page){
   await page.locator('#folder-agent-setup-mode-external').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
 }
+async function topologyFolderFixture(page){
+  const h=await setup(page),{digest}=await import('../../../tools/canon/drift.mjs');
+  const provider={page:{title:'Approved provider',canon:{version:1,id:'provider',kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:'Frozen provider API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};
+  const consumer={page:{title:'Imported story',canon:{version:1,id:'consumer',kind:'design',owner:'group:default/test'},sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'public',as:'shared'}]}}]}};
+  const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))},hits=[];
+  await page.route('**/diagrams.json',route=>{hits.push('catalog');return route.fulfill({json:catalog});});
+  for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
+  return Object.assign(h,{provider,consumer,catalog,hits});
+}
+
+for(const entry of ['welcome','editor'])test('Open file loads authored topology from '+entry+' and connects its folder',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    if(entry==='editor'){
+      await page.locator('#welcome-new').click();await page.locator('.welcome-template-card').filter({hasText:'Blank diagram'}).click();
+    }
+    const raw=structuredClone(h.consumer);delete raw.page.canon;let text=JSON.stringify(raw,null,2)+'\n';
+    await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'imported.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
+    await expect(page.locator('#workbench-workspace')).toBeVisible();await expect(page.locator('#src')).toHaveValue(text);
+    await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
+    expect(h.hits).toEqual(['catalog','provider']);await expect(page.locator('#undo-builder')).toBeDisabled();
+    h.provider.page.sections[0].diagram.nodes.api.title='Later deployment';raw.page.title='Reopened imported story';text=JSON.stringify(raw,null,2)+'\n';
+    if(entry==='welcome')await page.locator('#workspace-home').click();
+    await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'reopened.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
+    await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
+    await page.locator('#docview [data-dv-node="local"]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited local');await title.press('Enter');
+    const edited=await page.locator('#src').inputValue();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);text=edited;
+    const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+    const saved=JSON.parse(await readFile(await(await download).path(),'utf8'));expect(saved.page.sections[0].diagram.topologyImports).toEqual(raw.page.sections[0].diagram.topologyImports);expect(saved.page.canon).toBeUndefined();expect(JSON.stringify(saved)).not.toMatch(/topologyContext|topologyProvenance|shared::api/);
+    await page.reload();await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
+    await writeFile(path.join(h.folder,'story.spec.json'),text);await openAgent(page);await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);expect(h.hits).toEqual(['catalog','provider']);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+async function fileSurface(page,entry){
+  await page.locator('#welcome-file').setInputFiles({name:'ordinary.spec.json',mimeType:'application/json',buffer:Buffer.from(source)});
+  await expect(page.locator('#src')).toHaveValue(source);
+  if(entry==='welcome')await page.locator('#workspace-home').click();
+  return page.locator(entry==='welcome'?'#welcome-file':'#file-input');
+}
+for(const entry of ['welcome','editor'])for(const change of ['navigation','source','new file','new error','pagehide'])test('Open file from '+entry+' retires held providers after '+change,async({page})=>{
+  const h=await topologyFolderFixture(page);let release,reached=false;const held=new Promise(resolve=>release=resolve);
+  await page.route('**/provider.json',async route=>{reached=true;await held;await route.fulfill({json:h.provider});});
+  try{
+    const input=await fileSurface(page,entry),raw=structuredClone(h.consumer);delete raw.page.canon;
+    await input.setInputFiles({name:'pending.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});await expect.poll(()=>reached).toBe(true);
+    let expected=source,message;
+    if(change==='navigation'){
+      if(entry==='welcome'){await page.locator('#welcome-paste').click();await page.goBack();await page.goForward();await expect(page.locator('#welcome-paste-screen')).toBeVisible();}
+      else{await page.goBack();await expect(page.locator('#welcome-home')).toBeVisible();await page.goForward();await expect(page.locator('#workbench-workspace')).toBeVisible();}
+    }
+    if(change==='source'){expected=source+'\n';await page.locator('#src').evaluate((el,text)=>{el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));},expected);}
+    if(change==='pagehide')await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));
+    if(change==='new file'){expected=source.replace('Browser contract','New file');await input.setInputFiles({name:'new.spec.json',mimeType:'application/json',buffer:Buffer.from(expected)});await expect(page.locator('#src')).toHaveValue(expected);}
+    if(change==='new error'){
+      raw.page.sections[0].diagram.topologyImports[0].spec='missing';await input.setInputFiles({name:'new-error.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});
+      message=page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr');await expect(message).toContainText('Missing authored provider missing');
+    }
+    const received=page.waitForResponse(response=>response.url().endsWith('/provider.json'));release();await(await received).finished();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    await expect(page.locator('#src')).toHaveValue(expected);if(message)await expect(message).toContainText('Missing authored provider missing');
+    if(change==='navigation' && entry==='welcome')await expect(page.locator('#welcome-paste-screen')).toBeVisible();
+    expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')))).topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
+  }finally{release?.();await page.close();await h.cleanup();}
+});
+for(const entry of ['welcome','editor'])for(const failure of ['catalog','provider','revision'])test('Open file from '+entry+' preserves the current draft on '+failure+' failure',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    await fileSurface(page,'editor');await page.locator('#docview [data-dv-node="a"]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Retained local');await title.press('Enter');const before=await page.locator('#src').inputValue();
+    if(entry==='welcome')await page.locator('#workspace-home').click();
+    if(failure==='catalog')h.catalog.version=2;if(failure==='provider')h.catalog.diagrams=[];if(failure==='revision')h.provider.page.title='Later revision';
+    const raw=structuredClone(h.consumer);delete raw.page.canon;raw.topologyContext={catalogURL:'https://untrusted.invalid/providers.json',specs:[h.provider]};
+    await page.locator(entry==='welcome'?'#welcome-file':'#file-input').setInputFiles({name:'failed.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(raw))});
+    await expect(page.locator(entry==='welcome'?'#welcome-file-error':'#guide .gerr')).toContainText(failure==='catalog'?'version 3':failure==='provider'?'Missing authored provider':'revision mismatch');
+    await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeEnabled();
+    expect((await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')))).topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+for(const entry of ['welcome','editor'])test('Open file from '+entry+' keeps ordinary files offline and preserves its malformed-source policy',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    const input=await fileSurface(page,entry);
+    for(const text of [' { unfinished\n','{"page":{"sections":[]}}']){
+      await input.setInputFiles({name:'repair.spec.json',mimeType:'application/json',buffer:Buffer.from(text)});
+      if(entry==='editor')await expect(page.locator('#src')).toHaveValue(text);
+      else{await expect(page.locator('#welcome-file-error')).toBeVisible();await expect(page.locator('#src')).toHaveValue(source);}
+    }
+    expect(h.hits).toEqual([]);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+for(const entry of ['folder directly','Canon first'])test('connect a folder containing authored topology via '+entry,async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    const raw=structuredClone(h.consumer);if(entry==='folder directly')delete raw.page.canon;
+    let text=JSON.stringify(raw,null,2);const ledger='# Coverage\n\nPreserve approved imports.\n';
+    if(entry==='Canon first'){
+      await page.goto(origin+'/index.html?diagram=consumer');await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();
+      await expect(page.locator('#docview [data-dv-node="shared::api"]')).toBeVisible();text=await page.locator('#src').inputValue();
+      h.provider.page.sections[0].diagram.nodes.api.title='Later deployment';
+      await openAgent(page);await page.locator('#folder-agent-open-setup').click();
+    }else await page.locator('#welcome-agent').click();
+    await writeFile(path.join(h.folder,'story.spec.json'),text);await writeFile(path.join(h.folder,'story.ledger.md'),ledger);
+    await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);expect(await readFile(path.join(h.folder,'story.ledger.md'),'utf8')).toBe(ledger);
+    expect(text).not.toContain('topologyProvenance');expect(text).not.toContain('shared::api');
+    expect(h.hits).toEqual(entry==='Canon first'?['catalog','consumer','provider']:['catalog','provider']);
+    await disconnect(page);await expect.poll(async()=>(await h.read('editor.json')).connected).toBe(false);
+    h.provider.page.sections[0].diagram.nodes.api.title='Later deployment';const requests=h.hits.slice();
+    if(entry==='folder directly'){
+      await page.reload();await expect(page.locator('#src')).toHaveValue(text);await openAgent(page);await resumeFolder(page);
+    }else{
+      await mkdir(path.join(h.folder,'empty'));await page.evaluate(()=>window.pickPath='/empty');await chooseFolder(page);
+    }
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
+    await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#docview [data-dv-node="shared::api"]')).toHaveText(/Frozen provider API/);
+    expect(h.hits).toEqual(requests);expect((await h.read('state.json')).ledger).toBe(ledger);
+    if(entry==='Canon first')expect(await readFile(path.join(h.folder,'empty/story.spec.json'),'utf8')).toBe(text);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
+
+for(const change of ['close','source','project','saved file'])test('folder topology preparation cannot initialize after '+change+' changes',async({page})=>{
+  const h=await topologyFolderFixture(page);let release,reached=false;const held=new Promise(resolve=>release=resolve);
+  await page.route('**/provider.json',async route=>{reached=true;await held;await route.fulfill({json:h.provider});});
+  try{
+    const raw=structuredClone(h.consumer);delete raw.page.canon;const text=JSON.stringify(raw),ledger='# Imported story';
+    await writeFile(path.join(h.folder,'story.spec.json'),text);await writeFile(path.join(h.folder,'story.ledger.md'),ledger);
+    await page.locator('#welcome-agent').click();const before=await page.locator('#src').inputValue();
+    await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();await expect.poll(()=>reached).toBe(true);
+    expect(h.writes).toEqual([]);await expect(stat(path.join(h.folder,'.flowview-agent'))).rejects.toThrow();
+    if(change==='close')await closeGuide(page);
+    if(change==='source')await page.evaluate(()=>{const src=document.getElementById('src');src.value+='\n';src.dispatchEvent(new Event('input',{bubbles:true}));});
+    if(change==='project')await page.locator('#workspace-home').evaluate(button=>button.click());
+    if(change==='saved file')await writeFile(path.join(h.folder,'story.spec.json'),text+'\n');
+    const received=page.waitForResponse(response=>response.url().endsWith('/provider.json'));release();await (await received).finished();
+    if(change==='source' || change==='saved file')await expect(page.locator('#folder-agent-status')).toContainText(/changed while opening/);
+    else{
+      await expect(page.locator('#folder-agent-copy')).toBeDisabled();
+      // A subsequent completed connection proves late work from the cancelled
+      // attempt cannot publish into either folder or install its provider context.
+      await mkdir(path.join(h.folder,'after-cancel'));await page.evaluate(()=>window.pickPath='/after-cancel');
+      if(change==='project')await page.locator('#welcome-agent').click();else await page.locator('#folder-agent-open-setup').click();
+      await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();await expect(page.locator('#folder-agent-copy')).toBeEnabled();
+    }
+    await expect.poll(()=>h.requests.filter(url=>url.endsWith('provider.json')).length).toBe(1);
+    await expect(page.locator('#src')).toHaveValue(change==='source'?before+'\n':before);
+    expect(h.writes.filter(name=>!name.startsWith('/after-cancel/'))).toEqual([]);await expect(stat(path.join(h.folder,'.flowview-agent'))).rejects.toThrow();
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(change==='saved file'?text+'\n':text);
+    const draft=await page.evaluate(()=>JSON.parse(localStorage.getItem('dv-workbench-draft')));expect(draft.topologyContext).toBeUndefined();expect(h.errors).toEqual([]);
+  }finally{release?.();await page.close();await h.cleanup();}
+});
+
+for(const failure of ['catalog','missing provider','provider revision'])test('folder topology '+failure+' failure leaves the draft and folder uninitialized',async({page})=>{
+  const h=await topologyFolderFixture(page);
+  try{
+    if(failure==='catalog')h.catalog.version=2;
+    if(failure==='missing provider')h.catalog.diagrams=h.catalog.diagrams.filter(entry=>entry.id!=='provider');
+    if(failure==='provider revision')h.provider.page.sections[0].diagram.nodes.api.title='Changed after catalog pin';
+    const raw=structuredClone(h.consumer);delete raw.page.canon;const text=JSON.stringify(raw);
+    await writeFile(path.join(h.folder,'story.spec.json'),text);await page.locator('#welcome-agent').click();const before=await page.locator('#src').inputValue();
+    await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-status')).toContainText(failure==='catalog'?'version 3':failure==='missing provider'?'Missing authored provider':'revision mismatch');
+    await expect(page.locator('#src')).toHaveValue(before);expect(h.writes).toEqual([]);await expect(stat(path.join(h.folder,'.flowview-agent'))).rejects.toThrow();
+    expect(await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(text);expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 async function finishCopiedRequest(page,h){
   const request=await h.read('request.json');h.run('reply','--request',request.id,'--text','Ready for the next request.');
   await expect(page.locator('#folder-agent-cancel')).toBeHidden();
@@ -240,7 +410,7 @@ test('agent topology declarations preview both states and commit authored source
     const current=JSON.stringify(raw,null,4)+'\n',proposed=current.replace('"title": "Doorbell"','"title": "Customer camera"');
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(current);
     await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);await h.listen();
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await h.listen();
     await page.locator('#folder-agent-input').fill('Rename the exported camera');await page.locator('#folder-agent-send').click();
     const request=await publishedRequest(h,'Rename the exported camera'),state=await h.read('state.json');
     await writeFile(path.join(h.session,'candidate.spec.json'),proposed);
@@ -604,7 +774,7 @@ test('full-document reviewed apply, exact receipt Undo and cancelled late propos
   try{
     const spec=JSON.parse(source);spec.page.blocks[0].id='delivery';const original=JSON.stringify(spec,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(original);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
     async function send(text){await h.listen();await page.locator('#folder-agent-input').fill(text);await page.locator('#folder-agent-send').click();return publishedRequest(h,text);}
     const request=await send('Rename the delivery service'),current=await h.read('state.json');
 
@@ -820,7 +990,7 @@ test('conflicting update preserves local edits and copies actionable feedback fo
   try{
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(source);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await closeGuide(page);
+    await page.locator('#editor-tab-agent').click();await chooseFolder(page);await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
     await h.listen();await page.locator('#folder-agent-input').fill('Rename the camera');await page.locator('#folder-agent-send').click();const request=await publishedRequest(h,'Rename the camera'),base=await h.read('state.json');
     const human=source.replace('"Doorbell"','"My camera"');
     await page.locator('#editor-tab-json').click();await page.locator('#src').fill(human);await page.locator('#go').click();await expect.poll(async()=> (await h.read('state.json')).source).toBe(human);

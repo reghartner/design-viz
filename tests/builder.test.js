@@ -862,7 +862,7 @@ function diffWorkbench(storage = new Map(), options = {}){
   const readers = [];
   function element(tag = 'div'){
     const events = new Map();
-    return {tagName: tag.toUpperCase(), hidden: true, children: [], style: {}, attributes: {},
+    return {tagName: tag.toUpperCase(), isConnected:true, hidden: true, children: [], style: {}, attributes: {},
       value: '', clientWidth: 440, clientHeight: 300,
       classList: {add(){}, remove(){}, toggle(){}},
       addEventListener(type, fn){ if (!events.has(type)) events.set(type, []); events.get(type).push(fn); },
@@ -890,14 +890,14 @@ function diffWorkbench(storage = new Map(), options = {}){
     URL: {createObjectURL(){ return 'blob:test'; }, revokeObjectURL(){}},
     getComputedStyle(){ return {}; },
     setTimeout(fn){ timers.set(++timerId, fn); return timerId; }, clearTimeout(id){ timers.delete(id); },
-    FileReader: class {readAsText(file){ this.result = file.text; readers.push(this); if(!options.deferredFileRead)this.onload(); }},
+    FileReader: class {readAsText(file){ this.result = file.text; readers.push(this); if(!options.deferredFileRead)this.pending=this.onload(); }},
     localStorage: {
       getItem(k){ if (options.storageThrows) throw Error('blocked'); return storage.get(k) || null; },
       setItem(k, v){ if (options.storageThrows) throw Error('blocked'); storage.set(k, v); },
       removeItem(k){ if (options.storageThrows) throw Error('blocked'); storage.delete(k); }
     }
   };
-  vm.runInNewContext(readSource('validator.js'), sandbox);
+  vm.runInNewContext(readSource('canon.js')+'\n'+readSource('validator.js')+'\n'+readSource('library.workbench.js'), sandbox);
   vm.runInNewContext(readSource('builder.workbench.js'), sandbox);
   ids.src.value = JSON.stringify(diffFixture());
   const builder = sandbox.initWorkbenchBuilder({view: element(), src: ids.src,
@@ -931,7 +931,7 @@ test('diff UI toggles, selects JSON, and hides on Escape, input, and render atte
   w.diff(); w.render(); assert.ok(w.ids.diffbox.hidden);
 });
 
-test('baseline survives autosave and recovery, and opening a file resets its baseline and history', () => {
+test('baseline survives autosave and recovery, and opening a file resets its baseline and history', async () => {
   const w = diffWorkbench(), next = diffFixture(); next.page.title = 'Draft';
   w.ids.src.value = JSON.stringify(next); w.ids.src.fire('input'); w.flush();
   const recovered = diffWorkbench(w.storage);
@@ -944,6 +944,7 @@ test('baseline survives autosave and recovery, and opening a file resets its bas
   const file = plain(next); file.page.skin = 'daylight';
   recovered.ids['file-input'].files = [{text: JSON.stringify(file)}];
   recovered.ids['file-input'].fire('change');
+  await recovered.readers[0].pending;
   assert.deepStrictEqual(recovered.diff(), ['no changes']);
   recovered.ids['undo-builder'].click();
   assert.deepStrictEqual(recovered.diff(), ['no changes']);

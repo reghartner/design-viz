@@ -123,6 +123,53 @@ async function localHarness({connect=true,providerGate}={}){
   await ready;
   return {...h,local,sent,host,get applied(){return applied;},done:()=>receipt,setOpen:value=>open=value,setBusy:value=>busy=value};
 }
+test('folder preparation pins the current catalog and all direct/transitive imports without touching the draft',async()=>{
+  const h=await harness(),raw=JSON.parse(h.proposal.source);diagram(raw).topologyImports.push({spec:'leaf',export:'public',as:'extra'});
+  raw.topologyContext={catalogURL:'https://untrusted.invalid/catalog.json',specs:[provider('forged')]};
+  const before=JSON.stringify(raw),context=await h.c.prepareAuthoredTopology(raw,null);
+  assert.equal(context.ephemeral,true);assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);
+  assert.ok(diagram(h.session.resolve(raw,context)).nodes['shared::inner::api']);assert.ok(diagram(h.session.resolve(raw,context)).nodes['extra::api']);
+  assert.equal(JSON.stringify(raw),before);assert.equal(raw.page.canon,undefined);assert.equal(h.session.text(),h.original);assert.equal(h.session.topologyContext(),null);
+});
+for(const catalog of [true,false])test('folder preparation keeps complete frozen '+(catalog?'catalog':'backend')+' context and rebinds a different consumer privately',async()=>{
+  const h=await harness(),current=JSON.parse(h.original);current.page.canon={version:1,id:'consumer',kind:'design',owner:'group:default/test'};
+  const context={version:1,id:'consumer',specs:copy([...h.providers,current]),...(catalog?{catalog:h.catalog,catalogURL:'https://test.invalid/diagrams.json'}:{})};
+  const raw=JSON.parse(h.proposal.source);raw.page.canon=copy(current.page.canon);const before=JSON.stringify(context);
+  h.providers[0].page.title='Later deployment';
+  assert.equal(await h.c.prepareAuthoredTopology(raw,context),context);assert.deepEqual(h.hits,[]);
+  raw.page.canon.id='different';const next=await h.c.prepareAuthoredTopology(raw,context);
+  assert.equal(next.ephemeral,true);assert.notEqual(next.id,context.id);assert.notEqual(next.id,raw.page.canon.id);
+  assert.equal(JSON.stringify(context),before);assert.deepEqual(h.hits,[]);
+  assert.ok(diagram(h.session.resolve(raw,next)).nodes['shared::inner::api']);
+  assert.equal(next.specs.find(spec=>spec.page.canon.id==='leaf').page.title,'leaf');
+});
+test('import-free folder preparation needs no repository and does not retain an unrelated consumer identity',async()=>{
+  const h=await harness();assert.equal(await h.c.prepareAuthoredTopology(JSON.parse(h.original),null),null);assert.deepEqual(h.hits,[]);
+  const context={version:1,id:'leaf',specs:copy(h.providers)};
+  assert.equal(await h.c.prepareAuthoredTopology(JSON.parse(h.original),context),null);
+  assert.equal(await h.c.prepareAuthoredTopology(copy(h.providers[0]),context),context);assert.deepEqual(h.hits,[]);
+});
+for(const compatible of [true,false])test('an incomplete backend context pins missing-provider metadata and '+(compatible?'retains frozen sources':'refuses incompatible frozen sources'),async()=>{
+  const h=await harness(),current=JSON.parse(h.original);current.page.canon={version:1,id:'consumer',kind:'design',owner:'group:default/test'};
+  const context={version:1,id:'consumer',specs:copy([h.providers[0],current])},before=JSON.stringify(context);
+  diagram(h.providers[0]).nodes.api.title='Later remote provider';
+  if(!compatible){diagram(h.providers[0]).topologyExports.next=copy(diagram(h.providers[0]).topologyExports.public);diagram(h.providers[1]).topologyImports[0].export='next';}
+  const {digest}=await import('../tools/canon/drift.mjs');for(const entry of h.catalog.diagrams)entry.revision=digest(h.providers.find(spec=>spec.page.canon.id===entry.id));
+  assert.notEqual(h.catalog.diagrams[0].revision,digest(context.specs[0]));
+  const preparing=h.c.prepareAuthoredTopology(JSON.parse(h.proposal.source),context);
+  if(compatible){const next=await preparing;assert.equal(next.catalog.version,3);assert.equal(diagram(h.session.resolve(JSON.parse(h.proposal.source),next)).nodes['shared::inner::api'].title,'leaf API');}
+  else await assert.rejects(preparing,/export/i);
+  assert.deepEqual(h.hits,['diagrams.json','nested.json']);assert.equal(JSON.stringify(context),before);assert.equal(h.session.text(),h.original);assert.equal(h.session.topologyContext(),null);
+});
+for(const failure of ['catalog','provider revision','provider URL'])test('folder preparation refuses '+failure+' without replacing the draft or context',async()=>{
+  const h=await harness();
+  if(failure==='catalog')h.catalog.version=2;
+  if(failure==='provider revision')h.providers[0].page.title='Changed after catalog pin';
+  if(failure==='provider URL')h.catalog.diagrams[0].specUrl='https://untrusted.invalid/source.json';
+  await assert.rejects(h.c.prepareAuthoredTopology(JSON.parse(h.proposal.source),null),failure==='catalog'?/version 3/:failure==='provider revision'?/revision mismatch/:/URL|relative|unsafe/i);
+  assert.equal(h.session.text(),h.original);assert.equal(h.session.topologyContext(),null);assert.equal(h.session.canUndo(),false);
+  assert.ok(h.hits.every(hit=>!hit.includes('untrusted')));
+});
 test('local transport initialization prepares and validates a pinned provider before automatic acceptance',async()=>{
   const h=await localHarness();await h.done();assert.equal(h.applied,1);
   assert.deepEqual(h.hits,['diagrams.json','nested.json','leaf.json']);assert.equal(h.session.text(),h.proposal.source);

@@ -196,8 +196,8 @@ or invalid imports leave source and history unchanged.
 The dialog deliberately loads a chosen provider and its dependencies from the
 same v3 index/revision lock captured on Canon entry. It never reloads that index
 or refreshes existing providers. Browsing caches successful fetches for this
-session; successful insertion or an explicitly committed agent review extends
-persisted provider context. Undo
+session; successful insertion, opening a diagram file or agent folder, or an explicitly
+committed agent review extends persisted provider context. Undo
 removes the import but retains the frozen cache for Redo. Recovery carries that
 context and catalog; JSON downloads contain authored references, while offline HTML
 exports contain a read-only page snapshot without provider context. Offline, legacy v1/v2 and backend
@@ -229,6 +229,21 @@ a reference, and a previously blocked agent proposal is checked again against it
 The Workbench gives the draft a session-only consumer identity for
 resolution; browser recovery retains it, but it is never written into the
 document. Local provider files are deliberately unsupported.
+
+Opening a local JSON file from Welcome or **File → open…**, or opening/resuming
+an agent diagram folder, also prepares its topology context,
+without requiring a Canon visit or a separate picker connection. It reuses an
+applicable frozen snapshot, including a complete backend snapshot without a
+catalog. If new providers need a catalog and none is pinned, it pins this site's
+approved v3 catalog while retaining all frozen provider bytes. Missing providers
+are acquired from the pinned catalog and their full dependency closure
+is verified before opening the source or initializing the folder. A different
+consumer receives private temporary membership while retaining the approved
+provider snapshots. Catalog addresses and provider context
+embedded in local files are never used to authorize acquisition. Invalid providers,
+changed saved files, cancelled setup and changed drafts prevent publication.
+File reads and provider loading also retire on another file selection, navigation,
+or editor destruction. Ordinary import-free files require no repository request.
 
 Open the published consumer and choose **Edit in Workbench**. The local copy
 renders imported topology and exposes ordinary steps, paths, failures and panels.

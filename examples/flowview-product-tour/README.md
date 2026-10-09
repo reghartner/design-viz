@@ -54,8 +54,7 @@ conversation needs fresh setup and does not inherit native chat memory. See
 ## Screenshot provenance
 
 Original PNGs remain in [screenshots](screenshots/), embedded byte-for-byte in
-the spec and portable HTML. This revision changes layout and narration, not
-the captured product UI. The archive also retains captures omitted from the
+the spec and portable HTML. The archive also retains captures omitted from the
 shorter tour; the spec identifies active screens.
 
 - New-build captures came from the local landing page and Workbench on
@@ -74,6 +73,11 @@ shorter tour; the spec identifies active screens.
 - `review-correction-illustrative*` is a labeled conversation illustration.
 - `backstage-*` came from the React plugin's local preview shell with fictional
   catalog data and a reference adapter, not a company deployment.
+  The opening, expanded, and return captures were refreshed on 2026-10-09 UTC
+  from `main` at `7d45eb29d28e6cb0c99993053627684341cd53da`, including the
+  Backstage CTA fix from PR #417. They show the small **Edit in Workbench** link
+  beside reader controls, with no **Build with Claude** action. The expanded
+  capture retains step 3; returning to the entity retains the selected diagram.
 - `*-wide.png` composites put the complete source window beside a magnified
   detail of the same capture. Orange outlines mark real controls for the tour;
   they are presentation annotations.

@@ -33,7 +33,8 @@ export async function vendorFlowview(source, destination) {
   // before replacing the destination; failure leaves its existing runtime intact.
   const buildRoot = await mkdtemp(path.join(tmpdir(), 'flowview-vendor-build-'));
   const inputs = ['src/', 'tools/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
-    '.claude/skills/hld-to-page/', 'examples/canon/', 'diagrams/'];
+    '.claude/skills/hld-to-page/', 'examples/canon/', 'examples/contract-blocks/',
+    'examples/data-contract/', 'examples/doorbell-chime/', 'examples/independent-extraction/', 'diagrams/'];
   try {
     for (const name of tracked.filter(name => ['canon.json', 'LICENSE'].includes(name) || inputs.some(prefix => name.startsWith(prefix)))) {
       const target = path.join(buildRoot, name);

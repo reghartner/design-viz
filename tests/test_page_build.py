@@ -49,7 +49,8 @@ class PageBuildTest(unittest.TestCase):
         for name in ['src', 'docs', 'cookbook', 'contract', '.claude', 'LICENSE']:
             (checkout / name).symlink_to(ROOT / name, target_is_directory=(ROOT / name).is_dir())
         (checkout / 'examples').mkdir()
-        (checkout / 'examples/canon').symlink_to(ROOT / 'examples/canon', target_is_directory=True)
+        for name in ['canon', 'contract-blocks', 'data-contract', 'doorbell-chime', 'independent-extraction']:
+            (checkout / 'examples' / name).symlink_to(ROOT / 'examples' / name, target_is_directory=True)
         (checkout / 'canon.json').write_text('{"version":1,"diagrams":[]}')
         (checkout / 'tools/canon').mkdir(parents=True)
         for folder in ['tools', 'tools/canon', 'tools/arrange']:

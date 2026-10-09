@@ -327,3 +327,18 @@ test('24-column Standard layouts declare a capability while legacy12 layouts rem
     assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('layout.grid-24'));
   }
 });
+
+
+test('DeviceApp badge capability detects declaration, initial and modern or legacy step overrides',()=>{
+ const make=()=>({page:{sections:[{diagram:{panels:[{id:'app',type:'deviceapp',sources:[{id:'s'}],fields:[{id:'card'}]}]}}]}});
+ for(const key of ['badgeMode','badgeText','badgeColor'])for(const location of ['field','initial','panels','patch']){
+  const raw=make(),d=raw.page.sections[0].diagram,p=d.panels[0],value=key==='badgeMode'?'none':key==='badgeText'?'Connected':'#abc';
+  assert.ok(!C.detect(raw).includes('content.deviceapp-badges'));
+  if(location==='field')p.fields[0][key]=value;
+  else if(location==='initial')p.initial={card:{[key]:value}};
+  else d.steps=[{[location]:{app:{card:{[key]:value}}}}];
+  assert.ok(C.detect(raw).includes('content.deviceapp-badges'),key+' '+location);
+  const available={...C.features};delete available['content.deviceapp-badges'];
+  assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('content.deviceapp-badges'));
+ }
+});

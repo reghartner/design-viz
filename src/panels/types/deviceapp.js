@@ -2,6 +2,20 @@
 /* Device app values are authored UI data, with optional per-field provenance.
    A source node is a diagram reference, never an instruction to fetch an API. */
 var DEVICEAPP_STATUSES = ['unknown', 'loading', 'ready', 'stale', 'error'];
+var DEVICEAPP_BADGE_MODES = ['status', 'custom', 'none'];
+var DEVICEAPP_BADGE_LABELS = {status:'Status', custom:'Custom', none:'Hidden'};
+var DEVICEAPP_STATUS_LABELS = {unknown:'No data', loading:'Loading', ready:'Current', stale:'Cached', error:'Unavailable'};
+function deviceAppBadgeColor(value) {
+  return typeof value === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(value);
+}
+function deviceAppBadgeWarnings(value, path, warnings) {
+  if (value.badgeMode != null && DEVICEAPP_BADGE_MODES.indexOf(value.badgeMode) < 0)
+    warnings.push(path + '.badgeMode: expected status, custom or none — ignored');
+  if (value.badgeText != null && typeof value.badgeText !== 'string')
+    warnings.push(path + '.badgeText: expected text or null — ignored');
+  if (value.badgeColor != null && !deviceAppBadgeColor(value.badgeColor))
+    warnings.push(path + '.badgeColor: use #RGB or #RRGGBB — ignored');
+}
 var DEVICEAPP_SCREENS = ['home', 'app'];
 function deviceAppItems(panel, key) {
   var seen = Object.create(null),
@@ -52,13 +66,14 @@ function deviceAppPatchWarnings(obj, path, panel, warnings, context) {
     }
     if (v === null) return;
     if (!panelObject(v)) {
-      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?, reportedAt?} or null — ignored');
+      warnings.push(p + ': expected {value?, status?, source?, detail?, visible?, icon?, reportedAt?, badgeMode?, badgeText?, badgeColor?} or null — ignored');
       return;
     }
     Object.keys(v).forEach(function (k) {
-      if (['value', 'status', 'source', 'detail', 'visible', 'icon', 'reportedAt'].indexOf(k) < 0)
+      if (['value', 'status', 'source', 'detail', 'visible', 'icon', 'reportedAt', 'badgeMode', 'badgeText', 'badgeColor'].indexOf(k) < 0)
         warnings.push(p + '.' + k + ': unknown field property — ignored');
     });
+    deviceAppBadgeWarnings(v, p, warnings);
     if (panelOwn(v, 'reportedAt') && v.reportedAt !== null) {
       if (!storyTimeReportParsable(v.reportedAt))
         warnings.push(p + '.reportedAt: "' + String(v.reportedAt).slice(0, 80) + '" is not a report time — use "now", "-15m", "+5m", "06:05" or "2026-09-25T06:05" (years 100–9999); ignored');
@@ -130,6 +145,7 @@ function deviceAppWarnings(panel, d, path, warnings) {
         if (item.node != null && (typeof item.node !== 'string' || !panelOwn(d.nodes, item.node)))
           warnings.push(p + '.node: unknown diagram node — no node highlight');
       } else {
+        deviceAppBadgeWarnings(item, p, warnings);
         if (item.kind != null && ['text', 'battery'].indexOf(item.kind) < 0)
           warnings.push(p + '.kind: expected text or battery — using text');
         if (item.freshness != null && STORY_FRESHNESS_MODES.indexOf(item.freshness) < 0)
@@ -264,6 +280,13 @@ function foldDeviceAppStates(panel, steps) {
             typeof v.value === 'boolean')
         )
           next.value = v.value;
+        ['badgeMode', 'badgeText', 'badgeColor'].forEach(function (key) {
+          if (!panelOwn(v, key)) return;
+          // Null restores the declaration; omission carries the previous override.
+          if (v[key] === null) delete next[key];
+          else if (key === 'badgeMode' ? DEVICEAPP_BADGE_MODES.indexOf(v[key]) >= 0 :
+            key === 'badgeText' ? typeof v[key] === 'string' : deviceAppBadgeColor(v[key])) next[key] = v[key];
+        });
         if (DEVICEAPP_STATUSES.indexOf(v.status) >= 0) next.status = v.status;
         if (
           panelOwn(v, 'source') &&
@@ -345,6 +368,13 @@ function deviceAppModel(panel, state) {
       v.value != null &&
       (typeof v.value === 'string' || isFiniteNum(v.value) || typeof v.value === 'boolean');
     if (battery) valid = isFiniteNum(v.value) && v.value >= 0 && v.value <= 100;
+    var badgeMode = DEVICEAPP_BADGE_MODES.indexOf(v.badgeMode) >= 0 ? v.badgeMode :
+        DEVICEAPP_BADGE_MODES.indexOf(f.badgeMode) >= 0 ? f.badgeMode : 'status',
+      status = DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
+      badgeText = badgeMode === 'status' ? DEVICEAPP_STATUS_LABELS[status] :
+        badgeMode === 'custom' ? str(v.badgeText, str(f.badgeText)).trim() : '',
+      badgeColor = deviceAppBadgeColor(v.badgeColor) ? v.badgeColor :
+        deviceAppBadgeColor(f.badgeColor) ? f.badgeColor : '#53617a';
     return {
       id: f.id,
       label: str(f.label, f.id),
@@ -353,7 +383,10 @@ function deviceAppModel(panel, state) {
       icon: ICON_SET.indexOf(v.icon) >= 0 ? v.icon : ICON_SET.indexOf(f.icon) >= 0 ? f.icon : battery ? 'battery' : null,
       value: valid ? String(v.value) + (battery ? '%' : str(f.unit)) : '—',
       pct: battery && valid ? v.value : 0,
-      status: DEVICEAPP_STATUSES.indexOf(v.status) >= 0 ? v.status : 'unknown',
+      status: status,
+      badgeMode: badgeMode,
+      badgeText: badgeText,
+      badgeColor: badgeColor,
       detail: str(v.detail),
       visible: v.visible !== false,
       updated: Array.isArray(state._updated) && state._updated.indexOf(f.id) >= 0,
@@ -398,14 +431,7 @@ function deviceAppBrand(m, compact) {
   return FlowBrand.render(panelObject(m.brand) ? Object.assign({},m.brand,{app:m.appName}) : m.brand,{compact:!!compact});
 }
 function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh) {
-  var m = deviceAppModel(panel, state),
-    labels = {
-      unknown: 'No data',
-      loading: 'Loading',
-      ready: 'Current',
-      stale: 'Cached',
-      error: 'Unavailable',
-    };
+  var m = deviceAppModel(panel, state);
   function badge(s) {
     return '<span class="da-badge" aria-hidden="true">' + (s ? s.letter : '?') + '</span>';
   }
@@ -445,8 +471,7 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
           f.label +
             ': ' +
             f.value +
-            '. ' +
-            labels[f.status] +
+            (f.badgeText ? '. ' + f.badgeText : '') +
             (mapped?'. Source: '+f.source.label:'')
         ) +
         '">' +
@@ -464,11 +489,9 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
         (f.battery
           ? '<span class="da-meter" aria-hidden="true"><i style="width:' + f.pct + '%"></i></span>'
           : '') +
-        '<span class="da-meta"><span class="da-state">' +
-        labels[f.status] +
-        '</span>' +
-        (f.updated ? '<span class="da-update-label">Updated</span>' : '') +
-        '</span>' +
+        (f.badgeText || f.updated ? '<span class="da-meta">' +
+          (f.badgeText ? '<span class="da-state' + (f.badgeMode === 'custom' ? ' da-state-custom" style="--da-badge-color:' + f.badgeColor : '') + '">' + esc(f.badgeText) + '</span>' : '') +
+          (f.updated ? '<span class="da-update-label">Updated</span>' : '') + '</span>' : '') +
         (f.detail ? '<span class="da-detail">' + esc(f.detail) + '</span>' : '') +
         (mapped?'</button>':'</div>');
     });
@@ -505,7 +528,7 @@ function deviceAppPanelHTML(panel, state, fresh, notificationFresh, screenFresh)
         fields.length
           ? fields
               .map(function (f) {
-                return f.label + ' · ' + labels[f.status];
+                return f.label + (f.badgeText ? ' · ' + f.badgeText : '');
               })
               .join(' / ')
           : 'No fields in this step'
@@ -673,6 +696,7 @@ PanelRegistry.extend('deviceapp', {
 .da-stale .da-state{background:#fff0d6;color:#915209;}
 .da-error .da-state{background:#fde4e7;color:#a62f46;}
 .da-loading .da-state{background:#e4edff;color:#325dab;}
+.da-field .da-state-custom{color:var(--da-badge-color);background:color-mix(in srgb,var(--da-badge-color) 12%,white);}
 .da-update-label{color:#626f87;}
 .da-detail{display:block;font-size:calc(11 * var(--da-px));line-height:1.4;opacity:.78;}
 .da-updated{box-shadow:0 0 0 calc(1 * var(--da-px)) color-mix(in srgb,var(--da-color) 35%,transparent);}
@@ -741,10 +765,10 @@ PanelRegistry.extend('deviceapp', {
       device: 'Front door camera',
       subtitle: 'Device health',
       fields: [
-        { id: 'battery', label: 'Battery', kind: 'battery' },
-        { id: 'power', label: 'Charging source' },
-        { id: 'model', label: 'Camera model', icon: 'camera' },
-        { id: 'firmware', label: 'Firmware', icon: 'chip' },
+        { id: 'battery', label: 'Battery', kind: 'battery', badgeMode: 'none' },
+        { id: 'power', label: 'Charging source', badgeMode: 'none' },
+        { id: 'model', label: 'Camera model', icon: 'camera', badgeMode: 'none' },
+        { id: 'firmware', label: 'Firmware', icon: 'chip', badgeMode: 'none' },
       ],
       initial: {
         battery: { value: 68, status: 'ready' },
@@ -791,6 +815,9 @@ PanelRegistry.extend('deviceapp', {
             { k: 'source' },
             { k: 'icon', kind: 'icon' },
             { k: 'unit' },
+            { k: 'badgeMode', label: 'Badge', kind: 'enum', options: DEVICEAPP_BADGE_MODES, optionLabels: DEVICEAPP_BADGE_LABELS, unsetLabel: 'Status (default)' },
+            { k: 'badgeText', label: 'Badge text' },
+            { k: 'badgeColor', label: 'Badge color (#RGB or #RRGGBB)' },
             { k: 'freshness', kind: 'enum', options: STORY_FRESHNESS_MODES },
           ],
           max: 12,
@@ -818,8 +845,9 @@ PanelRegistry.extend('deviceapp', {
       sample.state=foldDeviceAppStates(sample.panel,[])[0];sample.states=[sample.state];return sample;
     },
     editor: function(context){
-      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key==='reportedAt'?'Report time':key;},
+      return {patchLabel:function(key){return key==='phoneScreen'?'Phone screen':key==='visible'?'Card visibility':key==='reportedAt'?'Report time':key==='badgeMode'?'Badge':key==='badgeText'?'Badge text':key==='badgeColor'?'Badge color':key;},
       validateSubfield:function(key,col,value){
+        if(col[0]==='badgeColor' && value!=null && !deviceAppBadgeColor(value))return 'use #RGB or #RRGGBB for the badge color';
         return col[0]==='reportedAt' && value!=null && !storyTimeReportParsable(value)?'use now, -15m, +5m, 06:05 or 2026-09-25T06:05 for the report time':null;
       },
       /* Report time: when this card's value last arrived, in story time. */
@@ -850,6 +878,16 @@ PanelRegistry.extend('deviceapp', {
         return box;
       },
       patchField:function(field,input,options){
+        if(field[0]==='badgeMode'){
+          input.setAttribute('aria-label','Badge');
+          Array.from(input.options).forEach(function(option){if(DEVICEAPP_BADGE_LABELS[option.value])option.textContent=DEVICEAPP_BADGE_LABELS[option.value];});
+          return;
+        }
+        if(field[0]==='badgeText' || field[0]==='badgeColor'){
+          input.setAttribute('aria-label',field[0]==='badgeText'?'Badge text':'Badge color');
+          input.placeholder=field[0]==='badgeText'?'Custom label (empty hides badge)':'#RGB or #RRGGBB';
+          return;
+        }
         if(field[0]==='date'){
           if(options && options.initial)input.setAttribute('aria-label','Starting date');
           input.placeholder=options && options.initial?'Optional · Thu, Sep 24':'Inherit previous date';
@@ -894,6 +932,9 @@ PanelRegistry.extend('deviceapp', {
             [
               ['value', f.kind === 'battery' ? 'num' : 'text'],
               ['status', 'enum', ['unknown', 'loading', 'ready', 'stale', 'error']],
+              ['badgeMode', 'enum', DEVICEAPP_BADGE_MODES, { nullLabel: 'Use declared badge' }],
+              ['badgeText', 'text', null, { nullLabel: 'Use declared badge text' }],
+              ['badgeColor', 'text', null, { nullLabel: 'Use declared badge color' }],
               ['icon', 'enum', ICON_SET, { nullLabel: 'Use declared icon' }],
               ['source', 'enum', sourceIds],
               ['detail', 'text'],

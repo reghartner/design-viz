@@ -159,6 +159,31 @@ instead, or `"off"` to keep your own text. An explicit `detail` still wins until
 the next report; a cached value still needs `"status": "stale"` from you.
 Without `storyTime`, keep authoring `detail` as above.
 
+## Optional tile badges
+
+New picker tiles start with **Badge → Hidden**. Existing diagrams keep their
+status badges until you change them. In **fields**, choose **Hidden**, **Custom**
+or **Status**; Custom uses **Badge text** and a hex **Badge color**. This panel
+declaration fragment shows all three choices:
+
+```
+"fields": [
+  {"id": "battery", "label": "Battery", "kind": "battery", "badgeMode": "none"},
+  {"id": "power", "label": "Power", "badgeMode": "custom", "badgeText": "Solar connected", "badgeColor": "#168878"},
+  {"id": "firmware", "label": "Firmware", "badgeMode": "status"}
+]
+```
+
+Starting state and step controls support the same three badge properties.
+`{"power":{"badgeText":"On battery","badgeColor":"#915209"}}` changes the
+custom label and color from that step onward. Omitted properties inherit prior
+overrides; `badgeText:null` restores the declared label (likewise mode/color).
+The assignment menu provides **Inherit** and **Use declared badge text/color**.
+An empty custom label hides the pill; use **Set value** on an unset Badge text
+assignment to author an empty string. Whole-field null resets restore defaults.
+Color sets badge text plus a tinted background; unsafe/invalid colors are ignored.
+Badges do not change `status`, battery data, `detail` or computed report freshness.
+
 ## Edit and view
 
 - Add a **deviceapp** panel, then edit its app name, device, starting screen,

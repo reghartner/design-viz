@@ -238,3 +238,12 @@ test('the story-time example uses report times and builds without warnings', () 
   assert.deepEqual(details(d), ['Updated just now', 'Updated 2 h ago', 'Updated just now', 'Updated just now', 'Updated 3 h ago', 'Updated 6 h ago', 'Updated 7 h ago', 'Updated just now']);
   assert.ok(!JSON.stringify(d).match(/"detail":\s*"(Updated|Reported|Last report)/), 'no hand-written freshness');
 });
+
+test('hidden and custom badges leave report freshness, semantic status and battery values intact',()=>{
+ const p=app([{id:'battery',kind:'battery',badgeMode:'none'}],{battery:{value:68,status:'stale',reportedAt:'now'}});
+ const d=diagram({panels:[p],steps:[step(),step({time:'+5m',panels:{app:{battery:{badgeMode:'custom',badgeText:'Solar connected',badgeColor:'#168878'}}}}),step({time:'+5m'})]});
+ const states=fold(d);
+ assert.deepEqual(states.map(s=>s.battery.value),[68,68,68]);assert.deepEqual(states.map(s=>s.battery.status),['stale','stale','stale']);
+ assert.deepEqual(states.map(s=>s.battery.detail),['Updated just now','Updated 5 min ago','Updated 10 min ago']);
+ assert.deepEqual(states.map(s=>C.deviceAppModel(p,s).fields[0].badgeText),['','Solar connected','Solar connected']);
+});

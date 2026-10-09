@@ -17,6 +17,7 @@ var FlowviewCompatibility = (function(){
   Object.keys(extraLabels).forEach(function(id){features[id]={label:extraLabels[id],since:baseline};});
   // Capabilities added after the baseline, with their first release.
   var released={
+    'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
     'layout.graph-frame':['Saved graph content framing','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
@@ -86,6 +87,10 @@ var FlowviewCompatibility = (function(){
           var notify=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'notify') || Object.prototype.hasOwnProperty.call(v,'clear'));};
           var navigation=function(v){return object(v) && (Object.prototype.hasOwnProperty.call(v,'phoneScreen') ||
             (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'visible');}));};
+          var hasBadge=function(v){return object(v) && ['badgeMode','badgeText','badgeColor'].some(function(key){return Object.prototype.hasOwnProperty.call(v,key);});};
+          var badges=function(v){return object(v) && (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && hasBadge(v[f.id]);});};
+          if((Array.isArray(p.fields)?p.fields:[]).some(hasBadge) || badges(p.initial) ||
+            (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && badges(patches[p.id]);}))used['content.deviceapp-badges']=true;
           var reported=function(v){return object(v) && (Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && object(v[f.id]) && Object.prototype.hasOwnProperty.call(v[f.id],'reportedAt');});};
           if((Array.isArray(p.fields)?p.fields:[]).some(function(f){return f && f.freshness!=null;}) || reported(p.initial) ||
             (Array.isArray(d.steps)?d.steps:[]).some(function(s){var patches=s && (s.panels || s.patch);return object(patches) && reported(patches[p.id]);}))used['content.deviceapp-freshness']=true;

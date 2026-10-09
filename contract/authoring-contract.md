@@ -1689,6 +1689,23 @@ perspectives" of one timeline). Types:
   does not imply freshness. Battery values are numeric 0–100; other values can
   be text, finite numbers or booleans. Missing/null values show `—`. Invalid
   battery values warn and show `—`, never a fabricated zero reading.
+  The small tile badge is optional. Field declarations and initial/step field
+  patches accept `badgeMode`: `"none"` hides it, `"custom"` uses `badgeText`
+  and `badgeColor` (`#RGB` or `#RRGGBB`), and `"status"` uses the labels above.
+  Omitted mode defaults to status for existing diagrams; new picker tiles use
+  none. Custom color sets the text and a tinted background (default `#53617a`);
+  invalid colors warn and are ignored. Empty/whitespace custom text hides the pill.
+  Hidden badges also omit the status from card accessible names and source
+  summaries; custom badges use their authored text in both. This presentation
+  never changes semantic status, battery values or timestamp-derived detail.
+  Badge properties carry independently; omitted patch properties inherit the
+  earlier override, and `null` restores the field declaration/default. A whole
+  field `null` reset also restores its declared badge. Use **fields → Badge**,
+  **Badge text**, **Badge color** for defaults and the same controls in
+  **Starting state** or a selected step for overrides. Assignment controls offer
+  **Inherit** (remove the override) and **Use declared badge** (explicit null).
+  To set an empty custom label, choose **Set value** on an unset Badge text
+  assignment. Badge properties declare `content.deviceapp-badges` compatibility.
   Patches MERGE each field's `value`, `status`, `detail`, optional `source`
   and `icon` overrides, `visible` boolean and `reportedAt` report time. Thus `{"battery":{"status":"stale"}}` preserves
   its last value. Cards are visible by default. Put `{"clip":{"visible":false}}`

@@ -1358,11 +1358,11 @@ function colInput(col, value){
       input = document.createElement('select');
       input.className = 'fctl';
       var none = document.createElement('option');
-      none.value = ''; none.textContent = '(' + (col.label || col.k) + ')';
+      none.value = ''; none.textContent = col.unsetLabel || '(' + (col.label || col.k) + ')';
       input.appendChild(none);
       options.forEach(function(o){
         var op = document.createElement('option');
-        op.value = o; op.textContent = o;
+        op.value = o; op.textContent = col.optionLabels && col.optionLabels[o] || o;
         input.appendChild(op);
       });
       /* an unknown existing value keeps a selectable option (same pattern

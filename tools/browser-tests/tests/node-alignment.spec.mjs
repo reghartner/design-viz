@@ -168,6 +168,50 @@ for(const presentation of ['standard','explore'])for(const direction of ['horizo
   });
 }
 
+for(const presentation of ['standard','explore'])for(const direction of ['horizontal','vertical']){
+  test(presentation+' '+direction+' alignment pins an automatic clicked anchor and remains stable',async({page,server},info)=>{
+    const raw=fixture(),d=raw.page.blocks[0].diagram;
+    d.nodes={a:{title:'Automatic mover'},b:{title:'Automatic anchor'},c:{title:'Unselected automatic'},row:{title:'Row reference'}};
+    d.rows=[['row']];d.edges=direction==='vertical'?[{from:'row',to:'a'}]:[];
+    d.floats=direction==='horizontal'?
+      [{id:'a',side:'below',noSpread:true},{id:'b',side:'below',noSpread:true},{id:'c',side:'below',noSpread:true}]:
+      [{id:'a',side:'below',dy:120},{id:'b',side:'below',noSpread:true},{id:'c',side:'below',noSpread:true}];
+    if(presentation==='explore'){
+      raw.page.presentation='explore';
+      d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
+    }
+    await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+    if(presentation==='explore')await page.locator('#workspace-fit').click();
+    else await page.locator('#docview .board').getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await select(page);const before=await source(page),beforeGeometry=await cardCenters(page,['a','b','c']),beforeDiagram=await diagram(page);
+    expect(beforeGeometry[0][direction==='horizontal'?'y':'x']).not.toBeCloseTo(beforeGeometry[1][direction==='horizontal'?'y':'x'],3);
+    await node(page,'b').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align '+direction+'ly',exact:true}).click();
+    const aligned=await source(page),afterDiagram=await diagram(page),afterGeometry=await cardCenters(page,['a','b','c']);
+    for(const id of ['a','b']){const f=afterDiagram.floats.find(item=>item.id===id);expect(f.x).toEqual(expect.any(Number));expect(f.y).toEqual(expect.any(Number));}
+    expect(afterDiagram.floats.find(f=>f.id==='b')).toMatchObject({side:'below',noSpread:true});
+    expect(afterDiagram.floats.find(f=>f.id==='b').x).toBeCloseTo(beforeGeometry[1].x,3);
+    expect(afterDiagram.floats.find(f=>f.id==='b').y).toBeCloseTo(beforeGeometry[1].y,3);
+    expect(afterGeometry[1].x).toBeCloseTo(beforeGeometry[1].x,3);expect(afterGeometry[1].y).toBeCloseTo(beforeGeometry[1].y,3);
+    expect(afterGeometry[0][direction==='horizontal'?'x':'y']).toBeCloseTo(beforeGeometry[0][direction==='horizontal'?'x':'y'],3);
+    expect(afterGeometry[0][direction==='horizontal'?'y':'x']).toBeCloseTo(afterGeometry[1][direction==='horizontal'?'y':'x'],3);
+    expect(afterGeometry[2].x).toBeCloseTo(beforeGeometry[2].x,3);expect(afterGeometry[2].y).toBeCloseTo(beforeGeometry[2].y,3);
+    for(const key of ['x','y'])expect(afterDiagram.floats.find(f=>f.id==='c')[key]).toEqual(expect.any(Number));
+    expect(afterDiagram.nodes.row).toEqual(beforeDiagram.nodes.row);await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(2);
+    const repeated=[];
+    for(let repeat=0;repeat<3;repeat++){
+      const geometry=await cardCenters(page,['a','b','c']);await node(page,'b').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align '+direction+'ly',exact:true}).click();
+      expect(await source(page)).toBe(aligned);const nextGeometry=await cardCenters(page,['a','b','c']);expect(nextGeometry).toEqual(geometry);repeated.push(nextGeometry);
+    }
+    await writeFile('/tmp/design-viz-auto-anchor-'+presentation+'-'+direction+'-geometry.json',JSON.stringify({before:beforeGeometry,after:afterGeometry,repeated},null,2));
+    await closeTools(page);
+    if(presentation==='explore')await page.locator('#workspace-fit-selection').click();
+    else await page.locator('#docview .board').getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await page.screenshot({path:'/tmp/design-viz-auto-anchor-'+presentation+'-'+direction+'-1280.png'});
+    await info.attach(presentation+' '+direction+' automatic anchor',{body:await page.screenshot(),contentType:'image/png'});
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+  });
+}
+
 async function marqueeCorner(page,id){
   const r=await node(page,id).boundingBox();
   await page.keyboard.down('Alt');await page.mouse.move(r.x+r.width+10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width-4,r.y+6,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');

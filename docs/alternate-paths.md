@@ -17,7 +17,9 @@ caption, semantic node tones, failures and panel state remain at step 1.
 Clicking a step number or using the previous/next controls returns illumination
 to that step's hops and focused nodes. The step count, playback ending, node
 tones and panel state all follow the selected path.
-Chips retain their order when switching.
+Chips retain their order when switching. Path labels stay pinned and keyboard
+reachable while long step rows scroll horizontally; in very narrow controls,
+the label rail shortens so the focused or selected step circle remains visible.
 
 A path ends at its last referenced step. Next is disabled there; Play replays
 from its first step. Returning to the happy path recomputes its state from the

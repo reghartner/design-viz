@@ -1416,6 +1416,26 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       stepText = termbar.stepText, btnPlay = termbar.btnPlay;
   var captionLine = stepN.parentNode, captionGhost = null, captionTimer = null;
 
+  /* Sticky path labels sit above the horizontal scrollport. Native focus
+     scrolling only knows about the scrollport, so keep a focused or selected
+     circle clear of the visible label rail as well. */
+  function revealPathStep(button){
+    if(destroyed || !button || !chipsBox.clientWidth || !button.getBoundingClientRect)return;
+    var frame=chipsBox.getBoundingClientRect(),rect=button.getBoundingClientRect(),labelRight=frame.left;
+    var rail=chipsBox.querySelector('.path-timeline-labels');
+    if(rail)labelRight=Math.max(labelRight,rail.getBoundingClientRect().right);
+    Array.from(chipsBox.querySelectorAll('.path-chip')).forEach(function(label){labelRight=Math.max(labelRight,label.getBoundingClientRect().right);});
+    var left=Math.min(frame.right-34,labelRight+8),right=frame.right-6;
+    var scale=frame.width/chipsBox.clientWidth || 1;
+    if(rect.left<left)chipsBox.scrollLeft-=(left-rect.left)/scale;
+    else if(rect.right>right)chipsBox.scrollLeft+=(rect.right-right)/scale;
+  }
+  function revealFocusedPathStep(event){
+    var button=event.target;
+    if(button && button.classList && button.classList.contains('schip'))revealPathStep(button);
+  }
+  if(chipsBox.addEventListener)chipsBox.addEventListener('focusin',revealFocusedPathStep);
+
   var chipButtons = [], pathButtons = [], pathTimeline = null, chipDeltas = null;
   function paintStepCoins(){
     if (board.deltaDetails) board.deltaDetails.close();
@@ -1509,11 +1529,12 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       line.setAttribute('data-path-row',path.id); line.style.setProperty('--path-color',path.color);
       var choice = document.createElement('button'); choice.type = 'button'; choice.className = 'path-chip';
       choice.textContent = path.label; choice.setAttribute('data-dv-path',path.id);
+      choice.title=path.label;
       choice.disabled=!path.indices.length;
       if(choice.disabled)choice.title='No steps from this path are shown in this view.';
       choice.style.gridColumn = 1; choice.style.gridRow = rowNumber + 1;
       choice.addEventListener('click',function(ev){
-        ev.stopPropagation();clearEditingPreview();selectPath(path.id,0);paintPathOverview();
+        ev.stopPropagation();clearEditingPreview();chipsBox.scrollLeft=0;selectPath(path.id,0);paintPathOverview();
         secBox.dispatchEvent(new CustomEvent('dv:pathchange',{bubbles:true}));
       });
       line.appendChild(choice); pathButtons.push({button:choice,path:path,row:line});
@@ -1532,7 +1553,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     }
   }
   function syncPathControls(){
-    if(pathTimeline){pathTimeline.sync(selectedPath.id,cur);return;}
+    if(pathTimeline){pathTimeline.sync(selectedPath.id,cur);revealPathStep(chipsBox.querySelector && chipsBox.querySelector('.schip[aria-current="true"]'));return;}
     pathButtons.forEach(function(choice){
       var active = choice.path.id === selectedPath.id;
       choice.button.setAttribute('aria-pressed',String(active));
@@ -1540,6 +1561,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
     });
     var active = chipButtons.find(function(chip){return chip.path.id === selectedPath.id && chip.index === cur;});
     chipButtons.forEach(function(chip){chip.button.setAttribute('aria-current',String(chip === active));});
+    if(active)revealPathStep(active.button);
   }
   paintChips();
 
@@ -1898,6 +1920,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       destroyed = true; stopAuto(); clearLit(); clearCaptionTween(); clearWireContracts();
       if(pathTimeline)pathTimeline.destroy();
       if(chipDeltas)chipDeltas.destroy();
+      if(chipsBox.removeEventListener)chipsBox.removeEventListener('focusin',revealFocusedPathStep);
       if (document.removeEventListener) document.removeEventListener('visibilitychange', visibilityChanged);
     },
     onHide: function(){ if (!destroyed && !hidden){

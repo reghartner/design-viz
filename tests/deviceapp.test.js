@@ -5,7 +5,7 @@ for(const f of ['canon','validator','engine','builder.workbench','clipboard.work
 const plain=v=>JSON.parse(JSON.stringify(v));
 const panel=()=>{const p={...plain(C.PANEL_TEMPLATES.deviceapp),id:'app',type:'deviceapp'};
  p.sources=[{id:'telemetry',label:'Device telemetry'},{id:'registry',label:'Device registry'}];
- p.fields.forEach((f,i)=>f.source=i<2?'telemetry':'registry');return p;};
+ p.fields.forEach((f,i)=>{f.source=i<2?'telemetry':'registry';delete f.badgeMode;});return p;};
 const spec=p=>({page:{blocks:[{heading:'Camera',diagram:{nodes:{api:{title:'Telemetry'}},rows:[['api']],edges:[],panels:[p],steps:[{id:'start',nodes:['api']}]}}]}});
 const patch=app=>({panels:{app}});
 test('deviceapp merges field values and statuses independently; reset, source override and snapshots are isolated',()=>{
@@ -205,4 +205,57 @@ test('switching folded sequences settles presentation even when the new path has
  C.renderPanelBody(host,p,second[1],'pastel',second,1,true);
  assert.match(host.innerHTML,/data-da-screen="app"/);assert.match(host.innerHTML,/New path/);assert.doesNotMatch(host.innerHTML,/ fresh/);
  C.renderPanelBody(host,p,second[2],'pastel',second,2,true);assert.match(host.innerHTML,/da-screen-home fresh/);
+});
+
+
+test('badges may be hidden or custom independently of semantic status, including accessible and source labels',()=>{
+ const p=panel();p.fields[0].badgeMode='none';
+ p.fields[1].badgeMode='custom';p.fields[1].badgeText='Solar <connected>';p.fields[1].badgeColor='#08a';
+ p.initial.power.status='error';
+ const states=C.foldDeviceAppStates(p,[patch({})]),html=C.deviceAppPanelHTML(p,states[0],false);
+ const battery=html.match(/data-da-field="battery"[\s\S]*?<\/button>/)[0];
+ assert.doesNotMatch(battery,/Current|da-state|da-meta/);assert.match(battery,/Battery: 68%\. Source:/);
+ assert.match(html,/aria-label="Charging source: Solar panel\. Solar &lt;connected&gt;\. Source:/);
+ assert.match(html,/da-state-custom" style="--da-badge-color:#08a">Solar &lt;connected&gt;/);
+ assert.match(html,/Battery \/ Charging source · Solar &lt;connected&gt;/);assert.doesNotMatch(html,/Unavailable/);
+ assert.equal(C.deviceAppModel(p,states[0]).fields[1].status,'error');
+ const updated=C.deviceAppPanelHTML(p,C.foldDeviceAppStates(p,[patch({battery:{value:65}})])[0],false);
+ assert.match(updated,/da-update-label">Updated/);
+});
+test('badge overrides carry, null restores declarations, field reset restores all defaults and earlier snapshots stay intact',()=>{
+ const p=panel();Object.assign(p.fields[0],{badgeMode:'custom',badgeText:'Declared',badgeColor:'#123456'});
+ Object.assign(p.initial.battery,{badgeText:'Initial',badgeColor:'#abc'});
+ const states=C.foldDeviceAppStates(p,[patch({}),patch({battery:{badgeText:'Step',badgeColor:'#fed',badgeMode:'none'}}),patch({}),
+  patch({battery:{badgeMode:'custom'}}),patch({battery:{badgeText:null,badgeColor:null,badgeMode:null}}),patch({battery:{badgeText:''}}),patch({battery:null})]);
+ const cards=states.map(s=>C.deviceAppModel(p,s).fields[0]);
+ assert.deepEqual(plain(cards.map(f=>f.badgeText)),['Initial','','','Step','Declared','','Declared']);
+ assert.deepEqual(plain(cards.map(f=>f.badgeColor)),['#abc','#fed','#fed','#fed','#123456','#123456','#123456']);
+ assert.equal(cards[6].status,'unknown');assert.equal(cards[6].value,'—');
+ assert.match(C.deviceAppPanelHTML(p,states[0],false),/>Initial<\/span>/);
+ assert.doesNotMatch(C.deviceAppPanelHTML(p,states[5],false),/da-state-custom/);
+ assert.deepEqual(plain(states[2]._updated),[]);
+ states[3].battery.badgeText='Mutation';assert.equal(states[1].battery.badgeText,'Step');
+});
+test('badges validate declarations and patches, reject unsafe CSS, escape labels and preserve legacy defaults',()=>{
+ const p=panel();Object.assign(p.fields[0],{badgeMode:'custom',badgeText:'<img src=x onerror=bad()>',badgeColor:'red; background:url(evil)'});
+ p.fields[1].badgeMode='invalid';p.fields[1].badgeText=42;
+ const raw=spec(p);raw.page.blocks[0].diagram.steps=[patch({battery:{badgeMode:'invalid',badgeText:42,badgeColor:'url(evil)'}})];
+ const warnings=C.validate(C.normalize(raw)).warnings.join('\n');
+ assert.match(warnings,/fields\[0\]\.badgeColor/);assert.match(warnings,/fields\[1\]\.badgeMode/);assert.match(warnings,/fields\[1\]\.badgeText/);
+ for(const key of ['badgeMode','badgeText','badgeColor'])assert.match(warnings,new RegExp('battery\\.'+key));
+ const state=C.foldDeviceAppStates(p,raw.page.blocks[0].diagram.steps)[0],html=C.deviceAppPanelHTML(p,state,false);
+ assert.doesNotMatch(html,/<img|url\(evil\)|red;|invalid/);assert.match(html,/&lt;img src=x onerror=bad\(\)&gt;/);assert.match(html,/--da-badge-color:#53617a/);
+ assert.equal(C.deviceAppModel(p,state).fields[1].badgeText,'Current');
+ p.fields[0].badgeText='   ';assert.equal(C.deviceAppModel(p,state).fields[0].badgeText,'');
+ const legacy=panel();for(const [status,label] of Object.entries({unknown:'No data',loading:'Loading',ready:'Current',stale:'Cached',error:'Unavailable'})){
+  legacy.initial.battery.status=status;assert.equal(C.deviceAppModel(legacy,legacy.initial).fields[0].badgeText,label);
+ }
+});
+test('picker defaults hide badges and typed state controls can author custom badges and declaration resets',()=>{
+ const p={...plain(C.PANEL_TEMPLATES.deviceapp),id:'app',type:'deviceapp'};assert.ok(p.fields.every(f=>f.badgeMode==='none'));
+ assert.doesNotMatch(C.deviceAppPanelHTML(p,C.foldDeviceAppStates(p,[])[0],false),/da-state|da-meta/);
+ const fields=C.panelPatchFields(p).find(f=>f[0]==='battery')[2];
+ const out=C.patchFieldsCollect(fields,{badgeMode:'custom',badgeText:'Connected',badgeColor:'#123'});
+ assert.ok(!out.error,out.error);assert.equal(out.item.badgeText,'Connected');assert.equal(out.item.badgeColor,'#123');
+ for(const key of ['badgeMode','badgeText','badgeColor'])assert.match(fields.find(f=>f[0]===key)[3].nullLabel,/Use declared badge/);
 });

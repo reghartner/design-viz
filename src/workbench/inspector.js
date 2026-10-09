@@ -2,12 +2,12 @@
    read models remain shared leaves; source/history publication belongs to session. */
 function createBuilderInspector(opts){
   var document=opts.document,guide=opts.guide,session=opts.session,modes=opts.modes;
-  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null;
+  var panelEditors=Object.create(null),inspectorScrollKey=null,invalidateEffectiveState=null,invalidateExtraction=null,invalidateTopologyExport=null,invalidateAlignment=null,invalidateEdgeEndpoints=null;
   var OPEN_VOCABULARY=new Set(),OPEN_INITIAL_EDITORS=new Map(),OPEN_PATCH_EDITORS=new Set(),CUSTOM_PANEL_FOLDS=new Map(),OPEN_EFFECTIVE_STATE=false,OPEN_EFFECTIVE_PANELS=new Set(),OPEN_STORY_TIME=false,OPEN_DOCUMENT_ADVANCED=false;
   var disposed=false,refreshTimer=null,refreshVersion=0,formLife=createWorkbenchLifetime();
   var proseDraft={key:null,fields:Object.create(null)};
   function listen(target,type,fn,options){return formLife.listen(target,type,fn,options);}
-  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;}
+  function retireForm(){formLife.destroy();formLife=createWorkbenchLifetime();invalidateExtraction=null;invalidateTopologyExport=null;invalidateAlignment=null;invalidateEdgeEndpoints=null;}
   var prefix='dv-inspector-'+Math.random().toString(36).slice(2);
   var accentListId=prefix+'-accents',groupListId=prefix+'-groups';
   function parseEditor(){return session.snapshot();}
@@ -661,14 +661,17 @@ function visibilityControl(val,ctx){
   }
 
 function edgeForm(val, ctx){
-    var t = session.target, expected = session.snapshot();
+    var t = session.target, expected = session.snapshot(), staleSource = false;
+    invalidateEdgeEndpoints=function(){staleSource=true;};
     var ids = Object.keys((ctx.diagram && ctx.diagram.nodes) || {});
     function endpoint(field){
       return selectControl(ids, val[field], function(v){
         if (v == null) return true; /* endpoint kept — nothing to commit */
         return commitCascade(function(raw){
           var current=session.snapshot();
-          if(current.text!==expected.text || current.project!==expected.project || current.renderedText!=null && current.renderedText!==current.text)
+          /* Successful Inspector edits retain this form. Direct JSON input
+             invalidates its callbacks even if that replacement is rendered. */
+          if(staleSource || current.project!==expected.project || current.renderedText!=null && current.renderedText!==current.text)
             return {error:'Source changed. Render and reselect this connection.'};
           return planSetEdgeEndpoint(current.text, raw, t.section, t.index, field, v, session.resolve ? session.resolve(raw) : null);
         });
@@ -2691,7 +2694,7 @@ function renderInspector(){
 
   return {
     render:renderInspector,renderMulti:renderMultiInspector,refresh:refreshFormSoon,refreshCatalog:refreshCatalog,retire:function(){if(!disposed)retire();},
-    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();if(invalidateAlignment)invalidateAlignment();},
+    sourceChanged:function(){if(disposed)return;cancelRefresh();if(invalidateEffectiveState)invalidateEffectiveState();if(invalidateExtraction)invalidateExtraction();if(invalidateTopologyExport)invalidateTopologyExport();if(invalidateAlignment)invalidateAlignment();if(invalidateEdgeEndpoints)invalidateEdgeEndpoints();},
     message:inspectorMessage,error:formError,commit:commitSimple,transact:commitCascade,focusProse:focusProse,
     panel:panelEditor,panelForTarget:panelEditorForTarget,panelForCard:panelEditorForCard,
     busy:function(view){return !disposed && Object.keys(panelEditors).some(function(type){var editor=panelEditors[type].value;return editor.busy && editor.busy(view,guide);});},

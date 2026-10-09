@@ -1,4 +1,4 @@
-import {test,expect,closeTools} from '../helpers/test.mjs';
+import {test,expect,closeTools,pastePage} from '../helpers/test.mjs';
 import {readFile} from 'node:fs/promises';
 import {digest} from '../../canon/drift.mjs';
 const diagram=raw=>raw.page.sections[0].diagram;
@@ -118,4 +118,44 @@ test('consumer story activates saved cross and provider edges without changing o
     await closeTools(page);
   }
   await expect(page.locator('#src')).toHaveValue(before);
+});
+
+
+for(const imported of [true,false])for(const first of ['label','endpoint'])test('same Inspector accepts '+first+' then endpoint edits for '+(imported?'imported':'local')+' nodes',async({page,server})=>{
+  const destination=imported?'shared::store':'third';
+  if(imported)await fixture(page,server);
+  else{
+    await page.goto(server.origin+'/workbench.html');
+    await pastePage(page,JSON.stringify({page:{title:'Local connections',sections:[{diagram:{nodes:{local:{},other:{},third:{}},rows:[['local','other','third']],edges:[{from:'local',to:'other',label:'Request'}],steps:[{id:'request',edge:'local->other'}]}}]}}));
+    await closeTools(page);
+  }
+  await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  const before=await source(page);
+  if(first==='label'){
+    const label=page.getByRole('textbox',{name:'label',exact:true});await label.fill('Changed');await label.press('Enter');
+    await expect.poll(async()=>diagram(JSON.parse(await source(page))).edges[0].label).toBe('Changed');
+  }else{
+    await page.getByRole('combobox',{name:'to',exact:true}).selectOption(destination);
+    await expect.poll(async()=>diagram(JSON.parse(await source(page))).edges[0].to).toBe(destination);
+  }
+  const afterFirst=await source(page),field=first==='label'?'to':'from',value=first==='label'?destination:'other';
+  // Do not reselect the edge: ordinary field edits retain this mounted form.
+  await page.getByRole('combobox',{name:field,exact:true}).selectOption(value);
+  await expect.poll(async()=>diagram(JSON.parse(await source(page))).edges[0][field]).toBe(value);
+  const afterSecond=await source(page),d=diagram(JSON.parse(afterSecond));
+  expect(d.edges[0].to).toBe(destination);expect(d.steps[0].edge).toBe(d.edges[0].from+'->'+destination);
+  expect(d.edges[0].label).toBe(first==='label'?'Changed':'Request');expect(d.edges).toHaveLength(1);
+  for(const text of [afterFirst,before]){await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);}
+  for(const text of [afterFirst,afterSecond]){await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(text);}
+});
+
+
+test('held endpoint callbacks cannot edit replacement source after manual Render',async({page,server})=>{
+  await fixture(page,server);await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('combobox',{name:'to',exact:true}).evaluate(el=>window.oldEndpoint=el);
+  const raw=JSON.parse(await source(page)),d=diagram(raw);d.edges[0]={from:'other',to:'local',label:'Replacement'};d.steps[0].edge='other->local';d.nodes.local.title='Replacement rendered';
+  const changed=JSON.stringify(raw);await page.locator('#editor-tab-json').click();await page.locator('#src').fill(changed);await page.locator('#go').click();
+  await expect(node(page,'local')).toContainText('Replacement rendered');
+  await page.evaluate(()=>{window.oldEndpoint.value='shared::store';window.oldEndpoint.dispatchEvent(new Event('change',{bubbles:true}));});
+  await expect(page.locator('#src')).toHaveValue(changed);
 });

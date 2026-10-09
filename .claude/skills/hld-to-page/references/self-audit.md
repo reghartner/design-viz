@@ -114,14 +114,20 @@ one is either a missing ledger row or an unsupported claim; fix it.
 ## 5. Look at the page
 
 Open the built HTML in a browser (desktop width, and the host width if known).
-For each path: step through from the first step, switch from one ending to
-another, and check:
+For each actual authored view, compare the rendered result with its visual
+brief at the focal step/state, then step through every path from the first
+step and switch from one ending to another. Check:
+- the intended audience can find the focal source-backed evidence in the
+  planned reading order without required evidence being hidden or crowded out;
 - the panel you named as Focus actually changes visibly at that step;
 - clocks, dates and freshness texts read correctly on screen;
 - icons changed and changed back where planned;
 - nothing contradicts the caption (a carried red tone, "no notifications",
   "Updated just now" hours later, a subject in the wrong room);
-- labels are readable and not clipped.
+- labels are readable and not clipped, and panels or controls do not obscure
+  the graph or the focal evidence;
+- illustrative staging does not imply an unsupported UI action, system
+  mechanism or meaningful physical relationship.
 
 If browser tools are not available, say which of these checks were not done.
 Never claim a visual check from reading JSON.

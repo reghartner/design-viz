@@ -21,6 +21,11 @@ every worksheet cell and every spec field. For longer discussion and examples
   one line in the section description, such as "Clock times and the battery
   drain rate are illustrative." Any value the source does state is used
   verbatim instead.
+- `Illustrative` is not a general exception for unsupported behavior. It does
+  not authorize an invented user action, UI control, automatic transition,
+  system mechanism, or meaningful physical placement. Source or ask for those
+  when they affect the story; otherwise omit them or use neutral cosmetic
+  staging that makes no such claim.
 - Operator answers are facts too. A time or value the operator gives is an
   anchor (an absolute step `time`, a `charge` patch); never move or replace
   it to fit an approximate rate. Drift fills gaps between anchors only where

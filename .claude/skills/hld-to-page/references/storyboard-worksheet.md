@@ -29,6 +29,18 @@ and end where the source ends, for each path.>
 3. What must the audience NOT be led to believe? (For example: that the door
    closed, that the alarm was verified, that the message arrived.)
 
+**Per-view visual brief.** Add one row for each view you will actually author.
+Use `default` for a single unnamed view. Named layouts get their existing IDs;
+do not create or duplicate a view merely to fill this table.
+
+| View id | Audience and task in this view | Takeaway | Focal source-backed evidence (panel + step/state) | Density and reading order |
+|---|---|---|---|---|
+| | | | | |
+
+Name what must be visible and readable at the focal state. Density and reading
+order describe the intended scan path and what may recede; they do not invent
+an interaction, hide required evidence, or replace the step x panel matrix.
+
 ## B. Panel plan
 
 One row per panel you will declare. A panel without a clear question is

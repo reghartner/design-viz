@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
 SKILL = '.claude/skills/hld-to-page/SKILL.md'
 REFS = '.claude/skills/hld-to-page/references/'
+WORKFLOW = REFS + 'authoring-workflow.md'
 COMMON = ['Output rules', 'Top-level shape', 'Section shape', 'Diagram object',
           'view', 'autoplay', 'nodes', 'rows — left-to-right slots (no coordinates)',
           'floats — automatic or freely placed nodes', 'edges',
@@ -166,11 +167,19 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         text = normalize_links(text, path)
         parts.append('<!-- Source: ' + path + (' # ' + heading if heading else '') + ' -->\n' + text)
         provenance.append({'path': path, 'section': heading, 'sha256': hashlib.sha256(loaded[path].encode()).hexdigest(), 'characters': len(text), 'bytes': len(text.encode())})
-    add(SKILL, 'Scoped exceptions and handoff')
+    add(WORKFLOW, 'Scoped exceptions and handoff')
+    add(WORKFLOW, 'The rules that matter most')
     if mode == 'new':
-        add(SKILL, 'Phase 1: Inventory the source')
-        add(SKILL, 'Phase 2: Ask the operator (bounded batches, wait after each)')
-    add(SKILL, 'Phase 7: Deliver')
+        add(WORKFLOW, 'Phase 1: Inventory the source')
+        add(REFS + 'evidence-and-updates.md', 'Coverage ledger')
+        add(WORKFLOW, 'Phase 2: Ask the operator (bounded batches, wait after each)')
+        add(WORKFLOW, 'Phase 3: Fill the storyboard worksheet')
+    add(WORKFLOW, 'Phase 4: Translate the worksheet into a spec')
+    add(WORKFLOW, 'Phase 5: Validate and preview')
+    add(WORKFLOW, 'Phase 6: Self-audit against the worksheet')
+    add('docs/visibility-evidence.md', 'Required author evidence before proposing')
+    add('docs/visibility-evidence.md', 'Expectation format and eligibility')
+    add(WORKFLOW, 'Phase 7: Deliver')
     add(REFS + 'honesty-rules.md')
     add(REFS + 'evidence-and-updates.md', 'Fidelity and provenance')
     for title in COMMON: add(CONTRACT, title)
@@ -193,8 +202,8 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     # The maintained route table gives examples without embedding the cookbook.
     routes.add('cookbook/README.md')
     route_text = '\n'.join('- `' + path + '`' for path in sorted(routes) if (ROOT / path).exists())
-    document = '# Focused authoring packet\n\nMode: ' + mode + '. Selection is the union of explicit choices and spec inference.\n\nPanels: ' + (', '.join(sorted(panels)) or 'none') + '. Features: ' + (', '.join(sorted(features)) or 'none') + '.\n\nRead these extracted rules instead of loading the full contract and cookbook. Follow the active collaboration protocol for candidate approval; a packet does not grant publication or new story decisions. Fully specified small edits retain the scoped-edit exception below. Full documentation remains available on demand; source paths and relative links resolve from VIZ, not the packet output folder.\n\n' + '\n\n'.join(parts) + '\n\n## On-demand routes and examples\n\n' + route_text + '\n'
-    baseline_paths = [CONTRACT, SKILL, REFS + 'worked-example.md', 'cookbook/README.md']
+    document = '# Focused authoring packet\n\nMode: ' + mode + '. Selection is the union of explicit choices and spec inference.\n\nPanels: ' + (', '.join(sorted(panels)) or 'none') + '. Features: ' + (', '.join(sorted(features)) or 'none') + '.\n\nThis packet is the primary authoring guidance: use its selected rules instead of preloading the full workflow, contract, cookbook or session manual. Linked references are on demand unless this packet names a needed worksheet/source route. Follow the active collaboration protocol for candidate approval; a packet does not grant publication or new story decisions. Fully specified small edits retain the scoped-edit exception below. Full documentation remains available on demand; source paths and relative links resolve from VIZ, not the packet output folder.\n\n' + '\n\n'.join(parts) + '\n\n## On-demand routes and examples\n\n' + route_text + '\n'
+    baseline_paths = [CONTRACT, SKILL, WORKFLOW, REFS + 'worked-example.md', 'cookbook/README.md']
     baseline = '\n\n'.join((ROOT / path).read_text() for path in baseline_paths)
     metadata = {'version': 1, 'mode': mode, 'selectionPolicy': 'union; explicit selections never narrow inferred requirements',
                 'explicit': {'panels': sorted(explicit_panels), 'features': sorted(explicit_features)},

@@ -318,7 +318,7 @@ new arithmetic, no new attributions.
 
 ## Graph placement and connection schema
 
-For ordinary new-diagram authoring, follow SKILL rule 12: use unpositioned
+For ordinary new-diagram authoring, follow the packet/workflow rule 12: use unpositioned
 floats and automatic connections, then run the bundled pure Node
 `tools/compose-page-layout.cjs` command. The fields below document existing specs and explicit
 user-directed layout work.

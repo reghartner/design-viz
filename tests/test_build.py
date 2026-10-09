@@ -92,12 +92,12 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(hashlib.sha256(raw).hexdigest(), packed['sha256'])
         files = json.loads(raw)['files']
         for name in ['.claude/skills/hld-to-page/SKILL.md', 'docs/folder-agent-session.md',
-                     'docs/folder-agent-existing-edit.md', 'tools/canon/generated-runtime.cjs',
+                     'docs/folder-agent-existing-edit.md', '.claude/skills/hld-to-page/references/authoring-workflow.md', 'tools/canon/generated-runtime.cjs',
                      'tools/auto-arrange-spec.cjs']:
             self.assertEqual(files[name], (ROOT / name).read_text())
         # The short entry guide stays short and its relative links resolve inside the kit.
         guide = files['docs/folder-agent-existing-edit.md']
-        self.assertLessEqual(len(guide), 4500)
+        self.assertLessEqual(len(guide), 6000)
         links = re.findall(r'\]\(([^)#]+)\)', guide)
         self.assertIn('../.claude/skills/hld-to-page/SKILL.md', links)
         self.assertIn('folder-agent-session.md', links)

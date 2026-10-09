@@ -5,6 +5,50 @@ A correct carried value can be hidden behind a phone home screen, a card's
 must be visible at a story beat in a companion JSON file. This does not extend
 FlowSpec or change `spec_walk.py --expect` (which still checks values only).
 
+## Required author evidence before proposing
+
+For every source/request-required visible story beat, add a concise ledger row:
+**requirement and source → exact section/view/path/step → panel/card → expected
+state, value and icon (where relevant) → check result / remaining visual review**.
+Use existing worksheet/coverage rows if they already carry this information.
+Retain source-required icons when simplifying cards; replacing an icon with text
+is not proof. Preserve required animation and visual richness as well as values.
+For fully specified edits, reconcile affected beats and any visibility/layout
+consequences; do not restart the worksheet or invent a question batch.
+
+Write `candidate.visibility.json` for supported targets and run from VIZ:
+
+```sh
+node tools/visibility-check.cjs <candidate.spec.json> <candidate.visibility.json>
+python3 .claude/skills/hld-to-page/scripts/spec_walk.py <candidate.spec.json> --state --expect '<path>/<step>:<panel>.<field>=<value>'
+```
+
+Pair visibility expectations with `spec_walk.py --expect` assertions for required
+values and icons, using the documented state paths; inspect carried state and
+source time anchors too. Fix WARNs; resolve each CHECK or explain it in the ledger.
+Values and icons can pass while their card is hidden. Hidden, unsupported,
+excluded or unreachable targets never count as proved visible. Fix an actionable
+failure before claiming that requirement is met; keep genuine tool limits explicit.
+
+Diagram-only beats and unsupported panel internals may be **N/A to automated
+visibility**, with the exact target and reason in the ledger and actual review
+still outstanding. Do not create empty or fake assertions to get a passing result.
+For Canon imports, use the resolved authorized Canon/Workbench preview; standalone
+walk/visibility tools do not resolve imports. Preserve authored declarations and
+record that limitation instead of flattening the source.
+
+Before proposing, summarize actual validation, value/icon and visibility results
+and outstanding review in the ledger and proposal. In a file-only session say
+**rendered fit, occlusion and legibility unverified pending real Workbench human
+preview**. Presentation eligibility alone is not pixel QA or proof of source
+truth. Already-authorized rendered captures can supply visual evidence; this
+obligation grants no browser, server, installation or delegation permission.
+A preview proposal may carry honest unverified checks; it must not claim those
+requirements proved or the visual work complete. Follow paired preview/approval
+and the matching result before a completion reply.
+
+## Expectation format and eligibility
+
 ```json
 {"version":1,"expectations":[
   {"section":"arrival","view":"story","path":"happy","step":"open-app",
@@ -34,10 +78,9 @@ without a central panel-type switch. Its address is trusted repository metadata.
 
 ```sh
 node tools/visibility-check.cjs story.spec.json story.visibility.json
-node tools/browser-tests/visibility-audit.mjs story.spec.json story.visibility.json
 ```
 
-The first command works with Node in a source checkout or extracted authoring
+The command works with Node in a source checkout or extracted authoring
 kit. It labels its result **presentation-eligibility**: full selected-path state
 and whole-panel visibility fold through skipped stops; view membership and
 reachable stops use the same filter normalization as playback. Unknown,
@@ -45,7 +88,11 @@ ambiguous, excluded or filtered targets fail even when `visible:false` was
 requested. It never navigates an editor-only preview to reveal hidden stops.
 Intentionally hidden content is separate from an unreachable story beat.
 
-The second command is a full-checkout coordinator tool. Install the locked
+## Optional authorized rendered audit
+
+`node tools/browser-tests/visibility-audit.mjs story.spec.json story.visibility.json`
+is a full-checkout coordinator tool, only when browser use and setup are already
+authorized. It uses the locked
 `tools/browser-tests` dependencies and their Chromium as described in
 [browser contracts](../tools/browser-tests/README.md). It builds the current
 production native renderer, mounts the unchanged spec, and navigates each

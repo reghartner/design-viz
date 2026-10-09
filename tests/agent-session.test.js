@@ -22,6 +22,11 @@ test('local helper publishes source/selection and delivers file proposals exactl
   assert.match(readme,/For existing edits, preserve layout and routes/);
   assert.match(readme,/compose-page-layout\.cjs.*--section <zero-based section> <draft spec> <different arranged spec>/);
   assert.match(readme,/no browser control/);
+  assert.match(readme,/compact packet-first entry/);
+  assert.match(readme,/Read the selected packet before JSON edits/);
+  assert.match(readme,/visibility-check\.cjs <candidate\.spec\.json> <candidate\.visibility\.json>/);
+  assert.match(readme,/value\/icon expectations/);
+  assert.match(readme,/unverified pending real Workbench human preview/);
   assert.equal((await h.send({snapshot:{...h.snapshot,selection}})).status,200);
   const state=await h.read('state.json');assert.deepEqual(state.selection,selection);assert.equal(state.connected,true);
   assert.equal(state.source,h.snapshot.source);assert.ok(!JSON.stringify(state).includes(h.server.token));

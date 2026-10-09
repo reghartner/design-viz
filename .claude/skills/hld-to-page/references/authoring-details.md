@@ -4,6 +4,62 @@ Read the sections relevant to the chosen widgets and delivery surface. Paths in
 this file are relative to VIZ. The contract and executable examples remain the
 schema authority; this reference collects non-obvious authoring decisions.
 
+## Document settings and preview appearance
+
+Read this section when the request changes document metadata, the saved skin,
+reader-tour settings, section prose, or preview appearance.
+
+`page.title` and `page.skin` are saved document defaults. `page.generatedFrom`
+uses `{url, label?, version?, at?}` for the source line below the title. In the
+workbench, **Inspect → Document settings** authors these fields with Undo; add
+the URL before its description/version/date, and clear the URL to remove the
+source line. Wrapped pages and bare pages using either `blocks` or `sections`
+keep their shape. **Outline → Document settings** is another entry. The
+**Advanced: reader tour and compatibility** group authors `page.tour` JSON with
+the shared tour validator and shows runtime/contract/feature requirements
+read-only. Clearing the tour restores the built-in reader walkthrough. Keep
+`page.flowview` metadata system-owned; Save/Export stamp it and preserve
+declared requirements. A bare diagram explicitly offers **Add document settings**
+to add a page wrapper without changing its diagram.
+
+**Canvas appearance** skin buttons affect only the current preview. **Use
+document default** follows the saved skin even when a host cookie selects a
+different theme; **Edit saved default…** opens Document settings. Save and Export
+use the authored default; hosting sites may override reader appearance.
+
+For section text/bullets, `collapsed:true` starts prose folded. Humans set this
+with **Initially collapse prose** in the section inspector; the diagram and
+contract blocks remain visible, and reader toggles do not rewrite that default.
+Explore Section notes have independent placement and sizing; read
+`docs/section-layouts.md` when authoring those settings.
+
+## Specialized panel authoring
+
+Read this section only when the story uses these panel types.
+
+Data contract step patches can override `fields` (all cell values), `columns`,
+and `fieldWidth`; arrays replace the full list and `enterOnce` makes an override
+temporary. Omitted content falls back to the carried state or declaration.
+For field-by-field contract explanations, use the `data-contract` panel with
+custom columns and step-specific `highlights`; keep values sourced and use
+optional highlight labels to explain the emphasis. Read
+`cookbook/software-state.md` and fetch the field reference with
+`python3 tools/widget_doc.py data-contract`. The `table` panel remains the
+record-snapshot view and accepts fixed column widths.
+
+For operation cost breakdowns or architecture comparisons, use the `cost` panel
+and `cookbook/messaging-cost.md`. Declare 1–6 entries; one shows component
+amounts and shares, exactly two also compare baseline and alternative. For one
+operation use `messages:1`, `unit:"operation"`, `period:"per operation"`, zero
+`perMillion` and actual component amounts as `fixed`; start from
+`src/starters/operation-cost.json`. Link cost lines to engineering nodes,
+separate fixed charges from per-million rates, and state pricing assumptions
+and exclusions. Its stacked bars share a zero baseline; use Auto density for
+responsive panels or Compact for a short horizontal comparison beside the
+diagram. The recipe and `python3 tools/widget_doc.py cost` cover the exact
+fields and starter views. Never present illustrative rates as current provider
+pricing.
+
 ### Route current storytelling requests before proposing a layout
 
 These capabilities already exist. Load the matching recipe/guide, not every row:

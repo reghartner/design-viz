@@ -105,6 +105,17 @@ class BuildTests(unittest.TestCase):
             normalized = posixpath.normpath('docs/' + link)
             self.assertIn(normalized, files, link)
             self.assertTrue((ROOT / normalized).is_file(), link)
+        # Progressive-disclosure routes must remain usable in the extracted kit,
+        # where no source checkout can repair a broken relative link.
+        skill = files['.claude/skills/hld-to-page/SKILL.md']
+        skill_links = re.findall(r'\]\(([^)]+)\)', skill)
+        for link in skill_links:
+            target = link.split('#', 1)[0]
+            if not target or '://' in target:
+                continue
+            normalized = posixpath.normpath('.claude/skills/hld-to-page/' + target)
+            self.assertIn(normalized, files, link)
+            self.assertTrue((ROOT / normalized).is_file(), link)
         self.assertEqual(packed['watcher'], (ROOT / 'tools/folder-agent.py').read_text())
         self.assertFalse(any('node_modules/' in name or '/agents/' in name or '/research/' in name for name in files))
 

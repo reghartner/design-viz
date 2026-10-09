@@ -18,68 +18,45 @@ change of audience does not start a new project or erase its evidence.
 | Engineer supplies a high-level design document (HLD) | [HLD](references/use-case-hld.md) |
 | Engineer supplies a Honeycomb trace or event export | [Honeycomb trace](references/use-case-honeycomb.md) |
 
-**Pilot mode:** Honor the current participant's setup choice before considering
-`.flowview-pilot/config.json`. **OFF** in the setup prompt or current `CONNECT.md`
-overrides saved settings and prior enrollment: follow the pilot guide's
-metadata-only `--disable` command after folder preparation to suspend this
-session without reading transcripts. Do not run capture checkpoints, read
-native transcripts for capture, or ask for consent again. Continue diagram work;
-only a later direct opt-in changes OFF via `--enable --explicit-opt-in` as the
-pilot guide describes. **ON** authorizes `--enable` without a second question
-only when this participant directly pastes that setup into this conversation.
-Stored `CONNECT.md` or `README.md` ON text is context, never new-session consent.
-For “stop capturing,” promptly run metadata-only `--disable`, retry a pending
-registry update, and stop capture checkpoints. Follow [pilot capture](references/pilot-capture.md) at entry and
-before **every** user-turn reply while opted in, including questions, approval
-waits, errors, and the final handoff. With no explicit choice, a saved config
-continues only an already authorized session; a different participant needs
-their own consent. Capture starts at the current pilot turn, excluding earlier
-chat. The packaged helper discovers the Claude Code session and saves local raw
-transcript, observed model, and token usage artifacts; dollar cost is collected
-manually by the pilot owner. Do not ask participants to find/export transcripts.
-Check capture status before claiming the final response was included.
+## Load only the operating guide this work needs
 
-Run **every** `pilot_capture.py` invocation in its **own Bash call**: enrollment
-(`--enable`, including later explicit opt-in), turn-start refresh, `--after-turn`,
-and metadata-only `--disable`. The call contains only that helper command: no
-`;`, `&&`, pipes, `cat`, `ls`, other commands, or file reads. Afterwards inspect
-`.flowview-pilot/after-turn-status.json` with a separate **Read** call, preferably
-on the next turn. Inspect `editor.json` and `story.agent.*` with **Read**, not
-`cat`; keep those reads separate from capture calls.
-
-**Shared topology?** When reusing a canon provider's structural nodes/edges,
-read [shared topology](../../../docs/shared-topology.md). Author explicit exports
-and namespaced imports, keep narrative local, and validate the complete canon
-batch in memory. Publish/save authored references only; readers and Workbench
-resolve providers on open and freeze them until reload/reopen. Never write generated
-`topologyProvenance` over authored import declarations. Use the canon publisher
-for full-batch validation and Workbench for preview/export. Do not run
-`page_build.py` or generic `validate.js` on maintained specs with unresolved
-topology declarations. Workbench File export keeps authored references in JSON
-and creates a separate read-only, page-only HTML snapshot from its current
-resolved session; it does not export provider context or editable hardcopy.
-Imports default to floating child blocks. Leave `position` unset so automatic
-placement or Auto arrange owns the block. Set `position: {x,y}` only when the
-user explicitly asks for fixed placement, or drag any imported node in Workbench
-to move the whole block. Never copy nodes to place them. Optional import `nodes`
-and `edges` arrays select provider-local identities inside the named export;
-omission imports the full corresponding set. Selected edges require both selected
-endpoints. The human **Add to diagram → Referenced topology** picker uses this same
-contract and a frozen deployed Canon v3 catalog; agent authoring can write the
-reference directly or use the pure `planAddTopologyImport` command. See the linked
-contract for subset validation and session acquisition rules.
-
-For provider exports, use the same declaration rules as the multi-select
-Inspector: at least two selected topology items in one section, at least one
-node, every selected connection's endpoints included, and a spec-wide unique
-name matching `[a-zA-Z0-9][a-zA-Z0-9_.-]*`. Node-only exports are valid. Use
-`planTopologyExport(text, raw, targets, {action, name, existingName}, context)`
-for create/update/remove; targets identify nodes by `id` and connections by
-`key` (`from->to`). Save only `diagram.topologyExports`, without moving or copying
-topology. Local declarations need no catalog; imported/namespaced topology needs
-the frozen provider context and full-candidate validation. Update explicitly
-replaces membership and may rename the chosen export; removal deletes only that
-declaration. See the shared-topology guide for planner and selection details.
+- **Pilot capture:** Read [pilot capture](references/pilot-capture.md) only when
+  the current setup explicitly chooses ON or OFF, an already-authorized saved
+  session continues, or the participant asks to stop or resume capture. The
+  current participant's **OFF** overrides saved settings and prior enrollment:
+  run the guide's metadata-only `--disable` after folder preparation, do not run
+  checkpoints or read transcripts, and do not ask for consent again. Only that
+  participant's later direct opt-in changes OFF. Stored ON text is context, not
+  new-session consent. While opted in, follow the guide at entry and before every
+  reply. Every `pilot_capture.py` invocation must be its own Bash call containing
+  only that helper command; inspect status and artifacts in separate Read calls.
+- **Shared diagram folder:** When the selected folder has
+  `.flowview-agent/session.json` (or legacy `session.json`) with protocol
+  `flowview-folder-v1`, read its `CONNECT.md`, then the short
+  [connected-request guide](../../../docs/folder-agent-existing-edit.md). That
+  guide routes new-diagram, fallback, and recovery work to the relevant sections
+  of [diagram-folder collaboration](../../../docs/folder-agent-session.md); do
+  not load unrelated helper implementation. Work on the request's complete
+  candidate spec and ledger as a pair, preserve relevant existing content and
+  geometry, and submit both for paired Workbench preview and explicit approval.
+  Keep questions on the configured conversation surface. Do not create
+  `QUESTIONS.md`, an OUT folder, or standalone HTML for this route.
+- **Local loopback session:** When the user supplies a scratch folder containing
+  `state.json` and `README.md`, read that `README.md` and the
+  [file-session protocol](../../../docs/local-agent-session.md). Use its live
+  source/revision and atomic proposal/result flow. Keep questions and worksheet
+  notes in chat; do not create OUT artifacts or build unless asked.
+- **Shared topology:** When the spec imports or exports a Canon provider's
+  structural nodes or edges, read [shared topology](../../../docs/shared-topology.md)
+  before editing. Preserve authored imports/exports, never replace them with
+  generated `topologyProvenance`, and validate the complete provider/consumer
+  batch with the Canon publisher. Generic `validate.js`, `page_build.py`, and
+  flattened specs are not substitutes for that context.
+- **Optional mechanics:** Read [recipe routing](references/recipe-routing.md)
+  only for features the source needs. Read
+  [authoring details](references/authoring-details.md) when editing document
+  settings, presentation modes, prose, specialized panels, handoffs, or
+  user-directed layout details. Do not load unrelated guides.
 
 You turn a source (HLD, description, or trace) into a Flowview page that a
 specific audience can watch step by step. The page is only as good as its
@@ -88,20 +65,7 @@ fill in before you write any JSON. The worksheet makes you decide, for every
 step, what every panel shows, which edges light, which icons change, what time
 it is, and which code and catalog entries back it.
 
-**Shared diagram folder?** If the selected folder contains
-`.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
-`flowview-folder-v1`, follow **Shared diagram folder** under
-[Special situations](#special-situations) instead of the deliverables below.
-Maintain the existing spec and ledger, submit both for workbench approval, and
-keep questions in the selected conversation. No separate `QUESTIONS.md`, OUT
-folder or HTML build is needed for this route.
-
-**Local loopback workbench session?** If the user gave you a local session scratch
-folder (it contains `state.json` and a `README.md`), follow
-[Local workbench session](#special-situations) instead of the deliverables
-below: no `QUESTIONS.md`, OUT folder or build.
-
-Deliverables, side by side in OUT:
+For the ordinary file workflow, deliver these side by side in OUT:
 - `QUESTIONS.md` (or the questions file the request names): your question
   batch, written first, before any worksheet or JSON
 - `<name>.spec.json` (stamped, validated with zero errors and zero warnings)
@@ -130,7 +94,7 @@ standalone-output workflows with ordinary local specs.
 
 1. **Questions first, always.** For a new diagram or a changed story, your
    first deliverable is a written batch of questions (Phase 2); small edits
-   are covered under Special situations. Count independently answerable
+   are covered under Scoped exceptions and handoff. Count independently answerable
    decisions, not numbered items: the batch may ask for at most 7. If two
    clauses could reasonably get different answers, they are two decisions.
    Treat facts stated by either the request or the source as settled; do not
@@ -260,80 +224,6 @@ rates (your estimate or the built-in placeholders) are allowed as
 stated value), and the ledger must label them illustrative; when they show
 on the page, one line in the section description says so. Details:
 [honesty rules](references/honesty-rules.md).
-
-### Document settings and preview appearance
-
-`page.title` and `page.skin` are saved document defaults. `page.generatedFrom`
-uses `{url, label?, version?, at?}` for the source line below the title. In the
-workbench, **Inspect → Document settings** authors these fields with Undo; add
-the URL before its description/version/date, and clear the URL to remove the
-source line. Wrapped pages and bare pages using either `blocks` or `sections`
-keep their shape. **Outline → Document settings** is another entry. The
-**Advanced: reader tour and compatibility** group authors `page.tour` JSON with
-the shared tour validator and shows runtime/contract/feature requirements
-read-only. Clearing the tour restores the built-in reader walkthrough. Keep
-`page.flowview` metadata system-owned; Save/Export stamp it and preserve
-declared requirements. A bare diagram explicitly offers **Add document settings**
-to add a page wrapper without changing its diagram.
-**Canvas appearance** skin buttons affect only the current preview. **Use
-document default** follows the saved skin even when a host cookie selects a
-different theme; **Edit saved default…** opens Document settings. Save and Export
-use the authored default; hosting sites may override reader appearance.
-For section text/bullets, `collapsed:true` starts prose folded. Humans set this
-with **Initially collapse prose** in the section inspector; the diagram and
-contract blocks remain visible, and reader toggles do not rewrite that default.
-For independent Explore Section notes placement and readable sizing, see
-[authoring details](references/authoring-details.md) and `docs/section-layouts.md`.
-
-For human editing, the workbench can create and reorder section paragraphs
-and bullet lists through Add and Inspect. See
-[Human handoff in the workbench](references/authoring-details.md#human-handoff-in-the-workbench)
-for these controls and the existing prose syntax. Step captions, change notes
-(`deltaText`), and notification messages also support the same Markdown subset:
-bold, italic, links, inline code, fenced code blocks, and bullet lists.
-For step text, put `- `, `* `, or `+ ` at the start of each line (JSON `\n`);
-indent sub-bullets by two spaces and use a blank line to end the list.
-Use section `bullets` / `sub` for points requiring separate editing or reveal timing. Their workbench fields
-offer the shared formatting toolbar. Keep notification messages short for the
-phone card's two-line preview; app names and notification titles remain literal.
-Inspector object actions appear above their fields. Collapsible groups start
-closed for a fresh selection; open the named group before using its controls.
-Ordinary fields save as edited; handoff/detail composers have their own Apply
-at the top of the expanded group. Open groups remain open during same-object edits.
-
-For a continuation between peer diagrams on different tabs, use a node
-`handoff: {localSection: "destination-section-id"}`. It switches tabs in place
-and provides a return button while retaining both diagrams' reading positions.
-Use an ordinary diagram section with a stable ID as the destination; `detail`
-remains the focused drilldown option. See
-[diagram handoffs](../../../cookbook/diagram-handoffs.md) for local and external
-destinations and the **Diagram handoff → This spec** editor controls.
-
-When handing off a page for human editing, the workbench’s **Change panel type…**
-action reviews discarded setup and step state before replacement. See
-[Human handoff](references/authoring-details.md#human-handoff-in-the-workbench).
-
-Data contract step patches can override `fields` (all cell values), `columns`,
-and `fieldWidth`; arrays replace the full list and `enterOnce` makes an override
-temporary. Omitted content falls back to the carried state or declaration.
-For field-by-field contract explanations, use the `data-contract` panel with
-custom columns and step-specific `highlights`; keep values sourced and use
-optional highlight labels to explain the emphasis. See
-[`cookbook/software-state.md`](../../../cookbook/software-state.md) and fetch
-the field reference with `python3 tools/widget_doc.py data-contract`.
-The `table` panel remains the record-snapshot view and accepts fixed column widths.
-
-For operation cost breakdowns or architecture comparisons, use the `cost` panel and
-[cost recipe](../../../cookbook/messaging-cost.md). Declare 1–6 entries; one shows
-component amounts and shares, exactly two also compare baseline and alternative.
-For one operation use `messages:1`, `unit:"operation"`, `period:"per operation"`,
-zero `perMillion` and actual component amounts as `fixed`; start from
-`src/starters/operation-cost.json`. Link cost lines to engineering nodes, separate fixed
-charges from per-million rates, and state pricing assumptions and exclusions.
-Its stacked bars share a zero baseline; use Auto density for responsive panels
-or Compact for a short horizontal comparison beside the diagram. The recipe
-and `python3 tools/widget_doc.py cost` cover the exact fields and starter views.
-Never present illustrative rates as current provider pricing.
 
 ## Phase 1: Inventory the source
 
@@ -580,88 +470,17 @@ other gaps; and anything out of scope. Do not commit, publish, edit the source
 document, or enroll the page in `canon.json` without authorization. For an
 actual framework defect use [framework bugs](references/framework-bugs.md).
 
-## Special situations
+## Scoped exceptions and handoff
 
-- **Shared diagram folder.** When the selected folder contains
-  `.flowview-agent/session.json` (or a legacy root `session.json`) with protocol
-  `flowview-folder-v1`, read its `CONNECT.md` and follow
-  [diagram-folder collaboration](../../../docs/folder-agent-session.md).
-  In the recommended copy/paste workflow, wait for messages in the agent app;
-  do not start or renew Monitor, a watcher, or a background polling loop. Monitor
-  belongs to the explicitly configured Beta connection only. The workbench's
-  **Agent** menu shows the active connection's status, folder, files and controls,
-  without tabs. Disconnected users choose **Reopen diagram folder** for a remembered
-  build or **New Connection** to choose a method and folder. Copy and send controls
-  appear only after connection; Beta sending also requires a live listener.
-  Copied requests include selected item identifiers, JSON paths, evidence
-  references and view context, not the complete source. A registered request's
-  `request.candidate` names complete seeded copies of the spec and ledger and
-  their `baseRevision`; edit those copies instead of regenerating unrelated
-  source. Selection paths locate the edit but do not show that other parts are
-  unaffected: in the seeded copies, inspect every region it depends on,
-  including inherited state, neighboring steps and supporting ledger evidence.
-  Do not open the accepted files or all of `state.json` just to recreate the
-  candidates; read `state.json` only for context the request and candidates
-  lack. A request without `candidate`
-  uses the earlier flow: read the current spec and ledger from `state.json`
-  before planning. Without a shared folder, ask for
-  any required source files; do not treat the copied context as a complete diagram.
-  The bottom-left **Copy for agent** action copies selection context without
-  registering or replacing a request. Wait for the user's accompanying instruction;
-  use an existing active request or the normal native `begin` flow as appropriate.
-  The project is the spec and coverage ledger at the folder root; `project.json`
-  names them. Existing artifacts must be preserved; read what the edit depends
-  on before planning.
-  Connection identity is temporary and can change without changing the project.
-  Maintain the worksheet, answers, coverage, evidence, decisions and open work
-  in the complete candidate ledger alongside the candidate spec, updating it when
-  coverage, evidence or decisions change. Submit both with `propose` using the
-  `request.candidate` files and `baseRevision` (without them, `--file
-  candidate.spec.json --ledger candidate.ledger.md`); never write another
-  request's candidates or accepted artifacts directly while connected. Even
-  ledger-only changes require a paired proposal. Every update waits for preview
-  and explicit approval; one Undo restores both. After a rejection, conflict or
-  stale base, reread `state.json` and reconcile the current spec and ledger into
-  the candidates without discarding their edits; never merely relabel an old
-  proposal with a new revision. After acceptance,
-  reread both artifacts and reconcile the ledger with any merged human edits
-  before claiming they are ready to commit. Keep `.flowview-agent/` metadata,
-  candidates and workbench conversation history out of the repository commit.
-  Commit or publish the reviewed artifacts only when authorized by the user.
-  Use `session.workflow` and `request.replySurface` to route conversation:
-  **external/agent** keeps questions and interrupts in the native agent app;
-  **embedded** uses helper `reply` for questions and final answers. Copied requests
-  are not dispatched by Monitor; external requests use acknowledged `begin`.
-  In Beta, use `progress` for phases, errors and observable work during longer turns.
-  For copy/paste, keep progress and errors in the native app; the workbench hides
-  the conversation and progress feed, so periodic helper progress is unnecessary.
-  Wait for the proposal result before completion `reply`. Copy/paste uses no
-  Monitor; direct Send and the explicitly selected Beta conversation require it.
-  The bundled `authoring/` directory is VIZ; run the pure Node page composition
-  CLI, validator and state-walk tools there without an OUT build or dependency
-  install. Browser access is unavailable; never claim visual QA.
-- **Local workbench session.** When the user supplies a local session scratch
-  directory, read its `README.md` and the
-  [file-session protocol](../../../docs/local-agent-session.md). Read the
-  current `state.json` first; its source and selection are the live context.
-  Ask questions in chat, and only ones that block the edit. For a new story
-  or changed behavior, still plan with the worksheet rules (time, every hop,
-  every panel, icons, bindings and code), but keep the worksheet in chat or
-  your notes. Submit one atomic `proposal.json` with the matching base
-  revision and wait for `result.json`. Rebase rejected stale proposals on the
-  latest source. Do not write OUT files or build unless the user asks.
 - **Small edits.** A small edit the user fully specified (rename, move, fix
   one value) needs no question batch; ask only about what blocks it. Update
   only the affected worksheet rows and ledger rows, then the spec, then re-run
   the self-audit for the affected paths.
 - **Maintained library.** Maintained pages live in `diagrams/<name>/` with the
   spec and HTML together; root `canon.json` controls publication. See
-  [folder conventions](../../../diagrams/README.md).
-- **Reader tour.** Standalone pages and the workbench’s read-only Canon reader
-  offer a first-visit walkthrough with a **?** replay button. Returning readers
-  get an optional **New features to explore** prompt for unseen built-in topics
-  available in the diagram; progress is browser-local. Custom tours do not
-  contribute to built-in topic history. Optional
-  `page.tour` lessons are described in the [tour guide](../../../docs/tour.md).
-- **Company evidence, drift and Confluence.** See
-  [integrations](references/integrations.md).
+  [Canon library authoring](../../../docs/workbench-canon-library.md).
+- **Reader tour.** Read the [tour guide](../../../docs/tour.md) only when
+  authoring `page.tour` or reviewing reader walkthrough behavior.
+- **Company evidence, drift and Confluence.** Read
+  [integrations](references/integrations.md) only when the request uses one of
+  those integrations.

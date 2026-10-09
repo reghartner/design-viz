@@ -32,8 +32,8 @@ const floats=p=>p.locator('.explore-window:visible');
 const rect=loc=>loc.boundingBox();
 const overlaps=(a,b)=>Math.min(a.x+a.width,b.x+b.width)-Math.max(a.x,b.x)>1 && Math.min(a.y+a.height,b.y+b.height)-Math.max(a.y,b.y)>1;
 const responsiveScale=width=>width<800?1:Math.round((.8+.2*Math.max(0,Math.min(1,(width-1280)/160)))*100)/100;
-test('Business remains standard; linked Explore has a full-height canvas and independent edge stack',async({page,server})=>{
- const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeHidden();
+test('Both Views retain page Explore mode, a full-height canvas and independent edge stack',async({page,server})=>{
+ const url=await build(server);await page.goto(url);await expect(page.locator('.explore-stage')).toBeVisible();
  await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  await expect(page.locator('.explore-stage')).toBeVisible();await expect(floats(page)).toHaveCount(5);
  const before=await page.locator('.boardcanvas>svg').count();
@@ -57,7 +57,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  // anchored to the bottom; graph pan and zoom still leave it stationary.
  const player=await rect(page.locator('.explore-player'));expect(player.y+player.height).toBeCloseTo(stage.y+stage.height-12,0);
  expect(await page.locator('.explore-player .stepline').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
  await page.getByRole('button',{name:'Fit diagram',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
@@ -190,7 +190,7 @@ test('fullscreen is explicit and refusal keeps an exit-able in-page view',async(
  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.viewport-status')).toContainText('unavailable');
  await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Hide panels',exact:true}).focus();await page.keyboard.press('Escape');await expect(page.locator('.explore-panel-menu')).not.toHaveAttribute('open','');await expect(page.locator('.explore-panel-menu summary')).toBeFocused();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).press('Escape');await expect(page.locator('.section-viewport')).not.toHaveClass(/viewport-expanded/);
- await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);await expect(page.locator('.explore-stage')).toBeHidden();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.section-viewport')).toHaveClass(/viewport-expanded/);await expect(page.locator('.explore-stage')).toBeVisible();
 });
 test('ordinary diagrams can expand without named views, with a bounded fallback',async({page,server})=>{
  const input=path.join(server.root,'plain-expand.json'),out=path.join(server.root,'plain-expand.html');

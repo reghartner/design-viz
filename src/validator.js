@@ -199,6 +199,7 @@ function sectionLayoutWarnings(d, path, warnings){
         if(!v.sectionLayout || !['default','backstage','confluence'].some(function(k){return Array.isArray(v.sectionLayout[k]);}))warnings.push(p+'.sectionLayout: declare at least one host profile');
         sectionLayoutProfileWarnings(d,v.sectionLayout,p,warnings);
         sectionExploreLayout(d,v.exploreLayout,warnings,p+'.exploreLayout');
+        sectionPathLabelWidth(v.pathLabelWidth,warnings,p+'.pathLabelWidth');
         var pathIds=Array.isArray(d.paths)?diagramPathList(d).map(function(path){return path.id;}):[],validPaths=true;
         if(v.paths!=null){
           validPaths=Array.isArray(v.paths) && v.paths.length && !v.paths.some(function(id,j){return typeof id!=='string' || pathIds.indexOf(id)<0 || v.paths.indexOf(id)!==j;});

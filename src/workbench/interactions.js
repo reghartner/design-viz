@@ -67,7 +67,7 @@ function createBuilderInteractions(opts){
     if(t.kind==='panel' && t.id){var panel=Array.from(secEl.querySelectorAll('.explore-canvas-objects [data-explore-panel]')).find(function(el){return el.getAttribute('data-explore-panel')===t.id;});if(panel)return panel;}
     if (t.kind === 'section') return secEl;
     if (t.kind === 'prose') return secEl.querySelector('[data-explore-content="prose"]') || secEl.querySelector('.sec-prose');
-    if (t.kind === 'step-controls') return secEl.querySelector('.explore-player[data-explore-layout="' + cssQuote(t.layoutId) + '"]');
+    if (t.kind === 'step-controls') return secEl.querySelector('.explore-player[data-explore-layout="' + cssQuote(t.layoutId) + '"]') || secEl.querySelector('.termbar');
     if (t.kind === 'step'){
       /* prefer the numbered coin; edgeless steps (or steps hidden by
          the current path/view) have no coin — fall back to their chip */
@@ -486,8 +486,8 @@ function createBuilderInteractions(opts){
     if (!secEl || !secEl.hasAttribute('data-dv-section')) return null;
     var gi = parseInt(secEl.getAttribute('data-dv-section'), 10);
     if (isNaN(gi)) return null;
-    var stepControls=ev.target.closest && ev.target.closest('.explore-player[data-explore-layout]');
-    if(stepControls && secEl.contains(stepControls))return {section:gi,kind:'step-controls',layoutId:stepControls.getAttribute('data-explore-layout'),el:stepControls};
+    var stepControls=ev.target.closest && ev.target.closest('.explore-player[data-explore-layout],.termbar');
+    if(stepControls && secEl.contains(stepControls))return {section:gi,kind:'step-controls',layoutId:stepControls.getAttribute('data-explore-layout') || secEl.getAttribute('data-view-id') || 'flow',el:stepControls};
     var el = ev.target.closest('[data-dv-node], [data-dv-edge], [data-dv-step], [data-dv-panel], [data-dv-bullet], [data-dv-bullet-path], [data-dv-para], [data-dv-crow], [data-dv-contract]');
     if (el && secEl.contains(el)){
       if (el.hasAttribute('data-dv-node'))

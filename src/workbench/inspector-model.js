@@ -190,8 +190,8 @@ var BUILDER_GUIDES = {
     ]
   },
   'step-controls': {
-    title: 'Step controls — Explore layout',
-    how: 'These settings belong to this named Explore view. Individual step content and behavior remain unchanged.',
+    title: 'Step controls',
+    how: 'Set path label width for this Chapter. Explore also offers placement and caption position.',
     fields: [
       ['Caption position', 'place the current step text below, above, left or right of the path controls']
     ]

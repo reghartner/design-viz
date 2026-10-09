@@ -647,3 +647,21 @@ test('App screens Starting state exposes explicit default, null and set modes',(
   const omit=aria(h.guide,'Starting screen assignment');omit.value='omit';omit.fire('change');h.flush();
   assert.deepEqual(JSON.parse(h.text).panels[0].initial,{date:'',futureTop:9});
 });
+
+test('path label width inspector is shared by Standard and Explore with exact undo and bounded edits',()=>{
+  for(const presentation of ['standard','explore']){
+    const e=environment(),spec={nodes:{a:{}},rows:[['a']],steps:[{id:'start',text:'Start'}],layouts:[{
+      id:'chapter',name:'Chapter',presentation,sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},
+      exploreLayout:{steps:{textPosition:'above'}}
+    }]};
+    const h=e.mount(spec);h.session.target={kind:'step-controls',section:0,layoutId:'chapter'};h.inspector.render();
+    let width=aria(h.guide,'Path label width');assert.equal(width.value,'230');
+    assert.equal(!!aria(h.guide,'Caption position'),presentation==='explore');
+    const before=h.text;width.value='300';width.fire('change');h.flush();const after=h.text;
+    assert.equal(JSON.parse(after).layouts[0].pathLabelWidth,300);
+    assert.deepEqual(JSON.parse(after).layouts[0].exploreLayout,spec.layouts[0].exploreLayout);
+    h.session.undo();assert.equal(h.text,before);h.session.redo();assert.equal(h.text,after);
+    h.inspector.render();width=aria(h.guide,'Path label width');width.value='1000';width.fire('change');assert.equal(h.text,after);
+    width.value='';width.fire('change');h.flush();assert.equal(JSON.parse(h.text).layouts[0].pathLabelWidth,undefined);
+  }
+});

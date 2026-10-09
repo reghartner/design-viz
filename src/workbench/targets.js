@@ -63,7 +63,7 @@ function builderTargetPath(raw, target){
   if (target.kind === 'step-controls'){
     var diagram=specValueAt(raw,d),layouts=diagram && diagram.layouts;
     var layoutIndex=Array.isArray(layouts)?layouts.findIndex(function(view){return view && view.id===target.layoutId;}):-1;
-    return layoutIndex>=0?d.concat(['layouts',layoutIndex]):null;
+    return layoutIndex>=0?d.concat(['layouts',layoutIndex]):!Array.isArray(layouts)?d:null;
   }
   if (target.kind === 'node') return d.concat(['nodes', target.id]);
   if (target.kind === 'group'){

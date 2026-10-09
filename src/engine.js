@@ -959,8 +959,12 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
          '</g>';
   });
   s += '</svg>';
-  el.innerHTML = s;
+  // The board canvas also hosts Explore panels and controls. Replace only
+  // this renderer's graph; clearing the host discards those live objects.
+  el.insertAdjacentHTML('afterbegin', s);
   var svg = el.firstChild;
+  if (el._boardSVG) el._boardSVG.remove();
+  el._boardSVG = svg;
   var nodeEls = {};
   Object.keys(d.nodes).forEach(function(id){
     var node = document.getElementById(prefix + '-n-' + id);

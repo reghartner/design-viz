@@ -50,12 +50,12 @@ body .docview .section-viewport .explore-window-body>.pwidget{box-sizing:border-
 .explore-stacked .explore-window-resize{right:auto;left:0;transform:scaleX(-1);cursor:nesw-resize;}
 .explore-window :focus-visible,.explore-panel-menu summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .explore-player{position:absolute;z-index:20;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);box-sizing:border-box;overflow:hidden;overscroll-behavior:contain;border:1px solid var(--explore-border);border-radius:12px;box-shadow:0 6px 22px #14244224;background:var(--explore-bg);}
-body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px)) minmax(0,1fr);gap:6px 12px;min-height:0;max-height:none;width:calc(100% / var(--explore-overlay-scale,1));height:calc(100% / var(--explore-overlay-scale,1));transform:scale(var(--explore-overlay-scale,1));transform-origin:top left;margin:0;border:0;border-radius:0;box-shadow:none;background:var(--explore-bg);padding:12px 14px 10px 20px;align-items:start;align-content:start;}
+body .docview .explore-player>.termbar{position:relative;box-sizing:border-box;display:grid;grid-template-columns:max-content minmax(0,1fr);grid-template-rows:minmax(34px,var(--explore-tracks-height,34px)) minmax(34px,1fr);gap:6px 12px;min-height:0;max-height:none;width:calc(100% / var(--explore-overlay-scale,1));height:calc(100% / var(--explore-overlay-scale,1));transform:scale(var(--explore-overlay-scale,1));transform-origin:top left;margin:0;border:0;border-radius:0;box-shadow:none;background:var(--explore-bg);padding:12px 14px 10px 20px;align-items:start;align-content:start;}
 .explore-player .step-transport{grid-column:1;grid-row:1;align-self:start;flex-wrap:nowrap;}
 .explore-player .schips{grid-column:2;grid-row:1;min-width:0;min-height:0;height:100%;overflow:auto;box-sizing:border-box;flex-wrap:nowrap;align-content:start;}
 .explore-player .schips>.schip{flex-shrink:0;}
 .explore-player .stepline{grid-column:1/span 2;grid-row:2;min-width:0;height:100%;max-height:100%;overflow:auto;margin:0;}
-body .docview .explore-player[data-step-text-position="above"]>.termbar{grid-template-rows:minmax(0,1fr) minmax(34px,var(--explore-tracks-height,34px));}
+body .docview .explore-player[data-step-text-position="above"]>.termbar{grid-template-rows:minmax(34px,1fr) minmax(34px,var(--explore-tracks-height,34px));}
 .explore-player[data-step-text-position="above"] .step-transport{grid-row:2;}
 .explore-player[data-step-text-position="above"] .schips{grid-row:2;}
 .explore-player[data-step-text-position="above"] .stepline{grid-row:1;}
@@ -177,18 +177,18 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 .explore-navigation .diagram-view-choice{order:initial;}
 .explore-player{display:flex;flex-direction:column;container-type:inline-size;}
 .explore-player>.playback-mode-rail{flex:none;}
-body .docview .explore-player>.termbar{flex:1;min-height:0;height:auto;}
+body .docview .explore-player>.termbar{flex:none;min-height:0;height:calc((100% - var(--explore-rail-height,0px)) / var(--explore-overlay-scale,1));overflow:auto;}
 @container(max-width:560px){
  body .docview .explore-player>.termbar{display:flex;flex-direction:column;gap:6px;padding:6px 10px;overflow:auto;}
  .explore-player .step-transport{flex-wrap:wrap;flex:none;}
- .explore-player .schips{flex:none;width:100%;min-height:34px;max-height:110px;}
+ .explore-player .schips{flex:none;width:100%;min-height:34px;max-height:var(--explore-tracks-height,34px);}
  .explore-player .stepline{flex:1;min-height:34px;width:100%;}
 }
 [popover]:not(:popover-open){display:none;}
 .explore-panel-body:popover-open,.explore-edge-legend:popover-open{color:var(--dtext);box-sizing:border-box;overflow:auto;}
 @container(max-width:560px){
  body .docview .explore-player>.termbar{flex-wrap:nowrap;}
- body .docview .explore-player .schips{flex:0 0 auto;height:auto;max-height:84px;}
+ body .docview .explore-player .schips{flex:0 0 auto;height:var(--explore-tracks-height,34px);max-height:none;}
  body .docview .explore-player .stepline{flex:1 0 34px;height:auto;max-height:none;}
 }
 /* Detached Standard controls share their authored tile with the mode switch. */

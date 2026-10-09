@@ -343,7 +343,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function constrain(w,r){
     if(canvasWindow(w))return {x:clamp(r.x,-10000,10000),y:clamp(r.y,-10000,10000),w:clamp(r.w,minimum(w),10000),h:clamp(r.h,72,10000)};
     var b=bounds(),scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
-    var minH=w===playerWindow?((parseFloat(player.style.getPropertyValue('--explore-tracks-height')) || 34)+58)*scale:32+40*scale;
+    var minH=w===playerWindow?Math.min(104*scale,Math.max(72,b.h-24)):32+40*scale;
     var maxW=w===playerWindow?b.w:b.w*scale,maxH=w===playerWindow?b.h*scale:32+(b.h-32)*scale;
     var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-24,maxH)));
     return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-12)),w:width,h:height};
@@ -385,6 +385,40 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(overflow>0)w.state.h=Math.min(logicalMax,w.state.h+overflow);
     // Pristine notes keep fitting fluid type through viewport changes.
     // Gestures and authored rectangles leave automatic sizing explicitly.
+  }
+  function fittedControlsRect(r,insets){
+    // Probe at the current width, including the narrow-container layout. Keep
+    // the content fit transient: authored geometry and its Undo history belong
+    // to gestures, not viewport/font/path changes.
+    apply(playerWindow,r);
+    if(!bar || bar.hidden)return r;
+    var chips=bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
+    var chipStyle=chips && getComputedStyle(chips),style=getComputedStyle(bar);
+    var tracks=timeline?Math.max(34,timeline.offsetHeight+(parseFloat(chipStyle.paddingTop)||0)+(parseFloat(chipStyle.paddingBottom)||0)):34;
+    var caption=bar.querySelector('.stepline:not(.dv-caption-old)'),captionHeight=34;
+    if(caption){
+      var oldHeight=caption.style.height,oldMax=caption.style.maxHeight;
+      caption.style.height='auto';caption.style.maxHeight='none';
+      captionHeight=Math.max(34,caption.scrollHeight);
+      caption.style.height=oldHeight;caption.style.maxHeight=oldMax;
+    }
+    var transport=bar.querySelector('.step-transport'),transportHeight=transport?transport.offsetHeight:34;
+    var compact=style.display==='flex',beside=!compact && /^(left|right)$/.test(player.getAttribute('data-step-text-position'));
+    var gap=parseFloat(style.rowGap)||0,padding=(parseFloat(style.paddingTop)||0)+(parseFloat(style.paddingBottom)||0);
+    var rail=player.querySelector('.playback-mode-rail'),railHeight=rail?rail.offsetHeight:0;
+    var scale=canvasWindow(playerWindow)?1:overlayScale();
+    var contentHeight=compact?transportHeight+tracks+captionHeight+gap*2:beside?Math.max(transportHeight,tracks,captionHeight):Math.max(transportHeight,tracks)+captionHeight+gap;
+    var room=Math.max(104,bounds().h-insets.top-insets.bottom);
+    r.h=Math.min(Math.max(r.h,railHeight+(contentHeight+padding)*scale+2),room);
+    player.style.setProperty('--explore-rail-height',railHeight+'px');
+    // Reserve a usable caption row even when the timeline needs scrolling.
+    var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
+    var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):tracks;
+    player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
+    // Authored positions use the normal stage boundary. Only automatic docks
+    // reserve the Workbench toolbar inset when paint anchors them below.
+    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-12));
+    return r;
   }
   function paint(){
     if(!active || retired)return;
@@ -429,20 +463,20 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(canvasWindow(w) && previous && ['x','y','w','h'].some(function(key){return Math.abs(previous[key]-r[key])>.01;}))canvasGeometryChanged=true;
       apply(w,r);
     });
-    var chips=bar && bar.querySelector('.schips'),timeline=chips && chips.querySelector('.path-timeline,.path-matrix');
-    var padding=chips?getComputedStyle(chips):null;
-    var tracks=timeline?Math.min(180,Math.max(34,timeline.offsetHeight+(parseFloat(padding.paddingTop)||0)+(parseFloat(padding.paddingBottom)||0))):34;
-    player.style.setProperty('--explore-tracks-height',tracks+'px');
-    var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
-    if(!controls){
-      var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
-      var height=Math.min((b.h-24)/contentScale,tracks+112+(Math.min(b.w-24,controlWidth*contentScale)<560?64:0));
-      controls=workbenchCanvas?{x:84,y:b.h-height*contentScale-insetBottom,w:controlWidth,h:height}:{x:12,y:b.h-height*contentScale-12,w:controlWidth,h:height};
-    }
-    playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
-    apply(playerWindow,constrain(playerWindow,scaledRect(playerWindow,controls)));
     player.hidden=!bar && !player.querySelector('.playback-mode-rail');
     player.classList.toggle('player-ambient',!!bar && bar.hidden);
+    var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
+    var automaticControls=!controls;
+    if(!controls){
+      var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
+      controls={x:workbenchCanvas?84:12,y:12,w:controlWidth,h:146};
+    }
+    playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
+    var previousControls=playerWindow.rect,r=constrain(playerWindow,scaledRect(playerWindow,controls));
+    r=fittedControlsRect(r,insets);
+    if(automaticControls)r.y=Math.max(12,b.h-r.h-insetBottom);
+    apply(playerWindow,r);
+    if(canvasWindow(playerWindow) && previousControls && Math.abs(previousControls.h-r.h)>.01)canvasGeometryChanged=true;
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));
     summary.textContent='Panels · '+windows.filter(visible).length;
     if(boundsChanged){lastWidth=b.w;lastHeight=b.h;sizeGraph(false);if(priorCamera)positionCamera(priorCamera);}
@@ -510,7 +544,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(canvasWindow(g.w)){dx/=graphScale();dy/=graphScale();}
     var sizing=canvasSizing(g.w);
     if(g.kind==='move'){
-      var moved=scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true);if(sizing)moved.h=g.before.h;
+      var moved=scaledRect(g.w,constrain(g.w,{x:g.rect.x+dx,y:g.rect.y+dy,w:g.rect.w,h:g.rect.h}),true);if(sizing || g.w===playerWindow && !g.automatic)moved.h=g.before.h;
       Object.assign(g.w.state,moved,{stacked:false});
     }
     else if(sizing && sizing.resizeAxis==='width'){
@@ -534,7 +568,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+delta,h:r.h}),true));
     }else if(kind==='resize')Object.assign(w.state,scaledRect(w,constrain(w,{x:r.x,y:r.y,w:r.w+dir[0]*n,h:r.h+dir[1]*n}),true));
     else{
-      var moved=scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true);if(sizing)moved.h=before.h;
+      var moved=scaledRect(w,constrain(w,{x:r.x+dir[0]*n,y:r.y+dir[1]*n,w:r.w,h:r.h}),true);if(sizing || w===playerWindow && !automatic)moved.h=before.h;
       Object.assign(w.state,moved,{stacked:false});
     }
     paint();
@@ -622,7 +656,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     mountWindows();
     if(visibilityObserver && bar)visibilityObserver.observe(bar,{attributes:true,attributeFilter:['hidden']});
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
-    if(tracksObserver && bar)tracksObserver.observe(bar.querySelector('.schips'),{childList:true,subtree:true});
+    if(tracksObserver && bar)tracksObserver.observe(bar,{childList:true,subtree:true,characterData:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
     lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
     // A reader view can enter at page size before becoming full-browser. Restore the

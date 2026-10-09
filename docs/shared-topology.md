@@ -255,8 +255,14 @@ edits against the same frozen provider sources. Broken references are rejected
 before builder transactions write source or add Undo. Raw invalid text remains
 repairable while the last valid preview stays visible.
 
-Consumer narrative and local node-to-imported-node edges remain editable. Edit
-shared structure in the provider; drag any imported node to place its whole block.
+Consumer narrative and consumer-owned connections remain editable, including
+connections from or to imported nodes and between imported nodes. Alt/Option-click
+a source node (or choose **Connect from this node** in its Inspector), then click
+the destination. The connection Inspector’s **from** and **to** lists include
+imported nodes; changing an endpoint also retargets the consumer’s story references
+in the same Undo action. Only the consumer connection is saved. Provider-owned
+connections remain read-only. Edit shared structure in the provider; drag any
+imported node to place its whole block.
 Workbench draws a light labeled boundary around each direct and nested referenced
 set; this editor-only cue is not persisted or shown on published pages. Selecting
 any imported node, connection, or group exposes **Remove referenced topology**.

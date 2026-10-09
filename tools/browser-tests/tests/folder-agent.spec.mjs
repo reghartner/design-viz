@@ -1,4 +1,4 @@
-import {canvasTools} from '../helpers/test.mjs';
+import {canvasTools,closeTools} from '../helpers/test.mjs';
 import {test,expect} from '@playwright/test';
 import {chooseAddDestination} from '../helpers/test.mjs';
 import {readFile,writeFile,mkdir,mkdtemp,rm,stat,rename,readdir} from 'node:fs/promises';
@@ -92,15 +92,48 @@ async function connectExternal(page){
   await page.locator('#folder-agent-setup-mode-external').click();await page.locator('#folder-agent-connect').click();
   await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);
 }
-async function topologyFolderFixture(page){
+async function topologyFolderFixture(page,connections=false){
   const h=await setup(page),{digest}=await import('../../../tools/canon/drift.mjs');
   const provider={page:{title:'Approved provider',canon:{version:1,id:'provider',kind:'canonical',owner:'group:default/test'},sections:[{diagram:{nodes:{api:{title:'Frozen provider API'}},rows:[['api']],topologyExports:{public:{nodes:['api'],edges:[]}}}}]}};
   const consumer={page:{title:'Imported story',canon:{version:1,id:'consumer',kind:'design',owner:'group:default/test'},sections:[{diagram:{nodes:{local:{title:'Local'}},rows:[['local']],topologyImports:[{spec:'provider',export:'public',as:'shared'}]}}]}};
+  if(connections){
+    const p=provider.page.sections[0].diagram,c=consumer.page.sections[0].diagram;
+    p.nodes.store={title:'Frozen store'};p.rows[0].push('store');p.edges=[{from:'api',to:'store'}];p.topologyExports.public={nodes:['api','store'],edges:['api->store']};
+    c.edges=[{from:'local',to:'shared::api'}];c.steps=[{edge:'local->shared::api'},{edge:'shared::api->shared::store'}];
+  }
   const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:1,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))},hits=[];
   await page.route('**/diagrams.json',route=>{hits.push('catalog');return route.fulfill({json:catalog});});
   for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>{hits.push(spec.page.canon.id);return route.fulfill({json:spec});});
   return Object.assign(h,{provider,consumer,catalog,hits});
 }
+
+test('folder imports preserve saved cross and provider edges through manual rewire and resume',async({page},info)=>{
+  const h=await topologyFolderFixture(page,true);
+  async function edges(){
+    await expect(page.locator('#docview path.edge')).toHaveCount(2);
+    for(const e of await page.locator('#docview path.edge').all()){
+      expect(await e.evaluate(el=>el.getTotalLength())).toBeGreaterThan(1);
+      await expect(e).toHaveCSS('visibility','visible');expect(Number(await e.evaluate(el=>getComputedStyle(el).opacity))).toBeGreaterThan(0);
+    }
+  }
+  try{
+    const text=JSON.stringify(h.consumer,null,2);await writeFile(path.join(h.folder,'story.spec.json'),text);
+    await page.locator('#welcome-agent').click();await page.locator('#folder-agent-start-adopt').click();await page.locator('#folder-agent-connect').click();
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await edges();
+    await page.locator('#docview path.edge[data-dv-edge="0"]').dispatchEvent('click');await page.locator('#editor-tab-inspect').click();
+    await page.getByRole('combobox',{name:'to',exact:true}).selectOption('shared::store');
+    await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.edges[0].to).toBe('shared::store');
+    const after=await page.locator('#src').inputValue();await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await edges();
+    await expect.poll(async()=>await readFile(path.join(h.folder,'story.spec.json'),'utf8')).toBe(after);
+    expect(after).not.toContain('topologyProvenance');expect(Object.keys(JSON.parse(after).page.sections[0].diagram.nodes)).toEqual(['local']);
+    await closeTools(page);await page.screenshot({path:info.outputPath('folder-import-edges.png')});
+    await openAgent(page);await disconnect(page);await expect.poll(async()=>(await h.read('editor.json')).connected).toBe(false);
+    await page.reload();await openAgent(page);await resumeFolder(page);
+    await expect(page.locator('#folder-agent-copy')).toBeEnabled();await closeGuide(page);await edges();await expect(page.locator('#src')).toHaveValue(after);
+    expect(h.errors).toEqual([]);
+  }finally{await page.close();await h.cleanup();}
+});
 
 for(const entry of ['welcome','editor'])test('Open file loads authored topology from '+entry+' and connects its folder',async({page})=>{
   const h=await topologyFolderFixture(page);

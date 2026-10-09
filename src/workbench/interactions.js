@@ -780,7 +780,7 @@ function createBuilderInteractions(opts){
       if(typeof connect.section==='number' && target.section!==connect.section){
         connectStatus('connect: choose a SOURCE node in section '+(connect.section+1)+' (Esc cancels)');return;
       }
-      var got=builderDiagram(session.text(),parsed.raw,target.section);
+      var got=builderDiagram(session.text(),session.resolve?session.resolve(parsed.raw):parsed.raw,target.section);
       if(got.error || !got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,target.id)){cancelConnect('Source node no longer exists');return;}
       connect.stage=2;connect.section=target.section;connect.fromId=target.id;
       setSelected(target.el);

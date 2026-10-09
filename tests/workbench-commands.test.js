@@ -1028,3 +1028,35 @@ test('document tour uses the shared validator and keeps publication metadata int
   assert.deepEqual(JSON.parse(result.text).page.tour,tour);assert.deepEqual(JSON.parse(result.text).page.flowview,raw.page.flowview);
   assert.equal(JSON.parse(B.planDocumentSetting(result.text,JSON.parse(result.text),'tour',null).text).page.tour,undefined);
 });
+
+test('imported endpoints resolve references while graph plans write only the authored consumer',()=>{
+  const C=require('../tools/canon/core.cjs');
+  const model=(id,diagram)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{diagram}]}});
+  const provider=model('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
+  const d={nodes:{local:{},other:{}},rows:[['local','other']],topologyImports:[{spec:'provider',export:'core',as:'shared'}],edges:[{from:'local',to:'shared::api'}],steps:[{edge:'local->shared::api'},{edges:['local->shared::api','shared::api->shared::store'],failures:{'local->shared::api':'blocked'}}]};
+  const consumer=model('consumer',d),snapshot=JSON.stringify([provider,consumer]);
+  const resolved=C.materializeTopology([provider,consumer])[1];
+  for(const wrap of [v=>v,v=>v.page,v=>v.page.sections[0].diagram,v=>({page:{blocks:[{tabs:[{sections:v.page.sections}]}]}})]){
+    const raw=wrap(consumer),reference=wrap(resolved),text=JSON.stringify(raw,null,3)+'\n';
+    for(const [field,id] of [['to','shared::store'],['from','shared::store'],['to','other']]){
+      const plan=B.planSetEdgeEndpoint(text,raw,0,0,field,id,reference);assert.ok(!plan.error,plan.error);
+      const out=B.builderDiagram(plan.text,JSON.parse(plan.text),0).d,key=out.edges[0].from+'->'+out.edges[0].to;
+      assert.equal(out.edges.length,1);assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.topologyImports,d.topologyImports);
+      assert.equal(out.steps[0].edge,key);assert.equal(out.steps[1].edges[0],key);assert.equal(out.steps[1].failures[key],'blocked');
+      assert.equal(out.steps[1].edges[1],'shared::api->shared::store');assert.equal(out.topologyProvenance,undefined);
+    }
+    for(const pair of [['other','shared::api'],['shared::api','other'],['shared::store','shared::api']]){
+      const plan=B.planAddEdgeBetween(text,raw,0,...pair,reference);assert.ok(!plan.error,plan.error);
+      const out=B.builderDiagram(plan.text,JSON.parse(plan.text),0).d;
+      assert.equal(out.edges.length,2);assert.equal(out.edges[1].from,pair[0]);assert.equal(out.edges[1].to,pair[1]);assert.deepEqual(out.nodes,d.nodes);
+    }
+    assert.match(B.planSetEdgeEndpoint(text,raw,0,0,'to','shared::missing',reference).error,/unknown node/);
+    assert.match(B.planSetEdgeEndpoint(text,raw,0,1,'to','other',reference).error,/not found/);
+    assert.match(B.planSetEdgeEndpoint(text,raw,0,0,'label','other',reference).error,/endpoint/);
+    assert.match(B.planAddEdgeBetween(text,raw,0,'shared::api','shared::store',reference).error,/already exists/);
+    assert.match(B.planAddEdgeBetween(text,raw,0,'shared::api','shared::api',reference).error,/same node/);
+    assert.match(B.planAddEdgeBetween(text,raw,0,'shared::missing','other',reference).error,/unknown node/);
+    assert.match(B.planSetEdgeEndpoint(text,raw,0,0,'to','shared::api').error,/unknown node/);
+  }
+  assert.equal(JSON.stringify([provider,consumer]),snapshot);
+});

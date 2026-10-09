@@ -1,10 +1,11 @@
-/* Workbench-only Explore gestures. Viewer panels and graph nodes share authored
-   selection; this owner keeps all menus, capture and marquee DOM transient. */
+/* Workbench-only diagram gestures. Standard and Explore graph nodes share
+   authored selection; Explore also contributes canvas panels and controls. This
+   owner keeps all menus, capture and marquee DOM transient. */
 function createBuilderSpatialSelection(opts){
   var life=createWorkbenchLifetime(),doc=opts.document,win=opts.window,view=opts.view,menu=null,menuLife=null,opener=null,marquee=null,swallow=false,focusNodes=[],nudge=null,status=null;
   var fitButton=doc.getElementById?doc.getElementById('workspace-fit-selection'):null;
   function active(){return !opts.isActive || opts.isActive();}
-  function surface(el){return el && el.closest && el.closest('.viewport-explore');}
+  function surface(el){return el && el.closest && el.closest('.section-viewport');}
   function snapshot(){var s=opts.session.snapshot();return !s.error && (s.renderedText==null || s.renderedText===s.text)?s:null;}
   function target(el){
     var shell=surface(el),sec=shell && shell.closest('.doc-sec');if(!sec || el.closest('[data-dv-detail-preview]'))return null;
@@ -27,7 +28,7 @@ function createBuilderSpatialSelection(opts){
     // identity and before welcome reveals the editor. Mutation still uses the
     // stricter snapshot()/active() checks when the menu is actually invoked.
     var s=opts.session.snapshot();if(s.error)return;
-    Array.from(view.querySelectorAll('.viewport-explore .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel],.viewport-explore .explore-canvas-objects .explore-player')).forEach(function(el){
+    Array.from(view.querySelectorAll('.section-viewport .boardcanvas g.node[data-dv-node],.viewport-explore .explore-canvas-objects [data-explore-panel],.viewport-explore .explore-canvas-objects .explore-player')).forEach(function(el){
       var section=el.closest('.doc-sec'),controls=el.classList.contains('explore-player'),panel=el.hasAttribute('data-explore-panel'),id=el.getAttribute(panel?'data-explore-panel':'data-dv-node');
       if(!section || el.closest('[data-dv-detail-preview]'))return;
       var got=builderDiagram(s.text,s.raw,Number(section.getAttribute('data-dv-section')));
@@ -58,21 +59,23 @@ function createBuilderSpatialSelection(opts){
     var geometry=rects(targets,shell);if(geometry.length!==targets.length || geometry.some(function(r){return !r || r.w<=0 || r.h<=0;}))return null;
     return {targets:targets,shell:shell,s:s,id:layoutId(shell),geometry:geometry};
   }
+  function fitReason(c){return !c?'Select visible nodes, canvas panels or canvas step controls to fit.':c.shell.classList.contains('viewport-explore')?null:'Fit selection is available only in Explore.';}
   function fitSelection(){
-    var c=context();if(!active() || !c)return;
+    var c=context();if(!active() || fitReason(c))return;
     var rs=c.geometry,x=Math.min.apply(null,rs.map(function(r){return r.x;})),y=Math.min.apply(null,rs.map(function(r){return r.y;}));
     view.dispatchEvent(new win.CustomEvent('workbench-fit-selection',{detail:{x:x,y:y,w:Math.max.apply(null,rs.map(function(r){return r.x+r.w;}))-x,h:Math.max.apply(null,rs.map(function(r){return r.y+r.h;}))-y}}));
   }
-  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null;fitButton.disabled=!c;fitButton.title=c?'Frame selected canvas objects':'Select visible nodes, canvas panels or canvas step controls to fit.';}}
+  function sync(){if(status){status.remove();status=null;}if(fitButton){var c=life.alive()?context():null,reason=fitReason(c);fitButton.disabled=!!reason;fitButton.title=reason || 'Frame selected canvas objects';}}
   function distribute(direction){var c=context();if(!active() || !c)return;opts.apply(planDistributeSpatial(c.s.text,c.s.raw,c.targets,c.id,direction,c.geometry),null,c.s);}
   function actions(host,lifetime){
     var c=context();sync();if(!c)return;
     var box=doc.createElement('div');box.className='iactions dv-spatial-actions';host.appendChild(box);
     var fit=doc.createElement('button');fit.type='button';fit.className='bbtn';fit.textContent='Fit selection';box.appendChild(fit);lifetime.listen(fit,'click',fitSelection);
+    if(!c.shell.classList.contains('viewport-explore')){fit.disabled=true;fit.title=fitReason(c);return;}
     var entries=[];
     ['horizontal','vertical'].forEach(function(direction){var button=doc.createElement('button');button.type='button';button.className='bbtn';button.textContent='Distribute '+(direction==='horizontal'?'horizontally':'vertically');box.appendChild(button);entries.push({button:button,direction:direction});lifetime.listen(button,'click',function(){distribute(direction);});});
     var note=doc.createElement('p');note.className='fnote';box.appendChild(note);
-    function update(){var current=context(),reasons=[];fit.disabled=!current;entries.forEach(function(entry){var reason=current?planDistributeSpatial(current.s.text,current.s.raw,current.targets,current.id,entry.direction,current.geometry).error:'Render and select the objects again.';entry.button.disabled=!!reason;entry.button.title=reason || 'Keep outer bounds and equalize visual gaps.';if(reason && reasons.indexOf(reason)<0)reasons.push(reason);});note.textContent='Tab to an object; Enter selects, Shift+Enter adds or removes. Arrows move 10 graph units; Shift+arrows move 50. Release arrows for one Undo action. '+reasons.join(' ');}
+    function update(){var current=context(),reasons=[],fitError=fitReason(current);fit.disabled=!!fitError;fit.title=fitError || 'Frame selected canvas objects';if(fitError)reasons.push(fitError);entries.forEach(function(entry){var reason=current?planDistributeSpatial(current.s.text,current.s.raw,current.targets,current.id,entry.direction,current.geometry).error:'Render and select the objects again.';entry.button.disabled=!!reason;entry.button.title=reason || 'Keep outer bounds and equalize visual gaps.';if(reason && reasons.indexOf(reason)<0)reasons.push(reason);});note.textContent='Tab to an object; Enter selects, Shift+Enter adds or removes. Arrows move 10 graph units; Shift+arrows move 50. Release arrows for one Undo action. '+reasons.join(' ');}
     update();lifetime.listen(opts.src,'input',update);
   }
   function announce(message,shell){if(status)status.remove();status=doc.createElement('div');status.className='dv-spatial-status';status.setAttribute('role','status');status.textContent=message;shell.appendChild(status);}
@@ -109,6 +112,11 @@ function createBuilderSpatialSelection(opts){
   life.listen(doc,'pointerdown',cancelNudge,true);
   life.listen(doc,'focusin',function(ev){if(nudge && ev.target!==nudge.focus.el)cancelNudge();},true);
   function open(ev){
+    /* Renderer-owned node references keep their established whole-node
+       right-click entry. Keyboard focus on the node still opens actions, while
+       the dedicated references trigger owns its own keyboard menu. */
+    var referenced=ev.type==='contextmenu' && ev.target.closest && ev.target.closest('.node[data-dv-node]');
+    if(referenced && referenced.querySelector('.nrefs-trigger'))return;
     if(!active() || opts.busy())return;var t=target(ev.target);if(!t)return;
     ev.preventDefault();ev.stopPropagation();close(false);cancel();cancelNudge();
     var targets=currentTargets();if(!targets.some(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);})) {opts.select([t]);targets=currentTargets();}
@@ -127,7 +135,7 @@ function createBuilderSpatialSelection(opts){
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},spatial?null:'Duplicate supports nodes and canvas panels.');
     ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){opts.apply(planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex),null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
-    item('Fit selection',fitSelection,context()?null:'Select visible nodes, canvas panels or canvas step controls to fit.');
+    item('Fit selection',fitSelection,fitReason(context()));
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;
     menu.style.left=Math.max(8,bounds.left,Math.min(x,Math.min(win.innerWidth,bounds.right)-r.width-8))+'px';menu.style.top=Math.max(8,bounds.top,Math.min(y,Math.min(win.innerHeight,bounds.bottom)-r.height-8))+'px';
     var items=Array.from(menu.querySelectorAll('button'));items[0].tabIndex=0;items[0].focus({preventScroll:true});
@@ -140,13 +148,13 @@ function createBuilderSpatialSelection(opts){
     menuLife.listen(doc,'pointerdown',function(e){if(menu && !menu.contains(e.target))close(false);},true);
     menuLife.listen(doc,'focusin',function(e){if(menu && !menu.contains(e.target))close(false);});
     menuLife.listen(win,'resize',function(){close(false);});
-    var board=shell.querySelector('.explore-board'),scrollLeft=board && board.scrollLeft,scrollTop=board && board.scrollTop;
+    var board=shell.querySelector('.board'),scrollLeft=board && board.scrollLeft,scrollTop=board && board.scrollTop;
     menuLife.listen(shell,'scroll',function(e){if(e.target===board && (board.scrollLeft!==scrollLeft || board.scrollTop!==scrollTop))close(false);},true);
   }
   life.listen(view,'contextmenu',open,true);
   life.listen(view,'pointerdown',function(ev){
     if(!active() || opts.busy() || ev.button!==0 || !ev.altKey || ev.ctrlKey || ev.metaKey || ev.shiftKey)return;
-    var board=ev.target.closest('.explore-board'),shell=surface(ev.target);if(!board || !shell || !snapshot())return;
+    var board=ev.target.closest('.board'),shell=surface(ev.target);if(!board || !shell || !snapshot())return;
     if(ev.target.closest('.explore-window,.explore-player,.explore-tools,a,button,input,select,textarea,[contenteditable],[role="button"],[data-dv-node],[data-dv-edge],[data-dv-step],[data-dv-group],[data-dv-row]'))return;
     ev.preventDefault();ev.stopImmediatePropagation();close(false);marquee={board:board,shell:shell,id:ev.pointerId,x:ev.clientX,y:ev.clientY,text:opts.session.text()};board.setPointerCapture(ev.pointerId);
   },true);

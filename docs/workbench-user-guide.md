@@ -53,9 +53,11 @@ Choose a chapter to jump within the guide. **Close** or Escape returns to your
 previous work. Reading does not change the spec, selection, undo history, or
 welcome navigation. Browser Find and normal text copying remain available.
 
-Workbench Explore supports Alt/Option-drag marquee selection of nodes and
-on-canvas panels, plus a shared right-click action menu. The Nodes & connections
-chapter explains mixed selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap distribution, Fit selection, Free placement, and Undo.
+Workbench Standard and Explore views support Alt/Option-drag marquee selection
+of nodes and a shared right-click action menu. Explore also includes on-canvas
+panels and step controls. The Nodes & connections chapter explains mixed
+selection, keyboard focus and graph-unit nudging, alignment centers, equal-gap
+distribution, Fit selection, Free placement, and Undo.
 
 In Explore, **Panels → Placement for Section notes** chooses **Floating** or
 **On canvas** independently of other panels and step controls. Notes retain a

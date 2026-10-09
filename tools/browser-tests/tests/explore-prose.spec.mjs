@@ -168,7 +168,7 @@ for(const skin of ['aurora','daylight','pastel','editorial','terminal','blueprin
     if(surface==='reader')await page.goto(await build(server,raw,'notes-'+skin));
     else{await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);}
     await expect(notes(page)).toBeVisible();await page.evaluate(()=>document.fonts.ready);
-    for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');
+    for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','18px');
     const contrast=await notes(page).evaluate(el=>{
       function luminance(color){const rgb=color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>{v/=255;return v<=.04045?v/12.92:((v+.055)/1.055)**2.4;});return rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722;}
       const bg=luminance(getComputedStyle(el).backgroundColor);
@@ -229,14 +229,14 @@ test('notes placement and both geometries save, undo, redo and reopen independen
 for(const width of [1280,1440,1920])test('notes remain readable and independently sized at '+width+'px',async({page,server},info)=>{
  await page.setViewportSize({width,height:1000});const raw=fixture('explore');delete raw.page.sections[0].diagram.layouts[1].exploreLayout.prose;
  await page.goto(await build(server,raw,'readable-notes-'+width));await page.evaluate(()=>document.fonts.ready);
- for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');const before=await notes(page).boundingBox();
+ for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','18px');const before=await notes(page).boundingBox();
  await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect(await notes(page).boundingBox()).toEqual(before);
  expect(await notes(page).locator('.explore-window-body').evaluate(el=>({overflow:el.scrollHeight-el.clientHeight,scale:getComputedStyle(el).transform}))).toEqual({overflow:0,scale:'matrix(1, 0, 0, 1, 0, 0)'});
  await page.screenshot({path:info.outputPath('section-notes-'+width+'.png')});
  await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');await page.getByRole('button',{name:'Fit canvas',exact:true}).click();
  await expect(notes(page)).toBeInViewport();
- const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
- expect(metrics.font).toBeGreaterThanOrEqual(19);expect(metrics.font).toBeLessThanOrEqual(22);expect(metrics.overflow).toBeLessThanOrEqual(1);
+ const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),logicalFont:parseFloat(getComputedStyle(texts[0]).fontSize),scale,overflow:body.scrollHeight-body.clientHeight};});
+ expect(metrics.logicalFont).toBe(18);expect(metrics.font).toBeCloseTo(18*metrics.scale,2);expect(metrics.overflow).toBeLessThanOrEqual(1);
  await info.attach('canvas-notes-rendered-size-'+width,{body:JSON.stringify(metrics),contentType:'application/json'});
  await page.screenshot({path:info.outputPath('section-notes-canvas-'+width+'.png')});
  await page.locator('.explore-panel-menu summary').click();
@@ -249,12 +249,18 @@ for(const width of [1280,1440,1920])test('notes remain readable and independentl
 
 async function notesGeometry(page){return notes(page).evaluate(el=>({x:parseFloat(el.style.getPropertyValue('--float-x')),y:parseFloat(el.style.getPropertyValue('--float-y')),w:parseFloat(el.style.getPropertyValue('--float-w')),h:parseFloat(el.style.getPropertyValue('--float-h'))}));}
 async function notesOverflow(page){return notes(page).locator('.explore-window-body').evaluate(el=>el.scrollHeight-el.clientHeight);}
+test('standalone initial Fit keeps pristine canvas notes visible on desktop resize',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(await build(server,raw,'standalone-notes-resize'));await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ const wide=await notesGeometry(page);await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);await expect(notes(page)).toBeInViewport();
+});
 for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live desktop resize until '+gesture.toLowerCase(),async({page,server},info)=>{
  await page.setViewportSize({width:1920,height:1000});const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
  await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);
  const wide=await notesGeometry(page);expect(await notesOverflow(page)).toBe(0);
- await page.setViewportSize({width:1280,height:1000});await expect.poll(async()=>(await notesGeometry(page)).h).toBeGreaterThan(wide.h);await expect.poll(()=>notesOverflow(page)).toBe(0);
- await page.getByRole('button',{name:'Fit canvas',exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
+ // Explore uses fixed 18px notes text, so width and intrinsic height stay stable across desktop widths.
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);await expect.poll(()=>notesOverflow(page)).toBe(0);await expect(notes(page)).toBeInViewport();
+ await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);expect(await notesOverflow(page)).toBe(0);
  await notes(page).focus();await notes(page).getByRole('button',{name:gesture+' Section notes; use arrow keys',exact:true}).press('ArrowRight');const manual=await notesGeometry(page);expect(manual).not.toEqual(wide);
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(manual);
@@ -270,4 +276,25 @@ test('saved and newly authored canvas notes retain their rectangle on live brows
  expect(await notesGeometry(page)).toEqual(saved);
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(saved);await expect(page.locator('#src')).toHaveValue(savedText);
+});
+
+test('pristine Workbench canvas notes preserve live camera navigation on resize',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ const board=page.locator('.explore-board');
+ const camera=()=>board.evaluate(el=>{const width=parseFloat(el.style.getPropertyValue('--explore-width')),margin=parseFloat(el.style.getPropertyValue('--explore-margin-x'));return {zoom:width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width,x:(el.scrollLeft+el.clientWidth/2-margin)/width};});
+ await page.getByRole('button',{name:'Zoom canvas in',exact:true}).click();
+ const beforePan=await camera(),area=await board.boundingBox();await page.mouse.move(area.x+area.width*.45,area.y+area.height*.5);await page.mouse.down();await page.mouse.move(area.x+area.width*.45+120,area.y+area.height*.5,{steps:6});await page.mouse.up();
+ const navigated=await camera();expect(navigated.x).not.toBeCloseTo(beforePan.x,2);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(camera).toEqual(expect.objectContaining({zoom:navigated.zoom}));
+ expect((await camera()).x).toBeCloseTo(navigated.x,2);
+});
+
+test('Workbench Fit selection keeps its camera framing on resize with pristine notes',async({page,server})=>{
+ const raw=fixture('explore');raw.page.sections[0].diagram.layouts[1].exploreLayout.prosePlacement='canvas';
+ await page.setViewportSize({width:1920,height:1000});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
+ const board=page.locator('.explore-board'),camera=()=>board.evaluate(el=>{const width=parseFloat(el.style.getPropertyValue('--explore-width')),margin=parseFloat(el.style.getPropertyValue('--explore-margin-x'));return {zoom:width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width,x:(el.scrollLeft+el.clientWidth/2-margin)/width};});
+ const beforeFit=await camera(),node=page.locator('.explore-canvas [data-dv-node="camera"]');await node.focus();await node.press('Enter');await expect(page.locator('#workspace-fit-selection')).toBeEnabled();
+ await page.locator('#workspace-fit-selection').click();const fitted=await camera();expect(fitted.zoom).not.toBeCloseTo(beforeFit.zoom,2);
+ await page.setViewportSize({width:1280,height:1000});await expect.poll(camera).toEqual(expect.objectContaining({zoom:fitted.zoom}));expect((await camera()).x).toBeCloseTo(fitted.x,2);
 });

@@ -452,6 +452,18 @@ function planSectionPathLabelWidth(text,raw,section,layoutId,value){
   });
   if(!plan.error)plan.layoutId=selected;return plan;
 }
+function planSectionExploreTextScale(text,raw,section,layoutId,surface,value){
+  var got=builderDiagram(text,raw,section);if(got.error)return got;
+  if(['prose','controls'].indexOf(surface)<0)return {error:'Choose Section notes or step controls.'};
+  var view=(got.d.layouts || []).find(function(v){return v && v.id===layoutId;});
+  if(!view || view.presentation!=='explore')return {error:'Select an Explore chapter before changing text size.'};
+  var warnings=[];if(value!==null)sectionExploreTextScale(value,warnings);
+  if(warnings.length)return {error:warnings.join('\n')};
+  var next=builderClone(view.exploreLayout || {}),scales=next.textScale && typeof next.textScale==='object' && !Array.isArray(next.textScale)?next.textScale:{};
+  if(value===null || value===1)delete scales[surface];else scales[surface]=value;
+  if(Object.keys(scales).length)next.textScale=scales;else delete next.textScale;
+  return planSectionExploreLayout(text,raw,section,layoutId,Object.keys(next).length?next:null);
+}
 function planSectionExploreLayout(text,raw,section,layoutId,value){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var index=Array.isArray(got.d.layouts)?got.d.layouts.findIndex(function(v){return v && v.id===layoutId;}):-1;

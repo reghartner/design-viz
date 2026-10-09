@@ -501,10 +501,10 @@ so changing the default or any individual panel cannot move notes. Workbench
 changes save with one Undo/Redo operation; reader changes stay in the session.
 Notes keep separate floating `prose` and graph-unit `canvas.prose` rectangles.
 Drag the notes header or resize its corner in either placement; select canvas
-notes first to reveal these handles. Floating notes use 16px body text at 100%
-scale, independently of the Panels & controls size setting. Canvas notes use
-fluid logical body text: 26px at a 1280px browser width, decreasing smoothly to
-19px at 1920px, clamped to that range. New canvas rectangles start 440 graph units
+notes first to reveal these handles. Explore notes use 18px body text at 100%
+text size, independently of the Panels & controls frame setting. Both placements
+use the same logical type across desktop widths. Inspect → Text size (%) adjusts
+notes separately from playback controls. New canvas rectangles start 440 graph units
 wide with a height fitted to the content. Unsaved notes keep fitting through
 browser resizing until moved, resized, or saved as an authored rectangle.
 Saved rectangles retain their dimensions. Canvas
@@ -639,3 +639,15 @@ attachments across profiles; deleting a Home map detaches its controls.
 Select empty space in the step controls, then use **Inspect → Path label width (px)** in Standard or Explore. The width belongs to the selected Chapter and applies to both ordinary path rows and shared-path timelines. Enter 160–360 logical pixels; clear the field to restore the 230 px default. Labels wrap to at most two lines, with the complete name available on hover and to assistive technology. Narrow control windows reserve room for scrollable step circles.
 
 The optional JSON field is `diagram.layouts[].pathLabelWidth`. Invalid imported values warn and render at the default width. Chapter duplication, Undo/Redo, and JSON or standalone HTML export preserve the setting.
+
+### Explore text size
+
+Select empty space in **Section notes** or the **step controls**, then use **Inspect → Text size (%)**. Each has an independent setting from 75% to 175%; clearing it or choosing **Reset text size** restores 100%. The Chapter saves these settings with Undo/Redo, duplication, JSON, standalone HTML and Backstage rendering. Standard typography is unchanged.
+
+At 100%, Explore uses 18px notes with a 10px window heading, 16px captions, 13px path names and transport labels, and 12px step numbers. These logical sizes are consistent at 1280, 1440 and 1920 desktop widths. Floating content keeps its physical text size when panel/frame scale changes. Canvas content follows graph zoom, including Fit; zooming out reduces its physical text size. Resize frames for room; text wraps or scrolls within constrained frames instead of silently shrinking.
+
+Use `exploreLayout.textScale: {prose: 1.25, controls: 1.5}` for 125% notes and 150% step-control text. Each optional multiplier defaults to 1 and accepts 0.75–1.75. Malformed imported values warn and independently use 1. Placement and frame geometry are separate settings. Resetting the arrangement retains text sizes.
+
+The notes text setting also scales the **Section notes** window heading, which stays within its 32px header and truncates with an ellipsis when narrow. The chapter heading and chapter navigation keep their existing sizes: they are shared navigation chrome, independent of either content surface.
+
+Typed widget panels retain their existing per-widget content sizing and overlay scaling; these notes/control text settings do not change widget text or panel headings. Use a widget’s own content options where available, enlarge its frame for more room, or adjust **Panels & controls** to scale floating widgets. On-canvas widgets follow diagram zoom.

@@ -191,7 +191,7 @@ var BUILDER_GUIDES = {
   },
   'step-controls': {
     title: 'Step controls',
-    how: 'Set path label width for this Chapter. Explore also offers placement and caption position.',
+    how: 'Set path label width for this Chapter. Explore also offers text size, placement and caption position.',
     fields: [
       ['Caption position', 'place the current step text below, above, left or right of the path controls']
     ]
@@ -217,7 +217,7 @@ var BUILDER_GUIDES = {
   },
   prose: {
     title: 'Section notes',
-    how: 'Select a paragraph or bullet to edit it. Delete Section notes removes the paragraphs and bullets while keeping the section and its diagram.',
+    how: 'Explore text size is independent of the notes frame. Select a paragraph or bullet to edit it. Delete Section notes removes the paragraphs and bullets while keeping the section and its diagram.',
     fields: [['text, bullets', 'shared notes in Standard and Explore; use the window’s × button to hide notes temporarily']]
   },
   para: {

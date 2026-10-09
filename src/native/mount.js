@@ -60,7 +60,7 @@ function mountNativeSpec(environment, spec, options){
     var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+(definition && definition.id || 'flow');
     if(!canvasSeen.has(key)){
       canvasSeen.add(key);cancelAnimationFrame(canvasFrame);var rec=canvasSection;
-      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:20,bottom:190});});
+      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:20,bottom:190},true);});
     }
   }
   function snapshot(){

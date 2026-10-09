@@ -23,7 +23,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     var board=rec.sectionEl.querySelector('.board');
     if(!board || !board.clientWidth || !board.clientHeight){if(board)fitObserver.observe(board);return;}
     cancelFirstFit();seen.add(key);
-    if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180});
+    if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180},true);
   }
   function show(rec){
     cancelFirstFit();

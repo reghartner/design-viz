@@ -39,7 +39,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  const before=await page.locator('.boardcanvas>svg').count();
  const shell=await rect(page.locator('.viewer-diagram-canvas')),nav=await rect(page.locator('.explore-navigation'));
  const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board')),viewport=page.viewportSize();
- expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+ expect(shell).toEqual({x:0,y:nav.y+nav.height,width:viewport.width,height:viewport.height-nav.y-nav.height});
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(stage.x).toBeGreaterThanOrEqual(shell.x);expect(stage.x+stage.width).toBeLessThanOrEqual(shell.x+shell.width);
  expect(board).toEqual(stage);

@@ -255,3 +255,22 @@ test('wrapped native host actions keep More links inside a phone viewport',async
  for(const width of [320,390]){await page.setViewportSize({width,height:800});const box=await link.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);await expect(link).toBeInViewport();}
  await info.attach('native-phone-more',{body:await page.screenshot(),contentType:'image/png'});await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#alpha').getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();
 });
+
+
+test('an inline Explore camera survives the live expanded portal and return without needing Fit',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});await page.addInitScript(trackResources);await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
+ const baseline=await resources(page);await page.evaluate(()=>{__host.left(true);__host.right(true);});const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+ await alpha.getByRole('button',{name:'Explore',exact:true}).click();const board=alpha.locator('.explore-board'),native=await alpha.locator('[data-flowview-native]').elementHandle();
+ const camera=container=>canvasCamera(container);
+ async function graphInView(container){await expect.poll(()=>container.locator('.explore-board').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top);})).toBe(true);}
+ async function closeCamera(container,expected){await expect.poll(async()=>{const actual=await camera(container);return Math.max(...Object.keys(expected).map(key=>Math.abs(actual[key]-expected[key])));}).toBeLessThan(.01);}
+ await graphInView(alpha);const opening=await camera(alpha),sibling=await beta.locator('.stepid').textContent();
+ await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});await graphInView(dialog);await closeCamera(dialog,opening);
+ expect(await dialog.locator('[data-flowview-native]').evaluate((el,prior)=>el===prior,native)).toBe(true);
+ await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=40;el.scrollTop+=25;});const customized=await camera(dialog);
+ await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();await closeCamera(alpha,customized);
+ await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();await closeCamera(dialog,customized);await graphInView(dialog);
+ await dialog.getByRole('button',{name:'Business',exact:true}).click();await expect(dialog.locator('.explore-stage')).toBeHidden();await dialog.getByRole('button',{name:'Explore',exact:true}).click();await closeCamera(dialog,customized);
+ await page.keyboard.press('Escape');await closeCamera(alpha,customized);await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();await expect(beta.locator('.stepid')).toHaveText(sibling);
+ await page.evaluate(()=>{__host.left(false);__host.right(false);});await expect.poll(()=>resources(page)).toEqual(baseline);
+});

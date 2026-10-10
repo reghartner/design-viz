@@ -40,7 +40,7 @@ function orderedTabFixture(primary,withSource){
 function navigationFixture(){
  const section=(id,label)=>({id,heading:label,diagram:diagram(id.slice(0,1),2)});
  return {page:{title:'Navigation hierarchy',blocks:[
-  {tabs:[{label:'First',sections:[section('first','First diagram')]},{label:'Second',sections:[section('second','Second diagram'),section('secondary','Secondary diagram')]}]},
+  {tabs:[{label:'First',sections:[section('first','First diagram')]},{label:'Second',sections:[section('second','Second diagram'),section('secondary','Secondary diagram')],views:[{id:'both',name:'Both diagrams',presentation:'explore',sections:['second','secondary']}],defaultView:'both'}]},
   section('loose','Loose diagram'),
   {tabs:[{label:'Third',sections:[section('third','Third diagram')]},{label:'Fourth',sections:[section('fourth','Fourth diagram')]}]}
  ]}};
@@ -110,10 +110,8 @@ test('workbench entering Explore through an ordinary document tab frames its dia
  await board.evaluate(el=>el.style.display='none');
  await page.getByRole('button',{name:'Fresh view',exact:true}).click();await afterTwoFrames(page);
  await expect.poll(()=>board.evaluate(el=>el.clientWidth)).toBe(0);
- await page.evaluate(()=>{
-  document.querySelector('#section-explore .board').style.removeProperty('display');
-  Array.from(document.querySelectorAll('#section-explore .diagram-views button')).find(el=>el.textContent==='Explore').click();
- });
+ await board.evaluate(el=>el.style.removeProperty('display'));
+ await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Explore',exact:true}).click();
  await afterTwoFrames(page);
  await expect(page.locator('#workspace-zoom')).toHaveText(zoom);
  await expectCamera(board,camera);
@@ -169,7 +167,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await expect(exploreTab).toHaveAttribute('aria-description',/pan.*zoom/);
  await exploreTab.click();
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
- await expect(navigation.locator('.explore-navigation-group:not([hidden]) .explore-navigation-label')).toHaveText(['Tabs','Sections','Chapters']);
+ await expect(navigation.locator('.explore-navigation-group:not([hidden]) .explore-navigation-label')).toHaveText(['Tabs','Views']);
  await expect(navigation.getByRole('tab')).toHaveText(['Standard story','Explore story']);
  const destinationViews=page.locator('#section-explore .diagram-view-choice [data-view-layout]');
  await expect(destinationViews).toHaveCount(3);
@@ -194,7 +192,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await expect(page.locator('#section-standard [data-dv-node="s1"]')).toBeInViewport();
  await expect.poll(()=>page.evaluate(()=>{
   const shell=document.querySelector('.explore-full-window .viewer-diagram-canvas');
-  const bar=shell?.querySelector(':scope > .diagram-views'),tools=shell?.querySelector(':scope > .explore-tools'),stage=shell?.querySelector(':scope > .explore-stage');
+  const bar=document.querySelector('#docview>.explore-navigation'),tools=shell?.querySelector(':scope > .explore-tools'),stage=shell?.querySelector(':scope > .explore-stage');
   if(!bar || !stage || !tools)return false;const b=bar.getBoundingClientRect(),s=stage.getBoundingClientRect(),t=tools.getBoundingClientRect();
   // Reader sizing belongs between navigation and canvas, without overlapping
   // either surface or leaving the old floating-toolbar gutter.
@@ -207,14 +205,15 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await info.attach('explore-navigation-narrow',{path:narrow,contentType:'image/png'});
 });
 
-test('Explore top bar keeps every tab block and untabbed or secondary diagram reachable',async({page,server})=>{
+test('Explore top bar keeps every tab block reachable and restricts section navigation to its View',async({page,server})=>{
  await standalone(page,server,navigationFixture());
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
  await expect(navigation.getByRole('tablist')).toHaveCount(2);
  await expect(navigation.getByRole('tab')).toHaveText(['First','Second','Third','Fourth']);
  await navigation.getByRole('tab',{name:'Fourth',exact:true}).click();
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();
- await navigation.getByRole('button',{name:'Loose diagram',exact:true}).click();
+ await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveCount(0);
+ await page.evaluate(()=>{location.hash='d=loose&v=explore';});
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();
  await navigation.getByRole('tab',{name:'Second',exact:true}).click();
  await navigation.getByRole('button',{name:'Secondary diagram',exact:true}).click();
@@ -224,7 +223,8 @@ test('Explore top bar keeps every tab block and untabbed or secondary diagram re
 test('workbench diagram buttons update editing context without changing source or Undo',async({page,server})=>{
  const raw=navigationFixture(),source=JSON.stringify(raw,null,2);
  await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
- const navigation=page.locator('.explore-navigation');await navigation.getByRole('button',{name:'Loose diagram',exact:true}).click();
+ const navigation=page.locator('.explore-navigation');await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveCount(0);
+ await chooseAddDestination(page,'3');
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();await expect(page.locator('#diagram-add-target')).toHaveValue('3');
  await navigation.getByRole('tab',{name:'Second',exact:true}).click();
  await navigation.getByRole('button',{name:'Secondary diagram',exact:true}).click();
@@ -232,38 +232,42 @@ test('workbench diagram buttons update editing context without changing source o
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
-test('native setCanvas reuses tabs and Chapters, then restores and isolates their DOM',async({page,server},info)=>{
+test('native setCanvas preserves persistent tabs and Views and isolates sibling DOM',async({page,server},info)=>{
  await writeFile(path.join(server.root,'chapter-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'chapter-native.html'),'<style>#one{position:fixed;inset:0}#two{display:none}</style><div id="one"></div><div id="two"></div><script type="module">import {mountNativeViewer} from "./chapter-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/chapter-native.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(raw=>{window.one=mount(document.querySelector('#one'),raw);window.two=mount(document.querySelector('#two'),raw);one.setCanvas(true);},mixedFixture());
  const one=page.locator('#one'),two=page.locator('#two');
+ await one.locator('.explore-navigation').evaluate(el=>window.oneNav=el);await two.locator('.explore-navigation').evaluate(el=>window.twoNav=el);
+ const sibling=await page.evaluate(()=>two.snapshot());
  await expect(one.getByRole('combobox',{name:'Explore story'})).toHaveCount(0);
  await expect(one.locator('.explore-navigation-tabs')).toBeVisible();await expect(one.locator('.explore-navigation-chapters')).toBeVisible();
  await one.getByRole('tab',{name:'Explore story',exact:true}).click();
  await expect(one.locator('#section-explore [data-dv-node="x0"]')).toBeInViewport();
  await expect(one.getByRole('button',{name:'Fresh view',exact:true})).toBeVisible();
  await expect(one.getByRole('tab',{name:'Explore story',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await expect(one.getByRole('button',{name:'Explore',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await info.attach('native-monitor-icons',{body:await page.screenshot(),contentType:'image/png'});
- await expect(two.locator('.explore-navigation')).toHaveCount(0);await expect(two.locator('.docview > .tabbar')).toHaveCount(1);
+ await expect(two.locator('.explore-navigation')).toHaveCount(1);await expect(two.locator('.explore-navigation .tabbar')).toHaveCount(1);expect(await page.evaluate(()=>two.snapshot())).toEqual(sibling);
  await page.evaluate(()=>one.setCanvas(false));
- await expect(one.locator('.explore-navigation')).toHaveCount(0);await expect(one.locator('.docview > .tabbar')).toHaveCount(1);
+ expect(await one.locator('.explore-navigation').evaluate(el=>el===window.oneNav)).toBe(true);
+ await expect(one.locator('.explore-navigation .tabbar')).toHaveCount(1);await expect(one.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(one.locator('#section-explore .diagram-views > .diagram-view-choice')).toHaveCount(1);
  await page.evaluate(()=>{one.setCanvas(true);one.destroy();});await expect(one).toBeEmpty();
- await expect(two.locator('.docview > .tabbar')).toHaveCount(1);await page.evaluate(()=>two.destroy());
+ expect(await two.locator('.explore-navigation').evaluate(el=>el===window.twoNav)).toBe(true);await expect(two.locator('.explore-navigation .tabbar')).toHaveCount(1);expect(await page.evaluate(()=>two.snapshot())).toEqual(sibling);await page.evaluate(()=>two.destroy());
 });
 
-test('native canvas keeps legacy Standard tabs reachable without Chapter controls',async({page,server})=>{
+test('native canvas preserves legacy Standard presentation and persistent navigation',async({page,server})=>{
  await writeFile(path.join(server.root,'legacy-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'legacy-native.html'),'<style>#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./legacy-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/legacy-native.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);viewer.setCanvas(true);},legacyFixture());
  const host=page.locator('#host');await expect(host.locator('.explore-navigation-tabs')).toBeVisible();
- await expect(host.locator('.explore-navigation-chapters')).toBeHidden();
+ await expect(host.locator('.explore-navigation').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
+ await expect(host.locator('.viewer-diagram-canvas')).toHaveCount(0);await host.locator('.explore-navigation').evaluate(el=>window.nativeNav=el);
  await host.getByRole('tab',{name:'Large story',exact:true}).click();
  await expect(host.locator('#section-large [data-dv-node="b0"]')).toBeInViewport();
  await expect.poll(()=>page.evaluate(()=>viewer.snapshot()?.section)).toBe('large');
- await page.evaluate(()=>viewer.setCanvas(false));await expect(host.locator('.explore-navigation')).toHaveCount(0);
- await expect(host.locator('.docview > .tabbar')).toHaveCount(1);await page.evaluate(()=>viewer.destroy());
+ await page.evaluate(()=>viewer.setCanvas(false));expect(await host.locator('.explore-navigation').evaluate(el=>el===window.nativeNav)).toBe(true);
+ await expect(host.locator('.explore-navigation .tabbar')).toHaveCount(1);await expect(host.getByRole('tab',{name:'Large story',exact:true})).toHaveAttribute('aria-selected','true');await page.evaluate(()=>viewer.destroy());
 });
 
 for(const primary of ['standard','explore'])test('reader tab navigation follows its '+primary+' primary diagram',async({page,server})=>{

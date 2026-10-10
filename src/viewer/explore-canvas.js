@@ -17,7 +17,7 @@ function initViewerExploreCanvas(ctl,view,opts){
     if(ctl.onChange)ctl.onChange();
     show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
   }
-  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action});
+  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action,isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;

@@ -58,3 +58,30 @@ test('one-section legacy Views retain authored names and their opening arrangeme
  const owner=ctx.tabViewOwners(ctx.normalize(raw))[0],views=ctx.tabViewDefinitions(owner);
  assert.deepEqual(plain(views.map(v=>v.name)),['Business','Explore']);assert.equal(ctx.tabViewDefault(owner,views).legacyLayout,'brief');
 });
+
+
+test('legacy introductory prose preserves the first diagram default and authored View names',()=>{
+ for(const presentation of ['standard','explore']){
+  const raw={sections:[{id:'intro',text:'Introductory context'},{id:'diagram',diagram:{nodes:{a:{}},rows:[['a']],layouts:[
+   {id:'opening',name:'Opening',presentation,sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},
+   {id:'other',name:'Other',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}],defaultLayout:'opening'}}]};
+  const before=JSON.stringify(raw),owner=ctx.tabViewOwners(ctx.normalize(raw))[0],views=ctx.tabViewDefinitions(owner),selected=ctx.tabViewDefault(owner,views);
+  assert.equal(selected.presentation,presentation);assert.equal(selected.members.at(-1).record.section.id,'diagram');
+  assert.deepEqual(plain(views.map(v=>v.name)),['Standard','Opening','Other']);assert.equal(JSON.stringify(raw),before);
+  if(presentation==='standard')assert.deepEqual(plain(selected.members.map(m=>m.record.section.id)),['intro','diagram']);
+ }
+});
+
+test('canonical default View retains explicit prose-first member ordering',()=>{
+ const raw={sections:[{id:'intro',text:'Introductory context'},{id:'diagram',diagram:{nodes:{a:{}},rows:[['a']]}}],
+  views:[{id:'reading',name:'Reading',presentation:'explore',sections:['intro','diagram']}],defaultView:'reading'};
+ const owner=ctx.tabViewOwners(ctx.normalize(raw))[0],selected=ctx.tabViewDefault(owner,ctx.tabViewDefinitions(owner));
+ assert.equal(selected.id,'reading');assert.deepEqual(plain(selected.members.map(m=>m.record.section.id)),['intro','diagram']);
+});
+
+
+test('legacy prose plus a Standard arrangement has distinct aggregate and diagram View labels',()=>{
+ const raw={sections:[{id:'intro',text:'Introduction'},{id:'story',heading:'Story',diagram:{nodes:{a:{}},rows:[['a']],layouts:[
+  {id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}]}}]};
+ const owner=ctx.tabViewOwners(ctx.normalize(raw))[0];assert.deepEqual(plain(ctx.tabViewDefinitions(owner).map(v=>v.name)),['Standard','Story · Standard']);
+});

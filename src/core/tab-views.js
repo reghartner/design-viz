@@ -22,19 +22,25 @@ function tabViewDefinitions(owner){
   });
   // Legacy layouts remain authored and independently addressable. A layout can
   // never turn a neighbouring section into a member of its Explore canvas.
-  var views=[],standard=[];
+  var views=[],standard=[],diagramCount=eligible.filter(function(rec){return !!rec.section.diagram;}).length;
   eligible.forEach(function(rec){var d=rec.section.diagram,definitions=d?diagramLayoutViews(d):[],initial=d && sectionLayoutDefinition(d);
     if(!initial || initial.presentation!=='explore')standard.push({record:rec,layout:initial?initial.legacy?'layout':initial.id:undefined});
     if(d && !Array.isArray(d.layouts)){var focus=diagramFocusPanel(d);if(focus && !definitions.length)definitions.push({id:'home',name:panelCapability(focus.type,'focusLabel',focus.title || 'Panel'),presentation:'standard'});if(focus || definitions.length)definitions.push({id:'flow',name:'Data flow',presentation:'standard'});}
-    definitions.forEach(function(def){views.push({id:'section-'+rec.number+'-'+def.id,name:(eligible.length>1?(rec.section.heading || rec.reference)+' · ':'')+def.name,presentation:def.presentation,legacy:true,legacyLayout:def.legacy?'layout':def.id,members:[{record:rec,layout:def.legacy?'layout':def.id}]});});
+    definitions.forEach(function(def){views.push({id:'section-'+rec.number+'-'+def.id,name:(diagramCount>1?(rec.section.heading || rec.reference)+' · ':'')+def.name,presentation:def.presentation,legacy:true,legacyLayout:def.legacy?'layout':def.id,members:[{record:rec,layout:def.legacy?'layout':def.id}]});});
   });
-  if(standard.length && (eligible.length>1 || !views.length))views.unshift({id:'standard',name:'Standard',presentation:'standard',legacy:true,members:standard});
+  if(standard.length && (eligible.length>1 || !views.length)){
+    views.forEach(function(view){if(view.name==='Standard'){var rec=view.members[0].record;view.name=(rec.section.heading || rec.reference)+' · '+view.name;}});
+    views.unshift({id:'standard',name:'Standard',presentation:'standard',legacy:true,members:standard});
+  }
   return views;
 }
 function tabViewDefault(owner,views){
   if(owner.source.views)return views.find(function(view){return view.id===owner.source.defaultView;}) || views[0];
-  var first=owner.records.find(function(rec){return !rec.domainOnly;}),def=first && first.section.diagram && sectionLayoutDefinition(first.section.diagram);
-  var single=owner.records.filter(function(rec){return !rec.domainOnly;}).length===1;
+  // Introductory prose does not replace a legacy diagram's authored opening mode.
+  // Explicit Views above retain their own member order, including prose first.
+  var eligible=owner.records.filter(function(rec){return !rec.domainOnly;});
+  var first=eligible.find(function(rec){return !!rec.section.diagram;}) || eligible[0],def=first && first.section.diagram && sectionLayoutDefinition(first.section.diagram);
+  var single=eligible.length===1;
   var diagram=first && first.section.diagram,focus=diagram && diagramFocusPanel(diagram);
   var id=def ? def.legacy?'layout':def.id : focus && diagram.primaryPanel===focus.id ? 'home' : 'flow';
   return def && def.presentation==='explore' || single ? views.find(function(view){return view.members.length===1 && view.members[0].record===first && view.legacyLayout===id;}) || views[0]:views[0];

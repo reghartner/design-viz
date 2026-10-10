@@ -2125,7 +2125,7 @@ function createExploreNavigation(ctl,options){
       var owner=ctl.views.owner(selected),currentView=ctl.views.current(selected);
       chapters.querySelectorAll('.tab-view-choices').forEach(function(el){el.remove();});
       var viewChoices=doc.createElement('div');viewChoices.className='diagram-view-choice tab-view-choices';viewChoices.setAttribute('role','group');viewChoices.setAttribute('aria-label','Views');
-      (owner?owner.views:[]).forEach(function(definition){var button=doc.createElement('button');button.type='button';button.className='mbtn';button.textContent=definition.name;button.setAttribute('data-tab-view',definition.id);button.setAttribute('aria-pressed',String(definition===currentView));setExploreIndicator(button,definition.presentation==='explore','Explore View');button.addEventListener('click',function(){ctl.views.select(selected,definition.id);});viewChoices.appendChild(button);});
+      (owner?owner.views:[]).forEach(function(definition){var button=doc.createElement('button');button.type='button';button.className='mbtn';button.textContent=definition.name;button.setAttribute('data-tab-view',definition.id);button.setAttribute('aria-pressed',String(definition===currentView));setExploreIndicator(button,definition.presentation==='explore','Explore View: its canvas can be panned and zoomed.');button.addEventListener('click',function(){ctl.views.select(selected,definition.id);});viewChoices.appendChild(button);});
       chapters.appendChild(viewChoices);chapters.hidden=!owner;
     }else chapters.hidden=!move(choices,chapters);
     if(options.action && options.action.parentNode!==actions)move(options.action,actions,true);
@@ -2969,6 +2969,8 @@ function renderPage(view, page, skin, backlinks, options){
   ctl.destroy = function(){
     ctl.destroyed = true;
     view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
+    view.removeEventListener('tab-view-change',paintTabExploreIndicators);
+    view.removeEventListener('navigation-mounted',paintTabExploreIndicators);
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.details)ctl.details.destroy();
     if(ctl.views)ctl.views.destroy();
@@ -2988,9 +2990,9 @@ function renderPage(view, page, skin, backlinks, options){
   function paintTabExploreIndicators(){
     ctl.tabBlocks.forEach(function(tb){
       tb.buttons.forEach(function(button,index){
-        var primary=ctl.sections.find(function(rec){return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===tb.index && rec.tab===index;});
-        var definition=primary && primary.viewport.viewDefinition();
-        setExploreIndicator(button,!!(definition && definition.presentation==='explore'),'This tab’s primary diagram View uses Explore viewing mode: its canvas can be panned and zoomed.');
+        var primary=ctl.views?ctl.views.primary(tb.index,index):ctl.sections.find(function(rec){return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===tb.index && rec.tab===index;});
+        var definition=primary && (ctl.views?ctl.views.current(primary):primary.viewport.viewDefinition());
+        setExploreIndicator(button,!!(definition && definition.presentation==='explore'),'This tab’s selected View uses Explore viewing mode: its canvas can be panned and zoomed.');
       });
     });
   }
@@ -3106,7 +3108,9 @@ function renderPage(view, page, skin, backlinks, options){
   });
   deferredHides.forEach(function(f){ f(); });
   view.addEventListener('diagram-view-change',paintTabExploreIndicators);
-  paintTabExploreIndicators();
+  view.addEventListener('tab-view-change',paintTabExploreIndicators);
+  // URL and preview restoration select silently, then mount their navigation.
+  view.addEventListener('navigation-mounted',paintTabExploreIndicators);
   ctl.rendering = false;
   ctl.manifest = {
     tabBlocks:ctl.tabBlocks.map(function(tb){
@@ -3132,6 +3136,7 @@ function renderPage(view, page, skin, backlinks, options){
       ctl.activeTarget = {kind:'diagram', section:initialDirect.number};
   }
   ctl.views=createTabViewController(ctl,page);
+  paintTabExploreIndicators();
   var viewInitial=ctl.views.primary(ctl.tabBlocks.length?1:null,ctl.tabBlocks.length?0:null);
   if(viewInitial)ctl.activeTarget={kind:'diagram',section:viewInitial.number};
   if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))

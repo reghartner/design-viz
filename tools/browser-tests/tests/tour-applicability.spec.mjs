@@ -31,7 +31,7 @@ async function build(server,source){
 }
 const heading=page=>page.locator('.dv-tour-ui .dv-tour-heading');
 const activeTab=page=>page.locator('.tabbtn[aria-selected="true"]');
-const activeView=page=>page.locator('.tabpanel:not([hidden]) .diagram-view-choice button[aria-pressed="true"]');
+const activeView=page=>page.locator('.tab-view-choices button[aria-pressed="true"]');
 const panel=(page,id)=>page.locator('[data-explore-panel="'+id+'"]');
 function tourWarnings(page){
   const warnings=[];page.on('console',m=>{if(m.type()==='warning'&&m.text().includes('tour step'))warnings.push(m.text());});return warnings;
@@ -57,13 +57,13 @@ async function startBoth(page){await page.locator('.dv-tour-replay').click();awa
 test('the built-in tour finds later-tab capabilities and numbers only the lessons it can show',async({page,server},info)=>{
   const warnings=tourWarnings(page),url=await build(server,spec());await page.goto(url);
   await expect(activeTab(page)).toHaveText('Overview');await startBoth(page);
-  const detailTopics=['Choose a chapter','Flows can split','And they come back together',
+  const detailTopics=['Choose a View','Flows can split','And they come back together',
     'The panels tell the story','Make room to explore','Bring a panel back'];
   const lessons=await walk(page,async title=>{
     if(detailTopics.includes(title))await expect(activeTab(page)).toHaveText('Details');
-    if(title==='Choose a chapter'){
+    if(title==='Choose a View'){
       const body=page.locator('.dv-tour-ui .dv-tour-body').first();
-      await expect(body).toContainText('screen icon on a chapter marks Explore');
+      await expect(body).toContainText('screen icon on a View marks Explore');
       await expect(body).toContainText('pan and zoom');
       const screenshot=info.outputPath('tour-explore-marker.png');await page.screenshot({path:screenshot});
       await info.attach('tour-explore-marker',{path:screenshot,contentType:'image/png'});
@@ -85,18 +85,18 @@ test('a panel hidden in Standard is still taught using its available Explore vie
   // Keep the rich section alone so this specifically tests view discovery.
   source.page.sections=source.page.blocks[0].tabs[1].sections;delete source.page.blocks;
   await page.goto(await build(server,source));
-  await expect(activeView(page)).toHaveCount(0); // There are no tabs in this fixture.
-  await expect(page.locator('.diagram-view-choice button[aria-pressed="true"]')).toHaveText('Business view');
+  await expect(activeTab(page)).toHaveCount(0); // There are no tabs in this fixture.
+  await expect(activeView(page)).toHaveText('Business view');
   await expect(page.locator('.pwidget:visible')).toHaveCount(0);
   await startBoth(page);let sawPanels=false;
   const lessons=await walk(page,async title=>{
     if(title==='The panels tell the story'){
-      sawPanels=true;await expect(page.locator('.diagram-view-choice button[aria-pressed="true"]')).toHaveText('Engineering view');
+      sawPanels=true;await expect(activeView(page)).toHaveText('Engineering view');
       await expect(page.locator('.pwidget:visible')).toHaveCount(2);
     }
   });
   expect(sawPanels).toBe(true);expectContiguous(lessons);expect(warnings).toEqual([]);
-  await expect(page.locator('.diagram-view-choice button[aria-pressed="true"]')).toHaveText('Business view');
+  await expect(activeView(page)).toHaveText('Business view');
   await expect(page.locator('.pwidget:visible')).toHaveCount(0);
 });
 
@@ -123,7 +123,7 @@ test('planning and completing the built-in tour preserve the reader view, path, 
     const after=await geometry();for(const key of Object.keys(before))expect(after[key],key+' restored').toBeCloseTo(before[key],0);
     expect(new URL(page.url()).hash).toBe(hash);
   }
-  await startBoth(page);await expect(heading(page)).toHaveText('Choose a chapter');
+  await startBoth(page);await expect(heading(page)).toHaveText('Choose a View');
   await page.locator('.dv-tour-exit').click();await expect(page.locator('.dv-tour')).toBeHidden();await restored();
   await startBoth(page);await walk(page);await restored();
 });
@@ -160,4 +160,20 @@ test('the tour finds unfiltered branches and a later stop that reveals initially
   });
   expect(checked).toEqual(['Flows can split','And they come back together','The panels tell the story']);
   expectContiguous(lessons);expect(warnings).toEqual([]);
+});
+
+
+test('canonical Tab Views are discovered and restored without losing section membership',async({page,server})=>{
+  const source=spec(),tab=source.page.blocks[0].tabs[1];
+  tab.views=[{id:'business',name:'Business view',presentation:'standard',sections:[{section:'details',layout:'story'}]},
+    {id:'engineering-view',name:'Engineering view',presentation:'explore',sections:[{section:'details',layout:'engineering'}]}];
+  tab.defaultView='business';
+  const warnings=tourWarnings(page);await page.goto((await build(server,source))+'#d=details&v=engineering-view&m=step&p=retry-path&s=retry');
+  await expect(activeView(page)).toHaveText('Engineering view');const before=new URL(page.url()).hash;
+  await startBoth(page);const lessons=await walk(page);expectContiguous(lessons);
+  expect(lessons.map(x=>x.title)).toEqual(expect.arrayContaining(['Choose a View','Bring a panel back']));
+  await expect(activeTab(page)).toHaveText('Details');await expect(activeView(page)).toHaveText('Engineering view');
+  await expect(page.locator('.path-chip[aria-pressed="true"]:visible')).toHaveText('Retry delivery');
+  await expect(page.locator('.schip[aria-current="true"]:visible')).toHaveText('2');
+  expect(new URL(page.url()).hash).toBe(before);expect(warnings).toEqual([]);
 });

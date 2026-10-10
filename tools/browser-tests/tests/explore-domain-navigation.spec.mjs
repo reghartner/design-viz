@@ -11,7 +11,7 @@ function story(multiple=false){
   const root=section('root'),child=section('child',true),grandchild=section('grandchild',true),other=section('other');
   root.diagram.nodes.service.detail={section:'child'};child.diagram.nodes.service.detail={section:'grandchild'};
   for(const s of [root,other]){s.diagram.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12},{controls:'steps',x:0,y:12,w:12,h:4}]}}];s.diagram.defaultLayout='canvas';}
-  return {page:{title:'Domain navigation',sections:[root,child,grandchild,...(multiple?[other]:[])]}};
+  return {page:{title:'Domain navigation',defaultView:'canvas',views:[{id:'canvas',name:'Explore',presentation:'explore',sections:[{section:'root',layout:'canvas'},...(multiple?[{section:'other',layout:'canvas'}]:[])]}],sections:[root,child,grandchild,...(multiple?[other]:[])]}};
 }
 async function open(page,server,raw,native=false){
   if(native){
@@ -51,7 +51,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
       window.domainFrames=[];let remaining=24;const host=el.getRootNode();
       host.addEventListener('click',()=>requestAnimationFrame(function sample(){
         const child=Array.from(host.querySelectorAll('[data-dv-detail-preview]')).find(s=>!s.hidden);
-        if(child){const board=child.querySelector('.explore-board'),shell=child.querySelector('.viewer-diagram-canvas,.workbench-diagram-canvas'),nav=child.querySelector('.explore-navigation'),r=board.getBoundingClientRect(),s=shell.getBoundingClientRect(),n=nav.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,sx:s.x,sy:s.y,sw:s.width,sh:s.height,navBottom:n.bottom,opacity:style.opacity,transform:style.transform});}
+        if(child){const board=child.querySelector('.explore-board'),shell=child.querySelector('.viewer-diagram-canvas,.workbench-diagram-canvas'),nav=host.querySelector('.explore-navigation'),r=board.getBoundingClientRect(),s=shell.getBoundingClientRect(),n=nav.getBoundingClientRect(),style=getComputedStyle(child);window.domainFrames.push({x:r.x,y:r.y,w:r.width,h:r.height,sx:s.x,sy:s.y,sw:s.width,sh:s.height,navBottom:n.bottom,opacity:style.opacity,transform:style.transform});}
         if(--remaining)requestAnimationFrame(sample);
       }),{once:true,capture:true});
     });
@@ -59,8 +59,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
     const contentTop=host==='workbench'?await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top'))):0;
-    const viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:0,sw:viewport.width,sh:viewport.height};
-    const first=frames[0];
+    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:first.navBottom,sw:viewport.width,sh:viewport.height-first.navBottom};
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');
       expect({sx:frame.sx,sy:frame.sy,sw:frame.sw,sh:frame.sh}).toEqual(expectedShell);

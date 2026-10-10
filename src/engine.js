@@ -3451,6 +3451,10 @@ function wireDeepLinks(ctl, win, preservedHash, options){
             diagramSection:state.diagramSection,
             cardSection:state.cardSection, cardIndex:state.cardIndex, row:state.row};
   }
+  function linkedView(sec){
+    var selected=sec && ctl.views && ctl.views.current(sec);
+    return selected && !selected.legacy ? selected.id : sec && sec.presentation && sec.presentation.viewId ? sec.presentation.viewId() : sec && sec.hasDiagram ? 'flow' : selected && selected.id;
+  }
   function stateHash(state){
     var st = {};
     if (state.tabBlock != null && state.tab != null){
@@ -3463,8 +3467,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     if (state.diagramSection != null){
       var diagramSec = section(state.diagramSection);
       if(diagramSec)st.d=String(diagramSec.reference);
-      if(diagramSec && ctl.views && ctl.views.current(diagramSec))st.v=ctl.views.current(diagramSec).id;
-      else if(diagramSec && diagramSec.presentation && diagramSec.presentation.viewId)st.v=diagramSec.presentation.viewId();
+      if(diagramSec)st.v=linkedView(diagramSec);
       if (diagramSec && diagramSec.stepper){
         st.m = diagramSec.stepper.mode();
         if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
@@ -3551,12 +3554,13 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
       if(ctl.handoffs && diagramSec && ctl.view.querySelector('.dv-embed-target'))
         ctl.sections.forEach(function(rec){rec.sectionEl.classList.toggle('dv-embed-target',rec===diagramSec);});
-      var eligible=!ctl.views || ctl.views.ensure(diagramSec,st.v,true);
-      if(!eligible && ctl.views)eligible=ctl.views.ensure(diagramSec,undefined,true);
+      var owner=ctl.views && ctl.views.owner(diagramSec),presentation=diagramSec && diagramSec.presentation;
+      var opening=owner && owner.source.views ? tabViewDefault(owner,owner.views).id : presentation && presentation.defaultView ? presentation.defaultView() : 'flow';
+      var eligible=!ctl.views || ctl.views.ensure(diagramSec,st.v || opening,true);
+      if(!eligible && ctl.views)eligible=ctl.views.ensure(diagramSec,opening,true) || ctl.views.ensure(diagramSec,undefined,true);
       if(ctl.details && diagramSec && eligible)ctl.details.showSection(diagramSec.reference);
       // Restore the view before its path/step: selecting a view installs its
       // visible-stop filter. Stale IDs (and old links without v) use the default.
-      var presentation=diagramSec && diagramSec.presentation;
       if(!ctl.views && presentation && presentation.setView){
         if(st.v == null || !presentation.setView(st.v))presentation.setView(presentation.defaultView());
       }
@@ -3631,7 +3635,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
         embedBtn.innerHTML=COPY_ICON;embedBtn.title='Copy link';embedBtn.setAttribute('aria-label','Copy link to section '+chapterLabel);
         bindCopy(embedBtn,function(){var state=cloneState(fragmentState);state.diagramSection=sec.number;return stateHash(state);});
       }else bindCopyControl(win, embedBtn, function(){
-        var view=sec.presentation && sec.presentation.viewId && sec.presentation.viewId();
+        var view=linkedView(sec);
         return win.location.href.split('#')[0] + '#embed=' + encodeURIComponent(String(sec.reference))+
           (view?'&v='+encodeURIComponent(view):'');
       });

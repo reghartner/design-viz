@@ -26,7 +26,7 @@ test('legacy mixed arrangements migrate only after explicit authoring and preser
  const diagram={nodes:{a:{title:'A'}},rows:[['a']],layouts:[{id:'page',name:'Page',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}]};
  const raw={sections:[{heading:'First',diagram},{heading:'Second',diagram:{nodes:{b:{}},rows:[['b']]}}]},text=JSON.stringify(raw,null,2),owners=ctx.tabViewOwners(ctx.normalize(raw)),defs=ctx.tabViewDefinitions(owners[0]);
  assert.equal(JSON.stringify(raw,null,2),text);const explore=defs.find(v=>v.presentation==='explore');assert.equal(explore.members.length,1);
- const r=ctx.planTabViewEdit(text,raw,0,explore.id,'name','Canvas renamed');assert.ok(!r.error,r.error);const next=JSON.parse(r.text);assert.deepEqual(next.sections[0].diagram,diagram);assert.ok(next.views.some(v=>v.presentation==='explore'));assert.ok(next.views.some(v=>v.presentation==='standard'));assert.equal(next.sections.length,2);
+ const r=ctx.planTabViewEdit(text,raw,0,explore.id,'name','Canvas renamed');assert.ok(!r.error,r.error);const next=JSON.parse(r.text);assert.deepEqual(next.sections[0].diagram,diagram);assert.ok(next.views.some(v=>v.presentation==='explore'));assert.ok(next.views.some(v=>v.presentation==='standard'));assert.equal(next.sections.length,2);assert.equal(next.defaultView,ctx.tabViewDefault(owners[0],defs).id);
 });
 test('section insert, duplicate, rename, move and delete repair canonical membership atomically',()=>{
  let raw=fixture(),text=JSON.stringify(raw,null,2);let r=ctx.planAddSection(text,raw,1,'explore-bc');assert.ok(!r.error,r.error);raw=JSON.parse(r.text);assert.equal(tab(raw).views[1].sections.at(-1).section,tab(raw).sections.at(-1).id);assert.equal(tab(raw).views[0].sections.length,2);
@@ -43,4 +43,18 @@ test('independent arrangement duplicates placement once without copying section 
 test('deleting a Tab never rewrites the next Tab with removed View membership',()=>{
  const raw=fixture(),notes=raw.page.blocks[0].tabs[1];notes.views=[{id:'notes',name:'Notes',presentation:'standard',sections:['notes']}];notes.defaultView='notes';
  const r=ctx.planDeleteTab(JSON.stringify(raw,null,2),raw,0,0);assert.ok(!r.error,r.error);const next=JSON.parse(r.text);assert.deepEqual(next.page.blocks[0].tabs,[notes]);assert.deepEqual(plain(ctx.validate(ctx.normalize(next)).errors),[]);
+});
+
+test('direct page Views have an implicit owner and source plans preserve shared section identity',()=>{
+ const original=tab(fixture()),raw={page:{title:'Implicit Tab',sections:original.sections,views:original.views,defaultView:original.defaultView}};
+ const owners=ctx.tabViewOwners(ctx.normalize(raw));assert.equal(owners.length,1);assert.equal(owners[0].source,raw.page);
+ const r=plan(raw,2,'explore-bc','name','Page journey'),next=JSON.parse(r.text);assert.equal(next.page.views[1].name,'Page journey');assert.deepEqual(next.page.sections,raw.page.sections);assert.equal(next.page.defaultView,'standard-ac');
+});
+
+test('one-section legacy Views retain authored names and their opening arrangement',()=>{
+ const raw={sections:[{id:'one',diagram:{nodes:{a:{}},rows:[['a']],layouts:[
+  {id:'brief',name:'Business',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},
+  {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}],defaultLayout:'brief'}}]};
+ const owner=ctx.tabViewOwners(ctx.normalize(raw))[0],views=ctx.tabViewDefinitions(owner);
+ assert.deepEqual(plain(views.map(v=>v.name)),['Business','Explore']);assert.equal(ctx.tabViewDefault(owner,views).legacyLayout,'brief');
 });

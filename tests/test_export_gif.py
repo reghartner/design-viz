@@ -1,6 +1,7 @@
 """Pure encoder/link tests plus an optional Chrome capture smoke test."""
 
 import json
+import math
 import pathlib
 import socket
 import subprocess
@@ -512,7 +513,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                         self.assertGreaterEqual(clip["x"] + clip["width"], r["right"], part)
                         self.assertGreaterEqual(clip["y"] + clip["height"], r["bottom"], part)
                     self.assertGreater(clip["y"], state["heading"]["bottom"])
-                    self.assertLessEqual(clip["height"], state["grid"]["height"] + 33)
+                    self.assertLessEqual(clip["height"], math.ceil(state["grid"]["height"]) + 33)
 
     def test_explore_capture_includes_graph_floating_panels_and_pinned_steps(self):
         spec = json.loads((ROOT / "src/starters/named-layouts.json").read_text())
@@ -544,7 +545,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
                   graph:rect(sec.querySelector('.explore-canvas')),
                   bar:rect(sec.querySelector('.termbar')),grid:rect(grid),
                   heading:rect(sec.querySelector('.sec-h')),
-                  toolbar:rect(sec.querySelector('.diagram-views')),
+                  toolbar:rect(document.querySelector('#docview>.explore-navigation')),
                   notes:rect(sec.querySelector('[data-explore-content="prose"]')),
                   panels:Array.from(sec.querySelectorAll('[data-explore-panel]'))
                     .filter(function(el){return el.getBoundingClientRect().height>0;})
@@ -564,7 +565,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual({panel["id"] for panel in state["panels"]}, {"outcome", "clip"})
             clip = state["clip"]
             self.assertIsNotNone(clip)
-            parts = [state["canvas"], state["stage"], state["graph"], state["bar"]]
+            parts = [state["canvas"], state["stage"], state["graph"], state["bar"], state["toolbar"]]
             # Full-size stacks may extend below or left of the stage. Export
             # captures their visible intersection with its overflow:hidden
             # boundary, not the off-canvas portion of each DOM rectangle.
@@ -587,7 +588,7 @@ class ExportGifChromeSmokeTest(unittest.TestCase):
             self.assertEqual(clip["x"], 0)
             self.assertEqual(clip["y"], 0)
             self.assertLessEqual(clip["y"], state["toolbar"]["top"])
-            self.assertLessEqual(clip["height"], state["canvas"]["height"] + 33)
+            self.assertLessEqual(clip["height"], math.ceil(max(part["bottom"] for part in parts) - min(part["top"] for part in parts)) + 33)
             # Exercise the production frame path too: view verification must
             # accept a hidden authored grid, and capture more than the step bar.
             frames = export_gif.capture_frames(

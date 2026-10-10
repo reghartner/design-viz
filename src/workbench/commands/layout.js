@@ -424,7 +424,7 @@ function planSectionDiagramVisibility(text,raw,section,layoutId,visible){
       selected=promoted.layoutId;
     }
     var view=d.layouts.find(function(v){return v.id===selected;});
-    if(!view)return {error:'Reselect the chapter before changing diagram visibility.'};
+    if(!view)return {error:'Reselect the section arrangement before changing diagram visibility.'};
     var profiles=builderSectionLayout24(view.sectionLayout);
     if(!Array.isArray(profiles.default))profiles.default=sectionLayoutItems(d,'default',selected) || sectionLayoutPreset(d,'default');
     view.sectionLayout=profiles;
@@ -483,7 +483,7 @@ function builderPromoteSectionViews(d,layoutId){
 }
 function planEnsureSectionView(text,raw,section,optimizeTarget){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
-  if(Array.isArray(got.d.layouts))return {error:'This diagram already has Chapters.'};
+  if(Array.isArray(got.d.layouts))return {error:'This diagram already has saved arrangements.'};
   return builderRewrite(text,raw,got.path,function(d){
     builderEnsureSectionView(d);
     if(optimizeTarget)d.layouts[0].sectionLayout[optimizeTarget]=sectionLayoutOptimize(got.d,optimizeTarget,sectionLayoutItems(got.d,optimizeTarget));
@@ -827,14 +827,14 @@ function builderTabViewOwner(raw,section){
 function planTabViewEdit(text,raw,section,id,action,value){
   if(raw.nodes && raw.rows){text='{\n  "sections": [{"diagram": '+text+'}]\n}';raw=JSON.parse(text);}
   var got=builderTabViewOwner(raw,section);if(!got)return {error:'Select a section first.'};
-  var owner=got.owner,views=tabViewDefinitions(owner),current=views.find(function(v){return v.id===id;}) || tabViewDefault(owner,views),next=text;
+  var owner=got.owner,views=tabViewDefinitions(owner),opening=tabViewDefault(owner,views),current=views.find(function(v){return v.id===id;}) || tabViewDefault(owner,views),next=text;
   function set(path,key,val){var result=jsonSetField(next,path,key,JSON.stringify(val));if(!result)throw new Error('Unable to locate the View source.');next=result.text;}
   if(!owner.source.views){
     var used=new Set(sectionRecords(normalize(raw)).map(function(rec){return rec.section.id;}).filter(Boolean));
     owner.records.forEach(function(rec){if(rec.section.id)return;var proposed='section-'+rec.number;while(used.has(proposed))proposed+='-copy';used.add(proposed);set(specSectionPaths(raw)[rec.number-1].section,'id',proposed);});
     raw=JSON.parse(next);got=builderTabViewOwner(raw,section);owner=got.owner;
     views=views.map(function(view){return {id:view.id,name:view.name.slice(0,80),presentation:view.presentation,sections:view.members.map(function(member){var ref={section:sectionRecords(normalize(raw))[member.record.number-1].section.id};if(member.layout)ref.layout=member.layout;return ref;})};});
-    set(got.path,'views',views);set(got.path,'defaultView',current && current.id || views[0].id);
+    set(got.path,'views',views);set(got.path,'defaultView',opening && opening.id || views[0].id);
   }else views=JSON.parse(JSON.stringify(owner.source.views));
   var index=views.findIndex(function(v){return v.id===id;});if(index<0)index=views.findIndex(function(v){return current && v.id===current.id;});
   var selected=views[index];if(!selected)return {error:'The selected View no longer exists.'};

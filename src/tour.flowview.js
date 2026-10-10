@@ -122,18 +122,30 @@ function wireTour(ctl, view, win, config, options){
         break;
       }
   }
+  function availableViews(sec){
+    var owner=ctl.views && ctl.views.owner(sec);
+    if(owner)return owner.views.filter(function(v){return v.members.some(function(m){return m.record.runtime===sec;});});
+    return sec.presentation && sec.presentation.views ? sec.presentation.views() : [];
+  }
+  function ownerSnapshot(){
+    return ctl.views?ctl.views.owners.filter(function(owner){return owner.current && owner.selected;}).map(function(owner){return {view:owner.current.id,section:owner.selected};}):[];
+  }
+  function restoreOwners(saved){
+    saved.forEach(function(item){if(item.section)ctl.views.select(item.section,item.view,item.section);});
+  }
   function applyDiagramState(sec, ds){
     if (!sec || !ds) return true;
     var pres=sec.presentation, requested=ds.view;
     if(requested == null && ds.presentation != null){
-      var choices=pres && pres.views ? pres.views() : [];
+      var choices=availableViews(sec);
       var match=choices.find(function(v){return v.presentation===ds.presentation;});
       if(match)requested=match.id;
       else if(ds.presentation!=='standard' || choices.length)return false;
     }
     /* Same order as the deep-link apply: view installs its visible-stop
        filter before the path, the path before the step. */
-    if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
+    if(ctl.views){if(!ctl.views.ensure(sec,requested,false))return false;}
+    else if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
     if(ds.diagramVisible === true){
       var board=sec.sectionEl.querySelector('.board');
       for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
@@ -194,6 +206,7 @@ function wireTour(ctl, view, win, config, options){
     var drill = ctl.details ? ctl.details.snapshot() : null;
     snapshot = {
       drill: drill,
+      owners: ownerSnapshot(),
       activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
       scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
@@ -218,6 +231,7 @@ function wireTour(ctl, view, win, config, options){
       if(!sec)return;
       restoreSection(sec,saved,true);
     });
+    restoreOwners(savedPage.owners || []);
     var restoration;
     if(ctl.details){
       if(ctl.details.snapshot())ctl.details.close(true);
@@ -904,20 +918,20 @@ function wireTour(ctl, view, win, config, options){
     var steps=config.steps.map(function(step){
       if((step.kind || 'spot')!=='spot')return step;
       var candidates=(preferred?[preferred.sec]:[]).concat(ctl.steppers,ctl.sections)
-        .filter(function(sec,i,all){return sec.hasDiagram && all.indexOf(sec)===i;});
+        .filter(function(sec,i,all){return sec.hasDiagram && !sec.detailOnly && all.indexOf(sec)===i;});
       for(var i=0;i<candidates.length;i++){
         var sec=candidates[i], pres=sec.presentation, saved=sectionSnapshot(sec);
         var ds=step.diagramState || {};
         if(stateTokenMiss(sec,ds))continue;
-        var choices=[saved.view];
+        var current=ctl.views && ctl.views.current(sec), choices=[current?current.id:saved.view];
         if(preferred && preferred.sec===sec)choices.unshift(preferred.view);
-        if(pres && pres.views)choices=choices.concat(pres.views().map(function(v){return v.id;}));
+        choices=choices.concat(availableViews(sec).map(function(v){return v.id;}));
         choices=choices.filter(function(id,j,all){return all.indexOf(id)===j;});
-        if(ds.presentation!=null)choices=pres && pres.views ? pres.views().filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;}) : [];
+        if(ds.presentation!=null)choices=availableViews(sec).filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;});
         for(var j=0;j<choices.length;j++){
           var state=Object.assign({},ds,{section:sec.reference});
           if(choices[j]!=null)state.view=choices[j];
-          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();});
+          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();}), owners=ownerSnapshot();
           var targetState=ctl.activeTarget, detailsAt=openedDetails.length;
           var scroll={x:win.scrollX,y:win.scrollY}, valid=false;
           try{
@@ -946,6 +960,7 @@ function wireTour(ctl, view, win, config, options){
           }finally{
             openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected){d.open=false;if(typeof syncNavigationPopover==='function')syncNavigationPopover(d);}});
             restoreSection(sec,saved,false);
+            restoreOwners(owners);
             ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
             ctl.activeTarget=targetState;if(ctl.onChange)ctl.onChange();win.scrollTo(scroll.x,scroll.y);
           }

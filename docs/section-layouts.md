@@ -86,6 +86,7 @@ geometry. The View membership reference selects an arrangement for its own
 section only. Use **View → Independent section arrangement** before adjusting
 geometry that should differ between two Views of the same section.
 
+**View → Show selected section diagram** saves diagram visibility across all host profiles of its section arrangement.
 **View → Arrange selected section… → Visible elements** saves diagram, panel,
 and Section notes visibility. Hidden diagram tiles reclaim their Standard rows;
 Explore retains the canvas, panels and playback. This changes the selected
@@ -175,7 +176,7 @@ view preserves the setting; changing the preview host does not change it.
 
 ## Link to or capture a particular view
 
-Use the view's stable `layouts[].id`, not its display name, in the HTML fragment:
+Use the Tab View's stable `views[].id`, not its display name, in the HTML fragment. Legacy documents continue accepting section `layouts[].id` links:
 
 ```text
 page.html#d=front-door&v=home-story

@@ -35,10 +35,12 @@ function createTabViewController(ctl,page){
   function ensure(rec,id,silent){
     var owner=ownerOf(rec);if(!owner || rec.detailOnly)return false;
     var record=owner.records.find(function(record){return record.runtime===rec;}),diagram=record.section.diagram;
+    if(!owner.source.views && id==='home' && diagram && !Array.isArray(diagram.layouts) && diagramLayoutViews(diagram).length)id='layout';
     var plainFlow=id==='flow' && diagram && !diagramLayoutViews(diagram).length && !diagramFocusPanel(diagram);
     var view=id?owner.views.find(function(v){return v.id===id || v.legacy && (v.legacyLayout===id || plainFlow && v.id==='standard') && v.members.some(function(m){return m.record.runtime===rec;});}):owner.current;
     if(id && (!view || !view.members.some(function(m){return m.record.runtime===rec;})))return false;
     if(!view || !view.members.some(function(m){return m.record.runtime===rec;}))view=owner.views.find(function(v){return v.members.some(function(m){return m.record.runtime===rec;});});
+    if(view && owner.current===view && owner.selected===rec)return true;
     return view?select(rec,view.id,rec,silent):false;
   }
   function legacyChanged(ev){

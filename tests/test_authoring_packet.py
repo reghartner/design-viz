@@ -118,6 +118,14 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertIn('**Small edits.**', text)
         self.assertEqual(json.dumps(raw), before)
 
+    def test_tab_views_infer_presentation_without_section_layouts(self):
+        raw = {'page': {'sections': [{'id': 'notes', 'text': ['Notes']}],
+                        'views': [{'id': 'canvas', 'name': 'Canvas', 'presentation': 'explore', 'sections': ['notes']}]}}
+        text, meta = packet.generate([], [], mode='edit', raw=raw)
+        self.assertTrue({'layouts', 'explore'} <= set(meta['selected']['features']))
+        self.assertIn('## Tab-owned Views', text)
+        self.assertIn('docs/tab-views.md', text)
+
     def test_unknown_selection_and_output_collision_fail_without_mutating_source(self):
         with self.assertRaisesRegex(ValueError, 'Unknown selection'):
             packet.generate(['future-widget'], [])

@@ -182,9 +182,10 @@ function initWorkbenchLibrary(opts){
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
-  var specRequests=new Map();
+  var specRequests=new Map(),headerObserver=null;
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
   function retireViewer(){
+    if(headerObserver)headerObserver.disconnect();headerObserver=null;document.body.classList.remove('canon-reader-active');reader.style.removeProperty('--flowview-navigation-top');
     if(positionChange && ctl && ctl.onChange===positionChange.wrapped)ctl.onChange=positionChange.prior;
     positionChange=null;
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
@@ -319,6 +320,10 @@ function initWorkbenchLibrary(opts){
       deepLinks=wireDeepLinks(ctl,window,null,{history:false,linkBase:canonDiagramURL(location.href,current.id)});
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
+      document.body.classList.add('canon-reader-active');
+      var header=document.querySelector('.workbench-header');
+      function headerSize(){var height=header?Math.ceil(header.getBoundingClientRect().height):0;reader.style.setProperty('--flowview-navigation-top',height+'px');var nav=reader.querySelector('.explore-navigation');if(nav)reader.style.setProperty('--flowview-navigation-bottom',Math.ceil(height+nav.getBoundingClientRect().height+8)+'px');}
+      headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}
       exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
       if(opts.savePosition){

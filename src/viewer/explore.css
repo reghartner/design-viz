@@ -243,10 +243,10 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
    (dialogs and native mounts) use their own scroll surface and sticky row. */
 @media screen{
  .docview.has-document-navigation{container-type:normal;}
- .has-document-navigation>.explore-navigation{position:fixed;inset:0 0 auto;z-index:100;min-height:48px;padding:6px 12px;}
+ .has-document-navigation>.explore-navigation{position:fixed;inset:var(--flowview-navigation-top,0px) 0 auto;z-index:100;min-height:48px;padding:6px 12px;}
  .document-navigation-space{height:var(--flowview-navigation-height,48px);}
  .has-document-navigation .doc-sec{scroll-margin-top:calc(var(--flowview-navigation-height,48px) + 12px);}
- .has-document-navigation.explore-full-window .viewer-diagram-canvas{top:var(--flowview-navigation-height,48px);}
+ .has-document-navigation.explore-full-window .viewer-diagram-canvas{top:calc(var(--flowview-navigation-top,0px) + var(--flowview-navigation-height,48px));}
  .navigation-contained>.explore-navigation{position:sticky;top:0;}
  .navigation-contained>.document-navigation-space{display:none;}
  body .docview.navigation-contained.explore-full-window.has-document-navigation{margin:0;padding:0;border:0;border-radius:0;max-width:none;width:100%;}
@@ -263,7 +263,7 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 }
 
 @media screen{
- .has-document-navigation:fullscreen{overflow:auto;box-sizing:border-box;background:var(--dv-board-ground,#fff);}
+ .has-document-navigation:fullscreen{--flowview-navigation-top:0px!important;overflow:auto;box-sizing:border-box;max-width:none;width:100%;height:100%;margin:0;background:var(--dv-board-ground,#fff);}
  .has-document-navigation:fullscreen>.explore-navigation{top:0;}
 }
 

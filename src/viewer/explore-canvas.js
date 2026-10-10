@@ -4,7 +4,7 @@
 function initViewerExploreCanvas(ctl,view,opts){
   var container=opts && opts.container || document.body;
   view.classList.toggle('navigation-contained',container!==document.body || !!(opts && opts.contained));
-  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=ctl.activeTarget && JSON.stringify(ctl.activeTarget);
+  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=null;
   var fitObserver=new ResizeObserver(function(entries){
     if(!frame && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))frame=requestAnimationFrame(firstFit);
   }),fitRecord=null,fitDefinition=null,fitKey=null;
@@ -90,12 +90,15 @@ function initViewerExploreCanvas(ctl,view,opts){
   view.addEventListener('detail-navigation',detailChanged);
   function tabPrimary(target){if(target && ctl.views)return ctl.views.primary(target.tabBlock,target.tab);return target && ctl.sections.find(function(r){return !r.detailOnly && r.hasDiagram && r.viewport && r.tabBlock===target.tabBlock && r.tab===target.tab;});}
   function exploreDefinition(rec){var definition=rec && rec.viewport && rec.viewport.viewDefinition();return definition && definition.presentation==='explore'?rec:null;}
-  function navigationChanged(){
-    var target=ctl.activeTarget,key=JSON.stringify(target);if(key===lastTarget)return;lastTarget=key;
-    detailRoot=null;
-    var rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
+  function navigationState(){
+    var target=ctl.activeTarget,rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
     if(!rec && target && target.kind==='tab')rec=tabPrimary(target) || ctl.sections.find(function(r){return r.tabBlock===target.tabBlock && r.tab===target.tab;});
-    if(rec!==active)show(rec);
+    var ownerView=ctl.views && ctl.views.current(rec),definition=rec && rec.viewport && rec.viewport.viewDefinition();
+    return {rec:rec,key:JSON.stringify([target,ownerView && ownerView.id,definition && definition.id,definition && definition.presentation])};
+  }
+  function navigationChanged(){
+    var state=navigationState();if(state.key===lastTarget)return;lastTarget=state.key;
+    detailRoot=null;show(state.rec);
   }
   var priorChange=ctl.onChange;
   function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
@@ -104,6 +107,6 @@ function initViewerExploreCanvas(ctl,view,opts){
   var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?tabPrimary(target):null;
   if(!initial && (!target || target.kind!=='tab'))initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && !r.tabBlock;});
   if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
-  show(initial);if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
+  show(initial);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
   return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
 }

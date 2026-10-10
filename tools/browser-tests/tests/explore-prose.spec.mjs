@@ -38,7 +38,7 @@ test('Explore floats only prose, keeps live formatting/reveals and restores the 
   await expect(notes(page).locator('[data-dv-bullet-path="1"]')).toHaveClass(/dv-fragment-hidden/);await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(notes(page).locator('[data-dv-bullet-path="1"]')).not.toHaveClass(/dv-fragment-hidden/);
   const shell=await page.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
   const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox(),prose=await notes(page).boundingBox(),viewport=page.viewportSize();
-  expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(nav.y).toBe(0);expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);expect(prose.x).toBeGreaterThanOrEqual(stage.x);expect(prose.y).toBeGreaterThanOrEqual(stage.y);expect(prose.x+prose.width).toBeLessThanOrEqual(stage.x+stage.width);expect(prose.y+prose.height).toBeLessThanOrEqual(stage.y+stage.height);
   const original=await notes(page).boundingBox();await notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowLeft');expect((await notes(page).boundingBox()).x).toBeCloseTo(original.x-8,0);
   await notes(page).getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(notes(page)).toBeHidden();await page.locator('.explore-panel-menu summary').click();await page.getByRole('checkbox',{name:'Section notes',exact:true}).check();await page.keyboard.press('Escape');
@@ -82,8 +82,10 @@ test('Standard to Explore frames a short graph after indexing, and preserves a r
   await page.goto(await build(server,spec,'no-notes'));await page.getByRole('button',{name:'Explore',exact:true}).click();
   const node=page.locator('.explore-canvas [data-dv-node="camera"]');await expect(node).toBeInViewport();await expect(notes(page)).toHaveCount(0);
   const board=page.locator('.explore-board');const camera=await board.evaluate(b=>{b.scrollLeft+=80;return {x:b.scrollLeft,y:b.scrollTop};});
-  await page.getByRole('button',{name:'Business',exact:true}).click();await page.getByRole('button',{name:'Explore',exact:true}).click();
-  await expect.poll(()=>board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop}))).toEqual(camera);
+  for(let cycle=0;cycle<5;cycle++){
+    await page.getByRole('button',{name:'Business',exact:true}).click();await page.getByRole('button',{name:'Explore',exact:true}).click();
+    await expect.poll(()=>board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop}))).toEqual(camera);
+  }
 });
 
 test('first prose from Add or section inspector creates visible notes and keeps Explore with exact history',async({page,server})=>{

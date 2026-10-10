@@ -180,7 +180,7 @@ function createBuilderSpatialSelection(opts){
   life.listen(win,'pointercancel',cancel);life.listen(win,'blur',clear);
   life.listen(view,'lostpointercapture',function(ev){if(marquee && ev.pointerId===marquee.id)cancel();},true);
   life.listen(opts.src,'input',clear);
-  life.listen(view,'click',function(ev){if(ev.target.closest('[data-view-layout]')){clear();opts.select([]);}},true);
+  life.listen(view,'click',function(ev){if(ev.target.closest('[data-view-layout],[data-tab-view]')){clear();opts.select([]);}},true);
   life.listen(view,'dv:pathchange',clear);
   return {actions:actions,sync:sync,target:target,clear:clear,refresh:refresh,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
 }

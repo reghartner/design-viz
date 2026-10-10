@@ -254,6 +254,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
     board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
   }
+  function scrollState(){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    return {x:board.scrollLeft,y:board.scrollTop,width:lastWidth,height:lastHeight,graphWidth:graphPixels,graphHeight:graphPixels*ratio,marginX:marginX,marginY:marginY,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};
+  }
+  function restoreScroll(saved){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    var unchanged=saved.width===board.clientWidth && saved.height===board.clientHeight && saved.graphWidth===graphPixels && saved.graphHeight===graphPixels*ratio && saved.marginX===marginX && saved.marginY===marginY;
+    // Avoid a lossy normalized-camera round trip when the viewport and graph
+    // are unchanged. Fractional graph heights can otherwise add a pixel on
+    // every View switch. Resized destinations still keep the graph center.
+    if(saved.camera && !unchanged)positionCamera(saved.camera);
+    else{board.scrollLeft=saved.x;board.scrollTop=saved.y;}
+  }
   function saveCamera(token){
     if(!active || retired)return;
     // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
@@ -659,9 +672,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(tracksObserver && bar)tracksObserver.observe(bar,{childList:true,subtree:true,characterData:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
     lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
-    // A reader view can enter at page size before becoming full-browser. Restore the
-    // graph-relative center; raw scroll offsets describe the old viewport.
-    if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
+    if(memory.scroll)restoreScroll(memory.scroll);
     else if(memory.layout.camera)positionCamera(memory.layout.camera);
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
   }
@@ -670,7 +681,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // the regular camera suspended until the destination layout is mounted.
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
-    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
@@ -679,7 +690,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
-  function isFullscreen(){return document.fullscreenElement===shell;}
+  function fullscreenHost(){return shell.closest('.has-document-navigation') || shell;}
+  function isFullscreen(){return document.fullscreenElement===fullscreenHost();}
   function setExpanded(value){expanded=value;shell.classList.toggle('viewport-expanded',value);expand.textContent=value?'Exit expanded view':'Expand';expand.setAttribute('aria-label',value?'Exit expanded diagram view':'Expand diagram view');expand.setAttribute('aria-pressed',String(value));paint();}
   function exitExpanded(){
     pendingFullscreen++;setExpanded(false);status.textContent='';
@@ -692,8 +704,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var token=++pendingFullscreen;
     function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
     try{
-      if(!shell.requestFullscreen){failed();return;}
-      var promise=shell.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
+      var host=fullscreenHost();if(!host.requestFullscreen){failed();return;}
+      var promise=host.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
     }catch(_){failed();}
   }
   function fullscreenChanged(){if(!isFullscreen() && expanded){setExpanded(false);status.textContent='';}}
@@ -780,8 +792,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){
+      var opening=on && !readerCanvas && active && memory && memory.scroll;
       readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);
       syncTools();fitHeight();paint();
+      // Enter may briefly use the inline dimensions before the reader mounts
+      // its canvas. Restore from the original capture after that final layout.
+      if(opening)restoreScroll(opening);
     },
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
@@ -792,6 +808,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     currentCamera:function(){return camera();},
     panelPlacement:function(){return onCanvas()?'canvas':'floating';},
     canvasCommand:function(){return expand;},
+    navigationKeydown:keydown,
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
@@ -818,7 +835,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     scrollTarget:function(){return active?stage:grid;},
     refresh:resized,
     snapshotCanvasState:function(){
-      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera(lastWidth,lastHeight)};memory.zoom=zoom;}
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);
     },
     restoreCanvasState:function(saved){
@@ -833,7 +850,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       return true;
     },
     snapshotReaderState:function(){
-      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;}
       return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open,legendOpen:legendMenu.open};
     },
     restoreReaderState:function(saved){

@@ -138,7 +138,7 @@ export async function chapterOptions(page,section){
 }
 export async function arrangeChapter(page,section){
   await chapterOptions(page,section);
-  await (section || page.locator('#docview .explore-navigation')).getByRole('button',{name:'Arrange chapter and saved visibility…',exact:true}).click();
+  await (section || page.locator('#docview .explore-navigation')).getByRole('button',{name:'Arrange selected section…',exact:true}).click();
 }
 
 export async function openAutoArrange(page){

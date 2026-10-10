@@ -342,3 +342,10 @@ test('DeviceApp badge capability detects declaration, initial and modern or lega
   assert.ok(C.check(C.stamp(raw),{version:C.version,contract:'1',features:available}).missingFeatures.includes('content.deviceapp-badges'));
  }
 });
+test('canonical Tab and implicit page Views declare membership and Explore capabilities',()=>{
+  const raw=JSON.parse(fs.readFileSync('examples/tab-views/tab-views.spec.json','utf8'));
+  for(const doc of [raw,{page:{views:raw.page.blocks[0].tabs[0].views,sections:raw.page.blocks[0].tabs[0].sections}}]){
+    const stamped=C.stamp(doc);assert.ok(stamped.page.flowview.features.includes('document.tab-views'));assert.ok(stamped.page.flowview.features.includes('layout.explore'));
+    const older={...C.features};delete older['document.tab-views'];assert.ok(C.check(stamped,{version:C.version,contract:'1',features:older}).missingFeatures.includes('document.tab-views'));
+  }
+});

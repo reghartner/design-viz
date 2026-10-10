@@ -2045,7 +2045,7 @@ function setExploreIndicator(control,visible,description){
    reader returns to the page or a workbench preview is replaced. */
 function syncNavigationPopover(details){
   var body=details.querySelector(':scope > .section-view-options-body,:scope > .explore-panel-body,:scope > .explore-edge-legend,:scope > #workspace-appearance-body,:scope > .workspace-help-body,:scope > .workspace-canvas-tools-body');
-  if(!body || !body.showPopover)return;
+  if(!body || !body.isConnected || !body.showPopover)return;
   body.setAttribute('popover','manual');
   if(!details.open){if(body.matches(':popover-open'))body.hidePopover();return;}
   if(!body.matches(':popover-open'))body.showPopover();
@@ -2058,33 +2058,38 @@ function syncNavigationPopover(details){
 function createExploreNavigation(ctl,options){
   options=options || {};
   var doc=ctl.view.ownerDocument,nav=doc.createElement('nav'),tabs=doc.createElement('div'),diagrams=doc.createElement('div'),chapters=doc.createElement('div'),actions=doc.createElement('div');
-  nav.className='explore-navigation';nav.setAttribute('aria-label','Diagram navigation');
+  nav.className='explore-navigation';nav.setAttribute('aria-label','Document navigation');
+  var spacer=doc.createElement('div');spacer.className='document-navigation-space';spacer.setAttribute('aria-hidden','true');
   tabs.className='explore-navigation-group explore-navigation-tabs';
   diagrams.className='explore-navigation-group explore-navigation-diagrams';
   chapters.className='explore-navigation-group explore-navigation-chapters';
   actions.className='explore-navigation-actions';
   function title(text){var label=doc.createElement('span');label.className='explore-navigation-label';label.textContent=text;return label;}
-  tabs.appendChild(title('Tabs'));diagrams.appendChild(title('Diagrams'));chapters.appendChild(title('Chapters'));
-  nav.appendChild(tabs);nav.appendChild(diagrams);nav.appendChild(chapters);nav.appendChild(actions);
+  tabs.appendChild(title('Tabs'));diagrams.appendChild(title('Sections'));chapters.appendChild(title('Views'));
+  nav.appendChild(tabs);nav.appendChild(chapters);nav.appendChild(diagrams);nav.appendChild(actions);
   nav.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var popover=ev.target.closest('details[open]');if(popover){ev.preventDefault();ev.stopPropagation();popover.open=false;popover.querySelector('summary').focus();}return;}if(ev.target.closest('input,textarea,select,summary,button') && !((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();});
   nav.addEventListener('toggle',function(ev){if(ev.target.tagName!=='DETAILS')return;if(ev.target.open)nav.querySelectorAll('details[open]').forEach(function(other){if(other!==ev.target)other.open=false;});syncNavigationPopover(ev.target);},true);
-  function refreshNavigationGeometry(){if(!nav.isConnected)return;ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(nav.getBoundingClientRect().bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);}
+  function refreshNavigationGeometry(){if(!nav.isConnected)return;var bounds=nav.getBoundingClientRect();ctl.view.style.setProperty('--flowview-navigation-height',Math.ceil(bounds.height)+'px');ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(bounds.bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);}
   var navigationSize=new ResizeObserver(refreshNavigationGeometry);
   var moved=[],current=null,revealFrame=0;
-  function rememberNavigationCamera(){if(current && current.viewport){current.viewport.snapshotCanvasState();current.viewport.snapshotReaderState();}}
+  function rememberNavigationCamera(){if(current && current.boardSize && current.boardSize.snapshot)current.boardSize.snapshot();if(current && current.viewport){current.viewport.snapshotCanvasState();current.viewport.snapshotReaderState();}}
   nav.addEventListener('click',rememberNavigationCamera,true);nav.addEventListener('keydown',rememberNavigationCamera,true);
   function activeElement(){var focused=doc.activeElement;while(focused && focused.shadowRoot && focused.shadowRoot.activeElement)focused=focused.shadowRoot.activeElement;return focused;}
   function containsFocus(node,focused){return !!(node && focused && (node===focused || node.contains && node.contains(focused)));}
-  function move(node,host){
+  function move(node,host,persistent){
     if(!node)return false;
     var anchor=null;if(node.parentNode){anchor=doc.createComment('explore navigation position');node.parentNode.insertBefore(anchor,node);}
-    moved.push({node:node,anchor:anchor});host.appendChild(node);return true;
+    moved.push({node:node,anchor:anchor,persistent:!!persistent});host.appendChild(node);return true;
   }
-  function restore(refocus){
+  function restore(refocus,keepDocument){
     var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});
     nav.querySelectorAll('details[open]').forEach(function(details){details.open=false;syncNavigationPopover(details);});
-    moved.reverse().forEach(function(entry){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();if(entry.anchor)entry.anchor.remove();});
-    moved=[];current=null;cancelAnimationFrame(revealFrame);revealFrame=0;navigationSize.disconnect();nav.remove();tabs.hidden=diagrams.hidden=chapters.hidden=false;
+    // Dynamic controls may already have been retired or reparented by their owner.
+    // Restore only nodes that this navigation still owns.
+    moved.slice().reverse().filter(function(entry){return !keepDocument || !entry.persistent;}).forEach(function(entry){if(nav.contains(entry.node)){if(entry.anchor && entry.anchor.parentNode)entry.anchor.parentNode.insertBefore(entry.node,entry.anchor);else entry.node.remove();}if(entry.anchor)entry.anchor.remove();});
+    moved=keepDocument?moved.filter(function(entry){return entry.persistent;}):[];current=null;cancelAnimationFrame(revealFrame);revealFrame=0;
+    if(!keepDocument){navigationSize.disconnect();nav.remove();spacer.remove();ctl.view.classList.remove('has-document-navigation');ctl.view.style.removeProperty('--flowview-navigation-height');ctl.view.style.removeProperty('--flowview-navigation-bottom');}
+    tabs.hidden=diagrams.hidden=chapters.hidden=false;
     if(refocus!==false && owned && focused.isConnected)focused.focus({preventScroll:true});
   }
   function diagramRecords(){
@@ -2099,28 +2104,38 @@ function createExploreNavigation(ctl,options){
     diagrams.appendChild(button);return {rec:rec,button:button};
   });
   function mount(rec){
-    if(!rec || !rec.sectionEl)return false;
-    if(current===rec && nav.isConnected){var pending=rec.sectionEl.querySelector('.section-viewport>.diagram-views>.section-view-settings');if(pending)move(pending,actions);return true;}
-    var focused=activeElement(),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false);
-    var host=rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice');
-    if(!host){host=rec.sectionEl.querySelector('.diagram-views');if(!host){host=doc.createElement('div');host.className='diagram-views';rec.sectionEl.prepend(host);}}
-    host.prepend(nav);current=rec;navigationSize.observe(nav);
+    if(current===rec && rec && nav.isConnected && !ctl.views){var pending=rec.sectionEl.querySelector('.section-viewport>.diagram-views>.section-view-settings');if(pending)move(pending,actions);refreshNavigationGeometry();return true;}
+    var focused=activeElement(),focusView=focused && focused.getAttribute && focused.getAttribute('data-tab-view'),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false,true);
+    var host=rec && rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice');
+    if(!host && rec)host=rec.sectionEl.querySelector('.diagram-views');
+    if(!choices && host)choices=host.querySelector(':scope > .diagram-view-choice');
+    if(!nav.isConnected){ctl.view.prepend(spacer);ctl.view.prepend(nav);ctl.view.classList.add('has-document-navigation');navigationSize.observe(nav);}
+    current=rec;nav.setAttribute('data-navigation-section',rec?String(rec.number):'');
     var movedTabs=false,embedded=ctl.view.querySelector('.dv-embed-target');
-    if(!embedded)ctl.tabBlocks.forEach(function(tabBlock){movedTabs=move(tabBlock.bar,tabs) || movedTabs;});
+    if(!embedded)ctl.tabBlocks.forEach(function(tabBlock){movedTabs=(tabBlock.bar.parentNode===tabs || move(tabBlock.bar,tabs,true)) || movedTabs;});
     tabs.hidden=!movedTabs;
-    var selected=rec,detail=ctl.details && ctl.details.snapshot && ctl.details.snapshot();
+    var selected=rec || ctl.activeTarget || {},detail=ctl.details && ctl.details.snapshot && ctl.details.snapshot();
     if(detail && detail.section)selected=ctl.sections.find(function(candidate){return candidate.reference===detail.section;}) || selected;
-    var peers=sectionButtons.filter(function(entry){return entry.rec.tabBlock===selected.tabBlock && entry.rec.tab===selected.tab;});
-    diagrams.querySelector('.explore-navigation-label').textContent=peers.some(function(entry){return !entry.rec.hasDiagram;})?'Sections':'Diagrams';
-    sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0 && !!entry.rec.tabBlock;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
-    diagrams.hidden=peers.length<2 && !sectionButtons.some(function(entry){return !entry.rec.tabBlock && entry.rec!==selected;});chapters.hidden=!move(choices,chapters);
-    move(options.action,actions);
+    var members=ctl.views?ctl.views.members(selected):null;
+    var peers=sectionButtons.filter(function(entry){return members?members.indexOf(entry.rec)>=0:entry.rec.tabBlock===selected.tabBlock && entry.rec.tab===selected.tab;});
+    diagrams.querySelector('.explore-navigation-label').textContent='Sections';
+    sectionButtons.forEach(function(entry){entry.button.hidden=peers.indexOf(entry)<0;entry.button.setAttribute('aria-pressed',String(entry.rec===selected));});
+    diagrams.hidden=peers.length<2;
+    if(ctl.views){
+      var owner=ctl.views.owner(selected),currentView=ctl.views.current(selected);
+      chapters.querySelectorAll('.tab-view-choices').forEach(function(el){el.remove();});
+      var viewChoices=doc.createElement('div');viewChoices.className='diagram-view-choice tab-view-choices';viewChoices.setAttribute('role','group');viewChoices.setAttribute('aria-label','Views');
+      (owner?owner.views:[]).forEach(function(definition){var button=doc.createElement('button');button.type='button';button.className='mbtn';button.textContent=definition.name;button.setAttribute('data-tab-view',definition.id);button.setAttribute('aria-pressed',String(definition===currentView));setExploreIndicator(button,definition.presentation==='explore','Explore View');button.addEventListener('click',function(){ctl.views.select(selected,definition.id);});viewChoices.appendChild(button);});
+      chapters.appendChild(viewChoices);chapters.hidden=!owner;
+    }else chapters.hidden=!move(choices,chapters);
+    if(options.action && options.action.parentNode!==actions)move(options.action,actions,true);
     /* The chapter heading sits behind the full-window Explore surface. Keep
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
-    move(rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
-    move(host.querySelector('.section-view-settings'),actions);
-    move(host.querySelector('.viewport-actions'),actions);
+    move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
+    move(host && host.querySelector('.handoff-back'),actions);
+    move(host && host.querySelector('.section-view-settings'),actions);
+    move(host && host.querySelector('.viewport-actions'),actions);
     actions.hidden=false;
     // Selection can unhide its section only after the navigation is mounted.
     // Reveal the selected chips after that layout, while retaining their real DOM.
@@ -2137,11 +2152,35 @@ function createExploreNavigation(ctl,options){
         }
       });
     });
+    if(owned && focusView && !focused.isConnected)focused=Array.from(chapters.querySelectorAll('[data-tab-view]')).find(function(button){return button.getAttribute('data-tab-view')===focusView;}) || focused;
     if((owned || moved.some(function(entry){return containsFocus(entry.node,focused);})) && focused.isConnected)focused.focus({preventScroll:true});
+    refreshNavigationGeometry();
     ctl.view.dispatchEvent(new CustomEvent('navigation-mounted'));
     return true;
   }
-  return {element:nav,mount:mount,restore:restore,destroy:restore};
+  // Track document scrolling without activating another section's canvas or
+  // rewriting its URL. Ignore nested boards, menus and horizontal tab lanes.
+  var scrollFrame=0;
+  function scrolled(ev){
+    if(!nav.isConnected || options.isCanvas && options.isCanvas())return;
+    if(ev && ev.target && ev.target.nodeType===1 && ctl.view.contains(ev.target))return;
+    if(scrollFrame)return;
+    scrollFrame=requestAnimationFrame(function(){
+      scrollFrame=0;if(!nav.isConnected || options.isCanvas && options.isCanvas())return;
+      var edge=nav.getBoundingClientRect().bottom+24,visible=diagramRecords().filter(function(rec){return rec.sectionEl.getClientRects().length && !rec.sectionEl.hidden;});
+      var next=visible[0];
+      visible.forEach(function(rec){if(rec.sectionEl.getBoundingClientRect().top<=edge)next=rec;});
+      var last=visible[visible.length-1],bottom=window.innerHeight;
+      for(var host=ctl.view.parentElement;host && host!==doc.body;host=host.parentElement){if(/auto|scroll/.test(getComputedStyle(host).overflowY)){bottom=Math.min(bottom,host.getBoundingClientRect().bottom);break;}}
+      if(last && last.sectionEl.getBoundingClientRect().bottom<=bottom+1)next=last;
+      if(next && next!==current){mount(next);if(options.onScrollSection)options.onScrollSection(next);}
+      refreshNavigationGeometry();
+    });
+  }
+  window.addEventListener('scroll',scrolled,true);
+  function viewChanged(){var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
+  ctl.view.addEventListener('tab-view-change',viewChanged);
+  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){ctl.view.removeEventListener('tab-view-change',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
@@ -2156,7 +2195,7 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
     group=document.createElement('div');group.className='diagram-view-choice';
     toolbar.appendChild(group);box.insertBefore(toolbar,layout.grid);
   }
-  group.setAttribute('role','group');group.setAttribute('aria-label','Chapters');
+  group.setAttribute('role','group');group.setAttribute('aria-label','Views');
   var buttons=Object.create(null);
   views.forEach(function(v){
     var button=document.createElement('button');button.type='button';button.className='mbtn';button.textContent=v.name;
@@ -2932,6 +2971,7 @@ function renderPage(view, page, skin, backlinks, options){
     view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.details)ctl.details.destroy();
+    if(ctl.views)ctl.views.destroy();
     ctl.steppers.forEach(function(rec){ rec.stepper.destroy(); });
     ctl.sections.forEach(function(rec){
       if (rec.boardSize) rec.boardSize.destroy();
@@ -2950,7 +2990,7 @@ function renderPage(view, page, skin, backlinks, options){
       tb.buttons.forEach(function(button,index){
         var primary=ctl.sections.find(function(rec){return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===tb.index && rec.tab===index;});
         var definition=primary && primary.viewport.viewDefinition();
-        setExploreIndicator(button,!!(definition && definition.presentation==='explore'),'This tab’s primary diagram chapter uses Explore viewing mode: its canvas can be panned and zoomed.');
+        setExploreIndicator(button,!!(definition && definition.presentation==='explore'),'This tab’s primary diagram View uses Explore viewing mode: its canvas can be panned and zoomed.');
       });
     });
   }
@@ -3038,6 +3078,7 @@ function renderPage(view, page, skin, backlinks, options){
       });
       if (activate !== false){
         changed({kind:'tab', tabBlock:tabBlockIndex, tab:idx});
+        if(ctl.views){var primary=ctl.views.primary(tabBlockIndex,idx);if(primary)ctl.views.ensure(primary,undefined,true);}
         view.dispatchEvent(new CustomEvent('diagram-tab-change',{detail:{tabBlock:tabBlockIndex,tab:idx}}));
       }
       /* Explore temporarily reparents the tablist into the active panel. Focus
@@ -3090,6 +3131,9 @@ function renderPage(view, page, skin, backlinks, options){
     if (initialDirect && initialDirect.stepper.mode() === 'step')
       ctl.activeTarget = {kind:'diagram', section:initialDirect.number};
   }
+  ctl.views=createTabViewController(ctl,page);
+  var viewInitial=ctl.views.primary(ctl.tabBlocks.length?1:null,ctl.tabBlocks.length?0:null);
+  if(viewInitial)ctl.activeTarget={kind:'diagram',section:viewInitial.number};
   if(records.some(function(r){return r.section.detailOnly || Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.detail;});}))
     ctl.details=wireDetailFlows(ctl,page,skin,backlinks,options);
   if(records.some(function(r){return Object.values(r.section.diagram && r.section.diagram.nodes || {}).some(function(n){return n.handoff && n.handoff.localSection!=null;});}))
@@ -3419,7 +3463,8 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     if (state.diagramSection != null){
       var diagramSec = section(state.diagramSection);
       if(diagramSec)st.d=String(diagramSec.reference);
-      if(diagramSec && diagramSec.presentation && diagramSec.presentation.viewId)st.v=diagramSec.presentation.viewId();
+      if(diagramSec && ctl.views && ctl.views.current(diagramSec))st.v=ctl.views.current(diagramSec).id;
+      else if(diagramSec && diagramSec.presentation && diagramSec.presentation.viewId)st.v=diagramSec.presentation.viewId();
       if (diagramSec && diagramSec.stepper){
         st.m = diagramSec.stepper.mode();
         if (diagramSec.stepper.paths && diagramSec.stepper.paths().length > 1) st.p = diagramSec.stepper.path();
@@ -3506,11 +3551,13 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       var diagramSec = section(diagramTarget.section), sp = diagramSec && diagramSec.stepper;
       if(ctl.handoffs && diagramSec && ctl.view.querySelector('.dv-embed-target'))
         ctl.sections.forEach(function(rec){rec.sectionEl.classList.toggle('dv-embed-target',rec===diagramSec);});
-      if(ctl.details && diagramSec)ctl.details.showSection(diagramSec.reference);
+      var eligible=!ctl.views || ctl.views.ensure(diagramSec,st.v,true);
+      if(!eligible && ctl.views)eligible=ctl.views.ensure(diagramSec,undefined,true);
+      if(ctl.details && diagramSec && eligible)ctl.details.showSection(diagramSec.reference);
       // Restore the view before its path/step: selecting a view installs its
       // visible-stop filter. Stale IDs (and old links without v) use the default.
       var presentation=diagramSec && diagramSec.presentation;
-      if(presentation && presentation.setView){
+      if(!ctl.views && presentation && presentation.setView){
         if(st.v == null || !presentation.setView(st.v))presentation.setView(presentation.defaultView());
       }
       if (sp && sp.selectPath) sp.selectPath(st.p || sp.paths()[0].id);
@@ -3581,7 +3628,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     if (embedBtn){
       if(!manageHistory){
         var chapterLabel=(embedBtn.getAttribute('aria-label') || String(sec.reference)).replace(/^Copy embed link for /,'').replace(/ —.*$/,'');
-        embedBtn.innerHTML=COPY_ICON;embedBtn.title='Copy link';embedBtn.setAttribute('aria-label','Copy link to chapter '+chapterLabel);
+        embedBtn.innerHTML=COPY_ICON;embedBtn.title='Copy link';embedBtn.setAttribute('aria-label','Copy link to section '+chapterLabel);
         bindCopy(embedBtn,function(){var state=cloneState(fragmentState);state.diagramSection=sec.number;return stateHash(state);});
       }else bindCopyControl(win, embedBtn, function(){
         var view=sec.presentation && sec.presentation.viewId && sec.presentation.viewId();

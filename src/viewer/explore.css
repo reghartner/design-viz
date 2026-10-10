@@ -22,12 +22,12 @@
 .explore-overlay-value{min-width:52px;font-variant-numeric:tabular-nums;}
 .explore-zoom-group button:disabled{opacity:.4;cursor:default;}
 .explore-zoom{font:600 11px 'IBM Plex Mono',monospace;color:var(--dtext);background:var(--explore-bg,#fff);border-radius:6px;padding:6px;}
-.section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
-.sk-aurora .section-viewport{--explore-bg:#101a2c;--explore-border:#294658;}
-.sk-pastel .section-viewport,.sk-daylight .section-viewport{--explore-bg:#fff;--explore-border:#dce1f1;}
-.sk-editorial .section-viewport{--explore-bg:var(--ed-sheet);--explore-border:var(--ed-rule);}
-.sk-terminal .section-viewport{--explore-bg:var(--tm-surface);--explore-border:var(--tm-line);}
-.sk-blueprint .section-viewport{--explore-bg:#0A345D;--explore-border:#537FA1;}
+.section-viewport,.explore-navigation{--explore-bg:#fff;--explore-border:#dce1f1;}
+.sk-aurora .section-viewport,.sk-aurora .explore-navigation{--explore-bg:#101a2c;--explore-border:#294658;}
+.sk-pastel .section-viewport,.sk-pastel .explore-navigation,.sk-daylight .section-viewport,.sk-daylight .explore-navigation{--explore-bg:#fff;--explore-border:#dce1f1;}
+.sk-editorial .section-viewport,.sk-editorial .explore-navigation{--explore-bg:var(--ed-sheet);--explore-border:var(--ed-rule);}
+.sk-terminal .section-viewport,.sk-terminal .explore-navigation{--explore-bg:var(--tm-surface);--explore-border:var(--tm-line);}
+.sk-blueprint .section-viewport,.sk-blueprint .explore-navigation{--explore-bg:#0A345D;--explore-border:#537FA1;}
 .explore-window{position:absolute;z-index:2;left:var(--float-x);top:var(--float-y);width:var(--float-w);height:var(--float-h);min-width:0;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;border:1px solid var(--explore-border);border-radius:12px;background:var(--explore-bg);box-shadow:0 6px 22px #1424421c;}
 .explore-window-header{height:32px;min-height:32px;display:flex;align-items:center;border-bottom:1px solid var(--explore-border);padding:0 5px 0 8px;gap:3px;}
 .explore-window-grip{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;padding:6px 0;border:0;background:none;color:var(--dtext);font:600 10px 'IBM Plex Mono',monospace;cursor:grab;touch-action:none;}
@@ -122,7 +122,7 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
  .explore-navigation-label{font:600 10px 'IBM Plex Sans',sans-serif;color:var(--dfaint);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;}
  body .explore-navigation .tabbar{width:max-content;margin:0;padding:0;border:0;flex-wrap:nowrap;gap:5px;background:none;box-shadow:none;}
  .explore-navigation .tabunit{flex:none;}
- .viewer-diagram-canvas .explore-navigation .diagram-view-choice{flex-wrap:nowrap;max-width:none;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
+ .explore-navigation .diagram-view-choice{flex-wrap:nowrap;max-width:none;padding:0;border:0;border-radius:0;background:none;box-shadow:none;}
  .explore-navigation-actions{display:flex;align-items:center;gap:6px;margin-left:auto;flex:none;}
  .viewport-explore>.diagram-views,.section-viewport.viewport-explore:fullscreen>.diagram-views{margin-bottom:0;}
  .section-viewport>.explore-tools{position:relative;inset:auto;flex:none;flex-wrap:nowrap;gap:12px;width:100%;min-width:0;box-sizing:border-box;padding:4px 12px;border-bottom:1px solid var(--explore-border);background:var(--explore-bg);overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;pointer-events:auto;}
@@ -237,3 +237,52 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 .explore-notes-size-hint{padding:0 0 10px 23px;}
 
 .docview .explore-board.authored-diagram-hidden .boardcanvas>svg{visibility:hidden;pointer-events:none;}
+
+/* One document-owned navigation row stays in place across every Chapter. The
+   spacer reserves its measured height in the normal reader. Contained readers
+   (dialogs and native mounts) use their own scroll surface and sticky row. */
+@media screen{
+ .docview.has-document-navigation{container-type:normal;}
+ .has-document-navigation>.explore-navigation{position:fixed;inset:0 0 auto;z-index:100;min-height:48px;padding:6px 12px;}
+ .document-navigation-space{height:var(--flowview-navigation-height,48px);}
+ .has-document-navigation .doc-sec{scroll-margin-top:calc(var(--flowview-navigation-height,48px) + 12px);}
+ .has-document-navigation.explore-full-window .viewer-diagram-canvas{top:var(--flowview-navigation-height,48px);}
+ .navigation-contained>.explore-navigation{position:sticky;top:0;}
+ .navigation-contained>.document-navigation-space{display:none;}
+ body .docview.navigation-contained.explore-full-window.has-document-navigation{margin:0;padding:0;border:0;border-radius:0;max-width:none;width:100%;}
+ .explore-navigation .diagram-view-choice{display:flex;flex-wrap:nowrap;padding:0;border:0;box-shadow:none;background:none;}
+ .has-document-navigation .diagram-views:not(:has(>.diagram-view-choice)):not(:has(>.viewport-actions)):not(:has(>.section-view-settings)){margin:0;padding:0;}
+}
+@media print{.explore-navigation,.document-navigation-space{display:none!important;}}
+
+@media screen{
+ .has-document-navigation>.explore-navigation{background:var(--explore-bg,#fff);border:0;border-bottom:1px solid var(--explore-border,#dce1f1);}
+ .has-document-navigation>.explore-navigation .explore-diagram-button[aria-pressed="true"]{background:var(--dink,#244aa5);color:var(--explore-bg,#fff);border-color:var(--dink,#244aa5);}
+ .document-viewing-mode{display:flex;align-items:center;gap:6px;white-space:nowrap;}
+ .document-viewing-mode select{font:inherit;color:var(--dtext);background:var(--explore-bg,#fff);border:1px solid var(--explore-border,#dce1f1);border-radius:6px;padding:5px;}
+}
+
+@media screen{
+ .has-document-navigation:fullscreen{overflow:auto;box-sizing:border-box;background:var(--dv-board-ground,#fff);}
+ .has-document-navigation:fullscreen>.explore-navigation{top:0;}
+}
+
+@media screen{
+ .has-document-navigation .doc-sec>.diagram-views>.diagram-view-choice,.has-document-navigation .section-viewport>.diagram-views>.diagram-view-choice{display:none;}
+ .has-document-navigation.explore-full-window .explore-active-section:not(:has(.section-viewport)){position:fixed;inset:var(--flowview-navigation-height,48px) 0 0;z-index:80;overflow:auto;box-sizing:border-box;padding:24px;background:var(--dv-board-ground,#fff);}
+ .docview.navigation-contained{padding-top:0!important;}
+ .navigation-contained>.explore-navigation{margin:0;}
+ .navigation-contained.explore-full-window .viewer-diagram-canvas{position:absolute;}
+ .navigation-contained.explore-full-window .explore-active-section:not(:has(.section-viewport)){position:absolute;}
+ .doc-sec[hidden]{display:none!important;}
+}
+
+/* Desktop lanes shrink independently without changing navigation height when
+   a View includes a different number of sections. Each lane reveals selection. */
+@media screen and (min-width:641px){
+ .explore-navigation{flex-wrap:nowrap;}
+ .explore-navigation-group{flex:0 1 auto;}
+ .explore-navigation-chapters{flex:1 1 auto;}
+ .explore-navigation-group>:is(.explore-navigation-label,button,.diagram-view-choice,.tabbar){flex:none;}
+ .native-canvas .explore-navigation-actions{flex-wrap:nowrap;}
+}

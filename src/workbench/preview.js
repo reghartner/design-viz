@@ -40,6 +40,7 @@ function workbenchPreviewSnapshot(page, ctl){
       if(rec.presentation.viewId)prior.viewId=rec.presentation.viewId();
     }
     if(rec.presentation && rec.presentation.layoutId)prior.layoutId=rec.presentation.layoutId();
+    if(ctl.views){var owner=ctl.views.owner(rec),view=ctl.views.current(rec);if(owner && view){prior.tabView=view.id;prior.tabViewSelected=owner.selected===rec;}}
     saved.push(prior);
     if (!stepper) return;
     if (stepper.path) prior.path = stepper.path();
@@ -61,11 +62,14 @@ function workbenchPreviewSnapshot(page, ctl){
 function restoreWorkbenchPreview(page, ctl, saved){
   if (!saved) return;
   var sections = workbenchPreviewSections(page),matches=matchWorkbenchPreviewSections(saved.sections,sections);
+  var restoredOwners=new Set();
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1),owner=ctl.views && ctl.views.owner(rec);if(prior && owner && !restoredOwners.has(owner) && prior.tabView){if(ctl.views.select(rec,prior.tabView,undefined,true))restoredOwners.add(owner);}});
+  ctl.sections.forEach(function(rec){var prior=matches.get(rec.number-1);if(prior && prior.tabViewSelected && ctl.views)ctl.views.ensure(rec,prior.tabView,true);});
   ctl.sections.forEach(function(rec){
     var section = sections[rec.number - 1], stepper = rec.stepper;
     var prior=matches.get(rec.number-1);
     if (!section || !prior) return;
-    if(rec.presentation){
+    if(rec.presentation && !(ctl.views && prior.tabView)){
       if(prior.viewId!=null && rec.presentation.setView)rec.presentation.setView(prior.viewId);
       else {
         if(rec.presentation.setLayout && prior.layoutId)rec.presentation.setLayout(prior.layoutId);

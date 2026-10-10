@@ -30,10 +30,10 @@ height when a host needs it. Backstage itself uses normal document layout.
 Types are authored in `src/native/mount.d.ts` and copied into the package.
 The host's existing `ViewerTarget` extends this type with its request counter.
 
-The optional `view` selects an authored named view before resolving `path` or
-`step`. Omitting it preserves the current view. An unknown ID raises a
-recoverable error rather than silently opening a different view. The view's saved
-Standard or Explore presentation follows that selection. The React hook reacts
+The optional `view` selects a Tab-owned View before resolving `path` or
+`step`. Omitting it preserves an eligible current View, or deliberately chooses one that includes the destination section. An unknown ID raises a
+recoverable error rather than silently opening a different view. Explicit section/View pairs with mismatched membership are rejected. Legacy section arrangement IDs remain accepted. The View’s saved
+Standard or Explore presentation follows that selection; expanding the host does not override it. See [the View contract](tab-views.md). The React hook reacts
 to a changed `target.view` without reloading the spec and retains the reader's
 latest section/view/step when a changed link resolver requires a fresh mount.
 Revision changes start from the new spec and host target.

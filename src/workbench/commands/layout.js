@@ -815,3 +815,49 @@ function planDuplicateSpatial(text,raw,targets,layoutId,rects){
     if(active)targets.forEach(function(t,i){if(t.kind!=='panel' || !rects || !rects[i])return;var ex=active.exploreLayout || (active.exploreLayout={}),canvas=ex.canvas || (ex.canvas={}),panels=canvas.panels || (canvas.panels=[]),id=panelMap[t.id],p=panels.find(function(p){return p.panel===id;});if(!p){p={panel:id};panels.push(p);}Object.assign(p,rects[i],{x:rects[i].x+24,y:rects[i].y+24});var placements=ex.panelPlacements || (ex.panelPlacements=[]);var placement=placements.find(function(p){return p.panel===id;});if(!placement){placement={panel:id};placements.push(placement);}placement.placement='canvas';});
   });
 }
+
+/* Tab View edits preserve the source outside the changed fields. Migration is
+   explicit (the first View edit), and keeps legacy section arrangements intact. */
+function builderTabViewOwner(raw,section){
+  var rec=specSectionPaths(raw)[section];if(!rec)return null;
+  var at=rec.section.lastIndexOf('tabs'),path=at>=0?rec.section.slice(0,at+2):raw.page?['page']:[];
+  var page=normalize(raw),record=sectionRecords(page)[section],owner=tabViewOwners(page).find(function(o){return o.tabBlock===record.tabBlock && o.tab===record.tab;});
+  return {path:path,owner:owner};
+}
+function planTabViewEdit(text,raw,section,id,action,value){
+  if(raw.nodes && raw.rows){text='{\n  "sections": [{"diagram": '+text+'}]\n}';raw=JSON.parse(text);}
+  var got=builderTabViewOwner(raw,section);if(!got)return {error:'Select a section first.'};
+  var owner=got.owner,views=tabViewDefinitions(owner),current=views.find(function(v){return v.id===id;}) || tabViewDefault(owner,views),next=text;
+  function set(path,key,val){var result=jsonSetField(next,path,key,JSON.stringify(val));if(!result)throw new Error('Unable to locate the View source.');next=result.text;}
+  if(!owner.source.views){
+    var used=new Set(sectionRecords(normalize(raw)).map(function(rec){return rec.section.id;}).filter(Boolean));
+    owner.records.forEach(function(rec){if(rec.section.id)return;var proposed='section-'+rec.number;while(used.has(proposed))proposed+='-copy';used.add(proposed);set(specSectionPaths(raw)[rec.number-1].section,'id',proposed);});
+    raw=JSON.parse(next);got=builderTabViewOwner(raw,section);owner=got.owner;
+    views=views.map(function(view){return {id:view.id,name:view.name.slice(0,80),presentation:view.presentation,sections:view.members.map(function(member){var ref={section:sectionRecords(normalize(raw))[member.record.number-1].section.id};if(member.layout)ref.layout=member.layout;return ref;})};});
+    set(got.path,'views',views);set(got.path,'defaultView',current && current.id || views[0].id);
+  }else views=JSON.parse(JSON.stringify(owner.source.views));
+  var index=views.findIndex(function(v){return v.id===id;});if(index<0)index=views.findIndex(function(v){return current && v.id===current.id;});
+  var selected=views[index];if(!selected)return {error:'The selected View no longer exists.'};
+  var resultId=selected.id;
+  if(action==='create' || action==='duplicate'){
+    var stem=action==='create'?'view':selected.id.slice(0,54)+'-copy',serial=2,newId=stem;while(views.some(function(v){return v.id===newId;}))newId=stem+'-'+serial++;
+    selected=JSON.parse(JSON.stringify(selected));selected.id=newId;selected.name=action==='create'?'New View':(selected.name.slice(0,73)+' copy');views.splice(index+1,0,selected);resultId=newId;
+  }else if(action==='delete'){
+    if(views.length===1)return {error:'Keep at least one View in this Tab.'};views.splice(index,1);resultId=views[Math.min(index,views.length-1)].id;
+    var currentSource=specValueAt(JSON.parse(next),got.path);if(currentSource.defaultView===id)set(got.path,'defaultView',resultId);
+  }else if(action==='arrangement'){
+    var updatedRaw=JSON.parse(next),record=sectionRecords(normalize(updatedRaw))[section],member=selected.sections.find(function(member){return tabViewMemberReference(member)===record.section.id;});
+    if(!member || !record.section.diagram)return {error:'Select a diagram section included in this View.'};
+    var layoutId=typeof member==='object' && member.layout || (sectionLayoutDefinition(record.section.diagram) || {}).id || 'flow';
+    var duplicated=planDuplicateSectionLayout(next,updatedRaw,section,layoutId);if(duplicated.error)return duplicated;next=duplicated.text;
+    selected.sections=selected.sections.map(function(value){return tabViewMemberReference(value)===record.section.id?{section:record.section.id,layout:duplicated.layoutId}:value;});
+  }else if(action==='name'){
+    if(typeof value!=='string' || !value.trim() || value.trim().length>80)return {error:'Use a View name between 1 and 80 characters.'};selected.name=value.trim();
+  }else if(action==='presentation')selected.presentation=value;
+  else if(action==='sections')selected.sections=value;
+  else if(action==='default')set(got.path,'defaultView',selected.id);
+  else return {error:'Unknown View action.'};
+  set(got.path,'views',views);
+  var findings=validate(normalize(JSON.parse(next)));if(findings.errors.length)return {error:findings.errors.join('\n')};
+  return {text:next,viewId:resultId};
+}

@@ -1517,3 +1517,8 @@ body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:fo
 
 .section-view-options-body .chapter-diagram-visibility{display:flex;flex-direction:row;align-items:center;gap:8px;}
 .section-view-options-body .chapter-diagram-visibility input{width:auto;}
+
+.workspace-canvas #docview>.document-navigation-space{display:none;}
+.workspace-canvas #docview .doc-sec{scroll-margin-top:calc(var(--workspace-content-top) + 12px);}
+
+@media screen and (min-width:1025px){.workspace-canvas #docview .explore-navigation{flex-wrap:nowrap;}}

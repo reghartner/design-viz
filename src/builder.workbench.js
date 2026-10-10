@@ -903,6 +903,7 @@ function initWorkbenchBuilder(opts){
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
+    editView:function(section,id,action,value){var nextId,ok=commitCascade(function(raw){var plan=planTabViewEdit(session.text(),raw,section,id,action,value);nextId=plan.viewId;return plan;});return ok?nextId:null;},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
     },
@@ -973,7 +974,8 @@ function initWorkbenchBuilder(opts){
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
       inspectorMessage('no sections found in the editor text'); return;
     }
-    var plan = kind === 'section' ? planAddSection(session.text(), parsed.raw)
+    var ctl=opts.ctl(),active=ctl && ctl.sections.find(function(rec){return rec.number===session.insertSection+1;}),activeView=active && ctl.views && ctl.views.current(active);
+    var plan = kind === 'section' ? planAddSection(session.text(), parsed.raw,session.insertSection,activeView && activeView.id)
                                   : planFn(session.text(), parsed.raw, session.insertSection, kind === 'step' && stepperFor(session.insertSection) ? stepperFor(session.insertSection).path() : undefined);
     if (plan.error){ inspectorMessage(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;

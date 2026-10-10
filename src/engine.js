@@ -3684,8 +3684,14 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   ctl.activeStepper = activeStepper;
   if(manageHistory)win.addEventListener('hashchange', apply);
   var initialState=parseHash(win.location.hash),hasInitialTarget=Object.keys(initialState).some(function(key){return initialState[key]!=null;});
+  // An explicit route owns its initial scroll. Otherwise browser reload
+  // restoration can overwrite the routed card position after apply() and
+  // switch the passive navigation context to an unrelated section.
+  var previousScrollRestoration=null;
+  if(manageHistory && hasInitialTarget && win.history && 'scrollRestoration' in win.history){previousScrollRestoration=win.history.scrollRestoration;win.history.scrollRestoration='manual';}
   if(win.location.hash && (manageHistory || options.restoreHash!==false && hasInitialTarget))apply();else write();
   return {receiveLinkBaseMessage:receiveLinkBaseMessage,destroy:function(){
+    if(previousScrollRestoration!==null && win.history.scrollRestoration==='manual')win.history.scrollRestoration=previousScrollRestoration;
     if(manageHistory)win.removeEventListener('hashchange',apply);
     if(ctl.onChange===linkedChange)ctl.onChange=priorChange;
     ctl.activeStepper=priorActiveStepper;

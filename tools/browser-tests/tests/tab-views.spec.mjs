@@ -45,3 +45,27 @@ test('native Views keep host-top nav, reject cross-View destinations and isolate
  await navbar.getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(one.locator('#section-a')).toBeVisible();await expect(one.locator('#section-c')).toBeVisible();expect(await geometry()).toEqual(initial);await navbar.getByRole('button',{name:'Explore A',exact:true}).click();expect(await geometry()).toEqual(initial);
  await page.evaluate(()=>first.destroy());await expect(one.locator('.explore-navigation')).toHaveCount(0);await expect(two.locator('.explore-navigation')).toHaveCount(1);await page.evaluate(()=>{second.destroy();window.legacy=mount(document.querySelector('#two'),{sections:[{id:'plain',diagram:{nodes:{a:{title:'A'}},rows:[['a']]}}]});legacy.navigate({section:'plain',view:'flow'});});await expect(two.locator('#section-plain')).toBeVisible();await page.evaluate(()=>legacy.destroy());
 });
+
+test('compound contract routes retain the second member navigation through tour restoration and reload',async({page,server})=>{
+ const raw=await fixture(),sections=raw.page.blocks[0].tabs[0].sections;
+ for(const id of ['a','c'])sections.find(section=>section.id===id).contract={title:'Contract '+id.toUpperCase(),fields:[{k:'event',v:id}]};
+ raw.page.tour={version:1,steps:[{id:'visit-a',target:{selector:'.board',within:'section'},diagramState:{section:'a',mode:'step'},copy:{heading:'Visit A'}}]};
+ const input=path.join(server.root,'tab-view-contracts.json'),output=path.join(server.root,'tab-view-contracts.html');
+ await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ const url=server.origin+'/tab-view-contracts.html',root=page.locator('#docview');
+ async function assertContext(){
+  await expect(nav(root)).toHaveAttribute('data-navigation-section','3');
+  await expect(nav(root).getByRole('button',{name:'Standard A + C',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(nav(root).getByRole('button',{name:/^Copy embed link for Section C/})).toBeVisible();
+  await expect(root.locator('#section-b')).toBeHidden();
+ }
+ for(const route of ['#d=c&v=standard-ac&c=c','#d=c&v=standard-ac&c=c&r=1','#c=c']){
+  await page.goto(url+route);await assertContext();
+  const hash=new URL(page.url()).hash;
+  await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
+  await expect(page.locator('.dv-tour-ui .dv-tour-heading')).toHaveText('Visit A');
+  await page.keyboard.press('Escape');await expect(page.locator('.dv-tour')).toBeHidden();await assertContext();
+  expect(new URL(page.url()).hash).toBe(hash);
+  await page.reload();await assertContext();expect(new URL(page.url()).hash).toBe(hash);
+ }
+});

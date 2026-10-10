@@ -2133,6 +2133,19 @@ test('host-owned deep links restore an initial target without writing host histo
   h.channel.destroy();
 });
 
+test('explicit standalone routes own reload scrolling and release that ownership on destroy', () => {
+  const seed=deepLinkHarness(undefined,{history:false});seed.channel.destroy();
+  seed.win.history.scrollRestoration='auto';seed.win.location.hash='#t=overview';
+  const hosted=deepLinkHarness(undefined,{history:false},seed.win);
+  assert.strictEqual(seed.win.history.scrollRestoration,'auto');hosted.channel.destroy();
+  const routed=deepLinkHarness(undefined,undefined,seed.win);
+  assert.strictEqual(seed.win.history.scrollRestoration,'manual');routed.channel.destroy();
+  assert.strictEqual(seed.win.history.scrollRestoration,'auto');
+  seed.win.location.hash='';
+  const plain=deepLinkHarness(undefined,undefined,seed.win);
+  assert.strictEqual(seed.win.history.scrollRestoration,'auto');plain.channel.destroy();
+});
+
 test('overlapping deep-link setters retire safely in either order', () => {
   function pair(){
     const a=deepLinkHarness(undefined,{history:false}),b=deepLinkHarness(undefined,{history:false},a.win);

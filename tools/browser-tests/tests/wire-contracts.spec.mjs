@@ -53,7 +53,7 @@ test('wire hover, traversable content, pin, source links, keyboard, dismissal an
 async function avoidsCanvasControls(root){
  const overlaps=await root.evaluate(el=>{
   const scope=el.shadowRoot || el,pop=scope.querySelector('.wire-contract-preview').getBoundingClientRect();
-  return Array.from(scope.querySelectorAll('.diagram-views,.explore-tools,.explore-player')).map(control=>{
+  return Array.from(scope.querySelectorAll('.explore-navigation,.diagram-views,.explore-tools,.explore-player')).map(control=>{
    const r=control.getBoundingClientRect();return {control:control.className,area:Math.max(0,Math.min(pop.right,r.right)-Math.max(pop.left,r.left))*Math.max(0,Math.min(pop.bottom,r.bottom)-Math.max(pop.top,r.top))};
   });
  });
@@ -67,7 +67,7 @@ async function nearMarkerOrAboveToolbar(page,root){
  // Rendered card and toolbar heights vary across hosts. A full-width
  // toolbar can leave too little room below it for the complete card: require
  // that measured constraint before accepting the above-toolbar fallback.
- const bars=await root.locator('.diagram-views,.explore-tools').evaluateAll(els=>els.map(el=>{
+ const bars=await root.locator('.explore-navigation,.diagram-views,.explore-tools').evaluateAll(els=>els.map(el=>{
   const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};
  }).filter(r=>r.width && r.height));
  expect(bars.length).toBeGreaterThan(0);
@@ -112,6 +112,14 @@ test('Workbench binds an existing card to an active wire with one Undo/Redo and 
 
 test('native Canvas keeps the full preview above its toolbar when no adjacent card fits',async({page,server})=>{
  await page.setViewportSize({width:1100,height:780});const root=await open(page,server,fixture(true),true);
+ // A native embed near the bottom of its host page leaves too little visible
+ // canvas below its toolbar. Keep the wire visible by panning the real board.
+ await page.evaluate(async()=>{
+  document.body.style.overflow='hidden';document.querySelector('#host').style.marginTop='560px';
+  await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
+  const scope=document.querySelector('#host').shadowRoot,board=scope.querySelector('.board');
+  board.scrollTop+=scope.querySelector('.wire-contract-marker').getBoundingClientRect().top-690;
+ });
  await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
  await marker(root).first().click();await geometry(page,preview(root));await avoidsCanvasControls(root);
  expect(await nearMarkerOrAboveToolbar(page,root)).toBe('above-toolbar');

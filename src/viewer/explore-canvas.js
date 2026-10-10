@@ -93,14 +93,19 @@ function initViewerExploreCanvas(ctl,view,opts){
   function navigationState(){
     var target=ctl.activeTarget,rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
     if(!rec && target && target.kind==='tab')rec=tabPrimary(target) || ctl.sections.find(function(r){return r.tabBlock===target.tabBlock && r.tab===target.tab;});
-    // A page/contract target still has a selected owner View. Restoring such a
-    // route (for example after a tour) must not empty the document navigation.
+    function eligible(record){return record && !record.detailOnly && !record.viewExcluded && (!record.tabBlock || ctl.tabBlocks[record.tabBlock-1].active()===record.tab) && (!ctl.views || ctl.views.members(record).indexOf(record)>=0);}
+    function diagramRecord(number){return ctl.sections.find(function(record){return record.number===number && record.hasDiagram && eligible(record);});}
+    // Compound contract routes retain their explicit diagram destination. A
+    // plain card route uses its own eligible diagram before keeping current
+    // navigation or falling back to the selected View's opening member.
+    if(!rec && target && (target.kind==='card' || target.kind==='row'))rec=diagramRecord(target.diagramSection) || diagramRecord(target.section);
+    if(!rec && eligible(navigation.current()))rec=navigation.current();
     if(!rec){
-      var visible=ctl.sections.find(function(r){return !r.detailOnly && !r.viewExcluded && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
-      rec=visible && (ctl.views && ctl.views.primary(visible.tabBlock,visible.tab) || visible);
+      var visible=ctl.sections.find(eligible),primary=visible && ctl.views && ctl.views.primary(visible.tabBlock,visible.tab);
+      rec=eligible(primary)?primary:visible;
     }
     var ownerView=ctl.views && ctl.views.current(rec),definition=rec && rec.viewport && rec.viewport.viewDefinition();
-    return {rec:rec,key:JSON.stringify([target,ownerView && ownerView.id,definition && definition.id,definition && definition.presentation])};
+    return {rec:rec,key:JSON.stringify([target,rec && rec.number,ownerView && ownerView.id,definition && definition.id,definition && definition.presentation])};
   }
   function navigationChanged(){
     var state=navigationState();if(state.key===lastTarget)return;lastTarget=state.key;
@@ -110,9 +115,6 @@ function initViewerExploreCanvas(ctl,view,opts){
   function changed(){if(priorChange)priorChange.apply(ctl,arguments);navigationChanged();}
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
-  var target=ctl.activeTarget,initial=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):target && target.kind==='tab'?tabPrimary(target):null;
-  if(!initial && (!target || target.kind!=='tab'))initial=ctl.sections.find(function(r){return !r.detailOnly && r.viewport && r.viewport.isExplore() && !r.tabBlock;});
-  if(!initial)initial=ctl.sections.find(function(r){return !r.detailOnly && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
-  show(initial);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
+  show(navigationState().rec);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
   return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
 }

@@ -266,6 +266,11 @@ function initSectionLayoutEditor(opts){
     }
     section.querySelectorAll('.section-layout-tile').forEach(function(tile){tile.classList.toggle('layout-selected',tile.getAttribute('data-layout-key')===selected);});
   }
+  function refreshViewSettings(){
+    view.querySelectorAll('.doc-sec[data-dv-section]').forEach(function(section){
+      if(!section.closest('[data-dv-detail-preview]'))viewSettings(section,rawDiagram(Number(section.getAttribute('data-dv-section'))));
+    });
+  }
   function refresh(){
     sections.forEach(function(rec,section){if(!view.contains(section)){rec.life.destroy();rec.fields.destroy();rec.viewFields.destroy();sections.delete(section);}});
     if(drag && !drag.grid.isConnected)cancel();
@@ -420,7 +425,7 @@ function initSectionLayoutEditor(opts){
   life.listen(document,'keydown',function(ev){if(drag&&ev.key==='Escape'){ev.preventDefault();ev.stopPropagation();cancel();}},true);
   life.listen(window,'blur',cancel);life.listen(window,'resize',cancel);life.listen(opts.src,'input',function(){cancel();endEditing();view.querySelectorAll('.section-arranger:popover-open').forEach(function(actions){actions.hidePopover();});view.querySelectorAll('.section-arranging').forEach(function(section){section.classList.remove('section-arranging');});});
   var query=new URLSearchParams(window.location.search).get('layout');if(['backstage','confluence'].indexOf(query)>=0){target.value=query;profile=query;}
-  updateTarget();return {refresh:life.guard(refresh),cancel:life.guard(cancel),
+  updateTarget();return {refresh:life.guard(refresh),refreshViewSettings:life.guard(refreshViewSettings),cancel:life.guard(cancel),
     beforeReplace:life.guard(function(request){cancel();if(!request || ['edit','history'].indexOf(request.origin)<0)endEditing();clearSections();}),
     destroy:function(){if(!life.alive())return;cancel();life.destroy();endEditing();
       var ctl=opts.ctl && opts.ctl();if(ctl)ctl.sections.forEach(function(rec){if(rec.presentation && rec.presentation.setArranging)rec.presentation.setArranging(false);if(rec.presentation && rec.presentation.setExploreAuthor)rec.presentation.setExploreAuthor(null);});

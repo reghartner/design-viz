@@ -951,7 +951,11 @@ function initWorkbenchBuilder(opts){
   }
   function previewRendered(outcome){
     hideDiff();
-    if(outcome.ok && outcome.retained==='explore')return;
+    if(outcome.ok && outcome.retained==='explore'){
+      // Retain the live canvas, but renew source-bound View action callbacks.
+      if(sectionLayoutEditor)sectionLayoutEditor.refreshViewSettings();
+      return;
+    }
     if(addMenu)addMenu.refresh();
     if(outlineSearch)refreshOutline();
     if(!outcome.ok){

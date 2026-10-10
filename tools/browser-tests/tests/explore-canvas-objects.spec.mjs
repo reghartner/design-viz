@@ -114,10 +114,10 @@ test('Fit recovers a far-away canvas panel and Floating retains its normal zoom 
 
 test('canvas selection is transient across Explore view teardown and rebuild',async({page,server})=>{
  await open(page,server,fixture(),'reader');const panel=home(page);await expectCanvasChrome(panel,false);
- await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();
+ await page.locator('#docview>.explore-navigation .diagram-view-choice button[aria-pressed="true"]').focus();
  for(let i=0;i<40 && !(await panel.getAttribute('aria-current'));i++)await page.keyboard.press('Tab');
  await expect(panel).toBeFocused();await expectCanvasChrome(panel,true);await page.keyboard.press('Escape');await expectCanvasChrome(panel,false);
- await page.locator('.diagram-view-choice button[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
+ await page.locator('#docview>.explore-navigation .diagram-view-choice button[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-canvas-selected')).toHaveCount(0);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(home(page)).toBeVisible();await expectCanvasChrome(home(page),false);
 });
@@ -196,7 +196,9 @@ test('canvas widget buttons, keyboard handles, step content and visibility retai
 test('inline Explore keeps far-below canvas objects inside its scrollable bounds and Fit recovers them',async({page,server})=>{
  const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;layout.canvas.panels[0].x=500;layout.canvas.panels[0].y=9000;
  await page.setViewportSize({width:1440,height:900});await open(page,server,raw,'inline');await page.evaluate(()=>document.fonts.ready);
- await expect(page.locator('.viewer-diagram-canvas,.workbench-diagram-canvas')).toHaveCount(0);
+ await expect(page.locator('flowview-root.native-canvas,.workbench-diagram-canvas')).toHaveCount(0);
+ const hostBounds=await page.locator('flowview-root').boundingBox(),canvasBounds=await page.locator('.viewer-diagram-canvas').boundingBox(),navBounds=await page.locator('.explore-navigation').boundingBox();
+ expect(canvasBounds.x).toBeGreaterThanOrEqual(hostBounds.x);expect(canvasBounds.y).toBeCloseTo(navBounds.y+navBounds.height,0);expect(canvasBounds.x+canvasBounds.width).toBeLessThanOrEqual(hostBounds.x+hostBounds.width+1);expect(canvasBounds.y+canvasBounds.height).toBeLessThanOrEqual(hostBounds.y+hostBounds.height+1);
  const canvas=page.locator('.boardcanvas'),far=home(page),initial=await far.boundingBox(),container=await canvas.boundingBox();
  const margin=await board(page).evaluate(el=>parseFloat(el.style.getPropertyValue('--explore-margin-y')));
  // Absolute objects must have the same trailing scroll margin as the graph,

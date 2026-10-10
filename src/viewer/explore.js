@@ -25,7 +25,7 @@ function restoreCanvasPanelMemory(d, memories, id, value){
 function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, prose){
   var retired=false, active=false, expanded=false, pendingFullscreen=0,workbenchCanvas=false,readerCanvas=false;
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
-  var definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
+  var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
   var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0;
   var shell=document.createElement('div');shell.className='section-viewport';
@@ -41,7 +41,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var menu=document.createElement('details');menu.className='explore-panel-menu';menu.hidden=false;
   var summary=document.createElement('summary');summary.textContent='Panels';menu.appendChild(summary);
   var choices=document.createElement('div');choices.className='explore-panel-choices';menu.appendChild(choices);actions.appendChild(menu);
-  var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=false;
+  var legendMenu=document.createElement('details');legendMenu.className='explore-legend-menu';legendMenu.hidden=true;
   var legendSummary=document.createElement('summary');legendSummary.textContent='Legend';legendMenu.appendChild(legendSummary);
   var legendItems=document.createElement('div');legendItems.className='lg explore-edge-legend';legendItems.setAttribute('role','group');legendItems.setAttribute('aria-label','Edge legend');legendMenu.appendChild(legendItems);actions.appendChild(legendMenu);
   var panelBody=document.createElement('div');panelBody.className='explore-panel-body';menu.appendChild(panelBody);panelBody.appendChild(choices);
@@ -52,7 +52,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var placementHint=document.createElement('small');placementHint.className='explore-placement-hint';placementHint.textContent='Default applies to panels without overrides.';placementLabel.appendChild(placementHint);placementLabel.hidden=true;placement.addEventListener('change',function(){changePlacement(placement.value);});
   var focus=button('Hide panels',function(){memory.focus=!memory.focus;paint();});focus.hidden=true;
   var stack=button('Stack at edge',function(){var token=beginEdit(true);if(token===false)return;windows.filter(function(w){return available(w) && !canvasWindow(w);}).forEach(function(w){w.state.stacked=true;setWindowHidden(w,false);w.state.automatic=false;rememberRect(w);});memory.focus=false;paint();publish(token);});stack.classList.add('explore-stack');stack.hidden=true;
-  var expand=button('Expand',toggleExpanded);expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
+  var expand=button('Expand',toggleExpanded);expand.classList.add('viewport-expand');expand.title='Expand diagram view';expand.setAttribute('aria-pressed','false');expand.setAttribute('aria-label','Expand diagram view');
   var status=document.createElement('span');status.className='viewport-status';status.setAttribute('role','status');actions.appendChild(status);
   function zoomGroup(label,cls){
     var group=document.createElement('div');group.className='explore-zoom-group '+cls;group.setAttribute('role','group');group.setAttribute('aria-label',label);
@@ -86,6 +86,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   playerResize.addEventListener('keydown',function(ev){keyboard(ev,playerWindow,'resize');});
   var legend=board.querySelector('.lg');
   if(legend)Array.prototype.slice.call(legend.querySelectorAll('.li')).forEach(function(item){legendItems.appendChild(item);});
+  legendMenu.hidden=!legendItems.childElementCount;
   function syncTools(){
     // Every reader Explore surface shares the compact row. Workbench canvas
     // controls have their own owner, so its panel sizing stays in the menu.
@@ -254,6 +255,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
     board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
   }
+  function scrollState(){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    return {x:board.scrollLeft,y:board.scrollTop,width:lastWidth,height:lastHeight,graphWidth:graphPixels,graphHeight:graphPixels*ratio,marginX:marginX,marginY:marginY,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};
+  }
+  function restoreScroll(saved){
+    var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
+    var unchanged=saved.width===board.clientWidth && saved.height===board.clientHeight && saved.graphWidth===graphPixels && saved.graphHeight===graphPixels*ratio && saved.marginX===marginX && saved.marginY===marginY;
+    // Avoid a lossy normalized-camera round trip when the viewport and graph
+    // are unchanged. Fractional graph heights can otherwise add a pixel on
+    // every View switch. Resized destinations still keep the graph center.
+    if(saved.camera && !unchanged)positionCamera(saved.camera);
+    else{board.scrollLeft=saved.x;board.scrollTop=saved.y;}
+  }
   function saveCamera(token){
     if(!active || retired)return;
     // Canvas navigation lives in scroll/zoom memory. Keeping it out of the
@@ -342,15 +356,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function constrain(w,r){
     if(canvasWindow(w))return {x:clamp(r.x,-10000,10000),y:clamp(r.y,-10000,10000),w:clamp(r.w,minimum(w),10000),h:clamp(r.h,72,10000)};
-    var b=bounds(),scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
+    var b=bounds(),bottom=workbenchCanvas?12:stackInsets().bottom,scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
     var minH=w===playerWindow?Math.min(104*scale,Math.max(72,b.h-24)):32+40*scale;
     var maxW=w===playerWindow?b.w:b.w*scale,maxH=w===playerWindow?b.h*scale:32+(b.h-32)*scale;
-    var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-24,maxH)));
-    return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-12)),w:width,h:height};
+    var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-bottom-12,maxH)));
+    return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-bottom)),w:width,h:height};
   }
   function stackInsets(){
     var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getBoundingClientRect();
-    return {top:12,bottom:workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):12};
+    var owner=readerCanvas && shell.closest('.docview'),utilities=owner && owner.querySelector(':scope > .reader-page-actions');
+    var utilityRect=utilities && utilities.getClientRects().length && utilities.getBoundingClientRect();
+    var readerBottom=utilityRect?Math.max(12,stage.getBoundingClientRect().bottom-utilityRect.top+12):12;
+    return {top:12,bottom:workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):readerBottom};
   }
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
@@ -415,9 +432,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var trackRoom=(r.h-railHeight-2)/scale-padding-(beside?0:34+gap)-(compact?transportHeight+gap:0);
     var rowHeight=beside?Math.max(tracks,captionHeight,transportHeight):tracks;
     player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
-    // Authored positions use the normal stage boundary. Only automatic docks
-    // reserve the Workbench toolbar inset when paint anchors them below.
-    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-12));
+    // Reader utilities reserve space for floating controls. Workbench toolbar
+    // insets still apply only to automatic docks, not authored geometry.
+    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(workbenchCanvas?12:insets.bottom)));
     return r;
   }
   function paint(){
@@ -649,7 +666,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(bar)move(bar,player);move(board,canvas);board.querySelector('.boardcanvas').appendChild(objectLayer);if(legend)move(legend,tools);overlayZoom.hidden=false;syncTools();
     // Reuse the rendered samples so protocol overrides, skins and response
     // dashes stay identical to Standard. The move anchors restore them on leave.
-    legendMenu.hidden=false;
+    legendMenu.hidden=!legendItems.childElementCount;
     board.classList.add('explore-board');paintBoardVisibility();fitHeight();
     cards.forEach(function(card){var index=Number(card.getAttribute('data-dv-panel')),panel=d.panels[index],it=items.find(function(v){return v.panel===panel.id;}) || {};floatingWindow(card,panel,it,false);if(visibilityObserver)visibilityObserver.observe(card,{attributes:true,attributeFilter:['class'],childList:true,subtree:true});});
     if(prose){prose.setFloating(true);floatingWindow(prose.proseEl,null,memory.layout.prose || {},true);}
@@ -659,9 +676,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(tracksObserver && bar)tracksObserver.observe(bar,{childList:true,subtree:true,characterData:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
     lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
-    // A reader view can enter at page size before becoming full-browser. Restore the
-    // graph-relative center; raw scroll offsets describe the old viewport.
-    if(memory.scroll){if(memory.scroll.camera)positionCamera(memory.scroll.camera);else{board.scrollLeft=memory.scroll.x;board.scrollTop=memory.scroll.y;}}
+    if(memory.scroll)restoreScroll(memory.scroll);
     else if(memory.layout.camera)positionCamera(memory.layout.camera);
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
   }
@@ -670,17 +685,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // the regular camera suspended until the destination layout is mounted.
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
-    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
+    if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
-    stage.appendChild(player);controlsPlacementLabel.hidden=true;objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=false;
+    stage.appendChild(player);controlsPlacementLabel.hidden=true;objectLayer.remove();windows.forEach(function(w){w.el.remove();});windows=[];choices.replaceChildren();menu.open=false;legendMenu.open=false;legendMenu.hidden=!legendItems.childElementCount;
     stage.hidden=true;grid.hidden=false;board.hidden=canvasBoardHidden;board.classList.remove('explore-board','authored-diagram-hidden');player.removeAttribute('data-explore-layout');player.removeAttribute('data-step-text-position');['--explore-width','--explore-margin-x','--explore-margin-y','--explore-canvas-height','--explore-canvas-width'].forEach(function(k){board.style.removeProperty(k);});
     shell.classList.remove('viewport-explore');syncTools();menu.hidden=false;focus.hidden=stack.hidden=true;standardPanels();
     if(!holdNavigation && boardSize && boardSize.resume)boardSize.resume();
   }
-  function isFullscreen(){return document.fullscreenElement===shell;}
-  function setExpanded(value){expanded=value;shell.classList.toggle('viewport-expanded',value);expand.textContent=value?'Exit expanded view':'Expand';expand.setAttribute('aria-label',value?'Exit expanded diagram view':'Expand diagram view');expand.setAttribute('aria-pressed',String(value));paint();}
+  function fullscreenHost(){return shell.closest('.has-document-navigation') || shell;}
+  function isFullscreen(){return document.fullscreenElement===fullscreenHost();}
+  function setExpanded(value){expanded=value;shell.classList.toggle('viewport-expanded',value);expand.textContent=value?'Exit expanded view':'Expand';expand.title=value?'Exit expanded diagram view':'Expand diagram view';expand.setAttribute('aria-label',value?'Exit expanded diagram view':'Expand diagram view');expand.setAttribute('aria-pressed',String(value));paint();}
   function exitExpanded(){
     pendingFullscreen++;setExpanded(false);status.textContent='';
     if(isFullscreen() && document.exitFullscreen){var result=document.exitFullscreen();if(result && result.catch)result.catch(function(){});}
@@ -692,8 +708,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var token=++pendingFullscreen;
     function failed(){if(retired || token!==pendingFullscreen)return;status.textContent='Expanded in this page. Browser fullscreen is unavailable.';}
     try{
-      if(!shell.requestFullscreen){failed();return;}
-      var promise=shell.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
+      var host=fullscreenHost();if(!host.requestFullscreen){failed();return;}
+      var promise=host.requestFullscreen();if(promise && promise.then)promise.then(function(){if(retired || token!==pendingFullscreen){if(isFullscreen() && document.exitFullscreen)document.exitFullscreen().catch(function(){});}},failed);
     }catch(_){failed();}
   }
   function fullscreenChanged(){if(!isFullscreen() && expanded){setExpanded(false);status.textContent='';}}
@@ -780,8 +796,12 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     },
     viewDefinition:function(){return definition;},
     setReaderCanvas:function(on){
+      var opening=on && !readerCanvas && active && memory && memory.scroll;
       readerCanvas=on;shell.classList.toggle('viewer-diagram-canvas',on);
       syncTools();fitHeight();paint();
+      // Enter may briefly use the inline dimensions before the reader mounts
+      // its canvas. Restore from the original capture after that final layout.
+      if(opening)restoreScroll(opening);
     },
     setWorkbenchCanvas:function(on){
       if(retired || workbenchCanvas===on)return;
@@ -792,6 +812,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     currentCamera:function(){return camera();},
     panelPlacement:function(){return onCanvas()?'canvas':'floating';},
     canvasCommand:function(){return expand;},
+    navigationKeydown:keydown,
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
@@ -800,7 +821,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       if(!active || !memory || !force && memory.scroll || !(memory.layout && memory.layout.camera))return false;
       sizeGraph(false);positionCamera(memory.layout.camera);return true;
     },
-    setView:function(view,tiles,sourceGrid){leave(true);definition=view;items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
+    setPresentation:function(value){if(presentationOverride===value)return;presentationOverride=value;if(!definition)definition={id:'flow',presentation:'standard'};if(definition.presentation===value)return;leave(true);definition=Object.assign({},definition,{presentation:value});enter();if(!active && boardSize && boardSize.resume)boardSize.resume();},
+    setView:function(view,tiles,sourceGrid){leave(true);definition=presentationOverride?Object.assign({},view,{presentation:presentationOverride}):view;items=tiles || [];panelSource=sourceGrid || grid;standardPanels();var fresh=!memories[view.id];enter();if(!active && boardSize && boardSize.resume)boardSize.resume();if(workbenchCanvas && fresh)shell.dispatchEvent(new CustomEvent('workbench-canvas-view',{bubbles:true}));shell.dispatchEvent(new CustomEvent('diagram-view-change',{bubbles:true}));},
     setArranging:function(value){shell.classList.toggle('viewport-arranging',!!value);},
     setAuthor:function(value){if(!value){clearScrollEdit();finish(true);}author=value;},
     adoptLayout:function(id,value){
@@ -815,9 +837,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       var previous=definition;definition=Object.assign({},definition,{exploreLayout:defaults});enter();definition=previous;publish(token);
     },
     scrollTarget:function(){return active?stage:grid;},
-    refresh:resized,
+    refresh:resized,refreshChrome:paint,
     snapshotCanvasState:function(){
-      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:camera(lastWidth,lastHeight)};memory.zoom=zoom;}
+      if(workbenchCanvas && active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;}
       return copy(workbenchCanvas?memories:otherMemories);
     },
     restoreCanvasState:function(saved){
@@ -832,7 +854,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       return true;
     },
     snapshotReaderState:function(){
-      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll={x:board.scrollLeft,y:board.scrollTop,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};memory.zoom=zoom;}
+      if(active && graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;}
       return {memories:copy(workbenchCanvas?otherMemories:memories),canvasMemories:copy(workbenchCanvas?memories:otherMemories),expanded:expanded,fullscreen:isFullscreen(),stageHeight:stage.style.height,menuOpen:menu.open,legendOpen:legendMenu.open};
     },
     restoreReaderState:function(saved){

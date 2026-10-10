@@ -486,8 +486,8 @@ def clip_expression(section_reference: str, margin: int) -> str:
 
     The rect covers the visible Explore canvas, custom composition or legacy
     board grid, plus step controls wherever they are attached or detached. Explore
-    keeps its navigation, graph, floating panels and pinned controls inside the
-    full-browser canvas shell. Custom layouts
+    includes its document-owned navigation above the graph, floating panels and
+    pinned controls. Standard captures remain diagram-only. Custom layouts
     relocate panels out of ``.boardgrid`` and hide that old container, so both
     grid types must be considered. Zero-area hidden elements contribute nothing.
     Expand by ``margin`` CSS pixels and clamp to the document. Return null when
@@ -500,6 +500,10 @@ def clip_expression(section_reference: str, margin: int) -> str:
         "var pad = %d;"
         "var parts = Array.prototype.slice.call(sec.querySelectorAll("
         "'.viewer-diagram-canvas, .explore-stage, .section-layout-grid, .boardgrid, .termbar'));"
+        "if (sec.classList.contains('explore-active-section')){"
+        "var root=sec.closest('.docview'),nav=root && root.querySelector(':scope > .explore-navigation');"
+        "if(nav)parts.push(nav);"
+        "}"
         "var left = Infinity, top = Infinity, right = -Infinity, bottom = -Infinity;"
         "parts.forEach(function(el){"
         "var r = el.getBoundingClientRect();"

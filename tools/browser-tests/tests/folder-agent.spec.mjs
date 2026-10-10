@@ -77,7 +77,7 @@ async function openAgent(page){
 }
 async function expectWorkbenchCanvas(page){
   const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
-  const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
+  const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('#docview > .explore-navigation').boundingBox();
   const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
   const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:viewport.width-96,height:viewport.height-contentTop-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
@@ -769,8 +769,8 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
     await canvasTools(page);await page.locator('#workspace-panels').click();
-    await page.locator('button[data-layout-id="technical"]').click();
-    await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
+    await page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true}).click();
+    await expect(page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true})).toHaveAttribute('aria-pressed','true');
     await page.locator('#workspace-fit').click();
     await chooseAddDestination(page,'1');
     await expectWorkbenchCanvas(page);
@@ -778,7 +778,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await expect(page.locator('[data-dv-node="a"]')).toBeHidden();
     await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();
     await chooseAddDestination(page,'0');
-    await expect(page.locator('button[data-layout-id="technical"]')).toHaveAttribute('aria-pressed','true');
+    await expect(page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true})).toHaveAttribute('aria-pressed','true');
     await page.locator('#workspace-zoom-out').click();
     const camera=()=>page.locator('.workspace-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const prior=await camera();
@@ -791,7 +791,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await page.locator('#open-page-preview').click();
     await expect(page.locator('#page-preview')).toBeVisible();
     await expect(page.locator('#page-preview .viewer-diagram-canvas>.explore-stage')).toBeVisible();
-    await page.locator('#page-preview .explore-navigation').getByRole('button',{name:'Delivery',exact:true}).click();
+    await expect(page.locator('#page-preview .explore-navigation').getByRole('button',{name:'Technical',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(page.locator('#page-preview .viewer-diagram-canvas')).toContainText('Customer support');
     await page.locator('#close-page-preview').click();
     expect(await camera()).toEqual(prior);

@@ -903,6 +903,7 @@ function initWorkbenchBuilder(opts){
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
+    editView:function(section,id,action,value){var nextId,ok=commitCascade(function(raw){var plan=planTabViewEdit(session.text(),raw,section,id,action,value);nextId=plan.viewId;return plan;});return ok?nextId:null;},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
     },
@@ -950,7 +951,11 @@ function initWorkbenchBuilder(opts){
   }
   function previewRendered(outcome){
     hideDiff();
-    if(outcome.ok && outcome.retained==='explore')return;
+    if(outcome.ok && outcome.retained==='explore'){
+      // Retain the live canvas, but renew source-bound View action callbacks.
+      if(sectionLayoutEditor)sectionLayoutEditor.refreshViewSettings();
+      return;
+    }
     if(addMenu)addMenu.refresh();
     if(outlineSearch)refreshOutline();
     if(!outcome.ok){
@@ -973,7 +978,8 @@ function initWorkbenchBuilder(opts){
     if (kind !== 'section' && !specSectionPaths(parsed.raw).length){
       inspectorMessage('no sections found in the editor text'); return;
     }
-    var plan = kind === 'section' ? planAddSection(session.text(), parsed.raw)
+    var ctl=opts.ctl(),active=ctl && ctl.sections.find(function(rec){return rec.number===session.insertSection+1;}),activeView=active && ctl.views && ctl.views.current(active);
+    var plan = kind === 'section' ? planAddSection(session.text(), parsed.raw,session.insertSection,activeView && activeView.id)
                                   : planFn(session.text(), parsed.raw, session.insertSection, kind === 'step' && stepperFor(session.insertSection) ? stepperFor(session.insertSection).path() : undefined);
     if (plan.error){ inspectorMessage(plan.error); return; }
     if(!session.accept(plan,{snapshot:parsed,beforePublish:clearMultiSelect}))return;
@@ -1376,14 +1382,14 @@ function initWorkbenchBuilder(opts){
   refreshProvenance();
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});
-  function navigateWorkspace(target){
+  function navigateWorkspace(target,navigationOptions){
     var parsed=session.snapshot();if(parsed.error)return;
-    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
+    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target,navigationOptions);if(!rec)return;
     session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
     if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
     if(stepList)stepList.sync();
   }
-  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
+  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference},{editDetail:true});});
   function destroy(){life.destroy();}
   return {
     resolve:session.resolve,

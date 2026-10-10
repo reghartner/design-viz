@@ -1201,6 +1201,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .canon-library-owner{color:#7a8194;overflow-wrap:anywhere}.canon-library-action{margin-top:auto;color:#7161a3;font-weight:650}
 .canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:108px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
 #canon-reader{margin:28px 0 50px;max-width:none}
+.canon-reader-active .workbench-header{position:sticky;top:0;z-index:110;max-width:none;background:#f7f8fc;}
 #welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}
 .welcome:has(#welcome-reader-screen:not([hidden])){max-width:none}#canon-reader .doc-heading{display:none}
 @media(max-width:760px){.welcome-library-entry>span:first-child{display:grid;gap:5px}.canon-reader-toolbar{flex-wrap:wrap}}
@@ -1517,3 +1518,22 @@ body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:fo
 
 .section-view-options-body .chapter-diagram-visibility{display:flex;flex-direction:row;align-items:center;gap:8px;}
 .section-view-options-body .chapter-diagram-visibility input{width:auto;}
+
+.workspace-canvas #docview>.document-navigation-space{display:none;}
+.workspace-canvas #docview .doc-sec{scroll-margin-top:calc(var(--workspace-content-top) + 12px);}
+
+@media screen and (min-width:1025px){.workspace-canvas #docview .explore-navigation{flex-wrap:nowrap;}}
+
+/* Keep View settings compact, with each membership checkbox beside its label. */
+.section-view-options-body{gap:8px;padding:12px;}
+.section-view-options-body label{gap:5px;margin:0;font:500 12px/18px 'IBM Plex Sans',sans-serif;}
+.section-view-options-body :is(input:not([type=checkbox]),select){box-sizing:border-box;width:100%;min-width:0;min-height:30px;font:inherit;}
+.section-view-options-body .view-presentation-field{display:grid;grid-template-columns:1fr 1fr;align-items:center;}
+.view-name-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;align-items:end;}
+.view-management-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+.section-view-options-body fieldset{min-width:0;margin:2px 0;padding:8px;border:1px solid var(--line);border-radius:7px;}
+.section-view-options-body legend{padding:0 4px;font-weight:600;}
+.tab-view-member-row{display:flex;align-items:center;gap:6px;min-height:34px;}
+.section-view-options-body .tab-view-member{display:flex;flex-direction:row;align-items:center;gap:8px;flex:1;min-width:0;}
+.section-view-options-body :is(.tab-view-member,.chapter-diagram-visibility) input{width:15px;height:15px;flex:none;margin:0;}
+.section-view-options-body .fnote{margin:2px 0 0;}

@@ -29,6 +29,7 @@ test('new single-file HTML works offline with exact composed navigation and loca
     };
   });
   const hash='#t=distance-gate&d=alert-only-inside-15-feet&m=step&s=6&c=alert-only-inside-15-feet&r=2';
+  const canonicalHash=hash.replace('&m=step','&v=flow&m=step');
   await page.goto(pathToFileURL(path.join(server.root,'standalone.html')).href+hash);
   const row=page.locator('#contract-alert-only-inside-15-feet-row-2');
   await expect(row).toHaveClass(/dv-hash-target/);await expect(row).toBeFocused();await expect(row).toBeInViewport();
@@ -36,7 +37,7 @@ test('new single-file HTML works offline with exact composed navigation and loca
   await expect(page.locator('.tabbtn[aria-selected=true]')).toHaveText('Distance gate');
   await expect(page.locator('#section-alert-only-inside-15-feet .schip[aria-current=true]')).toHaveText('6');
   await expect(page.locator('#section-alert-only-inside-15-feet .board')).toHaveClass(/stepmode/);
-  expect(new URL(page.url()).hash).toBe(hash);
+  expect(new URL(page.url()).hash).toBe(canonicalHash);
   await page.evaluate(()=>document.fonts.ready);
   expect(await page.evaluate(()=>[...document.fonts].some(face=>face.family.includes('IBM Plex Sans')&&face.status==='loaded'))).toBe(true);
   await testInfo.attach('initial-font-layout',{body:JSON.stringify(await row.evaluate(scrollPosition)),contentType:'application/json'});
@@ -48,5 +49,5 @@ test('new single-file HTML works offline with exact composed navigation and loca
   await expect(row).toHaveClass(/dv-hash-target/);await expect(row).toBeFocused();await expect(row).toBeInViewport();
   await expect.poll(()=>row.evaluate(scrollPosition)).toMatchObject({aligned:true});
   await testInfo.attach('settled-scroll',{body:JSON.stringify(await row.evaluate(scrollPosition)),contentType:'application/json'});
-  expect(new URL(page.url()).hash).toBe(hash);
+  expect(new URL(page.url()).hash).toBe(canonicalHash);
 });

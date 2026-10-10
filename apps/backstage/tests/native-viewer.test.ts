@@ -115,11 +115,13 @@ it('keeps sibling mounts independent and supports destroy/remount on the same ho
   expect(remount.root.querySelector('.stepid')?.textContent).toBe('persist');
   expect(b.root.querySelector('.stepid')?.textContent).not.toBe('failure');
 });
-it('expands a curated view transiently and restores it without changing its story or sibling',()=>{
+it('expands Standard within the same navigation without changing its story or sibling',()=>{
   const raw=spec(),before=JSON.stringify(raw),a=boot(raw),b=boot();
   a.navigate({section:'recording',view:'business',path:'happy',step:'persist'});
   const position=a.snapshot();a.setCanvas(true);
-  expect(a.root.querySelector('.native-canvas .viewer-diagram-canvas')).toBeTruthy();
+  expect(a.root.querySelector('.native-canvas .explore-navigation')).toBeTruthy();
+  expect(a.root.querySelector('.viewer-diagram-canvas')).toBeNull();
+  expect(a.root.querySelector('#section-recording')?.hasAttribute('hidden')).toBe(false);
   expect(b.root.querySelector('.native-canvas')).toBeNull();
   expect(a.snapshot()).toEqual(position);
   a.setCanvas(false);
@@ -137,7 +139,16 @@ it('expands the active diagram tab rather than the first diagram in the document
   expect(tabs).toHaveLength(2);tabs[1].click();
   viewer.setCanvas(true);
   expect(viewer.snapshot()?.section).toBe('second-story');
-  expect(viewer.root.querySelector('.explore-active-section .sec-h')?.textContent?.trim()).toBe('Second story');
+  expect(viewer.root.querySelector('[role=tabpanel]:not([hidden]) .sec-h')?.textContent?.trim()).toBe('Second story');
+  expect(viewer.root.querySelector('.explore-active-section')).toBeNull();
+});
+it('expands authored Explore without changing its View, playback or sibling mount',()=>{
+  const raw=spec();Object.assign(raw.page.sections[0].diagram.layouts[0],{presentation:'explore'});
+  const before=JSON.stringify(raw),a=boot(raw),b=boot();a.navigate({section:'recording',view:'business',path:'happy',step:'persist'});
+  const position=a.snapshot(),nav=a.root.querySelector('.explore-navigation');a.setCanvas(true);
+  expect(a.root.querySelector('.native-canvas .viewer-diagram-canvas')).toBeTruthy();expect(a.root.querySelector('.explore-navigation')).toBe(nav);expect(a.snapshot()).toEqual(position);
+  expect(b.root.querySelector('.native-canvas')).toBeNull();expect(b.root.querySelector('.viewer-diagram-canvas')).toBeNull();
+  a.setCanvas(false);expect(a.root.querySelector('.native-canvas')).toBeNull();expect(a.root.querySelector('.viewer-diagram-canvas')).toBeTruthy();expect(a.snapshot()).toEqual(position);expect(JSON.stringify(raw)).toBe(before);
 });
 it('protects dynamic SVG and HTML links and refuses unsafe image declarations before mounting',()=>{
   const viewer=boot(),view=viewer.root.querySelector('.docview')!;

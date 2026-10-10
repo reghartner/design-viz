@@ -74,3 +74,9 @@
 .dv-tour-discovery[hidden]{display:none;}
 .dv-tour-discovery:focus-visible{outline:2px solid #63D9F5;outline-offset:2px;}
 @media print{.dv-tour-discovery{display:none!important;}}
+
+/* Reader utilities follow the fixed navigation's spacer in Standard. Explore
+   keeps the same controls together at the bottom, clear of the top navigation. */
+.reader-page-actions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:8px;margin:0 0 12px;}
+.reader-page-actions>.tbtn{position:static;float:none;box-sizing:border-box;min-height:32px;margin:0;padding:5px 10px;border-radius:7px;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+@media screen{body.viewer-exploring .reader-page-actions{position:fixed;right:12px;bottom:12px;left:12px;z-index:85;margin:0;pointer-events:none;}body.viewer-exploring .reader-page-actions>.tbtn{position:static;margin:0;pointer-events:auto;}}

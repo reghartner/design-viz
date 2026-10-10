@@ -132,13 +132,13 @@ export async function chooseAddDestination(page,index){
   await page.locator('#diagram-add-close').click();
 }
 export async function chapterOptions(page,section){
-  const options=(section || page.locator('#docview .explore-navigation')).locator('.section-view-options');
+  const options=page.locator('#docview .explore-navigation').locator('.section-view-options');
   if(await options.getAttribute('open')===null)await options.locator('summary').click();
   return options;
 }
 export async function arrangeChapter(page,section){
   await chapterOptions(page,section);
-  await (section || page.locator('#docview .explore-navigation')).getByRole('button',{name:'Arrange chapter and saved visibility…',exact:true}).click();
+  await page.locator('#docview .explore-navigation').getByRole('button',{name:'Arrange selected section…',exact:true}).click();
 }
 
 export async function openAutoArrange(page){

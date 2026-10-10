@@ -53,7 +53,8 @@ var BUILDER_SECTION_TEMPLATE = [
   '  }',
   '}'
 ].join('\n');
-function planAddSection(text, raw){
+function planAddSection(text, raw, sectionIdx, viewId){
+  if(Number.isInteger(sectionIdx)){var added=planAddViewSection(text,raw,sectionIdx,viewId);if(added)return added;}
   var base, page;
   if (raw && raw.page){ page = raw.page; base = ['page']; }
   else if (raw && (raw.blocks || raw.sections)){ page = raw; base = []; }
@@ -265,6 +266,23 @@ function builderDocumentDetailResult(plan,raw,mapPath,copies){
     if(original)updateOwner(original,copy.to);
   });
   if(error)return error;
+  // Keep View membership stable across section identity/deletion/duplication.
+  var doc=builderDocumentPage(raw),ownerPaths=doc?[doc.path]:[];
+  specSectionPaths(raw).forEach(function(rec){var ti=rec.section.lastIndexOf('tabs');if(ti>=0){var path=rec.section.slice(0,ti+2);if(!ownerPaths.some(function(other){return JSON.stringify(path)===JSON.stringify(other);}))ownerPaths.push(path);}});
+  ownerPaths.forEach(function(ownerPath){
+    var owner=specValueAt(raw,ownerPath);if(!owner || !Array.isArray(owner.views))return;
+    var nextPath=mapPath(ownerPath);if(!nextPath)return;var nextOwner=specValueAt(nextRaw,nextPath);if(!nextOwner || !Array.isArray(nextOwner.views))return;
+    var changed=false,views=builderClone(owner.views).map(function(view){view.sections=view.sections.reduce(function(list,member){
+      var id=tabViewMemberReference(member),before=records.find(function(rec){return rec.section.id===id;}),afterPath=before && mapPath(before.path),after=afterPath && nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(afterPath);});
+      if(!after){changed=true;return list;}var next=typeof member==='string'?after.section.id:Object.assign({},member,{section:after.section.id});if(after.section.id!==id)changed=true;list.push(next);
+      (copies || []).forEach(function(copy){if(!before || JSON.stringify(copy.from)!==JSON.stringify(before.path))return;var duplicated=nextRecords.find(function(rec){return JSON.stringify(rec.path)===JSON.stringify(copy.to);});if(duplicated){list.push(typeof next==='string'?duplicated.section.id:Object.assign({},next,{section:duplicated.section.id}));changed=true;}});return list;
+    },[]);return view;}).filter(function(view){if(view.sections.length)return true;changed=true;return false;});
+    if(changed){if(!views.length){error={error:'This section is the last member of every View. Add another section to a View before deleting it.'};return;}
+      var result=jsonSetField(out,nextPath,'views',JSON.stringify(views,null,2));if(!result){error={error:'Could not update View membership.'};return;}out=result.text;
+      if(!views.some(function(view){return view.id===nextOwner.defaultView;})){result=jsonSetField(out,nextPath,'defaultView',JSON.stringify(views[0].id));out=result.text;}
+    }
+  });
+  if(error)return error;
   if(out===plan.text)return plan;
   plan.text=out;
   var landing=plan.newPath || (plan.kind==='section' && nextRecords[plan.index] && nextRecords[plan.index].path);
@@ -284,7 +302,7 @@ function planSetSectionIdentity(text,raw,sectionIdx,key,value){
   }
   var plan=builderDocumentDetailResult(planSetField(text,raw,rec.section,key,value==null?null:JSON.stringify(value)),raw);
   if(plan.error)return plan;
-  var errors=[],page=normalize(JSON.parse(plan.text));validateDetails(page,errors,[]);validateLocalHandoffs(page,errors);
+  var errors=[],page=normalize(JSON.parse(plan.text));validateDetails(page,errors,[]);validateLocalHandoffs(page,errors);validateTabViews(page,errors);
   return errors.length?{error:errors.join('\n')}:plan;
 }
 function planSetNodeHandoff(text,raw,sectionIdx,nodeId,handoff){
@@ -328,4 +346,14 @@ function planCreateNodeDetail(text,raw,sectionIdx,nodeId){
   var index=specSectionPaths(raw).length,newPath=specSectionPaths(JSON.parse(assigned.text))[index].section;
   var range=jsonLocate(assigned.text,newPath);
   return {text:assigned.text,start:range.start,end:range.end,kind:'section',index:index,sectionId:id};
+}
+
+function planAddViewSection(text,raw,sectionIdx,viewId){
+  var got=builderTabViewOwner(raw,sectionIdx),ownerPath=got && got.path,owner=ownerPath && specValueAt(raw,ownerPath);if(!owner || !Array.isArray(owner.views))return null;
+  var view=owner.views.find(function(view){return view.id===viewId;}) || owner.views.find(function(view){return view.id===owner.defaultView;}) || owner.views[0];
+  var taken=Object.create(null);sectionRecords(normalize(raw)).forEach(function(rec){taken[rec.reference]=true;});var section=JSON.parse(BUILDER_SECTION_TEMPLATE);section.id=builderUniqueKey(taken,'section');
+  var key=ownerPath.indexOf('tabs')>=0?'sections':owner.blocks?'blocks':'sections',listPath=ownerPath.concat([key]),list=specValueAt(raw,listPath),insert=jsonInsertMember(text,listPath,null,JSON.stringify(section,null,2));if(!insert)return {error:'Could not add the section.'};
+  var views=builderClone(owner.views),selected=views.find(function(v){return v.id===view.id;});selected.sections.push({section:section.id});var update=jsonSetField(insert.text,ownerPath,'views',JSON.stringify(views,null,2));if(!update)return {error:'Could not include the new section in this View.'};
+  var next=JSON.parse(update.text),path=listPath.concat([list.length]),index=specSectionPaths(next).findIndex(function(rec){return JSON.stringify(rec.section)===JSON.stringify(path);}),range=jsonLocate(update.text,path);
+  return {text:update.text,kind:'section',index:index,start:range.start,end:range.end};
 }

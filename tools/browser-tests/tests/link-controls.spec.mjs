@@ -30,7 +30,7 @@ async function build(server,name){
 function controls(root){
  return {
   tab:root.getByRole('button',{name:'Copy link to tab Story',exact:true}),
-  chapter:root.getByRole('button',{name:/^Copy (?:embed link for|link to chapter) Delivery/}),
+  chapter:root.getByRole('button',{name:/^Copy (?:embed link for|link to section) Delivery/}),
   step:root.getByRole('button',{name:'Copy link to this diagram step',exact:true}),
   contract:root.getByRole('button',{name:'Copy link to this contract card',exact:true})
  };

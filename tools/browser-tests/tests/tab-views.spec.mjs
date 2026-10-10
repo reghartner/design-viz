@@ -1,0 +1,141 @@
+import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {readFile,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+import path from 'node:path';
+import {repo} from '../helpers/prepare.mjs';
+const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
+async function standalone(page,server,raw){raw=raw || await fixture();raw.page.blocks[0].tabs[0].sections[2].text=Array.from({length:30},()=> 'Section C explains the shared content across Views.');await writeFile(path.join(server.root,'tab-views.json'),JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tab-views.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tab-views.html')]);await page.goto(server.origin+'/tab-views.html');return page.locator('#docview');}
+const nav=root=>root.locator(':scope > .explore-navigation');
+const visible=root=>root.locator('.doc-sec[data-dv-section]:visible');
+for(const width of [1280,1440])test(`Tab Views enforce overlap membership and retain browser-top navigation at ${width}`,async({page,server},info)=>{
+ await page.setViewportSize({width,height:950});const root=await standalone(page,server);
+ await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');
+ await expect(visible(root)).toHaveCount(2);await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-detail')).toBeHidden();
+ await nav(root).evaluate(el=>{window.savedNav=el;});
+ const geometry=async()=>nav(root).evaluate(el=>({same:el===window.savedNav,y:el.getBoundingClientRect().y,width:el.getBoundingClientRect().width}));
+ expect(await geometry()).toEqual({same:true,y:0,width});await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);expect(await geometry()).toEqual({same:true,y:0,width});
+ await nav(root).getByRole('button',{name:'Explore B + C',exact:true}).click();await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(1);await expect(root.locator('#section-b')).toBeVisible();
+ await expect(nav(root).locator('.explore-navigation-diagrams button:visible')).toHaveText(['Section B','Section C']);await nav(root).getByRole('button',{name:'Section C',exact:true}).click();await expect(root.locator('#section-c .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();
+ await expect(root.locator('.explore-player:visible')).toHaveCount(1);expect(await geometry()).toEqual({same:true,y:0,width});
+ await nav(root).getByRole('button',{name:'Explore A',exact:true}).click();await expect(root.locator('#section-a .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-c')).toBeHidden();
+ await root.locator('#section-a [data-dv-detail]').click();await expect(root.locator('[data-dv-detail-preview]:visible')).toHaveCount(1);await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toBeVisible();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toHaveAttribute('aria-pressed','true');
+ await nav(root).getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(2);await root.locator('#section-a [data-dv-detail]').click();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toBeVisible();expect(await geometry()).toEqual({same:true,y:0,width});
+ await info.attach('tab-views-'+width,{body:await page.screenshot(),contentType:'image/png'});
+ await page.goto(server.origin+'/tab-views.html#d=b&v=explore-a');await expect(root.locator('#section-b')).toBeVisible();await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(root.locator('#section-a')).toBeHidden();
+});
+test('Workbench View authoring has one Undo and retains the selected View through content edits',async({page,server})=>{
+ const raw=await fixture();await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);const root=page.locator('#docview'),source=page.locator('#src');
+ await nav(root).getByRole('button',{name:'Explore B + C',exact:true}).click();const before=await source.inputValue();
+ await nav(root).locator('.section-view-options>summary').click();await page.getByRole('button',{name:'Duplicate View',exact:true}).click();
+ const duplicated=JSON.parse(await source.inputValue());expect(duplicated.page.blocks[0].tabs[0].views).toHaveLength(4);expect(duplicated.page.blocks[0].tabs[0].sections).toEqual(raw.page.blocks[0].tabs[0].sections);
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');
+ await nav(root).locator('.section-view-options>summary').click();await nav(root).getByLabel('View name',{exact:true}).fill('Review B and C');await page.getByRole('button',{name:'Rename View',exact:true}).click();await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
+ await nav(root).locator('.section-view-options>summary').click();await nav(root).getByLabel('Include Section C',{exact:true}).uncheck();await expect(root.locator('#section-c')).toBeHidden();expect(JSON.parse(await source.inputValue()).page.blocks[0].tabs[0].views[1].sections).toEqual([{section:'b'}]);
+ await page.locator('#undo-builder').click();await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
+ await nav(root).getByRole('button',{name:'Section C',exact:true}).click();const beforeContent=await source.inputValue();await root.locator('#section-c [data-dv-node=service]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited C');await title.press('Enter');await closeTools(page);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await nav(root).getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await nav(root).getByRole('button',{name:'Review B and C',exact:true}).click();
+ await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeContent);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(root.locator('#section-c')).toBeVisible();
+ await page.locator('#diagram-add').click();await page.locator('.diagram-add-structure>summary').click();await page.locator('#add-section').click();const added=JSON.parse(await source.inputValue());expect(added.page.blocks[0].tabs[0].sections).toHaveLength(5);expect(added.page.blocks[0].tabs[0].views[1].sections.at(-1).section).toBe(added.page.blocks[0].tabs[0].sections.at(-1).id);await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeContent);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
+ const saved=await source.inputValue();await page.reload();await expect(source).toHaveValue(saved);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toBeVisible();
+});
+test('native Views keep host-top nav, reject cross-View destinations and isolate sibling mounts',async({page,server})=>{
+ await writeFile(path.join(server.root,'tab-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'tab-native.html'),'<style>body{margin:0}.host{height:700px;overflow:auto;position:relative;width:48%;display:inline-block;vertical-align:top}</style><div class="host" id="one"></div><div class="host" id="two"></div><script type="module">import {mountNativeViewer} from "./tab-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/tab-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.first=mount(document.querySelector('#one'),raw);window.second=mount(document.querySelector('#two'),raw);first.setCanvas(true);},await fixture());
+ const one=page.locator('#one'),two=page.locator('#two'),navbar=one.locator('.explore-navigation');await navbar.evaluate(el=>window.savedNav=el);const geometry=()=>navbar.evaluate(el=>({same:el===window.savedNav,y:el.getBoundingClientRect().top,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));const initial=await geometry();
+ await navbar.getByRole('button',{name:'Explore B + C',exact:true}).click();expect(await page.evaluate(()=>first.snapshot())).toMatchObject({section:'b',view:'explore-bc'});await expect(two.locator('#section-a')).toBeVisible();await expect(two.locator('#section-b')).toBeHidden();
+ expect(await page.evaluate(()=>{try{first.navigate({section:'c',view:'explore-a'});return false;}catch{return true;}})).toBe(true);await expect(one.locator('#section-b')).toBeVisible();
+ await navbar.getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(one.locator('#section-a')).toBeVisible();await expect(one.locator('#section-c')).toBeVisible();expect(await geometry()).toEqual(initial);await navbar.getByRole('button',{name:'Explore A',exact:true}).click();expect(await geometry()).toEqual(initial);
+ await page.evaluate(()=>first.destroy());await expect(one.locator('.explore-navigation')).toHaveCount(0);await expect(two.locator('.explore-navigation')).toHaveCount(1);await page.evaluate(()=>{second.destroy();window.legacy=mount(document.querySelector('#two'),{sections:[{id:'plain',diagram:{nodes:{a:{title:'A'}},rows:[['a']]}}]});legacy.navigate({section:'plain',view:'flow'});});await expect(two.locator('#section-plain')).toBeVisible();await page.evaluate(()=>legacy.destroy());
+});
+
+test('compound contract routes retain the second member navigation through tour restoration and reload',async({page,server})=>{
+ const raw=await fixture(),sections=raw.page.blocks[0].tabs[0].sections;
+ for(const id of ['a','c'])sections.find(section=>section.id===id).contract={title:'Contract '+id.toUpperCase(),fields:[{k:'event',v:id}]};
+ raw.page.tour={version:1,steps:[{id:'visit-a',target:{selector:'.board',within:'section'},diagramState:{section:'a',mode:'step'},copy:{heading:'Visit A'}}]};
+ const input=path.join(server.root,'tab-view-contracts.json'),output=path.join(server.root,'tab-view-contracts.html');
+ await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ const url=server.origin+'/tab-view-contracts.html',root=page.locator('#docview');
+ async function assertContext(){
+  await expect(nav(root)).toHaveAttribute('data-navigation-section','3');
+  await expect(nav(root).getByRole('button',{name:'Standard A + C',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(nav(root).getByRole('button',{name:/^Copy embed link for Section C/})).toBeVisible();
+  await expect(root.locator('#section-b')).toBeHidden();
+ }
+ for(const route of ['#d=c&v=standard-ac&c=c','#d=c&v=standard-ac&c=c&r=1','#c=c']){
+  await page.goto(url+route);await assertContext();
+  const hash=new URL(page.url()).hash;
+  await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
+  await expect(page.locator('.dv-tour-ui .dv-tour-heading')).toHaveText('Visit A');
+  await page.keyboard.press('Escape');await expect(page.locator('.dv-tour')).toBeHidden();await assertContext();
+  expect(new URL(page.url()).hash).toBe(hash);
+  await page.reload();await assertContext();expect(new URL(page.url()).hash).toBe(hash);
+ }
+});
+
+
+for(const width of [320,390])test(`reader menus and utilities stay reachable at ${width}px`,async({page,server},info)=>{
+ await page.setViewportSize({width,height:900});const root=await standalone(page,server),navigation=nav(root);
+ await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();
+ const before=await navigation.boundingBox();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+ const samples=await navigation.locator('.explore-panel-menu>summary').evaluate(async summary=>{
+  const body=summary.parentElement.querySelector('.explore-panel-body'),frames=[];
+  const sample=()=>{if(body.getClientRects().length)frames.push(body.getBoundingClientRect().toJSON());};
+  summary.click();sample();for(let i=0;i<8;i++){await new Promise(requestAnimationFrame);sample();}return frames;
+ });
+ expect(samples.length).toBeGreaterThan(0);for(const box of samples){expect(box.x).toBeGreaterThanOrEqual(12);expect(box.right).toBeLessThanOrEqual(width-12);expect(box.bottom).toBeLessThanOrEqual(900-12);}
+ await info.attach('opening-menu-frames',{body:JSON.stringify(samples,null,2),contentType:'application/json'});
+ await page.keyboard.press('Escape');await expect(navigation.locator('.explore-panel-menu>summary')).toBeFocused();
+ const dock=root.locator(':scope > .reader-page-actions'),player=root.locator('.explore-player:visible');
+ async function separated(){await expect.poll(async()=>{const a=await player.boundingBox(),b=await dock.boundingBox();return b.y-a.y-a.height;}).toBeGreaterThanOrEqual(8);}
+ await separated();
+ // A longer discovery label forces another row and exercises the live dock
+ // measurement, including resize/font-layout changes rather than a fixed inset.
+ await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await separated();
+ await page.setViewportSize({width:width+90,height:760});await separated();
+ await page.setViewportSize({width,height:900});await separated();
+ await navigation.getByRole('button',{name:'Explore A',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
+ await navigation.getByRole('button',{name:'Standard A + C',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
+ await expect(dock).toBeVisible();
+ // Offscreen tab chips remain reachable by keyboard and reveal in their lane.
+ const notes=navigation.getByRole('tab',{name:'Notes',exact:true});await notes.focus();await expect(notes).toBeInViewport();
+ await info.attach('reader-phone',{body:await page.screenshot(),contentType:'image/png'});
+});
+
+
+test('Legend follows the selected member section and omits empty keys',async({page,server})=>{
+ const raw=await fixture(),diagram=raw.page.blocks[0].tabs[0].sections[2].diagram;
+ diagram.nodes.target={title:'Published event'};diagram.rows=[['service','target']];diagram.edges=[{id:'publish',from:'service',to:'target',kind:'evt',label:'Publish'}];
+ const root=await standalone(page,server,raw),navigation=nav(root);
+ await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+ await navigation.getByRole('button',{name:'Section C',exact:true}).click();await navigation.locator('.explore-legend-menu>summary').click();
+ await expect(navigation.getByRole('group',{name:'Edge legend',exact:true})).toBeVisible();await expect(navigation.locator('.explore-edge-legend .li')).toHaveCount(1);
+ await page.keyboard.press('Escape');await navigation.getByRole('button',{name:'Section B',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+});
+
+
+for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped captions above utilities and hides them in Ambient (${skin})`,async({page,server},info)=>{
+ await page.setViewportSize({width:390,height:900});await page.emulateMedia({reducedMotion:'reduce'});
+ const raw=JSON.parse(await readFile(path.join(repo,'examples/flowview-product-tour/flowview-product-tour.spec.json'),'utf8'));
+ raw.page.skin=skin;const tab=raw.page.blocks[0].tabs[3],section=tab.sections[0];
+ tab.views=[{id:'standard',name:'Backstage story',presentation:'standard',sections:[section.id]},{id:'explore',name:'Explore Backstage',presentation:'explore',sections:[section.id]}];tab.defaultView='explore';
+ section.diagram.autoplay=false;
+ const input=path.join(server.root,'dense-caption-'+skin+'.json'),output=path.join(server.root,'dense-caption-'+skin+'.html');
+ await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ await page.goto(server.origin+'/dense-caption-'+skin+'.html');await nav(page.locator('#docview')).getByRole('tab',{name:'04 · Backstage',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
+ const root=page.locator('#section-backstage'),player=root.locator('.explore-player'),bar=player.locator('.termbar'),caption=bar.locator('.stepline'),dock=page.locator('#docview > .reader-page-actions'),board=root.locator('.explore-board');
+ await expect(bar.locator('.schips button')).toHaveCount(7);
+ const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+ async function separated(){await expect.poll(async()=>{const p=await player.boundingBox(),d=await dock.boundingBox();return d.y-p.y-p.height;}).toBeGreaterThanOrEqual(8);}
+ async function readable(){
+  await expect(bar).toBeVisible();await expect(caption).toBeInViewport();await separated();
+  const metrics=await caption.evaluate(el=>({height:el.clientHeight,content:el.scrollHeight,box:el.getBoundingClientRect().toJSON()})),p=await player.boundingBox();
+  expect(metrics.height).toBeGreaterThan(34);expect(metrics.content).toBeLessThanOrEqual(metrics.height);expect(metrics.box.bottom).toBeLessThanOrEqual(p.y+p.height);
+ }
+ await readable();const initial=await camera();await info.attach('dense-step-phone',{body:await page.screenshot(),contentType:'image/png'});
+ await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();expect(await camera()).toEqual(initial);
+ await expect(player.getByRole('button',{name:'STEP',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
+ await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();expect(await camera()).toEqual(initial);
+ // Wrapped utility rows and a shorter viewport must reserve their actual space.
+ await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await readable();
+ await page.setViewportSize({width:390,height:740});await readable();
+ await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();
+ await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();
+});

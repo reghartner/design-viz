@@ -142,7 +142,8 @@ function initWorkbenchOnboarding(opts){
     Object.keys(buttons).forEach(function(key){buttons[key].setAttribute('aria-pressed',String(key===next));});
     frame=doc.createElement('iframe');frame.title='Interactive Flowview practice';frame.setAttribute('sandbox','allow-scripts');
     var section=next==='example' && ctl && workbenchLandingSection(ctl),sp=section && section.stepper;
-    var state=section?{section:section.reference,view:section.presentation && section.presentation.viewId(),mode:sp && sp.mode(),path:sp && sp.path(),step:sp && sp.sourceIndex()}:null;
+    var ownerView=section && ctl.views.current(section);
+    var state=section?{section:section.reference,view:ownerView && !ownerView.legacy?ownerView.id:section.presentation && section.presentation.viewId(),mode:sp && sp.mode(),path:sp && sp.path(),step:sp && sp.sourceIndex()}:null;
     frame.addEventListener('load',function(){if(frame && dialog.open)frame.focus();});
     frame.srcdoc=workbenchPracticeSource(opts.source,next,state);dialog.appendChild(frame);
   }
@@ -229,17 +230,22 @@ function initWorkbenchPractice(opts){
   builder.loadSpec(chapter==='agent'?welcomeBlankSpec('My visitor story'):sample);workspace.showTool('inspect');
   var reader=null;
   if(chapter==='viewer' || chapter==='example'){
-    builder.destroy();
+    workspace.canvas.reset();builder.destroy();
     var readerView=doc.getElementById('docview');readerView.replaceChildren();
-    reader=renderPage(readerView,normalize(sample),null,null,{autoplay:false});reader.suppressFragmentWrites=true;
+    var readerPage=normalize(sample);reader=renderPage(readerView,readerPage,null,null,{autoplay:false});reader.suppressFragmentWrites=true;
+    // The practice reader replaced the editor renderer. Its canvas and shared
+    // navigation must resolve records from this live controller.
+    workspace.canvas.bind(function(){return reader;},function(){return readerPage;});
+    var section=workbenchLandingSection(reader);
     if(chapter==='example'){
       var initial=JSON.parse(decodeURIComponent(doc.documentElement.dataset.flowviewView || 'null'));
-      var section=initial && reader.sections.find(function(section){return section.reference===initial.section;}) || workbenchLandingSection(reader),player=section && section.stepper;
+      section=initial && reader.sections.find(function(section){return section.reference===initial.section;}) || section;var player=section && section.stepper;
       workbenchLandingActivate(reader,section);
-      if(initial && initial.view && section && section.presentation)section.presentation.setView(initial.view);
+      if(initial && initial.view && section)reader.views.ensure(section,initial.view,true);
       if(initial && player){player.jumpSource(initial.step,initial.path);if(initial.mode==='ambient')player.enterAmbient();}
     }
     doc.body.classList.add('practice-viewer');
+    if(section)workspace.canvas.select(section.number-1);
   }
   function send(event,id){parent.postMessage({type:'flowview-tour',event:event,id:id},'*');}
   function click(id){var node=doc.getElementById(id);if(node && !node.disabled)node.click();}

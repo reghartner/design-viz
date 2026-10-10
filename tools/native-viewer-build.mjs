@@ -17,11 +17,14 @@ export async function nativeViewerSource(){
   for(const family of new Set(manifest.map(font=>font.family)))css=css.split("'"+family+"'").join("'Flowview Native "+family+"'");
   const variables=[...new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map(m=>m[1]))];
   css=':host{display:block;isolation:isolate;}flowview-root{all:initial;display:block;'+variables.map(name=>name+':initial;').join('')+'}\n'+css+
-    '\nflowview-root{--home-max-height:560px;}flowview-root[class] .docview[class]{box-sizing:border-box;width:100%;max-width:none;padding:12px;}'+
+    '\nflowview-root{--home-max-height:560px;position:relative;}flowview-root.viewer-exploring{height:650px;overflow:hidden;}flowview-root[class] .docview[class]{box-sizing:border-box;width:100%;max-width:none;padding:12px;}'+
+    'flowview-root[class] .docview.has-document-navigation{padding:0;}'+
+    'flowview-root .has-document-navigation:not(.explore-full-window)>:not(.explore-navigation):not(.document-navigation-space){margin-left:12px;margin-right:12px;}'+
     '.docview .copychip,.docview .embedchip{display:none;}[hidden]{display:none!important;}'+
-    'flowview-root.native-canvas{display:block;position:relative;height:100dvh;overflow:hidden;}'+
-    '.native-canvas .docview.explore-full-window{padding:0;}'+
-    '.native-canvas .viewer-diagram-canvas{position:absolute;inset:0;}'+
+    'flowview-root.native-canvas{display:block;position:relative;height:100dvh;overflow:auto;}flowview-root.native-canvas.viewer-exploring{overflow:hidden;}'+
+    'flowview-root.native-canvas .docview.explore-full-window{padding:0;}'+
+    '.native-canvas .viewer-diagram-canvas{position:absolute;inset:var(--flowview-navigation-height,48px) 0 0;}'+
+    '.native-canvas .navigation-contained>.explore-navigation{margin:0 0 0 var(--flowview-host-actions-inline-offset,0px);min-height:var(--flowview-host-actions-block-offset,48px);padding-left:12px;}@media(max-width:1024px){.native-canvas .navigation-contained>.explore-navigation{margin:var(--flowview-host-actions-block-offset,0px) 0 0;min-height:48px;}.native-canvas .docview.explore-full-window .viewer-diagram-canvas{top:calc(var(--flowview-navigation-height,48px) + var(--flowview-host-actions-block-offset,0px));}}'+
     '.native-canvas-story{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;font:12px sans-serif;}'+
     '.native-canvas-story select{font:inherit;max-width:200px;}';
   const assets={css,fonts,icons:shared.icons};

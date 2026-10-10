@@ -129,7 +129,7 @@ test('invalid drafts retain the last usable Explore reader across host and width
   expect(await page.evaluate(()=>location.hash)).toBe(hash);
 });
 
-test('page preview opens the selected authored Explore chapter as a full canvas across host rerenders',async({page,server})=>{
+test('page preview opens the selected authored Explore View as a full canvas across host rerenders',async({page,server})=>{
   const raw=editorSpec(),diagram=raw.page.blocks[0].diagram;
   diagram.layouts[0].name='Overview';
   diagram.layouts.push({...structuredClone(diagram.layouts[0]),id:'engineering',name:'Engineering',presentation:'standard'});
@@ -137,19 +137,23 @@ test('page preview opens the selected authored Explore chapter as a full canvas 
 
   await page.locator('#docview').getByRole('button',{name:'Engineering',exact:true}).click();
   await chapterOptions(page);
-  await page.locator('#docview').getByRole('combobox',{name:'Viewing mode',exact:true}).selectOption('explore');
+  await page.locator('#docview>.explore-navigation').getByRole('combobox',{name:'View presentation',exact:true}).selectOption('explore');
   await expect(page.locator('#docview .doc-sec').first()).toHaveAttribute('data-view-id','engineering');
   const source=await page.locator('#src').inputValue(),undoDisabled=await page.locator('#undo-builder').isDisabled();
   await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
   const surface=page.locator('#page-preview-surface'),reader=page.locator('#page-preview-view');
   await expect(surface).toHaveClass(/viewer-exploring/);await expect(reader).toHaveClass(/explore-full-window/);
   await expect(reader.getByRole('button',{name:'Engineering',exact:true})).toHaveAttribute('aria-pressed','true');
-  const geometry=await surface.evaluate(el=>{
-    const canvas=el.querySelector('.viewer-diagram-canvas'),a=el.getBoundingClientRect(),b=canvas.getBoundingClientRect();
-    const hits=[[a.left+12,a.top+12],[a.right-12,a.top+12],[a.left+12,a.bottom-12],[a.right-12,a.bottom-12]].map(([x,y])=>canvas.contains(document.elementFromPoint(x,y)));
-    return {surface:{x:a.x,y:a.y,width:a.width,height:a.height},canvas:{x:b.x,y:b.y,width:b.width,height:b.height},hits};
-  });
-  expect(geometry.canvas).toEqual(geometry.surface);expect(geometry.hits).toEqual([true,true,true,true]);
+  async function assertGeometry(){
+    const geometry=await surface.evaluate(el=>{
+      const canvas=el.querySelector('.viewer-diagram-canvas'),nav=el.querySelector('.explore-navigation'),a=el.getBoundingClientRect(),b=canvas.getBoundingClientRect(),n=nav.getBoundingClientRect();
+      const hits=[[a.left+12,a.top+12],[a.right-12,a.top+12],[a.left+12,a.bottom-12],[a.right-12,a.bottom-12]].map(([x,y])=>{const hit=document.elementFromPoint(x,y);return canvas.contains(hit)||nav.contains(hit);});
+      return {surface:{x:a.x,y:a.y,width:a.width,height:a.height},canvas:{x:b.x,y:b.y,width:b.width,height:b.height},nav:{x:n.x,y:n.y,width:n.width,height:n.height},hits};
+    });
+    expect(geometry.nav.height).toBeGreaterThan(0);expect(geometry.nav).toEqual({...geometry.surface,height:geometry.nav.height});
+    expect(geometry.canvas).toEqual({...geometry.surface,y:geometry.nav.y+geometry.nav.height,height:geometry.surface.height-geometry.nav.height});expect(geometry.hits).toEqual([true,true,true,true]);
+  }
+  await assertGeometry();
   for(const host of ['backstage','confluence','default']){
     await page.locator('#layout-preview-target').selectOption(host);
     if(host!=='default'){
@@ -157,7 +161,7 @@ test('page preview opens the selected authored Explore chapter as a full canvas 
       await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).dispatchEvent('change');
     }
     await expect(surface).toHaveClass(/viewer-exploring/);await expect(reader).toHaveClass(/explore-full-window/);
-    await expect(reader.getByRole('button',{name:'Engineering',exact:true})).toHaveAttribute('aria-pressed','true');
+    await expect(reader.getByRole('button',{name:'Engineering',exact:true})).toHaveAttribute('aria-pressed','true');await assertGeometry();
   }
   await page.locator('#close-page-preview').click();
   await expect(page.locator('#docview .doc-sec').first()).toHaveAttribute('data-view-id','engineering');

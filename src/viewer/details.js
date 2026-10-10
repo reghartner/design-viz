@@ -8,7 +8,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     var record=detailSection(page,rec.reference);
     var frame={rec:rec,section:record.section,page:page,root:rec,original:true};
     frames.set(rec.sectionEl,frame);liveRoots.set(rec.reference,frame);
-    if(record.section.detailOnly && !options.authoring){rec.sectionEl.hidden=true;if(rec.stepper){rec.stepper.pause();rec.stepper.onHide();}}
+    if(rec.detailOnly || rec.viewExcluded){rec.sectionEl.hidden=true;if(rec.stepper){rec.stepper.pause();rec.stepper.onHide();}}
   });
   function current(){return session && session.stack[session.stack.length-1];}
   function retire(frame){
@@ -40,7 +40,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
     if(options.onDetailNavigate)options.onDetailNavigate(snapshot());
   }
   function restoreOriginal(frame){
-    frame.rec.sectionEl.hidden=!!(frame.section.detailOnly && !options.authoring);
+    frame.rec.sectionEl.hidden=!!(frame.rec.detailOnly || frame.rec.viewExcluded || frame.rec.viewOwner && frame.rec.viewOwner.current.presentation==='explore' && frame.rec.viewOwner.selected!==frame.rec);
     if(frame.rec.stepper && !frame.rec.sectionEl.hidden)frame.rec.stepper.onShow();
   }
   function close(silent){
@@ -239,7 +239,7 @@ function wireDetailFlows(ctl, page, skin, backlinks, options){
   ctl.view.addEventListener('pointerdown',cancelInteraction,true);
 
   return {snapshot:snapshot,restore:restore,close:close,
-    showSection:function(reference){close(true);liveRoots.forEach(function(f){restoreOriginal(f);});var frame=liveRoots.get(reference);if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
+    showSection:function(reference){var frame=liveRoots.get(reference);if(!frame || ctl.views && !ctl.views.ensure(frame.rec,undefined,true))return false;close(true);liveRoots.forEach(function(f){restoreOriginal(f);});if(frame){frame.rec.sectionEl.hidden=false;if(frame.rec.stepper)frame.rec.stepper.onShow();}},
     activeSection:function(){return session && session.stack.length>1?current().rec:null;},
     activeSections:function(){return session?session.stack.map(function(frame){return frame.rec;}):[];},
     activeStepper:function(){return current() && current().rec.stepper;},

@@ -37,9 +37,14 @@ test('expanded canvas owns the full browser and returns to the same curated view
   await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.viewer-diagram-canvas')).toHaveCount(0);
+  await expect(dialog.locator('[data-view-id]')).toHaveAttribute('data-view-id','brief');
+  const standardNav=await dialog.locator('.explore-navigation').boundingBox();
+  await dialog.getByRole('button',{name:'Explore',exact:true}).click();
+  expect(await dialog.locator('.explore-navigation').boundingBox()).toEqual(standardNav);
   const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
   const board=await dialog.locator('.explore-board').boundingBox();
-  expect(shell).toEqual({x:0,y:0,width:1600,height:1000});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
+  expect(shell).toEqual({x:0,y:desktop.nav.y+desktop.nav.height,width:1600,height:1000-desktop.nav.y-desktop.nav.height});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
   expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
@@ -51,7 +56,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   await info.attach('backstage-expanded-desktop',{body:await page.screenshot(),contentType:'image/png'});
   expect(await dialog.locator('[data-flowview-native]').evaluate((node,previous)=>node===previous,original)).toBe(true);
   await expect(dialog.locator('.preadout')).toHaveText('Success');
-  await expect(dialog.locator('[data-view-id]')).toHaveAttribute('data-view-id','brief');
+  await expect(dialog.locator('[data-view-id]')).toHaveAttribute('data-view-id','explore');
   await expect(page.locator('#beta .native-canvas')).toHaveCount(0);
   expect(await page.evaluate(()=>__host.requests.length)).toBe(2);
   await page.setViewportSize({width:480,height:800});const narrow=await expandedGeometry(dialog);
@@ -67,7 +72,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
     return Math.max(...Object.keys(savedCamera).map(key=>Math.abs(actual[key]-savedCamera[key])));
   }).toBeLessThan(.01);
   await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();
-  await expect(alpha.locator('.explore-stage')).toBeHidden();
+  await expect(alpha.locator('.explore-stage')).toBeVisible();
   await expect(alpha.locator('.preadout')).toHaveText('Success');
   expect(await alpha.locator('[data-flowview-native]').evaluate(node=>[
     node.style.getPropertyValue('--flowview-host-actions-inline-offset'),
@@ -193,7 +198,7 @@ test('visible host Edit opens the exact Explore chapter and step in the Canon re
   }
 });
 
-test('Home and Data flow retain live step controls across Explore switches and reopen',async({page,server},info)=>{
+test('Home and Data flow retain live step controls across expanded-window switches and reopen',async({page,server},info)=>{
   await page.setViewportSize({width:1600,height:1000});await page.addInitScript(trackResources);
   await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
   const baseline=await resources(page);
@@ -207,9 +212,13 @@ test('Home and Data flow retain live step controls across Explore switches and r
   const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});
   for(const name of ['Data flow','Home','Data flow']){
     await dialog.getByRole('button',{name,exact:true}).click();
-    await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
-    await expect(dialog.locator('.explore-player .playback-mode-rail')).toBeVisible();
+    await expect(dialog.locator((name==='Home'?'.primary-panel':'.diagramcol')+' > .termbar')).toBeVisible();
+    await expect(dialog.locator('.playback-mode-rail')).toBeVisible();
+    await expect(dialog.locator('.explore-stage')).toBeHidden();
+    const navBeforeScroll=await dialog.locator('.explore-navigation').boundingBox();
+    await dialog.locator('.schips').scrollIntoViewIfNeeded();
     await expect(dialog.locator('.schips')).toBeInViewport();
+    expect((await dialog.locator('.explore-navigation').boundingBox()).y).toBe(navBeforeScroll.y);
     await expect(dialog.locator('.stepid')).toHaveText('detect');
     await dialog.getByRole('button',{name:'Next step',exact:true}).click();
     await expect(dialog.locator('.stepid')).toHaveText('upload');
@@ -226,7 +235,7 @@ test('Home and Data flow retain live step controls across Explore switches and r
   await alpha.getByRole('button',{name:'Home',exact:true}).click();
   await expect(alpha.locator('.primary-panel > .termbar')).toBeVisible();
   await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
-  await expect(dialog.locator('.explore-player .termbar')).toBeVisible();
+  await expect(dialog.locator('.primary-panel > .termbar')).toBeVisible();
   await expect(dialog.locator('.stepid')).toHaveText('persist');
   await dialog.getByRole('button',{name:'Data flow',exact:true}).click();
   await dialog.getByRole('button',{name:'Home',exact:true}).click();
@@ -236,4 +245,32 @@ test('Home and Data flow retain live step controls across Explore switches and r
   await expect(beta.locator('.stepid')).toHaveText('done');
   await page.evaluate(()=>{__host.left(false);__host.right(false);});
   await expect.poll(()=>resources(page)).toEqual(baseline);
+});
+
+
+test('wrapped native host actions keep More links inside a phone viewport',async({page,server},info)=>{
+ await page.setViewportSize({width:320,height:800});await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);await page.evaluate(()=>__host.left(true));
+ await page.locator('#alpha').getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true}),actions=dialog.getByRole('toolbar',{name:'Diagram actions'});
+ await actions.locator('summary').click();const link=actions.getByRole('link',{name:'Open standalone viewer',exact:true});await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');
+ for(const width of [320,390]){await page.setViewportSize({width,height:800});const box=await link.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);await expect(link).toBeInViewport();}
+ await info.attach('native-phone-more',{body:await page.screenshot(),contentType:'image/png'});await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#alpha').getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();
+});
+
+
+test('an inline Explore camera survives the live expanded portal and return without needing Fit',async({page,server})=>{
+ await page.setViewportSize({width:1440,height:900});await page.addInitScript(trackResources);await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
+ const baseline=await resources(page);await page.evaluate(()=>{__host.left(true);__host.right(true);});const alpha=page.locator('#alpha'),beta=page.locator('#beta');
+ await alpha.getByRole('button',{name:'Explore',exact:true}).click();const board=alpha.locator('.explore-board'),native=await alpha.locator('[data-flowview-native]').elementHandle();
+ const camera=container=>canvasCamera(container);
+ async function graphInView(container){await expect.poll(()=>container.locator('.explore-board').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top);})).toBe(true);}
+ async function closeCamera(container,expected){await expect.poll(async()=>{const actual=await camera(container);return Math.max(...Object.keys(expected).map(key=>Math.abs(actual[key]-expected[key])));}).toBeLessThan(.01);}
+ await graphInView(alpha);const opening=await camera(alpha),sibling=await beta.locator('.stepid').textContent();
+ await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});await graphInView(dialog);await closeCamera(dialog,opening);
+ expect(await dialog.locator('[data-flowview-native]').evaluate((el,prior)=>el===prior,native)).toBe(true);
+ await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=40;el.scrollTop+=25;});const customized=await camera(dialog);
+ await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();await closeCamera(alpha,customized);
+ await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();await closeCamera(dialog,customized);await graphInView(dialog);
+ await dialog.getByRole('button',{name:'Business',exact:true}).click();await expect(dialog.locator('.explore-stage')).toBeHidden();await dialog.getByRole('button',{name:'Explore',exact:true}).click();await closeCamera(dialog,customized);
+ await page.keyboard.press('Escape');await closeCamera(alpha,customized);await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();await expect(beta.locator('.stepid')).toHaveText(sibling);
+ await page.evaluate(()=>{__host.left(false);__host.right(false);});await expect.poll(()=>resources(page)).toEqual(baseline);
 });

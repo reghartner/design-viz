@@ -88,3 +88,31 @@ test('custom page tours keep their authored sequence and do not mark built-in to
   await expect(heading(page)).toHaveText('Company lesson');await expect(prompt(page)).toHaveCount(0);await walk(page);
   expect(await page.evaluate(key=>localStorage.getItem(key),key)).toBeNull();
 });
+
+
+test('standalone reader utilities stay reachable below navigation in both presentations at desktop and phone widths',async({page,server})=>{
+  const raw=library().diagrams[0].spec;
+  raw.page.sections[0].id='delivery';
+  raw.page.views=[{id:'standard',name:'Standard',presentation:'standard',sections:['delivery']},
+    {id:'explore',name:'Explore',presentation:'explore',sections:['delivery']}];
+  const input=path.join(server.root,'tour-utilities.json'),output=path.join(server.root,'tour-utilities.html');
+  await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+  await page.goto(server.origin+'/tour-utilities.html');
+  for(const width of [1280,390]){
+    await page.setViewportSize({width,height:900});
+    for(const name of ['Standard','Explore']){
+      await page.locator('#docview>.explore-navigation').getByRole('button',{name,exact:true}).click();
+      await expect.poll(()=>page.locator('.reader-page-actions>.tbtn').evaluateAll(buttons=>{
+        const nav=document.querySelector('#docview>.explore-navigation').getBoundingClientRect();
+        return buttons.filter(button=>!button.hidden).every(button=>{
+          const r=button.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+          return r.top>=nav.bottom && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth && button.contains(hit);
+        });
+      })).toBe(true);
+      await page.getByRole('button',{name:'Replay the tour',exact:true}).click();
+      await expect(page.locator('.dv-tour-chooser')).toBeVisible();
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.dv-tour')).toBeHidden();
+    }
+  }
+});

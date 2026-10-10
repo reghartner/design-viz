@@ -22,7 +22,7 @@ CONTRACT = 'contract/authoring-contract.md'
 SKILL = '.claude/skills/hld-to-page/SKILL.md'
 REFS = '.claude/skills/hld-to-page/references/'
 WORKFLOW = REFS + 'authoring-workflow.md'
-COMMON = ['Output rules', 'Top-level shape', 'Section shape', 'Diagram object',
+COMMON = ['Output rules', 'Top-level shape', 'Tab-owned Views', 'Section shape', 'Diagram object',
           'view', 'autoplay', 'nodes', 'rows — left-to-right slots (no coordinates)',
           'floats — automatic or freely placed nodes', 'edges',
           'Edge kinds (protocols) and the legend', 'Validation behavior']
@@ -44,7 +44,7 @@ DEPENDENCIES = {'time': ['steps'], 'paths': ['steps'], 'reveals': ['steps'],
                 'visibility': ['steps'], 'audio': ['steps'], 'delta': ['steps'],
                 'drilldowns': ['layouts'], 'explore': ['layouts']}
 ROUTES = {
-    'layouts': ['docs/section-layouts.md'], 'explore': ['docs/section-layouts.md'],
+    'layouts': ['docs/tab-views.md', 'docs/section-layouts.md'], 'explore': ['docs/tab-views.md', 'docs/section-layouts.md'],
     'bindings': [REFS + 'bindings-and-code.md'],
     'topology': ['docs/shared-topology.md'],
     'drilldowns': ['docs/drilldowns.md'],
@@ -119,6 +119,15 @@ def infer(raw):
     if process.returncode:
         raise ValueError('Cannot infer from spec: ' + process.stderr.strip())
     panels, features = set(), set()
+    page = raw.get('page', raw) if isinstance(raw, dict) else {}
+    owners = [page] + [tab for block in page.get('blocks', page.get('sections', []))
+                       if isinstance(block, dict) for tab in block.get('tabs', [])]
+    for owner in owners:
+        views = owner.get('views') if isinstance(owner, dict) else None
+        if isinstance(views, list):
+            features.add('layouts')
+            if any(isinstance(view, dict) and view.get('presentation') == 'explore' for view in views):
+                features.add('explore')
     for sec in json.loads(process.stdout):
         d = sec.get('diagram') or {}
         panels.update(p['type'] for p in d.get('panels', []))
@@ -187,7 +196,7 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         for title in FEATURES[feature]: add(CONTRACT, title)
         for path in INLINE.get(feature, []): add(path)
     if 'layouts' in features:
-        for title in ['Spec contract', 'Named-layout fields', 'Paths shown in each view', 'Steps shown in each view']:
+        for title in ['Section arrangement contract', 'Named-layout fields', 'Paths shown in each view', 'Steps shown in each view']:
             add('docs/section-layouts.md', title)
     if 'explore' in features: add('docs/section-layouts.md', 'Explore presentation')
     if panels:

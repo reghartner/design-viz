@@ -6,15 +6,16 @@ test('native mount forwards host diagram routing independently of detail loading
   const reference={spec:'recording',revision:'approved-r1',section:'storage'},
     resolveDiagramLink=value=>'https://designs.test/diagrams/'+value.spec,
     loadDetail=()=>{detailReads++;return Promise.resolve({});};
-  const view={querySelectorAll:()=>[]};
+  const view={querySelectorAll:()=>[],dispatchEvent(){}};
   const context={
     normalize:value=>value,validate:()=>({errors:[],warnings:[]}),resolveSkin:()=>({}),
     document:{createElement:()=>view},applySkinClasses:()=>{},sectionRecords:()=>[],
     renderPage:(_view,_page,_skin,_backlinks,options)=>{pageOptions=options;return {};},
+    initViewerExploreCanvas:()=>({destroy(){}}),
     ResizeObserver:class {observe(){}},
   };
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/native/mount.js'),'utf8')+'\nthis.mount=mountNativeSpec;',context);
-  context.mount({body:{appendChild(){}},listen(){},fontsReady:Promise.resolve()}, {},
+  context.mount({body:{appendChild(){},classList:{toggle(){}}},listen(){},fontsReady:Promise.resolve()}, {},
     {resolveDiagramLink,loadDetail});
   assert.equal(pageOptions.resolveDiagramLink,resolveDiagramLink);
   assert.equal(pageOptions.loadDetail,loadDetail);
@@ -31,15 +32,15 @@ test('native targets select views before exact source jumps and publish the fina
     stepper:{mode:()=> 'step',path:()=>selectedPath,current:()=>({id:selectedStep,n:0}),
       selectPath(id){events.push(['path',id]);if(id==='failed' && selectedView==='business')return false;selectedPath=id;return true;},
       jumpSource(index,path){events.push(['source',index,path]);selectedPath=path;selectedStep=source.steps[index].id;controller.onChange();return true;}}};
-  const controller={sections:[section],activeTarget:{kind:'page'}};
-  const view={querySelectorAll:()=>[]};
+  const controller={sections:[section],activeTarget:{kind:'page'},views:{current:()=>({id:selectedView,legacy:true}),ensure(rec,id){return id==null || (rec.presentation?rec.presentation.setView(id):id==='flow');}}};
+  const view={querySelectorAll:()=>[],dispatchEvent(){}};
   const context={normalize:value=>value,validate:()=>({errors:[],warnings:[]}),resolveSkin:()=>({}),
     document:{createElement:()=>view},applySkinClasses(){},
     sectionRecords:()=>[{reference:'recording',aliases:['old-recording'],section:{diagram:source}}],
-    renderPage:()=>controller,ResizeObserver:class{observe(){}},
+    renderPage:()=>controller,initViewerExploreCanvas:()=>({destroy(){}}),CustomEvent:class{},ResizeObserver:class{observe(){}},
     resolveSourceStep(_source,path,step){events.push(['resolve',path,step]);return {path:{id:path},sourceIndex:source.steps.findIndex(s=>s.id===step)};}};
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/native/mount.js'),'utf8')+'\nthis.mount=mountNativeSpec;',context);
-  const viewer=context.mount({body:{appendChild(){}},listen(){},fontsReady:Promise.resolve()}, {},
+  const viewer=context.mount({body:{appendChild(){},classList:{toggle(){}}},listen(){},fontsReady:Promise.resolve()}, {},
     {scrollIntoView:false,onChange:value=>changes.push(JSON.parse(JSON.stringify(value)))});
   viewer.navigate({section:'old-recording',view:'operations',path:'failed',step:'failure'});
   assert.deepEqual(events,[['view','operations'],['resolve','failed','failure'],['source',2,'failed']]);

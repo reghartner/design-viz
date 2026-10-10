@@ -82,5 +82,8 @@ test('Explore omits an empty edge legend',async({page,server})=>{
   const raw=fixture(),d=raw.page.blocks[0].diagram;d.edges=[];d.steps=[];delete d.paths;delete raw.page.protocols;
   d.layouts.forEach(layout=>delete layout.steps);d.defaultLayout='explore';
   const root=await open(page,server,'standalone',raw);await expect(root.locator('.explore-stage')).toBeVisible();
-  await expect(root.locator('.explore-legend-menu')).toBeVisible();
+  await expect(root.locator('.explore-edge-legend .li')).toHaveCount(0);
+  await expect(root.locator('.explore-legend-menu')).toBeHidden();
+  await root.getByRole('button',{name:'Business',exact:true}).click();await expect(root.locator('.explore-legend-menu')).toBeHidden();
+  await root.getByRole('button',{name:'Explore',exact:true}).click();await expect(root.locator('.explore-legend-menu')).toBeHidden();
 });

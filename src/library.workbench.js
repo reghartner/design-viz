@@ -50,7 +50,9 @@ function canonReaderTarget(ctl){
   });
   if(!rec || rec.reference==null)return null;
   var target={d:String(rec.reference)},sp=rec.stepper;
-  if(rec.presentation && rec.presentation.viewId)target.v=rec.presentation.viewId();
+  var ownerView=ctl.views && ctl.views.current(rec);
+  if(ownerView && !ownerView.legacy)target.v=ownerView.id;
+  else if(rec.presentation && rec.presentation.viewId)target.v=rec.presentation.viewId();
   if(sp){
     target.m=sp.mode();
     if(sp.paths && sp.paths().length>1)target.p=sp.path();

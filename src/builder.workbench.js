@@ -1382,14 +1382,14 @@ function initWorkbenchBuilder(opts){
   refreshProvenance();
   if(agentSession)life.own(function(){agentSession.destroy();});
   if(agentChat)life.own(function(){agentChat.destroy();});
-  function navigateWorkspace(target){
+  function navigateWorkspace(target,navigationOptions){
     var parsed=session.snapshot();if(parsed.error)return;
-    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target);if(!rec)return;
+    var rec=applyWorkspaceTarget(opts.ctl(),normalize(parsed.raw),target,navigationOptions);if(!rec)return;
     session.insertSection=rec.number-1;updateTargetLabel(parsed.raw);
     if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);
     if(stepList)stepList.sync();
   }
-  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference});});
+  life.listen(view,'detail-edit-section',function(event){navigateWorkspace({d:event.detail.reference},{editDetail:true});});
   function destroy(){life.destroy();}
   return {
     resolve:session.resolve,

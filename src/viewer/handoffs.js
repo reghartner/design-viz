@@ -66,10 +66,14 @@ function wireLocalHandoffs(ctl, page){
   }
   function paintBack(rec){
     back.remove();
-    if(!trail.length || !rec)return;
-    var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
-    back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
-    (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+    if(trail.length && rec){
+      var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
+      back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
+      (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+    }
+    // Destination selection can mount the shared navigation before this trail
+    // is painted. Move the newly created return action into that same bar.
+    ctl.view.dispatchEvent(new CustomEvent('navigation-actions-changed'));
   }
   function activate(rec, saved){
     if(disposed)return;

@@ -4879,3 +4879,16 @@ test('floating prose reuses its content without changing the standard page colla
   C.setProseCollapsed(control,false,false);C.setProseCollapsed(control,true,false);assert.equal(element.hidden,false);
   control.setFloating(false);assert.equal(element.hidden,true);assert.equal(control.toggleButton.hidden,false);assert.equal(control.teaserEl.hidden,false);assert.equal(control.collapsed,true);
 });
+
+test('restoring a contract route also restores its diagram after transient navigation',()=>{
+  const h=deepLinkHarness({kind:'page'});
+  const target={scrollIntoView(){},querySelectorAll(){return [];}};
+  const presentation={viewId:()=> 'page',defaultView:()=> 'page',setView:()=>true};
+  h.ctl.sections.push({number:1,reference:'delivery',presentation,sectionEl:target,contractCard:target},{number:2,reference:'reference',presentation,sectionEl:target});
+  h.ctl.manifest.sections.push({number:1,reference:'delivery',hasDiagram:true,hasCard:true,rowCount:0},{number:2,reference:'reference',hasDiagram:true});
+  h.win.location.hash='#d=delivery&v=page&c=delivery';h.windowListeners.hashchange();
+  const saved=h.ctl.activeTarget;assert.equal(saved.kind,'card');
+  h.ctl.activeTarget={kind:'diagram',section:2};h.ctl.onChange();
+  h.ctl.activeTarget=saved;h.ctl.onChange();
+  assert.equal(h.historyWrites.at(-1),'#d=delivery&v=page&c=delivery');
+});

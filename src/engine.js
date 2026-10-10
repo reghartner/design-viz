@@ -2180,7 +2180,8 @@ function createExploreNavigation(ctl,options){
   window.addEventListener('scroll',scrolled,true);
   function viewChanged(){var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
   ctl.view.addEventListener('tab-view-change',viewChanged);
-  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){ctl.view.removeEventListener('tab-view-change',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
+  ctl.view.addEventListener('navigation-actions-changed',viewChanged);
+  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
@@ -3503,6 +3504,10 @@ function wireDeepLinks(ctl, win, preservedHash, options){
     } else if (target.kind === 'tab'){
       fragmentState = {tabBlock:target.tabBlock, tab:target.tab,
                        diagramSection:null, cardSection:null, row:null};
+    } else if ((target.kind==='card' || target.kind==='row') && Object.prototype.hasOwnProperty.call(target,'diagramSection')){
+      // A contract route may also carry a diagram View/step. Restoring that
+      // route after transient tour probes must restore both destinations.
+      fragmentState.diagramSection=target.diagramSection;
     }
   }
   function withPreserved(h){
@@ -3604,7 +3609,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
       row:cardTarget && cardTarget.kind === 'row' ? cardTarget.row : null
     };
     if (cardTarget)
-      ctl.activeTarget = {kind:cardTarget.kind, section:cardTarget.section, row:cardTarget.row};
+      ctl.activeTarget = {kind:cardTarget.kind, section:cardTarget.section, row:cardTarget.row, diagramSection:diagramTarget ? diagramTarget.section : null};
     else if (diagramTarget)
       ctl.activeTarget = {kind:'diagram', section:diagramTarget.section};
     else if (target.kind === 'tab')

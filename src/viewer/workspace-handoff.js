@@ -49,15 +49,17 @@ async function verifyWorkspaceHandoff(raw,request,cryptoProvider){
   var revision=await workspaceSourceDigest(raw,cryptoProvider);
   if(revision!==request.revision)throw new Error('This story has changed since you opened it in Backstage. Refresh diagrams there and open it again. Your draft has not changed.');
 }
-function applyWorkspaceTarget(ctl,page,target){
+function applyWorkspaceTarget(ctl,page,target,options){
   if(!target || target.d==null)return null;
   var source=sectionRecords(page).find(function(rec){return rec.reference===target.d || rec.aliases && rec.aliases.indexOf(target.d)>=0;});
   var rec=source && ctl.sections.find(function(r){return r.reference===source.reference;});
   if(!rec)throw new Error('The linked story section is unavailable. Refresh diagrams in Backstage.');
+  if(ctl.views && !(options && options.editDetail && rec.detailOnly)){
+    if(!ctl.views.ensure(rec,target.v,true))throw new Error('The linked view is unavailable. Refresh diagrams in Backstage.');
+  }else if(target.v!=null && (rec.presentation ? !rec.presentation.setView || !rec.presentation.setView(target.v) : target.v!=='flow'))
+    throw new Error('The linked view is unavailable. Refresh diagrams in Backstage.');
   if(rec.tabBlock!=null)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
   ctl.activeTarget={kind:'diagram',section:rec.number};
-  if(target.v!=null && (rec.presentation ? !rec.presentation.setView || !rec.presentation.setView(target.v) : target.v!=='flow'))
-    throw new Error('The linked view is unavailable. Refresh diagrams in Backstage.');
   var sp=rec.stepper;
   if(target.p!=null || target.s!=null){
     var resolved=sp && resolveSourceStep(source.section.diagram,target.p || sp.path(),target.s);

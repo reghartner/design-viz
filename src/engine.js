@@ -3693,6 +3693,16 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   }};
 }
 
+/* Reader utilities stay after the navigation spacer, never over its fixed bar. */
+function readerPageActions(view){
+  var actions=view.querySelector(':scope > .reader-page-actions');
+  if(actions)return actions;
+  actions=view.ownerDocument.createElement('div');actions.className='reader-page-actions';
+  var spacer=view.querySelector(':scope > .document-navigation-space');
+  view.insertBefore(actions,spacer?spacer.nextSibling:view.firstChild);
+  return actions;
+}
+
 /* ---------------- presenter mode (C1): fullscreen + keyboard ---------------- */
 function wirePresenter(ctl, view, win){
   var doc = win.document;
@@ -3700,7 +3710,7 @@ function wirePresenter(ctl, view, win){
   btn.className = 'tbtn presentbtn';
   btn.textContent = 'PRESENT';
   btn.setAttribute('aria-label', 'Enter presenter mode (fullscreen)');
-  view.insertBefore(btn, view.firstChild);
+  readerPageActions(view).appendChild(btn);
   function presenting(){ return doc.body.classList.contains('presenting'); }
   function enter(){
     doc.body.classList.add('presenting');

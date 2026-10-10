@@ -93,6 +93,12 @@ function initViewerExploreCanvas(ctl,view,opts){
   function navigationState(){
     var target=ctl.activeTarget,rec=target && target.kind==='diagram'?ctl.sections.find(function(r){return r.number===target.section;}):null;
     if(!rec && target && target.kind==='tab')rec=tabPrimary(target) || ctl.sections.find(function(r){return r.tabBlock===target.tabBlock && r.tab===target.tab;});
+    // A page/contract target still has a selected owner View. Restoring such a
+    // route (for example after a tour) must not empty the document navigation.
+    if(!rec){
+      var visible=ctl.sections.find(function(r){return !r.detailOnly && !r.viewExcluded && (!r.tabBlock || ctl.tabBlocks[r.tabBlock-1].active()===r.tab);});
+      rec=visible && (ctl.views && ctl.views.primary(visible.tabBlock,visible.tab) || visible);
+    }
     var ownerView=ctl.views && ctl.views.current(rec),definition=rec && rec.viewport && rec.viewport.viewDefinition();
     return {rec:rec,key:JSON.stringify([target,ownerView && ownerView.id,definition && definition.id,definition && definition.presentation])};
   }

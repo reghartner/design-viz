@@ -93,6 +93,10 @@ function wireTour(ctl, view, win, config, options){
     for (var i = 0; i < paths.length; i++) if (paths[i].id === token) return token;
     return null;
   }
+  function sectionNavigation(sec){
+    var nav=view.querySelector(':scope > .explore-navigation');
+    return sec && nav && nav.getAttribute('data-navigation-section')===String(sec.number)?nav:null;
+  }
   function queryTarget(step, sec, target){
     /* within:"section" is strict — a selector never leaks into other
        sections or hidden tabs (majors: a page-wide fallback here matched
@@ -101,7 +105,12 @@ function wireTour(ctl, view, win, config, options){
                (sec && sec.sectionEl ? sec.sectionEl : null);
     if (!root || !target || typeof target.selector !== 'string') return null;
     try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
-      var found=matches.find(isRendered) || matches[0] || null;
+      var found=matches.find(isRendered) || null;
+      // Section controls retain their owner when moved into document navigation.
+      // Do not search another section's actions or another viewer's navigation.
+      var nav=target.within!=='page' && sectionNavigation(sec);
+      if(!found && nav)found=Array.prototype.slice.call(nav.querySelectorAll(target.selector)).find(function(node){return node.closest('.explore-navigation-actions,.explore-navigation-chapters') && isRendered(node);}) || null;
+      found=found || matches[0] || null;
       var modal=options.overlayHost && options.overlayHost();
       // Trying a highlighted control can open a native modal. Keep that new
       // surface usable, including its focusable controls, until the next lesson.
@@ -712,6 +721,13 @@ function wireTour(ctl, view, win, config, options){
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
     hole.r = 12; hole.kind = 'primary';
     var holes = [hole];
+    // A workspace lesson includes its moved panel/expansion controls. Keep the
+    // actual controls clickable without exposing unrelated tabs or Views.
+    var nav=sectionNavigation(sec),actions=nav && nav.querySelector('.viewport-actions');
+    if(target.classList.contains('section-viewport') && isRendered(actions)){
+      var actionHole=tourCutoutRect(rectOf(actions),null,6,viewport());
+      actionHole.r=6;actionHole.kind='reveal';holes.push(actionHole);
+    }
     /* every control the copy names is genuinely un-dimmed AND ringed */
     eff.secondaries.forEach(function(item){
       var second = queryTarget(step, sec, item.target);
@@ -1309,9 +1325,8 @@ function wireTour(ctl, view, win, config, options){
   replay.textContent = '?';
   replay.setAttribute('aria-label', 'Replay the tour');
   replay.addEventListener('click', function(){ disabled = false; guarded(start); });
-  var present = view.querySelector('.presentbtn');
-  if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
-  else view.insertBefore(replay, view.firstChild);
+  var pageActions=readerPageActions(view);
+  pageActions.appendChild(replay);
   if(options.replay===false)replay.hidden=true;
 
   function updateDiscovery(){
@@ -1350,6 +1365,7 @@ function wireTour(ctl, view, win, config, options){
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
     if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
+    if(!pageActions.children.length)pageActions.remove();
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
     }

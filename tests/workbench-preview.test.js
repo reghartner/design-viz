@@ -128,3 +128,16 @@ test('new project and import boundaries discard previous preview identity even w
   }
   p.forgetDocument();p.render(SOURCE);assert.equal(previous.at(-1),null);
 });
+
+
+test('reader preview opens the visible authoring canvas instead of a stale prior navigation target',()=>{
+  const c={activeTabReferences:()=>[]};vm.createContext(c);vm.runInContext(readSource('workbench/preview.js'),c);
+  c.workbenchPreviewSnapshot=()=>({sections:[]});
+  for(const activeClass of ['workspace-active-section','explore-active-section']){
+    const ctl={activeTarget:{kind:'diagram',section:2},sections:[
+      {number:1,sectionEl:{classList:{contains:name=>name===activeClass}},viewport:{isExplore:()=>true}},
+      {number:2,sectionEl:{classList:{contains:()=>false}},viewport:{isExplore:()=>true}}]};
+    assert.deepEqual(plain(c.workbenchReaderPreviewSnapshot({},ctl).target),{kind:'diagram',section:1});
+    assert.deepEqual(ctl.activeTarget,{kind:'diagram',section:2});
+  }
+});

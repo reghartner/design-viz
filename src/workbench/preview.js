@@ -133,7 +133,7 @@ function workbenchReaderPreviewSnapshot(page,ctl){
      actually being presented after an authoring rerender. The visible Explore
      section is authoritative when handing the reader its opening surface. */
   var activeExplore=(ctl.sections || []).find(function(rec){
-    return rec.sectionEl && rec.sectionEl.classList.contains('explore-active-section') &&
+    return rec.sectionEl && (rec.sectionEl.classList.contains('workspace-active-section') || rec.sectionEl.classList.contains('explore-active-section')) &&
       rec.viewport && rec.viewport.isExplore && rec.viewport.isExplore();
   });
   var target=activeExplore?{kind:'diagram',section:activeExplore.number}:

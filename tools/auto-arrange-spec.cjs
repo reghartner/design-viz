@@ -6,7 +6,7 @@
    atomic output write. */
 const fs=require('node:fs');
 const path=require('node:path');
-const core=require('./canon/core.cjs');
+const core=require('./arrange/core.cjs');
 
 function vendor(name){
   const bundled=path.join(__dirname,'auto-arrange','vendor',name);

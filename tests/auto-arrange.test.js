@@ -204,6 +204,19 @@ test('native geometry roundtrips, resets both representations, validates shape, 
   assert.ok(C.AUTO_ARRANGE_WORKER_SOURCE.includes('Viz.js 3.31.0'));
 });
 
+test('mixed native and automatic route cleanup preserves actual avoidance crossing ceilings',()=>{
+  const d={nodes:{target:{},source:{},obstacle:{},junction:{}},rows:[[]],edges:[{from:'source',to:'junction'},{from:'junction',to:'target'}]};
+  const selected={positions:[{id:'target',x:528,y:100},{id:'source',x:324,y:216},{id:'obstacle',x:528,y:216},{id:'junction',x:528,y:332}],
+    edges:[{curveControls:[{t:1/3,dx:7.3,dy:4.2},{t:2/3,dx:-7.6,dy:-4.3}]},{}]};
+  const before=C.autoArrangeScore(d,selected),automatic={positions:selected.positions,edges:[{},{}]};
+  assert.equal(before.hits,0);assert.equal(before.crossings,0);assert.equal(before.incidentCrossings,0);
+  assert.equal(C.autoArrangeScore(d,automatic).incidentCrossings,1,'the automatic bow around the obstacle crosses the incoming automatic edge');
+  const cleaned=C.autoArrangeNaturalRoutes(d,plain(selected),true);
+  assert.equal(cleaned.score.hits,0);assert.equal(cleaned.score.crossings,0);assert.equal(cleaned.score.incidentCrossings,0);
+  assert.deepEqual(plain(cleaned.positions),selected.positions);
+  assert.deepEqual(plain(cleaned.edges),selected.edges,'retain the native incoming route that avoids the existing automatic bow');
+});
+
 test('directed paths follow topology in balanced snake rows with at most four cards',()=>{
   for(const count of [1,4,5,6,9,12,13]){
     const ids=Array.from({length:count},(_,i)=>'n'+i);

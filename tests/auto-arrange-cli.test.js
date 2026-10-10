@@ -68,3 +68,31 @@ test('CLI refuses input overwrite and leaves an existing output untouched after 
   const unsupported=run(input,output);assert.notEqual(unsupported.status,0);assert.match(unsupported.stderr,/80 nodes/);
   assert.equal(fs.readFileSync(output,'utf8'),'keep existing output');
 });
+
+// Exercise the checkout bootstrap in isolation: production builds may already
+// exist in the developer's tree, and must never mask missing/stale-source bugs.
+test('fresh checkout CLI ignores stale generated code and matches the Workbench arranger',async t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-arrange-source-'));t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  const root=path.resolve(__dirname,'..');
+  fs.cpSync(path.join(root,'src'),path.join(directory,'src'),{recursive:true});
+  for(const file of ['auto-arrange-spec.cjs','source-loader.cjs','arrange/core.cjs','canon/core.cjs']){
+    const target=path.join(directory,'tools',file);fs.mkdirSync(path.dirname(target),{recursive:true});fs.copyFileSync(path.join(root,'tools',file),target);
+  }
+  const source=diagram('fresh'),input=path.join(directory,'input.json'),output=path.join(directory,'output.json');
+  fs.writeFileSync(input,JSON.stringify(source));
+  const Viz=require('../src/workbench/vendor/viz-3.31.0.js'),cola=require('../src/workbench/vendor/webcola-3.4.0.js'),viz=await Viz.instance();
+  const arranged=viewer.autoArrangeCandidates(source,viz,cola);
+  const expected=JSON.parse(JSON.stringify(viewer.autoArrangeDiagram(source,arranged)));
+  let posted;
+  const worker={TextDecoder,TextEncoder,setTimeout,clearTimeout,location:{href:'https://flowview.test/auto-arrange-worker.js'},postMessage(message){posted=message;}};
+  worker.self=worker;vm.runInNewContext(viewer.AUTO_ARRANGE_WORKER_SOURCE,worker);
+  await worker.onmessage({data:source});
+  assert.equal(posted.error,undefined);
+  assert.deepEqual(JSON.parse(JSON.stringify(posted.result)),JSON.parse(JSON.stringify(arranged)),'embedded worker and headless context use identical arrangement');
+  for(const generated of [false,true]){
+    if(generated)fs.writeFileSync(path.join(directory,'tools/canon/generated-runtime.cjs'),"throw Error('stale generated runtime must not load');\n");
+    const result=cp.spawnSync(process.execPath,[path.join(directory,'tools/auto-arrange-spec.cjs'),input,output],{encoding:'utf8'});
+    assert.equal(result.status,0,result.stderr);
+    assert.deepEqual(JSON.parse(fs.readFileSync(output,'utf8')),expected,generated?'stale build is ignored':'fresh checkout needs no build');
+  }
+});

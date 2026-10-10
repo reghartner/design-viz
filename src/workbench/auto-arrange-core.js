@@ -144,7 +144,10 @@ function autoArrangeNaturalRoutes(d,result,preserveIncident){
   var automatic=autoArrangeDiagram(d,{positions:result.positions,edges:result.edges.map(function(){return {};})});
   var adjust=autoArrangeAdjust(automatic,L),paths=[],hits=[],cache=[],selected=result.edges.map(function(){return 0;});
   arranged.edges.forEach(function(e,i){
-    paths.push([autoArrangePathGeometry(samplePathD(edgePath(e,L))),autoArrangePathGeometry(samplePathD(edgePath(automatic.edges[i],L,adjust[i])))]);
+    // A previous pass may already have removed this edge's native controls.
+    // Its baseline must include the same automatic avoidance the viewer uses;
+    // otherwise mixed candidates compare crossings against an undrawn route.
+    paths.push([autoArrangePathGeometry(samplePathD(edgePath(e,L,adjust[i]))),autoArrangePathGeometry(samplePathD(edgePath(automatic.edges[i],L,adjust[i])))]);
     hits.push(countPathRectHits(paths[i][1].path,ids.filter(function(id){return id!==e.from && id!==e.to;}).map(function(id){var p=L.pos[id];return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};})));
   });
   // Placed floats have no shared endpoint spreading. Each automatic route and

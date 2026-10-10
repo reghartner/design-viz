@@ -139,8 +139,10 @@ Automatic edges have no saved controls or label nudges; retained curves stay
 editable. This step preserves all node positions.
 
 Checks use the viewer's shared automatic avoidance, so a safe automatic bow
-can avoid a card without saved controls. Path samples and native/automatic
-crossing pairs are cached; each pair has at most four combinations. The final
+can avoid a card without saved controls. When a prior pass already removed an
+edge's native controls, its existing avoidance bow also participates in the
+crossing budget; later cleanup cannot substitute an unadjusted route for it.
+Path samples and native/automatic crossing pairs are cached; each pair has at most four combinations. The final
 layout receives one full score after selection, rather than one per edge.
 No additional Graphviz routing is needed for this step.
 
@@ -285,7 +287,9 @@ shared graph geometry across profiles. Semantic content/state/declaration order
 are preserved. Only system-owned compatibility metadata is refreshed, retaining
 prior requirements; bare diagrams become a page wrapper. Errors write nothing.
 
-For graph-only tasks, the lighter `tools/auto-arrange-spec.cjs` remains unchanged.
+For graph-only tasks, use the lighter `tools/auto-arrange-spec.cjs`. Both CLIs
+compile the current shared arranger sources in a checkout, ignoring generated
+build artifacts, and use the bundled backend in an exported authoring kit.
 The complete authoring workflow uses `compose-page-layout.cjs`.
 
 ## Distribution and maintenance

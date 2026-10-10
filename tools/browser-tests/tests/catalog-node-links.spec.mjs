@@ -39,34 +39,32 @@ test('catalog selection seeds an empty title, preserves authored names, and undo
   expect((await nodes()).b).toEqual({title:'Authored name'});
 });
 
-test('right-click release leaves node links open for an ordinary click, with explicit dismissal',async({page,context,server})=>{
+test('linked nodes use object actions while the links trigger keeps click and keyboard access',async({page,context,server})=>{
   await context.route('**/node-source',route=>route.fulfill({contentType:'text/plain',body:'Saved source destination'}));
   await page.goto(server.origin+'/workbench.html');
   const raw=spec();
   for(const node of Object.values(raw.page.blocks[0].diagram.nodes))node.link=server.origin+'/node-source';
   await paste(page,JSON.stringify(raw));
   const node=page.locator('[data-dv-node="a"]'),trigger=node.locator('.nrefs-trigger');
-  const menu=page.getByRole('dialog',{name:'Links for a',exact:true});
+  const links=page.getByRole('dialog',{name:'Links for a',exact:true});
+  const actions=page.getByRole('menu',{name:'Object actions',exact:true});
   // Separate down/up exercises the contextmenu-before-release browser sequence.
   await node.hover();const box=await node.boundingBox();
   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
-  await page.mouse.down({button:'right'});await expect(menu).toBeVisible();
+  await page.mouse.down({button:'right'});await expect(actions).toBeVisible();await expect(links).toBeHidden();
   await page.mouse.up({button:'right'});
-  await expect.poll(()=>menu.evaluate(el=>el.matches(':popover-open'))).toBe(true);
-  await expect(trigger).toHaveAttribute('aria-expanded','true');
+  await expect.poll(()=>actions.evaluate(el=>el.matches(':popover-open'))).toBe(true);
+  await expect(trigger).toHaveAttribute('aria-expanded','false');
+  await page.keyboard.press('Escape');await expect(actions).toBeHidden();
+  await trigger.click();await expect(links).toBeVisible();
   const opened=context.waitForEvent('page');
-  await menu.getByRole('link',{name:'Source'}).click();const destination=await opened;
+  await links.getByRole('link',{name:'Source'}).click();const destination=await opened;
   await expect(destination.locator('body')).toHaveText('Saved source destination');await destination.close();
   await page.bringToFront();
-  await node.click({button:'right'});await expect(menu).toBeVisible();
-  await page.locator('#editor-tab-inspect').click();await expect(menu).toBeHidden();
+  await page.locator('#editor-tab-inspect').click();await expect(links).toBeHidden();
   await closeTools(page);
-  await trigger.focus();await trigger.press('Shift+F10');await expect(menu).toBeVisible();
-  await page.keyboard.press('Escape');await expect(menu).toBeHidden();await expect(trigger).toBeFocused();
-  await trigger.click();await menu.getByRole('button',{name:'Close node links'}).click();await expect(menu).toBeHidden();
-  await node.click({button:'right'});await page.locator('[data-dv-node="b"]').click({button:'right'});
-  await expect(menu).toBeHidden();
-  await expect(page.getByRole('dialog',{name:'Links for Authored name',exact:true})).toBeVisible();
-  await page.keyboard.press('Escape');
+  await trigger.focus();await trigger.press('Shift+F10');await expect(links).toBeVisible();
+  await page.keyboard.press('Escape');await expect(links).toBeHidden();await expect(trigger).toBeFocused();
+  await trigger.click();await links.getByRole('button',{name:'Close node links'}).click();await expect(links).toBeHidden();
   await inspectPageElement(page,node);await expect(page.locator('#guide').getByLabel('id',{exact:true})).toHaveValue('a');
 });

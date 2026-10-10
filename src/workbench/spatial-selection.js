@@ -117,11 +117,6 @@ function createBuilderSpatialSelection(opts){
   life.listen(doc,'pointerdown',cancelNudge,true);
   life.listen(doc,'focusin',function(ev){if(nudge && ev.target!==nudge.focus.el)cancelNudge();},true);
   function open(ev){
-    /* Renderer-owned node references keep their established whole-node
-       right-click entry. Keyboard focus on the node still opens actions, while
-       the dedicated references trigger owns its own keyboard menu. */
-    var referenced=ev.type==='contextmenu' && ev.target.closest && ev.target.closest('.node[data-dv-node]');
-    if(referenced && referenced.querySelector('.nrefs-trigger'))return;
     if(!active() || opts.busy())return;var t=target(ev.target);if(!t)return;
     ev.preventDefault();ev.stopPropagation();close(false);cancel();cancelNudge();
     var targets=currentTargets();if(!targets.some(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);})) {opts.select([t]);targets=currentTargets();}

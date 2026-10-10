@@ -109,3 +109,33 @@ test('Legend follows the selected member section and omits empty keys',async({pa
  await expect(navigation.getByRole('group',{name:'Edge legend',exact:true})).toBeVisible();await expect(navigation.locator('.explore-edge-legend .li')).toHaveCount(1);
  await page.keyboard.press('Escape');await navigation.getByRole('button',{name:'Section B',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
 });
+
+
+for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped captions above utilities and hides them in Ambient (${skin})`,async({page,server},info)=>{
+ await page.setViewportSize({width:390,height:900});await page.emulateMedia({reducedMotion:'reduce'});
+ const raw=JSON.parse(await readFile(path.join(repo,'examples/flowview-product-tour/flowview-product-tour.spec.json'),'utf8'));
+ raw.page.skin=skin;const tab=raw.page.blocks[0].tabs[3],section=tab.sections[0];
+ tab.views=[{id:'standard',name:'Backstage story',presentation:'standard',sections:[section.id]},{id:'explore',name:'Explore Backstage',presentation:'explore',sections:[section.id]}];tab.defaultView='explore';
+ section.diagram.autoplay=false;
+ const input=path.join(server.root,'dense-caption-'+skin+'.json'),output=path.join(server.root,'dense-caption-'+skin+'.html');
+ await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
+ await page.goto(server.origin+'/dense-caption-'+skin+'.html');await nav(page.locator('#docview')).getByRole('tab',{name:'04 · Backstage',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
+ const root=page.locator('#section-backstage'),player=root.locator('.explore-player'),bar=player.locator('.termbar'),caption=bar.locator('.stepline'),dock=page.locator('#docview > .reader-page-actions'),board=root.locator('.explore-board');
+ await expect(bar.locator('.schips button')).toHaveCount(7);
+ const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
+ async function separated(){await expect.poll(async()=>{const p=await player.boundingBox(),d=await dock.boundingBox();return d.y-p.y-p.height;}).toBeGreaterThanOrEqual(8);}
+ async function readable(){
+  await expect(bar).toBeVisible();await expect(caption).toBeInViewport();await separated();
+  const metrics=await caption.evaluate(el=>({height:el.clientHeight,content:el.scrollHeight,box:el.getBoundingClientRect().toJSON()})),p=await player.boundingBox();
+  expect(metrics.height).toBeGreaterThan(34);expect(metrics.content).toBeLessThanOrEqual(metrics.height);expect(metrics.box.bottom).toBeLessThanOrEqual(p.y+p.height);
+ }
+ await readable();const initial=await camera();await info.attach('dense-step-phone',{body:await page.screenshot(),contentType:'image/png'});
+ await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();expect(await camera()).toEqual(initial);
+ await expect(player.getByRole('button',{name:'STEP',exact:true})).toBeInViewport();await info.attach('dense-ambient-phone',{body:await page.screenshot(),contentType:'image/png'});
+ await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();expect(await camera()).toEqual(initial);
+ // Wrapped utility rows and a shorter viewport must reserve their actual space.
+ await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await readable();
+ await page.setViewportSize({width:390,height:740});await readable();
+ await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();
+ await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();
+});

@@ -215,7 +215,10 @@ test('Home and Data flow retain live step controls across expanded-window switch
     await expect(dialog.locator((name==='Home'?'.primary-panel':'.diagramcol')+' > .termbar')).toBeVisible();
     await expect(dialog.locator('.playback-mode-rail')).toBeVisible();
     await expect(dialog.locator('.explore-stage')).toBeHidden();
+    const navBeforeScroll=await dialog.locator('.explore-navigation').boundingBox();
+    await dialog.locator('.schips').scrollIntoViewIfNeeded();
     await expect(dialog.locator('.schips')).toBeInViewport();
+    expect((await dialog.locator('.explore-navigation').boundingBox()).y).toBe(navBeforeScroll.y);
     await expect(dialog.locator('.stepid')).toHaveText('detect');
     await dialog.getByRole('button',{name:'Next step',exact:true}).click();
     await expect(dialog.locator('.stepid')).toHaveText('upload');
@@ -242,4 +245,13 @@ test('Home and Data flow retain live step controls across expanded-window switch
   await expect(beta.locator('.stepid')).toHaveText('done');
   await page.evaluate(()=>{__host.left(false);__host.right(false);});
   await expect.poll(()=>resources(page)).toEqual(baseline);
+});
+
+
+test('wrapped native host actions keep More links inside a phone viewport',async({page,server},info)=>{
+ await page.setViewportSize({width:320,height:800});await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);await page.evaluate(()=>__host.left(true));
+ await page.locator('#alpha').getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true}),actions=dialog.getByRole('toolbar',{name:'Diagram actions'});
+ await actions.locator('summary').click();const link=actions.getByRole('link',{name:'Open standalone viewer',exact:true});await expect(link).toHaveAttribute('target','_blank');await expect(link).toHaveAttribute('rel','noopener noreferrer');
+ for(const width of [320,390]){await page.setViewportSize({width,height:800});const box=await link.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(width);await expect(link).toBeInViewport();}
+ await info.attach('native-phone-more',{body:await page.screenshot(),contentType:'image/png'});await page.keyboard.press('Escape');await expect(dialog).not.toBeVisible();await expect(page.locator('#alpha').getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();
 });

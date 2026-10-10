@@ -4,7 +4,7 @@ import {execFileSync} from 'node:child_process';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
-async function standalone(page,server){const raw=await fixture();raw.page.blocks[0].tabs[0].sections[2].text=Array.from({length:30},()=> 'Section C explains the shared content across Views.');await writeFile(path.join(server.root,'tab-views.json'),JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tab-views.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tab-views.html')]);await page.goto(server.origin+'/tab-views.html');return page.locator('#docview');}
+async function standalone(page,server,raw){raw=raw || await fixture();raw.page.blocks[0].tabs[0].sections[2].text=Array.from({length:30},()=> 'Section C explains the shared content across Views.');await writeFile(path.join(server.root,'tab-views.json'),JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tab-views.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tab-views.html')]);await page.goto(server.origin+'/tab-views.html');return page.locator('#docview');}
 const nav=root=>root.locator(':scope > .explore-navigation');
 const visible=root=>root.locator('.doc-sec[data-dv-section]:visible');
 for(const width of [1280,1440])test(`Tab Views enforce overlap membership and retain browser-top navigation at ${width}`,async({page,server},info)=>{
@@ -68,4 +68,44 @@ test('compound contract routes retain the second member navigation through tour 
   expect(new URL(page.url()).hash).toBe(hash);
   await page.reload();await assertContext();expect(new URL(page.url()).hash).toBe(hash);
  }
+});
+
+
+for(const width of [320,390])test(`reader menus and utilities stay reachable at ${width}px`,async({page,server},info)=>{
+ await page.setViewportSize({width,height:900});const root=await standalone(page,server),navigation=nav(root);
+ await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();
+ const before=await navigation.boundingBox();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+ const samples=await navigation.locator('.explore-panel-menu>summary').evaluate(async summary=>{
+  const body=summary.parentElement.querySelector('.explore-panel-body'),frames=[];
+  const sample=()=>{if(body.getClientRects().length)frames.push(body.getBoundingClientRect().toJSON());};
+  summary.click();sample();for(let i=0;i<8;i++){await new Promise(requestAnimationFrame);sample();}return frames;
+ });
+ expect(samples.length).toBeGreaterThan(0);for(const box of samples){expect(box.x).toBeGreaterThanOrEqual(12);expect(box.right).toBeLessThanOrEqual(width-12);expect(box.bottom).toBeLessThanOrEqual(900-12);}
+ await info.attach('opening-menu-frames',{body:JSON.stringify(samples,null,2),contentType:'application/json'});
+ await page.keyboard.press('Escape');await expect(navigation.locator('.explore-panel-menu>summary')).toBeFocused();
+ const dock=root.locator(':scope > .reader-page-actions'),player=root.locator('.explore-player:visible');
+ async function separated(){await expect.poll(async()=>{const a=await player.boundingBox(),b=await dock.boundingBox();return b.y-a.y-a.height;}).toBeGreaterThanOrEqual(8);}
+ await separated();
+ // A longer discovery label forces another row and exercises the live dock
+ // measurement, including resize/font-layout changes rather than a fixed inset.
+ await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await separated();
+ await page.setViewportSize({width:width+90,height:760});await separated();
+ await page.setViewportSize({width,height:900});await separated();
+ await navigation.getByRole('button',{name:'Explore A',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
+ await navigation.getByRole('button',{name:'Standard A + C',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
+ await expect(dock).toBeVisible();
+ // Offscreen tab chips remain reachable by keyboard and reveal in their lane.
+ const notes=navigation.getByRole('tab',{name:'Notes',exact:true});await notes.focus();await expect(notes).toBeInViewport();
+ await info.attach('reader-phone',{body:await page.screenshot(),contentType:'image/png'});
+});
+
+
+test('Legend follows the selected member section and omits empty keys',async({page,server})=>{
+ const raw=await fixture(),diagram=raw.page.blocks[0].tabs[0].sections[2].diagram;
+ diagram.nodes.target={title:'Published event'};diagram.rows=[['service','target']];diagram.edges=[{id:'publish',from:'service',to:'target',kind:'evt',label:'Publish'}];
+ const root=await standalone(page,server,raw),navigation=nav(root);
+ await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+ await navigation.getByRole('button',{name:'Section C',exact:true}).click();await navigation.locator('.explore-legend-menu>summary').click();
+ await expect(navigation.getByRole('group',{name:'Edge legend',exact:true})).toBeVisible();await expect(navigation.locator('.explore-edge-legend .li')).toHaveCount(1);
+ await page.keyboard.press('Escape');await navigation.getByRole('button',{name:'Section B',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
 });

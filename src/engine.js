@@ -2137,6 +2137,9 @@ function createExploreNavigation(ctl,options){
     move(host && host.querySelector('.section-view-settings'),actions);
     move(host && host.querySelector('.viewport-actions'),actions);
     actions.hidden=false;
+    // Prepare top-layer bodies before a click opens their details element. A
+    // deferred toggle otherwise paints one frame at the old section anchor.
+    nav.querySelectorAll('details').forEach(syncNavigationPopover);
     // Selection can unhide its section only after the navigation is mounted.
     // Reveal the selected chips after that layout, while retaining their real DOM.
     revealFrame=requestAnimationFrame(function(){
@@ -2972,6 +2975,7 @@ function renderPage(view, page, skin, backlinks, options){
     view.removeEventListener('diagram-view-change',paintTabExploreIndicators);
     view.removeEventListener('tab-view-change',paintTabExploreIndicators);
     view.removeEventListener('navigation-mounted',paintTabExploreIndicators);
+    if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();
     if(ctl.handoffs)ctl.handoffs.destroy();
     if(ctl.details)ctl.details.destroy();
     if(ctl.views)ctl.views.destroy();
@@ -3700,12 +3704,19 @@ function wireDeepLinks(ctl, win, preservedHash, options){
 }
 
 /* Reader utilities stay after the navigation spacer, never over its fixed bar. */
-function readerPageActions(view){
+function readerPageActions(view,ctl){
   var actions=view.querySelector(':scope > .reader-page-actions');
   if(actions)return actions;
   actions=view.ownerDocument.createElement('div');actions.className='reader-page-actions';
   var spacer=view.querySelector(':scope > .document-navigation-space');
   view.insertBefore(actions,spacer?spacer.nextSibling:view.firstChild);
+  if(ctl && typeof ResizeObserver!=='undefined'){
+    ctl.readerActionsSize=new ResizeObserver(function(){
+      if(ctl.destroyed)return;
+      ctl.sections.forEach(function(rec){if(rec.viewport && rec.viewport.refreshChrome)rec.viewport.refreshChrome();});
+    });
+    ctl.readerActionsSize.observe(actions);
+  }
   return actions;
 }
 
@@ -3716,7 +3727,7 @@ function wirePresenter(ctl, view, win){
   btn.className = 'tbtn presentbtn';
   btn.textContent = 'PRESENT';
   btn.setAttribute('aria-label', 'Enter presenter mode (fullscreen)');
-  readerPageActions(view).appendChild(btn);
+  readerPageActions(view,ctl).appendChild(btn);
   function presenting(){ return doc.body.classList.contains('presenting'); }
   function enter(){
     doc.body.classList.add('presenting');

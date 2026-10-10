@@ -141,13 +141,14 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 }
 
 @media screen and (max-width:640px){
- .explore-navigation{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:5px 8px;padding:6px;}
- .explore-navigation-tabs{grid-column:1 / -1;grid-row:1;}
+ .explore-navigation{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,auto);grid-template-rows:repeat(3,34px);align-items:center;gap:6px 8px;}
+ .explore-navigation:not(:has(.explore-navigation-diagrams>button:nth-of-type(2))){grid-template-rows:repeat(2,34px);}
+ .explore-navigation-tabs{grid-column:1;grid-row:1;}
  .explore-navigation-chapters{grid-column:1 / -1;grid-row:2;}
- .explore-navigation-actions{grid-column:1 / -1;grid-row:4;flex-wrap:wrap;justify-content:flex-end;max-width:100%;}
  .explore-navigation-diagrams{grid-column:1 / -1;grid-row:3;}
- .explore-navigation-label{font-size:9px;}
- .explore-navigation .tabbtn,.explore-navigation .diagram-view-choice .mbtn{min-height:34px;padding:5px 8px;}
+ .explore-navigation-actions{grid-column:2;grid-row:1;max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:thin;}
+ .explore-navigation .viewport-actions{flex-wrap:nowrap;}
+ .explore-navigation-actions>*{flex:none;}
 }
 
 @media screen{body.viewer-exploring .dv-tour-replay{position:fixed;right:12px;bottom:12px;z-index:85;margin:0;}}
@@ -169,7 +170,7 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 .explore-panel-menu[open]{background:var(--explore-bg);}
 .explore-navigation .viewport-actions{padding:0;border:0;box-shadow:none;background:none;}
 .explore-navigation{border-radius:0;box-shadow:none;}
-.explore-panel-body{position:absolute;right:0;top:calc(100% + 6px);width:260px;max-width:calc(100vw - 24px);max-height:65vh;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
+.explore-panel-body{position:absolute;right:0;top:calc(100% + 6px);width:280px;max-width:calc(100vw - 24px);max-height:65vh;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
 .explore-panel-body .explore-panel-choices{position:static;width:auto;min-width:0;max-width:none;padding:0;margin:0;border:0;box-shadow:none;}
 .explore-panel-body .explore-overlay-zoom{flex-wrap:wrap;}
 .explore-panel-body [hidden]{display:none!important;}
@@ -212,12 +213,12 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .explore-canvas-objects>.explore-window.explore-canvas-selected:focus-visible{outline:3px solid var(--acc);outline-offset:3px;}
  .explore-canvas-objects>.explore-prose-window>.explore-window-body{background:var(--explore-bg);}
 }
-.explore-placement{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
+.explore-placement{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 0;font:12px 'IBM Plex Sans',sans-serif;color:var(--dtext);}
 .explore-placement select{font:inherit;color:inherit;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:6px;padding:6px;}
 @media print{.explore-canvas-objects{position:static;width:auto;height:auto;transform:none!important;}}
 
 .explore-panel-choice{display:grid;grid-template-columns:minmax(0,1fr);align-items:center;gap:0;border-bottom:1px solid var(--explore-border);}
-.explore-panel-choices .explore-panel-choice>.explore-placement{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;padding:0 0 10px 23px;font-size:11px;cursor:default;}
+.explore-panel-choices .explore-panel-choice>.explore-placement{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:8px;padding:0 0 6px 23px;font-size:12px;cursor:default;}
 .explore-panel-choice .explore-placement select{max-width:105px;font-size:12px;}
 .explore-panel-choice>label:first-child{min-width:0;overflow-wrap:anywhere;}
 
@@ -234,11 +235,11 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .explore-canvas-objects>.explore-player:is(.explore-canvas-selected,.dv-sel)>.explore-window-resize{visibility:visible;}
 }
 
-.explore-notes-size-hint{padding:0 0 10px 23px;}
+.explore-notes-size-hint{padding:0 0 6px 23px;}
 
 .docview .explore-board.authored-diagram-hidden .boardcanvas>svg{visibility:hidden;pointer-events:none;}
 
-/* One document-owned navigation row stays in place across every Chapter. The
+/* One document-owned navigation row stays in place across every View. The
    spacer reserves its measured height in the normal reader. Contained readers
    (dialogs and native mounts) use their own scroll surface and sticky row. */
 @media screen{
@@ -257,7 +258,6 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
 
 @media screen{
  .has-document-navigation>.explore-navigation{background:var(--explore-bg,#fff);border:0;border-bottom:1px solid var(--explore-border,#dce1f1);}
- .has-document-navigation>.explore-navigation .explore-diagram-button[aria-pressed="true"]{background:var(--dink,#244aa5);color:var(--explore-bg,#fff);border-color:var(--dink,#244aa5);}
  .document-viewing-mode{display:flex;align-items:center;gap:6px;white-space:nowrap;}
  .document-viewing-mode select{font:inherit;color:var(--dtext);background:var(--explore-bg,#fff);border:1px solid var(--explore-border,#dce1f1);border-radius:6px;padding:5px;}
 }
@@ -285,4 +285,33 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .explore-navigation-chapters{flex:1 1 auto;}
  .explore-navigation-group>:is(.explore-navigation-label,button,.diagram-view-choice,.tabbar){flex:none;}
  .native-canvas .explore-navigation-actions{flex-wrap:nowrap;}
+}
+
+/* Navigation is one control family; diagram content keeps its authored type. */
+.explore-navigation{--navigation-accent:#4956c9;}
+.sk-aurora .explore-navigation{--navigation-accent:#8ae8ff;}
+.sk-pastel .explore-navigation,.sk-daylight .explore-navigation{--navigation-accent:#4956c9;}
+.sk-editorial .explore-navigation{--navigation-accent:var(--ed-accent,#0e5b56);}
+.sk-terminal .explore-navigation{--navigation-accent:var(--tm-good,#5eeb9a);}
+.sk-blueprint .explore-navigation{--navigation-accent:#b9e3ff;}
+body .docview.has-document-navigation>.explore-navigation :is(.tabbtn,.mbtn,.embedcopy,summary){
+ box-sizing:border-box;min-height:34px;margin:0;padding:6px 10px;border:1px solid var(--explore-border);border-radius:7px;
+ background:var(--explore-bg);color:var(--dtext);font:500 12px/20px 'IBM Plex Sans',sans-serif;letter-spacing:normal;text-transform:none;white-space:nowrap;
+}
+body .docview.has-document-navigation>.explore-navigation :is(.tabbtn,.mbtn)[aria-selected="true"],
+body .docview.has-document-navigation>.explore-navigation :is(.tabbtn,.mbtn)[aria-pressed="true"]{
+ color:var(--navigation-accent);border-color:color-mix(in srgb,var(--navigation-accent) 70%,var(--explore-border));background:color-mix(in srgb,var(--navigation-accent) 10%,var(--explore-bg));font-weight:600;
+}
+body .docview.has-document-navigation>.explore-navigation :is(.tabbtn,.mbtn,summary):hover{background:color-mix(in srgb,var(--navigation-accent) 7%,var(--explore-bg));}
+body .docview.has-document-navigation>.explore-navigation .embedcopy{width:34px;min-width:34px;padding:6px;}
+body .docview.has-document-navigation>.explore-navigation .tabbtn::after{display:none;}
+body .docview.has-document-navigation>.explore-navigation .explore-panel-body .mbtn,.explore-panel-body select{min-height:30px;font:500 12px/18px 'IBM Plex Sans',sans-serif;padding:5px 8px;border-radius:6px;}
+.explore-panel-body .explore-panel-choices{display:block;}
+.explore-panel-body .explore-panel-choices label{padding-top:5px;padding-bottom:5px;}
+
+@media screen and (max-width:640px){
+ body .docview.has-document-navigation>.explore-navigation .viewport-expand{width:34px;min-width:34px;padding:5px;font-size:0;}
+ body .docview.has-document-navigation>.explore-navigation .viewport-expand::before{content:'⛶';font:20px/20px 'IBM Plex Sans',sans-serif;}
+ .explore-navigation-group::-webkit-scrollbar,.explore-navigation-actions::-webkit-scrollbar{height:3px;}
+ .explore-navigation-group::-webkit-scrollbar-thumb,.explore-navigation-actions::-webkit-scrollbar-thumb{background:var(--explore-border);border-radius:3px;}
 }

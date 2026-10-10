@@ -1325,7 +1325,7 @@ function wireTour(ctl, view, win, config, options){
   replay.textContent = '?';
   replay.setAttribute('aria-label', 'Replay the tour');
   replay.addEventListener('click', function(){ disabled = false; guarded(start); });
-  var pageActions=readerPageActions(view);
+  var pageActions=readerPageActions(view,ctl);
   pageActions.appendChild(replay);
   if(options.replay===false)replay.hidden=true;
 
@@ -1365,7 +1365,7 @@ function wireTour(ctl, view, win, config, options){
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
     if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
-    if(!pageActions.children.length)pageActions.remove();
+    if(!pageActions.children.length){if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();pageActions.remove();}
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
     }

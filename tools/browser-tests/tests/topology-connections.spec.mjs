@@ -13,7 +13,7 @@ async function fixture(page,server,mode='file',view='ambient'){
   const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
   for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
-  await page.goto(server.origin+'/workbench.html'+(mode==='canon'?'?diagram=consumer':''));
+  await page.goto(server.origin+(mode==='lifetime'?'/lifetime/index.html':'/workbench.html')+(mode==='canon'?'?diagram=consumer':''));
   if(mode==='canon'){await expect(page.locator('#canon-reader-edit')).toBeEnabled();await page.locator('#canon-reader-edit').click();}
   else await page.locator('#welcome-file').setInputFiles({name:'consumer.spec.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(consumer,null,2))});
   await expect(node(page,'shared::api')).toBeVisible();await closeTools(page);
@@ -158,4 +158,70 @@ test('held endpoint callbacks cannot edit replacement source after manual Render
   await expect(node(page,'local')).toContainText('Replacement rendered');
   await page.evaluate(()=>{window.oldEndpoint.value='shared::store';window.oldEndpoint.dispatchEvent(new Event('change',{bubbles:true}));});
   await expect(page.locator('#src')).toHaveValue(changed);
+});
+
+
+for(const view of ['ambient','explore'])test('imported node arrangement survives history, block drag, reset and authored save/reload in '+view,async({page,server},info)=>{
+  await fixture(page,server,'file',view);const before=await source(page);
+  const center=async id=>node(page,id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};});
+  const ids=['local','other','shared::api','shared::store'],initial=await Promise.all(ids.map(center));
+  const handle=page.locator('#docview .dv-topology-boundary[data-topology-import="shared"] .dv-topology-handle');
+  async function drag(target,dx,dy){
+    await closeTools(page);const box=await target.boundingBox(),scale=await node(page,'shared::api').evaluate(n=>n.ownerSVGElement.getScreenCTM().a);
+    const x=Math.round(box.x+box.width/2),y=Math.round(box.y+box.height/2);
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+Math.round(dx*scale),y+Math.round(dy*scale),{steps:10});
+    return {dx:Math.round(dx*scale)/scale,dy:Math.round(dy*scale)/scale};
+  }
+  const nodeDelta=await drag(node(page,'shared::store').locator('.card'),-100,100);
+  await expect(page.locator('#docview .dv-ghost')).toHaveCount(1);await expect(page.locator('#docview .dv-free-edge-preview')).toHaveCount(1);
+  await page.mouse.up();const arranged=await roundtrip(page,before),arrangedD=diagram(JSON.parse(arranged));
+  expect(arrangedD.topologyImports[0].nodePositions.store).toBeDefined();
+  const expected=JSON.parse(before);diagram(expected).topologyImports=arrangedD.topologyImports;expect(JSON.parse(arranged)).toEqual(expected);
+  const positions=await Promise.all(ids.map(center));expect(positions.slice(0,3)).toEqual(initial.slice(0,3));
+  expect(positions[3].x-initial[3].x).toBeCloseTo(nodeDelta.dx,0);expect(positions[3].y-initial[3].y).toBeCloseTo(nodeDelta.dy,0);
+  const blockDelta=await drag(handle,50,40);await expect(page.locator('#docview .dv-ghost')).toHaveCount(2);await page.mouse.up();
+  const moved=await roundtrip(page,arranged),movedD=diagram(JSON.parse(moved));
+  expect(movedD.topologyImports[0].nodePositions).toEqual(arrangedD.topologyImports[0].nodePositions);
+  const movedPositions=await Promise.all(ids.map(center));expect(movedPositions.slice(0,2)).toEqual(initial.slice(0,2));
+  for(const i of [2,3]){expect(movedPositions[i].x-positions[i].x).toBeCloseTo(blockDelta.dx,0);expect(movedPositions[i].y-positions[i].y).toBeCloseTo(blockDelta.dy,0);}
+  await closeTools(page);await handle.click();await page.getByRole('menuitem',{name:'Reset node arrangement',exact:true}).click();
+  const reset=await roundtrip(page,moved),resetD=diagram(JSON.parse(reset));
+  expect(resetD.topologyImports[0].nodePositions).toBeUndefined();expect(resetD.topologyImports[0].position).toEqual(movedD.topologyImports[0].position);
+  const resetPositions=await Promise.all(ids.map(center));
+  for(const i of [2,3]){expect(resetPositions[i].x-initial[i].x).toBeCloseTo(blockDelta.dx,0);expect(resetPositions[i].y-initial[i].y).toBeCloseTo(blockDelta.dy,0);}
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
+  await closeTools(page);await node(page,'shared::store').click();await page.locator('#editor-tab-inspect').click();
+  await page.getByRole('button',{name:'Reset node arrangement',exact:true}).click();await expect(page.locator('#src')).toHaveValue(reset);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(moved);
+  await drag(node(page,'shared::store').locator('.card'),50,50);await page.keyboard.press('Escape');await page.mouse.up();await expect(page.locator('#src')).toHaveValue(moved);
+  await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await drag(node(page,'shared::store').locator('.card'),50,50);const stale=moved+'\n';
+  await page.evaluate(value=>{const src=document.querySelector('#src');src.value=value;src.dispatchEvent(new Event('input',{bubbles:true}));},stale);
+  await page.mouse.up();await expect(page.locator('#src')).toHaveValue(stale);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await page.locator('#editor-tab-json').click();await page.locator('#go').click();await closeTools(page);
+  const download=page.waitForEvent('download');await page.locator('#workspace-export-trigger').click();await page.locator('#file-save').click();
+  const bytes=await readFile(await(await download).path(),'utf8');expect(diagram(JSON.parse(bytes))).toEqual(movedD);
+  await page.locator('#file-input').setInputFiles({name:'arranged.spec.json',mimeType:'application/json',buffer:Buffer.from(bytes)});
+  await page.reload();await expect(node(page,'shared::store')).toBeVisible();await closeTools(page);
+  expect(await Promise.all(ids.map(center))).toEqual(movedPositions);await painted(page);
+  await info.attach('custom-import-arrangement',{body:await page.locator('#docview').screenshot(),contentType:'image/png'});
+});
+
+
+test('imported node drags retire when rendering, replacing provider context or destroying the editor',async({page,server})=>{
+  const {provider,consumer}=await fixture(page,server,'lifetime');const before=await source(page);
+  async function hold(){
+    await closeTools(page);const box=await node(page,'shared::store').locator('.card').boundingBox();
+    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
+    await page.mouse.move(box.x+box.width/2+70,box.y+box.height/2+50,{steps:8});
+    await expect(page.locator('#docview .dv-ghost')).toHaveCount(1);
+  }
+  await hold();await page.evaluate(()=>document.querySelector('#go').click());await page.mouse.up();
+  await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await hold();diagram(provider).nodes.api.title='Updated provider';
+  await page.evaluate(({text,context})=>__editorTest.builder.loadText(text,context),{text:before,context:{version:1,id:'consumer',specs:[provider,consumer]}});
+  await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect(node(page,'shared::api')).toContainText('Updated provider');
+  await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
+  await hold();await page.evaluate(()=>__editorTest.builder.destroy());await page.mouse.up();
+  await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
 });

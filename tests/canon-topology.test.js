@@ -351,3 +351,23 @@ test('authored editor sessions resolve a frozen closure while preserving source,
   assert.ok(html.includes('platform::api'));assert.deepEqual(JSON.parse(text),edited);
   assert.equal(session.undo(),true);assert.equal(text,original);
 });
+
+
+test('custom import centers validate selected identities, shape and relative/absolute bounds',()=>{
+  for(const nodePositions of [null,[],{api:null},{api:{x:1}},{api:{x:'1',y:2}},{api:{x:NaN,y:2}},{api:{x:0,y:Infinity}},{api:{x:100001,y:0}},{api:{x:1,y:2,z:3}},{missing:{x:0,y:0}},{'platform::api':{x:0,y:0}}]){
+    const specs=source();diagram(specs[1]).topologyImports[0].nodePositions=nodePositions;
+    assert.throws(()=>resolve(specs),/Topology checkout.*import.*nodePositions/);
+  }
+  const specs=source(),imp=diagram(specs[1]).topologyImports[0];imp.position={x:90000,y:0};imp.nodePositions={api:{x:20000,y:0}};
+  assert.throws(()=>resolve(specs),/placement exceeds supported coordinate range/);
+});
+test('subsets and nested imports support custom centers without copying structure',()=>{
+  const specs=notificationSource(['push','sms']),consumer=diagram(specs[1]),imp=consumer.topologyImports[0];
+  imp.nodes=['dispatcher','push','sms'];imp.edges=['dispatcher->push','dispatcher->sms'];imp.position={x:200,y:300};imp.nodePositions={push:{x:-80,y:120}};
+  const baseline=resolve(specs);assert.deepEqual(diagram(baseline[1]).floats.find(f=>f.id==='notify::push'),{id:'notify::push',side:'below',x:120,y:420});
+  imp.nodePositions.email={x:0,y:0};assert.throws(()=>resolve(specs),/not selected\/exported: email/);delete imp.nodePositions.email;
+  consumer.topologyExports={shared:{nodes:['notify::push','notify::sms'],edges:[]}};
+  const outer={page:{title:'Outer',canon:{version:1,id:'outer',kind:'canonical',owner:'group:default/team'},sections:[{diagram:{topologyImports:[{spec:'notification-parent',export:'shared',as:'outer',position:{x:100,y:100},nodePositions:{'notify::sms':{x:40,y:-80}}}]}}]}};
+  const result=resolve([...specs,outer]);assert.deepEqual(diagram(result[2]).floats.find(f=>f.id==='outer::notify::sms'),{id:'outer::notify::sms',side:'below',x:140,y:20});
+  assert.deepEqual(diagram(result[1]),diagram(baseline[1]));assert.deepEqual(resolve(result),result);
+});

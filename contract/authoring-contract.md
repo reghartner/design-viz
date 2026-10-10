@@ -114,9 +114,16 @@ Diagram source may declare `topologyExports: {name: {nodes: [nodeId], edges:
 namespace}]`. Imported node IDs are `namespace::nodeId`; consumer steps and
 connecting edges use those identities directly. Consumers own steps, paths,
 failures and panels. Each import defaults to a floating block. Optional
-`position: {x, y}` on the import fixes its minimum node-center coordinates in
-parent diagram units; dragging any imported node moves the entire block and
-writes only that position. Internal node-center spacing is provider-derived.
+`position: {x, y}` fixes the import origin in parent diagram units (the
+minimum provider-derived node-center coordinates before custom arrangement).
+Optional `nodePositions: {providerNodeId: {x, y}}` overrides individual node
+centers relative to that origin. Keys must be selected exported node identities,
+including nested paths such as `inner::api`; omitted nodes retain provider layout.
+Relative and final absolute coordinates must be finite and within ±100000.
+Dragging an imported node saves its center and pins the import origin; dragging
+the reference’s ⋯ handle moves the entire block by changing only `position`.
+Reset node arrangement removes `nodePositions` and preserves `position`.
+All layout data belongs to the consumer; provider structure stays read-only.
 Optional `nodes: [providerNodeId]` and `edges: ["from->to"]` on an import select
 within its named export; omission means the full corresponding array. Require
 at least one node, unique identities, and both endpoints of every selected edge.

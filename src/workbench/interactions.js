@@ -366,6 +366,8 @@ function createBuilderInteractions(opts){
     item('Inspect imported member',function(){selectSpatial([ref.target]);if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});});
     item('Copy diagram link',function(){window.navigator.clipboard.writeText(url).catch(function(){if(current())inspectorMessage('Could not copy the diagram link.');});},!url?unavailable:!window.navigator.clipboard?'Clipboard access is unavailable in this browser.':null);
     var got=builderDiagram(ref.s.text,ref.s.raw,ref.section),direct=!got.error && (got.d.topologyImports || []).some(function(imp){return imp.as===ref.imp.as;});
+    var reset=direct?planResetTopologyArrangement(ref.s.text,ref.s.raw,ref.section,ref.imp.as):{error:ref.imp.as.indexOf('::')>=0?'Reset the containing reference to restore this nested arrangement.':'Open the authored consumer with its providers to reset its arrangement.'};
+    item('Reset node arrangement',function(){applyPlan(planResetTopologyArrangement(ref.s.text,ref.s.raw,ref.section,ref.imp.as),null,ref.s);},reset.error);
     var removal=direct?planRemoveTopologyImport(ref.s.text,ref.s.raw,ref.section,ref.imp.as,context):{error:'This nested reference belongs to its containing provider. Remove it in the diagram that imports it.'};
     item('Delete reference',function(){
       var plan=planRemoveTopologyImport(session.text(),parseEditor().raw,ref.section,ref.imp.as,session.topologyContext());
@@ -389,7 +391,7 @@ function createBuilderInteractions(opts){
     referenceMenuLife.listen(view,'scroll',function(e){var saved=scrollPositions.find(function(p){return p.el===e.target;});if(saved && (saved.el.scrollLeft!==saved.left || saved.el.scrollTop!==saved.top))closeReferenceMenu(false);},true);
   }
   life.listen(view,'contextmenu',openReferenceMenu,true);
-  life.listen(view,'click',function(ev){if(ev.target.closest('.dv-topology-handle'))openReferenceMenu(ev);},true);
+  life.listen(view,'click',function(ev){if(!suppressClick && ev.target.closest('.dv-topology-handle'))openReferenceMenu(ev);},true);
   life.listen(view,'keydown',function(ev){
     var handle=ev.target.closest('.dv-topology-handle');
     if(handle && (ev.key==='Enter' || ev.key===' ') || (ev.key==='ContextMenu' || ev.key==='F10' && ev.shiftKey && !ev.ctrlKey && !ev.altKey && !ev.metaKey))openReferenceMenu(ev);
@@ -1048,6 +1050,7 @@ function createBuilderInteractions(opts){
         handle.setAttribute('transform','translate('+(x1-10-depth*8)+' '+(y1-28-depth*16)+')');
         handle.setAttribute('role','button');handle.setAttribute('tabindex','0');handle.setAttribute('aria-haspopup','menu');
         handle.setAttribute('aria-label','Reference actions for '+imp.as);handle.setAttribute('aria-keyshortcuts','Enter Space Shift+F10');
+        var handleTip=document.createElementNS(SVG_NS,'title');handleTip.textContent=depth?'Drag to move the containing reference; click for reference actions.':'Drag to move the whole reference; click for reference actions.';handle.appendChild(handleTip);
         var handleRect=document.createElementNS(SVG_NS,'rect');handleRect.setAttribute('width','26');handleRect.setAttribute('height','24');handleRect.setAttribute('rx','5');handle.appendChild(handleRect);
         var dots=document.createElementNS(SVG_NS,'text');dots.setAttribute('x','13');dots.setAttribute('y','16');dots.setAttribute('text-anchor','middle');dots.setAttribute('aria-hidden','true');dots.textContent='⋯';handle.appendChild(dots);g.appendChild(handle);
         svg.appendChild(g);
@@ -1291,7 +1294,8 @@ function createBuilderInteractions(opts){
       }
       return;
     }
-    var nodeEl = ev.target.closest('g.node[data-dv-node]');
+    var blockHandle=ev.target.closest('.dv-topology-handle'),blockReference=blockHandle && referenceTarget(blockHandle);
+    var nodeEl = blockReference?findTargetEl(blockReference.target):ev.target.closest('g.node[data-dv-node]');
     if (nodeEl && !addToStep && !ev.target.closest('.nbackref, .nlink, a, button, [data-dv-handoff]')){
       var ndSec = nodeEl.closest('.doc-sec');
       if (ndSec && ndSec.hasAttribute('data-dv-section')){
@@ -1309,12 +1313,13 @@ function createBuilderInteractions(opts){
             if(!imported.position || !Array.isArray(startDiagram.topologyImports) || !startDiagram.topologyImports.some(function(imp){return imp.as===imported.as;})){
               cancelNodeDrag();inspectorMessage('Open the authored consumer from Canon to move its imported block.');return;
             }
-            startDiagram=resolvedDiagram;nodeDrag.topologyImport=imported;
+            startDiagram=resolvedDiagram;nodeDrag.topologyImport=imported;nodeDrag.wholeImport=!!blockHandle;
+            nodeDrag.contextKey=JSON.stringify(session.topologyContext());
             nodeDrag.topologyBoundaries=Array.from(ndSec.querySelectorAll('.dv-topology-boundary')).filter(function(boundary){
-              var name=boundary.getAttribute('data-topology-import');return name===imported.as || name.indexOf(imported.as+'::')===0;
+              var name=boundary.getAttribute('data-topology-import');return nodeDrag.wholeImport && (name===imported.as || name.indexOf(imported.as+'::')===0);
             });
             var importPositions=layout(startDiagram).pos;
-            nodeDrag.members=imported.nodes.map(function(id){
+            nodeDrag.members=(nodeDrag.wholeImport?imported.nodes:[nodeDrag.id]).map(function(id){
               var el=findTargetEl({kind:'node',section:ndGi,id:id});return {id:id,el:el,xy:el && nodeTranslateXY(el),origin:importPositions[id]};
             });
             if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))nodeDrag.selectionError='Render all imported nodes before moving the block.';
@@ -1386,7 +1391,7 @@ function createBuilderInteractions(opts){
       if (!nodeDrag.moved) return;
       if(nodeDrag.selectionError){var message=nodeDrag.selectionError;cancelNodeDrag();inspectorMessage(message);return;}
       if(nodeDrag.floating){
-        if(session.text()!==nodeDrag.snapshot.text){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(session.text()!==nodeDrag.snapshot.text || nodeDrag.topologyImport && JSON.stringify(session.topologyContext())!==nodeDrag.contextKey){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
         if(nodeDrag.members){updateSelectedFloatGhosts(ev);return;}
         nodeDrag.el.classList.add('dv-dragsrc');updateNodeDragGhost(ev);return;
       }
@@ -1450,10 +1455,12 @@ function createBuilderInteractions(opts){
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
       if(nd.floating){
-        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project || !nd.el.isConnected || ndParsed.renderedText!=null && ndParsed.renderedText!==ndParsed.text || nd.topologyImport && JSON.stringify(session.topologyContext())!==nd.contextKey){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
         if(nd.topologyImport){
-          ndPlan=planPlaceTopologyImport(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,
-            nd.topologyImport.position.x+nd.delta.dx,nd.topologyImport.position.y+nd.delta.dy);
+          ndPlan=nd.wholeImport?planPlaceTopologyImport(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,
+            nd.topologyImport.position.x+nd.delta.dx,nd.topologyImport.position.y+nd.delta.dy):
+            planPlaceTopologyNode(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,nd.id,
+              nd.origin.cx+nd.delta.dx,nd.origin.cy+nd.delta.dy,session.topologyContext());
         }else if(nd.selection){
           ndPlan=planTransformFloats(session.text(),ndParsed.raw,nd.selection,{type:'move',dx:nd.delta.dx,dy:nd.delta.dy});
           applyPlan(ndPlan,null,ndParsed);return;

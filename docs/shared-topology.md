@@ -261,8 +261,26 @@ a source node (or choose **Connect from this node** in its Inspector), then clic
 the destination. The connection Inspector’s **from** and **to** lists include
 imported nodes; changing an endpoint also retargets the consumer’s story references
 in the same Undo action. Only the consumer connection is saved. Provider-owned
-connections remain read-only. Edit shared structure in the provider; drag any
-imported node to place its whole block.
+connections remain read-only. Edit shared structure in the provider. Drag an
+imported node to rearrange just that node; drag the reference’s **⋯** handle to
+move the whole block with its custom arrangement (a nested handle moves the
+containing direct reference). Click the handle for reference
+actions. **Reset node arrangement** in the Inspector or reference menu restores
+the provider arrangement while preserving the block position. Each drag or reset
+is one Undo action; Escape cancels an active drag.
+
+The authored import stores optional `nodePositions`, keyed by provider-relative
+exported node identity, such as `"nodePositions":{"api":{"x":0,"y":180}}`.
+These are node centers relative to the import’s `position`, not displacements
+from the provider layout. The first node drag also saves the current import
+origin. Nodes without a saved center keep their provider-derived arrangement.
+Moving the whole block changes only `position`. Provider refreshes retain saved
+centers by stable identity; removed or deselected identities are validation
+errors, so remove their saved entries when changing an import’s subset. Nested
+identities use the full relative path (for example `inner::api`) on the direct
+consumer import. Coordinates and resulting absolute centers must be finite and
+between -100000 and 100000. Published resolved snapshots remain immutable;
+open the authored consumer with its provider context to arrange nodes.
 Workbench draws a light labeled boundary around each direct and nested referenced
 set; this editor-only cue is not persisted or shown on published pages. Selecting
 any imported node, connection, or group exposes **Remove referenced topology**.

@@ -72,7 +72,9 @@ After the packet, load a guide only for starting-material or handoff details:
   includes its backend and needs no source checkout or build.
 - **Canon/topology:** select `--feature topology` when needed; the packet includes
   its owner. Preserve imports/exports and use the complete provider/consumer
-  context. Never flatten accepted source to satisfy standalone tools.
+  context. Never flatten accepted source to satisfy standalone tools. For requested
+  imported-node rearrangement, use consumer import `nodePositions`; preserve
+  provider structure. See [shared topology](../../../docs/shared-topology.md).
 - **Optional detail:** the [workflow reference](references/authoring-workflow.md)
   preserves detailed phases. [Recipe routing](references/recipe-routing.md) and
   [authoring details](references/authoring-details.md) cover special features.

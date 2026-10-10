@@ -158,6 +158,35 @@ function planPlaceTopologyImport(text,raw,sectionIdx,namespace,x,y){
   ]);
 }
 
+/* A custom center is relative to the direct import origin, keyed by its
+   provider-relative identity (which can itself include nested namespaces). */
+function planPlaceTopologyNode(text,raw,sectionIdx,namespace,id,x,y,context){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Node position requires finite X/Y coordinates between -100000 and 100000.'};
+  var resolved;
+  try{resolved=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}
+  var record=specSectionPaths(resolved)[sectionIdx],diagram=record && specValueAt(resolved,record.diagram);
+  var owner=FlowTopology.origin(diagram,'nodes',id);
+  var imports=got.d.topologyImports || [],index=imports.findIndex(function(imp){return imp.as===namespace;});
+  if(index<0 || !owner || owner.as!==namespace)return {error:'Choose a node in this authored topology import.'};
+  var position=owner.position;if(!position)return {error:'Render the import before arranging its nodes.'};
+  var relative={x:Math.round((x-position.x)*10)/10,y:Math.round((y-position.y)*10)/10};
+  if(!floatCoordinate(relative.x) || !floatCoordinate(relative.y))return {error:'Relative node position exceeds the supported coordinate range.'};
+  var positions=builderClone(imports[index].nodePositions || {});
+  Object.defineProperty(positions,id.slice(namespace.length+2),{value:relative,enumerable:true,writable:true,configurable:true});
+  return planSetFields(text,raw,got.path.concat(['topologyImports',index]),[
+    ['position',JSON.stringify(position)],['nodePositions',JSON.stringify(positions)]
+  ]);
+}
+function planResetTopologyArrangement(text,raw,sectionIdx,namespace){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  var imports=got.d.topologyImports || [],indexes=[];
+  imports.forEach(function(imp,index){if(imp.as===namespace)indexes.push(index);});
+  if(indexes.length!==1)return {error:'Choose one authored topology import.'};
+  if(!Object.keys(imports[indexes[0]].nodePositions || {}).length)return {error:'This reference already uses the provider arrangement.'};
+  return planSetField(text,raw,got.path.concat(['topologyImports',indexes[0]]),'nodePositions',null);
+}
+
 /* Selection order defines the alignment anchor. Automatic floats are resolved
    together before pinning, so moving one cannot move another's starting point. */
 function builderSelectedFloats(text,raw,targets){

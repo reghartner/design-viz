@@ -85,9 +85,16 @@ var FlowTopology = (function(){
         }
         if(own(d,'topologyImports') && !Array.isArray(d.topologyImports))fail(at,'topologyImports must be an array');
         (d.topologyImports || []).forEach(function(imp,i){
-          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges'],where);
+          var where=at+' import '+i;shape(imp,['spec','export','as','position','nodes','edges','nodePositions'],where);
           if(typeof imp.spec!=='string' || !imp.spec || !token(imp.export) || !token(imp.as))fail(where,'requires spec, export, and a namespace as (letters, digits, dot, dash, underscore)');
           ['nodes','edges'].forEach(function(key){if(own(imp,key))list(imp[key],where+' '+key);});
+          if(own(imp,'nodePositions')){
+            if(!object(imp.nodePositions))fail(where,'nodePositions must be an object keyed by exported node identity');
+            Object.keys(imp.nodePositions).forEach(function(key){
+              shape(imp.nodePositions[key],['x','y'],where+' nodePositions '+key);
+              if(!positionedFloat(imp.nodePositions[key]))fail(where,'nodePositions '+key+' requires finite x/y coordinates between -100000 and 100000');
+            });
+          }
           if(own(imp,'position')){
             shape(imp.position,['x','y'],where+' position');
             if(!positionedFloat(imp.position))fail(where,'position requires finite x/y coordinates between -100000 and 100000');
@@ -101,7 +108,7 @@ var FlowTopology = (function(){
       states.set(id,'visiting');
       var spec=byId.get(id);
       sections(spec).forEach(function(sec,si){
-        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[];
+        var d=sec.diagram,at=id+' section '+(sec.id || si),imports=d.topologyImports || [],provenance=[],defaultPlacements=Object.create(null);
         var namespaces=new Set();
         imports.forEach(function(imp){
           var where=at+' import '+imp.as+' ('+imp.spec+' export '+imp.export+')',prefix=imp.as+'::';
@@ -119,13 +126,19 @@ var FlowTopology = (function(){
           });
           if(!exp.nodes.length)fail(where,'select at least one exported node');
           var selected=new Set(exp.nodes);
+          Object.keys(imp.nodePositions || {}).forEach(function(key){
+            if(!selected.has(key))fail(where,'nodePositions identity is not selected/exported: '+key);
+          });
           if(d.nodes==null)d.nodes={};if(!object(d.nodes))fail(where,'consumer nodes must be an object');
           if(d.edges==null)d.edges=[];if(!Array.isArray(d.edges))fail(where,'consumer edges must be an array');
           if(d.rows==null || Array.isArray(d.rows) && !d.rows.length)d.rows=[[]];
           if(!Array.isArray(d.rows) || d.rows.some(function(row){return !Array.isArray(row) || row.some(function(slot){return typeof slot!=='string' && (!Array.isArray(slot) || slot.some(function(key){return typeof key!=='string';}));});}))fail(where,'broken consumer row placement');
           // Default each block below existing content. Explicit positions are
           // absolute origins, so provider size changes never reset a saved drag.
-          var parentLayout=layout(d),bottom=0;
+          // Custom centers must not push subsequent automatically placed imports.
+          // Use provider-derived centers only to choose their default origins.
+          var placementDiagram=Object.assign({},d,{floats:(d.floats || []).map(function(f){return defaultPlacements[f.id] || f;})});
+          var parentLayout=layout(placementDiagram),bottom=0;
           Object.keys(parentLayout.pos).forEach(function(key){var p=parentLayout.pos[key];bottom=Math.max(bottom,p.cy+p.h/2);});
           var position=imp.position?clone(imp.position):{x:LEFT_X,y:bottom+80};
           if(Object.keys(d.nodes).some(function(key){return key.startsWith(prefix);}))fail(where,'namespace collision with existing node '+prefix);
@@ -182,8 +195,11 @@ var FlowTopology = (function(){
           if(d.floats==null)d.floats=[];
           if(!Array.isArray(d.floats))fail(where,'consumer floats must be an array');
           nodeIds.forEach(function(key){
-            var p=fragmentLayout.pos[key],f={id:key,side:'below',x:position.x+p.cx-minX,y:position.y+p.cy-minY};
+            var p=fragmentLayout.pos[key],relative=key.slice(prefix.length);
+            var custom=own(imp.nodePositions || {},relative)?imp.nodePositions[relative]:null;
+            var f={id:key,side:'below',x:position.x+(custom?custom.x:p.cx-minX),y:position.y+(custom?custom.y:p.cy-minY)};
             if(!positionedFloat(f))fail(where,'block placement exceeds supported coordinate range for '+key);
+            if(custom)defaultPlacements[key]={id:key,side:'below',x:position.x+p.cx-minX,y:position.y+p.cy-minY};
             d.floats.push(f);
           });
           provenance.push({spec:imp.spec,export:imp.export,as:imp.as,position:position,nodes:nodeIds,edges:edgeIds,groups:Object.keys(groups).map(function(key){return prefix+key;})});

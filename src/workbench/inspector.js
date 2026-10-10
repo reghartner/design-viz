@@ -2443,8 +2443,10 @@ function renderInspector(){
       t.kind==='node'?'nodes':t.kind==='edge'?'edges':t.kind==='group'?'groups':'',
       t.kind==='edge' && resolvedValue?resolvedValue.from+'->'+resolvedValue.to:t.id);
     if(imported){
+      var authoredRecord=specSectionPaths(parsed.raw)[t.section],authoredDiagram=authoredRecord && specValueAt(parsed.raw,authoredRecord.diagram);
+      var hasAuthoredImport=(authoredDiagram && authoredDiagram.topologyImports || []).some(function(imp){return imp.as===imported.as;});
       var note=document.createElement('p');note.className='fnote';
-      note.textContent='Read-only topology from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). Drag any imported node to move the whole floating block. Only this import’s position is saved; internal structure stays provider-owned. Edit this consumer’s steps, paths, failures, and panels here.';
+      note.textContent='Read-only topology structure from '+imported.spec+' / '+imported.export+' (namespace '+imported.as+'). '+(hasAuthoredImport?'Drag a node to rearrange it here, or drag the reference’s ⋯ handle to move the whole block. Only this consumer’s arrangement is saved; structure stays provider-owned.':'This resolved snapshot is read only. Open the authored consumer with its providers to rearrange nodes.')+' Edit this consumer’s steps, paths, failures, and panels here.';
       guide.appendChild(note);
       if(t.kind==='node'){
         var connectImported=actionButton('Connect from this node',function(){modes.connectFrom(t);});
@@ -2453,6 +2455,14 @@ function renderInspector(){
         guide.appendChild(connectImported);
       }
       var importedError=document.createElement('div');importedError.className='gerr ierr';importedError.hidden=true;guide.appendChild(importedError);
+      var arrangementContextKey=JSON.stringify(session.topologyContext());
+      var resetArrangement=actionButton('Reset node arrangement',function(){
+        if(session.text()!==parsed.text || JSON.stringify(session.topologyContext())!==arrangementContextKey){formError('The source or provider context changed. Render and reselect before resetting.');return false;}
+        return applyPlan(planResetTopologyArrangement(parsed.text,parsed.raw,t.section,imported.as),null,parsed);
+      });
+      var resetPlan=planResetTopologyArrangement(parsed.text,parsed.raw,t.section,imported.as);
+      resetArrangement.disabled=!!resetPlan.error;if(resetPlan.error)resetArrangement.title=resetPlan.error;
+      guide.appendChild(resetArrangement);
       var removeImport=actionButton('Remove referenced topology',function(){
         var namespace=imported.as,section=t.section;
         return commitCascade(function(raw){return planRemoveTopologyImport(session.text(),raw,section,namespace,session.topologyContext());},{after:function(){

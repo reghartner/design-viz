@@ -154,7 +154,7 @@ for(const canvas of [false,true])test('reference actions navigate, explain block
   await member.click({button:'right'});await expect(menu).toBeVisible();const remove=menu.getByRole('menuitem',{name:/Delete reference/});
   await expect(remove).toHaveAttribute('aria-disabled','true');await expect(remove).toContainText('Consumer connections');await remove.click({force:true});await expect(page.locator('#src')).toHaveValue(blocked);
   await page.keyboard.press('Escape');await page.locator('#editor-tab-json').click();await page.locator('#src').fill(importedText);await page.locator('#go').click();await prepareEditorSurface(page);
-  await handle.click();await expect(menu).toBeVisible();await menu.getByRole('menuitem',{name:'Inspect imported member',exact:true}).click();await expect(page.locator('#guide')).toContainText('Read-only topology from first');await prepareEditorSurface(page);
+  await handle.click();await expect(menu).toBeVisible();await menu.getByRole('menuitem',{name:'Inspect imported member',exact:true}).click();await expect(page.locator('#guide')).toContainText('Read-only topology structure from first');await prepareEditorSurface(page);
   await handle.click();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu).toHaveCount(0);
   await page.locator('#editor-tab-json').click();await page.locator('#src').fill(importedText);await page.locator('#go').click();await prepareEditorSurface(page);
   await member.click({button:'right'});await menu.getByRole('menuitem',{name:'Delete reference',exact:true}).click();
@@ -330,25 +330,27 @@ test('the backend workspace handoff drags a whole floating import with authored 
   const node=id=>root.locator('g.node[data-dv-node="'+id+'"]');
   const center=async id=>node(id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};});
   const original=await Promise.all(['client','platform::api','platform::store'].map(center));
+  let delta;
   async function drag(){
-    const box=await node('platform::api').locator('.card').boundingBox(),scale=await node('platform::api').evaluate(n=>n.ownerSVGElement.getScreenCTM().a);
-    const x=box.x+box.width/2,y=box.y+box.height/2;
-    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+90*scale,y+70*scale,{steps:12});
+    const box=await boundary.locator('.dv-topology-handle').boundingBox(),scale=await node('platform::api').evaluate(n=>n.ownerSVGElement.getScreenCTM().a);
+    const x=Math.round(box.x+box.width/2),y=Math.round(box.y+box.height/2);
+    delta={dx:Math.round(90*scale)/scale,dy:Math.round(70*scale)/scale};
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+Math.round(90*scale),y+Math.round(70*scale),{steps:12});
   }
   await drag();await expect(root.locator('.dv-ghost')).toHaveCount(2);
   await expect(boundary).toHaveAttribute('transform',/translate\(/);
   await expect(root.locator('.dv-free-edge-preview')).toHaveCount(2);await page.mouse.up();
   const after=await page.locator('#src').inputValue(),moved=JSON.parse(after),d=moved.page.sections[0].diagram;
   const origin=spec.page.sections[0].diagram.topologyProvenance.imports[0].position;
-  expect(d.topologyImports[0].position.x).toBeCloseTo(origin.x+90,0);
-  expect(d.topologyImports[0].position.y).toBeCloseTo(origin.y+70,0);
+  expect(d.topologyImports[0].position.x).toBeCloseTo(origin.x+delta.dx,0);
+  expect(d.topologyImports[0].position.y).toBeCloseTo(origin.y+delta.dy,0);
   const expected=JSON.parse(before);expected.page.sections[0].diagram.topologyImports[0].position=d.topologyImports[0].position;
   expect(moved).toEqual(expected);expect(d.floats).toBeUndefined();expect(d.topologyProvenance).toBeUndefined();
   const placed=await Promise.all(['client','platform::api','platform::store'].map(center));
   expect(placed[0]).toEqual(original[0]);
-  for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(90,0);expect(placed[i].y-original[i].y).toBeCloseTo(70,0);}
+  for(const i of [1,2]){expect(placed[i].x-original[i].x).toBeCloseTo(delta.dx,0);expect(placed[i].y-original[i].y).toBeCloseTo(delta.dy,0);}
   const boundaryAfter=await boundary.locator(':scope > rect').evaluate(rect=>({x:Number(rect.getAttribute('x')),y:Number(rect.getAttribute('y'))}));
-  expect(boundaryAfter.x-boundaryBefore.x).toBeCloseTo(90,0);expect(boundaryAfter.y-boundaryBefore.y).toBeCloseTo(70,0);
+  expect(boundaryAfter.x-boundaryBefore.x).toBeCloseTo(delta.dx,0);expect(boundaryAfter.y-boundaryBefore.y).toBeCloseTo(delta.dy,0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
   await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
@@ -401,7 +403,7 @@ test('a published topology consumer renders and its imported node inspector is r
   await expect(page.locator('#workspace-provenance')).toContainText('Referenced topology (frozen session)');
   await page.locator('#docview [data-dv-node="platform::api"]').click();
   await page.locator('#editor-tab-inspect').click();
-  await expect(page.locator('#guide')).toContainText('Read-only topology from first / core');
+  await expect(page.locator('#guide')).toContainText('Read-only topology structure from first / core');
   await expect(page.locator('#guide').getByLabel('title',{exact:true})).toHaveCount(0);
   const source=JSON.parse(await page.locator('#src').inputValue());
   expect(source.page.sections[0].diagram.steps[1].edge).toBe('platform::api->platform::store');

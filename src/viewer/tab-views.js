@@ -5,12 +5,20 @@ function createTabViewController(ctl,page){
   owners.forEach(function(owner){owner.views=tabViewDefinitions(owner);owner.current=tabViewDefault(owner,owner.views);owner.records.forEach(function(record){record.runtime=ctl.sections.find(function(rec){return rec.number===record.number;});record.runtime.detailOnly=record.domainOnly;record.runtime.viewOwner=owner;});owner.selected=owner.current && owner.current.members[0] && owner.current.members[0].record.runtime;});
   function ownerOf(rec){return rec && rec.viewOwner;}
   function members(owner){return owner && owner.current?owner.current.members.map(function(member){return member.record.runtime;}):[];}
+  function placeSection(rec,previous){
+    if(previous.nextSibling===rec.sectionEl)return;
+    // Reordering a live section clears descendant scroll offsets in Chromium.
+    // Keep the Explore camera intact before presentation changes capture it.
+    var board=rec.sectionEl.querySelector('.explore-board'),left=board && board.scrollLeft,top=board && board.scrollTop;
+    previous.after(rec.sectionEl);
+    if(board){board.scrollLeft=left;board.scrollTop=top;}
+  }
   function apply(owner){
     if(!owner || !owner.current)return;
     updating=true;
     try{
       var active=members(owner);if(active.indexOf(owner.selected)<0)owner.selected=active[0];
-      if(!owner.current.legacy && active.length){var anchor=owner.anchor;if(!anchor){anchor=document.createComment('Tab section order');active[0].sectionEl.before(anchor);owner.anchor=anchor;}var previous=anchor;active.forEach(function(rec){previous.after(rec.sectionEl);previous=rec.sectionEl;});}
+      if(!owner.current.legacy && active.length){var anchor=owner.anchor;if(!anchor){anchor=document.createComment('Tab section order');active[0].sectionEl.before(anchor);owner.anchor=anchor;}var previous=anchor;active.forEach(function(rec){placeSection(rec,previous);previous=rec.sectionEl;});}
       owner.records.forEach(function(record){var rec=record.runtime,member=owner.current.members.find(function(m){return m.record===record;}),visible=!!member && (owner.current.presentation==='standard' || rec===owner.selected);
         rec.viewExcluded=!member;rec.viewingMode=owner.current.presentation;
         if(member && rec.presentation){var layout=member.layout || rec.presentation.defaultView();if(rec.presentation.viewId()!==layout)rec.presentation.setView(layout);}

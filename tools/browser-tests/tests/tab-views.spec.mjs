@@ -139,3 +139,30 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
  await player.getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(bar).toBeHidden();await separated();
  await player.getByRole('button',{name:'STEP',exact:true}).click();await readable();
 });
+
+for(const width of [870,1280])for(const authored of [false,true])test(`reader View reordering preserves the ${authored?'authored':'default'} camera before Fit at ${width}px`,async({page,server},info)=>{
+ await page.setViewportSize({width,height:742});const raw=await fixture(),tab=raw.page.blocks[0].tabs[0];
+ tab.views=[
+  {id:'full-story',name:'Full story',presentation:'standard',sections:['a','b','c']},
+  {id:'explore-story',name:'Explore story',presentation:'explore',sections:['a','b','c']},
+  {id:'reversed',name:'Reversed subset',presentation:'explore',sections:['c','a']}
+ ];tab.defaultView='full-story';
+ if(authored){const d=tab.sections[2].diagram;d.defaultLayout='shared';d.layouts=[{id:'shared',name:'Shared arrangement',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},exploreLayout:{camera:{zoom:.5,x:.5,y:.5}}}];}
+ const root=await standalone(page,server,raw),navigation=nav(root),section=root.locator('#section-c'),board=section.locator('.explore-board'),node=section.locator('[data-dv-node=service]');
+ await navigation.getByRole('button',{name:'Explore story',exact:true}).click();await navigation.getByRole('button',{name:'Section C',exact:true}).click();
+ // No Fit gesture: first entry and every later transition must show the graph.
+ await expect(node).toBeInViewport({ratio:1});await page.evaluate(()=>document.fonts.ready);
+ const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,width:el.querySelector('.boardcanvas>svg').getBoundingClientRect().width}));
+ if(authored)expect(await board.evaluate(el=>el.querySelector('.boardcanvas>svg').getBoundingClientRect().width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width)).toBeCloseTo(.5,3);
+ await section.getByRole('button',{name:'Zoom in',exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
+ await expect(node).toBeInViewport();
+ for(let cycle=0;cycle<3;cycle++){
+  await navigation.getByRole('button',{name:'Full story',exact:true}).click();await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);
+  await navigation.getByRole('button',{name:'Explore story',exact:true}).click();await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
+  // C actually moves before A, not just through a redundant DOM insertion.
+  await navigation.getByRole('button',{name:'Reversed subset',exact:true}).click();expect((await navigation.locator('.explore-navigation-diagrams button:visible').allTextContents()).sort()).toEqual(['Section A','Section C']);
+  expect(await root.locator('.doc-sec[data-dv-section]').evaluateAll(nodes=>nodes.map(n=>n.id).indexOf('section-c')<nodes.map(n=>n.id).indexOf('section-a'))).toBe(true);
+  await expect(root.locator('#section-b')).toBeHidden();await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
+ }
+ await info.attach('retained-reader-camera',{body:await page.screenshot(),contentType:'image/png'});
+});

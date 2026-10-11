@@ -1046,6 +1046,69 @@ function autoArrangeExpandSpacing(d,result,viz){
   }catch(ex){}
   throw new Error('Could not expand layout spacing with clear cards and connections. The diagram is unchanged.');
 }
+var AUTO_ARRANGE_READABILITY_LIMITS={nodes:48,edges:80,passes:3,beam:8,slots:8,checks:72,routes:18};
+// Consolidate a sparse row into nearby connected slots after spacing has
+// expanded. Only row-removal proposals may trade aspect for a smaller drawing;
+// every accepted route still respects both crossing budgets and wide clearance.
+function autoArrangeReadability(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=AUTO_ARRANGE_READABILITY_LIMITS;
+  if(ids.length<5 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var original=result,best=result,checks=0,routes=0,adj=Object.create(null),incoming=Object.create(null),originalPoints=Object.fromEntries(result.positions.map(function(p){return [p.id,p];}));
+  ids.forEach(function(id){adj[id]=[];incoming[id]=0;});edges.forEach(function(e){incoming[e.to]++;});edges.forEach(function(e){if(e.from!==e.to){if(adj[e.from].indexOf(e.to)<0)adj[e.from].push(e.to);if(adj[e.to].indexOf(e.from)<0)adj[e.to].push(e.from);}});
+  function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
+  var clearance=Infinity;result.positions.forEach(function(p,i){result.positions.slice(i+1).forEach(function(q){clearance=Math.min(clearance,gap(p,q));});});
+  function clear(p,placed){return placed.every(function(q){return gap(p,q)>=clearance-.1;});}
+  function linked(positions){var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),aligned=0;edges.forEach(function(e){var a=byId[e.from],b=byId[e.to];if(a===b)return;if(Math.abs(a.x-b.x)<.1 || Math.abs(a.y-b.y)<.1)aligned++;});return aligned;}
+  function routeLength(candidate){var out=autoArrangeDiagram(d,candidate),L=layout(out),adjust=autoArrangeAdjust(out,L),sum=0;out.edges.forEach(function(e,i){var p=samplePathD(edgePath(e,L,adjust[i]));for(var j=1;j<p.length;j++)sum+=Math.hypot(p[j].x-p[j-1].x,p[j].y-p[j-1].y);});return sum;}
+  var originalRoutes=routeLength(result),originalAligned=linked(result.positions);
+  function safe(candidate,source){var a=candidate.score,b=source.score,c=original.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.width<=c.width*1.1+.1 && Math.hypot(a.width,a.height)<=Math.hypot(c.width,c.height)+.1 && a.height<b.height-.1 && a.area<=b.area*.97 && a.length<=c.length*1.035 && linked(candidate.positions)>=originalAligned && routeLength(candidate)<=originalRoutes*1.05;}
+  // Cheap center geometry only shortlists candidates. It is never a safety
+  // score: final routes, including avoidance bows, decide whether to publish.
+  function estimate(positions){var points=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=0,diagonal=0,crossings=0,reversed=0;
+    edges.forEach(function(e){var a=points[e.from],b=points[e.to];if(!a || !b)return;length+=Math.hypot(a.x-b.x,a.y-b.y);if(Math.abs(a.x-b.x)>.1 && Math.abs(a.y-b.y)>.1)diagonal++;
+      // Source inputs should not reverse their established join direction just
+      // to occupy a free slot. Feedback and non-source edges remain unrestricted.
+      if(!incoming[e.from] && incoming[e.to]>1){var p=originalPoints[e.from],q=originalPoints[e.to];if((q.y-p.y)*(b.y-a.y)<-.1)reversed++;}
+    });
+    function side(a,b,c){return (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);}
+    edges.forEach(function(e,i){var a=points[e.from],b=points[e.to];if(!a || !b)return;edges.slice(i+1).forEach(function(f){if(autoArrangeIncident(e,f))return;var c=points[f.from],v=points[f.to];if(c && v && side(a,b,c)*side(a,b,v)<0 && side(c,v,a)*side(c,v,b)<0)crossings++;});});return length+diagonal*150+crossings*600+reversed*900;
+  }
+  for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
+    var source=best,ys=Array.from(new Set(source.positions.map(function(p){return p.y;}))).sort(function(a,b){return a-b;});if(ys.length<3)break;
+    var dy=ys[1]-ys[0];if(dy<44+clearance-.1 || ys.some(function(y,i){return i && Math.abs(y-ys[i-1]-dy)>.1;}))break;
+    var left=Math.min.apply(null,source.positions.map(function(p){return p.x;})),right=Math.max.apply(null,source.positions.map(function(p){return p.x;}));
+    var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),proposals=[];
+    for(var row=0;row<ys.length && checks<limits.checks;row++){
+      var y=ys[row],occupants=source.positions.filter(function(p){return p.y===y;});if(occupants.length>4)continue;
+      var moved=new Set(occupants.map(function(p){return p.id;})),other=source.positions.filter(function(p){return !moved.has(p.id);}).map(function(p){return {id:p.id,x:p.x,y:p.y>y?p.y-dy:p.y};});
+      occupants.sort(function(a,b){return adj[b.id].length-adj[a.id].length;});var beam=[{positions:other,cost:0}];
+      for(var oi=0;oi<occupants.length && beam.length;oi++){
+        var node=occupants[oi],next=[];
+        beam.forEach(function(state){var neighbors=adj[node.id].map(function(id){return state.positions.find(function(p){return p.id===id;});}).filter(Boolean),spots=[];
+          var xs=Array.from(new Set([node.x].concat(neighbors.flatMap(function(p){return [p.x,p.x-dx,p.x+dx];})))).filter(function(x){return x>=left-original.score.width*.05-.1 && x<=right+original.score.width*.05+.1;});
+          var rows=Array.from(new Set(other.map(function(p){return p.y;}))).filter(function(v){return Math.abs(v-y)<=dy*3+.1;});
+          rows.forEach(function(v){xs.forEach(function(x){var p={id:node.id,x:x,y:v};if(clear(p,state.positions)){var cost=neighbors.reduce(function(sum,q){return sum+Math.hypot(p.x-q.x,p.y-q.y)+(Math.abs(p.x-q.x)>.1 && Math.abs(p.y-q.y)>.1?150:0);},0);spots.push({point:p,cost:cost});}});});
+          spots.sort(function(a,b){return a.cost-b.cost;});spots.slice(0,limits.slots).forEach(function(spot){var positions=state.positions.concat([spot.point]);next.push({positions:positions,cost:estimate(positions)});});
+        });next.sort(function(a,b){return a.cost-b.cost;});beam=next.slice(0,limits.beam);
+      }
+      beam.forEach(function(state){proposals.push(state);});
+    }
+    proposals.sort(function(a,b){return a.cost-b.cost;});
+    var limit=Math.min(limits.checks,checks+Math.ceil(limits.checks/limits.passes)),bestCost=Infinity,maxCost=estimate(source.positions)+dy;
+    for(var i=0;i<proposals.length && checks<limit;i++){
+      var positions=source.positions.map(function(p){return proposals[i].positions.find(function(q){return q.id===p.id;});});if(positions.some(function(p){return !p;}))continue;
+      if(proposals[i].cost>maxCost)continue;
+      var candidate={positions:positions,edges:edges.map(function(){return {};})};checks++;candidate.score=autoArrangeScore(d,candidate);
+      if(!safe(candidate,source) && routes<limits.routes && candidate.score.crossings<=source.score.crossings+2){
+        routes++;try{var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];}));candidate=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed),{engine:'nop2'}));candidate.positions=positions;candidate=autoArrangeNaturalRoutes(d,candidate,true);}catch(ex){continue;}
+      }
+      if(safe(candidate,source) && proposals[i].cost<bestCost){best=candidate;bestCost=proposals[i].cost;}
+    }
+    if(best===source)break;
+  }
+  return best;
+}
+
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -1105,7 +1168,7 @@ function autoArrangeCandidates(d,viz,cola){
     // preserve safety, shape and footprint, and shorten center distances.
     if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
-      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeExpandSpacing(d,grid,viz);
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz);
   }
   // Ordered layouts are reproducible seeds, not a constraint on accepted
   // geometry. Unresolved small layouts also try direction-free searches.
@@ -1119,5 +1182,5 @@ function autoArrangeCandidates(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz);
+  return autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz);
 }

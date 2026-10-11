@@ -146,18 +146,44 @@ Path samples and native/automatic crossing pairs are cached; each pair has at mo
 layout receives one full score after selection, rather than one per edge.
 No additional Graphviz routing is needed for this step.
 
+After wide spacing, a bounded readability pass can consolidate a sparse row
+into nearby slots around connected neighbors. It handles ungrouped diagrams
+with 5–48 nodes and at most 80 edges whose occupied rows have a regular pitch.
+Each proposal removes one row containing at most four cards; other cards keep
+their horizontal positions and shift up by one row when necessary. Three passes
+use an eight-state beam and eight shortlisted slots per moved card. Across the
+whole pass, at most 72 automatic candidates and 18 native reroutes receive the
+full viewer score. Larger, grouped and irregular-row layouts retain their
+selected result. Successful directed-path snakes still return before this pass.
+
+Cheap center geometry ranks complete row-removal proposals across the graph.
+It prefers shorter, cardinal connections and penalizes newly reversed source
+inputs to joins. This is a soft direction preference; feedback links remain
+free to point upward. A proposal must also stay near the source's combined
+readability cost, so saving a row alone does not justify a worse input fan.
+Final acceptance uses actual viewer paths: no overlaps or card hits, neither
+crossing count may increase, minimum card clearance is preserved, and aligned
+connection count cannot fall below the starting layout. Each accepted step
+reduces occupied area by at least 3%. Width can grow at most 10% overall, occupied
+diagonal cannot grow, center-distance growth is capped at 3.5% and sampled route
+length growth at 5%, all relative to the pass's starting result.
+
+Aspect is a preference, not a universal readability requirement. This explicit
+row-removal trade can leave the square-to-landscape band when the smaller full
+geometry passes those guards; it does not relax other passes' safety checks.
 Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less
-compact shape, and target spacing can introduce whitespace. There are at most
+compact shape, and target spacing can introduce whitespace. Initial candidate selection uses at most
 thirteen routing attempts for small diagrams (a snake, six general candidates,
 one local leaf refinement, one optional aligned-grid reroute and up to four
 compact-grid finalists). Successful snakes return immediately. Above
 24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
 and, for ungrouped graphs, two stress candidates); grouped graphs use only
-the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges
+the two layered attempts plus a snake attempt when they form a directed path.
+Later refinement passes have their own bounded budgets described above. The supported limit remains 80 nodes and 160 edges
 per diagram. A worker has a 20-second deadline and is terminated on
 cancellation, source changes, section changes, project retirement or builder
 teardown. Failure never changes

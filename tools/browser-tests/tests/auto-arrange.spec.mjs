@@ -143,6 +143,22 @@ test('research fixture renders natural and retained routes and retry label with 
  await writeFile(path.join(repo,'.local/auto-arrange-grouped.spec.json'),await source(page));
 });
 
+test('48-node production worker publishes within its unchanged deadline',async({page,server})=>{
+ const spec=JSON.parse(await readFile(path.join(repo,'examples/auto-arrange-large-baselines/graph-input.spec.json'),'utf8'));
+ const block=spec.page.blocks.find(b=>b.id==='data-platform'),original=block.diagram;
+ expect(Object.keys(original.nodes)).toHaveLength(48);
+ await open(page,server,{page:{...spec.page,blocks:[block]}});const before=await source(page);
+ // Exercise the real button and complete embedded production pipeline. No
+ // Worker or timer overrides: a timeout keeps the dialog open and the source
+ // unchanged, so successful publication must beat its existing 20s deadline.
+ await arrange(page);const changed=await diagram(page);
+ expect(await source(page)).not.toBe(before);expect(changed.rows).toEqual([[]]);expect(changed.floats).toHaveLength(48);
+ expect(changed.floats.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))).toBe(true);
+ expect(changed.nodes).toEqual(original.nodes);
+ expect(changed.edges.map(({from,to,label})=>({from,to,label}))).toEqual(original.edges.map(({from,to,label})=>({from,to,label})));
+ await expect(page.locator('#docview g.node')).toHaveCount(48);
+});
+
 test('stale source and worker failure never publish geometry',async({page,server})=>{
  await open(page,server);const before=await source(page);
  await openAutoArrange(page);await page.locator('#src').evaluate(el=>{el.value+='\n';el.dispatchEvent(new Event('input',{bubbles:true}));});

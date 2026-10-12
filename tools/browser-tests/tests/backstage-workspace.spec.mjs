@@ -275,5 +275,9 @@ test('an inline Explore camera survives the live expanded portal and return with
  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();await closeCamera(dialog,customized);await graphInView(dialog);
  await dialog.getByRole('button',{name:'Business',exact:true}).click();await expect(dialog.locator('.explore-stage')).toBeHidden();await dialog.getByRole('button',{name:'Explore',exact:true}).click();await closeCamera(dialog,customized);
  await page.keyboard.press('Escape');await closeCamera(alpha,customized);await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();await expect(beta.locator('.stepid')).toHaveText(sibling);
+ // Wrapped headers change the board height's odd/even parity. Preserve the
+ // fractional camera center after a fresh manual pan and repeated promotion.
+ await board.evaluate(el=>{el.scrollLeft+=13;el.scrollTop+=17;});const repanned=await camera(alpha);
+ for(let cycle=0;cycle<2;cycle++){await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();await closeCamera(dialog,repanned);await page.keyboard.press('Escape');await closeCamera(alpha,repanned);}
  await page.evaluate(()=>{__host.left(false);__host.right(false);});await expect.poll(()=>resources(page)).toEqual(baseline);
 });

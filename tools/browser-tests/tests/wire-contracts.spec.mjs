@@ -118,7 +118,10 @@ test('native Canvas keeps the full preview above its toolbar when no adjacent ca
   document.body.style.overflow='hidden';document.querySelector('#host').style.marginTop='560px';
   await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);
   const scope=document.querySelector('#host').shadowRoot,board=scope.querySelector('.board');
-  board.scrollTop+=scope.querySelector('.wire-contract-marker').getBoundingClientRect().top-690;
+  const toolbarBottom=Math.max(...[...scope.querySelectorAll('.explore-navigation,.diagram-views,.explore-tools')].map(el=>el.getBoundingClientRect()).filter(r=>r.width&&r.height).map(r=>r.bottom));
+  // Wrapped View choices change the toolbar height. Keep the marker just below
+  // the actual controls while retaining too little room for the complete card.
+  board.scrollTop+=scope.querySelector('.wire-contract-marker').getBoundingClientRect().top-(toolbarBottom+8);
  });
  await marker(root).first().hover();await preview(root).locator('.ctlink').first().hover();await expect(preview(root)).toBeVisible();
  await marker(root).first().click();await geometry(page,preview(root));await avoidsCanvasControls(root);

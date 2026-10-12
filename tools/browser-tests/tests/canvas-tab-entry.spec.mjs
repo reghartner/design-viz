@@ -173,7 +173,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await navigation.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab').filter({hasText:'Standard story'})}).getByRole('button',{name:'Standard',exact:true}).click();await expect(standardTab).not.toHaveAttribute('data-explore-view','true');
  await page.setViewportSize({width:480,height:720});const raw=mixedFixture();raw.page.blocks[0].tabs[0].sections[0].diagram.rows=[['s0'],['s1']];await standalone(page,server,raw);
  await chooseNavigation(page.locator('.reader-navigation'),'View','Source Explore');
- await expect(page.locator('.reader-contents')).toBeHidden();await expect(page.locator('.reader-view-label')).toHaveText('Source Explore');
+ await expect(page.locator('.reader-contents')).toBeHidden();await expect(page.locator('.reader-top-view[aria-selected=true]')).toHaveText('Source Explore');
  for(const id of ['s0','s1'])await expect(page.locator('#section-standard [data-dv-node="'+id+'"]').first()).toBeInViewport();
  const nav=await navigation.boundingBox(),stage=await page.locator('.explore-active-section .explore-stage').boundingBox(),toolbar=await page.locator('.reader-toolbar').boundingBox();
  expect(stage.y).toBe(nav.y+nav.height);expect(toolbar.y+toolbar.height).toBeLessThanOrEqual(stage.y);expect(toolbar.width).toBe(nav.width);
@@ -184,7 +184,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
 test('Explore top bar keeps every tab block reachable and restricts section navigation to its View',async({page,server})=>{
  await standalone(page,server,navigationFixture());
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
- await expect(navigation.getByRole('tablist',{includeHidden:true})).toHaveCount(2);
+ await expect(navigation.locator('.tabbar[role=tablist]')).toHaveCount(2);
  await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Navigation hierarchy','First','Second','Third','Fourth']);
  await chooseNavigation(navigation,'Tab','Fourth');
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();

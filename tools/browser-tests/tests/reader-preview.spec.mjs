@@ -109,7 +109,7 @@ test('invalid drafts retain the last usable Explore reader across host and width
   const beforeCamera=await camera();
   await page.locator('#workspace-appearance>summary').click();await page.locator('#layout-preview-target').selectOption('backstage');await page.locator('#open-page-preview').click();
   await expect(page.locator('#page-preview-surface')).toHaveClass(/viewer-exploring/);
-  await expect(page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.locator('#page-preview-view .reader-view-label')).toHaveText('Business');
+  await expect(page.locator('#page-preview-view .reader-view-strip').getByRole('tab',{name:'Business',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.locator('#page-preview-view .reader-top-view[aria-selected=true]')).toHaveText('Business');
   for(const host of ['confluence','backstage','default']){
     await page.locator('#layout-preview-target').selectOption(host);
     if(host!=='default'){await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).fill('720');await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).dispatchEvent('change');expect(await page.locator('#page-preview-surface').evaluate(el=>el.clientWidth)).toBe(720);}
@@ -119,7 +119,7 @@ test('invalid drafts retain the last usable Explore reader across host and width
   }
   await page.locator('#page-preview-view').getByRole('button',{name:'Next step',exact:true}).first().click();
   expect(await page.evaluate(()=>location.hash)).toBe(hash);await page.setViewportSize({width:390,height:900});
-  const chapter=page.locator('#page-preview-view .reader-view-label');await expect(chapter).toBeInViewport();await expect(chapter).toHaveText('Business');await expect(page.locator('#page-preview-view .explore-stage')).toBeVisible();
+  const chapter=page.locator('#page-preview-view .reader-top-view[aria-selected=true]');await expect(chapter).toBeInViewport();await expect(chapter).toHaveText('Business');await expect(page.locator('#page-preview-view .explore-stage')).toBeVisible();
   await page.setViewportSize({width:1024,height:760});await page.keyboard.press('Escape');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const afterCamera=await camera();expect(afterCamera.x).toBeCloseTo(beforeCamera.x,2);expect(afterCamera.y).toBeCloseTo(beforeCamera.y,2);
   expect(await author.evaluate(el=>el.isConnected)).toBe(true);expect(await node.evaluate(el=>el.isConnected)).toBe(true);

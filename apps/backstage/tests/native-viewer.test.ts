@@ -135,7 +135,7 @@ it('expands the active diagram tab rather than the first diagram in the document
     {label:'First',sections:[{...section,heading:'First story'}]},
     {label:'Second',sections:[{...section,heading:'Second story'}]},
   ]}]}});
-  const tabs=Array.from(viewer.root.querySelectorAll('[role="tab"]')) as HTMLButtonElement[];
+  const tabs=Array.from(viewer.root.querySelectorAll('.tabbar [role="tab"]')) as HTMLButtonElement[];
   expect(tabs).toHaveLength(2);tabs[1].click();
   viewer.setCanvas(true);
   expect(viewer.snapshot()?.section).toBe('second-story');

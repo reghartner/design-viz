@@ -351,12 +351,22 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
 /* Contents is a reader shell. Workbench retains its shared navigation lanes. */
 @media screen{
  body .docview.has-reader-contents{padding-left:calc(var(--reader-inset,0px) + 24px)!important;}
+ /* Skin metadata badges use max-content width; include their padding in the
+    reader's available content width, including beneath the fixed Explore canvas. */
+ .has-reader-contents>.doc-sub{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
  body .docview.has-reader-contents>.reader-navigation{display:block;padding:0;gap:0;font:13px/1.45 'IBM Plex Sans',sans-serif;color:var(--dtext);}
  .reader-navigation>.explore-navigation-group{display:none!important;}
- .reader-top{height:56px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
- .reader-breadcrumb{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
- .reader-tab-label{color:var(--dfaint);}.reader-view-label{font-weight:600;}
- .reader-tab-label,.reader-view-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ .reader-top{min-height:56px;display:grid;grid-template-columns:34px minmax(60px,120px) minmax(0,1fr) 316px;align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
+ .reader-breadcrumb{min-width:0;}
+ .reader-tab-label{display:block;color:var(--dfaint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+ .reader-view-strip{display:flex;flex-wrap:wrap;gap:4px;min-width:0;align-items:center;}
+ body .reader-navigation .reader-view-strip .reader-top-view{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-color:var(--explore-border);font-size:12px;font-weight:500;padding:5px 9px;}
+ body .reader-navigation .reader-view-strip .reader-top-view[aria-selected=true]{color:var(--navigation-accent);background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));border-color:var(--navigation-accent);}
+ .reader-top>.explore-navigation-actions{width:316px;justify-content:flex-end;}
+ .reader-wrapped .reader-top{grid-template-columns:34px minmax(0,1fr) auto;row-gap:6px;}
+ .reader-wrapped .reader-view-strip{grid-column:1/-1;grid-row:2;}
+ .reader-wrapped .reader-top>.explore-navigation-actions{grid-column:3;grid-row:1;width:auto;}
+
  .reader-toolbar{height:45px;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;padding:0 14px;box-sizing:border-box;background:var(--reader-toolbar,var(--explore-bg));}
  .reader-toolbar>.reader-button{justify-self:end;}
  .reader-zoom-controls{display:flex;align-items:center;gap:4px;justify-self:start;}
@@ -395,12 +405,12 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  .has-reader-contents .viewer-diagram-canvas{left:var(--reader-inset,0px);width:auto;}
  .has-reader-contents.explore-full-window .explore-active-section:not(:has(.section-viewport)){left:var(--reader-inset,0px);}
  .has-reader-contents .viewer-diagram-canvas>.explore-tools{display:none!important;}
- .reader-narrow .reader-top{padding:0 10px;gap:8px;}
- .reader-narrow .reader-breadcrumb{display:block;font-size:12px;line-height:1.5;}.reader-narrow .reader-tab-label,.reader-narrow .reader-view-label{display:block;}.reader-narrow .reader-breadcrumb-separator{display:none;}
+ .reader-narrow .reader-top{padding:8px 10px;gap:6px 8px;}
+ .reader-narrow .reader-breadcrumb{font-size:12px;}
  .reader-narrow .reader-toolbar{padding:0 8px;}.reader-narrow .reader-zoom-controls>.reader-button{display:none;}.reader-narrow .reader-page-index{gap:0;}
  .reader-narrow .reader-contents{box-shadow:14px 0 38px #15203024;}
  .reader-navigation .explore-navigation-actions{gap:4px;min-width:0;}
- .reader-narrow .explore-navigation-actions{gap:2px;max-width:45%;overflow:visible;}
+ .reader-narrow .explore-navigation-actions{gap:2px;max-width:none;overflow:visible;}
  .reader-narrow .viewport-actions{gap:2px;}
  .reader-narrow .viewport-status{display:none!important;}
 
@@ -414,7 +424,7 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  .reader-utilities>summary::-webkit-details-marker{display:none;}
  .reader-utility-options{z-index:110;position:absolute;right:0;top:calc(100% + 8px);padding:8px;display:flex;flex-wrap:wrap;gap:6px;width:200px;border:1px solid var(--explore-border);border-radius:8px;background:var(--explore-bg);box-shadow:0 10px 30px #15203024;}
  .reader-navigation .reader-utility-options .viewport-expand{display:block!important;}
- .reader-narrow .explore-navigation-actions{max-width:47%;}
+ .reader-narrow .explore-navigation-actions{max-width:none;}
 }
 
 @media screen{body .reader-navigation .reader-tree-view-row:has([aria-current=page]) .reader-tree-view:hover{background:transparent;}}

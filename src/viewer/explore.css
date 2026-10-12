@@ -351,6 +351,9 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
 /* Contents is a reader shell. Workbench retains its shared navigation lanes. */
 @media screen{
  body .docview.has-reader-contents{padding-left:calc(var(--reader-inset,0px) + 24px)!important;}
+ /* Skin metadata badges use max-content width; include their padding in the
+    reader's available content width, including beneath the fixed Explore canvas. */
+ .has-reader-contents>.doc-sub{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
  body .docview.has-reader-contents>.reader-navigation{display:block;padding:0;gap:0;font:13px/1.45 'IBM Plex Sans',sans-serif;color:var(--dtext);}
  .reader-navigation>.explore-navigation-group{display:none!important;}
  .reader-top{min-height:56px;display:grid;grid-template-columns:34px minmax(60px,120px) minmax(0,1fr) 316px;align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}

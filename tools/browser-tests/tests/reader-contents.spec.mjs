@@ -132,6 +132,23 @@ for(const width of [1440,1120,768,390,320,286])test('all top Views wrap without 
   await info.attach('wrapped-top-'+width,{body:await page.screenshot(),contentType:'image/png'});
 });
 
+test('reader metadata wraps within narrow content under wider fallback font metrics',async({page,server})=>{
+  await page.setViewportSize({width:286,height:1000});const root=await open(page,server,'lavender');
+  const subtitle=root.locator(':scope > .doc-sub');
+  // Linux monospace metrics exposed an intrinsic-width metadata badge beneath
+  // the fixed Explore canvas. Force wider metrics so this reproduces everywhere.
+  await subtitle.evaluate(el=>el.style.font='500 13px monospace');
+  const strip=root.getByRole('tablist',{name:'Views in selected Tab'});
+  for(const name of ['Full story','Explore story','Full story']){
+    await strip.getByRole('tab',{name,exact:true}).click();
+    await expect(subtitle).toHaveText('generated from spec · skin: lavender');
+    const bounds=await subtitle.evaluate(el=>{const r=el.getBoundingClientRect(),parent=el.parentElement.getBoundingClientRect(),s=getComputedStyle(el.parentElement);return{left:r.left,right:r.right,availableRight:parent.right-parseFloat(s.paddingRight),height:r.height,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight};});
+    expect(bounds.left).toBeGreaterThanOrEqual(0);expect(bounds.right).toBeLessThanOrEqual(bounds.availableRight);expect(bounds.height).toBeGreaterThan(32);expect(bounds.scrollHeight).toBeLessThanOrEqual(bounds.clientHeight);
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(286);
+    if(name==='Full story'){await expect(subtitle).toBeVisible();await subtitle.scrollIntoViewIfNeeded();}
+  }
+});
+
 test('embedded top Views only offer memberships containing the embedded Section',async({page,server})=>{
   const root=await open(page,server);await page.goto(server.origin+'/contents.html#embed=build&v=explore');
   const strip=root.getByRole('tablist',{name:'Views in selected Tab'});await expect(strip.getByRole('tab')).toHaveText(['Full story','Explore story']);

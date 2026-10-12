@@ -6,7 +6,8 @@ const path=require('node:path');
 const os=require('node:os');
 const vm=require('node:vm');
 const {execFileSync}=require('node:child_process');
-const {arrangeGraph,arrangeDiagram,arrangeSpec}=require('../tools/arrange-experimental/index.cjs');
+const core=require('../tools/arrange/core.cjs'),{arrangeGraph}=core;
+function arrangeDiagram(d,options){const result=core.autoArrangeCandidates(d,options);return {diagram:core.autoArrangeDiagram(d,result),metrics:result.metrics};}
 const quick={seed:71,restarts:1,iterations:1600};
 const geometry=vm.createContext({});
 vm.runInContext('function clamp(n,a,b){return Math.max(a,Math.min(b,n));}\n'+fs.readFileSync(path.join(__dirname,'../src/core/geometry.js'),'utf8'),geometry);
@@ -24,7 +25,7 @@ function assertGeometry(d){
     assert.ok(geometry.validCurveControls(e.curveControls));
     const segments=geometry.edgeCurveSegments(e,L);assert.ok(segments.length);
     // Independently sample the actual renderer's decoded cubic geometry. This
-    // does not call the experimental router's sampler or collision function.
+    // does not call the arrangement router's sampler or collision function.
     for(const [a,b,c,z] of segments)for(let k=1;k<300;k++){
       const t=k/300,u=1-t,x=u*u*u*a.x+3*u*u*t*b.x+3*u*t*t*c.x+t*t*t*z.x,y=u*u*u*a.y+3*u*u*t*b.y+3*u*t*t*c.y+t*t*t*z.y;
       assert.ok(Number.isFinite(x)&&Number.isFinite(y));
@@ -55,19 +56,8 @@ test('deterministic placement and routes survive node and edge serialization ord
   assert.deepEqual(bare(a),bare(arrangeDiagram(d,quick)));
 });
 
-test('preserves edge identity, semantics, unknown metadata and unrelated page content',()=>{
-  const d=diagram(['a','b'],[['a','b']]);d.edges[0]={...d.edges[0],kind:'http',label:'Approved',when:{step:2},delta:true,custom:{keep:['this']}};d.nodes.a.custom='keep';d.floats=[{id:'a',x:10,y:20,custom:'placement metadata'}];d.panels=[{id:'note',type:'text',body:'Keep this.'}];
-  const input={version:7,page:{title:'Preserve',custom:{diagramText:'Prose'},blocks:[{type:'prose',body:'Unrelated'}, {id:'one',diagram:d},{id:'two',diagram:structuredClone(d)}]}};
-  const copy=structuredClone(input),result=arrangeSpec(input,quick);
-  assert.deepEqual(input,copy);assert.equal(result.reports.length,2);assert.equal(result.spec.version,7);assert.deepEqual(result.spec.page.blocks[0],input.page.blocks[0]);assert.deepEqual(result.spec.page.custom,input.page.custom);
-  for(const block of result.spec.page.blocks.filter(b=>b.diagram)){
-    const out=block.diagram;assert.deepEqual(out.panels,d.panels);assert.deepEqual(out.nodes,d.nodes);assert.equal(out.floats.find(f=>f.id==='a').custom,'placement metadata');
-    for(const key of Object.keys(d.edges[0]))assert.deepEqual(out.edges[0][key],d.edges[0][key]);
-  }
-});
-
 test('empty, singleton and disconnected diagrams retain all nodes',()=>{
-  assert.deepEqual(arrangeDiagram({nodes:{},rows:[[]],edges:[]},quick).diagram.floats,[]);
+  assert.throws(()=>arrangeDiagram({nodes:{},rows:[[]],edges:[]},quick),/Add a node/);
   for(const d of [diagram(['a'],[]),diagram(['a','b','c','d','e'],[['a','b'],['c','d']])])assertGeometry(arrangeDiagram(d,quick).diagram);
 });
 
@@ -94,20 +84,10 @@ test('invalid topology, dimensions and options fail explicitly',()=>{
   const good={nodes:[{id:'a'}],edges:[]};
   for(const input of [null,{}, {nodes:[{id:'a'},{id:'a'}],edges:[]},{nodes:[{id:'a',width:NaN}],edges:[]},{nodes:[{id:'a',height:-3}],edges:[]},{...good,edges:[{from:'a',to:'missing'}]}])assert.throws(()=>arrangeGraph(input,quick));
   for(const options of [{seed:NaN},{restarts:0},{iterations:2.3},{aspectRatio:0},{columnGap:-1},{rowGap:Infinity}])assert.throws(()=>arrangeGraph(good,options));
-  assert.throws(()=>arrangeSpec({page:{blocks:[]}},quick),/No diagrams/);
-});
-
-test('CLI writes a re-readable full spec and runtime report',()=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arrange-experimental-'));
-  try{
-    const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),report=path.join(dir,'report.json'),raw={page:{blocks:[{id:'graph',diagram:diagram(['a','b'],[['a','b']])}]}};
-    fs.writeFileSync(input,JSON.stringify(raw));execFileSync(process.execPath,[path.join(__dirname,'../tools/arrange-experimental/cli.cjs'),input,output,'--report',report,'--iterations','100','--restarts','1'],{stdio:'pipe'});
-    const arranged=JSON.parse(fs.readFileSync(output)),reports=JSON.parse(fs.readFileSync(report));assert.equal(reports.length,1);assert.ok(reports[0].runtimeMs>=0);assert.equal(arranged.page.blocks[0].diagram.edges[0].id,'edge-0');assertGeometry(arranged.page.blocks[0].diagram);
-  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });
 
 test('incremental search energy equals complete recomputation for moves and swaps',()=>{
-  const {score,topology}=require('../tools/arrange-experimental/placement.cjs');
+  const {score,topology}=(()=>{const context={};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/arrange/placement.js'),'utf8'),context);return context.FlowArrangePlacement;})();
   const edges=[[0,1],[1,2],[2,3],[3,4],[4,5],[5,1],[2,6],[0,6],[6,4]],t=topology(7,edges),points=[{x:0,y:0},{x:1,y:1},{x:2,y:0},{x:2,y:2},{x:0,y:2},{x:1,y:3},{x:3,y:1}];
   for(let a=0;a<7;a++)for(let b=-1;b<7;b++){
     if(a===b)continue;
@@ -117,46 +97,9 @@ test('incremental search energy equals complete recomputation for moves and swap
   }
 });
 
-test('visits native page sections and tabs while leaving embedded examples untouched',()=>{
-  const d=diagram(['a','b'],[['a','b']]),metadata={example:{diagram:structuredClone(d)}};
-  const input={page:{metadata,sections:[{heading:'Prose',metadata},{tabs:[{label:'First',sections:[{diagram:d},{heading:'Notes',metadata}]},{label:'Second',sections:[{diagram:structuredClone(d)}]}]}]}};
-  const result=arrangeSpec(input,quick);
-  assert.equal(result.reports.length,2);assert.deepEqual(result.spec.page.metadata,metadata);assert.deepEqual(result.spec.page.sections[0],input.page.sections[0]);assert.deepEqual(result.spec.page.sections[1].tabs[0].sections[1],input.page.sections[1].tabs[0].sections[1]);
-  assert.equal(result.reports[0].path,'$.page.sections[1].tabs[0].sections[0].diagram');
-  assert.equal(arrangeSpec(input.page,quick).reports.length,2);assert.equal(arrangeSpec(d,quick).reports.length,1);
-});
 
-// Each case snapshots existing bytes and verifies that rejection happens before
-// either destination can be created or overwritten.
-for(const scenario of [
-  {name:'report equals input',report:'in.json'},
-  {name:'report equals existing output',report:'out.json'},
-  {name:'relative dot segments alias a new output',report:'nested/../out.json',newOutput:true},
-  {name:'case variants of two new destinations',report:'OUT.json',newOutput:true},
-  {name:'Unicode normalization variants of two new destinations',output:'caf\u00e9.json',report:'cafe\u0301.json',newOutput:true},
-  {name:'input and output are the same file',output:'in.json',report:'report.json'},
-  {name:'report symlink targets input',report:'alias.json',link:['in.json','alias.json','symbolic']},
-  {name:'report symlink targets output',report:'alias.json',link:['out.json','alias.json','symbolic']},
-  {name:'report hard link targets input',report:'alias.json',link:['in.json','alias.json','hard']},
-  {name:'report hard link targets output',report:'alias.json',link:['out.json','alias.json','hard']},
-  {name:'output hard link targets input',output:'alias.json',report:'report.json',link:['in.json','alias.json','hard']},
-  {name:'directory symlink aliases two new destinations',output:'nested/new.json',report:'linked/new.json',newOutput:true,directoryLink:true},
-  {name:'dangling leaf symlink aliases a new output',report:'alias.json',newOutput:true,link:['out.json','alias.json','symbolic']},
-])test(`CLI rejects collision: ${scenario.name}`,()=>{
-  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'arrange-experimental-collision-'));
-  try {
-    fs.mkdirSync(path.join(dir,'nested'));
-    fs.writeFileSync(path.join(dir,'in.json'),JSON.stringify(diagram(['a','b'],[['a','b']]))+'\n');
-    if(!scenario.newOutput)fs.writeFileSync(path.join(dir,'out.json'),'An existing output must remain byte-for-byte intact.\n');
-    if(scenario.directoryLink)fs.symlinkSync('nested',path.join(dir,'linked'),'dir');
-    if(scenario.link){const [target,name,type]=scenario.link;if(type==='hard')fs.linkSync(path.join(dir,target),path.join(dir,name));else fs.symlinkSync(target,path.join(dir,name));}
-    const output=scenario.output??'out.json',report=scenario.report,before=new Map();
-    for(const file of ['in.json','out.json',output,report]){const absolute=path.resolve(dir,file);if(fs.existsSync(absolute))before.set(absolute,fs.readFileSync(absolute));}
-    assert.throws(()=>execFileSync(process.execPath,[path.join(__dirname,'../tools/arrange-experimental/cli.cjs'),'in.json',output,'--report',report,'--iterations','1','--restarts','1'],{cwd:dir,stdio:'pipe'}),error=>{
-      assert.equal(error.status,1);assert.match(error.stderr.toString(),/File path collision/);assert.equal(error.stdout.toString(),'');return true;
-    });
-    for(const [file,bytes] of before)assert.deepEqual(fs.readFileSync(file),bytes,`Modified ${file}`);
-    for(const file of [output,report]){const absolute=path.resolve(dir,file);if(!before.has(absolute))assert.equal(fs.existsSync(absolute),false,`Created ${file}`);}
-    if(scenario.link?.[2]==='symbolic')assert.equal(fs.readlinkSync(path.join(dir,scenario.link[1])),scenario.link[0]);
-  } finally { fs.rmSync(dir,{recursive:true,force:true}); }
+test('default iteration schedule keeps small searches and caps large ones deterministically',()=>{
+  const context={};vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../src/core/arrange/placement.js'),'utf8'),context);
+  const budget=context.FlowArrangePlacement.defaultIterations;
+  for(const [n,expected] of [[1,16000],[12,16000],[13,16900],[48,62400],[49,63700],[50,64000],[80,64000]])assert.equal(budget(n),expected);
 });

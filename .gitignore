@@ -29,3 +29,6 @@ node_modules/
 # Runtime bundles are generated before tests/packaging; authored inputs stay in src/.
 /apps/backstage/src/generated/
 /tools/canon/generated-runtime.cjs
+
+# Local captures from the pre-promotion arrangement experiment.
+/tools/arrange-experimental/artifacts/

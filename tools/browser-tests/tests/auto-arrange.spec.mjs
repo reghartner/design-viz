@@ -3,6 +3,7 @@ import {openAutoArrange} from '../helpers/test.mjs';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
+import {createHash} from 'node:crypto';
 import {test,expect,pastePage as paste,paste as pasteDiagram,prepareEditorSurface} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const grouped=JSON.parse(await readFile(path.join(repo,'tests/fixtures/auto-arrange-grouped.json'),'utf8'));
@@ -31,9 +32,9 @@ for(const framed of [false,true])test('Explore manual Auto arrange preserves pan
  await arrange(page);const arranged=await source(page),result=JSON.parse(arranged),changed=result.page.sections[0].diagram;
  expect(arranged).not.toBe(before);expect(changed.rows).toEqual([[]]);expect(changed.floats).toHaveLength(Object.keys(original.nodes).length);
  expect(changed.floats.every(f=>Number.isFinite(f.x)&&Number.isFinite(f.y))).toBe(true);
- const semantics=d=>{const copy=structuredClone(d);for(const key of ['rows','floats','routing'])delete copy[key];for(const e of copy.edges)for(const key of ['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt'])delete e[key];return copy;};
+ const semantics=d=>{const copy=structuredClone(d);for(const key of ['rows','floats','routing','graphFrame'])delete copy[key];for(const e of copy.edges)for(const key of ['bend','curvePoints','curveControls','fromPort','toPort','fromDx','fromDy','toDx','toDy','labelDx','labelDy','labelAt'])delete e[key];return copy;};
  expect(semantics(changed)).toEqual(semantics(original));expect(changed.layouts).toEqual(original.layouts);expect(changed.panels).toEqual(original.panels);
- expect(changed.graphFrame).toEqual(original.graphFrame);expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
+ expect(changed.graphFrame.w).toBeGreaterThan(0);expect(changed.graphFrame.h).toBeGreaterThan(0);expect(result.page.sections[1]).toEqual(raw.page.sections[1]);
  await expect(stage).toBeVisible();await expect(section).toHaveAttribute('data-view-id','service-flow');
  for(const id of ['outcome','clip'])await expect(section.locator('[data-explore-panel="'+id+'"]')).toBeVisible();
  await expect(section.locator('[data-explore-panel="home"]')).toBeHidden();
@@ -50,47 +51,34 @@ test('one button confirms, arranges offline, permits control and node drags, and
  await openAutoArrange(page);await expect(page.locator('#auto-arrange-dialog')).toContainText('one Undo');
  await page.locator('[data-arrange-cancel]').click();await expect(page.locator('#src')).toHaveValue(before);
  await arrange(page);const arranged=await source(page);expect(arranged).not.toBe(before);
- for(const e of (await diagram(page)).edges){
-  for(const field of ['curveControls','curvePoints','fromPort','toPort','labelDx','labelDy'])expect(e[field]).toBeUndefined();
- }
- const naturalRoute=await edge(page).getAttribute('d');
+ const placedDiagram=await diagram(page);
+ for(const e of placedDiagram.edges){expect(e.curveControls.length).toBeGreaterThanOrEqual(2);expect(e.fromPort.side).toBeTruthy();expect(e.toPort.side).toBeTruthy();expect(e.curvePoints).toBeUndefined();}
+ const originalRoute=await edge(page).getAttribute('d');
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // An automatic edge exposes one unshaped handle; dragging authors a through-point.
+ // B's saved native cubic has editable controls immediately.
  const q=await edgePoint(page,.15);await page.mouse.click(q.x,q.y);
- const handle=page.locator('[data-curve-point="-1"]');await expect(handle).toHaveCount(1);
+ const handle=page.locator('[data-curve-point="0"]');await expect(handle).toHaveCount(1);
  const box=await handle.boundingBox();
- await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+15,box.y+box.height/2+75,{steps:10});await page.mouse.up();
- await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(1);
- const edited=await source(page);expect(edited).not.toBe(arranged);expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
- await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
+ await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2+45,box.y+box.height/2+30,{steps:10});await page.mouse.up();
+ await expect.poll(async()=>JSON.stringify((await diagram(page)).edges[0].curveControls)).not.toBe(JSON.stringify(placedDiagram.edges[0].curveControls));
+ const edited=await source(page);await expect(edge(page)).not.toHaveAttribute('d',originalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
  await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
- // Drag another part of the authored curve to add one point, then Reset both forms.
- const insert=await edgePoint(page,.8);
- await page.mouse.move(insert.x,insert.y);await page.mouse.down();await page.mouse.move(insert.x+15,insert.y-30,{steps:10});await page.mouse.up();
- await expect.poll(async()=> (await diagram(page)).edges[0].curvePoints?.length).toBe(2);
- const twoPoints=await source(page);
+ // Undo/Redo rerenders the inspector; select the drawn edge again before Reset.
+ const selected=await edgePoint(page,.15);await page.mouse.click(selected.x,selected.y);
  await page.locator('#guide').getByRole('button',{name:'Reset curve',exact:true}).click();
  expect((await diagram(page)).edges[0].curvePoints).toBeUndefined();expect((await diagram(page)).edges[0].curveControls).toBeUndefined();
- await expect(edge(page)).toHaveAttribute('d',naturalRoute);
- await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(twoPoints);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(edited);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
- // Move Source below Service: the natural attachment changes from right to top.
+ // Free cards remain movable, retaining the selected ports and cubic controls.
  const node=page.locator('#docview g.node[data-dv-node="a"]'),card=node.locator('.card');await node.hover();
- const b=await card.boundingBox(),placed=(await diagram(page)).floats,old=placed.find(f=>f.id==='a'),destination=placed.find(f=>f.id==='b');
- const scale=await card.evaluate(el=>{const m=el.getScreenCTM();return {x:m.a,y:m.d};});
- const initialStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
- expect(initialStart.x).toBeCloseTo(old.x+75,3);expect(initialStart.y).toBeCloseTo(old.y,3);
- await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();
- await page.mouse.move(b.x+b.width/2+(destination.x-old.x)*scale.x,b.y+b.height/2+(destination.y+170-old.y)*scale.y,{steps:12});await page.mouse.up();
+ const b=await card.boundingBox(),old=placedDiagram.floats.find(f=>f.id==='a');
+ await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2+80,b.y+b.height/2+60,{steps:12});await page.mouse.up();
  const moved=await source(page),movedDiagram=await diagram(page),position=movedDiagram.floats.find(f=>f.id==='a');
- expect(position.y).toBeGreaterThan(destination.y+100);
- for(const field of ['curveControls','curvePoints','fromPort','toPort'])expect(movedDiagram.edges[0][field]).toBeUndefined();
- const movedStart=await edge(page).evaluate(el=>{const p=el.getPointAtLength(0);return {x:p.x,y:p.y};});
- expect(movedStart.x).toBeCloseTo(position.x,3);expect(movedStart.y).toBeCloseTo(position.y-22,3);
- await expect(edge(page)).not.toHaveAttribute('d',naturalRoute);
+ expect(position.x).toBeGreaterThan(old.x);expect(position.y).toBeGreaterThan(old.y);
+ for(const field of ['curveControls','fromPort','toPort'])expect(movedDiagram.edges[0][field]).toEqual(placedDiagram.edges[0][field]);
+ await expect(edge(page)).not.toHaveAttribute('d',originalRoute);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(arranged);
  const route=await edge(page).getAttribute('d');
  await page.reload();await expect(page.locator('#src')).toHaveValue(arranged);await expect(edge(page)).toHaveAttribute('d',route);
@@ -107,7 +95,7 @@ test('calculation status is prominent before a held worker completes and clears 
  await page.evaluate(()=>{const Real=window.Worker;window.Worker=class extends Real{postMessage(data){window.__releaseArrange=()=>super.postMessage(data);}};});
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
  const activity=page.locator('[data-arrange-activity]');
- await expect(activity).toBeVisible();await expect(activity).toHaveText('Calculating optimal node placement');
+ await expect(activity).toBeVisible();await expect(activity).toHaveText('Arranging nodes and connections');
  await expect(activity).toHaveAttribute('role','status');await expect(activity).toHaveAttribute('aria-live','polite');
  await expect(activity.locator('.auto-arrange-spinner')).toBeVisible();
  expect((await activity.boundingBox()).height).toBeGreaterThanOrEqual(112);
@@ -128,14 +116,15 @@ test('calculation status is prominent before a held worker completes and clears 
  await expect(page.locator('#src')).toHaveValue(arranged);await expect(page.locator('#auto-arrange')).toBeEnabled();
 });
 
-test('research fixture renders natural and retained routes and retry label with no node collisions',async({page,server})=>{
+test('grouped fixture renders cubic routes and retry label with no node collisions',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');await pasteDiagram(page,JSON.stringify(grouped,null,2));await arrange(page);
  const paths=await page.locator('#docview path.edge').evaluateAll(edges=>edges.map(e=>e.getAttribute('d')));expect(paths).toHaveLength(36);
  const hits=await page.locator('#docview svg').first().evaluate(svg=>{
   const cards=[...svg.querySelectorAll('g.node')].map(n=>{const r=n.querySelector('.card'),m=n.transform.baseVal.consolidate().matrix;return {id:n.dataset.dvNode,x:m.e,y:m.f,w:+r.getAttribute('width'),h:+r.getAttribute('height')};});
-  const raw=JSON.parse(document.querySelector('#src').value).page.blocks[0].diagram;let hits=0;
-  svg.querySelectorAll('path.edge').forEach((p,i)=>{const e=raw.edges[i],len=p.getTotalLength();for(const card of cards){if([e.from,e.to].includes(card.id))continue;for(let j=0;j<=500;j++){const q=p.getPointAtLength(len*j/500);if(q.x>card.x && q.x<card.x+card.w && q.y>card.y && q.y<card.y+card.h){hits++;break;}}}});return hits;
- });expect(hits).toBe(0);
+  const raw=JSON.parse(document.querySelector('#src').value).page.blocks[0].diagram;let hits=0,headerHits=0;
+  const headers=[...svg.querySelectorAll('.grpbox')].map(r=>({x:+r.getAttribute('x'),y:+r.getAttribute('y'),w:+r.getAttribute('width'),h:20}));
+  svg.querySelectorAll('path.edge').forEach((p,i)=>{const e=raw.edges[i],len=p.getTotalLength();for(const card of cards){if([e.from,e.to].includes(card.id))continue;for(let j=0;j<=500;j++){const q=p.getPointAtLength(len*j/500);if(q.x>card.x && q.x<card.x+card.w && q.y>card.y && q.y<card.y+card.h){hits++;break;}}}for(const r of headers)for(let j=0;j<=500;j++){const q=p.getPointAtLength(len*j/500);if(q.x>r.x&&q.x<r.x+r.w&&q.y>r.y&&q.y<r.y+r.h){headerHits++;break;}}});return {cards:hits,headers:headerHits};
+ });expect(hits).toEqual({cards:0,headers:0});
  await expect(page.locator('#docview text.lbl').filter({hasText:'retry'})).toBeVisible();
  await page.setViewportSize({width:1800,height:2000});
  await canvasTools(page);await page.locator('#workspace-panels').click();await page.locator('#docview').getByRole('button',{name:'Fit diagram',exact:true}).click();
@@ -176,4 +165,38 @@ test('active-section switch and project replacement retire pending arrangements'
  await openAutoArrange(page);await page.locator('[data-arrange-confirm]').click();
  await page.evaluate(()=>__editorTest.builder.destroy());await expect(page.locator('#auto-arrange-dialog')).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(replaced);
  await page.evaluate(()=>__editorTest.remount());await expect(page.locator('#auto-arrange-dialog')).toHaveCount(1);
+});
+
+for(const shape of ['sparse','dense','grouped'])test('actual production worker completes an 80-node '+shape+' graph within the deadline',async({page,server},testInfo)=>{
+ const ids=Array.from({length:80},(_,i)=>'n'+String(i).padStart(2,'0'));
+ const d={nodes:Object.fromEntries(ids.map((id,i)=>[id,{title:id,...(shape==='grouped'?{group:'g'+Math.floor(i/10)}:{})}])),rows:[ids],autoplay:false,
+   edges:shape==='sparse'?ids.slice(1).map((id,i)=>({from:ids[i],to:id})):ids.flatMap((id,i)=>[{from:id,to:ids[(i+1)%80]},{from:id,to:ids[(i+7)%80]}])};
+ if(shape==='grouped')d.groups=Object.fromEntries(Array.from({length:8},(_,i)=>['g'+i,{title:'Group '+i}]));
+ await open(page,server,{page:{blocks:[{heading:'Limit graph',diagram:d}]}});const before=await source(page);
+ await page.evaluate(()=>{const Real=window.Worker;window.Worker=class extends Real{postMessage(data){const started=performance.now();this.addEventListener('message',e=>window.__arrangementMeasurement={ms:performance.now()-started,error:e.data.error,metrics:e.data.result?.metrics},{once:true});super.postMessage(data);}};});
+ await arrange(page);const measurement=await page.evaluate(()=>window.__arrangementMeasurement);
+ expect(measurement.error).toBeUndefined();expect(measurement.ms).toBeLessThan(20000);
+ const out=await diagram(page);expect(out.floats).toHaveLength(80);expect(out.edges).toHaveLength(d.edges.length);expect(out.nodes).toEqual(d.nodes);expect(out.groups).toEqual(d.groups);
+ expect(out.edges.every(e=>e.fromPort&&e.toPort&&e.curveControls.length>=2)).toBe(true);
+ await testInfo.attach('worker-runtime',{body:JSON.stringify({shape,...measurement}),contentType:'application/json'});
+ console.log('Worker '+shape+': '+Math.round(measurement.ms)+'ms');
+ await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+});
+
+test('production 20-second deadline terminates an unresponsive worker and preserves source',async({page,server})=>{
+ await open(page,server);const before=await source(page);
+ await page.evaluate(()=>{const Real=window.Worker;window.__terminated=0;window.Worker=class extends Real{postMessage(){}terminate(){window.__terminated++;super.terminate();}};});
+ await openAutoArrange(page);const started=Date.now();await page.locator('[data-arrange-confirm]').click();
+ await expect(page.locator('[data-arrange-status]')).toContainText('took too long',{timeout:25000});
+ expect(Date.now()-started).toBeGreaterThanOrEqual(19500);expect(await page.evaluate(()=>window.__terminated)).toBe(1);
+ await expect(page.locator('[data-arrange-activity]')).toBeHidden();await expect(page.locator('#src')).toHaveValue(before);
+});
+
+
+test('built worker and transaction retain the approved research geometry byte fingerprint',async({page,server})=>{
+ const corpus=JSON.parse(await readFile(path.join(repo,'tests/fixtures/arrange-approved.json'),'utf8'));
+ const item=corpus.cases.find(c=>c.name==='research-compute-federation.spec.json');
+ await open(page,server,{page:{blocks:[{heading:'Research reference',diagram:item.input}]}});await arrange(page);
+ const out=await diagram(page),geometry={floats:out.floats,edges:out.edges,graphFrame:out.graphFrame};
+ expect(createHash('sha256').update(JSON.stringify(geometry)).digest('hex')).toBe(item.geometrySha256);
 });

@@ -1,5 +1,7 @@
+/* Shared deterministic graph arrangement; no runtime dependencies. */
+var FlowArrangeRouting=(function(){
 'use strict';
-const {crosses,hitsBox}=require('./placement.cjs');
+const {crosses,hitsBox}=FlowArrangePlacement;
 const SIDES=['top','right','bottom','left'];
 const round=v=>Math.round(v*100)/100;
 const mix=(a,b,t)=>({x:a.x+(b.x-a.x)*t,y:a.y+(b.y-a.y)*t});
@@ -117,4 +119,6 @@ function route(nodes,edges){
   const points=chosen.flatMap(r=>r.points),bounds=points.length?{left:Math.min(...points.map(p=>p.x)),top:Math.min(...points.map(p=>p.y)),right:Math.max(...points.map(p=>p.x)),bottom:Math.max(...points.map(p=>p.y))}:null;
   return {edges:result,metrics:{cardIntrusions:chosen.reduce((s,r)=>s+r.hits,0),crossings,sharedLength:round(sharedLength)},bounds};
 }
-module.exports={route,flatten,collisionCount,mazeRoute};
+return {route,flatten,collisionCount,mazeRoute};
+
+})();

@@ -321,7 +321,13 @@ new arithmetic, no new attributions.
 For ordinary new-diagram authoring, follow the packet/workflow rule 12: use unpositioned
 floats and automatic connections, then run the bundled pure Node
 `tools/compose-page-layout.cjs` command. The fields below document existing specs and explicit
-user-directed layout work.
+user-directed layout work. The production arranger writes positioned floats,
+pinned ports, native cubic controls and a graph frame. It preserves group
+membership/nesting and semantic content, with a limit of 80 nodes and 160
+connections. Use `tools/auto-arrange-spec.cjs --section 0 input.json output.json`
+for graph-only work. Both CLIs require distinct input/output files; use repeated
+`--section` or `--all` deliberately on pages with multiple diagrams. Read
+`docs/auto-arrange.md` for limitations and render-review guidance.
 
 For an existing diagram, append a raw float
 `{id:"<new-node-id>",side:"below",noSpread:true}` plus its semantic edges.
@@ -344,7 +350,7 @@ side when pinning it so the row headroom stays stable. All-free diagrams use
 `rows:[[]]`. Row layout and order remain automatic. Do not duplicate placement
 of one node in both rows and floats.
 
-Only when the user explicitly requests manual routing, use optional
+For scoped routing refinements, use optional
 `edges[].fromPort` / `toPort` objects to pin exit/entry:
 `{side:"right",offset:0.25}`. Offset is 0–1 along the side, starting at its left
 or top. These edges use curves, including in lane diagrams; other edges retain

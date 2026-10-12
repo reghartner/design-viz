@@ -8,10 +8,11 @@ async function main(){
   while(args.length){const key=args.shift();if(!['--engine-root','--corpus','--output','--arrange','--worker'].includes(key)||!args.length)throw Error('Usage: node tools/arrange-training/run.cjs [--engine-root TRUSTED_CHECKOUT] [--corpus DIRECTORY] --output DIRECTORY [--arrange INPUT_SPEC]');options[key]=args.shift();}
   if(options['--worker']){
     const engine=T.loadEngine(options['--worker']),d=JSON.parse(fs.readFileSync(0,'utf8'));
-    const viz=await require(path.join(engine.root,'src/workbench/vendor/viz-3.31.0.js')).instance();
-    const cola=require(path.join(engine.root,'src/workbench/vendor/webcola-3.4.0.js'));
-    const result=engine.C.autoArrangeCandidates(d,viz,cola);
-    process.stdout.write(JSON.stringify(engine.C.autoArrangeDiagram(d,result)));return;
+    // Historical engine roots may still own their legacy vendor dependencies.
+    const dependencies=engine.C.autoArrangeGraph?[]:[await require(path.join(engine.root,'src/workbench/vendor/viz-3.31.0.js')).instance(),require(path.join(engine.root,'src/workbench/vendor/webcola-3.4.0.js'))];
+    const arranger=engine.C.autoArrangeGraph?require(path.join(engine.root,'tools/arrange/core.cjs')):engine.C;
+    const result=arranger.autoArrangeCandidates(d,...dependencies);
+    process.stdout.write(JSON.stringify(arranger.autoArrangeDiagram(d,result)));return;
   }
   if(!options['--output'])throw Error('--output required');
   const started=performance.now(),out=path.resolve(options['--output']);fs.mkdirSync(out,{recursive:true});

@@ -1,170 +1,56 @@
-# Auto arrange
+# Automatic graph arrangement
 
-The workbench's **Auto arrange** button acts on the active diagram. Its dialog
-warns that placement and edge settings will be replaced. Cancel leaves the
-source untouched. Successful arrangement is one Undo entry; drag cards and
-curve handles afterward to refine it. The diagram canvas fits the result;
-this changes the current viewport, not saved camera settings.
+Workbench **Auto arrange** replaces the active diagram's node positions and
+connection geometry in one Undo action. The same deterministic arranger runs
+in the graph CLI, page composer, backend and exported authoring kit.
 
-Groups, nesting, node definitions, connection order and identity, labels,
-steps, paths, panels, named views and other sections are preserved. Rows and
-floats become ordinary positioned floats. Old routing, ports, bends, curve
-points and label nudges are discarded. Connections use the viewer's natural
-automatic curves and label placement wherever safe. Only necessary native
-cubic routes and their computed label nudges are retained. Arranged edges
-never save `fromPort` or `toPort`; shared geometry updates their attachment
-sides when nodes move. Only diagrams with retained curves need the
-`layout.cubic-curves` capability.
+It reads topology and card dimensions, starts with graph-distance stress, then
+searches a lattice with four seeded restarts. Each restart uses
+`min(64000, max(16000, 1300 × nodeCount))` annealing iterations, bounding
+the work for larger graphs. Candidate selection balances
+neighbor distance, shared axes, footprint and connection crossings. A cubic
+router selects ports and routes around cards, using channel detours when
+needed. There is no prescribed global flow direction or fixed row shape.
+Cycles, disconnected components, self-loops and parallel/reverse edges are
+supported. Identical topology, identifiers and options produce the same result;
+node/edge serialization order does not change placement (parallel edges keep
+their original ordering).
 
-Directed chains, including grouped chains, use at most four cards per row and reverse each
-successive row, so a six-card chain reads left to right across three cards, then
-right to left across three. Chains of up to 12 cards use 204 logical units
-between centers in both directions; they do not add empty space to reach a
-screen aspect ratio. Longer chains balance rows toward a 3:2 occupied
-footprint without reducing the minimum card gap, and also expand
-column spacing once minimum row clearance determines their height. Detection follows edge
-topology rather than node or edge declaration order. Cycles, forks and disconnected graphs use the
-general candidate search. The snake is accepted only after collision and route
-checks, including every resulting group box. A snake that would overlap groups
-is rejected and the clustered search remains available.
+Groups are placement constraints. The arranger recursively places each group's
+members and nested groups, then places those containers with the same search.
+Native container padding and title strips separate siblings and unrelated
+cards. Existing group IDs, membership, parent links and empty-group metadata
+are preserved. Invalid parent links receive the same tolerance as the viewer.
+Routes may cross group boundaries; the native 20px group title strips are
+routing obstacles. Edge labels and step markers are not router obstacles. Nested or dense grouped graphs can use considerably more space.
 
-Grouped graphs compare global clustered Graphviz dot candidates in top to
-bottom and left to right directions. Graphs with at most 24 nodes and 48 edges also
-try both directions with a 3:2 target footprint. Larger or denser graphs keep
-the ordinary candidate budget so extra routing and scoring do not exhaust the
-worker deadline. The target candidates expand spacing on the short axis and reroute the native
-splines; they do not compress cards. Ungrouped graphs also compare two
-deterministic WebCola stress layouts with Graphviz nop2 spline routing.
-External Graphviz labels preserve the graph's ranks while leaving room for
-labels. Candidate generation keeps at least 48 logical units between final card
-rectangles; layered ranks receive additional clearance for their connections.
+The result uses `rows:[[]]`, positioned `floats`, explicit `fromPort`/`toPort`,
+editable native `curveControls`, and a new `graphFrame`. Old bends, through
+points, endpoint/label nudges and lane routing are replaced. Semantic node and
+edge data, IDs, edge order, groups, steps, paths, panels, named views and other
+sections are preserved. Existing float metadata also survives. Graph geometry
+is shared by named views; Auto arrange does not repack panel rectangles.
 
-Candidate scoring uses final viewer geometry, including automatic avoidance, attachments
-and nested group boxes: reject overlapping cards/groups and routes through unrelated cards,
-then minimize nonincident crossing pairs. Disjoint route bounding boxes skip
-segment intersection checks, keeping disconnected graphs inexpensive to score.
-Among candidates with equal crossing counts, prefer an occupied footprint
-from square through 16:9 landscape. All
-ratios inside that range are equally preferred; ratios outside it are ranked
-by logarithmic distance to the nearest limit. Total straight-line, center-to-center
-edge distance and occupied area break ties. Each edge contributes its Euclidean endpoint distance, including parallel
-edges; self edges contribute zero. Curve arc length does not affect this score.
-Sampled curves still determine card hits, crossings and occupied bounds.
-The footprint encloses cards, groups and sampled routes,
-excluding the viewer's minimum-width canvas and label boxes.
+Drag cards or curve handles to refine the result, or use the inspector's
+position/port controls. The selected ports stay pinned when moving cards;
+choose automatic attachment or Reset curve when appropriate. Undo restores the
+complete previous source, including its previous frame and routes.
 
-After every search and refinement pass chooses its winner, Auto arrange expands
-that placement without changing its relative geometry. It applies one affine
-scale per screen axis about the top-left node center. A regular occupied-line
-pitch is reused when every interval is a whole multiple; otherwise calibration
-uses the normal 204-unit horizontal and 98-unit vertical pitch. The published
-pitch leaves 2.5 times the former horizontal rectangle gap and 1.5 times the
-former vertical gap. Shared rows, shared columns, empty grid slots, symmetry and
-node ordering are therefore preserved. Regular whitespace wider than three
-normal gaps is treated as aspect padding or empty lattice space and uses the
-normal pitch for calibration, so the expansion does not magnify an existing
-landscape-balancing margin. Existing native curve offsets scale with
-the same axes, then the normal route simplifier removes any controls it can.
-Fixed-position `nop2` routing is only a fallback and cannot move the expanded
-nodes. Both routes must preserve the winner's overlap, card-hit, ordinary-crossing
-and shared-endpoint-crossing ceilings; attachments remain automatic.
+The public limit is **80 nodes and 160 connections per diagram**. The worker
+has a **20-second deadline**; a timeout, blocked local worker, invalid result or
+routing failure leaves the source unchanged. Cancel, source edits, a section
+switch, project replacement and editor teardown retire pending calculations.
+The workbench commits only to the exact source/project/section that started it.
+Large graphs can reach the deadline on slower hardware; split a complex story
+into meaningful diagram sections if it cannot finish. The CLI uses the same
+bounded search without the UI deadline.
 
-After choosing the structural layout, ungrouped diagrams with at most 12 nodes
-and 24 edges may receive one local compaction attempt. A terminal sink with
-exactly one incident edge can move beside its neighbor if the new position
-shrinks the card footprint and keeps the card gap. The rest of the selected
-layout stays in place, preserving the spacing of forks and joins. The candidate
-is rerouted and must pass the same card/group and route safety checks. It
-compares crossings first, then shape, then occupied diagonal
-(`hypot(width, height)`) before edge distance for this local comparison. Blocked or unsafe tucks leave the structural layout
-unchanged. Larger or denser diagrams receive no extra attempt.
-
-Ranked ungrouped diagrams with at most 24 nodes and 48 edges also receive a
-bounded alignment pass when nearby card centers use scattered coordinates.
-It merges nearby centers into rows and columns, infers consistent gaps from
-the existing spacing, and searches nearby empty grid cells. Sources and sinks
-keep their grid positions while intermediate cards can share rows despite
-having different graph depths. Empty grid lines are closed, so occupied rows
-and columns have equal gaps. The objective checks card/group overlap, unrelated
-card hits and crossings first, then balances straight connection distance with
-a penalty for diagonal connections. This supports staggered processing/storage
-rows without hardcoded node identities or preserved Graphviz ranks.
-
-An aligned result must use no more distinct row/column centers and keep the
-chosen layout's crossing budget. Its occupied diagonal may grow by at most
-25%. A layout already within square–16:9 stays in that range unless the new
-layout uses at least 10% less area and no greater diagonal. Alignment can
-therefore add room for a cleaner grid, but never expands a graph just to meet
-an aspect ratio. A safe automatic grid needs no additional routing. Otherwise,
-one native routing attempt must pass the same safety and footprint checks;
-failure preserves the original layout. Grouped layouts and force layouts
-without recognizable ranks retain their placement.
-
-The search runs at most eight passes and 900 geometry evaluations, with the
-evaluation cap reduced by the product of node and edge counts. Diagrams above
-24 nodes or 48 edges receive no alignment work. This keeps the 80-node worker
-budget unchanged.
-
-Deep ungrouped graphs can receive a second compact-grid candidate after
-alignment. This pass requires 8–20 nodes, at most 32 edges, one source, and a
-unary entrance of at least three cards that fits across the grid. It only runs
-when the existing rank count exceeds the compact grid by at least two rows.
-The entrance folds left to right across the first row; the remaining nodes
-can swap cells on a regular grid with 204-unit columns and 120-unit rows.
-The grid has `ceil(sqrt(nodeCount))` columns and room for roughly one empty
-cell per two cards. Forward connections retain their downstream order, and
-parallel two-hop fork/join branches share a processing row. Feedback edges
-remain free to travel upward.
-
-Twelve deterministic seeded searches each try 20,000 cell moves or swaps.
-Cached straight-segment/card and segment-pair geometry provides the cheap
-search objective; it also penalizes diagonal connections and reversed forward
-links. These estimates never authorize the final layout. At most four
-finalists receive the full viewer score, with native rerouting only when the
-automatic candidate is unsafe. Acceptance requires no overlaps or unrelated
-card hits, no crossing increase, shorter total center distance, no greater
-occupied diagonal, and the existing aspect guard. Failed or unsafe routing
-preserves the selected layout. The normal natural-route simplifier then removes
-any unnecessary native controls. Small, already compact, multi-source, grouped
-and larger diagrams keep their prior behavior.
-
-After structural selection and any leaf refinement, routing starts with an
-all-automatic candidate. If it clears unrelated cards and does not increase
-nonincident crossings, all native controls are removed. Otherwise, automatic
-routes replace native routes individually in edge order whenever that change
-clears cards and stays within the chosen layout's crossing count. The pass
-repeats until no further individual replacement is safe. Every retained curve
-therefore prevents a card hit or an increase beyond that crossing budget.
-Automatic edges have no saved controls or label nudges; retained curves stay
-editable. This step preserves all node positions.
-
-Checks use the viewer's shared automatic avoidance, so a safe automatic bow
-can avoid a card without saved controls. When a prior pass already removed an
-edge's native controls, its existing avoidance bow also participates in the
-crossing budget; later cleanup cannot substitute an unadjusted route for it.
-Path samples and native/automatic crossing pairs are cached; each pair has at most four combinations. The final
-layout receives one full score after selection, rather than one per edge.
-No additional Graphviz routing is needed for this step.
-
-Long chains prioritize the four-card row limit and minimum clearance when those
-constraints prevent the target footprint.
-
-The bounded search does not promise an optimal, crossing-free or in-range
-result. In particular, fewer crossings win even when that requires a less
-compact shape, and target spacing can introduce whitespace. There are at most
-thirteen routing attempts for small diagrams (a snake, six general candidates,
-one local leaf refinement, one optional aligned-grid reroute and up to four
-compact-grid finalists). Successful snakes return immediately. Above
-24 nodes or 48 edges, there are at most five attempts (a snake plus two layered
-and, for ungrouped graphs, two stress candidates); grouped graphs use only
-the two layered attempts plus a snake attempt when they form a directed path. The supported limit remains 80 nodes and 160 edges
-per diagram. A worker has a 20-second deadline and is terminated on
-cancellation, source changes, section changes, project retirement or builder
-teardown. Failure never changes
-the source. Freshness is checked again before the atomic session transaction.
-Positions and any retained native paths are stored in the spec, so opening or
-exporting never reruns Graphviz or WebCola. Moving nodes updates natural routes
-and deforms retained curves through the shared viewer geometry.
+Arrangement is a starting point for visual review. It does not guarantee zero
+crossings, optimal compactness, label clearance or readability at every zoom.
+Card avoidance uses sampled curves. Labels, step markers, group titles and
+panel content need rendered inspection; shorten labels or make scoped manual
+position, route and label refinements where needed. Do not turn a particular
+reference layout into a mandatory shape for other topology.
 
 ## Headless authoring
 
@@ -292,40 +178,28 @@ compile the current shared arranger sources in a checkout, ignoring generated
 build artifacts, and use the bundled backend in an exported authoring kit.
 The complete authoring workflow uses `compose-page-layout.cjs`.
 
-## Distribution and maintenance
+## Distribution and validation
 
-The workbench embeds Viz.js 3.31.0 (1,329,882 bytes) and WebCola 3.4.0
-(79,814 bytes), plus shared geometry and worker code. They are initialized only
-when needed, in a Blob worker. Offline/file workbenches require no CDN or npm.
-A host CSP must permit `worker-src blob:` and WebAssembly compilation in the
-worker; a blocked worker reports an error and leaves the spec unchanged.
-Viewers, backend packages and standalone exports contain no layout engines.
+The production implementation lives in `src/core/arrange/`: placement, routing,
+topology orchestration and recursive group placement. The adapter in
+`src/workbench/auto-arrange-core.js` serves the embedded worker and backend.
+`src/source-bundles.json` declares these same sources for every runtime;
+`tools/source-loader.cjs` embeds the worker with HTML-safe escaping.
+The workbench needs permission for Blob workers (`worker-src blob:`), with no
+WebAssembly, external engine, network request or runtime package installation.
+Standalone viewers only render saved geometry and do not run arrangement.
 
-`src/source-bundles.json` inventories worker sources and notices;
-`tools/source-loader.cjs` embeds them with HTML-safe string escaping. Every
-workbench includes MIT notices for Viz.js, WebCola and Expat, and Graphviz's
-EPL-2.0 license plus its corresponding source/build URLs. The vendored bundle
-and notices are pinned in `src/workbench/vendor/manifest.json`.
+Build with `python3 tools/build.py`; generated HTML/runtime files stay ignored.
+Run the Node arrangement/CLI/composer suites and the built-workbench browser
+contracts in `tools/browser-tests/tests/auto-arrange.spec.mjs`. The approved
+reference fingerprints in `tests/fixtures/arrange-approved.json` record the
+historical revision and source hashes used for exact geometry parity.
+Native geometry checks cover cards, group containment, header space and routes;
+browser contracts cover real worker output, edit handles, cancel, stale jobs,
+Undo/Redo, reload/export and deadline behavior.
 
-Run `python3 tools/vendor-auto-arrange.py` to verify the committed checksums.
-`--refresh` downloads integrity-checked, pinned npm archives and reimports the
-same browser bundles; normal builds are network-free. Build with
-`python3 tools/build.py`. Never commit its ignored generated HTML/runtime files.
-
-`tests/auto-arrange.test.js` includes the approved 20-node/36-edge/6-group
-fixture: at most ten nonincident crossing pairs, no node/group overlap and no route
-through an unrelated card. Browser contracts inspect the actual SVG, native
-control and card dragging, cancellation, one Undo/Redo, reload and export.
-
-## Shape baselines
-
-`examples/auto-arrange-baselines/graph-input.spec.json` contains six importable
-comparison diagrams: a chain, a fork/join, three larger systems with legacy
-monoliths and direct/back couplings, and a deliberately nonplanar K₃,₃.
-Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
-`auto-arranged.spec.json` using the production algorithm and print occupied
-geometry/crossing metrics. The focused tests verify these outputs exactly,
-including the compact 3+3 snake, a terminal-leaf tuck that preserves its fork,
-aligned telemetry and fulfillment grids, semantic preservation and collision
-safety. The short chain deliberately
-exceeds 16:9; the five remaining baselines stay between square and 16:9.
+Development capture and independent geometry audit helpers live in
+`tools/arrange-validation/`. They require the repository browser-test tooling
+for captures; ordinary authoring does not. Existing example generator commands
+use the current shared production arranger. Committed example captures may
+represent the historical revision identified in their own documentation.

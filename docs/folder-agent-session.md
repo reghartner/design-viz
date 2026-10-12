@@ -264,7 +264,7 @@ clips content or is hard to read authorizes scoped candidate tile sizing without
 another permission round or asking the user to arrange it. Use `--rearrange`
 when that requested repair needs structural node placement, limited to the
 affected section. Validate and state-walk the result, then submit it for paired
-Workbench preview and explicit approval. See `docs/auto-arrange.md` for supported
+Workbench preview and explicit approval. The kit uses the same deterministic graph arranger as the workbench, including nested groups, pinned ports, cubic routes and framing. Inspect rendered labels and crossings and refine the affected geometry when needed. See `docs/auto-arrange.md` for supported
 inputs and estimation limits. This browserless session cannot establish visual QA.
 
 If the agent's file reader cannot return the long `source` or `ledger` line, it

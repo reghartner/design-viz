@@ -1,3 +1,5 @@
+/* Shared deterministic graph arrangement; no runtime dependencies. */
+var FlowArrangePlacement=(function(){
 'use strict';
 
 // A bounded lattice search. There are no authored coordinates, names, types,
@@ -57,20 +59,29 @@ function hitsBox(a,b,c,halfX=.34,halfY=.25) {
 
 function score(p, edges, t, aspect, strideRatio, moved=null) {
   let cost=0;
-  const touched=edges.map(([a,b])=>!moved||moved.includes(a)||moved.includes(b));
+  // Reuse topology-only masks and exact distance terms across the two scores
+  // for a move. Accumulation order and every floating-point term stay intact.
+  const key=moved?(moved[0]+1)*(p.length+1)+(moved.length>1?moved[1]+1:0):0;
+  let touched=t.scoreMasks&&t.scoreMasks[key];
+  if(!touched){touched=edges.map(([a,b])=>!moved||moved.includes(a)||moved.includes(b));if(t.scoreMasks)t.scoreMasks[key]=touched;}
   for(let ei=0;ei<edges.length;ei++) {
-    const [a,b]=edges[ei]; if(a===b)continue;
+    const a=edges[ei][0],b=edges[ei][1]; if(a===b)continue;
     const A=p[a],B=p[b];
     if(touched[ei]){
-      const dx=B.x-A.x,dy=B.y-A.y,dist=Math.hypot(dx,dy);
-      cost+=1.7*dist + .32*dist*dist;
+      const dx=B.x-A.x,dy=B.y-A.y;
+      let distanceCost;
+      if(t.distanceCosts){const key=Math.abs(dx)*(p.length*2+1)+Math.abs(dy);distanceCost=t.distanceCosts[key];if(distanceCost===undefined){const dist=Math.hypot(dx,dy);distanceCost=t.distanceCosts[key]=1.7*dist + .32*dist*dist;}}
+      else {const dist=Math.hypot(dx,dy);distanceCost=1.7*dist + .32*dist*dist;}
+      cost+=distanceCost;
       // An axial relationship reads as a phrase. Diagonal branches remain legal.
       if(dx && dy)cost+=1.25+ .25*Math.min(Math.abs(dx),Math.abs(dy));
-      if(dy<0 && !t.feedback.has(a+','+b))cost+=1.4*Math.min(3,-dy);
+      if(dy<0 && !(t.feedbackEdges?t.feedbackEdges[ei]:t.feedback.has(a+','+b)))cost+=1.4*Math.min(3,-dy);
       for(let i=0;i<p.length;i++)if(i!==a && i!==b && hitsBox(A,B,p[i]))cost+=22;
-      for(let ej=0;ej<edges.length;ej++) {
+      const comparisons=t.disjointEdges&&t.disjointEdges[ei];
+      for(let k=0;k<(comparisons?comparisons.length:edges.length);k++) {
+        const ej=comparisons?comparisons[k]:k;
         if(ej===ei || touched[ej]&&ej>ei)continue;
-        const [c,d]=edges[ej];if(a===c||a===d||b===c||b===d||c===d)continue;
+        const c=edges[ej][0],d=edges[ej][1];if(!comparisons&&(a===c||a===d||b===c||b===d||c===d))continue;
         if(crosses(A,B,p[c],p[d]))cost+=13;
       }
     }else for(const i of moved)if(i!==a&&i!==b&&hitsBox(A,B,p[i]))cost+=22;
@@ -85,13 +96,18 @@ function score(p, edges, t, aspect, strideRatio, moved=null) {
   return cost;
 }
 
+// Bound larger searches while preserving the default schedule below 50 nodes.
+function defaultIterations(n){return Math.min(64000,Math.max(16000,n*1300));}
+
 function place(nodes, inputEdges, options={}) {
   const n=nodes.length;if(!n)return {positions:[],score:0};
   const edges=Array.from(new Map(inputEdges.filter(([a,b])=>a!==b).map(e=>[e.join(','),e])).values());
   const t=topology(n,edges),aspect=options.aspectRatio??1.45;
+  t.scoreMasks=[];t.distanceCosts=[];t.feedbackEdges=edges.map(([a,b])=>t.feedback.has(a+','+b));
+  t.disjointEdges=edges.map(([a,b],ei)=>edges.map((e,i)=>i).filter(ej=>{const [c,d]=edges[ej];return ei!==ej&&a!==c&&a!==d&&b!==c&&b!==d&&c!==d;}));
   const xStep=Math.max(...nodes.map(n=>n.width))+ (options.columnGap??76),yStep=Math.max(...nodes.map(n=>n.height))+(options.rowGap??88);
   const strideRatio=xStep/yStep,baseCols=Math.max(2,Math.round(Math.sqrt(n*1.6*aspect/strideRatio)));
-  const restarts=options.restarts??4,iterations=options.iterations??Math.max(16000,n*1300);
+  const restarts=options.restarts??4,iterations=options.iterations??defaultIterations(n);
   let best=null;const candidates=[];
   for(let restart=0;restart<restarts;restart++) {
     const width=Math.min(n,Math.max(1,baseCols+(restart%3)-1)),height=Math.max(1,Math.ceil(n*1.55/width));
@@ -121,4 +137,6 @@ function place(nodes, inputEdges, options={}) {
   return {...best,candidates};
 }
 
-module.exports={place,topology,crosses,hitsBox,score};
+return {place,topology,crosses,hitsBox,score,defaultIterations};
+
+})();

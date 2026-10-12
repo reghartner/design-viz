@@ -1,0 +1,3385 @@
+{
+  "sourceRevision": "e74e524f0feb41eed97cf5b9a44837a85934bc29",
+  "description": "User-approved B outputs, frozen before production integration. Hash is JSON.stringify({floats,edges,graphFrame}) from that historical revision; inputs retain original topology and semantic fields.",
+  "cases": [
+    {
+      "name": "approval-diamond.spec.json",
+      "sourceSha256": "7ae547f79f8b8f8dd17b8759c12cca3edbcd7e85249b19a8a5d7440e45bfea7b",
+      "input": {
+        "title": "02 · Document approval · 9 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "uploader": {
+            "title": "Uploader",
+            "icon": "terminal"
+          },
+          "api": {
+            "title": "Upload API",
+            "icon": "cloud"
+          },
+          "store": {
+            "title": "File store",
+            "icon": "db"
+          },
+          "scan": {
+            "title": "Malware scan",
+            "icon": "shield"
+          },
+          "policy": {
+            "title": "Policy check",
+            "icon": "shield"
+          },
+          "review": {
+            "title": "Review queue",
+            "icon": "gear"
+          },
+          "reviewer": {
+            "title": "Reviewer",
+            "icon": "gear"
+          },
+          "publish": {
+            "title": "Publisher",
+            "icon": "cloud"
+          },
+          "archive": {
+            "title": "Archive",
+            "icon": "db"
+          }
+        },
+        "rows": [
+          [
+            "uploader",
+            "api",
+            "store",
+            "scan",
+            "policy",
+            "review",
+            "reviewer",
+            "publish",
+            "archive"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "uploader",
+            "to": "api"
+          },
+          {
+            "from": "api",
+            "to": "store"
+          },
+          {
+            "from": "api",
+            "to": "scan"
+          },
+          {
+            "from": "api",
+            "to": "policy"
+          },
+          {
+            "from": "store",
+            "to": "review"
+          },
+          {
+            "from": "scan",
+            "to": "review"
+          },
+          {
+            "from": "policy",
+            "to": "review"
+          },
+          {
+            "from": "review",
+            "to": "reviewer"
+          },
+          {
+            "from": "reviewer",
+            "to": "publish"
+          },
+          {
+            "from": "publish",
+            "to": "archive"
+          }
+        ]
+      },
+      "geometrySha256": "0ea7363965b2a31fdbdc69ba1727e5bffc689f28ad8929583c09dd3bbf15e89a"
+    },
+    {
+      "name": "data-platform.spec.json",
+      "sourceSha256": "97b1e180220e15b2dece4cea1250952f026ad3fe98640a8f20963d57fb495269",
+      "input": {
+        "title": "04 · Data platform · 48 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "orders-db": {
+            "title": "Orders DB",
+            "icon": "db",
+            "tint": "dev"
+          },
+          "accounts-db": {
+            "title": "Accounts DB",
+            "icon": "db",
+            "tint": "dev"
+          },
+          "support-api": {
+            "title": "Support API",
+            "icon": "cloud",
+            "tint": "dev"
+          },
+          "mobile-events": {
+            "title": "Mobile events",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "partner-files": {
+            "title": "Partner files",
+            "icon": "package",
+            "tint": "dev"
+          },
+          "iot-gateway": {
+            "title": "IoT gateway",
+            "icon": "antenna",
+            "tint": "dev"
+          },
+          "orders-cdc": {
+            "title": "Orders CDC",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "accounts-cdc": {
+            "title": "Accounts CDC",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "api-collector": {
+            "title": "API collector",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "event-ingress": {
+            "title": "Event ingress",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "file-landing": {
+            "title": "File landing",
+            "icon": "package",
+            "tint": "mqtt"
+          },
+          "schema-registry": {
+            "title": "Schema registry",
+            "icon": "db",
+            "tint": "data"
+          },
+          "event-bus": {
+            "title": "Event bus",
+            "icon": "antenna",
+            "tint": "mqtt"
+          },
+          "raw-store": {
+            "title": "Raw object store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "quality-gate": {
+            "title": "Quality gate",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "quarantine": {
+            "title": "Quarantine",
+            "icon": "db",
+            "tint": "data"
+          },
+          "replay-queue": {
+            "title": "Replay queue",
+            "icon": "package",
+            "tint": "mqtt"
+          },
+          "stream-router": {
+            "title": "Stream router",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "session-job": {
+            "title": "Session job",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "feature-job": {
+            "title": "Feature job",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "anomaly-job": {
+            "title": "Anomaly job",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "batch-scheduler": {
+            "title": "Batch scheduler",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "orders-model": {
+            "title": "Orders model",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "customer-model": {
+            "title": "Customer model",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "support-model": {
+            "title": "Support model",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "legacy-etl": {
+            "title": "Legacy ETL",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "legacy-warehouse": {
+            "title": "Legacy warehouse",
+            "icon": "db",
+            "tint": "auth"
+          },
+          "lakehouse": {
+            "title": "Lakehouse",
+            "icon": "db",
+            "tint": "data"
+          },
+          "feature-store": {
+            "title": "Feature store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "search-index": {
+            "title": "Search index",
+            "icon": "db",
+            "tint": "data"
+          },
+          "metrics-store": {
+            "title": "Metrics store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "catalog": {
+            "title": "Data catalog",
+            "icon": "db",
+            "tint": "data"
+          },
+          "lineage-service": {
+            "title": "Lineage service",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "identity-service": {
+            "title": "Identity service",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "policy-engine": {
+            "title": "Policy engine",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "semantic-layer": {
+            "title": "Semantic layer",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "warehouse-api": {
+            "title": "Warehouse API",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "notebook-gateway": {
+            "title": "Notebook gateway",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "dashboard-service": {
+            "title": "Dashboard service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "ml-serving": {
+            "title": "ML serving",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "reverse-etl": {
+            "title": "Reverse ETL",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "marketing-sink": {
+            "title": "Marketing sink",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "support-sink": {
+            "title": "Support sink",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "finance-export": {
+            "title": "Finance export",
+            "icon": "package",
+            "tint": "mqtt"
+          },
+          "privacy-audit": {
+            "title": "Privacy audit",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "platform-console": {
+            "title": "Platform console",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "cost-monitor": {
+            "title": "Cost monitor",
+            "icon": "gear",
+            "tint": "auth"
+          },
+          "archive": {
+            "title": "Compliance archive",
+            "icon": "db",
+            "tint": "data"
+          }
+        },
+        "rows": [
+          [
+            "orders-db",
+            "accounts-db",
+            "support-api",
+            "mobile-events",
+            "partner-files",
+            "iot-gateway",
+            "orders-cdc",
+            "accounts-cdc",
+            "api-collector",
+            "event-ingress",
+            "file-landing",
+            "schema-registry",
+            "event-bus",
+            "raw-store",
+            "quality-gate",
+            "quarantine",
+            "replay-queue",
+            "stream-router",
+            "session-job",
+            "feature-job",
+            "anomaly-job",
+            "batch-scheduler",
+            "orders-model",
+            "customer-model",
+            "support-model",
+            "legacy-etl",
+            "legacy-warehouse",
+            "lakehouse",
+            "feature-store",
+            "search-index",
+            "metrics-store",
+            "catalog",
+            "lineage-service",
+            "identity-service",
+            "policy-engine",
+            "semantic-layer",
+            "warehouse-api",
+            "notebook-gateway",
+            "dashboard-service",
+            "ml-serving",
+            "reverse-etl",
+            "marketing-sink",
+            "support-sink",
+            "finance-export",
+            "privacy-audit",
+            "platform-console",
+            "cost-monitor",
+            "archive"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "orders-db",
+            "to": "orders-cdc"
+          },
+          {
+            "from": "accounts-db",
+            "to": "accounts-cdc"
+          },
+          {
+            "from": "support-api",
+            "to": "api-collector"
+          },
+          {
+            "from": "mobile-events",
+            "to": "event-ingress"
+          },
+          {
+            "from": "iot-gateway",
+            "to": "event-ingress"
+          },
+          {
+            "from": "partner-files",
+            "to": "file-landing"
+          },
+          {
+            "from": "orders-cdc",
+            "to": "event-bus"
+          },
+          {
+            "from": "accounts-cdc",
+            "to": "event-bus"
+          },
+          {
+            "from": "api-collector",
+            "to": "event-bus"
+          },
+          {
+            "from": "event-ingress",
+            "to": "event-bus"
+          },
+          {
+            "from": "schema-registry",
+            "to": "event-bus"
+          },
+          {
+            "from": "file-landing",
+            "to": "raw-store"
+          },
+          {
+            "from": "event-bus",
+            "to": "raw-store"
+          },
+          {
+            "from": "raw-store",
+            "to": "quality-gate"
+          },
+          {
+            "from": "quality-gate",
+            "to": "quarantine"
+          },
+          {
+            "from": "quarantine",
+            "to": "replay-queue"
+          },
+          {
+            "from": "replay-queue",
+            "to": "event-bus"
+          },
+          {
+            "from": "quality-gate",
+            "to": "stream-router"
+          },
+          {
+            "from": "stream-router",
+            "to": "session-job"
+          },
+          {
+            "from": "stream-router",
+            "to": "feature-job"
+          },
+          {
+            "from": "stream-router",
+            "to": "anomaly-job"
+          },
+          {
+            "from": "session-job",
+            "to": "lakehouse"
+          },
+          {
+            "from": "feature-job",
+            "to": "feature-store"
+          },
+          {
+            "from": "anomaly-job",
+            "to": "metrics-store"
+          },
+          {
+            "from": "raw-store",
+            "to": "batch-scheduler"
+          },
+          {
+            "from": "batch-scheduler",
+            "to": "orders-model"
+          },
+          {
+            "from": "batch-scheduler",
+            "to": "customer-model"
+          },
+          {
+            "from": "batch-scheduler",
+            "to": "support-model"
+          },
+          {
+            "from": "orders-model",
+            "to": "lakehouse"
+          },
+          {
+            "from": "customer-model",
+            "to": "lakehouse"
+          },
+          {
+            "from": "support-model",
+            "to": "lakehouse"
+          },
+          {
+            "from": "file-landing",
+            "to": "legacy-etl"
+          },
+          {
+            "from": "legacy-etl",
+            "to": "legacy-warehouse"
+          },
+          {
+            "from": "legacy-etl",
+            "to": "lakehouse"
+          },
+          {
+            "from": "legacy-warehouse",
+            "to": "finance-export"
+          },
+          {
+            "from": "lakehouse",
+            "to": "search-index"
+          },
+          {
+            "from": "lakehouse",
+            "to": "catalog"
+          },
+          {
+            "from": "feature-store",
+            "to": "catalog"
+          },
+          {
+            "from": "search-index",
+            "to": "catalog"
+          },
+          {
+            "from": "metrics-store",
+            "to": "catalog"
+          },
+          {
+            "from": "catalog",
+            "to": "lineage-service"
+          },
+          {
+            "from": "lineage-service",
+            "to": "policy-engine"
+          },
+          {
+            "from": "identity-service",
+            "to": "policy-engine"
+          },
+          {
+            "from": "policy-engine",
+            "to": "semantic-layer"
+          },
+          {
+            "from": "lakehouse",
+            "to": "semantic-layer"
+          },
+          {
+            "from": "semantic-layer",
+            "to": "warehouse-api"
+          },
+          {
+            "from": "warehouse-api",
+            "to": "notebook-gateway"
+          },
+          {
+            "from": "warehouse-api",
+            "to": "dashboard-service"
+          },
+          {
+            "from": "feature-store",
+            "to": "ml-serving"
+          },
+          {
+            "from": "semantic-layer",
+            "to": "reverse-etl"
+          },
+          {
+            "from": "reverse-etl",
+            "to": "marketing-sink"
+          },
+          {
+            "from": "reverse-etl",
+            "to": "support-sink"
+          },
+          {
+            "from": "policy-engine",
+            "to": "privacy-audit"
+          },
+          {
+            "from": "lineage-service",
+            "to": "privacy-audit"
+          },
+          {
+            "from": "privacy-audit",
+            "to": "archive"
+          },
+          {
+            "from": "dashboard-service",
+            "to": "platform-console"
+          },
+          {
+            "from": "ml-serving",
+            "to": "platform-console"
+          },
+          {
+            "from": "platform-console",
+            "to": "cost-monitor"
+          },
+          {
+            "from": "cost-monitor",
+            "to": "batch-scheduler"
+          },
+          {
+            "from": "support-api",
+            "to": "legacy-warehouse"
+          }
+        ]
+      },
+      "geometrySha256": "3c6bb5f524eaf36d5b15925ba47aeb4f1436966f881e121aaec004ffd0be6486"
+    },
+    {
+      "name": "equipment-lending.spec.json",
+      "sourceSha256": "87817d42c19133c685e4322e7c8c66d4e5b4808df9df222fa69b654c66d510e0",
+      "input": {
+        "title": "Equipment lending",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "lend-request-app": {
+            "title": "Request app",
+            "icon": "server"
+          },
+          "lend-desk": {
+            "title": "Desk console",
+            "icon": "server"
+          },
+          "lend-partner": {
+            "title": "Partner API",
+            "icon": "server"
+          },
+          "lend-gateway": {
+            "title": "Request gateway",
+            "icon": "server"
+          },
+          "lend-identity": {
+            "title": "Identity check",
+            "icon": "server"
+          },
+          "lend-registry": {
+            "title": "Member registry",
+            "icon": "server"
+          },
+          "lend-eligibility": {
+            "title": "Eligibility rules",
+            "icon": "server"
+          },
+          "lend-inventory": {
+            "title": "Inventory view",
+            "icon": "server"
+          },
+          "lend-availability": {
+            "title": "Availability check",
+            "icon": "server"
+          },
+          "lend-reservation": {
+            "title": "Reservation service",
+            "icon": "server"
+          },
+          "lend-record": {
+            "title": "Loan record",
+            "icon": "server"
+          },
+          "lend-pick": {
+            "title": "Pick list",
+            "icon": "server"
+          },
+          "lend-inspection": {
+            "title": "Kit inspection",
+            "icon": "server"
+          },
+          "lend-handoff": {
+            "title": "Handoff service",
+            "icon": "server"
+          },
+          "lend-locker": {
+            "title": "Locker station",
+            "icon": "server"
+          },
+          "lend-courier": {
+            "title": "Courier adapter",
+            "icon": "server"
+          },
+          "lend-receipt": {
+            "title": "Receipt collector",
+            "icon": "server"
+          },
+          "lend-audit": {
+            "title": "Audit archive",
+            "icon": "server"
+          }
+        },
+        "rows": [
+          [
+            "lend-request-app",
+            "lend-desk",
+            "lend-partner",
+            "lend-gateway",
+            "lend-identity",
+            "lend-registry",
+            "lend-eligibility",
+            "lend-inventory",
+            "lend-availability",
+            "lend-reservation",
+            "lend-record",
+            "lend-pick",
+            "lend-inspection",
+            "lend-handoff",
+            "lend-locker",
+            "lend-courier",
+            "lend-receipt",
+            "lend-audit"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "lend-request-app",
+            "to": "lend-gateway"
+          },
+          {
+            "from": "lend-desk",
+            "to": "lend-gateway"
+          },
+          {
+            "from": "lend-partner",
+            "to": "lend-gateway"
+          },
+          {
+            "from": "lend-gateway",
+            "to": "lend-identity"
+          },
+          {
+            "from": "lend-registry",
+            "to": "lend-identity"
+          },
+          {
+            "from": "lend-identity",
+            "to": "lend-eligibility"
+          },
+          {
+            "from": "lend-gateway",
+            "to": "lend-eligibility"
+          },
+          {
+            "from": "lend-eligibility",
+            "to": "lend-availability"
+          },
+          {
+            "from": "lend-inventory",
+            "to": "lend-availability"
+          },
+          {
+            "from": "lend-gateway",
+            "to": "lend-availability"
+          },
+          {
+            "from": "lend-availability",
+            "to": "lend-reservation"
+          },
+          {
+            "from": "lend-reservation",
+            "to": "lend-record"
+          },
+          {
+            "from": "lend-reservation",
+            "to": "lend-pick"
+          },
+          {
+            "from": "lend-pick",
+            "to": "lend-inspection"
+          },
+          {
+            "from": "lend-reservation",
+            "to": "lend-inspection"
+          },
+          {
+            "from": "lend-inspection",
+            "to": "lend-handoff"
+          },
+          {
+            "from": "lend-handoff",
+            "to": "lend-record"
+          },
+          {
+            "from": "lend-handoff",
+            "to": "lend-locker"
+          },
+          {
+            "from": "lend-handoff",
+            "to": "lend-courier"
+          },
+          {
+            "from": "lend-locker",
+            "to": "lend-receipt"
+          },
+          {
+            "from": "lend-courier",
+            "to": "lend-receipt"
+          },
+          {
+            "from": "lend-receipt",
+            "to": "lend-audit"
+          },
+          {
+            "from": "lend-record",
+            "to": "lend-audit"
+          }
+        ]
+      },
+      "geometrySha256": "941d8bd287b410e6f20eb61bd0456fb612fc15fd32916771aa0f1347ab7a0b4c"
+    },
+    {
+      "name": "freight-operations.spec.json",
+      "sourceSha256": "2ff60e73d05bc024b3383191905ec5261ef8153420843219eaa59761d1bbae2a",
+      "input": {
+        "title": "03 · Freight operations · 40 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "booking-portal": {
+            "title": "Booking portal",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "edi-gateway": {
+            "title": "EDI gateway",
+            "icon": "router",
+            "tint": "dev"
+          },
+          "call-center": {
+            "title": "Call center",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "legacy-tms": {
+            "title": "Legacy TMS",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "quote-service": {
+            "title": "Quote service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "rate-store": {
+            "title": "Rate store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "contract-store": {
+            "title": "Contract store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "booking-service": {
+            "title": "Booking service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "order-store": {
+            "title": "Freight orders",
+            "icon": "db",
+            "tint": "data"
+          },
+          "route-planner": {
+            "title": "Route planner",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "map-service": {
+            "title": "Map service",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "capacity-service": {
+            "title": "Capacity service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "tender-service": {
+            "title": "Tender service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "carrier-portal": {
+            "title": "Carrier portal",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "carrier-api": {
+            "title": "Carrier API",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "retry-queue": {
+            "title": "Tender retry",
+            "icon": "package",
+            "tint": "mqtt"
+          },
+          "dispatch-board": {
+            "title": "Dispatch board",
+            "icon": "terminal",
+            "tint": "auth"
+          },
+          "pickup-scheduler": {
+            "title": "Pickup scheduler",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "driver-app": {
+            "title": "Driver app",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "yard-gate": {
+            "title": "Yard gate",
+            "icon": "chip",
+            "tint": "dev"
+          },
+          "dock-scheduler": {
+            "title": "Dock scheduler",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "scan-ingest": {
+            "title": "Scan ingest",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "tracking-service": {
+            "title": "Tracking service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "gps-gateway": {
+            "title": "GPS gateway",
+            "icon": "antenna",
+            "tint": "mqtt"
+          },
+          "status-store": {
+            "title": "Status store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "eta-service": {
+            "title": "ETA service",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "exception-engine": {
+            "title": "Exception engine",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "ops-console": {
+            "title": "Operations console",
+            "icon": "terminal",
+            "tint": "auth"
+          },
+          "customer-updates": {
+            "title": "Customer updates",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "webhook-dispatch": {
+            "title": "Webhook dispatch",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "billing-trigger": {
+            "title": "Billing trigger",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "proof-store": {
+            "title": "Proof of delivery",
+            "icon": "db",
+            "tint": "data"
+          },
+          "customs-broker": {
+            "title": "Customs broker",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "customs-service": {
+            "title": "Customs service",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "document-store": {
+            "title": "Document store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "warehouse-wms": {
+            "title": "Warehouse WMS",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "linehaul-hub": {
+            "title": "Linehaul hub",
+            "icon": "package",
+            "tint": "dev"
+          },
+          "last-mile-hub": {
+            "title": "Last-mile hub",
+            "icon": "package",
+            "tint": "dev"
+          },
+          "analytics-feed": {
+            "title": "Analytics feed",
+            "icon": "db",
+            "tint": "data"
+          },
+          "audit-archive": {
+            "title": "Audit archive",
+            "icon": "db",
+            "tint": "data"
+          }
+        },
+        "rows": [
+          [
+            "booking-portal",
+            "edi-gateway",
+            "call-center",
+            "legacy-tms",
+            "quote-service",
+            "rate-store",
+            "contract-store",
+            "booking-service",
+            "order-store",
+            "route-planner",
+            "map-service",
+            "capacity-service",
+            "tender-service",
+            "carrier-portal",
+            "carrier-api",
+            "retry-queue",
+            "dispatch-board",
+            "pickup-scheduler",
+            "driver-app",
+            "yard-gate",
+            "dock-scheduler",
+            "scan-ingest",
+            "tracking-service",
+            "gps-gateway",
+            "status-store",
+            "eta-service",
+            "exception-engine",
+            "ops-console",
+            "customer-updates",
+            "webhook-dispatch",
+            "billing-trigger",
+            "proof-store",
+            "customs-broker",
+            "customs-service",
+            "document-store",
+            "warehouse-wms",
+            "linehaul-hub",
+            "last-mile-hub",
+            "analytics-feed",
+            "audit-archive"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "rate-store",
+            "to": "quote-service"
+          },
+          {
+            "from": "contract-store",
+            "to": "quote-service"
+          },
+          {
+            "from": "booking-portal",
+            "to": "quote-service"
+          },
+          {
+            "from": "quote-service",
+            "to": "booking-service"
+          },
+          {
+            "from": "edi-gateway",
+            "to": "booking-service"
+          },
+          {
+            "from": "call-center",
+            "to": "booking-service"
+          },
+          {
+            "from": "booking-service",
+            "to": "order-store"
+          },
+          {
+            "from": "call-center",
+            "to": "legacy-tms"
+          },
+          {
+            "from": "legacy-tms",
+            "to": "order-store"
+          },
+          {
+            "from": "order-store",
+            "to": "route-planner"
+          },
+          {
+            "from": "map-service",
+            "to": "route-planner"
+          },
+          {
+            "from": "route-planner",
+            "to": "capacity-service"
+          },
+          {
+            "from": "capacity-service",
+            "to": "tender-service"
+          },
+          {
+            "from": "tender-service",
+            "to": "carrier-portal"
+          },
+          {
+            "from": "tender-service",
+            "to": "carrier-api"
+          },
+          {
+            "from": "carrier-portal",
+            "to": "dispatch-board"
+          },
+          {
+            "from": "carrier-api",
+            "to": "dispatch-board"
+          },
+          {
+            "from": "carrier-portal",
+            "to": "retry-queue"
+          },
+          {
+            "from": "carrier-api",
+            "to": "retry-queue"
+          },
+          {
+            "from": "retry-queue",
+            "to": "tender-service"
+          },
+          {
+            "from": "dispatch-board",
+            "to": "pickup-scheduler"
+          },
+          {
+            "from": "pickup-scheduler",
+            "to": "driver-app"
+          },
+          {
+            "from": "driver-app",
+            "to": "yard-gate"
+          },
+          {
+            "from": "yard-gate",
+            "to": "dock-scheduler"
+          },
+          {
+            "from": "dock-scheduler",
+            "to": "scan-ingest"
+          },
+          {
+            "from": "scan-ingest",
+            "to": "tracking-service"
+          },
+          {
+            "from": "gps-gateway",
+            "to": "tracking-service"
+          },
+          {
+            "from": "tracking-service",
+            "to": "status-store"
+          },
+          {
+            "from": "status-store",
+            "to": "eta-service"
+          },
+          {
+            "from": "eta-service",
+            "to": "exception-engine"
+          },
+          {
+            "from": "exception-engine",
+            "to": "ops-console"
+          },
+          {
+            "from": "exception-engine",
+            "to": "customer-updates"
+          },
+          {
+            "from": "customer-updates",
+            "to": "webhook-dispatch"
+          },
+          {
+            "from": "status-store",
+            "to": "billing-trigger"
+          },
+          {
+            "from": "driver-app",
+            "to": "proof-store"
+          },
+          {
+            "from": "proof-store",
+            "to": "billing-trigger"
+          },
+          {
+            "from": "order-store",
+            "to": "customs-service"
+          },
+          {
+            "from": "customs-broker",
+            "to": "customs-service"
+          },
+          {
+            "from": "customs-service",
+            "to": "document-store"
+          },
+          {
+            "from": "order-store",
+            "to": "document-store"
+          },
+          {
+            "from": "document-store",
+            "to": "warehouse-wms"
+          },
+          {
+            "from": "dispatch-board",
+            "to": "warehouse-wms"
+          },
+          {
+            "from": "warehouse-wms",
+            "to": "linehaul-hub"
+          },
+          {
+            "from": "linehaul-hub",
+            "to": "last-mile-hub"
+          },
+          {
+            "from": "last-mile-hub",
+            "to": "proof-store"
+          },
+          {
+            "from": "billing-trigger",
+            "to": "analytics-feed"
+          },
+          {
+            "from": "webhook-dispatch",
+            "to": "analytics-feed"
+          },
+          {
+            "from": "analytics-feed",
+            "to": "audit-archive"
+          },
+          {
+            "from": "legacy-tms",
+            "to": "audit-archive"
+          },
+          {
+            "from": "ops-console",
+            "to": "dispatch-board"
+          }
+        ]
+      },
+      "geometrySha256": "3d415892330a33e78267f1df40d9dbb39803f48df705bcebd76bb3b0d2a275ec"
+    },
+    {
+      "name": "fulfillment.spec.json",
+      "sourceSha256": "9cad24e7c05395bb80b5fc89f98d089fc56f6ed5b453e16771bc109fdea58985",
+      "input": {
+        "title": "04 · Order fulfillment · 16 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "buyer": {
+            "title": "Buyer",
+            "icon": "terminal"
+          },
+          "storefront": {
+            "title": "Storefront",
+            "icon": "db"
+          },
+          "gateway": {
+            "title": "Gateway",
+            "icon": "router"
+          },
+          "cart": {
+            "title": "Cart service",
+            "icon": "gear"
+          },
+          "checkout": {
+            "title": "Checkout",
+            "icon": "gear"
+          },
+          "payment": {
+            "title": "Payments",
+            "icon": "gear"
+          },
+          "risk": {
+            "title": "Risk check",
+            "icon": "shield"
+          },
+          "inventory": {
+            "title": "Inventory",
+            "icon": "gear"
+          },
+          "order": {
+            "title": "Legacy commerce",
+            "icon": "gear"
+          },
+          "events": {
+            "title": "Event bus",
+            "icon": "router"
+          },
+          "warehouse": {
+            "title": "Warehouse",
+            "icon": "package"
+          },
+          "carrier": {
+            "title": "Carrier",
+            "icon": "package"
+          },
+          "notify": {
+            "title": "Notifier",
+            "icon": "phone"
+          },
+          "mail": {
+            "title": "Email service",
+            "icon": "gear"
+          },
+          "analytics": {
+            "title": "Analytics",
+            "icon": "gear"
+          },
+          "ops": {
+            "title": "Ops dashboard",
+            "icon": "gear"
+          }
+        },
+        "rows": [
+          [
+            "buyer",
+            "storefront",
+            "gateway",
+            "cart",
+            "checkout",
+            "payment",
+            "risk",
+            "inventory",
+            "order",
+            "events",
+            "warehouse",
+            "carrier",
+            "notify",
+            "mail",
+            "analytics",
+            "ops"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "buyer",
+            "to": "storefront"
+          },
+          {
+            "from": "storefront",
+            "to": "gateway"
+          },
+          {
+            "from": "gateway",
+            "to": "cart"
+          },
+          {
+            "from": "cart",
+            "to": "checkout"
+          },
+          {
+            "from": "checkout",
+            "to": "payment"
+          },
+          {
+            "from": "checkout",
+            "to": "risk"
+          },
+          {
+            "from": "checkout",
+            "to": "inventory"
+          },
+          {
+            "from": "payment",
+            "to": "order"
+          },
+          {
+            "from": "risk",
+            "to": "order"
+          },
+          {
+            "from": "inventory",
+            "to": "order"
+          },
+          {
+            "from": "order",
+            "to": "events"
+          },
+          {
+            "from": "events",
+            "to": "warehouse"
+          },
+          {
+            "from": "warehouse",
+            "to": "carrier"
+          },
+          {
+            "from": "events",
+            "to": "notify"
+          },
+          {
+            "from": "notify",
+            "to": "mail"
+          },
+          {
+            "from": "events",
+            "to": "analytics"
+          },
+          {
+            "from": "analytics",
+            "to": "ops"
+          },
+          {
+            "from": "cart",
+            "to": "order",
+            "label": "lookup"
+          },
+          {
+            "from": "order",
+            "to": "inventory",
+            "label": "redo"
+          },
+          {
+            "from": "ops",
+            "to": "order",
+            "label": "manual patch"
+          }
+        ]
+      },
+      "geometrySha256": "fa493ce9146cb9cc4f77689b7c0ffde9ff76bf6fca433fae746d6aed9def359b"
+    },
+    {
+      "name": "incident-response.spec.json",
+      "sourceSha256": "83b7789d4807bad215c84668240cd1193a74c43dcdcecce1d6679aa60fec1070",
+      "input": {
+        "title": "01 · Incident response · 24 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "api-monitor": {
+            "title": "API monitor",
+            "icon": "antenna",
+            "tint": "dev"
+          },
+          "infra-monitor": {
+            "title": "Infra monitor",
+            "icon": "antenna",
+            "tint": "dev"
+          },
+          "customer-report": {
+            "title": "Customer report",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "alert-gateway": {
+            "title": "Alert gateway",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "support-portal": {
+            "title": "Support portal",
+            "icon": "terminal",
+            "tint": "mqtt"
+          },
+          "legacy-noc": {
+            "title": "Legacy NOC",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "dedupe": {
+            "title": "Deduplicator",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "correlator": {
+            "title": "Correlator",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "severity": {
+            "title": "Severity model",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "ownership": {
+            "title": "Ownership lookup",
+            "icon": "db",
+            "tint": "data"
+          },
+          "topology": {
+            "title": "Topology lookup",
+            "icon": "db",
+            "tint": "data"
+          },
+          "incident-store": {
+            "title": "Incident record",
+            "icon": "db",
+            "tint": "data"
+          },
+          "pager": {
+            "title": "Pager service",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "oncall": {
+            "title": "On-call engineer",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "incident-command": {
+            "title": "Incident command",
+            "icon": "terminal",
+            "tint": "auth"
+          },
+          "runbook": {
+            "title": "Runbook library",
+            "icon": "db",
+            "tint": "data"
+          },
+          "automation": {
+            "title": "Remediation runner",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "vendor": {
+            "title": "Vendor escalation",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "status-page": {
+            "title": "Status page",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "customer-comms": {
+            "title": "Customer comms",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "verification": {
+            "title": "Recovery checks",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "postmortem": {
+            "title": "Postmortem",
+            "icon": "terminal",
+            "tint": "auth"
+          },
+          "knowledge-base": {
+            "title": "Knowledge base",
+            "icon": "db",
+            "tint": "data"
+          },
+          "audit-archive": {
+            "title": "Audit archive",
+            "icon": "db",
+            "tint": "data"
+          }
+        },
+        "rows": [
+          [
+            "api-monitor",
+            "infra-monitor",
+            "customer-report",
+            "alert-gateway",
+            "support-portal",
+            "legacy-noc",
+            "dedupe",
+            "correlator",
+            "severity",
+            "ownership",
+            "topology",
+            "incident-store",
+            "pager",
+            "oncall",
+            "incident-command",
+            "runbook",
+            "automation",
+            "vendor",
+            "status-page",
+            "customer-comms",
+            "verification",
+            "postmortem",
+            "knowledge-base",
+            "audit-archive"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "api-monitor",
+            "to": "alert-gateway"
+          },
+          {
+            "from": "infra-monitor",
+            "to": "alert-gateway"
+          },
+          {
+            "from": "customer-report",
+            "to": "support-portal"
+          },
+          {
+            "from": "support-portal",
+            "to": "alert-gateway"
+          },
+          {
+            "from": "alert-gateway",
+            "to": "dedupe"
+          },
+          {
+            "from": "dedupe",
+            "to": "correlator"
+          },
+          {
+            "from": "correlator",
+            "to": "severity"
+          },
+          {
+            "from": "correlator",
+            "to": "ownership"
+          },
+          {
+            "from": "correlator",
+            "to": "topology"
+          },
+          {
+            "from": "severity",
+            "to": "incident-store"
+          },
+          {
+            "from": "ownership",
+            "to": "incident-store"
+          },
+          {
+            "from": "topology",
+            "to": "incident-store"
+          },
+          {
+            "from": "infra-monitor",
+            "to": "legacy-noc"
+          },
+          {
+            "from": "legacy-noc",
+            "to": "incident-store"
+          },
+          {
+            "from": "incident-store",
+            "to": "pager"
+          },
+          {
+            "from": "legacy-noc",
+            "to": "pager"
+          },
+          {
+            "from": "pager",
+            "to": "oncall"
+          },
+          {
+            "from": "oncall",
+            "to": "incident-command"
+          },
+          {
+            "from": "incident-command",
+            "to": "runbook"
+          },
+          {
+            "from": "incident-command",
+            "to": "automation"
+          },
+          {
+            "from": "incident-command",
+            "to": "vendor"
+          },
+          {
+            "from": "incident-command",
+            "to": "status-page"
+          },
+          {
+            "from": "automation",
+            "to": "runbook"
+          },
+          {
+            "from": "runbook",
+            "to": "verification"
+          },
+          {
+            "from": "automation",
+            "to": "verification"
+          },
+          {
+            "from": "vendor",
+            "to": "verification"
+          },
+          {
+            "from": "status-page",
+            "to": "customer-comms"
+          },
+          {
+            "from": "customer-comms",
+            "to": "verification"
+          },
+          {
+            "from": "verification",
+            "to": "incident-command"
+          },
+          {
+            "from": "verification",
+            "to": "postmortem"
+          },
+          {
+            "from": "postmortem",
+            "to": "knowledge-base"
+          },
+          {
+            "from": "knowledge-base",
+            "to": "audit-archive"
+          },
+          {
+            "from": "incident-command",
+            "to": "legacy-noc"
+          }
+        ]
+      },
+      "geometrySha256": "41522375a09ad60a1dd8dd6fcd2cd26c596800cd04a0864a631fabc0e3ca2472"
+    },
+    {
+      "name": "media-platform.spec.json",
+      "sourceSha256": "6fa7e682af44f1974f6e3afc3c96fc2b8475875cbb51ec5f79290914ed6a7a92",
+      "input": {
+        "title": "05 · Media platform · 20 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "camera": {
+            "title": "Camera",
+            "icon": "camera",
+            "tint": "dev"
+          },
+          "mobile": {
+            "title": "Mobile app",
+            "icon": "phone",
+            "tint": "dev"
+          },
+          "upload": {
+            "title": "Upload API",
+            "icon": "cloud",
+            "tint": "cmd"
+          },
+          "auth": {
+            "title": "Identity",
+            "icon": "shield",
+            "tint": "cmd"
+          },
+          "queue": {
+            "title": "Upload queue",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "metadata": {
+            "title": "Metadata DB",
+            "icon": "db",
+            "tint": "cmd"
+          },
+          "object": {
+            "title": "Object store",
+            "icon": "db",
+            "tint": "cmd"
+          },
+          "splitter": {
+            "title": "Job splitter",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "thumbnail": {
+            "title": "Thumbnail job",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "transcoder": {
+            "title": "Transcoder",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "captions": {
+            "title": "Caption job",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "thumbstore": {
+            "title": "Image store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "videostore": {
+            "title": "Video store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "textindex": {
+            "title": "Text index",
+            "icon": "db",
+            "tint": "data"
+          },
+          "publish": {
+            "title": "Legacy media core",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "cdn": {
+            "title": "CDN",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "search": {
+            "title": "Search API",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "notify": {
+            "title": "Notifications",
+            "icon": "phone",
+            "tint": "mqtt"
+          },
+          "analytics": {
+            "title": "Analytics",
+            "icon": "gear",
+            "tint": "mqtt"
+          },
+          "monitor": {
+            "title": "Monitoring",
+            "icon": "gear",
+            "tint": "mqtt"
+          }
+        },
+        "rows": [
+          [
+            "camera",
+            "mobile",
+            "upload",
+            "auth",
+            "queue",
+            "metadata",
+            "object",
+            "splitter",
+            "thumbnail",
+            "transcoder",
+            "captions",
+            "thumbstore",
+            "videostore",
+            "textindex",
+            "publish",
+            "cdn",
+            "search",
+            "notify",
+            "analytics",
+            "monitor"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "camera",
+            "to": "upload"
+          },
+          {
+            "from": "mobile",
+            "to": "upload"
+          },
+          {
+            "from": "upload",
+            "to": "auth"
+          },
+          {
+            "from": "auth",
+            "to": "queue"
+          },
+          {
+            "from": "upload",
+            "to": "metadata"
+          },
+          {
+            "from": "queue",
+            "to": "object"
+          },
+          {
+            "from": "object",
+            "to": "splitter"
+          },
+          {
+            "from": "splitter",
+            "to": "thumbnail"
+          },
+          {
+            "from": "splitter",
+            "to": "transcoder"
+          },
+          {
+            "from": "splitter",
+            "to": "captions"
+          },
+          {
+            "from": "thumbnail",
+            "to": "thumbstore"
+          },
+          {
+            "from": "transcoder",
+            "to": "videostore"
+          },
+          {
+            "from": "captions",
+            "to": "textindex"
+          },
+          {
+            "from": "thumbstore",
+            "to": "publish"
+          },
+          {
+            "from": "videostore",
+            "to": "publish"
+          },
+          {
+            "from": "textindex",
+            "to": "publish"
+          },
+          {
+            "from": "publish",
+            "to": "cdn"
+          },
+          {
+            "from": "publish",
+            "to": "search"
+          },
+          {
+            "from": "publish",
+            "to": "notify"
+          },
+          {
+            "from": "publish",
+            "to": "analytics"
+          },
+          {
+            "from": "publish",
+            "to": "monitor"
+          },
+          {
+            "from": "publish",
+            "to": "metadata",
+            "label": "catalog write"
+          },
+          {
+            "from": "transcoder",
+            "to": "object",
+            "label": "read"
+          },
+          {
+            "from": "monitor",
+            "to": "queue",
+            "label": "retry upload"
+          }
+        ]
+      },
+      "geometrySha256": "1aaad9804a75b1ca6d2c703ab562e936da6a5b16b7e927fdda1f0f1dbc36bf70"
+    },
+    {
+      "name": "regional-billing.spec.json",
+      "sourceSha256": "10fce3d557b02e036c666b53b64a09e6f14c1f7ed2f724566f3267e9c7e2f010",
+      "input": {
+        "title": "02 · Regional billing · 32 nodes · K3,3",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "customer-portal": {
+            "title": "Customer portal",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "batch-import": {
+            "title": "Batch import",
+            "icon": "package",
+            "tint": "dev"
+          },
+          "partner-api": {
+            "title": "Partner API",
+            "icon": "cloud",
+            "tint": "dev"
+          },
+          "us-ingress": {
+            "title": "US ingress",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "eu-ingress": {
+            "title": "EU ingress",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "apac-ingress": {
+            "title": "APAC ingress",
+            "icon": "router",
+            "tint": "mqtt"
+          },
+          "tax-engine": {
+            "title": "Tax engine",
+            "icon": "gear",
+            "tint": "auth"
+          },
+          "fx-engine": {
+            "title": "FX engine",
+            "icon": "gear",
+            "tint": "auth"
+          },
+          "fraud-engine": {
+            "title": "Fraud policy",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "legacy-billing": {
+            "title": "Legacy billing",
+            "icon": "server",
+            "tint": "auth"
+          },
+          "plan-catalog": {
+            "title": "Plan catalog",
+            "icon": "db",
+            "tint": "data"
+          },
+          "account-service": {
+            "title": "Account service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "usage-store": {
+            "title": "Usage store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "rating-service": {
+            "title": "Rating service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "discount-service": {
+            "title": "Discount service",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "invoice-builder": {
+            "title": "Invoice builder",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "invoice-store": {
+            "title": "Invoice store",
+            "icon": "db",
+            "tint": "data"
+          },
+          "payment-orchestrator": {
+            "title": "Payment orchestrator",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "card-gateway": {
+            "title": "Card gateway",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "bank-gateway": {
+            "title": "Bank gateway",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "retry-queue": {
+            "title": "Retry queue",
+            "icon": "package",
+            "tint": "mqtt"
+          },
+          "dunning": {
+            "title": "Dunning service",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "entitlement": {
+            "title": "Entitlements",
+            "icon": "shield",
+            "tint": "auth"
+          },
+          "revenue-ledger": {
+            "title": "Revenue ledger",
+            "icon": "db",
+            "tint": "data"
+          },
+          "tax-ledger": {
+            "title": "Tax ledger",
+            "icon": "db",
+            "tint": "data"
+          },
+          "audit-log": {
+            "title": "Audit log",
+            "icon": "db",
+            "tint": "data"
+          },
+          "statements": {
+            "title": "Statement service",
+            "icon": "server",
+            "tint": "cmd"
+          },
+          "email": {
+            "title": "Email delivery",
+            "icon": "cloud",
+            "tint": "mqtt"
+          },
+          "support-console": {
+            "title": "Support console",
+            "icon": "terminal",
+            "tint": "dev"
+          },
+          "reconciliation": {
+            "title": "Reconciliation",
+            "icon": "gear",
+            "tint": "cmd"
+          },
+          "warehouse-export": {
+            "title": "Warehouse export",
+            "icon": "package",
+            "tint": "data"
+          },
+          "finance-ops": {
+            "title": "Finance operations",
+            "icon": "terminal",
+            "tint": "dev"
+          }
+        },
+        "rows": [
+          [
+            "customer-portal",
+            "batch-import",
+            "partner-api",
+            "us-ingress",
+            "eu-ingress",
+            "apac-ingress",
+            "tax-engine",
+            "fx-engine",
+            "fraud-engine",
+            "legacy-billing",
+            "plan-catalog",
+            "account-service",
+            "usage-store",
+            "rating-service",
+            "discount-service",
+            "invoice-builder",
+            "invoice-store",
+            "payment-orchestrator",
+            "card-gateway",
+            "bank-gateway",
+            "retry-queue",
+            "dunning",
+            "entitlement",
+            "revenue-ledger",
+            "tax-ledger",
+            "audit-log",
+            "statements",
+            "email",
+            "support-console",
+            "reconciliation",
+            "warehouse-export",
+            "finance-ops"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "customer-portal",
+            "to": "us-ingress"
+          },
+          {
+            "from": "batch-import",
+            "to": "eu-ingress"
+          },
+          {
+            "from": "partner-api",
+            "to": "apac-ingress"
+          },
+          {
+            "from": "us-ingress",
+            "to": "tax-engine"
+          },
+          {
+            "from": "us-ingress",
+            "to": "fx-engine"
+          },
+          {
+            "from": "us-ingress",
+            "to": "fraud-engine"
+          },
+          {
+            "from": "eu-ingress",
+            "to": "tax-engine"
+          },
+          {
+            "from": "eu-ingress",
+            "to": "fx-engine"
+          },
+          {
+            "from": "eu-ingress",
+            "to": "fraud-engine"
+          },
+          {
+            "from": "apac-ingress",
+            "to": "tax-engine"
+          },
+          {
+            "from": "apac-ingress",
+            "to": "fx-engine"
+          },
+          {
+            "from": "apac-ingress",
+            "to": "fraud-engine"
+          },
+          {
+            "from": "customer-portal",
+            "to": "account-service"
+          },
+          {
+            "from": "plan-catalog",
+            "to": "rating-service"
+          },
+          {
+            "from": "usage-store",
+            "to": "rating-service"
+          },
+          {
+            "from": "rating-service",
+            "to": "discount-service"
+          },
+          {
+            "from": "discount-service",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "account-service",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "tax-engine",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "fx-engine",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "fraud-engine",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "batch-import",
+            "to": "legacy-billing"
+          },
+          {
+            "from": "legacy-billing",
+            "to": "invoice-builder"
+          },
+          {
+            "from": "legacy-billing",
+            "to": "invoice-store"
+          },
+          {
+            "from": "invoice-builder",
+            "to": "invoice-store"
+          },
+          {
+            "from": "invoice-store",
+            "to": "payment-orchestrator"
+          },
+          {
+            "from": "payment-orchestrator",
+            "to": "card-gateway"
+          },
+          {
+            "from": "payment-orchestrator",
+            "to": "bank-gateway"
+          },
+          {
+            "from": "card-gateway",
+            "to": "reconciliation"
+          },
+          {
+            "from": "bank-gateway",
+            "to": "reconciliation"
+          },
+          {
+            "from": "card-gateway",
+            "to": "retry-queue"
+          },
+          {
+            "from": "bank-gateway",
+            "to": "retry-queue"
+          },
+          {
+            "from": "retry-queue",
+            "to": "payment-orchestrator"
+          },
+          {
+            "from": "payment-orchestrator",
+            "to": "dunning"
+          },
+          {
+            "from": "dunning",
+            "to": "entitlement"
+          },
+          {
+            "from": "payment-orchestrator",
+            "to": "revenue-ledger"
+          },
+          {
+            "from": "tax-engine",
+            "to": "tax-ledger"
+          },
+          {
+            "from": "invoice-builder",
+            "to": "audit-log"
+          },
+          {
+            "from": "payment-orchestrator",
+            "to": "audit-log"
+          },
+          {
+            "from": "invoice-store",
+            "to": "statements"
+          },
+          {
+            "from": "statements",
+            "to": "email"
+          },
+          {
+            "from": "invoice-store",
+            "to": "support-console"
+          },
+          {
+            "from": "reconciliation",
+            "to": "warehouse-export"
+          },
+          {
+            "from": "revenue-ledger",
+            "to": "warehouse-export"
+          },
+          {
+            "from": "tax-ledger",
+            "to": "warehouse-export"
+          },
+          {
+            "from": "audit-log",
+            "to": "warehouse-export"
+          },
+          {
+            "from": "warehouse-export",
+            "to": "finance-ops"
+          },
+          {
+            "from": "reconciliation",
+            "to": "finance-ops"
+          }
+        ]
+      },
+      "geometrySha256": "76800abf8587470158dc07d1654153c006cb08427a0ebc06698d984bf82c27bd"
+    },
+    {
+      "name": "request-path.spec.json",
+      "sourceSha256": "b80bc7c139575d1e06ec821f81df9c97f3e5b49261f5af2370f843e4c38b85ad",
+      "input": {
+        "title": "01 · Webhook delivery · 6 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "sender": {
+            "title": "Sender",
+            "icon": "terminal"
+          },
+          "edge": {
+            "title": "Edge API",
+            "icon": "router"
+          },
+          "verify": {
+            "title": "Verifier",
+            "icon": "shield"
+          },
+          "queue": {
+            "title": "Delivery queue",
+            "icon": "package"
+          },
+          "worker": {
+            "title": "Worker",
+            "icon": "server"
+          },
+          "partner": {
+            "title": "Partner API",
+            "icon": "cloud"
+          }
+        },
+        "rows": [
+          [
+            "sender",
+            "edge",
+            "verify",
+            "queue",
+            "worker",
+            "partner"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "sender",
+            "to": "edge"
+          },
+          {
+            "from": "edge",
+            "to": "verify"
+          },
+          {
+            "from": "verify",
+            "to": "queue"
+          },
+          {
+            "from": "queue",
+            "to": "worker"
+          },
+          {
+            "from": "worker",
+            "to": "partner"
+          }
+        ]
+      },
+      "geometrySha256": "aed3ad3adc20b5838e18a2db4b439b993409eb0256f280a1ba65fea80cbdc74d"
+    },
+    {
+      "name": "research-compute-federation.spec.json",
+      "sourceSha256": "b8d4c8c2774c0bf177718d1bdce3c634970c193b3561d80eaa975ef1deebbd05",
+      "input": {
+        "title": "Research compute federation",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "compute-notebook": {
+            "title": "Notebook client",
+            "icon": "server"
+          },
+          "compute-cli": {
+            "title": "Command line client",
+            "icon": "server"
+          },
+          "compute-workflow": {
+            "title": "Workflow runner",
+            "icon": "server"
+          },
+          "compute-submission": {
+            "title": "Submission API",
+            "icon": "server"
+          },
+          "compute-identity": {
+            "title": "Identity service",
+            "icon": "server"
+          },
+          "compute-directory": {
+            "title": "Research directory",
+            "icon": "server"
+          },
+          "compute-quota": {
+            "title": "Quota checker",
+            "icon": "server"
+          },
+          "compute-planner": {
+            "title": "Job planner",
+            "icon": "server"
+          },
+          "compute-registry": {
+            "title": "Artifact registry",
+            "icon": "server"
+          },
+          "compute-staging": {
+            "title": "Input staging",
+            "icon": "server"
+          },
+          "compute-scheduler": {
+            "title": "Federation scheduler",
+            "icon": "server"
+          },
+          "compute-cpu": {
+            "title": "CPU cluster",
+            "icon": "server"
+          },
+          "compute-gpu": {
+            "title": "GPU cluster",
+            "icon": "server"
+          },
+          "compute-batch": {
+            "title": "Batch cluster",
+            "icon": "server"
+          },
+          "compute-results": {
+            "title": "Result index",
+            "icon": "server"
+          },
+          "compute-telemetry": {
+            "title": "Telemetry index",
+            "icon": "server"
+          },
+          "compute-costs": {
+            "title": "Cost index",
+            "icon": "server"
+          },
+          "compute-object": {
+            "title": "Output object store",
+            "icon": "server"
+          },
+          "compute-validator": {
+            "title": "Result validator",
+            "icon": "server"
+          },
+          "compute-quarantine": {
+            "title": "Quarantine store",
+            "icon": "server"
+          },
+          "compute-replay": {
+            "title": "Replay queue",
+            "icon": "server"
+          },
+          "compute-catalog": {
+            "title": "Dataset catalog",
+            "icon": "server"
+          },
+          "compute-download": {
+            "title": "Download API",
+            "icon": "server"
+          },
+          "compute-portal": {
+            "title": "Research portal",
+            "icon": "server"
+          },
+          "compute-archive": {
+            "title": "Cold archive",
+            "icon": "server"
+          },
+          "compute-dashboard": {
+            "title": "Operations dashboard",
+            "icon": "server"
+          },
+          "compute-alert": {
+            "title": "Alert dispatcher",
+            "icon": "server"
+          },
+          "compute-repair": {
+            "title": "Cluster repair",
+            "icon": "server"
+          },
+          "compute-budget": {
+            "title": "Budget reconciler",
+            "icon": "server"
+          },
+          "compute-allocation": {
+            "title": "Allocation ledger",
+            "icon": "server"
+          },
+          "compute-export": {
+            "title": "Sponsor export",
+            "icon": "server"
+          },
+          "compute-audit": {
+            "title": "Audit archive",
+            "icon": "server"
+          },
+          "compute-legacy": {
+            "title": "Legacy batch bridge",
+            "icon": "server"
+          },
+          "compute-instrument": {
+            "title": "Instrument gateway",
+            "icon": "server"
+          }
+        },
+        "rows": [
+          [
+            "compute-notebook",
+            "compute-cli",
+            "compute-workflow",
+            "compute-submission",
+            "compute-identity",
+            "compute-directory",
+            "compute-quota",
+            "compute-planner",
+            "compute-registry",
+            "compute-staging",
+            "compute-scheduler",
+            "compute-cpu",
+            "compute-gpu",
+            "compute-batch",
+            "compute-results",
+            "compute-telemetry",
+            "compute-costs",
+            "compute-object",
+            "compute-validator",
+            "compute-quarantine",
+            "compute-replay",
+            "compute-catalog",
+            "compute-download",
+            "compute-portal",
+            "compute-archive",
+            "compute-dashboard",
+            "compute-alert",
+            "compute-repair",
+            "compute-budget",
+            "compute-allocation",
+            "compute-export",
+            "compute-audit",
+            "compute-legacy",
+            "compute-instrument"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "compute-notebook",
+            "to": "compute-submission"
+          },
+          {
+            "from": "compute-cli",
+            "to": "compute-submission"
+          },
+          {
+            "from": "compute-workflow",
+            "to": "compute-submission"
+          },
+          {
+            "from": "compute-submission",
+            "to": "compute-identity"
+          },
+          {
+            "from": "compute-directory",
+            "to": "compute-identity"
+          },
+          {
+            "from": "compute-identity",
+            "to": "compute-quota"
+          },
+          {
+            "from": "compute-quota",
+            "to": "compute-planner"
+          },
+          {
+            "from": "compute-registry",
+            "to": "compute-planner"
+          },
+          {
+            "from": "compute-submission",
+            "to": "compute-staging"
+          },
+          {
+            "from": "compute-staging",
+            "to": "compute-scheduler"
+          },
+          {
+            "from": "compute-planner",
+            "to": "compute-scheduler"
+          },
+          {
+            "from": "compute-instrument",
+            "to": "compute-staging"
+          },
+          {
+            "from": "compute-instrument",
+            "to": "compute-legacy"
+          },
+          {
+            "from": "compute-legacy",
+            "to": "compute-batch"
+          },
+          {
+            "from": "compute-scheduler",
+            "to": "compute-cpu"
+          },
+          {
+            "from": "compute-scheduler",
+            "to": "compute-gpu"
+          },
+          {
+            "from": "compute-scheduler",
+            "to": "compute-batch"
+          },
+          {
+            "from": "compute-cpu",
+            "to": "compute-results"
+          },
+          {
+            "from": "compute-cpu",
+            "to": "compute-telemetry"
+          },
+          {
+            "from": "compute-cpu",
+            "to": "compute-costs"
+          },
+          {
+            "from": "compute-gpu",
+            "to": "compute-results"
+          },
+          {
+            "from": "compute-gpu",
+            "to": "compute-telemetry"
+          },
+          {
+            "from": "compute-gpu",
+            "to": "compute-costs"
+          },
+          {
+            "from": "compute-batch",
+            "to": "compute-results"
+          },
+          {
+            "from": "compute-batch",
+            "to": "compute-telemetry"
+          },
+          {
+            "from": "compute-batch",
+            "to": "compute-costs"
+          },
+          {
+            "from": "compute-results",
+            "to": "compute-object"
+          },
+          {
+            "from": "compute-object",
+            "to": "compute-validator"
+          },
+          {
+            "from": "compute-validator",
+            "to": "compute-quarantine"
+          },
+          {
+            "from": "compute-quarantine",
+            "to": "compute-replay"
+          },
+          {
+            "from": "compute-replay",
+            "to": "compute-scheduler"
+          },
+          {
+            "from": "compute-validator",
+            "to": "compute-catalog"
+          },
+          {
+            "from": "compute-catalog",
+            "to": "compute-download"
+          },
+          {
+            "from": "compute-download",
+            "to": "compute-portal"
+          },
+          {
+            "from": "compute-catalog",
+            "to": "compute-archive"
+          },
+          {
+            "from": "compute-telemetry",
+            "to": "compute-dashboard"
+          },
+          {
+            "from": "compute-dashboard",
+            "to": "compute-alert"
+          },
+          {
+            "from": "compute-alert",
+            "to": "compute-repair"
+          },
+          {
+            "from": "compute-repair",
+            "to": "compute-scheduler"
+          },
+          {
+            "from": "compute-costs",
+            "to": "compute-budget"
+          },
+          {
+            "from": "compute-budget",
+            "to": "compute-allocation"
+          },
+          {
+            "from": "compute-allocation",
+            "to": "compute-quota"
+          },
+          {
+            "from": "compute-budget",
+            "to": "compute-export"
+          },
+          {
+            "from": "compute-export",
+            "to": "compute-audit"
+          },
+          {
+            "from": "compute-archive",
+            "to": "compute-audit"
+          },
+          {
+            "from": "compute-legacy",
+            "to": "compute-results"
+          }
+        ]
+      },
+      "geometrySha256": "45cb12833b585d6aad19d4de99be9c88ca3081639e795ae899278b61a624002f"
+    },
+    {
+      "name": "signage-distribution.spec.json",
+      "sourceSha256": "2801430734b2ba470c2b1ba0446dd1ebca8307d593226e1554ffcfcf559bde24",
+      "input": {
+        "title": "Signage distribution",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "sign-editor": {
+            "title": "Content editor",
+            "icon": "server"
+          },
+          "sign-bulk": {
+            "title": "Bulk importer",
+            "icon": "server"
+          },
+          "sign-partner": {
+            "title": "Partner feed",
+            "icon": "server"
+          },
+          "sign-campaign": {
+            "title": "Campaign API",
+            "icon": "server"
+          },
+          "sign-legacy": {
+            "title": "Legacy scheduler",
+            "icon": "server"
+          },
+          "sign-assets": {
+            "title": "Asset store",
+            "icon": "server"
+          },
+          "sign-manifest": {
+            "title": "Manifest builder",
+            "icon": "server"
+          },
+          "sign-policy": {
+            "title": "Policy checker",
+            "icon": "server"
+          },
+          "sign-approval": {
+            "title": "Approval desk",
+            "icon": "server"
+          },
+          "sign-release": {
+            "title": "Release store",
+            "icon": "server"
+          },
+          "sign-rollout": {
+            "title": "Rollout controller",
+            "icon": "server"
+          },
+          "sign-broker": {
+            "title": "Edge broker",
+            "icon": "server"
+          },
+          "sign-relay": {
+            "title": "District relay",
+            "icon": "server"
+          },
+          "sign-display": {
+            "title": "Display agent",
+            "icon": "server"
+          },
+          "sign-cache": {
+            "title": "Local cache",
+            "icon": "server"
+          },
+          "sign-probe": {
+            "title": "Playback probe",
+            "icon": "server"
+          },
+          "sign-receipt": {
+            "title": "Receipt ingest",
+            "icon": "server"
+          },
+          "sign-health": {
+            "title": "Fleet health store",
+            "icon": "server"
+          },
+          "sign-retry": {
+            "title": "Retry queue",
+            "icon": "server"
+          },
+          "sign-repair": {
+            "title": "Repair worker",
+            "icon": "server"
+          },
+          "sign-console": {
+            "title": "Fleet console",
+            "icon": "server"
+          },
+          "sign-directory": {
+            "title": "Tenant directory",
+            "icon": "server"
+          },
+          "sign-billing": {
+            "title": "Usage export",
+            "icon": "server"
+          },
+          "sign-audit": {
+            "title": "Audit archive",
+            "icon": "server"
+          },
+          "sign-report": {
+            "title": "Report builder",
+            "icon": "server"
+          },
+          "sign-warehouse": {
+            "title": "Reporting warehouse",
+            "icon": "server"
+          }
+        },
+        "rows": [
+          [
+            "sign-editor",
+            "sign-bulk",
+            "sign-partner",
+            "sign-campaign",
+            "sign-legacy",
+            "sign-assets",
+            "sign-manifest",
+            "sign-policy",
+            "sign-approval",
+            "sign-release",
+            "sign-rollout",
+            "sign-broker",
+            "sign-relay",
+            "sign-display",
+            "sign-cache",
+            "sign-probe",
+            "sign-receipt",
+            "sign-health",
+            "sign-retry",
+            "sign-repair",
+            "sign-console",
+            "sign-directory",
+            "sign-billing",
+            "sign-audit",
+            "sign-report",
+            "sign-warehouse"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "sign-editor",
+            "to": "sign-campaign"
+          },
+          {
+            "from": "sign-bulk",
+            "to": "sign-campaign"
+          },
+          {
+            "from": "sign-partner",
+            "to": "sign-legacy"
+          },
+          {
+            "from": "sign-campaign",
+            "to": "sign-legacy"
+          },
+          {
+            "from": "sign-campaign",
+            "to": "sign-assets"
+          },
+          {
+            "from": "sign-assets",
+            "to": "sign-manifest"
+          },
+          {
+            "from": "sign-legacy",
+            "to": "sign-manifest"
+          },
+          {
+            "from": "sign-manifest",
+            "to": "sign-policy"
+          },
+          {
+            "from": "sign-directory",
+            "to": "sign-policy"
+          },
+          {
+            "from": "sign-policy",
+            "to": "sign-approval"
+          },
+          {
+            "from": "sign-approval",
+            "to": "sign-release"
+          },
+          {
+            "from": "sign-manifest",
+            "to": "sign-release"
+          },
+          {
+            "from": "sign-release",
+            "to": "sign-rollout"
+          },
+          {
+            "from": "sign-legacy",
+            "to": "sign-rollout"
+          },
+          {
+            "from": "sign-rollout",
+            "to": "sign-broker"
+          },
+          {
+            "from": "sign-broker",
+            "to": "sign-relay"
+          },
+          {
+            "from": "sign-relay",
+            "to": "sign-display"
+          },
+          {
+            "from": "sign-display",
+            "to": "sign-cache"
+          },
+          {
+            "from": "sign-cache",
+            "to": "sign-display"
+          },
+          {
+            "from": "sign-display",
+            "to": "sign-probe"
+          },
+          {
+            "from": "sign-probe",
+            "to": "sign-receipt"
+          },
+          {
+            "from": "sign-receipt",
+            "to": "sign-health"
+          },
+          {
+            "from": "sign-health",
+            "to": "sign-retry"
+          },
+          {
+            "from": "sign-retry",
+            "to": "sign-repair"
+          },
+          {
+            "from": "sign-repair",
+            "to": "sign-rollout"
+          },
+          {
+            "from": "sign-health",
+            "to": "sign-console"
+          },
+          {
+            "from": "sign-console",
+            "to": "sign-repair"
+          },
+          {
+            "from": "sign-receipt",
+            "to": "sign-report"
+          },
+          {
+            "from": "sign-report",
+            "to": "sign-warehouse"
+          },
+          {
+            "from": "sign-health",
+            "to": "sign-billing"
+          },
+          {
+            "from": "sign-billing",
+            "to": "sign-warehouse"
+          },
+          {
+            "from": "sign-release",
+            "to": "sign-audit"
+          },
+          {
+            "from": "sign-warehouse",
+            "to": "sign-audit"
+          }
+        ]
+      },
+      "geometrySha256": "8927e079cbf3a6157f73acbe2a16791062e7100068dde5046bfddb8e77d3cfa7"
+    },
+    {
+      "name": "subscription-matrix.spec.json",
+      "sourceSha256": "1f07abc004403d114d2db8efe9cedd174c09e17c1fe2bdf71c8040f1451604cd",
+      "input": {
+        "title": "06 · Subscription matrix · forced crossing",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "orders": {
+            "title": "Order events",
+            "icon": "gear"
+          },
+          "returns": {
+            "title": "Return events",
+            "icon": "gear"
+          },
+          "stock": {
+            "title": "Stock events",
+            "icon": "gear"
+          },
+          "audit": {
+            "title": "Audit sink",
+            "icon": "db"
+          },
+          "metrics": {
+            "title": "Metrics sink",
+            "icon": "db"
+          },
+          "risk": {
+            "title": "Risk sink",
+            "icon": "shield"
+          }
+        },
+        "rows": [
+          [
+            "orders",
+            "returns",
+            "stock",
+            "audit",
+            "metrics",
+            "risk"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "orders",
+            "to": "audit"
+          },
+          {
+            "from": "orders",
+            "to": "metrics"
+          },
+          {
+            "from": "orders",
+            "to": "risk"
+          },
+          {
+            "from": "returns",
+            "to": "audit"
+          },
+          {
+            "from": "returns",
+            "to": "metrics"
+          },
+          {
+            "from": "returns",
+            "to": "risk"
+          },
+          {
+            "from": "stock",
+            "to": "audit"
+          },
+          {
+            "from": "stock",
+            "to": "metrics"
+          },
+          {
+            "from": "stock",
+            "to": "risk"
+          }
+        ]
+      },
+      "geometrySha256": "c2d1029e533adf89a544a599071620406ee25ae2bddba2057d2d961645096728"
+    },
+    {
+      "name": "telemetry-fan.spec.json",
+      "sourceSha256": "1c6d3dabb98164176cb8e13ccbcb6d6e2d24469a73892a5deb69fb3d4c6fd877",
+      "input": {
+        "title": "03 · Telemetry pipeline · 13 nodes",
+        "view": "ambient",
+        "autoplay": false,
+        "nodes": {
+          "app": {
+            "title": "Web app",
+            "icon": "terminal"
+          },
+          "jobs": {
+            "title": "Job runner",
+            "icon": "server"
+          },
+          "edge": {
+            "title": "Edge gateway",
+            "icon": "router"
+          },
+          "collector": {
+            "title": "Collector",
+            "icon": "server"
+          },
+          "router": {
+            "title": "Legacy observability",
+            "icon": "router"
+          },
+          "metrics": {
+            "title": "Metrics job",
+            "icon": "server"
+          },
+          "logs": {
+            "title": "Logs job",
+            "icon": "server"
+          },
+          "traces": {
+            "title": "Traces job",
+            "icon": "server"
+          },
+          "metricdb": {
+            "title": "Metrics store",
+            "icon": "db"
+          },
+          "logdb": {
+            "title": "Logs store",
+            "icon": "db"
+          },
+          "tracedb": {
+            "title": "Trace store",
+            "icon": "db"
+          },
+          "dashboard": {
+            "title": "Dashboard",
+            "icon": "gear"
+          },
+          "alerts": {
+            "title": "Alert manager",
+            "icon": "gear"
+          }
+        },
+        "rows": [
+          [
+            "app",
+            "jobs",
+            "edge",
+            "collector",
+            "router",
+            "metrics",
+            "logs",
+            "traces",
+            "metricdb",
+            "logdb",
+            "tracedb",
+            "dashboard",
+            "alerts"
+          ]
+        ],
+        "edges": [
+          {
+            "from": "app",
+            "to": "collector"
+          },
+          {
+            "from": "jobs",
+            "to": "collector"
+          },
+          {
+            "from": "edge",
+            "to": "collector"
+          },
+          {
+            "from": "collector",
+            "to": "router"
+          },
+          {
+            "from": "router",
+            "to": "metrics"
+          },
+          {
+            "from": "router",
+            "to": "logs"
+          },
+          {
+            "from": "router",
+            "to": "traces"
+          },
+          {
+            "from": "metrics",
+            "to": "metricdb"
+          },
+          {
+            "from": "logs",
+            "to": "logdb"
+          },
+          {
+            "from": "traces",
+            "to": "tracedb"
+          },
+          {
+            "from": "metricdb",
+            "to": "dashboard"
+          },
+          {
+            "from": "logdb",
+            "to": "dashboard"
+          },
+          {
+            "from": "tracedb",
+            "to": "dashboard"
+          },
+          {
+            "from": "metricdb",
+            "to": "alerts"
+          },
+          {
+            "from": "app",
+            "to": "logs",
+            "label": "direct logs"
+          },
+          {
+            "from": "alerts",
+            "to": "router",
+            "label": "reconfigure"
+          },
+          {
+            "from": "router",
+            "to": "logdb",
+            "label": "legacy query"
+          }
+        ]
+      },
+      "geometrySha256": "4159161df3c427e32b995db86303ca9c919bbca3e369d272e99f27106f9f7c5f"
+    }
+  ]
+}

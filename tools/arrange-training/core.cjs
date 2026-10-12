@@ -115,7 +115,7 @@ function measure(engine, original) {
     axisWaste:m?1-axisEdges/m:0,elongation:Math.max(0,Math.abs(Math.log(aspect))-Math.log(3))};
   if(!Object.values(features).every(Number.isFinite))throw Error('Nonfinite features');
   const positions=ids.map(id=>({id,x:L.pos[id].cx,y:L.pos[id].cy}));
-  const engineScore=C.autoArrangeScore(d,{positions,edges:d.edges.map(e=>Object.fromEntries(ROUTE_KEYS.filter(k=>e[k]!==undefined).map(k=>[k,e[k]])))});
+  const engineScore=C.autoArrangeScore?C.autoArrangeScore(d,{positions,edges:d.edges.map(e=>Object.fromEntries(ROUTE_KEYS.filter(k=>e[k]!==undefined).map(k=>[k,e[k]])))}):{overlaps,hits,crossings:ordinaryCrossings,incidentCrossings,length:crowLength,area,width:occupied.w,height:occupied.h,aspect};
   return {features,safety:{overlaps,hits,ordinaryCrossings,incidentCrossings},crossingPairs:{ordinary:ordinaryPairs,incident:incidentPairs},
     diagnostics:{nodes:n,edges:m,minCardClearance,crowLength,renderedLength,area,width:occupied.w,height:occupied.h,aspect,axisEdges,
       manualRouteEdges:d.edges.filter(e=>ROUTE_KEYS.some(k=>e[k]!==undefined)).length},engineScore,positions};
@@ -149,7 +149,7 @@ function rank(model,row) {
 function engineRank(engine,row) {
   const a=row.A.engineScore,b=row.B.engineScore;
   const delta=engine.C.autoArrangeCompare?engine.C.autoArrangeCompare({score:a},{score:b}):a.crossings-b.crossings||a.length-b.length||a.area-b.area;
-  return {choice:delta<0?'A':delta>0?'B':'tie',comparisonDelta:delta,policy:engine.C.autoArrangeCompare?'autoArrangeCompare (default compact=false)':'crossings, engine length, area'};
+  return {choice:delta<0?'A':delta>0?'B':'tie',comparisonDelta:delta,policy:engine.C.autoArrangeCompare?'autoArrangeCompare (default compact=false)':'diagnostic only: crossings, center distance, area (no public engine comparator)'};
 }
 function leaveOneOut(rows) {
   if(rows.length<2)throw Error('Leave-one-out requires at least two pairs');
@@ -162,7 +162,7 @@ function preservesCrossings(candidate,base) {
 function contract(engine,diagram,model,{maxChecks=24}={}) {
   if(!Number.isInteger(maxChecks)||maxChecks<1||maxChecks>48)throw Error('maxChecks must be 1..48');
   const start=performance.now(),baseline=measure(engine,diagram);let best=clone(diagram),metrics=baseline,checks=0,accepted=0;
-  const clearanceFloor=Math.min(baseline.diagnostics.minCardClearance??Infinity,engine.C.AUTO_ARRANGE_CARD_GAP);
+  const clearanceFloor=Math.min(baseline.diagnostics.minCardClearance??Infinity,engine.C.AUTO_ARRANGE_CARD_GAP??54);
   if(!safe(baseline))return {diagram:best,baseline,metrics,checks,accepted,reason:'unsafe baseline; unchanged',runtimeMs:performance.now()-start};
   // Global affine contraction preserves every exact shared row/column, ordering,
   // and topology. Automatic natural curves are re-evaluated after each proposal.

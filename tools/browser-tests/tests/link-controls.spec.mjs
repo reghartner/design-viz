@@ -67,23 +67,20 @@ test('workbench unified navigation does not hide link controls at mobile width',
  await previewCopy.step.click();const previewLink=new URL(await copied(page));expect(previewLink.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(previewLink.hash).toContain('s=send');await page.locator('#close-page-preview').click();
 });
 
-test('canon reader exposes generated link controls instead of suppressing every copy chip',async({page,server})=>{
+test('canon reader keeps one position-aware share action across tabs and diagram state',async({page,server})=>{
  await captureClipboard(page);const published=spec();published.page.canon={version:1,id:'links',kind:'canonical',owner:'group:default/docs'};
  await page.context().route('**/diagrams.json',route=>route.fulfill({json:{version:1,diagrams:[{id:'links',title:'Link controls',spec:published}]}}));
  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Link controls/}).click();
- const root=page.locator('#canon-reader'),nav=root.locator('.explore-navigation'),copy=controls(root);
- for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
- await chooseNavigation(nav,'Tab','Reference');const referenceCopy=root.getByRole('button',{name:'Copy link to tab Reference',exact:true});await referenceCopy.click();let link=new URL(await copied(page));
- expect(link.search).toBe('?diagram=links');expect(link.hash).toContain('t=reference');
+ const root=page.locator('#canon-reader'),nav=root.locator('.explore-navigation'),copy=controls(root),share=nav.getByRole('button',{name:'Copy link to current position',exact:true});
+ await expect(nav.locator('.reader-utility-options').getByRole('button',{name:/^Copy link/})).toHaveCount(1);await expect(copy.step).toBeVisible();
+ await chooseNavigation(nav,'Tab','Reference');await share.click();let link=new URL(await copied(page));
+ expect(link.search).toBe('?diagram=links');expect(link.hash).toContain('t=reference');expect(link.hash).not.toContain('d=delivery');
+ await chooseNavigation(nav,'Tab','Story');await root.getByRole('button',{name:'Next step',exact:true}).click();await nav.getByRole('button',{name:'Page',exact:true}).click();await share.click();link=new URL(await copied(page));
+ expect(link.search).toBe('?diagram=links');for(const field of ['d=delivery','v=page','s=done'])expect(link.hash).toContain(field);
  const restoredPage=await page.context().newPage();await captureClipboard(restoredPage);await restoredPage.goto(link.href);
- const restoredRoot=restoredPage.locator('#canon-reader'),restoredNav=restoredRoot.locator('.explore-navigation'),restoredCopy=controls(restoredRoot);
- await expect(restoredRoot.getByRole('tab',{name:'Reference',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
- await chooseNavigation(restoredNav,'Tab','Story');await restoredRoot.getByRole('button',{name:'Next step',exact:true}).click();
- await restoredNav.getByRole('button',{name:'Page',exact:true}).click();await expect(restoredCopy.contract).toBeVisible();
- await restoredCopy.contract.click();link=new URL(await copied(restoredPage));expect(link.search).toBe('?diagram=links');
- for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(link.hash).toContain(field);
- await restoredPage.goto(link.href);await restoredPage.reload();await expect(restoredRoot.getByRole('tab',{name:'Story',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
- await expect(restoredNav.getByRole('button',{name:'Page',exact:true})).toHaveAttribute('aria-pressed','true');await expect(restoredRoot.locator('.stepline')).toContainText('Done');await expect(restoredCopy.contract).toBeVisible();
- await restoredCopy.contract.click();const restored=new URL(await copied(restoredPage));for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(restored.hash).toContain(field);
- await restoredCopy.chapter.click();const chapter=new URL(await copied(restoredPage));expect(chapter.search).toBe('?diagram=links');expect(chapter.hash).toContain('d=delivery');expect(chapter.hash).not.toContain('embed=');await restoredPage.close();
+ const restoredRoot=restoredPage.locator('#canon-reader'),restoredNav=restoredRoot.locator('.explore-navigation'),restoredCopy=controls(restoredRoot),restoredShare=restoredNav.getByRole('button',{name:'Copy link to current position',exact:true});
+  await expect(restoredRoot.getByRole('tab',{name:'Story',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
+  await expect(restoredNav.getByRole('button',{name:'Page',exact:true})).toHaveAttribute('aria-pressed','true');await expect(restoredRoot.locator('.stepline')).toContainText('Done');await expect(restoredCopy.contract).toBeVisible();
+ await restoredShare.click();const restored=new URL(await copied(restoredPage));for(const field of ['d=delivery','v=page','s=done'])expect(restored.hash).toContain(field);
+ await restoredCopy.contract.click();const contextual=new URL(await copied(restoredPage));expect(contextual.search).toBe('?diagram=links');for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(contextual.hash).toContain(field);await restoredPage.close();
 });

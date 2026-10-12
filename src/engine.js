@@ -2189,7 +2189,7 @@ function createExploreNavigation(ctl,options){
     /* The chapter heading sits behind the full-window Explore surface. Keep
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
-    move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
+    if(!options.singleShareAction)move(rec && rec.sectionEl.querySelector('.sec-heading-row .embedcopy'),actions);
     move(host && host.querySelector('.handoff-back'),actions);
     move(host && host.querySelector('.section-view-settings'),actions);
     move(host && host.querySelector('.viewport-actions'),actions);
@@ -3749,7 +3749,7 @@ function wireDeepLinks(ctl, win, preservedHash, options){
   var previousScrollRestoration=null;
   if(manageHistory && hasInitialTarget && win.history && 'scrollRestoration' in win.history){previousScrollRestoration=win.history.scrollRestoration;win.history.scrollRestoration='manual';}
   if(win.location.hash && (manageHistory || options.restoreHash!==false && hasInitialTarget))apply();else write();
-  return {receiveLinkBaseMessage:receiveLinkBaseMessage,destroy:function(){
+  return {receiveLinkBaseMessage:receiveLinkBaseMessage,currentURL:function(){return fullURL(currentHash());},destroy:function(){
     if(previousScrollRestoration!==null && win.history.scrollRestoration==='manual')win.history.scrollRestoration=previousScrollRestoration;
     if(manageHistory)win.removeEventListener('hashchange',apply);
     if(ctl.onChange===linkedChange)ctl.onChange=priorChange;

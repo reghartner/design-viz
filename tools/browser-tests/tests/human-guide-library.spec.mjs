@@ -263,8 +263,9 @@ test('published diagram links open directly in fresh tabs, preserve drafts, and 
   await fresh.reload();await expect(fresh.locator('#canon-reader-edit')).toBeEnabled();
   await fresh.close();
   await card.click();await expect(page).toHaveURL(url);
-  await page.getByRole('button',{name:'Copy link',exact:true}).click();
-  await expect.poll(()=>page.evaluate(()=>window.copiedLink)).toBe(url);
+  await page.getByRole('button',{name:'Copy link to current position',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=>window.copiedLink)).not.toBeUndefined();const copied=new URL(await page.evaluate(()=>window.copiedLink));
+  expect(copied.origin+copied.pathname+copied.search).toBe(url);expect(copied.hash).toContain('d=delivery');expect(copied.hash).toContain('v=flow');
   await page.goBack();await expect(screen(page,'library')).toBeVisible();expect(new URL(page.url()).searchParams.has('diagram')).toBe(false);
   await page.goForward();await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');
   await page.locator('#canon-reader-edit').click();expect(new URL(page.url()).searchParams.has('diagram')).toBe(false);
@@ -283,8 +284,11 @@ test('direct readers report missing documents and snapshots, retry, and offer a 
   });
   await page.goto(server.origin+'/workbench.html?diagram=delivery&canon=old&review=secret');
   await expect(page.locator('#canon-reader-title')).toHaveText('Reviewed delivery');expect(backendCalls).toBe(0);
-  await page.getByRole('button',{name:'Copy link',exact:true}).click();
-  await expect(page.getByRole('textbox',{name:'Copy this link manually'})).toHaveValue(server.origin+'/workbench.html?diagram=delivery');
+  await page.setViewportSize({width:390,height:800});const utilities=page.locator('#canon-reader .reader-utilities');await utilities.locator('summary').click();
+  await page.getByRole('button',{name:'Copy link to current position',exact:true}).click();
+  const fallback=page.getByRole('textbox',{name:'Copy this link manually'});await expect(fallback).toHaveValue(/\?diagram=delivery#.*d=delivery/);const fallbackURL=new URL(await fallback.inputValue());
+  expect(fallbackURL.origin+fallbackURL.pathname+fallbackURL.search).toBe(server.origin+'/workbench.html?diagram=delivery');expect(fallbackURL.hash).toContain('d=delivery');
+  await expect(fallback).toBeVisible();expect(await fallback.evaluate(el=>{const r=el.getBoundingClientRect(),u=el.parentElement.getBoundingClientRect();el.focus();el.select();return {contained:r.left>=u.left && r.right<=u.right && r.top>=u.top && r.bottom<=u.bottom && r.left>=0 && r.right<=innerWidth,selected:el.selectionStart===0 && el.selectionEnd===el.value.length};})).toEqual({contained:true,selected:true});
   await page.goto(server.origin+'/workbench.html?diagram=missing');
   await expect(page.locator('#canon-reader-error')).toContainText('no longer in the published library');
   await expect(page.locator('#canon-reader-edit')).toBeDisabled();await expect(page.locator('#canon-reader-copy')).toBeDisabled();

@@ -345,8 +345,8 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  body .docview.has-document-navigation>.explore-navigation.navigation-narrow .viewport-expand::before{content:'⛶';font:20px/20px 'IBM Plex Sans',sans-serif;}
 }
 
-/* Host actions may need a second line without covering the Tab/View pickers. */
-.explore-navigation-actions>.welcome-button{min-height:34px;padding:6px 10px;white-space:nowrap;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
+/* Host actions stay compact when the reader moves them into its utility menu. */
+.explore-navigation-actions .welcome-button{flex:none;min-height:34px;padding:6px 10px;white-space:nowrap;font:500 12px/20px 'IBM Plex Sans',sans-serif;}
 
 /* Contents is a reader shell. Workbench retains its shared navigation lanes. */
 @media screen{
@@ -356,13 +356,13 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  .has-reader-contents>.doc-sub{max-width:100%;box-sizing:border-box;overflow-wrap:anywhere;}
  body .docview.has-reader-contents>.reader-navigation{display:block;padding:0;gap:0;font:13px/1.45 'IBM Plex Sans',sans-serif;color:var(--dtext);}
  .reader-navigation>.explore-navigation-group{display:none!important;}
- .reader-top{min-height:56px;display:grid;grid-template-columns:34px minmax(60px,120px) minmax(0,1fr) 316px;align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
+ .reader-top{min-height:56px;display:grid;grid-template-columns:34px minmax(60px,120px) minmax(0,1fr) minmax(316px,max-content);align-items:center;gap:10px;padding:8px 14px;background:var(--reader-top,var(--explore-bg));border-bottom:1px solid var(--explore-border);box-sizing:border-box;}
  .reader-breadcrumb{min-width:0;}
  .reader-tab-label{display:block;color:var(--dfaint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
  .reader-view-strip{display:flex;flex-wrap:wrap;gap:4px;min-width:0;align-items:center;}
  body .reader-navigation .reader-view-strip .reader-top-view{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-color:var(--explore-border);font-size:12px;font-weight:500;padding:5px 9px;}
  body .reader-navigation .reader-view-strip .reader-top-view[aria-selected=true]{color:var(--navigation-accent);background:var(--reader-selected,color-mix(in srgb,var(--navigation-accent) 12%,var(--explore-bg)));border-color:var(--navigation-accent);}
- .reader-top>.explore-navigation-actions{width:316px;justify-content:flex-end;}
+ .reader-top>.explore-navigation-actions{width:auto;justify-content:flex-end;}
  .reader-wrapped .reader-top{grid-template-columns:34px minmax(0,1fr) auto;row-gap:6px;}
  .reader-wrapped .reader-view-strip{grid-column:1/-1;grid-row:2;}
  .reader-wrapped .reader-top>.explore-navigation-actions{grid-column:3;grid-row:1;width:auto;}

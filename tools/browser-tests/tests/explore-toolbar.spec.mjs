@@ -1,3 +1,4 @@
+import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 import {writeFile,readFile} from 'node:fs/promises';
@@ -53,9 +54,9 @@ for(const host of ['standalone','embed','native inline','native canvas'])test(ho
   await row.getByRole('button',{name:'Auto',exact:true}).focus();
   await info.attach(host+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
- await root.getByRole('button',{name:'Overview',exact:true}).click();
+ await chooseNavigation(root.locator('.explore-navigation'),'View','Overview');
  if(host!=='native canvas')await expect(row).toBeHidden();
- await root.getByRole('button',{name:'Engineering',exact:true}).click();await expect(row).toBeVisible();await expect(row.locator('.explore-overlay-value')).toHaveText('100%');
+ await chooseNavigation(root.locator('.explore-navigation'),'View','Engineering');await expect(row).toBeVisible();await expect(row.locator('.explore-overlay-value')).toHaveText('100%');
 });
 
 test('Page preview uses the reader row while Workbench retains one owned set of controls',async({page,server})=>{

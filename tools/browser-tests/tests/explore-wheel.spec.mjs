@@ -71,9 +71,9 @@ test('editor wheel zoom stays temporary until an explicit camera save, and stale
   expect(camera.zoom).toBeCloseTo(Math.exp(.36),4);expect(await width(board)).toBeCloseTo(initial*Math.exp(.36),0);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);await expect(page.locator('#redo-builder')).toBeDisabled();
-  await dispatch(board,-30);await page.locator('#section-story').getByRole('button',{name:'Standard',exact:true}).click();
+  await dispatch(board,-30);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Standard',exact:true}).click();
   await page.clock.fastForward(400);await expect(page.locator('#src')).toHaveValue(saved);
-  await page.locator('#section-story').getByRole('button',{name:'Explore',exact:true}).click();await prepareEditorSurface(page);
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Explore',exact:true}).click();await prepareEditorSurface(page);
   const invalid=saved+'\n{ unfinished';await page.locator('#src').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},invalid);
   const staleWidth=await width(board);expect(await dispatch(board,-30)).toBe(true);await page.clock.fastForward(400);
   expect(await width(board)).toBeCloseTo(staleWidth*Math.exp(.18),0);await expect(page.locator('#src')).toHaveValue(invalid);await chapterOptions(page);await page.getByRole('button',{name:'Use current camera as opening view',exact:true}).click();await expect(page.locator('#src')).toHaveValue(invalid);

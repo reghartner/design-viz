@@ -20,9 +20,10 @@ async function surface(page,section,explore){
   await expect(section.locator('.explore-stage'))[explore?'toBeVisible':'toBeHidden']();
   if(explore){
     await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
-    const shell=await section.locator('.viewer-diagram-canvas').boundingBox(),nav=await section.locator('.explore-navigation').boundingBox();
+    const shell=await section.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('#docview > .explore-navigation').boundingBox();
     const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox(),viewport=page.viewportSize();
-    expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+    expect(nav.y).toBe(0);expect(nav.x).toBe(0);expect(nav.width).toBe(viewport.width);
+    expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
     expect(board).toEqual(stage);
   }else{
     await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);

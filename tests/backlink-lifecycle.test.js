@@ -30,9 +30,10 @@ function harness() {
       remove() { if (node.parentNode) node.parentNode.children = node.parentNode.children.filter(child => child !== node); node.parentNode = null; },
       replaceChildren() { for (const child of [...node.children]) child.remove(); },
       contains(target) { return target === node || node.children.some(child => child.contains(target)); },
+      matches(selector) { return selector[0] === '.' ? classes.has(selector.slice(1)) || node.className.split(' ').includes(selector.slice(1)) : node.tag === selector; },
+      closest(selector) { for (let candidate = node; candidate; candidate = candidate.parentNode) if (candidate.matches(selector)) return candidate; return null; },
       querySelectorAll(selector) {
-        const matches = candidate => selector[0] === '.' ? candidate.className.split(' ').includes(selector.slice(1)) : candidate.tag === selector;
-        return node.children.flatMap(child => [...(matches(child) ? [child] : []), ...child.querySelectorAll(selector)]);
+        return node.children.flatMap(child => [...(child.matches(selector) ? [child] : []), ...child.querySelectorAll(selector)]);
       },
       querySelector(selector) { return node.querySelectorAll(selector)[0] || null; },
       focus() { node.focusCount++; document.activeElement = node; node.emit('focus'); },

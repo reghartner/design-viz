@@ -1,3 +1,4 @@
+import {chooseNavigation} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -56,8 +57,7 @@ async function verifyResize(root){
   await section.evaluate(el=>{el.style.width='';el.style.boxSizing='';});
 }
 async function verifyControls(root){
-  await root.getByRole('button',{name:'Second chapter',exact:true}).click();
-  await expect(root.getByRole('button',{name:'Second chapter',exact:true})).toHaveAttribute('aria-pressed','true');
+  await chooseNavigation(root.locator('.explore-navigation'),'View','Second chapter');
   await root.getByRole('button',{name:'Next step',exact:true}).click();
   await expect(root.locator('.stepline')).toContainText('Recording ready');
 }

@@ -167,6 +167,22 @@ test('Canon edit and browser Back preserve the selected chapter, path and step w
   await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
+test('Canon edit and browser Back retain the canonical owner View and its selected member',async({page,server})=>{
+  const spec=JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
+  spec.page.canon={version:1,id:'delivery',kind:'canonical',owner:'group:default/home'};
+  const data={version:1,diagrams:[{id:'delivery',title:'Reviewed delivery',spec}]};await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Reviewed delivery/}).click();
+  const reader=page.locator('#canon-reader'),navigation=reader.locator(':scope>.explore-navigation');
+  await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await navigation.getByRole('button',{name:'Section C',exact:true}).click();
+  await expect(reader.locator('#section-c')).toBeVisible();await expect(reader.locator('#section-b')).toBeHidden();
+  expect(await page.evaluate(()=>history.state.flowviewWorkbenchEntry.readerTarget)).toMatchObject({d:'c',v:'explore-bc'});
+  await page.locator('#canon-reader-edit').click();
+  await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('#docview #section-c')).toBeVisible();expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(spec);await expect(page.locator('#undo-builder')).toBeDisabled();
+  await page.goBack();await expect(navigation.getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#section-c')).toBeVisible();await expect(reader.locator('#section-b')).toBeHidden();
+  await page.reload();await expect(navigation.getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(reader.locator('#section-c')).toBeVisible();
+});
+
 test('Canon edit and browser Back preserve Ambient mode while stale modes use the authored default',async({page,server})=>{
   const data=library();await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
   await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();

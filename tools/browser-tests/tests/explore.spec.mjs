@@ -39,7 +39,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  const before=await page.locator('.boardcanvas>svg').count();
  const shell=await rect(page.locator('.viewer-diagram-canvas')),nav=await rect(page.locator('.explore-navigation'));
  const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board')),viewport=page.viewportSize();
- expect(shell).toEqual({x:0,y:0,width:viewport.width,height:viewport.height});
+ expect(nav.y).toBe(0);expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(stage.x).toBeGreaterThanOrEqual(shell.x);expect(stage.x+stage.width).toBeLessThanOrEqual(shell.x+shell.width);
  expect(board).toEqual(stage);
@@ -54,8 +54,9 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  const after=await rect(play);expect(after.x).toBeCloseTo(pos.x,0);expect(after.y).toBeCloseTo(pos.y,0);
  await play.click();await expect(floats(page)).toHaveCount(4);const long=await rect(play);expect(long.x).toBeCloseTo(pos.x,0);expect(long.y).toBeLessThanOrEqual(pos.y);
  // The automatic dock now grows upward to fit a longer caption while staying
- // anchored to the bottom; graph pan and zoom still leave it stationary.
- const player=await rect(page.locator('.explore-player'));expect(player.y+player.height).toBeCloseTo(stage.y+stage.height-12,0);
+ // anchored above the reader utilities; graph pan and zoom still leave it stationary.
+ const player=await rect(page.locator('.explore-player')),utilities=await rect(page.locator('#docview > .reader-page-actions'));
+ expect(player.y+player.height).toBeCloseTo(utilities.y-12,0);expect(overlaps(player,utilities)).toBe(false);
  expect(await page.locator('.explore-player .stepline').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
@@ -153,7 +154,8 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
  const stage=await rect(page.locator('.explore-stage')),oversized=page.locator('[data-explore-panel=outcome]'),following=page.locator('[data-explore-panel=clip]');
  const beforeOversized=await rect(oversized),beforeFollowing=await rect(following);
  const tools=surface==='workbench'?await rect(page.locator('#workspace-canvas-controls')):null;
- const insetBottom=tools?Math.max(68,stage.y+stage.height-tools.y+12):12,laneHeight=stage.height-12-insetBottom;
+ const utilities=surface==='reader'?await rect(page.locator('#docview > .reader-page-actions')):null;
+ const insetBottom=tools?Math.max(68,stage.y+stage.height-tools.y+12):stage.y+stage.height-utilities.y+12,laneHeight=stage.height-12-insetBottom;
  if(surface==='workbench')expect(beforeOversized.height).toBeGreaterThan(laneHeight);
  else expect(beforeOversized.height).toBeCloseTo(laneHeight,0);
  await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await page.keyboard.press('Escape');
@@ -162,7 +164,7 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
  expect(afterFollowing.width).toBeCloseTo(beforeFollowing.width,0);expect(afterFollowing.height).toBeCloseTo(beforeFollowing.height,0);
  expect(afterOversized.y).toBeCloseTo(stage.y+12,0);expect(afterFollowing.y).toBeCloseTo(stage.y+12,0);
  if(surface==='workbench')expect(afterOversized.y+afterOversized.height).toBeGreaterThan(stage.y+stage.height-insetBottom);
- else expect(afterOversized.y+afterOversized.height).toBeCloseTo(stage.y+stage.height-12,0);
+ else{expect(afterOversized.y+afterOversized.height).toBeCloseTo(utilities.y-12,0);expect(overlaps(afterOversized,utilities)).toBe(false);}
  expect(afterFollowing.x+afterFollowing.width).toBeCloseTo(afterOversized.x-8,0);
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
@@ -185,6 +187,7 @@ test('fullscreen is explicit and refusal keeps an exit-able in-page view',async(
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  expect(await page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(true);
+ await expect(page.locator('.explore-navigation')).toBeVisible();expect(await page.locator('.explore-navigation').evaluate(el=>document.fullscreenElement.contains(el))).toBe(true);
  await page.getByRole('button',{name:'Exit expanded diagram view',exact:true}).click();await expect.poll(()=>page.evaluate(()=>!!document.fullscreenElement)).toBe(false);
  await page.evaluate(()=>{Element.prototype.requestFullscreen=()=>Promise.reject(new Error('Host policy'));});
  await page.getByRole('button',{name:'Expand diagram view',exact:true}).click();await expect(page.locator('.viewport-status')).toContainText('unavailable');

@@ -64,11 +64,11 @@ test('pristine layouts respond to stage width while reset and first geometry sav
   await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));await panelsOptions(page);
   readout=page.locator('#docview .explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
   const source=page.locator('#src'),original=await source.inputValue(),before=await size(panel(page));
-  await panel(page).locator('.explore-window-grip').press('ArrowLeft');await expect(readout).toHaveText('80%');expect(await size(panel(page))).toEqual(before);
+  await panel(page).locator('.explore-window-grip').press('ArrowLeft');await panelsOptions(page);await expect(readout).toHaveText('80%');expect(await size(panel(page))).toEqual(before);
   const saved=JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[1].exploreLayout;expect(saved.overlayScale).toBe(.8);expect(saved.panels).toHaveLength(1);
   await page.locator('#undo-builder').click();await expect(source).toHaveValue(original);await panelsOptions(page);await expect(readout).toHaveText('80%');
   await page.locator('#redo-builder').click();await panelsOptions(page);await expect(readout).toHaveText('80%');
-  await panelsOptions(page);await readout.click();await expect(readout).toHaveText('100%');
+  await panelsOptions(page);await readout.click();await panelsOptions(page);await expect(readout).toHaveText('100%');
   expect(JSON.parse(await source.inputValue()).page.sections[0].diagram.layouts[1].exploreLayout.overlayScale).toBe(1);
   await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');
 });

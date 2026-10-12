@@ -18,6 +18,7 @@ var FlowviewCompatibility = (function(){
   // Capabilities added after the baseline, with their first release.
   var released={
     'content.deviceapp-badges':['Optional and custom Device app tile badges','0.2.0'],
+    'document.tab-views':['Tab-owned Views and section membership','0.2.0'],
     'layout.grid-24':['24-column Standard panel layouts','0.2.0'],
     'layout.graph-frame':['Saved graph content framing','0.2.0'],
     'layout.explore-prose-placement':['Independent placement of Explore Section notes','0.2.0'],
@@ -160,7 +161,9 @@ var FlowviewCompatibility = (function(){
       if((prose || Array.isArray(s.bullets) && s.bullets.length) && s.diagram && Array.isArray(s.diagram.layouts) &&
         s.diagram.layouts.some(function(v){return v && v.presentation==='explore';}))used['layout.explore-prose']=true;
     }
+    function views(owner){if(!object(owner) || !Array.isArray(owner.views))return;used['document.tab-views']=true;if(owner.views.some(function(view){return view && view.presentation==='explore';}))used['layout.explore']=true;}
     if(!object(page))return [];
+    views(page);
     if(page.nodes && page.rows)diagram(page);
     var blocks=page.blocks || page.sections;
     (Array.isArray(blocks)?blocks:[]).forEach(function(b){
@@ -168,6 +171,7 @@ var FlowviewCompatibility = (function(){
       if(b.id!=null || b.detailOnly)used['flow.drilldown']=true;
       diagram(b.diagram);contracts(b);
       (Array.isArray(b.tabs)?b.tabs:[]).forEach(function(t){
+        views(t);
         (t && Array.isArray(t.sections)?t.sections:[]).forEach(function(s){if(s && (s.id!=null || s.detailOnly))used['flow.drilldown']=true;diagram(s && s.diagram);contracts(s);});
       });
     });

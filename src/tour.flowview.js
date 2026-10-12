@@ -93,6 +93,10 @@ function wireTour(ctl, view, win, config, options){
     for (var i = 0; i < paths.length; i++) if (paths[i].id === token) return token;
     return null;
   }
+  function sectionNavigation(sec){
+    var nav=view.querySelector(':scope > .explore-navigation');
+    return sec && nav && nav.getAttribute('data-navigation-section')===String(sec.number)?nav:null;
+  }
   function queryTarget(step, sec, target){
     /* within:"section" is strict — a selector never leaks into other
        sections or hidden tabs (majors: a page-wide fallback here matched
@@ -101,7 +105,12 @@ function wireTour(ctl, view, win, config, options){
                (sec && sec.sectionEl ? sec.sectionEl : null);
     if (!root || !target || typeof target.selector !== 'string') return null;
     try { var matches=Array.prototype.slice.call(root.querySelectorAll(target.selector));
-      var found=matches.find(isRendered) || matches[0] || null;
+      var found=matches.find(isRendered) || null;
+      // Section controls retain their owner when moved into document navigation.
+      // Do not search another section's actions or another viewer's navigation.
+      var nav=target.within!=='page' && sectionNavigation(sec);
+      if(!found && nav)found=Array.prototype.slice.call(nav.querySelectorAll(target.selector)).find(function(node){return node.closest('.explore-navigation-actions,.explore-navigation-chapters') && isRendered(node);}) || null;
+      found=found || matches[0] || null;
       var modal=options.overlayHost && options.overlayHost();
       // Trying a highlighted control can open a native modal. Keep that new
       // surface usable, including its focusable controls, until the next lesson.
@@ -122,18 +131,30 @@ function wireTour(ctl, view, win, config, options){
         break;
       }
   }
+  function availableViews(sec){
+    var owner=ctl.views && ctl.views.owner(sec);
+    if(owner)return owner.views.filter(function(v){return v.members.some(function(m){return m.record.runtime===sec;});});
+    return sec.presentation && sec.presentation.views ? sec.presentation.views() : [];
+  }
+  function ownerSnapshot(){
+    return ctl.views?ctl.views.owners.filter(function(owner){return owner.current && owner.selected;}).map(function(owner){return {view:owner.current.id,section:owner.selected};}):[];
+  }
+  function restoreOwners(saved){
+    saved.forEach(function(item){if(item.section)ctl.views.select(item.section,item.view,item.section);});
+  }
   function applyDiagramState(sec, ds){
     if (!sec || !ds) return true;
     var pres=sec.presentation, requested=ds.view;
     if(requested == null && ds.presentation != null){
-      var choices=pres && pres.views ? pres.views() : [];
+      var choices=availableViews(sec);
       var match=choices.find(function(v){return v.presentation===ds.presentation;});
       if(match)requested=match.id;
       else if(ds.presentation!=='standard' || choices.length)return false;
     }
     /* Same order as the deep-link apply: view installs its visible-stop
        filter before the path, the path before the step. */
-    if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
+    if(ctl.views){if(!ctl.views.ensure(sec,requested,false))return false;}
+    else if(requested != null && (!pres || !pres.setView || !pres.setView(requested)))return false;
     if(ds.diagramVisible === true){
       var board=sec.sectionEl.querySelector('.board');
       for(var parent=board;parent && parent!==sec.sectionEl;parent=parent.parentElement){
@@ -194,6 +215,7 @@ function wireTour(ctl, view, win, config, options){
     var drill = ctl.details ? ctl.details.snapshot() : null;
     snapshot = {
       drill: drill,
+      owners: ownerSnapshot(),
       activeTarget: ctl.activeTarget ? JSON.parse(JSON.stringify(ctl.activeTarget)) : null,
       scrollX: win.scrollX || 0, scrollY: win.scrollY || 0,
       tabs: ctl.tabBlocks.map(function(tb){ return {index: tb.index, tab: tb.active()}; }),
@@ -218,6 +240,7 @@ function wireTour(ctl, view, win, config, options){
       if(!sec)return;
       restoreSection(sec,saved,true);
     });
+    restoreOwners(savedPage.owners || []);
     var restoration;
     if(ctl.details){
       if(ctl.details.snapshot())ctl.details.close(true);
@@ -698,6 +721,13 @@ function wireTour(ctl, view, win, config, options){
     var hole = tourCutoutRect(rect, step.offset, 8, viewport());
     hole.r = 12; hole.kind = 'primary';
     var holes = [hole];
+    // A workspace lesson includes its moved panel/expansion controls. Keep the
+    // actual controls clickable without exposing unrelated tabs or Views.
+    var nav=sectionNavigation(sec),actions=nav && nav.querySelector('.viewport-actions');
+    if(target.classList.contains('section-viewport') && isRendered(actions)){
+      var actionHole=tourCutoutRect(rectOf(actions),null,6,viewport());
+      actionHole.r=6;actionHole.kind='reveal';holes.push(actionHole);
+    }
     /* every control the copy names is genuinely un-dimmed AND ringed */
     eff.secondaries.forEach(function(item){
       var second = queryTarget(step, sec, item.target);
@@ -904,20 +934,20 @@ function wireTour(ctl, view, win, config, options){
     var steps=config.steps.map(function(step){
       if((step.kind || 'spot')!=='spot')return step;
       var candidates=(preferred?[preferred.sec]:[]).concat(ctl.steppers,ctl.sections)
-        .filter(function(sec,i,all){return sec.hasDiagram && all.indexOf(sec)===i;});
+        .filter(function(sec,i,all){return sec.hasDiagram && !sec.detailOnly && all.indexOf(sec)===i;});
       for(var i=0;i<candidates.length;i++){
         var sec=candidates[i], pres=sec.presentation, saved=sectionSnapshot(sec);
         var ds=step.diagramState || {};
         if(stateTokenMiss(sec,ds))continue;
-        var choices=[saved.view];
+        var current=ctl.views && ctl.views.current(sec), choices=[current?current.id:saved.view];
         if(preferred && preferred.sec===sec)choices.unshift(preferred.view);
-        if(pres && pres.views)choices=choices.concat(pres.views().map(function(v){return v.id;}));
+        choices=choices.concat(availableViews(sec).map(function(v){return v.id;}));
         choices=choices.filter(function(id,j,all){return all.indexOf(id)===j;});
-        if(ds.presentation!=null)choices=pres && pres.views ? pres.views().filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;}) : [];
+        if(ds.presentation!=null)choices=availableViews(sec).filter(function(v){return v.presentation===ds.presentation;}).map(function(v){return v.id;});
         for(var j=0;j<choices.length;j++){
           var state=Object.assign({},ds,{section:sec.reference});
           if(choices[j]!=null)state.view=choices[j];
-          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();});
+          var tabs=ctl.tabBlocks.map(function(tb){return tb.active();}), owners=ownerSnapshot();
           var targetState=ctl.activeTarget, detailsAt=openedDetails.length;
           var scroll={x:win.scrollX,y:win.scrollY}, valid=false;
           try{
@@ -946,6 +976,7 @@ function wireTour(ctl, view, win, config, options){
           }finally{
             openedDetails.splice(detailsAt).forEach(function(d){if(d.isConnected){d.open=false;if(typeof syncNavigationPopover==='function')syncNavigationPopover(d);}});
             restoreSection(sec,saved,false);
+            restoreOwners(owners);
             ctl.tabBlocks.forEach(function(tb,k){if(tb.active()!==tabs[k])tb.select(tabs[k],false,false);});
             ctl.activeTarget=targetState;if(ctl.onChange)ctl.onChange();win.scrollTo(scroll.x,scroll.y);
           }
@@ -1294,9 +1325,8 @@ function wireTour(ctl, view, win, config, options){
   replay.textContent = '?';
   replay.setAttribute('aria-label', 'Replay the tour');
   replay.addEventListener('click', function(){ disabled = false; guarded(start); });
-  var present = view.querySelector('.presentbtn');
-  if (present && present.parentNode === view) view.insertBefore(replay, present.nextSibling);
-  else view.insertBefore(replay, view.firstChild);
+  var pageActions=readerPageActions(view,ctl);
+  pageActions.appendChild(replay);
   if(options.replay===false)replay.hidden=true;
 
   function updateDiscovery(){
@@ -1335,6 +1365,7 @@ function wireTour(ctl, view, win, config, options){
        scroll into a different screen, or mark an interrupted tour completed. */
     snapshot=null;openedDetails=[];ctl.suppressFragmentWrites=false;
     if(overlay)overlay.remove();replay.remove();if(discovery)discovery.remove();
+    if(!pageActions.children.length){if(ctl.readerActionsSize)ctl.readerActionsSize.disconnect();pageActions.remove();}
     if(win.dvStartTour===startPublic){
       if(previousStart===undefined)delete win.dvStartTour;else win.dvStartTour=previousStart;
     }

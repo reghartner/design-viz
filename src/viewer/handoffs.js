@@ -41,14 +41,15 @@ function wireLocalHandoffs(ctl, page){
     var active=ctl.details && ctl.details.activeSection(),node=trigger.closest('[data-dv-node]');
     var heading=(active || rec).sectionEl.querySelector('.sec-h'),detailReader=active && reader(active);
     return {rec:rec,trigger:trigger,node:node && node.getAttribute('data-dv-node'),label:heading && heading.textContent.trim(),
-      detailReader:detailReader && detailReader.snapshotReaderState(),view:rec.presentation && rec.presentation.viewId(),
+      tabView:ctl.views && ctl.views.current(rec) && ctl.views.current(rec).id,detailReader:detailReader && detailReader.snapshotReaderState(),view:rec.presentation && rec.presentation.viewId(),
       mode:sp && sp.mode(),path:sp && sp.path(),sourceIndex:sp && sp.sourceIndex(),
       reader:r && r.snapshotReaderState(),scroll:board && {x:board.scrollLeft,y:board.scrollTop},
       drill:ctl.details && ctl.details.snapshot()};
   }
   function restore(saved){
     var rec=saved.rec,sp=rec.stepper,r=reader(rec);
-    if(rec.presentation && saved.view!=null && rec.presentation.viewId()!==saved.view)rec.presentation.setView(saved.view);
+    if(ctl.views)ctl.views.ensure(rec,saved.tabView,true);
+    if(!ctl.views && rec.presentation && saved.view!=null && rec.presentation.viewId()!==saved.view)rec.presentation.setView(saved.view);
     if(sp){
       sp.pause();
       if(saved.mode==='step')sp.jumpSource(saved.sourceIndex,saved.path);
@@ -65,10 +66,14 @@ function wireLocalHandoffs(ctl, page){
   }
   function paintBack(rec){
     back.remove();
-    if(!trail.length || !rec)return;
-    var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
-    back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
-    (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+    if(trail.length && rec){
+      var previous=trail[trail.length-1].rec,record=detailSection(page,previous.reference);
+      back.textContent='← Back to '+(trail[trail.length-1].label || record.section.heading || record.tabLabel || previous.reference);
+      (rec.sectionEl.querySelector('.diagram-views') || rec.sectionEl).prepend(back);
+    }
+    // Destination selection can mount the shared navigation before this trail
+    // is painted. Move the newly created return action into that same bar.
+    ctl.view.dispatchEvent(new CustomEvent('navigation-actions-changed'));
   }
   function activate(rec, saved){
     if(disposed)return;
@@ -83,6 +88,7 @@ function wireLocalHandoffs(ctl, page){
       if(ctl.view.querySelector('.dv-embed-target')){
         ctl.sections.forEach(function(item){item.sectionEl.classList.toggle('dv-embed-target',item===rec);});
       }
+      if(ctl.views && !ctl.views.ensure(rec,saved && saved.tabView,true))return;
       rec.sectionEl.hidden=false;
       if(rec.stepper){rec.stepper.onShow();rec.stepper.pause();}
       ctl.activeTarget={kind:'diagram',section:rec.number};

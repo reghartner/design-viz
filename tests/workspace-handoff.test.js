@@ -47,3 +47,14 @@ test('workspace targets restore Ambient and Step after resolving the selected pa
   h=harness();ctx.applyWorkspaceTarget(h.ctl,page,{d:'chapter',p:'failure',s:'failed',m:'step'});
   assert.deepEqual(h.events,['jump:failure:2'],'jumpSource already enters Step without resetting the selected step');
 });
+
+test('workspace targets select the owning View and reject excluded members before changing tabs',()=>{
+  const page={sections:[{id:'content',diagram:{nodes:{a:{title:'A'}},rows:[['a']]}}]},events=[];
+  const rec={number:1,reference:'content',tabBlock:1,tab:0,presentation:{setView(){throw new Error('Must route through owner View');}}};
+  const ctl={sections:[rec],activeTarget:{kind:'page'},tabBlocks:[{select(){events.push('tab');}}],views:{ensure(record,id,silent){events.push([record===rec,id,silent]);return id==='review';}}};
+  assert.throws(()=>ctx.applyWorkspaceTarget(ctl,page,{d:'content',v:'unrelated'}),/view is unavailable/);
+  assert.deepEqual(ctl.activeTarget,{kind:'page'});assert.equal(events.length,1);
+  assert.equal(ctx.applyWorkspaceTarget(ctl,page,{d:'content',v:'review'}),rec);
+  assert.deepEqual(events,[[true,'unrelated',true],[true,'review',true],'tab']);
+  assert.equal(ctl.activeTarget.section,1);
+});

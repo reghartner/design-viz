@@ -71,8 +71,8 @@ for(const host of ['standalone','workbench','native'])for(const placement of ['c
   await page.evaluate(()=>{location.hash='d=paths&v=explore&p=alternate&m=step&s=recover';});
   await expect(sec.locator('.step-text')).toHaveText('Recovered on alternate path');await expect(panel(page,'detail')).toBeVisible();
  }
- await sec.getByRole('button',{name:'Home',exact:true}).click();await expect(sec.locator('.pwidget[data-dv-panel="0"]')).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel="1"]')).toBeVisible();
- await sec.getByRole('button',{name:'Explore',exact:true}).click();await expect(panel(page,'status')).toBeVisible();await expect(panel(page,'detail')).toBeVisible();await expect(panel(page,'excluded')).toBeHidden();
+ await page.locator('.explore-navigation').getByRole('button',{name:'Home',exact:true}).click();await expect(sec.locator('.pwidget[data-dv-panel="0"]')).toBeVisible();await expect(sec.locator('.pwidget[data-dv-panel="1"]')).toBeVisible();
+ await page.locator('.explore-navigation').getByRole('button',{name:'Explore',exact:true}).click();await expect(panel(page,'status')).toBeVisible();await expect(panel(page,'detail')).toBeVisible();await expect(panel(page,'excluded')).toBeHidden();
  await evidence(page,info,host+'-'+placement+'-restored');
  if(host==='native'){await page.evaluate(()=>viewer.destroy());await expect(page.locator('#host')).toBeEmpty();}
 });

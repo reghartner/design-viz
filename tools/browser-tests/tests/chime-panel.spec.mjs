@@ -9,7 +9,8 @@ test('doorbell chime renders independent paths, readable states and small Canvas
  await writeFile(path.join(server.root,'chime-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));
  await writeFile(path.join(server.root,'chime-native.html'),'<div id="host"></div><script type="module">import {mountNativeViewer} from "./chime-native.js"; window.mountChime=mountNativeViewer;</script>');
  await page.goto(server.origin+'/chime-native.html');await page.waitForFunction(()=>!!window.mountChime);
- await page.evaluate(raw=>window.viewer=mountChime(document.querySelector('#host'),raw),JSON.parse(source));
+ const raw=JSON.parse(source);raw.page.views=[{id:'standard',name:'Standard',presentation:'standard',sections:['doorbell']},{id:'explore',name:'Explore',presentation:'explore',sections:['doorbell']}];raw.page.defaultView='standard';
+ await page.evaluate(raw=>window.viewer=mountChime(document.querySelector('#host'),raw),raw);
  const host=page.locator('#host'),panel=host.locator('.chime-panel');
  await expect(panel).toHaveAttribute('data-playback','stopped');
  await expect(panel.getByRole('status')).toHaveText('Not playing');
@@ -22,6 +23,8 @@ test('doorbell chime renders independent paths, readable states and small Canvas
  await go('quiet','quiet');await expect(panel).toHaveAttribute('data-playback','stopped');await expect(panel).toContainText('Quiet hours are on.');
  await go('ring','finish');await expect(panel).toContainText('The resident has been alerted.');
  await go('ring','ring');await page.evaluate(()=>viewer.setCanvas(true));
+ await expect(host.locator('.explore-navigation').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');await expect(host.locator('.viewer-diagram-canvas')).toHaveCount(0);
+ await host.locator('.explore-navigation').getByRole('button',{name:'Explore',exact:true}).click();await expect(panel).toHaveAttribute('data-playback','playing');
  const tile=host.locator('[data-explore-panel="bell"]');await expect(tile).toBeVisible();
  await tile.evaluate(el=>el.style.width='220px');
  expect(await panel.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);

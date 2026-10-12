@@ -19,6 +19,7 @@ recursively expand other logical bundles. Panel registration stays DOM-free.
 
 | Source owner | Responsibility and call-time dependencies |
 | --- | --- |
+| `core/tab-views.js` | Tab View validation, membership, implicit owners and nondestructive legacy projection |
 | `core/document.js` | Guarded normalization, blocks and all-section records; uses navigation for canonical references |
 | `core/navigation.js` | Hash grammar, section/tab/step references and route resolution; link-base canonicalization uses `URL` |
 | `core/paths.js` | Step patches, path projection and exact source-step lookup; uses shared `isHex()` and navigation `stepIndexOf()` |

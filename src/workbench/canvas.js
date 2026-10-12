@@ -1,8 +1,8 @@
-/* The selected Chapter owns the editor surface, just as in the reader. */
+/* The selected View owns the editor surface, just as in the reader. */
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
-  var savedSelection=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null;
+  var savedSelection=null,savedOwnerSections=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null;
   var fitObserver=new ResizeObserver(function(entries){
     if(!fitPending && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))fitPending=requestAnimationFrame(autoFit);
   });
@@ -71,7 +71,7 @@ function initWorkbenchCanvas(){
   }
   function exploreView(rec){
     var definition=rec && rec.viewport && rec.viewport.viewDefinition();
-    return !!(definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
+    return !!(rec && rec.viewingMode==='explore' || definition && definition.presentation==='explore' || rec && rec.inheritedExplore && !explicitView(rec));
   }
   function diagramMode(){return exploreView(current());}
   function identity(rec){
@@ -100,9 +100,10 @@ function initWorkbenchCanvas(){
     view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:index}));
     select(index);
   });
+  view.addEventListener('tab-view-change',function(ev){if(!selecting && ev.detail)select(ev.detail.section-1);});
   view.addEventListener('diagram-tab-change',function(ev){
     var target=ev.detail,matching=target && records().filter(function(r){return !r.detailOnly && r.tabBlock===target.tabBlock && r.tab===target.tab;}) || [];
-    var rec=matching.find(function(r){return r.viewport;}) || matching[0];
+    var ctl=getController(),rec=ctl && ctl.views && ctl.views.primary(target.tabBlock,target.tab) || matching.find(function(r){return r.viewport;}) || matching[0];
     if(!rec)return;
     view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:rec.number-1}));
     select(rec.number-1);
@@ -145,6 +146,7 @@ function initWorkbenchCanvas(){
     var changedSection=section!==index;finish(true);saveDetail();section=index;
     var ctl=getController(),base=records().find(function(r){return r.number===section+1;}),details=ctl && ctl.details,snapshot=details && details.snapshot();
     if(snapshot && base && snapshot.section!==base.reference)details.close(true);
+    if(base && ctl.views && !base.detailOnly)ctl.views.ensure(base,undefined,true);
     var all=records(),rec=current();if(!rec){rec=all[0];section=rec?rec.number-1:0;}
     if(activeCanvas && all.indexOf(activeCanvas)<0 && activeCanvas!==rec){activeCanvas.sectionEl.classList.remove('workspace-active-section');if(activeCanvas.viewport)activeCanvas.viewport.setWorkbenchCanvas(false);}
     var child=rec && all.indexOf(rec)<0?detailEntry(details.snapshot()):null;
@@ -184,7 +186,7 @@ function initWorkbenchCanvas(){
       if(r.viewport){r.viewport.setWorkbenchCanvas(on);
         if(on && (!r.canvasVisited || requestedFit))scheduleFit();}
     });
-    // A Chapter can enter Explore before the shared navigation is mounted.
+    // A View can enter Explore before the shared navigation is mounted.
     // Reconcile the camera immediately with the stage space the top bar took.
     if(diagramMode() && rec && rec.viewport){rec.viewport.refresh();if(!rec.canvasVisited)rec.viewport.restoreInitialCamera();}
     document.querySelectorAll('#workspace-pan,#workspace-zoom-out,#workspace-zoom,#workspace-zoom-in,#workspace-fit').forEach(function(b){b.disabled=!diagramMode() || !rec || !rec.viewport;b.hidden=b.disabled;});
@@ -199,6 +201,7 @@ function initWorkbenchCanvas(){
     var context=detailContext(snapshot);savedDetail=context?{context:context,navigation:snapshot}:null;
     activeCanvas=null;activeDetail=null;
     var page=getPage();saved=page?workbenchPreviewSections(page):null;savedSelection=saved && saved[section];
+    var owner=ctl && ctl.views && ctl.views.owner(records().find(function(rec){return rec.number===section+1;}));savedOwnerSections=owner && saved?owner.records.map(function(record){return saved[record.number-1];}):null;
     if(saved)records().forEach(function(rec){var s=saved[rec.number-1];if(s && rec.viewport){
       s.reader=rec.viewport.snapshotCanvasState();s.config=JSON.stringify([s.diagram.layouts,s.diagram.sectionLayout]);s.visited=rec.canvasVisited;
     }});
@@ -226,8 +229,12 @@ function initWorkbenchCanvas(){
         rec.canvasVisited=prior.visited && !!(definition && memory[definition.id]);
       }
     });
-    if(saved && matches.get(section)!==savedSelection){selectionKey=null;}
-    saved=null;savedSelection=null;
+    if(saved && matches.get(section)!==savedSelection){
+      selectionKey=null;var matched=records().find(function(rec){return matches.get(rec.number-1)===savedSelection;});
+      if(!matched && savedOwnerSections){var sibling=records().find(function(rec){return savedOwnerSections.indexOf(matches.get(rec.number-1))>=0;});var owner=sibling && getController().views.owner(sibling);matched=owner && owner.selected;}
+      if(matched){section=matched.number-1;view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:section}));}
+    }
+    saved=null;savedSelection=null;savedOwnerSections=null;
     var ctl=getController(),resolved=savedDetail && resolveDetail(savedDetail.context);
     if(resolved && ctl && ctl.details){
       section=resolved.indices[0];ctl.details.restore(Object.assign({},savedDetail.navigation,{section:resolved.reference}));

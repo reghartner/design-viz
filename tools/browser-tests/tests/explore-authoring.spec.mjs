@@ -8,49 +8,58 @@ import {repo} from '../helpers/prepare.mjs';
 const named=JSON.parse(await readFile(path.join(repo,'src/starters/named-layouts.json'),'utf8'));
 named.page.sections[0].diagram.autoplay=false;
 const section=page=>page.locator('#docview .doc-sec').first();
+const navigation=page=>page.locator('#docview>.explore-navigation');
 const raw=async page=>JSON.parse(await page.locator('#src').inputValue());
 
-test('Presentation is a per-view undoable edit and survives host preview changes and duplication',async({page,server})=>{
+test('View presentation, duplication and independent arrangements preserve source and Undo across host previews',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await prepareEditorSurface(page);
   await expect(page.locator('#welcome-paste-error')).toBeEmpty();
-  await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
+  await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
   await arrangeChapter(page,section(page));
-  const presentation=()=>section(page).locator('select[aria-label="Viewing mode"]');
+  const presentation=()=>navigation(page).locator('select[aria-label="View presentation"]');
   await expect(presentation()).toHaveValue('explore');
   const before=await page.locator('#src').inputValue();
   await chapterOptions(page);await presentation().selectOption('standard');
-  const changed=await page.locator('#src').inputValue();expect(changed).toBe(before.replace('"presentation": "explore"','"presentation": "standard"'));
+  const changed=await page.locator('#src').inputValue(),standard=JSON.parse(changed).page;
+  expect(standard.sections[0].diagram).toEqual(named.page.sections[0].diagram);
+  expect(standard.views.map(view=>({name:view.name,presentation:view.presentation}))).toEqual([{name:'Home story',presentation:'standard'},{name:'Service flow',presentation:'standard'}]);
+  expect(standard.defaultView).toBe(standard.views[0].id);expect(standard.views[1].sections).toEqual([{section:standard.sections[0].id,layout:'service-flow'}]);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(presentation()).toHaveValue('explore');
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(changed);await expect(presentation()).toHaveValue('standard');
   await chapterOptions(page);await presentation().selectOption('explore');
-  const explored=await page.locator('#src').inputValue();await page.keyboard.press('Escape');await page.getByRole('button',{name:'Done arranging',exact:true}).click();await prepareEditorSurface(page);
+  const explored=await page.locator('#src').inputValue(),expected=JSON.parse(changed);expected.page.views[1].presentation='explore';expect(JSON.parse(explored)).toEqual(expected);
+  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Done arranging',exact:true})).toHaveCount(0);await prepareEditorSurface(page);
   if(!await page.locator('#layout-preview-target').isVisible())await page.locator('#workspace-appearance>summary').click();await page.getByRole('combobox',{name:'Preview host',exact:true}).selectOption('confluence');
   await page.locator('#workspace-appearance>summary').click();await expect(page.locator('#layout-preview-target')).toBeHidden();
   await arrangeChapter(page,section(page));
   await expect(presentation()).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(explored);
-  await chapterOptions(page);await section(page).getByRole('button',{name:'Duplicate chapter',exact:true}).click();
-  const diagram=(await raw(page)).page.sections[0].diagram,copy=diagram.layouts.at(-1);
-  expect(copy.presentation).toBe('explore');expect(diagram.defaultLayout).toBe('home-story');
-  expect(diagram.layouts[0]).toEqual(named.page.sections[0].diagram.layouts[0]);
+  await chapterOptions(page);await navigation(page).getByRole('button',{name:'Duplicate View',exact:true}).click();
+  const duplicated=await page.locator('#src').inputValue(),duplicatePage=JSON.parse(duplicated).page,viewCopy=duplicatePage.views.at(-1);
+  expect(viewCopy.presentation).toBe('explore');expect(viewCopy.sections).toEqual(duplicatePage.views[1].sections);expect(duplicatePage.sections[0].diagram).toEqual(named.page.sections[0].diagram);
+  await expect(navigation(page).getByRole('button',{name:viewCopy.name,exact:true})).toHaveAttribute('aria-pressed','true');
+  // A View shares section content and its arrangement until explicitly separated.
+  await chapterOptions(page);await navigation(page).getByRole('button',{name:'Independent section arrangement',exact:true}).click();
+  const arranged=(await raw(page)).page,diagram=arranged.sections[0].diagram,copy=diagram.layouts.at(-1);
+  expect(diagram.defaultLayout).toBe('home-story');expect(diagram.layouts.slice(0,2)).toEqual(named.page.sections[0].diagram.layouts);
   expect(diagram.steps).toEqual(named.page.sections[0].diagram.steps);expect(diagram.paths).toEqual(named.page.sections[0].diagram.paths);
-  // Duplication migrates every Standard host profile, including hidden tiles and docked controls.
+  // Independent placement migrates every Standard host profile, including hidden tiles and docked controls.
   const sourceLayout=diagram.layouts[1].sectionLayout;
-  expect(sourceLayout).toEqual(named.page.sections[0].diagram.layouts[1].sectionLayout);
   expect(copy.sectionLayout).toEqual({columns:24,...Object.fromEntries(Object.entries(sourceLayout).map(([profile,tiles])=>[profile,tiles.map(tile=>({...tile,x:tile.x*2,w:tile.w*2}))]))});
-  expect(copy.exploreLayout).toEqual(diagram.layouts[1].exploreLayout);
+  expect(copy.exploreLayout).toEqual(diagram.layouts[1].exploreLayout);expect(arranged.views.at(-1).sections).toEqual([{section:arranged.sections[0].id,layout:copy.id}]);expect(arranged.views[1].sections).toEqual(standard.views[1].sections);
   await expect(section(page)).toHaveAttribute('data-view-id',copy.id);await expect(presentation()).toHaveValue('explore');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(duplicated);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);
 });
 
 test('Explore editing saves floating panels, controls and camera with Undo, reload and host scaling',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await prepareEditorSurface(page);
-  await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
+  await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
   await arrangeChapter(page,section(page));
   const stage=section(page).locator('.explore-stage'),panel=section(page).locator('[data-explore-panel=outcome]');
   await expect(stage).toBeVisible();await expect(section(page).getByRole('combobox',{name:'Layout element',exact:true})).toHaveCount(0);
   const disclosure=section(page).locator('[data-arrange-disclosure]'),fields=section(page).locator('.section-arrange-fields');
   await disclosure.click();await expect(disclosure).toHaveText('Show arrangement controls');await expect(disclosure).toHaveAttribute('aria-expanded','false');await expect(fields).toBeHidden();
-  const initial=await page.locator('#src').inputValue();
+  const initial=await page.locator('#src').inputValue(),retiredCamera=await navigation(page).getByRole('button',{name:'Use current camera as opening view',exact:true,includeHidden:true}).elementHandle();
   const grip=()=>panel.locator('.explore-window-grip');await grip().focus();await page.keyboard.press('Shift+ArrowLeft');
   await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.sections[0].diagram.layouts[1].exploreLayout?.panels[0].stacked).toBe(false);
   const moved=await page.locator('#src').inputValue();await expect(grip()).toBeFocused();await expect(disclosure).toHaveText('Show arrangement controls');await expect(fields).toBeHidden();
@@ -66,7 +75,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
   await page.locator('#workspace-zoom-in').click();
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
   await chapterOptions(page);await page.locator('#docview .explore-navigation').getByRole('button',{name:'Use current camera as opening view',exact:true}).click();await page.keyboard.press('Escape');
-  const beforePanSource=await page.locator('#src').inputValue();
+  const beforePanSource=await page.locator('#src').inputValue();await retiredCamera.evaluate(button=>button.click());await expect(page.locator('#src')).toHaveValue(beforePanSource);
   const beforePan=(await raw(page)).page.sections[0].diagram.layouts[1].exploreLayout.camera;
   const b=await board.evaluate(el=>{const r=el.getBoundingClientRect();for(let y=Math.max(100,r.top+100);y<Math.min(innerHeight-120,r.bottom-120);y+=50)for(let x=r.left+30;x<r.right-350;x+=50){const hit=document.elementFromPoint(x,y);if(hit && hit.closest('.explore-board')===el && hit.matches('.explore-board,.boardcanvas,svg,.dv-board-grid'))return {x,y};}throw Error('No empty graph area');});
   await page.mouse.move(b.x,b.y);await page.mouse.down();await expect(section(page).locator('.section-viewport')).toHaveClass(/viewport-gesturing/);await page.mouse.move(b.x+80,b.y+70,{steps:5});await page.mouse.up();
@@ -79,7 +88,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
   const norm=await panel.evaluate(el=>{const r=el.getBoundingClientRect(),s=el.closest('.explore-stage').getBoundingClientRect();return {w:r.width/s.width,y:(r.y-s.y)/s.height,sw:s.width};});
   expect(norm.w).toBeCloseTo(Math.max(128/norm.sw,defaults.panels[0].w),2);expect(norm.y).toBeCloseTo(defaults.panels[0].y,2);
   await page.reload();await page.locator('#workspace-home').click();await paste(page,saved);await prepareEditorSurface(page);
-  await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);await expect(panel).not.toHaveClass(/explore-stacked/);
+  await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);await expect(panel).not.toHaveClass(/explore-stacked/);
   const restored=await board.evaluate(el=>({left:el.scrollLeft,top:el.scrollTop,width:parseFloat(el.style.getPropertyValue('--explore-width')),mx:parseFloat(el.style.getPropertyValue('--explore-margin-x')),my:parseFloat(el.style.getPropertyValue('--explore-margin-y')),cw:el.clientWidth,ch:el.clientHeight,ratio:el.querySelector('svg').viewBox.baseVal.height/el.querySelector('svg').viewBox.baseVal.width}));
   expect((restored.left+restored.cw/2-restored.mx)/restored.width).toBeCloseTo(defaults.camera.x,2);
   expect((restored.top+restored.ch/2-restored.my)/(restored.width*restored.ratio)).toBeCloseTo(defaults.camera.y,2);
@@ -91,7 +100,7 @@ test('Explore editing saves floating panels, controls and camera with Undo, relo
 
 test('wheel panning is temporary until explicitly saved and cannot replace handwritten source',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(named,null,2));await prepareEditorSurface(page);
-  await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
+  await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
   const board=section(page).locator('.explore-board');await board.scrollIntoViewIfNeeded();
   const original=await page.locator('#src').inputValue();
   const r=await board.boundingBox();await page.mouse.move(r.x+60,Math.max(150,r.y+100));await page.mouse.wheel(0,160);
@@ -112,7 +121,7 @@ for(const mode of ['default','switched','expanded','fullscreen','arranged','sele
   if(mode==='narrow')await page.setViewportSize({width:1280,height:800});
   const spec=structuredClone(named);if(mode==='default')spec.page.sections[0].diagram.defaultLayout='service-flow';
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));await prepareEditorSurface(page);
-  if(mode!=='default')await section(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
+  if(mode!=='default')await navigation(page).getByRole('button',{name:'Service flow',exact:true}).click();await prepareEditorSurface(page);
   if(mode==='arranged')await arrangeChapter(page,section(page));
   if(mode==='selected')await section(page).locator('.schip').nth(2).click();
   if(mode==='zoomed')await page.locator('#workspace-zoom-in').click();

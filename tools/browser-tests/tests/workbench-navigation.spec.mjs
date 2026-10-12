@@ -1,3 +1,4 @@
+import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,paste,closeTools,chapterOptions,chooseAddDestination,arrangeChapter} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 function fixture(){
@@ -5,7 +6,7 @@ function fixture(){
  const d=first.diagram;delete d.layouts[0].steps;d.layouts[0].presentation='explore';d.layouts[0].name='Engineering';
  d.layouts.push({...structuredClone(d.layouts[0]),id:'standard',name:'Overview',presentation:'standard'});
  const other=structuredClone(first);other.id='secondary';other.heading='Second diagram';
- raw.page.blocks=[{tabs:[{label:'Main story',sections:[first,other]},{label:'Notes',sections:[{id:'notes',heading:'Notes only',text:'A prose destination.'}]}]}];return raw;
+ raw.page.blocks=[{tabs:[{label:'Main story',defaultView:'engineering',views:[{id:'engineering',name:'Engineering',presentation:'explore',sections:[{section:'primary',layout:d.layouts[0].id},{section:'secondary',layout:d.layouts[0].id}]},{id:'overview',name:'Overview',presentation:'standard',sections:[{section:'primary',layout:'standard'},{section:'secondary',layout:'standard'}]}],sections:[first,other]},{label:'Notes',sections:[{id:'notes',heading:'Notes only',text:'A prose destination.'}]}]}];return raw;
 }
 async function open(page,server){const source=JSON.stringify(fixture(),null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);return source;}
 const nav=page=>page.locator('#docview .explore-navigation');
@@ -15,7 +16,7 @@ async function camera(page){return selected(page).locator('.explore-board').eval
 test('one measured navigation surface keeps original tabs, all diagrams and compact mode icons across widths',async({page,server},info)=>{
  const source=await open(page,server);
  await expect(page.getByRole('button',{name:'Back to page',exact:true})).toHaveCount(0);
- await expect(nav(page)).toHaveCount(1);await expect(nav(page).locator('.explore-navigation-diagrams button:not([hidden])')).toHaveCount(2);
+ await expect(nav(page)).toHaveCount(1);await expect(nav(page).locator('.explore-navigation-diagrams .explore-diagram-button:not([hidden])')).toHaveCount(2);
  await expect(nav(page).getByRole('tab',{name:'Main story',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();
  await expect(nav(page).getByRole('button',{name:'Engineering',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();
  for(const width of [1440,1024,768,390]){
@@ -29,12 +30,12 @@ test('one measured navigation surface keeps original tabs, all diagrams and comp
   for(const selector of ['.step-transport','.schips','.stepline']){const content=selected(page).locator('.explore-player '+selector);await expect(content).toBeInViewport();const r=await content.boundingBox(),dock=await selected(page).locator('.explore-player').boundingBox();expect(r.x).toBeGreaterThanOrEqual(dock.x);expect(r.x+r.width).toBeLessThanOrEqual(dock.x+dock.width+1);expect(r.y+r.height).toBeLessThanOrEqual(dock.y+dock.height+1);}
   await info.attach('navigation-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
- await nav(page).getByRole('button',{name:'Overview',exact:true}).click();
+ await chooseNavigation(nav(page),'View','Overview');
  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(nav(page)).toHaveCount(1);
- await expect(nav(page).getByRole('tab',{name:'Main story',exact:true}).locator('.explore-indicator-badge')).toHaveCount(0);
+ await expect(nav(page).getByRole('combobox',{name:'Choose View',exact:true}).locator('option:checked')).toHaveText('Overview');await expect(nav(page).locator('.tabbtn[aria-selected=true]')).not.toHaveAttribute('data-explore-view','true');
  await expect(page.locator('#section-primary .playback-mode-rail')).toBeVisible();await page.locator('#section-primary .playback-mode-rail').getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(page.locator('#section-primary .termbar')).toBeHidden();await page.locator('#section-primary .playback-mode-rail').getByRole('button',{name:'STEP',exact:true}).click();await expect(page.locator('#section-primary .termbar')).toBeVisible();
- await expect(nav(page).getByRole('button',{name:'Engineering',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();
- await nav(page).getByRole('button',{name:'Second diagram',exact:true}).click();await expect(selected(page)).toHaveAttribute('id','section-secondary');
+ await page.setViewportSize({width:1440,height:1000});await expect(nav(page).getByRole('button',{name:'Engineering',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await page.setViewportSize({width:390,height:1000});
+ await nav(page).getByRole('button',{name:'Second diagram',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(nav(page).getByRole('button',{name:'Second diagram',exact:true})).toHaveAttribute('aria-pressed','true');
  await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(page.locator('#section-primary')).toHaveAttribute('data-view-id','standard');
  await expect(page.locator('#src')).toHaveValue(source);
 });
@@ -65,14 +66,14 @@ test('page preview is isolated and explicit camera commands author one undoable 
 
 test('long navigation labels reveal the selected chapter and detail insertion explains its source boundary',async({page,server},info)=>{
  const raw=fixture(),primary=raw.page.blocks[0].tabs[0].sections[0],d=primary.diagram;
- for(let i=0;i<9;i++)d.layouts.push({...structuredClone(d.layouts[0]),id:'long-'+i,name:'Chapter '+i+' — detailed engineering view'});
+ for(let i=0;i<9;i++){d.layouts.push({...structuredClone(d.layouts[0]),id:'long-'+i,name:'View '+i+' — detailed engineering view'});raw.page.blocks[0].tabs[0].views.push({id:'long-'+i,name:'View '+i+' — detailed engineering view',presentation:'explore',sections:[{section:'primary',layout:'long-'+i},'context-notes']});}
  const detail=structuredClone(primary);detail.id='detail-source';detail.heading='Detailed source';detail.detailOnly=true;d.nodes.a.detail={section:'detail-source'};raw.page.blocks.push(detail);
  raw.page.blocks[0].tabs[0].sections.push({id:'context-notes',heading:'Architecture context without a diagram',text:'Editable prose in this tab.'});
  const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);await page.setViewportSize({width:390,height:1000});
- const last=nav(page).getByRole('button',{name:'Chapter 8 — detailed engineering view',exact:true});await last.click();await expect(last).toHaveAttribute('aria-pressed','true');await expect(last).toBeInViewport();await expect(last.locator('.explore-indicator-badge svg')).toBeInViewport();const chip=await last.boundingBox(),icon=await last.locator('.explore-indicator-badge svg').boundingBox();expect(icon.x).toBeGreaterThanOrEqual(chip.x);expect(icon.x+icon.width).toBeLessThanOrEqual(chip.x+chip.width);
- await chapterOptions(page);const mode=nav(page).getByRole('combobox',{name:'Viewing mode',exact:true});await mode.focus();await page.keyboard.press('Escape');await expect(nav(page).locator('.section-view-options>summary')).toBeFocused();await expect(nav(page).locator('.section-view-options')).not.toHaveAttribute('open','');
+ const last=nav(page).getByRole('combobox',{name:'Choose View',exact:true}),name='View 8 — detailed engineering view';await chooseNavigation(nav(page),'View',name);await last.focus();await expect(last).toBeFocused();await expect(last).toBeInViewport({ratio:1});await expect(last).toHaveAttribute('title',name);await expect(selected(page).locator('.explore-board')).toBeVisible();
+ await chapterOptions(page);const mode=nav(page).getByRole('combobox',{name:'View presentation',exact:true});await mode.focus();await page.keyboard.press('Escape');await expect(nav(page).locator('.section-view-options>summary')).toBeFocused();await expect(nav(page).locator('.section-view-options')).not.toHaveAttribute('open','');
  await nav(page).getByRole('button',{name:'Architecture context without a diagram',exact:true}).click();await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeEnabled();await expect(page.locator('#diagram-add-destination')).toContainText('Architecture context');await page.locator('#diagram-add-close').click();
- await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(last).toHaveAttribute('aria-pressed','true');await expect(last).toBeInViewport();await info.attach('long-chapter-narrow',{body:await page.screenshot(),contentType:'image/png'});
+ await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(last.locator('option:checked')).toHaveText(name);await expect(last).toBeInViewport({ratio:1});await info.attach('long-chapter-narrow',{body:await page.screenshot(),contentType:'image/png'});
  await page.setViewportSize({width:1440,height:1000});await selected(page).locator('[data-dv-detail=a]').click();await page.locator('#diagram-add').click();await expect(page.locator('#diagram-add-error')).toContainText('Detail previews');await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeDisabled();await page.locator('#diagram-add-close').click();
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

@@ -31,7 +31,7 @@ async function build(server,steps,{explore=true,exploreId="engineering"}={}){
 const heading=page=>page.locator('.dv-tour-ui .dv-tour-heading');
 const selectedStep=page=>page.locator('.schip[aria-current="true"]:visible');
 const panel=(page,id)=>page.locator('[data-explore-panel="'+id+'"]');
-const selectedView=page=>page.locator('.diagram-view-choice button[aria-pressed="true"]');
+const selectedView=page=>page.locator('#docview>.explore-navigation .tab-view-choices button[aria-pressed="true"]');
 const panelRect=async(page,id)=>{
   const rect=await panel(page,id).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();
   return {...rect,x:rect.x-stage.x,y:rect.y-stage.y};
@@ -208,7 +208,7 @@ test('leaving a tour restores a section that was already in real fullscreen',asy
   // A real gesture permits the restoration request under browser policy.
   await page.locator('.dv-tour-exit').click();
   await expect(page.locator('.dv-tour')).toBeHidden();
-  await expect.poll(()=>page.evaluate(()=>document.fullscreenElement===document.querySelector('.section-viewport'))).toBe(true);
+  await expect.poll(()=>page.evaluate(()=>document.fullscreenElement===document.querySelector('#docview'))).toBe(true);
   await expect(selectedView(page)).toHaveText('Engineering view');
   await expect(page.getByRole('button',{name:'Exit expanded diagram view',exact:true})).toBeVisible();
 });

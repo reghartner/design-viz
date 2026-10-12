@@ -561,6 +561,7 @@ function validate(page){
         '; rendering proceeds but re-check the spec against the current authoring contract');
   }
   validateDetails(page, errors, warnings);
+  validateTabViews(page, errors);
   validateLocalHandoffs(page, errors);
   var protos = resolveProtocols(page);
   var lanes = resolveLanes(page);

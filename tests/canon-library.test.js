@@ -15,6 +15,10 @@ test('reader handoff captures stable chapter, view, path and source step referen
   assert.deepEqual(JSON.parse(JSON.stringify(context.canonReaderTarget(ctl))),{d:'delivery',v:'flow',m:'step',p:'failure',s:'retry'});
   stepper.ids=()=>['start',null,'done'];
   assert.equal(context.canonReaderTarget(ctl).s,'2');
+  ctl.views={current:()=>({id:'review-members',legacy:false})};
+  assert.equal(context.canonReaderTarget(ctl).v,'review-members');
+  ctl.views.current=()=>({id:'section-2-flow',legacy:true});
+  assert.equal(context.canonReaderTarget(ctl).v,'flow');
   assert.equal(context.canonReaderTarget(null),null);
 });
 test('library parsing validates IDs and specs without changing the published snapshot',()=>{

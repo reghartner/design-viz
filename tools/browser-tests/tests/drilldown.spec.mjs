@@ -67,8 +67,12 @@ test('native mounts restore external pinned details, isolate roots, and retire l
  expect(await page.evaluate(()=>__detailState.rootState.step)).toBe('dispatch');
  await page.evaluate(()=>{window.__saved=__detailState;__viewer.navigate({section:'doorbell-domains'});__viewer.navigate({section:'doorbell-domains',drilldown:__saved});});
  await expect(host.getByRole('navigation',{name:'Diagram drill-down'})).toContainText('Approved remote flow');expect(await page.evaluate(()=>__detailRequests.length)).toBe(2);
- await page.evaluate(()=>{__viewer.navigate({section:'connectivity'});});await expect(host.locator('#section-connectivity')).toBeVisible();
- await page.evaluate(()=>{__viewer.navigate({section:'doorbell-domains'});});await expect(host.locator('#section-connectivity')).toBeHidden();
+ const prior=await page.evaluate(()=>__viewer.snapshot());
+ expect(await page.evaluate(()=>{try{__viewer.navigate({section:'connectivity'});return false;}catch{return true;}})).toBe(true);
+ expect(await page.evaluate(()=>__viewer.snapshot())).toEqual(prior);await expect(host.getByRole('navigation',{name:'Diagram drill-down'})).toContainText('Approved remote flow');
+ await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains'}));await host.locator('[data-dv-detail="connectivity"]').click();
+ await expect(host.locator('[data-dv-detail-preview]:visible .sec-h')).toContainText('Connectivity');await expect(host.locator('#section-connectivity')).toBeHidden();
+ await host.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(host.locator('#section-doorbell-domains')).toBeVisible();
  await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains',drilldown:{section:'doorbell-domains',rootState:{path:'happy',step:'dispatch'},frames:[{node:null,expanded:['recording'],state:{}}]}}));
  await expect(host.locator('#section-doorbell-domains')).toBeVisible();await expect(host.locator('[data-dv-detail-preview]')).toHaveCount(0);
  await page.evaluate(()=>__viewer.navigate({section:'doorbell-domains',drilldown:{section:'doorbell-domains',rootState:{path:'happy',step:'dispatch'},frames:[{node:null,expanded:['recording'],state:{}},{node:'recording',expanded:[],state:{}}]}}));

@@ -22,7 +22,7 @@ async function renderJSON(page,edit){
 for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view survives node, section and page edits, Undo and host preview`,async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(kind),null,2));await prepareEditorSurface(page);
   const flow=kind==='named'?'service-flow':'flow';
-  await section(page).getByRole('button',{name:'Data flow',exact:true}).click();
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true}).click();
   await expect(section(page)).toHaveAttribute('data-view-id',flow);
   await section(page).locator('[data-dv-node="camera"]').click();await change(page,'id','doorbell');
   await expect(section(page)).toHaveAttribute('data-view-id',flow);
@@ -46,7 +46,7 @@ for(const kind of ['named','Home/Data flow','single layout'])test(`${kind} view 
 
 test('removing the selected view uses the remaining authored default',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture('named'),null,2));await prepareEditorSurface(page);
-  await section(page).getByRole('button',{name:'Data flow',exact:true}).click();
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Data flow',exact:true}).click();
   await renderJSON(page,raw=>{raw.page.blocks[0].diagram.layouts.pop();});
   await expect(section(page)).toHaveAttribute('data-view-id','home-story');
 });

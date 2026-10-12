@@ -120,8 +120,10 @@ test('single-step stories have an explained disabled Play; ambient mode cannot s
 test('presenter Space is an explicit Play command even when automatic step entry is off',()=>{
   const h=stepperHarness(), handlers={}, view=element();
   const doc={body:element(),documentElement:{},createElement:element,addEventListener:(name,fn)=>handlers[name]=fn};
+  view.ownerDocument=doc;view.querySelector=()=>null;
   h.context.wirePresenter({activeStepper:()=>h.stepper},view,{document:doc});
-  view.children[0].fire('click');
+  assert.equal(view.children[0].className,'reader-page-actions');
+  view.children[0].children[0].fire('click');
   let prevented=0;const space=()=>handlers.keydown({key:' ',preventDefault(){prevented++;}});
   space();assert.equal(h.stepper.mode(),'step');assert.equal(h.intervals.size,1);
   assert.equal(h.term.playbackStatus.textContent,'Playing · 3s / step');

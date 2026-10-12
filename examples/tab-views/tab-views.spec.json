@@ -1,0 +1,190 @@
+{
+  "page": {
+    "title": "Sections and Views",
+    "skin": "pastel",
+    "blocks": [
+      {
+        "tabs": [
+          {
+            "label": "Product",
+            "defaultView": "standard-ac",
+            "views": [
+              {
+                "id": "standard-ac",
+                "name": "Standard A + C",
+                "presentation": "standard",
+                "sections": [
+                  "a",
+                  "c"
+                ]
+              },
+              {
+                "id": "explore-bc",
+                "name": "Explore B + C",
+                "presentation": "explore",
+                "sections": [
+                  "b",
+                  "c"
+                ]
+              },
+              {
+                "id": "explore-a",
+                "name": "Explore A",
+                "presentation": "explore",
+                "sections": [
+                  "a"
+                ]
+              }
+            ],
+            "sections": [
+              {
+                "id": "a",
+                "heading": "Section A",
+                "text": [
+                  "Section A content belongs to this section and is shared by every View that includes it."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "service": {
+                      "title": "Section A",
+                      "icon": "gear",
+                      "tint": "cmd",
+                      "detail": {
+                        "section": "detail"
+                      }
+                    }
+                  },
+                  "rows": [
+                    [
+                      "service"
+                    ]
+                  ],
+                  "steps": [
+                    {
+                      "id": "ready",
+                      "text": "Section A is ready",
+                      "nodes": [
+                        "service"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "b",
+                "heading": "Section B",
+                "text": [
+                  "Section B content belongs to this section and is shared by every View that includes it."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "service": {
+                      "title": "Section B",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "service"
+                    ]
+                  ],
+                  "steps": [
+                    {
+                      "id": "ready",
+                      "text": "Section B is ready",
+                      "nodes": [
+                        "service"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "c",
+                "heading": "Section C",
+                "text": [
+                  "Section C content belongs to this section and is shared by every View that includes it."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "service": {
+                      "title": "Section C",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "service"
+                    ]
+                  ],
+                  "steps": [
+                    {
+                      "id": "ready",
+                      "text": "Section C is ready",
+                      "nodes": [
+                        "service"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "detail",
+                "heading": "Nested domain",
+                "text": [
+                  "Nested domain content belongs to this section and is shared by every View that includes it."
+                ],
+                "diagram": {
+                  "view": "step",
+                  "autoplay": false,
+                  "nodes": {
+                    "service": {
+                      "title": "Nested domain",
+                      "icon": "gear",
+                      "tint": "cmd"
+                    }
+                  },
+                  "rows": [
+                    [
+                      "service"
+                    ]
+                  ],
+                  "steps": [
+                    {
+                      "id": "ready",
+                      "text": "Nested domain is ready",
+                      "nodes": [
+                        "service"
+                      ]
+                    }
+                  ]
+                },
+                "detailOnly": true
+              }
+            ]
+          },
+          {
+            "label": "Notes",
+            "sections": [
+              {
+                "id": "notes",
+                "heading": "Notes",
+                "text": [
+                  "Another Tab keeps its own content and Views."
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

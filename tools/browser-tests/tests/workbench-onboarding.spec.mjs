@@ -22,7 +22,7 @@ test('canonical homepage setup defaults to copy/paste with user-owned agent',asy
   await expect(page.locator('#folder-agent-start-new')).toHaveAttribute('aria-pressed','true');
 });
 
-test('homepage names the practice destination and keeps the System flow chapter through expansion',async({page,server},info)=>{
+test('homepage names the practice destination and keeps the System flow View through expansion',async({page,server},info)=>{
   await page.goto(server.origin+'/workbench.html');
   const practiceAction=page.getByRole('button',{name:'Open practice viewer ↗',exact:true});
   await expect(practiceAction).toBeVisible();
@@ -55,7 +55,7 @@ test('homepage names the practice destination and keeps the System flow chapter 
   await page.screenshot({path:info.outputPath('landing-explore-view.png')});
   await practiceAction.click();
   const expanded=practice(page).locator('#section-visitor');
-  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(practice(page).locator('#docview>.explore-navigation').getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect(expanded.locator('.explore-board')).toBeVisible();
   await expect.poll(()=>expanded.locator('.stepline').innerText()).toBe(caption);
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
@@ -64,9 +64,10 @@ test('homepage names the practice destination and keeps the System flow chapter 
   const authored=await readFile(new URL('../../../src/starters/onboarding.json',import.meta.url),'utf8');
   await paste(page,authored);
   const editorSection=page.locator('#docview #section-visitor');
-  await editorSection.getByRole('button',{name:'System flow',exact:true}).click();
-  await editorSection.locator('.section-view-options summary').click();
-  await expect(editorSection.getByLabel('Viewing mode',{exact:true})).toHaveValue('explore');
+  const editorNavigation=page.locator('#docview>.explore-navigation');
+  await editorNavigation.getByRole('button',{name:'System flow',exact:true}).click();
+  await editorNavigation.locator('.section-view-options summary').click();
+  await expect(editorNavigation.getByLabel('View presentation',{exact:true})).toHaveValue('explore');
   await page.screenshot({path:info.outputPath('editor-system-flow.png')});
   await page.locator('#workspace-home').click();
   await page.setViewportSize({width:390,height:844});await fits();
@@ -191,7 +192,7 @@ test('skipping viewer intro records only visited topics and next entry starts in
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);
   await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose a chapter');
+  await expect(heading(frame)).toHaveText('Choose a View');
   await frame.getByRole('button',{name:'Skip tour',exact:true}).click();
   await expect(heading(practice(page))).toHaveText('Start with your own agent');
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('dv_tour_features_v1')).seen)).toEqual(['views']);
@@ -265,7 +266,7 @@ test('parent tour chrome blocks edit shortcuts and entering fullscreen works',as
 test('closing the first viewer card keeps the introduction available and expansion retains the selected outcome',async({page,server})=>{
   await page.addInitScript(()=>{try{localStorage.removeItem('dv_tour_v1');localStorage.removeItem('dv_tour_features_v1');document.cookie='dv_tour=;path=/;max-age=0';}catch{}});
   const frame=await start(page,server);await frame.getByRole('button',{name:/Show me both/}).click();
-  await expect(heading(frame)).toHaveText('Choose a chapter');
+  await expect(heading(frame)).toHaveText('Choose a View');
   await page.getByRole('button',{name:'Close tour',exact:true}).click();
   expect(await page.evaluate(()=>localStorage.getItem('dv_tour_v1'))).toBeNull();
   await page.getByRole('button',{name:'Take the tour →',exact:true}).click();
@@ -339,7 +340,7 @@ test('company config owns landing and reader while editing exercises remain fict
   await expect(page.locator('.workbench-tour-header>b')).toHaveText('Company <architecture> · Internal </script> example');
   await expect(practice(page).locator('#docview')).toHaveClass(/sk-blueprint/);
   await expect(page.locator('body')).not.toHaveClass(/sk-blueprint/);
-  await expect(expanded.getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(practice(page).locator('#docview>.explore-navigation').getByRole('button',{name:'System flow',exact:true})).toHaveAttribute('aria-pressed','true');
   await expect.poll(()=>expanded.locator('.stepline').textContent()).toBe(caption);
   await expect(expanded.getByText('Company ingestion',{exact:true})).toBeVisible();
   await page.screenshot({path:info.outputPath('company-expanded.png')});

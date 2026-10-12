@@ -21,54 +21,17 @@ function mountNativeSpec(environment, spec, options){
     link.setAttribute('target','_blank');link.setAttribute('rel','noopener noreferrer');
   }
   var navigating=false;
-  var canvas=false,canvasSection=null,canvasFrame=0,canvasSeen=new Set(),canvasNavigation=null;
-  function createCanvasNavigation(){
-    canvasNavigation=createExploreNavigation(controller,{selectSection:function(rec){
-      if(rec.tabBlock!=null)controller.tabBlocks[rec.tabBlock-1].select(rec.tab,false,false);
-      if(controller.details)controller.details.showSection(rec.reference);
-      controller.activeTarget={kind:'diagram',section:rec.number};canvasSync();changed();
-    }});
-  }
-  function tabPrimary(target){
-    return target && controller.sections.find(function(rec){
-      return !rec.detailOnly && rec.hasDiagram && rec.viewport && rec.tabBlock===target.tabBlock && rec.tab===target.tab;
-    });
-  }
-  function canvasSync(){
-    if(!canvas && !canvasSection)return;
-    if(!canvasNavigation)createCanvasNavigation();
-    var target=controller.activeTarget || {};
-    var detail=controller.details && controller.details.activeSection && controller.details.activeSection();
-    var selected=target.kind==='tab'?tabPrimary(target):controller.sections.find(function(rec){return rec.viewport && rec.number===target.section;});
-    var next=canvas && (detail || selected || canvasSection || controller.sections.find(function(rec){return rec.viewport && !rec.detailOnly;}));
-    if(canvasSection && canvasSection!==next){
-      canvasNavigation.restore();
-      canvasSection.viewport.setReaderCanvas(false);canvasSection.viewport.setWorkbenchCanvas(false);
-      canvasSection.sectionEl.classList.remove('explore-active-section');
-    }
-    canvasSection=next || null;view.classList.toggle('explore-full-window',!!canvasSection);
-    environment.body.classList.toggle('native-canvas',!!canvasSection);
-    if(!canvasSection){canvasNavigation.restore();return;}
-    if(canvasSection.tabBlock!=null)controller.tabBlocks[canvasSection.tabBlock-1].select(canvasSection.tab,false,false);
-    if(!detail)controller.activeTarget={kind:'diagram',section:canvasSection.number};
-    canvasSection.sectionEl.classList.add('explore-active-section');
-    // Reuse the transient diagram canvas: opening it never changes the authored
-    // presentation, including a curated Home view's saved primary panel.
-    canvasSection.viewport.setWorkbenchCanvas(true);canvasSection.viewport.setReaderCanvas(true);
-    canvasNavigation.mount(canvasSection);
-    canvasSection.viewport.restoreInitialCamera();
-    var definition=canvasSection.viewport.viewDefinition(),key=canvasSection.reference+':'+(definition && definition.id || 'flow');
-    if(!canvasSeen.has(key)){
-      canvasSeen.add(key);cancelAnimationFrame(canvasFrame);var rec=canvasSection;
-      canvasFrame=requestAnimationFrame(function(){if(canvasSection===rec)rec.viewport.fitCanvas({left:24,right:24,top:20,bottom:190});});
-    }
-  }
+  var canvas=false;
+  function tabPrimary(target){return target && controller.views.primary(target.tabBlock,target.tab);}
+  function canvasSync(){environment.body.classList.toggle('native-canvas',canvas);}
   function snapshot(){
     var active=controller.activeTarget || {}, section=(controller.sections || []).find(function(s){return s.number===active.section;});
     if(!section && active.kind==='tab')section=tabPrimary(active);
     if(!section)return null;
     var target={section:section.reference}, presentation=section.presentation, sp=section.stepper;
-    if(presentation && presentation.viewId)target.view=presentation.viewId();
+    var ownerView=controller.views.current(section);
+    if(ownerView && !ownerView.legacy)target.view=ownerView.id;
+    else if(presentation && presentation.viewId)target.view=presentation.viewId();
     else if(section.hasDiagram)target.view='flow';
     if(sp && sp.mode()==='step'){target.path=sp.path();target.step=sp.current().id || String(sp.current().n+1);}
     var drilldown=controller.details && controller.details.snapshot();
@@ -77,6 +40,7 @@ function mountNativeSpec(environment, spec, options){
   }
   function changed(){if(environment.disposed || navigating)return;canvasSync();protectLinks();if(options.onChange)options.onChange(snapshot());}
   controller.onChange=changed;
+  var reader=initViewerExploreCanvas(controller,view,{container:environment.body,contained:true});
   environment.listen(view,'click',linkClick,true);environment.listen(view,'auxclick',linkClick,true);
   var size=new ResizeObserver(function(){if(options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));});size.observe(view);
   environment.fontsReady.then(function(){if(!environment.disposed && options.onResize)options.onResize(Math.ceil(view.getBoundingClientRect().height));},function(){
@@ -98,12 +62,11 @@ function mountNativeSpec(environment, spec, options){
       if(!section)throw new Error('This section is no longer in the published diagram. Refresh diagrams.');
       navigating=true;
       try{
+        if(!controller.views.ensure(section,target.view,true))throw new Error('This view is no longer available for this section.');
         if(controller.details)controller.details.showSection(section.reference);
         if(section.tabBlock!=null)controller.tabBlocks[section.tabBlock-1].select(section.tab,false,false);
         controller.activeTarget={kind:'diagram',section:section.number};
         var presentation=section.presentation;
-        if(target.view!=null && (presentation ? !presentation.setView || !presentation.setView(target.view) : target.view!=='flow' || !section.hasDiagram))
-          throw new Error('This view is no longer in the published diagram. Refresh diagrams.');
         var sp=section.stepper;
         if(sp && (target.path || target.step)){
           var source=records.find(function(record){return record.reference===section.reference;}).section.diagram;
@@ -116,9 +79,9 @@ function mountNativeSpec(environment, spec, options){
         }
         if(target.drilldown && controller.details)controller.details.restore(target.drilldown);
         if(!canvas && options.scrollIntoView!==false)section.sectionEl.scrollIntoView({block:'start',behavior:'instant'});
-      }finally{navigating=false;changed();}
+      }finally{navigating=false;changed();view.dispatchEvent(new CustomEvent('tab-view-change'));}
     },
     pause:function(){if(controller.details)controller.details.pause();if(!environment.disposed)controller.steppers.forEach(function(s){s.stepper.pause();});},
-    destroy:function(){if(environment.disposed)return;if(canvasFrame)cancelAnimationFrame(canvasFrame);if(canvasNavigation)canvasNavigation.destroy();try{controller.destroy();}finally{environment.destroy();}}
+    destroy:function(){if(environment.disposed)return;reader.destroy();try{controller.destroy();}finally{environment.destroy();}}
   };
 }

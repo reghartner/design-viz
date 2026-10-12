@@ -61,18 +61,30 @@ export function InlineFlowview({
       : FlowviewCompatibility.check(state.spec);
   return (
     <div aria-label="Inline diagram viewer">
+      <style>{`
+        .flowview-inline-actions :is(button,a,summary){box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;min-height:34px;margin:0;padding:6px 10px;border:1px solid #dce1f1;border-radius:7px;background:#fff;color:#27364b;font:500 12px/20px system-ui,sans-serif;text-decoration:none;white-space:nowrap;cursor:pointer;}
+        .flowview-inline-actions :is(button,a,summary):hover{background:#f1f4fc;border-color:#bac7e4;}
+        .flowview-inline-actions :is(button,a,summary):focus-visible{outline:2px solid #4956c9;outline-offset:2px;}
+        .flowview-inline-actions button:disabled{opacity:.5;cursor:default;}
+        .flowview-inline-actions summary{list-style:none;gap:7px;}
+        .flowview-inline-actions summary::-webkit-details-marker{display:none;}
+        .flowview-inline-actions summary::after{content:'▾';font-size:10px;}
+        .flowview-inline-actions details[open]>summary{color:#4956c9;border-color:#4956c9;background:#eef0fb;}
+        .flowview-inline-actions .flowview-inline-more{position:absolute;right:8px;top:calc(100% + 6px);z-index:120;width:220px;max-width:calc(100vw - 24px);box-sizing:border-box;display:grid;gap:4px;padding:6px;border:1px solid #dce1f1;border-radius:9px;background:#fff;box-shadow:0 6px 20px #14244220;}
+        .flowview-inline-more a{justify-content:flex-start;border-color:transparent;white-space:normal;}
+      `}</style>
       <CanvasFrame expanded={expanded} onClose={close} title={diagram.title}>
       <div style={expanded ? {position:'absolute',top:0,left:0,right:0,zIndex:100,
         display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'none'} :
         {display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap',marginBottom:16}}>
         {!expanded && <h3 style={{margin:0,fontSize:22}}>{diagram.title}</h3>}
-        <div ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap',pointerEvents:'auto',maxWidth:'100%',boxSizing:'border-box',
+        <div className="flowview-inline-actions" ref={canvasActions} role="toolbar" aria-label="Diagram actions" style={{position:'relative',display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',pointerEvents:'auto',maxWidth:'100%',boxSizing:'border-box',
           background:'#fff',border:'1px solid #dce1f1',borderRadius:expanded?0:10,padding:expanded?'6px 12px':8}}>
           <button ref={toggle} disabled={!rendered} onClick={() => expanded ? close() : setExpandedRevision(identity)}>
             {expanded ? 'Back to entity' : 'Expand canvas'}
           </button>
           <EvidenceLink url={workspaceLink(diagram.editUrl, diagram, address, entityRef, 'edit')}>Edit in Workbench</EvidenceLink>
-          <details style={{position:'relative'}}><summary style={{cursor:'pointer'}}>More</summary><div style={{position:'absolute',right:0,top:'100%',zIndex:120,minWidth:190,display:'grid',gap:12,padding:14,border:'1px solid #dce1f1',borderRadius:8,background:'#fff',boxShadow:'0 4px 18px #14244212'}}>
+          <details><summary>More</summary><div className="flowview-inline-more">
             <EvidenceLink url={workspaceLink(diagram.viewerUrl, diagram, address, entityRef, 'view')}>Open standalone viewer</EvidenceLink>
           </div></details>
         </div>

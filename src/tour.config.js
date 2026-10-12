@@ -29,10 +29,10 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'views',
-      target: {selector: '.diagram-view-choice', within: 'section'},
+      target: {selector: '.tab-view-choices:has(button + button)', within: 'page'},
       copy: {
-        heading: 'Choose a chapter',
-        body: 'Tabs organize the document; Chapters choose a saved perspective inside the current tab. A small screen icon on a chapter marks Explore: a canvas you can pan and zoom. The same screen icon on a tab means its primary diagram’s selected chapter uses Explore viewing mode.'
+        heading: 'Choose a View',
+        body: 'Tabs contain sections. Views choose which sections to show: Standard stacks them; Explore shows one at a time. Use Sections to move between the current View’s members. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
       }
     },
     {
@@ -174,9 +174,9 @@ var TOUR_DEFAULT_CONFIG = {
       id: 'explore-recovery',
       personas: ['eng', 'both'],
       diagramState: {presentation: 'explore', mode: 'step'},
-      target: {selector: '.explore-panel-choices', within: 'section'},
+      target: {selector: '.explore-navigation .explore-panel-choices', within: 'page'},
       secondary: [
-        {target: {selector: '.explore-stack', within: 'section'}, note: 'Stack at edge keeps available panels full size, adding columns to the left.'}
+        {target: {selector: '.explore-navigation .explore-stack', within: 'page'}, note: 'Stack at edge keeps available panels full size, adding columns to the left.'}
       ],
       copy: {
         heading: 'Bring a panel back',
@@ -185,7 +185,7 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'expand',
-      target: {selector: '[aria-label="Expand diagram view"], [aria-label="Exit expanded diagram view"]', within: 'section'},
+      target: {selector: '.explore-navigation [aria-label="Expand diagram view"], .explore-navigation [aria-label="Exit expanded diagram view"]', within: 'page'},
       copy: {
         heading: 'Give this section more room',
         body: 'Expand enlarges this section, using fullscreen when available. Your selected step stays put. Exit expanded view brings you back to the page.'

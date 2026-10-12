@@ -50,14 +50,14 @@ test('49 nodes, 81 edges, grouped graphs and plain chains bypass optional flow s
   const metrics=C.autoArrangeFlowMetrics;try{C.autoArrangeFlowMetrics=()=>assert.fail('bypass must avoid geometry work');for(const {d,r} of cases)assert.equal(C.autoArrangeFlowClarity(d,r,{renderJSON(){assert.fail('bypass must not route');}}),r);}finally{C.autoArrangeFlowMetrics=metrics;}
 });
 
-test('generated research tail improves without moving its junction; a compact cardinal tail is not unfolded for longer routes',()=>{
+test('generated research routes improve safely; a compact cardinal tail is not unfolded for longer routes',()=>{
   // Automatic PR457 outputs from d18761273437cd533a4dbffe3f834e27bbd7350b,
   // frozen before this pass; these are regression seeds, not human preference labels.
   const seeds=require('./fixtures/auto-arrange-flow-seeds.json');
   for(const [file,id] of [['./fixtures/auto-arrange-training/round2-input.spec.json','research-compute-federation'],['../examples/auto-arrange-baselines/graph-input.spec.json','approval-diamond']]){
     const d=require(file).page.blocks.find(b=>b.id===id).diagram,r=plain(seeds[id]);r.score=C.autoArrangeScore(d,r);const after=C.autoArrangeFlowClarity(d,r,viz);safe(d,r,after);semantics(d,after);
     if(id==='approval-diamond')assert.equal(after,r,'straightening the tail does not justify longer total routes');
-    else {assert.notEqual(after,r);assert.ok(C.autoArrangeFlowMetrics(d,after).routeLength<C.autoArrangeFlowMetrics(d,r).routeLength);const topology=C.autoArrangeFlowTopology(d),old=Object.fromEntries(r.positions.map(p=>[p.id,p]));for(const p of after.positions)if(topology.adj[p.id].length>2)assert.deepEqual(plain(p),old[p.id],'external junction connections keep their useful positions');}
+    else {assert.notEqual(after,r);assert.ok(C.autoArrangeFlowMetrics(d,after).routeLength<C.autoArrangeFlowMetrics(d,r).routeLength);assert.ok(C.autoArrangeFlowMetrics(d,after).diagonal<=C.autoArrangeFlowMetrics(d,r).diagonal);}
   }
 });
 
@@ -76,8 +76,8 @@ test('multiple competing chains receive declaration-independent geometry under t
   safe(d,r,after);assert.notEqual(after,r);
   const first=snapshots[0],eligible=first.sizes.map((size,i)=>size?i:-1).filter(i=>i>=0);
   assert.ok(first.sizes.reduce((a,b)=>a+b,0)>C.AUTO_ARRANGE_FLOW_LIMITS.checks,'the regression exhausts the real budget');
-  assert.equal(first.owners.length,C.AUTO_ARRANGE_FLOW_LIMITS.checks);
-  assert.deepEqual(first.owners.slice(0,eligible.length),eligible,'every feasible chain gets a check before any gets a second');
+  assert.equal(first.owners.length,Math.ceil(C.AUTO_ARRANGE_FLOW_LIMITS.checks/4));
+  assert.deepEqual(first.owners.slice(0,eligible.length),eligible.slice(0,first.owners.length),'each checked motif gets a check before any gets a second');
   const original=Object.keys(d.nodes);
   for(const numeric of [false,true]){
   const names=Object.fromEntries(original.map((id,i)=>[id,numeric?String(original.length-i):'renamed-'+(original.length-i)]));
@@ -90,4 +90,67 @@ test('multiple competing chains receive declaration-independent geometry under t
   assert.deepEqual(restored.sort(byOriginal),plain(after.positions).sort(byOriginal));
   assert.deepEqual(plain(other.edges),plain(after.edges),'mapped routing is also independent of declarations and names');
   }
+});
+
+test('leaf-pair joins, forks and mixed arrows use the same horizontal run and reject an unrelated blocker',()=>{
+  const nodes={left:{},right:{},hub:{},core:{},tail:{}},links=[['left','hub'],['right','hub'],['hub','core'],['core','tail'],['tail','hub']];
+  const seed=[['left',405,100],['right',690,100],['hub',405,234.6],['core',120,369.2],['tail',405,503.8]].map(([id,x,y])=>({id,x,y}));
+  let expected;
+  for(const mode of ['join','fork','mixed']){
+    const d={nodes,edges:links.map(([a,b],i)=>({from:mode==='fork'||mode==='mixed'&&i%2?b:a,to:mode==='fork'||mode==='mixed'&&i%2?a:b}))};
+    const r={positions:plain(seed),edges:d.edges.map(()=>({}))};r.score=C.autoArrangeScore(d,r);
+    const after=C.autoArrangeFlowClarity(d,r,viz),p=Object.fromEntries(after.positions.map(p=>[p.id,p]));safe(d,r,after);
+    assert.equal(p.left.y,p.hub.y);assert.equal(p.right.y,p.hub.y);assert.ok(p.left.x<p.hub.x&&p.hub.x<p.right.x);
+    if(expected)assert.deepEqual(plain(after.positions),expected);else expected=plain(after.positions);
+    const blocked={nodes:{...nodes,blocker:{}},edges:d.edges},br={positions:seed.concat([{id:'blocker',x:120,y:234.6}]),edges:r.edges};br.score=C.autoArrangeScore(blocked,br);
+    const kept=C.autoArrangeFlowClarity(blocked,br,viz);if(kept!==br)safe(blocked,br,kept);
+    assert.deepEqual(plain(kept.positions.find(p=>p.id==='blocker')),br.positions.at(-1),'unrelated cards never move to make room');
+  }
+});
+
+test('readability structure measures undirected degree-two bends identically for every arrow orientation',()=>{
+  const nodes={a:{},b:{},c:{},d:{},e:{}},positions=[['a',120,100],['b',405,100],['c',405,234.6],['d',690,369.2],['e',975,369.2]].map(([id,x,y])=>({id,x,y}));
+  let expected;
+  for(const links of [[['a','b'],['b','c']],[['b','a'],['c','b']],[['a','b'],['c','b']],[['b','a'],['b','c']]]){
+    const d={nodes,edges:links.map(([from,to])=>({from,to}))},metrics=plain(C.autoArrangeFlowStructure(d,positions,C.autoArrangeFlowTopology(d)));
+    if(expected)assert.deepEqual(metrics,expected);else expected=metrics;
+    assert.equal(metrics.turns,1);
+  }
+});
+
+test('data-platform keeps both intake runs and aligns its top leaf pair without changing content',()=>{
+  const d=require('../examples/auto-arrange-large-baselines/graph-input.spec.json').page.blocks.find(b=>b.id==='data-platform').diagram,r=plain(require('./fixtures/auto-arrange-flow-seeds.json')['data-platform']);r.score=C.autoArrangeScore(d,r);
+  const after=C.autoArrangeFlowClarity(d,r,viz),p=Object.fromEntries(after.positions.map(p=>[p.id,p]));safe(d,r,after);semantics(d,after);
+  for(const ids of [['orders-db','orders-cdc','event-bus'],['accounts-db','accounts-cdc','event-bus'],['iot-gateway','event-ingress','mobile-events']]){
+    assert.ok(ids.every(id=>Math.abs(p[id].y-p[ids[0]].y)<.1),ids.join(' / ')+' shares a row');
+  }
+  assert.ok(p['iot-gateway'].x<p['event-ingress'].x&&p['event-ingress'].x<p['mobile-events'].x);
+  assert.ok(Math.abs(p['legacy-warehouse'].y-p['legacy-etl'].y)<.1,'the warehouse can rise to its neighbor row');
+  assert.ok(p['finance-export'].y<r.positions.find(p=>p.id==='finance-export').y-.1,'its attached leaf rises with it');
+  assert.ok(C.autoArrangeFlowMetrics(d,after).routeLength<C.autoArrangeFlowMetrics(d,r).routeLength);
+});
+
+test('early leaf tuck permits source and sink leaves on identical placed geometry',()=>{
+  const positions=[{id:'hub',x:0,y:0},{id:'leaf',x:0,y:800},{id:'left',x:-408,y:0},{id:'right',x:408,y:0}],nodes=Object.fromEntries(positions.map(p=>[p.id,{}]));
+  const forward={nodes,edges:[{from:'hub',to:'leaf'},{from:'hub',to:'left'},{from:'hub',to:'right'}]},reverse={nodes,edges:forward.edges.map(e=>({from:e.to,to:e.from}))};
+  const a=C.autoArrangeLeafPositions(forward,{positions}),b=C.autoArrangeLeafPositions(reverse,{positions});assert.ok(a);assert.deepEqual(plain(a),plain(b));assert.equal(a.leaf.y,a.hub.y);
+});
+
+test('a beneficial terminal chain after the sixteenth is visited before a no-improvement round can stop',()=>{
+  const d={nodes:{},edges:[]},r={positions:[],edges:[]};
+  for(let component=0;component<6;component++){
+    const x=component*2500,name=id=>'part'+component+'-'+id;
+    const positions=[['hub',405,350],['left',120,350],['left-leaf',-165,350],['right',690,350],['right-leaf',975,350],['down',405,529],['down-leaf',component===5?750:405,component===5?529:708]];
+    for(const [id,px,y] of positions){d.nodes[name(id)]={};r.positions.push({id:name(id),x:px+x,y});}
+    for(const branch of ['left','right','down'])d.edges.push({from:name('hub'),to:name(branch)},{from:name(branch),to:name(branch+'-leaf')});
+  }
+  r.edges=d.edges.map(()=>({}));r.score=C.autoArrangeScore(d,r);
+  assert.equal(Object.keys(d.nodes).length,42);assert.equal(C.autoArrangeFlowTopology(d).chains.length,18);
+  const schedule=C.autoArrangeFlowSchedule,snapshots=[];let after;
+  try{C.autoArrangeFlowSchedule=(queues,limit)=>schedule(queues,Math.min(limit,16));assert.equal(C.autoArrangeFlowClarity(d,r,viz),r,'a sixteen-check first round misses the only beneficial neighborhood');}finally{C.autoArrangeFlowSchedule=schedule;}
+  try{C.autoArrangeFlowSchedule=(queues,limit)=>{const selected=schedule(queues,limit);snapshots.push({eligible:queues.filter(q=>q.length).length,owners:selected.map(p=>queues.findIndex(q=>q.includes(p)))});return selected;};after=C.autoArrangeFlowClarity(d,r,viz);}finally{C.autoArrangeFlowSchedule=schedule;}
+  assert.equal(snapshots[0].eligible,18);assert.deepEqual(plain(snapshots[0].owners.slice(0,18)),Array.from({length:18},(_,i)=>i));
+  assert.ok(snapshots.reduce((sum,s)=>sum+s.owners.length,0)<=C.AUTO_ARRANGE_FLOW_LIMITS.checks);
+  assert.notEqual(after,r);safe(d,r,after);assert.ok(C.autoArrangeFlowMetrics(d,after).turns<C.autoArrangeFlowMetrics(d,r).turns);
+  assert.ok(after.positions.some((p,i)=>p.id.startsWith('part5-')&&(p.x!==r.positions[i].x||p.y!==r.positions[i].y)),'the final component supplies the actual improvement');
 });

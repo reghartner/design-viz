@@ -10,13 +10,13 @@ function fixture(){
 function minGap(r){let gap=Infinity;r.positions.forEach((a,i)=>r.positions.slice(i+1).forEach(b=>{gap=Math.min(gap,Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44)));}));return gap;}
 function assertSafe(before,after){assert.equal(after.score.overlaps,0);assert.equal(after.score.hits,0);assert.ok(after.score.crossings<=before.score.crossings);assert.ok(after.score.incidentCrossings<=before.score.incidentCrossings);assert.ok(minGap(after)>=minGap(before)-.1);assert.ok(after.score.width<=before.score.width*1.1+.1);assert.ok(Math.hypot(after.score.width,after.score.height)<=Math.hypot(before.score.width,before.score.height)+.1);}
 
-test('sparse rows fold adjacent terminal links without reversing a source join or enforcing screen aspect',()=>{
+test('sparse rows fold adjacent terminal links without imposing arrow direction or screen aspect',()=>{
   const {d,result}=fixture(),unchanged=plain({d,result}),after=C.autoArrangeReadability(d,result,viz),out=plain(C.autoArrangeDiagram(d,after));
   assertSafe(result,after);assert.ok(after.score.height<result.score.height);assert.ok(after.score.area<result.score.area*.75);
   assert.equal(result.score.shape,0);assert.ok(after.score.aspect>16/9,'a shorter drawing may be wider than a monitor');
   const positions=Object.fromEntries(after.positions.map(p=>[p.id,p]));
-  for(const id of ['a','b','c'])assert.ok(positions[id].y<=positions.d.y,'inputs retain their join direction');
-  for(const [a,b] of [['d','e'],['e','f']])assert.ok(positions[a].x===positions[b].x || positions[a].y===positions[b].y,'terminal links use cardinal neighbors');
+  assert.ok(['a','b','c'].some(id=>positions[id].y>positions.d.y),'an input can move below its join when geometry improves');
+  assert.ok(C.autoArrangeFlowMetrics(d,after).diagonal<=C.autoArrangeFlowMetrics(d,result).diagonal,'the whole graph keeps at least as many cardinal links');
   for(const key of ['nodes','steps','paths','panels'])assert.deepEqual(out[key],d[key]);assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges);
   assert.deepEqual(plain({d,result}),unchanged,'search is nonmutating');assert.deepEqual(plain(C.autoArrangeReadability(d,result,viz)),plain(after),'bounded search is deterministic');
   const names=Object.fromEntries(Object.keys(d.nodes).map((id,i)=>[id,'node-'+i]));
@@ -64,16 +64,14 @@ test('edge-over-budget and irregular-row layouts bypass candidate scoring and ro
   }finally{C.autoArrangeScore=score;}
 });
 
-test('generated research seed loses a sparse row with its source fan intact; telemetry rejects a reversed input',()=>{
+test('generated research and telemetry seeds lose sparse rows with safe direction-free geometry',()=>{
   const seeds=require('./fixtures/auto-arrange-readability-seeds.json');
   for(const [file,id] of [['./fixtures/auto-arrange-training/round2-input.spec.json','research-compute-federation'],['../examples/auto-arrange-baselines/graph-input.spec.json','telemetry-fan']]){
     const d=require(file).page.blocks.find(b=>b.id===id).diagram,before=plain(seeds[id]);before.score=C.autoArrangeScore(d,before);const after=C.autoArrangeReadability(d,before,viz);assertSafe(before,after);
     if(id==='research-compute-federation'){
       assert.ok(new Set(after.positions.map(p=>p.y)).size<new Set(before.positions.map(p=>p.y)).size);
       assert.ok(after.score.area<before.score.area*.92);assert.equal(after.score.incidentCrossings,0);
-      const p=Object.fromEntries(after.positions.map(p=>[p.id,p]));
-      for(const edge of d.edges.filter(e=>!d.edges.some(f=>f.to===e.from)))assert.ok(p[edge.from].y<=p[edge.to].y,'original downward source inputs retain clear join direction');
-    }else assert.deepEqual(plain(after),plain(before),'saving one row does not justify a source bowing back upward into the join');
+    }else {assert.ok(after.score.area<before.score.area*.9);assert.ok(after.score.length<before.score.length);assert.equal(after.score.incidentCrossings,0);}
     assert.deepEqual(plain(C.validate(C.normalize(C.autoArrangeDiagram(d,after))).errors),[]);
   }
 });
@@ -91,4 +89,13 @@ test('full automatic pipeline publishes the compact incident graph after spacing
   assert.ok(refined.score.area<before.score.area*.85);assert.deepEqual(plain(C.autoArrangeScore(d,result)),plain(result.score),'stored score measures the final viewer geometry');
   const out=plain(C.autoArrangeDiagram(d,result));assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
   assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
+});
+
+test('sparse-row proposals ignore complete and mixed arrow reversals on the same placed topology',()=>{
+  const {d,result}=fixture();let expected;
+  for(const mode of ['forward','reverse','mixed']){
+    const other={...d,edges:d.edges.map((e,i)=>mode==='reverse'||mode==='mixed'&&i%2?{...e,from:e.to,to:e.from}:e)},seed={...result,score:C.autoArrangeScore(other,result)};
+    const after=C.autoArrangeReadability(other,seed,viz);assertSafe(seed,after);
+    if(expected)assert.deepEqual(plain(after.positions),expected);else expected=plain(after.positions);
+  }
 });

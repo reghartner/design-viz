@@ -70,7 +70,7 @@ nodes. Both routes must preserve the winner's overlap, card-hit, ordinary-crossi
 and shared-endpoint-crossing ceilings; attachments remain automatic.
 
 After choosing the structural layout, ungrouped diagrams with at most 12 nodes
-and 24 edges may receive one local compaction attempt. A terminal sink with
+and 24 edges may receive one local compaction attempt. A terminal leaf with
 exactly one incident edge can move beside its neighbor if the new position
 shrinks the card footprint and keeps the card gap. The rest of the selected
 layout stays in place, preserving the spacing of forks and joins. The candidate
@@ -82,9 +82,8 @@ unchanged. Larger or denser diagrams receive no extra attempt.
 Ranked ungrouped diagrams with at most 24 nodes and 48 edges also receive a
 bounded alignment pass when nearby card centers use scattered coordinates.
 It merges nearby centers into rows and columns, infers consistent gaps from
-the existing spacing, and searches nearby empty grid cells. Sources and sinks
-keep their grid positions while intermediate cards can share rows despite
-having different graph depths. Empty grid lines are closed, so occupied rows
+the existing spacing, and searches nearby empty grid cells. Cards can share rows despite different graph depths; source and sink status
+does not lock a card to its original grid position. Empty grid lines are closed, so occupied rows
 and columns have equal gaps. The objective checks card/group overlap, unrelated
 card hits and crossings first, then balances straight connection distance with
 a penalty for diagonal connections. This supports staggered processing/storage
@@ -112,14 +111,14 @@ when the existing rank count exceeds the compact grid by at least two rows.
 The entrance folds left to right across the first row; the remaining nodes
 can swap cells on a regular grid with 204-unit columns and 120-unit rows.
 The grid has `ceil(sqrt(nodeCount))` columns and room for roughly one empty
-cell per two cards. Forward connections retain their downstream order, and
-parallel two-hop fork/join branches share a processing row. Feedback edges
-remain free to travel upward.
+cell per two cards. Ordered seed candidates retain downstream order and shared
+rows for parallel two-hop fork/join branches. When routing remains unresolved,
+the search also compares candidates without downstream-order constraints.
 
 Twelve deterministic seeded searches each try 20,000 cell moves or swaps.
 Cached straight-segment/card and segment-pair geometry provides the cheap
-search objective; it also penalizes diagonal connections and reversed forward
-links. These estimates never authorize the final layout. At most four
+search objective; it penalizes diagonal connections, with a forward-order
+penalty only in ordered seed candidates. These estimates never authorize the final layout. At most four
 finalists receive the full viewer score, with native rerouting only when the
 automatic candidate is unsafe. Acceptance requires no overlaps or unrelated
 card hits, no crossing increase, shorter total center distance, no greater
@@ -157,10 +156,10 @@ full viewer score. Larger, grouped and irregular-row layouts retain their
 selected result. Successful directed-path snakes still return before this pass.
 
 Cheap center geometry ranks complete row-removal proposals across the graph.
-It prefers shorter, cardinal connections and penalizes newly reversed source
-inputs to joins. This is a soft direction preference; feedback links remain
-free to point upward. A proposal must also stay near the source's combined
-readability cost, so saving a row alone does not justify a worse input fan.
+It prefers shorter, cardinal connections without penalizing upward arrows or
+reversing the vertical order of a source and join. A proposal must also stay
+near the starting geometry's combined readability cost, so saving a row alone
+does not justify longer, more diagonal connections.
 Final acceptance uses actual viewer paths: no overlaps or card hits, neither
 crossing count may increase, minimum card clearance is preserved, and aligned
 connection count cannot fall below the starting layout. Each accepted step
@@ -175,9 +174,12 @@ Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
 A final flow-clarity pass can rotate a two-to-four-card terminal chain together
-with its junction and one directly attached leaf. It handles ungrouped diagrams
+with its junction and one directly attached leaf. It also places a junction's
+two leaf neighbors in a straight three-card run, preferring a shared row, and
+can align a junction and its single leaf beside another connected neighbor
+within one grid pitch. It handles ungrouped diagrams
 with 5–48 nodes and at most 80 edges. It favors clearing cards from linked
-horizontal/vertical corridors and straightening simple directed chains; it does
+horizontal/vertical corridors and straightening simple undirected chains; it does
 not rearrange dense shared-hub cores. Junction moves are evaluated against the
 whole graph, including connections outside the moved chain.
 
@@ -187,15 +189,22 @@ result, occupied width and height may grow at most 30%, occupied area at most
 These are conservative experimental envelopes, not a target size. Growth and
 additional sparsely occupied rows receive soft penalties. Minimum card clearance
 is preserved; overlaps, card hits and increases in either crossing count are
-rejected. Straightening a chain without clearing an obstructed corridor must
-also shorten total sampled routes, so unfolding a compact tail alone cannot
+rejected. Straightening a chain, reducing diagonal links, or aligning a leaf pair without
+clearing an obstructed corridor must also shorten total sampled routes, so
+unfolding a compact tail alone cannot
 justify longer connections elsewhere. Aspect ratio remains a soft preference.
 
-Three deterministic passes consider at most 288 proposals each, with 48 total
-candidate checks and 12 native reroutes. Chains are ordered by their seed geometry,
-with one feasible proposal per chain in each scheduling round before another
-proposal from any chain. Node names and declaration order cannot consume the
-budget ahead of other chains. Cheap structural rejection precedes
+Five deterministic passes consider at most 288 proposals each, with 64 total
+candidate checks and 12 native reroutes. The two initial terminal-chain rounds may
+normally share half the checks; each round first guarantees one check for
+every eligible neighborhood, within the total cap. Three later rounds handle
+leaf neighborhoods with the remaining budget. Neighborhoods are ordered by their seed geometry, with
+one feasible proposal per neighborhood in each scheduling round before a
+second from any neighborhood. Node names and declaration order cannot consume
+the budget ahead of equivalent neighborhoods. Each leaf neighborhood shortlists
+its closest cardinal placements before paying for actual routing. Bend measurements use undirected
+neighbor pairs: forks, joins and mixed arrow orientations receive the same
+geometric proposals. Cheap structural rejection precedes
 actual path sampling. Both automatically bowed routes and native curves count
 in length and detour measurements. The directed-path snake returns before these
 optional passes, preserving the compact two-row six-node chain. These local
@@ -377,8 +386,8 @@ comparison diagrams: a chain, a fork/join, three larger systems with legacy
 monoliths and direct/back couplings, and a deliberately nonplanar K₃,₃.
 Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
 `auto-arranged.spec.json` using the production algorithm and print occupied
-geometry/crossing metrics. The focused tests verify these outputs exactly,
-including stage-specific snapshots of the compact 3+3 snake and a terminal-leaf tuck that preserves its fork,
-aligned telemetry and fulfillment grids, semantic preservation and collision
-safety. The short chain deliberately
+geometry/crossing metrics. The focused tests compare current deterministic geometry against these frozen
+reference outputs for crossing counts, route length and footprint bounds. They
+retain the compact 3+3 snake snapshot and verify source-or-sink leaf tucks that
+preserve their fork, semantic preservation and collision safety. The short chain deliberately
 exceeds 16:9. The final refinement passes preserve safety without imposing a universal aspect limit.

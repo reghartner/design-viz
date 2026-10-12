@@ -221,7 +221,10 @@ metrics guide proposals; rendered A/B review is still needed to assess clarity.
 
 A neighborhood pass considers internal degree-two cards at direct corners
 formed by their two neighbors, including moves across both axes at once. It also
-considers placing a leaf beside another leaf attached to the same hub. Terminal
+considers placing a leaf beside another leaf attached to the same hub. When
+both neighbors share a row or column, it offers interior inline positions with
+room for the existing card pitch on both sides. Equal-cost inline routes prefer
+a balanced midpoint over placing the connector close to one neighbor. Terminal
 chains remain the responsibility of the preceding flow pass. Four passes use
 at most 192 proposals each, 36 actual-path checks and six native reroutes, within
 the same 48-node/80-edge ungrouped limit. Candidates are ranked by geometry,
@@ -323,6 +326,20 @@ diagonals, fan rows or sparse rows. Its explicit distance gain can accept a
 safe straight-edge shortening without the general neighborhood's 75-point
 structural-benefit threshold. Aspect alone does not veto this shortening when
 both occupied dimensions stay bounded.
+
+A final spatial-path cleanup can move a peripheral connected path that has
+three or four external links. It discovers connected components on either side
+of horizontal and vertical coordinate cuts instead of enumerating edge-cut
+combinations. Eligible paths contain 3–8 cards, at most one multiway node, and no
+recognized protected frame members. Geometry and boundary-link length rank at
+most eight groups before docking.
+
+One round shares at most 128 shortlisted placements, 24 actual-path checks and
+six selective native repairs. The existing connected-block evaluator supplies
+cardinal docking/quarter turns and all its clearance, crossing, frame, footprint,
+route-growth and meaningful-improvement gates. Original semantics are preserved.
+This can shorten an exposed path around a feedback loop; it does not solve or
+recompose the entire feedback core.
 
 Before publication, every completed arrangement is translated to consistent
 near-origin margins: its leftmost occupied geometry starts at 45 logical units

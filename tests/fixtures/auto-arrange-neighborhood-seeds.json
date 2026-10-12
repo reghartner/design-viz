@@ -1857,5 +1857,969 @@
         "to": "lend-audit"
       }
     ]
+  },
+  "research-compute-federation-accepted": {
+    "positions": [
+      {
+        "id": "compute-notebook",
+        "x": 766.8382352941176,
+        "y": 100
+      },
+      {
+        "id": "compute-cli",
+        "x": 1051.8382352941176,
+        "y": 100
+      },
+      {
+        "id": "compute-workflow",
+        "x": 1336.8382352941176,
+        "y": 100
+      },
+      {
+        "id": "compute-submission",
+        "x": 1051.8382352941176,
+        "y": 252
+      },
+      {
+        "id": "compute-identity",
+        "x": 1479.3382352941176,
+        "y": 252
+      },
+      {
+        "id": "compute-directory",
+        "x": 1764.3382352941176,
+        "y": 252
+      },
+      {
+        "id": "compute-quota",
+        "x": 1479.3382352941176,
+        "y": 404
+      },
+      {
+        "id": "compute-planner",
+        "x": 1479.3382352941176,
+        "y": 556
+      },
+      {
+        "id": "compute-registry",
+        "x": 1194.3382352941176,
+        "y": 404
+      },
+      {
+        "id": "compute-staging",
+        "x": 1051.8382352941176,
+        "y": 556
+      },
+      {
+        "id": "compute-scheduler",
+        "x": 1479.3382352941176,
+        "y": 708
+      },
+      {
+        "id": "compute-cpu",
+        "x": 1123.0882352941176,
+        "y": 860
+      },
+      {
+        "id": "compute-gpu",
+        "x": 766.8382352941176,
+        "y": 860
+      },
+      {
+        "id": "compute-batch",
+        "x": 339.3382352941176,
+        "y": 860
+      },
+      {
+        "id": "compute-results",
+        "x": 339.3382352941176,
+        "y": 1012
+      },
+      {
+        "id": "compute-telemetry",
+        "x": 339.3382352941176,
+        "y": 708
+      },
+      {
+        "id": "compute-costs",
+        "x": 1194.3382352941176,
+        "y": 1012
+      },
+      {
+        "id": "compute-object",
+        "x": 624.3382352941176,
+        "y": 1012
+      },
+      {
+        "id": "compute-validator",
+        "x": 909.3382352941176,
+        "y": 1012
+      },
+      {
+        "id": "compute-quarantine",
+        "x": 1194.3382352941176,
+        "y": 1164
+      },
+      {
+        "id": "compute-replay",
+        "x": 1479.3382352941176,
+        "y": 860
+      },
+      {
+        "id": "compute-catalog",
+        "x": 909.3382352941176,
+        "y": 1164
+      },
+      {
+        "id": "compute-download",
+        "x": 624.3382352941176,
+        "y": 1164
+      },
+      {
+        "id": "compute-portal",
+        "x": 339.33823529411757,
+        "y": 1164
+      },
+      {
+        "id": "compute-archive",
+        "x": 1128.6764705882351,
+        "y": 1316
+      },
+      {
+        "id": "compute-dashboard",
+        "x": 624.3382352941176,
+        "y": 708
+      },
+      {
+        "id": "compute-alert",
+        "x": 909.3382352941176,
+        "y": 708
+      },
+      {
+        "id": "compute-repair",
+        "x": 1194.3382352941176,
+        "y": 708
+      },
+      {
+        "id": "compute-budget",
+        "x": 1764.3382352941176,
+        "y": 1012
+      },
+      {
+        "id": "compute-allocation",
+        "x": 1764.3382352941176,
+        "y": 860
+      },
+      {
+        "id": "compute-export",
+        "x": 1698.6764705882351,
+        "y": 1316
+      },
+      {
+        "id": "compute-audit",
+        "x": 1413.6764705882351,
+        "y": 1316
+      },
+      {
+        "id": "compute-legacy",
+        "x": 120,
+        "y": 556
+      },
+      {
+        "id": "compute-instrument",
+        "x": 437.13235294117646,
+        "y": 404
+      }
+    ],
+    "edges": [
+      {
+        "from": "compute-notebook",
+        "to": "compute-submission"
+      },
+      {
+        "from": "compute-cli",
+        "to": "compute-submission"
+      },
+      {
+        "from": "compute-workflow",
+        "to": "compute-submission"
+      },
+      {
+        "from": "compute-submission",
+        "to": "compute-identity"
+      },
+      {
+        "from": "compute-directory",
+        "to": "compute-identity"
+      },
+      {
+        "from": "compute-identity",
+        "to": "compute-quota"
+      },
+      {
+        "from": "compute-quota",
+        "to": "compute-planner"
+      },
+      {
+        "from": "compute-registry",
+        "to": "compute-planner"
+      },
+      {
+        "from": "compute-submission",
+        "to": "compute-staging"
+      },
+      {
+        "from": "compute-staging",
+        "to": "compute-scheduler"
+      },
+      {
+        "from": "compute-planner",
+        "to": "compute-scheduler"
+      },
+      {
+        "from": "compute-instrument",
+        "to": "compute-staging"
+      },
+      {
+        "from": "compute-instrument",
+        "to": "compute-legacy"
+      },
+      {
+        "from": "compute-legacy",
+        "to": "compute-batch"
+      },
+      {
+        "from": "compute-scheduler",
+        "to": "compute-cpu"
+      },
+      {
+        "from": "compute-scheduler",
+        "to": "compute-gpu",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": 25.5,
+            "dy": -5.4
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": -25.1,
+            "dy": 5.4
+          }
+        ]
+      },
+      {
+        "from": "compute-scheduler",
+        "to": "compute-batch",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": 97.9,
+            "dy": -13.1
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": -97.6,
+            "dy": 13
+          }
+        ]
+      },
+      {
+        "from": "compute-cpu",
+        "to": "compute-results"
+      },
+      {
+        "from": "compute-cpu",
+        "to": "compute-telemetry"
+      },
+      {
+        "from": "compute-cpu",
+        "to": "compute-costs"
+      },
+      {
+        "from": "compute-gpu",
+        "to": "compute-results",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": -1.5,
+            "dy": 0.5
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 1.4,
+            "dy": -0.5
+          }
+        ]
+      },
+      {
+        "from": "compute-gpu",
+        "to": "compute-telemetry",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": -1.5,
+            "dy": -0.5
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 1.4,
+            "dy": 0.5
+          }
+        ]
+      },
+      {
+        "from": "compute-gpu",
+        "to": "compute-costs",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": 1.5,
+            "dy": 0.5
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": -1.4,
+            "dy": -0.5
+          }
+        ]
+      },
+      {
+        "from": "compute-batch",
+        "to": "compute-results"
+      },
+      {
+        "from": "compute-batch",
+        "to": "compute-telemetry"
+      },
+      {
+        "from": "compute-batch",
+        "to": "compute-costs"
+      },
+      {
+        "from": "compute-results",
+        "to": "compute-object"
+      },
+      {
+        "from": "compute-object",
+        "to": "compute-validator"
+      },
+      {
+        "from": "compute-validator",
+        "to": "compute-quarantine"
+      },
+      {
+        "from": "compute-quarantine",
+        "to": "compute-replay"
+      },
+      {
+        "from": "compute-replay",
+        "to": "compute-scheduler"
+      },
+      {
+        "from": "compute-validator",
+        "to": "compute-catalog"
+      },
+      {
+        "from": "compute-catalog",
+        "to": "compute-download"
+      },
+      {
+        "from": "compute-download",
+        "to": "compute-portal"
+      },
+      {
+        "from": "compute-catalog",
+        "to": "compute-archive"
+      },
+      {
+        "from": "compute-telemetry",
+        "to": "compute-dashboard"
+      },
+      {
+        "from": "compute-dashboard",
+        "to": "compute-alert"
+      },
+      {
+        "from": "compute-alert",
+        "to": "compute-repair"
+      },
+      {
+        "from": "compute-repair",
+        "to": "compute-scheduler"
+      },
+      {
+        "from": "compute-costs",
+        "to": "compute-budget"
+      },
+      {
+        "from": "compute-budget",
+        "to": "compute-allocation"
+      },
+      {
+        "from": "compute-allocation",
+        "to": "compute-quota"
+      },
+      {
+        "from": "compute-budget",
+        "to": "compute-export"
+      },
+      {
+        "from": "compute-export",
+        "to": "compute-audit"
+      },
+      {
+        "from": "compute-archive",
+        "to": "compute-audit"
+      },
+      {
+        "from": "compute-legacy",
+        "to": "compute-results"
+      }
+    ]
+  },
+  "freight-operations-accepted": {
+    "positions": [
+      {
+        "id": "booking-portal",
+        "x": 120,
+        "y": 100
+      },
+      {
+        "id": "edi-gateway",
+        "x": 120,
+        "y": 369.2
+      },
+      {
+        "id": "call-center",
+        "x": 690,
+        "y": 234.6
+      },
+      {
+        "id": "legacy-tms",
+        "x": 690,
+        "y": 369.2
+      },
+      {
+        "id": "quote-service",
+        "x": 405,
+        "y": 234.6
+      },
+      {
+        "id": "rate-store",
+        "x": 405,
+        "y": 100
+      },
+      {
+        "id": "contract-store",
+        "x": 120,
+        "y": 234.59999999999968
+      },
+      {
+        "id": "booking-service",
+        "x": 405,
+        "y": 369.2
+      },
+      {
+        "id": "order-store",
+        "x": 405,
+        "y": 503.7999999999999
+      },
+      {
+        "id": "route-planner",
+        "x": 690,
+        "y": 638.4
+      },
+      {
+        "id": "map-service",
+        "x": 690,
+        "y": 503.7999999999999
+      },
+      {
+        "id": "capacity-service",
+        "x": 690,
+        "y": 772.9999999999999
+      },
+      {
+        "id": "tender-service",
+        "x": 690,
+        "y": 907.5999999999998
+      },
+      {
+        "id": "carrier-portal",
+        "x": 690,
+        "y": 1042.1999999999998
+      },
+      {
+        "id": "carrier-api",
+        "x": 975,
+        "y": 1042.1999999999998
+      },
+      {
+        "id": "retry-queue",
+        "x": 975,
+        "y": 907.6000000000001
+      },
+      {
+        "id": "dispatch-board",
+        "x": 690,
+        "y": 1176.8
+      },
+      {
+        "id": "pickup-scheduler",
+        "x": 690,
+        "y": 1311.3999999999996
+      },
+      {
+        "id": "driver-app",
+        "x": 405,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "yard-gate",
+        "x": 690,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "dock-scheduler",
+        "x": 975,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "scan-ingest",
+        "x": 1260,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "tracking-service",
+        "x": 1545,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "gps-gateway",
+        "x": 1545,
+        "y": 1580.5999999999995
+      },
+      {
+        "id": "status-store",
+        "x": 1260,
+        "y": 1176.8
+      },
+      {
+        "id": "eta-service",
+        "x": 1545,
+        "y": 1176.8
+      },
+      {
+        "id": "exception-engine",
+        "x": 1830,
+        "y": 1176.8
+      },
+      {
+        "id": "ops-console",
+        "x": 1260,
+        "y": 1042.2000000000003
+      },
+      {
+        "id": "customer-updates",
+        "x": 2115,
+        "y": 1715.1999999999996
+      },
+      {
+        "id": "webhook-dispatch",
+        "x": 2115,
+        "y": 1849.7999999999997
+      },
+      {
+        "id": "billing-trigger",
+        "x": 1830,
+        "y": 1715.1999999999996
+      },
+      {
+        "id": "proof-store",
+        "x": 405,
+        "y": 1715.1999999999996
+      },
+      {
+        "id": "customs-broker",
+        "x": 120,
+        "y": 503.7999999999999
+      },
+      {
+        "id": "customs-service",
+        "x": 120,
+        "y": 638.4
+      },
+      {
+        "id": "document-store",
+        "x": 120,
+        "y": 772.9999999999999
+      },
+      {
+        "id": "warehouse-wms",
+        "x": 120,
+        "y": 1311.3999999999996
+      },
+      {
+        "id": "linehaul-hub",
+        "x": 120,
+        "y": 1445.9999999999998
+      },
+      {
+        "id": "last-mile-hub",
+        "x": 120,
+        "y": 1715.1999999999996
+      },
+      {
+        "id": "analytics-feed",
+        "x": 2115,
+        "y": 1984.3999999999999
+      },
+      {
+        "id": "audit-archive",
+        "x": 1830,
+        "y": 503.7999999999999
+      }
+    ],
+    "edges": [
+      {
+        "from": "rate-store",
+        "to": "quote-service"
+      },
+      {
+        "from": "contract-store",
+        "to": "quote-service"
+      },
+      {
+        "from": "booking-portal",
+        "to": "quote-service"
+      },
+      {
+        "from": "quote-service",
+        "to": "booking-service"
+      },
+      {
+        "from": "edi-gateway",
+        "to": "booking-service"
+      },
+      {
+        "from": "call-center",
+        "to": "booking-service"
+      },
+      {
+        "from": "booking-service",
+        "to": "order-store"
+      },
+      {
+        "from": "call-center",
+        "to": "legacy-tms"
+      },
+      {
+        "from": "legacy-tms",
+        "to": "order-store"
+      },
+      {
+        "from": "order-store",
+        "to": "route-planner"
+      },
+      {
+        "from": "map-service",
+        "to": "route-planner"
+      },
+      {
+        "from": "route-planner",
+        "to": "capacity-service"
+      },
+      {
+        "from": "capacity-service",
+        "to": "tender-service"
+      },
+      {
+        "from": "tender-service",
+        "to": "carrier-portal"
+      },
+      {
+        "from": "tender-service",
+        "to": "carrier-api"
+      },
+      {
+        "from": "carrier-portal",
+        "to": "dispatch-board"
+      },
+      {
+        "from": "carrier-api",
+        "to": "dispatch-board"
+      },
+      {
+        "from": "carrier-portal",
+        "to": "retry-queue"
+      },
+      {
+        "from": "carrier-api",
+        "to": "retry-queue"
+      },
+      {
+        "from": "retry-queue",
+        "to": "tender-service"
+      },
+      {
+        "from": "dispatch-board",
+        "to": "pickup-scheduler"
+      },
+      {
+        "from": "pickup-scheduler",
+        "to": "driver-app"
+      },
+      {
+        "from": "driver-app",
+        "to": "yard-gate"
+      },
+      {
+        "from": "yard-gate",
+        "to": "dock-scheduler"
+      },
+      {
+        "from": "dock-scheduler",
+        "to": "scan-ingest"
+      },
+      {
+        "from": "scan-ingest",
+        "to": "tracking-service"
+      },
+      {
+        "from": "gps-gateway",
+        "to": "tracking-service"
+      },
+      {
+        "from": "tracking-service",
+        "to": "status-store"
+      },
+      {
+        "from": "status-store",
+        "to": "eta-service"
+      },
+      {
+        "from": "eta-service",
+        "to": "exception-engine"
+      },
+      {
+        "from": "exception-engine",
+        "to": "ops-console"
+      },
+      {
+        "from": "exception-engine",
+        "to": "customer-updates"
+      },
+      {
+        "from": "customer-updates",
+        "to": "webhook-dispatch"
+      },
+      {
+        "from": "status-store",
+        "to": "billing-trigger",
+        "curveControls": [
+          {
+            "t": 0.1111111111111111,
+            "dx": 196.00735294117646,
+            "dy": -2.3206896551724134
+          },
+          {
+            "t": 0.2222222222222222,
+            "dx": 460.0514705882353,
+            "dy": 26.223793103448276
+          },
+          {
+            "t": 0.3333333333333333,
+            "dx": 396.7647058823529,
+            "dy": 43.745000000000005
+          },
+          {
+            "t": 0.4444444444444444,
+            "dx": 333.47794117647055,
+            "dy": -31.09724137931034
+          },
+          {
+            "t": 0.5555555555555556,
+            "dx": 270.0514705882353,
+            "dy": -105.82344827586205
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 206.76470588235293,
+            "dy": -43.745000000000005
+          },
+          {
+            "t": 0.7777777777777778,
+            "dx": 143.47794117647058,
+            "dy": -29.124655172413792
+          },
+          {
+            "t": 0.8888888888888888,
+            "dx": 70.55147058823529,
+            "dy": 1.9725862068965514
+          }
+        ]
+      },
+      {
+        "from": "driver-app",
+        "to": "proof-store"
+      },
+      {
+        "from": "proof-store",
+        "to": "billing-trigger"
+      },
+      {
+        "from": "order-store",
+        "to": "customs-service",
+        "curveControls": [
+          {
+            "t": 0.3333333333333333,
+            "dx": -8.522058823529411,
+            "dy": 4.873448275862068
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 8.242647058823529,
+            "dy": -4.641379310344827
+          }
+        ]
+      },
+      {
+        "from": "customs-broker",
+        "to": "customs-service"
+      },
+      {
+        "from": "customs-service",
+        "to": "document-store"
+      },
+      {
+        "from": "order-store",
+        "to": "document-store",
+        "curveControls": [
+          {
+            "t": 0.16666666666666666,
+            "dx": 9.919117647058822,
+            "dy": 13.459999999999997
+          },
+          {
+            "t": 0.3333333333333333,
+            "dx": 15.926470588235293,
+            "dy": 26.919999999999995
+          },
+          {
+            "t": 0.5,
+            "dx": 16.066176470588236,
+            "dy": 25.527586206896547
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 27.38235294117647,
+            "dy": 12.531724137931032
+          },
+          {
+            "t": 0.8333333333333334,
+            "dx": 27.102941176470583,
+            "dy": -1.508448275862069
+          }
+        ]
+      },
+      {
+        "from": "document-store",
+        "to": "warehouse-wms"
+      },
+      {
+        "from": "dispatch-board",
+        "to": "warehouse-wms"
+      },
+      {
+        "from": "warehouse-wms",
+        "to": "linehaul-hub"
+      },
+      {
+        "from": "linehaul-hub",
+        "to": "last-mile-hub"
+      },
+      {
+        "from": "last-mile-hub",
+        "to": "proof-store"
+      },
+      {
+        "from": "billing-trigger",
+        "to": "analytics-feed"
+      },
+      {
+        "from": "webhook-dispatch",
+        "to": "analytics-feed"
+      },
+      {
+        "from": "analytics-feed",
+        "to": "audit-archive",
+        "curveControls": [
+          {
+            "t": 0.08333333333333333,
+            "dx": 106.5955882352941,
+            "dy": 77.62706896551724
+          },
+          {
+            "t": 0.16666666666666666,
+            "dx": 182.5955882352941,
+            "dy": 170.80275862068962
+          },
+          {
+            "t": 0.25,
+            "dx": 244.2058823529412,
+            "dy": 261.0775862068965
+          },
+          {
+            "t": 0.3333333333333333,
+            "dx": 330.2647058823529,
+            "dy": 321.8796551724137
+          },
+          {
+            "t": 0.4166666666666667,
+            "dx": 388.8014705882353,
+            "dy": 425.03431034482753
+          },
+          {
+            "t": 0.5,
+            "dx": 422.610294117647,
+            "dy": 472.26034482758615
+          },
+          {
+            "t": 0.5833333333333334,
+            "dx": 456.55882352941177,
+            "dy": -348.91568965517234
+          },
+          {
+            "t": 0.6666666666666666,
+            "dx": 490.3676470588235,
+            "dy": -225.45499999999996
+          },
+          {
+            "t": 0.75,
+            "dx": 524.3161764705882,
+            "dy": -102.11034482758619
+          },
+          {
+            "t": 0.8333333333333334,
+            "dx": 558.125,
+            "dy": -170.68672413793098
+          },
+          {
+            "t": 0.9166666666666666,
+            "dx": 249.93382352941177,
+            "dy": -101.29810344827584
+          }
+        ]
+      },
+      {
+        "from": "legacy-tms",
+        "to": "audit-archive"
+      },
+      {
+        "from": "ops-console",
+        "to": "dispatch-board"
+      }
+    ]
   }
 }

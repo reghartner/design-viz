@@ -1337,7 +1337,7 @@ function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
     600*Math.max(0,s.area/result.score.area-1)+150*Math.max(0,m.sparseRows-baseline.sparseRows);}
   for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
     var source=best,sourceMetrics=metrics,points=Object.fromEntries(source.positions.map(function(p){return [p.id,p];})),frames=autoArrangeBranchFrames(d,source.positions),proposals=[],seen=new Set();
-    function propose(id,point){
+    function propose(id,point,balance){
       if(proposals.length>=limits.proposals || Math.abs(point.x-points[id].x)<.1 && Math.abs(point.y-points[id].y)<.1)return;
       var key=id+':'+point.x+','+point.y;if(seen.has(key))return;seen.add(key);
       var occupant=junctions?source.positions.find(function(p){return p.id!==id && Math.abs(p.x-point.x)<.1 && Math.abs(p.y-point.y)<.1;}):null;
@@ -1348,7 +1348,7 @@ function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
       var structure=autoArrangeFlowStructure(d,positions,topology);if(structure.blocked>sourceMetrics.blocked)return;
       var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];}));
       structure.routeLength=edges.reduce(function(sum,e){var a=placed[e.from],b=placed[e.to];return sum+Math.hypot(a.x-b.x,a.y-b.y);},0);structure.routeExcess=0;
-      proposals.push({positions:positions,moved:moved,structure:structure,cost:quality(structure,source.score),key:key,id:id,minGain:tighten?Math.max(AUTO_ARRANGE_CARD_GAP,Math.hypot(points[id].x-points[topology.adj[id][0]].x,points[id].y-points[topology.adj[id][0]].y)*.2):0});
+      proposals.push({positions:positions,moved:moved,structure:structure,cost:quality(structure,source.score),balance:balance || 0,key:key,id:id,minGain:tighten?Math.max(AUTO_ARRANGE_CARD_GAP,Math.hypot(points[id].x-points[topology.adj[id][0]].x,points[id].y-points[topology.adj[id][0]].y)*.2):0});
     }
     var hubs=ids.filter(function(id){return topology.adj[id].length>=3;}),slots=Math.min(8,Math.floor(limits.proposals/Math.max(1,hubs.length)));
     ids.forEach(function(id){var neighbors=topology.adj[id];
@@ -1381,6 +1381,13 @@ function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
         for(var target=0;target<targets.length && proposals.length-start<slots;target++)propose(id,targets[target]);
       }else if(neighbors.length===2 && !tails.has(id)){
         var a=points[neighbors[0]],b=points[neighbors[1]];
+        // Inline connectors need interior slots as well as neighbor corners.
+        // Prefer balanced spacing when route/structure costs are equal.
+        function inline(axis,other,pitch){var low=Math.min(a[axis],b[axis])+pitch,high=Math.max(a[axis],b[axis])-pitch;if(low>high+.1)return;
+          [(a[axis]+b[axis])/2,Math.max(low,Math.min(high,points[id][axis])),low,high].forEach(function(value){var point={};point[axis]=value;point[other]=a[other];propose(id,point,Math.abs(Math.abs(value-a[axis])-Math.abs(value-b[axis])));});
+        }
+        if(Math.abs(a.y-b.y)<.1)inline('x','y',dx);
+        if(Math.abs(a.x-b.x)<.1)inline('y','x',dy);
         // Jump directly to a two-neighbor corner: its one-axis intermediate
         // can cross a card or increase crossings even when the corner is safe.
         propose(id,{x:a.x,y:b.y});propose(id,{x:b.x,y:a.y});
@@ -1392,7 +1399,7 @@ function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
         });
       }
     });
-    proposals.sort(function(a,b){return a.cost-b.cost;});
+    proposals.sort(function(a,b){return Math.abs(a.cost-b.cost)>.001?a.cost-b.cost:a.balance-b.balance;});
     var leafQueues=[];
     if(leaves){
       // Every eligible leaf gets its best slot before another gets a second.
@@ -1425,6 +1432,30 @@ function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
 }
 
 
+var AUTO_ARRANGE_SPATIAL_LIMITS={nodes:48,edges:80,passes:1,groups:8,checks:24,routes:6,proposals:128};
+function autoArrangeSpatialClarity(d,result,viz){return autoArrangeBlockClarity(d,result,viz,true);}
+// Axis cuts expose peripheral connected paths without enumerating combinations
+// of removed edges. Only simple paths with one possible junction are eligible.
+function autoArrangeSpatialPaths(d,positions){
+  var topology=autoArrangeFlowTopology(d),points=Object.fromEntries(positions.map(function(p){return [p.id,p];})),order=positions.slice().sort(function(a,b){return a.x-b.x || a.y-b.y;}).map(function(p){return p.id;}),index=Object.fromEntries(order.map(function(id,i){return [id,i];}));
+  var frames=autoArrangeBranchFrames(d,positions),protectedNodes=new Set(frames.flatMap(function(frame){return frame.bands?frame.bands.flat():frame.branches.concat(frame.ends);})),seen=new Set(),groups=[];
+  ['x','y'].forEach(function(axis){Array.from(new Set(order.map(function(id){return points[id][axis];}))).sort(function(a,b){return a-b;}).forEach(function(cut){[-1,1].forEach(function(sign){
+    var pending=new Set(order.filter(function(id){return sign*(points[id][axis]-cut)>=-.1;}));
+    while(pending.size){var queue=[pending.values().next().value],component=[];pending.delete(queue[0]);
+      for(var next=0;next<queue.length;next++){var id=queue[next];component.push(id);topology.adj[id].forEach(function(other){if(pending.has(other)){pending.delete(other);queue.push(other);}});}
+      if(component.length<3 || component.length>8 || component.some(function(id){return protectedNodes.has(id);}))continue;
+      component.sort(function(a,b){return index[a]-index[b];});var key=component.map(function(id){return index[id];}).join(',');if(seen.has(key))continue;seen.add(key);
+      var members=new Set(component),degrees=component.map(function(id){return topology.adj[id].filter(function(other){return members.has(other);}).length;});
+      if(degrees.some(function(degree){return degree>2;}) || degrees.filter(function(degree){return degree===1;}).length!==2 || component.filter(function(id){return topology.adj[id].length>2;}).length>1)continue;
+      var boundary=(d.edges || []).filter(function(e){return members.has(e.from)!==members.has(e.to);});if(boundary.length<3 || boundary.length>4)continue;
+      var distance=boundary.reduce(function(sum,e){return sum+Math.hypot(points[e.from].x-points[e.to].x,points[e.from].y-points[e.to].y);},0);
+      groups.push({ids:component,distance:distance,key:key});
+    }
+  });});});
+  groups.sort(function(a,b){return b.distance-a.distance || index[a.ids[0]]-index[b.ids[0]] || a.ids.length-b.ids.length || (a.key<b.key?-1:a.key>b.key?1:0);});
+  return groups.slice(0,AUTO_ARRANGE_SPATIAL_LIMITS.groups).map(function(group){return group.ids;});
+}
+
 var AUTO_ARRANGE_BLOCK_LIMITS={nodes:48,edges:80,passes:2,checks:12,routes:4,proposals:192};
 // Reuse the weak-cut partitioner with geometric traversal before its block cap.
 // Older motif search retains its own ordering and policy.
@@ -1434,10 +1465,10 @@ function autoArrangePlacedBlocks(d,positions){
   var canonical={nodes:Object.fromEntries(ids.map(function(id,i){return ['placed_'+i,d.nodes[id]];})),edges:edges.map(function(e){return Object.assign({},e,{from:'placed_'+index[e.from],to:'placed_'+index[e.to]});})};
   return autoArrangeConnectedMotifs(canonical).blocks.map(function(block){return block.map(function(i){return ids[i];});});
 }
-function autoArrangeBlockClarity(d,result,viz){
-  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=AUTO_ARRANGE_BLOCK_LIMITS;
+function autoArrangeBlockClarity(d,result,viz,spatial){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=spatial?AUTO_ARRANGE_SPATIAL_LIMITS:AUTO_ARRANGE_BLOCK_LIMITS;
   if(ids.length<8 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
-  var blocks=autoArrangePlacedBlocks(d,result.positions);if(!blocks.length)return result;
+  var blocks=spatial?autoArrangeSpatialPaths(d,result.positions):autoArrangePlacedBlocks(d,result.positions);if(!blocks.length)return result;
   var topology=autoArrangeFlowTopology(d),frames=autoArrangeBranchFrames(d,result.positions),baseline=autoArrangeFlowMetrics(d,result,topology),best=result,metrics=baseline,checks=0,routes=0;
   function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
   var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
@@ -1448,7 +1479,7 @@ function autoArrangeBlockClarity(d,result,viz){
     var source=best,sourceMetrics=metrics,points=Object.fromEntries(source.positions.map(function(p){return [p.id,p];})),proposals=[],seen=new Set(),slots=Math.floor(limits.proposals/blocks.length);
     blocks.forEach(function(block){
       var moved=new Set(block),boundary=edges.filter(function(e){return moved.has(e.from)!==moved.has(e.to);}),queue=[];
-      if(!boundary.length || boundary.length>2)return;
+      if(!boundary.length || boundary.length>(spatial?4:2))return;
       boundary.sort(function(a,b){var ai=moved.has(a.from)?a.from:a.to,bi=moved.has(b.from)?b.from:b.to;return points[ai].x-points[bi].x || points[ai].y-points[bi].y;});
       boundary.forEach(function(edge){var inner=points[moved.has(edge.from)?edge.from:edge.to],outer=points[moved.has(edge.from)?edge.to:edge.from];
         // Rotate in card-pitch coordinates so a vertical stack becomes a row
@@ -1633,7 +1664,7 @@ function autoArrangeCandidateSearch(d,viz,cola){
     // preserve safety, shape and footprint, and shorten center distances.
     if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
-      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz),viz),viz),viz),viz),viz),viz),viz);
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeSpatialClarity(d,autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz),viz),viz),viz),viz),viz),viz),viz),viz);
   }
   // Ordered layouts are reproducible seeds, not a constraint on accepted
   // geometry. Unresolved small layouts also try direction-free searches.
@@ -1647,5 +1678,5 @@ function autoArrangeCandidateSearch(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz);
+  return autoArrangeSpatialClarity(d,autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz);
 }

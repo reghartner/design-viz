@@ -294,3 +294,50 @@ test('straight-leaf tightening retains safety, footprint and structural ceilings
   for(const key of ['hits','overlaps','crossings','incidentCrossings','width','height','area'])try{C.autoArrangeScore=(...args)=>({...score(...args),[key]:r.score[key]+1});assert.equal(C.autoArrangeLeafTighten(d,r,viz),r,key);}finally{C.autoArrangeScore=score;}
   for(const key of ['turns','diagonal','fanRows','sparseRows','blocked','routeLength'])try{C.autoArrangeFlowMetrics=(diagram,candidate,...rest)=>{const m=flow(diagram,candidate,...rest);return candidate===r?m:{...m,[key]:flow(d,r)[key]+1};};assert.equal(C.autoArrangeLeafTighten(d,r,viz),r,key);}finally{C.autoArrangeFlowMetrics=flow;}
 });
+
+test('inline connector proposals put Research Instrument gateway between its same-row neighbors',()=>{
+  const d=diagram('research-compute-federation'),r=seed(d,'research-compute-federation-accepted'),a=C.autoArrangeNeighborhoodClarity(d,r,viz);safe(d,r,a);
+  const p=Object.fromEntries(a.positions.map(p=>[p.id,p]));assert.equal(p['compute-instrument'].y,p['compute-legacy'].y);assert.equal(p['compute-instrument'].y,p['compute-staging'].y);assert.equal(p['compute-instrument'].x,(p['compute-legacy'].x+p['compute-staging'].x)/2,'equivalent straight routes prefer balanced spacing');
+  assert.equal(C.autoArrangeFlowMetrics(d,a).diagonal,C.autoArrangeFlowMetrics(d,r).diagonal-2);assert.ok(C.autoArrangeFlowMetrics(d,a).routeLength<C.autoArrangeFlowMetrics(d,r).routeLength-243);
+  for(const old of r.positions.filter(p=>p.id!=='compute-instrument'))assert.deepEqual(plain(a.positions.find(p=>p.id===old.id)),old);
+});
+
+test('inline row and column connectors keep midpoint preference across arrows and declarations',()=>{
+  const original=[['a',120,400],['b',1260,400],['connector',690,100],['other',1260,100],['leaf',1545,100],['anchorA',120,700],['anchorB',1260,700]].map(([id,x,y])=>({id,x,y})),links=[['a','connector'],['connector','b'],['b','other'],['other','a'],['other','leaf'],['a','anchorA'],['b','anchorB']];
+  for(const axis of ['row','column'])for(const mode of ['forward','reverse','mixed','renamed']){
+    const names=Object.fromEntries(original.map((p,i)=>[p.id,mode==='renamed'?String(100-i):p.id])),positions=original.map(p=>({id:names[p.id],x:axis==='row'?p.x:p.y*2,y:axis==='row'?p.y:p.x})).reverse(),edges=links.map(([a,b],i)=>{const reverse=mode==='reverse'||mode==='mixed'&&i%2;return {from:names[reverse?b:a],to:names[reverse?a:b]};}),d={nodes:Object.fromEntries(positions.map(p=>[p.id,{}])),edges},r={positions,edges:edges.map(()=>({}))};r.score=C.autoArrangeScore(d,r);
+    const after=C.autoArrangeNeighborhoodClarity(d,r,viz);safe(d,r,after);const p=Object.fromEntries(after.positions.map(p=>[p.id,p])),a=p[names.a],b=p[names.b],connector=p[names.connector];assert.ok(Math.abs(connector.x-(a.x+b.x)/2)<.001);assert.ok(Math.abs(connector.y-(a.y+b.y)/2)<.001);
+  }
+});
+
+test('three-boundary spatial paths coordinate the Freight right side with actual safety and bounded routing',()=>{
+  const d=diagram('freight-operations'),r=seed(d,'freight-operations-accepted'),before=plain(r),members=['customer-updates','webhook-dispatch','analytics-feed'],groups=plain(C.autoArrangeSpatialPaths(d,r.positions));assert.ok(groups.some(group=>group.length===members.length&&members.every(id=>group.includes(id))));
+  let routes=0,checks=0;const natural=C.autoArrangeNaturalRoutes;let a;
+  try{C.autoArrangeNaturalRoutes=(...args)=>{checks++;return natural(...args);};a=C.autoArrangeSpatialClarity(d,r,{renderJSON(...args){routes++;return viz.renderJSON(...args);}});}finally{C.autoArrangeNaturalRoutes=natural;}
+  safe(d,r,a);assert.ok(a.score.area<r.score.area*.87);assert.ok(C.autoArrangeFlowMetrics(d,a).routeLength<C.autoArrangeFlowMetrics(d,r).routeLength-670);assert.ok(routes<=C.AUTO_ARRANGE_SPATIAL_LIMITS.routes);assert.ok(checks-routes<=C.AUTO_ARRANGE_SPATIAL_LIMITS.checks);
+  const points=Object.fromEntries(a.positions.map(p=>[p.id,p]));for(const old of r.positions){if(members.includes(old.id)){assert.equal(points[old.id].x,old.x);assert.ok(Math.abs(points[old.id].y-old.y+269.2)<.001);}else assert.deepEqual(plain(points[old.id]),old);}assert.deepEqual(plain(r),before);
+  const names=Object.fromEntries(Object.keys(d.nodes).map((id,i)=>[id,String(100-i)])),input={nodes:Object.fromEntries(Object.keys(d.nodes).reverse().map(id=>[names[id],{}])),edges:d.edges.slice().reverse().map(e=>({...e,from:names[e.from],to:names[e.to]}))},placed={positions:r.positions.map(p=>({...p,id:names[p.id]})).reverse(),edges:r.edges.slice().reverse().map(({from,to,...route})=>route)};placed.score=C.autoArrangeScore(input,placed);const renamed=C.autoArrangeSpatialClarity(input,placed,viz);safe(input,placed,renamed);for(const p of a.positions){const q=renamed.positions.find(q=>q.id===names[p.id]);assert.ok(Math.abs(p.x-q.x)<.001);assert.ok(Math.abs(p.y-q.y)<.001);}
+});
+
+test('spatial discovery recognizes topology-varied paths without depending on identifiers or arrow direction',()=>{
+  for(const count of [3,4])for(const mode of ['forward','reverse','mixed','renamed']){
+    const nodes=[{id:'hubA',x:900,y:100},{id:'hubB',x:900,y:400},{id:'hubC',x:900,y:1000},{id:'coreA',x:330,y:400},{id:'coreB',x:330,y:1000}].concat(Array.from({length:count},(_,i)=>({id:'path'+i,x:1200,y:550+i*150}))),links=[['coreA','hubA'],['coreA','hubB'],['coreA','coreB'],['coreB','hubC'],['hubA','hubB'],['hubA','hubC'],['hubB','hubC'],['hubB','path0'],['hubA','path'+(count-1)],['hubC','path'+(count-1)]].concat(Array.from({length:count-1},(_,i)=>['path'+i,'path'+(i+1)])),names=Object.fromEntries(nodes.map((p,i)=>[p.id,mode==='renamed'?String(100-i):p.id])),positions=nodes.map(p=>({...p,id:names[p.id]})).reverse(),d={nodes:Object.fromEntries(positions.map(p=>[p.id,{}])),edges:links.map(([a,b],i)=>{const reverse=mode==='reverse'||mode==='mixed'&&i%2;return {from:names[reverse?b:a],to:names[reverse?a:b]};})},groups=plain(C.autoArrangeSpatialPaths(d,positions)),wanted=Array.from({length:count},(_,i)=>names['path'+i]);assert.ok(groups.some(group=>group.length===count&&wanted.every(id=>group.includes(id))));assert.ok(groups.length<=C.AUTO_ARRANGE_SPATIAL_LIMITS.groups);
+  }
+});
+
+test('public pipeline emits the Research inline fix and bounded Freight right-side movement',()=>{
+  const cola=require('../src/workbench/vendor/webcola-3.4.0.js');
+  for(const id of ['research-compute-federation','freight-operations']){
+    const d=diagram(id),before=seed(d,id+'-accepted'),a=C.autoArrangeCandidates(d,viz,cola);safe(d,before,a);const p=Object.fromEntries(a.positions.map(p=>[p.id,p]));
+    if(id==='research-compute-federation'){assert.equal(p['compute-instrument'].y,p['compute-legacy'].y);assert.equal(p['compute-instrument'].y,p['compute-staging'].y);assert.ok(C.autoArrangeFlowMetrics(d,a).routeLength<C.autoArrangeFlowMetrics(d,before).routeLength-240);}
+    else{assert.ok(a.score.height<before.score.height-268);assert.ok(C.autoArrangeFlowMetrics(d,a).routeLength<C.autoArrangeFlowMetrics(d,before).routeLength-670);assert.equal(p['analytics-feed'].y,p['billing-trigger'].y);}
+  }
+});
+
+test('spatial docking retains both crossing ceilings and rejects card, shape and growth regressions',()=>{
+  const d=diagram('freight-operations'),r=seed(d,'freight-operations-accepted'),score=C.autoArrangeScore;
+  for(const key of ['hits','overlaps','crossings','incidentCrossings','width','height','area','length','shape'])try{
+    C.autoArrangeScore=(...args)=>({...score(...args),[key]:['hits','overlaps','crossings','incidentCrossings','shape'].includes(key)?r.score[key]+1:r.score[key]*2});assert.equal(C.autoArrangeSpatialClarity(d,r,viz),r,key);
+  }finally{C.autoArrangeScore=score;}
+  const grouped=plain(d);grouped.nodes[Object.keys(grouped.nodes)[0]].group='g';assert.equal(C.autoArrangeSpatialClarity(grouped,r,{renderJSON(){assert.fail('grouped diagrams bypass spatial docking');}}),r);
+});

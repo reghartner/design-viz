@@ -40,7 +40,7 @@ function skinBase(name){
 
 function skinClasses(name){
   var base = skinBase(name);
-  return base === name ? ['sk-' + base] : ['sk-' + base, 'sk-' + name];
+  return base === name ? ['sk-' + base] : ['sk-' + base].concat(['rose','lavender','lilac'].indexOf(name)>=0?['sk-pastel']:[]).concat(['sk-' + name]);
 }
 
 function applySkinClasses(body, view, name){
@@ -53,6 +53,7 @@ function applySkinClasses(body, view, name){
   if (view && view.querySelector){
     var label = view.querySelector('[data-dv-skin-label]');
     if (label) label.textContent = 'generated from spec · skin: ' + name;
+    view.dispatchEvent(new CustomEvent('reader-skin-change',{detail:{skin:name}}));
   }
   var scope = body && body.querySelectorAll ? body : view;
   if (scope && scope.querySelectorAll) scope.querySelectorAll('.boardcanvas>svg').forEach(refreshLaneTitles);
@@ -2087,6 +2088,7 @@ function createExploreNavigation(ctl,options){
   function fillPicker(select,buttons,selected){select.replaceChildren();buttons.forEach(function(button,index){var option=doc.createElement('option');option.value=String(index);option.textContent=button.textContent.trim();option.selected=button===selected;select.appendChild(option);});select.title=selected?selected.textContent.trim():'';}
   var laneLayoutKey='',lanesCompact=false,hasSectionChoices=false;
   function refreshNavigationLanes(){
+    if(options.contents)return;
     var width=nav.clientWidth,narrow=width<=640;
     // Measure the widest presentation state, including its Tab badge and panel
     // count. A separate normal-layout probe also includes Tab copy buttons that
@@ -2114,9 +2116,10 @@ function createExploreNavigation(ctl,options){
     updateSectionArrows();
   }
   nav.appendChild(tabs);nav.appendChild(chapters);nav.appendChild(diagrams);nav.appendChild(actions);
+  var contents=options.contents?createReaderContents(ctl,nav,actions,options):null;
   nav.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var popover=ev.target.closest('details[open]');if(popover){ev.preventDefault();ev.stopPropagation();popover.open=false;popover.querySelector('summary').focus();}else if(current && current.viewport && current.viewport.navigationKeydown)current.viewport.navigationKeydown(ev);return;}if(ev.target.closest('input,textarea,select,summary,button') && !((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();});
   nav.addEventListener('toggle',function(ev){if(ev.target.tagName!=='DETAILS')return;if(ev.target.open)nav.querySelectorAll('details[open]').forEach(function(other){if(other!==ev.target)other.open=false;});syncNavigationPopover(ev.target);},true);
-  function refreshNavigationGeometry(){if(!nav.isConnected)return;refreshNavigationLanes();var bounds=nav.getBoundingClientRect();ctl.view.style.setProperty('--flowview-navigation-height',Math.ceil(bounds.height)+'px');ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(bounds.bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);}
+  function refreshNavigationGeometry(){if(!nav.isConnected)return;refreshNavigationLanes();var bounds=nav.getBoundingClientRect();ctl.view.style.setProperty('--flowview-navigation-height',Math.ceil(bounds.height)+'px');ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(bounds.bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);if(contents)contents.geometry();}
   var navigationSize=new ResizeObserver(function(){refreshNavigationGeometry();revealSection(sectionChoices.querySelector('[aria-pressed="true"]'));});
   var navigationFonts=doc.fonts;function navigationFontsLoaded(){laneLayoutKey='';refreshNavigationGeometry();if(nav.isConnected)revealSection(sectionChoices.querySelector('[aria-pressed="true"]'));}
   if(navigationFonts && navigationFonts.addEventListener)navigationFonts.addEventListener('loadingdone',navigationFontsLoaded);
@@ -2155,6 +2158,7 @@ function createExploreNavigation(ctl,options){
   });
   function mount(rec){
     if(current===rec && rec && nav.isConnected && !ctl.views){var pending=rec.sectionEl.querySelector('.section-viewport>.diagram-views>.section-view-settings');if(pending)move(pending,actions);refreshNavigationGeometry();return true;}
+    if(contents)contents.release();
     var focused=activeElement(),focusView=focused && focused.getAttribute && focused.getAttribute('data-tab-view'),owned=nav.contains(focused) || moved.some(function(entry){return containsFocus(entry.node,focused);});restore(false,true);
     var host=rec && rec.sectionEl.querySelector('.section-viewport>.diagram-views'),choices=host && host.querySelector(':scope > .diagram-view-choice');
     if(!host && rec)host=rec.sectionEl.querySelector('.diagram-views');
@@ -2181,7 +2185,7 @@ function createExploreNavigation(ctl,options){
       chapters.appendChild(viewChoices);chapters.hidden=!owner;
     }else chapters.hidden=!move(choices,chapters);
     viewButtons=Array.from(chapters.querySelectorAll('.diagram-view-choice button'));fillPicker(viewPicker,viewButtons,viewButtons.find(function(button){return button.getAttribute('aria-pressed')==='true';}));
-    if(options.action && options.action.parentNode!==actions)move(options.action,actions,true);
+    [].concat(options.action || []).forEach(function(action){if(action.parentNode!==actions)move(action,actions,true);});
     /* The chapter heading sits behind the full-window Explore surface. Keep
        its real (already wired) embed-link control in the unified navigation,
        alongside the other chapter actions, and restore it with the rest. */
@@ -2201,6 +2205,7 @@ function createExploreNavigation(ctl,options){
     });
     if(owned && focusView && !focused.isConnected)focused=Array.from(chapters.querySelectorAll('[data-tab-view]')).find(function(button){return button.getAttribute('data-tab-view')===focusView;}) || focused;
     if((owned || moved.some(function(entry){return containsFocus(entry.node,focused);})) && focused.isConnected)focused.focus({preventScroll:true});
+    if(contents)contents.refresh(selected,rec);
     refreshNavigationGeometry();
     ctl.view.dispatchEvent(new CustomEvent('navigation-mounted'));
     return true;
@@ -2213,7 +2218,7 @@ function createExploreNavigation(ctl,options){
     if(ev && ev.target && ev.target.nodeType===1 && ctl.view.contains(ev.target))return;
     if(scrollFrame)return;
     scrollFrame=requestAnimationFrame(function(){
-      scrollFrame=0;if(!nav.isConnected || options.isCanvas && options.isCanvas())return;
+      scrollFrame=0;if(!nav.isConnected || options.isCanvas && options.isCanvas() || contents && contents.retainScroll())return;
       var edge=nav.getBoundingClientRect().bottom+24,visible=diagramRecords().filter(function(rec){return rec.sectionEl.getClientRects().length && !rec.sectionEl.hidden;});
       var next=visible[0];
       visible.forEach(function(rec){if(rec.sectionEl.getBoundingClientRect().top<=edge)next=rec;});
@@ -2228,7 +2233,7 @@ function createExploreNavigation(ctl,options){
   function viewChanged(ev){if(ev && ev.type==='navigation-actions-changed')laneLayoutKey='';var rec=ctl.sections.find(function(r){return r.number===ctl.activeTarget.section;});mount(rec || current);}
   ctl.view.addEventListener('tab-view-change',viewChanged);
   ctl.view.addEventListener('navigation-actions-changed',viewChanged);
-  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
+  return {element:nav,mount:mount,restore:restore,current:function(){return current;},destroy:function(){if(contents)contents.destroy();if(navigationFonts && navigationFonts.removeEventListener)navigationFonts.removeEventListener('loadingdone',navigationFontsLoaded);ctl.view.removeEventListener('tab-view-change',viewChanged);ctl.view.removeEventListener('navigation-actions-changed',viewChanged);window.removeEventListener('scroll',scrolled,true);cancelAnimationFrame(scrollFrame);restore();}};
 }
 function createSectionComposition(box, layout, d, board, bar, base, target, changed, stepper, boardSize, prose){
   var definition=sectionLayoutDefinition(d), views=diagramLayoutViews(d), layoutId=definition && definition.id;
@@ -2268,7 +2273,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   var layoutWidth=0;
   var layoutSizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(entries){
     var width=entries[0].contentRect.width;
-    if(width<=0 || width===layoutWidth)return;
+    // Explore borrows the board while this Standard grid is hidden. Its wider
+    // canvas must not replace the grid scale used to restore Standard scroll.
+    if(grid.hidden || width<=0 || width===layoutWidth)return;
     layoutWidth=width;
     grid.style.setProperty('--section-layout-scale',Math.min(1,width/1000));
     grid.style.setProperty('--section-layout-width',width<1000?'1000px':'auto');
@@ -2630,12 +2637,16 @@ function createBoardNavigation(board, group, legend, changed){
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
     if(paused)paused=state;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
-    if(enabled()){changed();board.scrollLeft=state.x;board.scrollTop=state.y;}
+    if(enabled()){changed();
+      // CSS zoom rounds scroll metrics differently from scroll assignments.
+      // Overshoot saved endpoints so the browser restores the exact boundary.
+      board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
+    }
   }
   return {refresh:refresh,reset:reset,
     snapshot:snapshot,restore:restore,

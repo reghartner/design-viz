@@ -38,7 +38,7 @@ test('Explore floats only prose, keeps live formatting/reveals and restores the 
   await expect(notes(page).locator('[data-dv-bullet-path="1"]')).toHaveClass(/dv-fragment-hidden/);await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(notes(page).locator('[data-dv-bullet-path="1"]')).not.toHaveClass(/dv-fragment-hidden/);
   const shell=await page.locator('.viewer-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
   const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox(),prose=await notes(page).boundingBox(),viewport=page.viewportSize();
-  expect(nav.y).toBe(0);expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  expect(nav.y).toBe(0);expect(shell).toEqual({x:284,y:nav.height,width:viewport.width-284,height:viewport.height-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);expect(prose.x).toBeGreaterThanOrEqual(stage.x);expect(prose.y).toBeGreaterThanOrEqual(stage.y);expect(prose.x+prose.width).toBeLessThanOrEqual(stage.x+stage.width);expect(prose.y+prose.height).toBeLessThanOrEqual(stage.y+stage.height);
   const original=await notes(page).boundingBox();await notes(page).getByRole('button',{name:'Move Section notes; use arrow keys',exact:true}).press('ArrowLeft');expect((await notes(page).boundingBox()).x).toBeCloseTo(original.x-8,0);
   await notes(page).getByRole('button',{name:'Hide Section notes',exact:true}).click();await expect(notes(page)).toBeHidden();await page.locator('.explore-panel-menu summary').click();await page.getByRole('checkbox',{name:'Section notes',exact:true}).check();await page.keyboard.press('Escape');
@@ -232,10 +232,15 @@ for(const width of [1280,1440,1920])test('notes remain readable and independentl
  await page.setViewportSize({width,height:1000});const raw=fixture('explore');delete raw.page.sections[0].diagram.layouts[1].exploreLayout.prose;
  await page.goto(await build(server,raw,'readable-notes-'+width));await page.evaluate(()=>document.fonts.ready);
  for(const item of await notes(page).locator('.sec-prose,.sec-text,.sec-bullets').all())await expect(item).toHaveCSS('font-size','16px');const before=await notes(page).boundingBox();
- await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();expect(await notes(page).boundingBox()).toEqual(before);
+ await page.locator('.reader-navigation .explore-panel-menu>summary').click();await page.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await page.keyboard.press('Escape');expect(await notes(page).boundingBox()).toEqual(before);
  expect(await notes(page).locator('.explore-window-body').evaluate(el=>({overflow:el.scrollHeight-el.clientHeight,scale:getComputedStyle(el).transform}))).toEqual({overflow:0,scale:'matrix(1, 0, 0, 1, 0, 0)'});
  await page.screenshot({path:info.outputPath('section-notes-'+width+'.png')});
- await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');await page.getByRole('button',{name:'Fit canvas',exact:true}).click();
+ await place(page,'Placement for Section notes','canvas');await place(page,'Placement for Upload queue','floating');
+ await page.getByRole('button',{name:'Fit',exact:true}).click();await expect(notes(page)).toBeInViewport();
+ const openFont=await notes(page).evaluate(el=>parseFloat(getComputedStyle(el.querySelector('.sec-text')).fontSize)*el.getBoundingClientRect().width/el.offsetWidth);expect(openFont).toBeGreaterThanOrEqual(14);
+ // Restore the full canvas width used by this readability contract; the open
+ // Contents sidebar intentionally reserves 284px and Fit scales to that space.
+ await page.locator('.reader-top>button').click();await page.getByRole('button',{name:'Fit',exact:true}).click();
  await expect(notes(page)).toBeInViewport();
  const metrics=await notes(page).evaluate(el=>{const texts=[...el.querySelectorAll('.sec-text,.sec-bullets')],body=el.querySelector('.explore-window-body'),scale=el.getBoundingClientRect().width/el.offsetWidth;return {font:Math.min(...texts.map(text=>parseFloat(getComputedStyle(text).fontSize)*scale)),overflow:body.scrollHeight-body.clientHeight};});
  expect(metrics.font).toBeGreaterThanOrEqual(19);expect(metrics.font).toBeLessThanOrEqual(22);expect(metrics.overflow).toBeLessThanOrEqual(1);
@@ -256,7 +261,7 @@ for(const gesture of ['Move','Resize'])test('pristine canvas notes refit on live
  await page.goto(await build(server,raw,'live-notes-'+gesture));await page.evaluate(()=>document.fonts.ready);
  const wide=await notesGeometry(page);expect(await notesOverflow(page)).toBe(0);
  await page.setViewportSize({width:1280,height:1000});await expect.poll(async()=>(await notesGeometry(page)).h).toBeGreaterThan(wide.h);await expect.poll(()=>notesOverflow(page)).toBe(0);
- await page.getByRole('button',{name:'Fit canvas',exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
+ await page.getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:info.outputPath('section-notes-live-1920-to-1280.png')});
  await page.setViewportSize({width:1920,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(wide);expect(await notesOverflow(page)).toBe(0);
  await notes(page).focus();await notes(page).getByRole('button',{name:gesture+' Section notes; use arrow keys',exact:true}).press('ArrowRight');const manual=await notesGeometry(page);expect(manual).not.toEqual(wide);
  await page.setViewportSize({width:1280,height:1000});await expect.poll(()=>notesGeometry(page)).toEqual(manual);

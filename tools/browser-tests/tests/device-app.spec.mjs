@@ -295,11 +295,14 @@ test('phone text and geometry scale together when its tile gets narrower or shor
     await step(root,index);
     const size=await shell.evaluate(el=>{
      const box=el.getBoundingClientRect(),body=el.closest('.pbody'),text=el.querySelector('.phonetitle')||el.querySelector('.da-value');
-     return {width:box.width,height:box.height,font:parseFloat(getComputedStyle(text).fontSize),bodyHeight:body.clientHeight,bodyScroll:body.scrollHeight,overflow:el.scrollWidth-el.clientWidth};
+     // The authored section grid can apply CSS zoom in a narrow host.
+     // Measure intrinsic fit in logical pixels and text/geometry together in rendered pixels.
+     const scale=box.width/el.offsetWidth;
+     return {width:el.offsetWidth,height:el.offsetHeight,renderedWidth:box.width,font:parseFloat(getComputedStyle(text).fontSize)*scale,bodyHeight:body.clientHeight,bodyScroll:body.scrollHeight,overflow:el.scrollWidth-el.clientWidth};
     });
     expect(size.width).toBeLessThanOrEqual(330);expect(size.width).toBeGreaterThan(140);
     expect(Math.abs(size.height/size.width-18.5/9)).toBeLessThan(.02);
-    expect(size.font).toBeCloseTo((index===2?12:29)*size.width/330,1);
+    expect(size.font).toBeCloseTo((index===2?12:29)*size.renderedWidth/330,1);
     expect(size.bodyScroll).toBeLessThanOrEqual(size.bodyHeight+1);expect(size.overflow).toBeLessThanOrEqual(1);
     if(width===220 || height===400)expect(size.width).toBeLessThan(200);
     else expect(size.width).toBeCloseTo(330,0);

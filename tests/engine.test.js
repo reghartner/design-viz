@@ -15,7 +15,7 @@ const ROOT = path.join(__dirname, '..');
 
 function loadCore(overrides = {}){
   const code = entrypoint('native').source;
-  const sandbox = {console, URL, ...overrides};
+  const sandbox = {console, URL, CustomEvent:class {constructor(type,options){this.type=type;this.detail=options && options.detail;}}, ...overrides};
   vm.runInNewContext(code, sandbox);
   return sandbox;
 }
@@ -676,11 +676,13 @@ test('contract version: mismatch warns, match and absence do not', () => {
   assert.strictEqual(warnOf(noField).length, 0);
 });
 
-test('all six skin tokens validate; an unknown skin uses the Pastel warning fallback', () => {
+test('all supported skin tokens validate; an unknown skin uses the Pastel warning fallback', () => {
   const mk = skin => C.normalize({page: {skin,
     blocks: [{diagram: {nodes: {a: {}}, rows: [['a']]}}]}});
   assert.deepStrictEqual(Array.from(C.SKIN_NAMES),
-    ['aurora', 'daylight', 'editorial', 'terminal', 'pastel', 'blueprint']);
+    ['aurora', 'daylight', 'editorial', 'terminal', 'pastel', 'blueprint', 'rose', 'lavender', 'lilac']);
+  assert.deepStrictEqual(Array.from(C.SELECTABLE_SKINS),['aurora','pastel','blueprint','terminal','rose','lavender','lilac']);
+  assert.strictEqual(C.skinLabel('lilac'),'Opus Lilac');
   for (const skin of C.SKIN_NAMES){
     assert.strictEqual(C.validate(mk(skin)).warnings.filter(w => w.includes('page.skin')).length, 0, skin);
   }
@@ -716,7 +718,7 @@ test('applySkinClasses layers overlays on Aurora and rejects unknown tokens with
   };
   const body = {classList: classList('host-shell', 'sk-daylight')};
   const label = {textContent: ''};
-  const view = {classList: classList('docview', 'sk-daylight'), querySelector: () => label};
+  const view = {classList: classList('docview', 'sk-daylight'), querySelector: () => label, dispatchEvent:()=>{}};
   assert.strictEqual(C.applySkinClasses(body, view, 'editorial'), true);
   assert.deepStrictEqual(Array.from(body.classList.values).sort(), ['host-shell', 'sk-aurora', 'sk-editorial']);
   assert.deepStrictEqual(Array.from(view.classList.values).sort(), ['docview', 'sk-aurora', 'sk-editorial']);

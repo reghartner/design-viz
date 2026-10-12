@@ -73,6 +73,12 @@ export {expect,trackResources};
 // Use the actual responsive navigation control, never its hidden desktop copy.
 export async function chooseNavigation(nav,kind,name){
   await nav.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  if(await nav.locator('.reader-contents').count()){
+    if(!await nav.locator('.reader-contents').isVisible())await nav.locator('.reader-top>button').click();
+    if(kind==='Tab'){const row=nav.locator('.reader-tree-tab').filter({hasText:name});if(await row.getAttribute('aria-expanded')!=='true')await row.click();const views=row.locator('..').locator('.reader-tree-view');const active=await views.evaluateAll(nodes=>nodes.findIndex(node=>node.getAttribute('data-owner-selected')==='true'));await views.nth(active>=0?active:0).click();}
+    else await nav.locator('.reader-contents-tab:has(.reader-tree-view[aria-current="page"])').getByRole('button',{name,exact:true}).and(nav.locator('.reader-tree-view')).click();
+    return;
+  }
   const picker=nav.getByRole('combobox',{name:'Choose '+kind,exact:true});
   if(await picker.isVisible()){
     await picker.selectOption({label:name});await expect(picker.locator('option:checked')).toHaveText(name);

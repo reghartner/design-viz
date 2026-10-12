@@ -70,11 +70,11 @@ test('a later legacy Explore story stays excluded until its View is selected',as
   const input=path.join(server.root,'implicit-canvas.json'),output=path.join(server.root,'implicit-canvas.html');
   await writeFile(input,JSON.stringify(spec));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
   await page.goto(server.origin+'/implicit-canvas.html#tour=0');
-  await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(page.locator('#section-front-door')).toBeHidden();await nav(page).locator('[data-tab-view=section-2-service-flow]').click();
+  await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(page.locator('#section-front-door')).toBeHidden();await nav(page).locator('.reader-tree-view[data-tab-view=section-2-service-flow]').click();
   await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
   await expect(page.locator('#section-front-door')).toHaveClass(/explore-active-section/);
   const shell=await page.locator('#section-front-door .viewer-diagram-canvas').boundingBox(),box=await page.locator('#section-front-door .explore-board').boundingBox(),navigation=await nav(page).boundingBox();
-  expect(shell).toEqual({x:0,y:navigation.y+navigation.height,width:page.viewportSize().width,height:page.viewportSize().height-navigation.y-navigation.height});
+  expect(shell).toEqual({x:284,y:navigation.y+navigation.height,width:page.viewportSize().width-284,height:page.viewportSize().height-navigation.y-navigation.height});
   expect(box.x).toBeGreaterThanOrEqual(shell.x);expect(box.x+box.width).toBeLessThanOrEqual(shell.x+shell.width);
   expect(box.y).toBeGreaterThanOrEqual(navigation.y+navigation.height);expect(box.y+box.height).toBeLessThanOrEqual(shell.y+shell.height);expect(box.height).toBeGreaterThan(300);
 });

@@ -44,7 +44,7 @@ const clip=page=>page.locator('[data-explore-panel=clip]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
-async function fit(page,host){await page.locator(host==='workbench'?'#workspace-fit':'.explore-diagram-zoom button').filter(host==='workbench'?{}:{hasText:'Fit canvas'}).click();}
+async function fit(page,host){if(host==='workbench')await page.locator('#workspace-fit').click();else await page.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
 async function drag(page,locator,dx,dy){const r=await locator.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:5});await page.mouse.up();}
 async function selectCanvas(locator){await locator.focus();await expect(locator).toHaveAttribute('aria-current','true');}
@@ -114,10 +114,10 @@ test('Fit recovers a far-away canvas panel and Floating retains its normal zoom 
 
 test('canvas selection is transient across Explore view teardown and rebuild',async({page,server})=>{
  await open(page,server,fixture(),'reader');const panel=home(page);await expectCanvasChrome(panel,false);
- await page.locator('#docview>.explore-navigation .diagram-view-choice button[aria-pressed="true"]').focus();
+ await page.locator('#docview>.reader-navigation .reader-tree-view[aria-pressed="true"]').focus();
  for(let i=0;i<40 && !(await panel.getAttribute('aria-current'));i++)await page.keyboard.press('Tab');
  await expect(panel).toBeFocused();await expectCanvasChrome(panel,true);await page.keyboard.press('Escape');await expectCanvasChrome(panel,false);
- await page.locator('#docview>.explore-navigation .diagram-view-choice button[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
+ await page.locator('#docview>.reader-navigation .reader-tree-view[aria-pressed="true"]').focus();await selectCanvas(panel);await expect(page.locator('.explore-canvas-selected')).toHaveCount(1);
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-canvas-selected')).toHaveCount(0);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(home(page)).toBeVisible();await expectCanvasChrome(home(page),false);
 });
@@ -185,7 +185,7 @@ test('canvas widget buttons, keyboard handles, step content and visibility retai
  d.steps[1].panels.app={battery:{value:42,status:'ready'}};d.steps[1].panelVisibility={outcome:false};
  await open(page,server,raw,'reader');await fit(page,'reader');const widget=page.locator('[data-explore-panel=app]'),button=widget.locator('[data-da-field=battery]');
  const target=await button.boundingBox();await board(page).dispatchEvent('wheel',{clientX:target.x+target.width/2,clientY:target.y+target.height/2,deltaY:-100,ctrlKey:true,bubbles:true,cancelable:true});
- const before=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));await button.click();await expect(page.locator('.boardcanvas>svg [data-dv-node=camera]')).toHaveClass(/da-node-focus/);expect(await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(before);await expect(widget).toHaveAttribute('aria-current','true');
+ await button.scrollIntoViewIfNeeded();const before=await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));await button.click();await expect(page.locator('.boardcanvas>svg [data-dv-node=camera]')).toHaveClass(/da-node-focus/);expect(await board(page).evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}))).toEqual(before);await expect(widget).toHaveAttribute('aria-current','true');
  await fit(page,'reader');const h=home(page),r=await h.boundingBox();await selectCanvas(h);await h.locator('.explore-window-grip').focus();await page.keyboard.press('ArrowRight');const moved=await h.boundingBox();expect(moved.x-r.x).toBeCloseTo(8,0);
  await h.locator('.explore-window-resize').focus();await page.keyboard.press('ArrowDown');expect((await h.boundingBox()).height-moved.height).toBeCloseTo(8,0);
  await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(widget.locator('[data-da-field=battery] .da-value')).toHaveText('42%');await expect(page.locator('[data-explore-panel=outcome]')).toBeHidden();
@@ -283,7 +283,7 @@ test('Workbench per-panel placement and gestures each undo once and export a mix
 
 test('mixed floating default remains responsive when another panel uses independently scaled canvas geometry',async({page,server})=>{
  const raw=fixture(false),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;delete layout.panels;layout.panelPlacements=[{panel:'home',placement:'canvas'}];layout.canvas.controlsScale=.5;layout.prose={hidden:true};
- await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'reader');await page.evaluate(()=>document.fonts.ready);
+ await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'reader');await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
  const r1=await clip(page).boundingBox();expect(await clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('0.8');
  await page.setViewportSize({width:1440,height:900});await expect.poll(async()=>clip(page).evaluate(el=>getComputedStyle(el).getPropertyValue('--explore-overlay-scale'))).toBe('1');
  expect((await clip(page).boundingBox()).width/r1.width).toBeCloseTo(1.25,2);await expect(home(page)).toHaveCSS('width','340px');
@@ -367,7 +367,7 @@ test('canvas step controls survive chapter, profile, preview and editor reload; 
  expect(await controlsRect(page)).toEqual(layout.canvas.controls);await expect(page.locator('#src')).toHaveValue(saved);
  if(!await page.locator('#open-page-preview').isVisible())await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),previewPlayer=preview.locator('.explore-canvas-objects>.explore-player');await expect(previewPlayer).toBeVisible();
- await preview.getByRole('button',{name:'Fit canvas',exact:true}).click();await previewPlayer.getByRole('button',{name:'Next step',exact:true}).click();
+ await preview.getByRole('button',{name:'Fit',exact:true}).click();await previewPlayer.getByRole('button',{name:'Next step',exact:true}).click();
  await previewPlayer.focus();await previewPlayer.locator('.explore-player-grip').press('ArrowRight');await expect(page.locator('#src')).toHaveValue(saved);
  await page.locator('#close-page-preview').click();expect(await controlsRect(page)).toEqual(layout.canvas.controls);
  await page.reload();await closeTools(page);await expect(page.locator('#src')).toHaveValue(saved);expect(await controlsRect(page)).toEqual(layout.canvas.controls);

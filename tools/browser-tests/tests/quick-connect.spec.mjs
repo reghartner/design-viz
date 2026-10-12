@@ -51,7 +51,7 @@ test('visible Connect action and the Add menu share cancellation and invalid-tar
 test('first connections in a step-free graph keep the header clear of nodes across skins',async({page,server},testInfo)=>{
   const raw=initial(),d=raw.page.blocks[0].diagram;delete d.edges;delete d.steps;d.view='ambient-only';
   const original=JSON.stringify(raw);await page.goto(server.origin+'/workbench.html');await paste(page,original);
-  for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
+  for(const skin of ['aurora','pastel','blueprint','terminal','rose','lavender','lilac']){
     await page.locator('#workspace-appearance > summary').click();await page.locator('#sk-'+skin).click();await page.locator('#workspace-appearance > summary').click();
     // Completing a connection opens its Inspector; clear it before the next skin's pointer gesture.
     await closeTools(page);const before=await node(page,'a').boundingBox();

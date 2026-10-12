@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,openInspectorGroup,paste,prepareEditorSurface} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation,openInspectorGroup,paste,prepareEditorSurface} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 const source=await readFile(path.join(repo,'examples/app-screens/app-screens.spec.json'),'utf8');
 const raw=JSON.parse(source), diagram=value=>value.page.sections[0].diagram;
@@ -120,11 +120,11 @@ test('standalone and native Backstage restore screens across paths, hidden steps
   d.layouts=[{id:'full',name:'Full',sectionLayout:d.sectionLayout},{id:'brief',name:'Brief',steps:['home','wake','live','error'],sectionLayout:d.sectionLayout}];d.defaultLayout='full';
   for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
     await page.evaluate(({raw,skin})=>{window.viewer?.destroy();window.viewer=mount(document.querySelector('#host'),raw,{skin});},{raw:filtered,skin});
-    await host.getByRole('button',{name:'Full',exact:true}).click();await screen(host,'home');
+    await chooseNavigation(host,'View','Full');await screen(host,'home');
     const before=await panel(host).locator('.appscreen-viewport').boundingBox();expect(before.width).toBeGreaterThan(100);expect(before.height).toBeGreaterThan(200);
     await chip(host,3).click();await screen(host,'live');const after=await panel(host).locator('.appscreen-viewport').boundingBox();
     expect(Math.abs(before.width-after.width)).toBeLessThan(1);expect(Math.abs(before.height-after.height)).toBeLessThan(1);
-    await host.getByRole('button',{name:'Brief',exact:true}).click();await chip(host,2).click();await screen(host,'connecting');
+    await chooseNavigation(host,'View','Brief');await chip(host,2).click();await screen(host,'connecting');
     await host.locator('.schip[data-step-source="4"]').click();await screen(host,'error');
     await host.locator('[data-dv-path=connected]').click();await screen(host,'home');
     for(const width of [1100,650]){

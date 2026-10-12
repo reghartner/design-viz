@@ -34,6 +34,8 @@ function initWorkbenchReaderPreview(opts){
   if(!open || !back || !dialog || !surface || !view || !workspace || !authorView || !header || !settings)return null;
   var life=createWorkbenchLifetime(),ctl=null,canvas=null,state=null;
   function active(){return !!state;}
+  function setReaderSkin(skin){if(!state)return;state.skin=skin;applySkinClasses(document.body,view,skin);}
+  life.listen(view,'reader-skin-change',function(ev){if(state)state.skin=ev.detail.skin;});
   function suspend(authoring){
     return (authoring.steppers || []).map(function(rec){
       var stepper=rec.stepper,playing=!!(stepper && stepper.playing && stepper.playing());
@@ -95,7 +97,7 @@ function initWorkbenchReaderPreview(opts){
   life.listen(dialog,'cancel',function(ev){ev.preventDefault();hide();});
   life.listen(dialog,'keydown',function(ev){ev.stopPropagation();});
   life.listen(settings,'change',function(){if(state)renderReader();});
-  return {active:active,show:show,hide:hide,destroy:function(){hide(false);life.destroy();}};
+  return {active:active,show:show,hide:hide,setSkin:setReaderSkin,destroy:function(){hide(false);life.destroy();}};
 }
 
 function initWorkbenchWorkspace(){

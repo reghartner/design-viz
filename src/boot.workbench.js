@@ -12,7 +12,7 @@ var CONTRACT = [
   '{',
   '  "page": {',
   '    "title": "<page title>",',
-  '    "skin": "pastel",                      // pastel (default)|aurora|daylight|editorial|terminal|blueprint',
+  '    "skin": "pastel",                      // pastel (default)|aurora|blueprint|terminal|rose|lavender|lilac',
   '    "protocols": {                         // optional: add new edge kinds',
   '      "<kind>": {"label": "<legend label>", "color": "#RRGGBB"}',
   '    },',
@@ -288,12 +288,12 @@ var workbenchPreview=createWorkbenchPreviewController({view:view,skin:currentSki
 var skinBtns = {};
 (function(){
   var holder = document.getElementById('skinbtns');
-  SKIN_NAMES.forEach(function(name){
+  SELECTABLE_SKINS.forEach(function(name){
     var b = document.createElement('button');
     b.className = 'skbtn';
     b.id = 'sk-' + name;
     b.setAttribute('aria-pressed', name === DEFAULT_SKIN ? 'true' : 'false');
-    b.textContent = name.toUpperCase();
+    b.textContent = skinLabel(name);
     b.addEventListener('click', function(){
       previewDocumentSkin = false; activeSkin = name; setSkinButtons(name);
       workbenchPreview.repaint(name);
@@ -356,6 +356,7 @@ window.dvSetSkin = function(name){
   if (SKIN_NAMES.indexOf(name) < 0) return false;
   previewDocumentSkin = false; activeSkin = name;
   setSkinButtons(name);
+  if(workbenchReaderPreview && workbenchReaderPreview.active())workbenchReaderPreview.setSkin(name);
   return applySkinClasses(document.body, view, name);
 };
 window.addEventListener('message', function(e){

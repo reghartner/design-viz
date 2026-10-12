@@ -909,6 +909,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     async function contained(supporting=true){
       await expect(stage).toBeVisible();
       const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox();
+      if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify(await page.locator('#agent-update-scroll').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,scrollHeight:el.scrollHeight,area:el.getBoundingClientRect().toJSON(),nav:el.querySelector('.reader-navigation').getBoundingClientRect().toJSON(),canvas:el.querySelector('.viewer-diagram-canvas').getBoundingClientRect().toJSON()}))),contentType:'application/json'});
       expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
       expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
       expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
@@ -940,7 +941,7 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
     const zoom=view.locator('.explore-zoom'),beforeZoom=await zoom.innerText();
     await view.getByRole('button',{name:'Zoom in',exact:true}).click();await expect(zoom).not.toHaveText(beforeZoom);
-    await view.getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await view.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).click();
     await view.getByRole('button',{name:'Next step',exact:true}).click();
     await expect(view.locator('.stepline')).toContainText('Recording ready');
     await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');

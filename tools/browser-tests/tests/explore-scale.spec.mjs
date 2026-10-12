@@ -1,4 +1,4 @@
-import {canvasTools} from '../helpers/test.mjs';
+import {chooseNavigation,canvasTools} from '../helpers/test.mjs';
 import {panelsOptions} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -22,12 +22,13 @@ async function build(server,spec,name='scale'){
   execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),out]);
   return server.origin+'/'+name+'.html#d=doorbell&v=service-flow&m=step&s=quiet&tour=0';
 }
+async function chooseView(page,name){const nav=page.locator('#docview>.explore-navigation'),side=nav.locator('.reader-contents'),closed=await side.count() && !await side.isVisible();await chooseNavigation(nav,'View',name);if(closed)await nav.locator('.reader-top>button').click();}
 const graph=page=>page.locator('.explore-board .boardcanvas>svg');
 const panel=page=>page.locator('[data-explore-panel=outcome]');
 const player=page=>page.locator('.explore-player');
 const size=async loc=>{const r=await loc.boundingBox();return {w:r.width,h:r.height};};
 test('reader scale is separate from diagram zoom, scales content, packs panels and keeps the full-width step row',async({page,server})=>{
-  await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,fixture()));await page.evaluate(()=>document.fonts.ready);
+  await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,fixture()));await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
   const startGraph=await graph(page).boundingBox(),start=await size(panel(page)),steps=await size(player(page));
   await panelsOptions(page);const zoom=page.locator('.explore-overlay-zoom');await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
   await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
@@ -42,15 +43,15 @@ test('reader scale is separate from diagram zoom, scales content, packs panels a
   const ps=await size(panel(page));await page.getByRole('button',{name:'Zoom in',exact:true}).click();expect((await graph(page).boundingBox()).width).toBeGreaterThan(startGraph.width);expect(await size(panel(page))).toEqual(ps);
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeHidden();
   await page.getByRole('button',{name:'Next step',exact:true}).click();await expect(page.locator('[data-explore-panel=clip]')).toBeVisible();await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
-  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();
-  await page.getByRole('button',{name:'Service flow',exact:true}).click();await panelsOptions(page);await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
+  await chooseView(page,'Home story');await expect(page.locator('.explore-stage')).toBeHidden();
+  await chooseView(page,'Service flow');await panelsOptions(page);await expect(zoom.locator('.explore-overlay-value')).toHaveText('90%');
   await page.getByRole('button',{name:'Hide panels',exact:true}).click();await page.getByRole('button',{name:'Restore panels',exact:true}).click();expect(await size(panel(page))).toEqual(ps);
   await zoom.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();expect((await size(panel(page))).w).toBeCloseTo(start.w,0);
   for(let n=0;n<5;n++)await zoom.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(zoom.getByRole('button',{name:'Shrink panels and controls',exact:true})).toBeDisabled();
   await page.reload();await panelsOptions(page);await expect(zoom.locator('.explore-overlay-value')).toHaveText('100%');
 });
 test('pristine layouts respond to stage width while reset and first geometry save latch an explicit scale',async({page,server})=>{
-  const spec=pristineFixture();await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,spec,'responsive-scale'));await page.evaluate(()=>document.fonts.ready);
+  const spec=pristineFixture();await page.setViewportSize({width:1280,height:800});await page.goto(await build(server,spec,'responsive-scale'));await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
   await panelsOptions(page);let readout=page.locator('.explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
   expect((await size(panel(page))).w).toBeCloseTo(240,0);
   await page.setViewportSize({width:1360,height:800});await expect(readout).toHaveText('90%');expect((await size(panel(page))).w).toBeCloseTo(270,0);
@@ -59,7 +60,7 @@ test('pristine layouts respond to stage width while reset and first geometry sav
   await page.setViewportSize({width:1280,height:800});await expect(readout).toHaveText('80%');
   await readout.click();await expect(readout).toHaveText('100%');expect((await size(panel(page))).w).toBeCloseTo(300,0);
   await page.setViewportSize({width:1200,height:800});await expect(readout).toHaveText('100%');
-  await page.getByRole('button',{name:'Home story',exact:true}).click();await page.getByRole('button',{name:'Service flow',exact:true}).click();await panelsOptions(page);await expect(readout).toHaveText('100%');
+  await chooseView(page,'Home story');await chooseView(page,'Service flow');await panelsOptions(page);await expect(readout).toHaveText('100%');
 
   await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec,null,2));await panelsOptions(page);
   readout=page.locator('#docview .explore-overlay-value').filter({visible:true});await expect(readout).toHaveText('80%');
@@ -102,8 +103,8 @@ test('saved scale survives scaled drag/resize authoring, one Undo/Redo, view swi
   expect((await size(player(page))).w).toBeCloseTo(pr.width+8,0);expect((await size(player(page))).h).toBeCloseTo(pr.height+8,0);
   const saved=await source(),raw=JSON.parse(saved),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
   expect(layout.overlayScale).toBe(.65);expect(layout.camera).toEqual(fixture(.75).page.sections[0].diagram.layouts[1].exploreLayout.camera);
-  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(readout).toBeHidden();
-  await page.getByRole('button',{name:'Service flow',exact:true}).click();await panelsOptions(page);await expect(readout).toHaveText('65%');await expect(page.locator('#src')).toHaveValue(saved);
+  await chooseView(page,'Home story');await expect(readout).toBeHidden();
+  await chooseView(page,'Service flow');await panelsOptions(page);await expect(readout).toHaveText('65%');await expect(page.locator('#src')).toHaveValue(saved);
   await page.goto(await build(server,raw,'exported'));
   await expect(page.locator('.explore-overlay-value')).toHaveText('65%');
   const exported=await panel(page).boundingBox(),stage=await page.locator('.explore-stage').boundingBox();

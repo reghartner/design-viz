@@ -206,5 +206,5 @@ The placement controls refuse to write if the source changed since the inspector
 was opened; reselect the step after manual JSON changes.
 
 Published pages keep playback, the live view switch, and the Data flow disclosure. Editing controls are
-workbench-only. The map supports all six skins, phones, exported HTML and embeds;
+workbench-only. The map supports all supported skins, phones, exported HTML and embeds;
 the primary panel is retained in print.

@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function spec({hiddenStandardPanels=false}={}){
@@ -75,7 +75,7 @@ test('the built-in tour finds later-tab capabilities and numbers only the lesson
   });
   expect(lessons.map(x=>x.title)).toEqual(expect.arrayContaining(detailTopics));expectContiguous(lessons);
   expect(warnings).toEqual([]);await expect(activeTab(page)).toHaveText('Overview');
-  await page.getByRole('tab',{name:'Details',exact:true}).click();
+  await chooseNavigation(page.locator('.reader-navigation'),'Tab','Details');
   await expect(activeView(page)).toHaveText('Business view');
   await expect(page.locator('.path-chip[aria-pressed="true"]:visible')).toHaveText('Normal delivery');
 });
@@ -113,13 +113,13 @@ test('planning and completing the built-in tour preserve the reader view, path, 
     const a=el.getBoundingClientRect(),b=el.closest('.explore-stage').getBoundingClientRect();
     return {x:a.x-b.x,y:a.y-b.y,width:a.width,height:a.height};
   });
-  const before=await geometry(),zoom=await page.locator('.explore-zoom:visible').textContent(),hash=new URL(page.url()).hash;
+  const before=await geometry(),zoom=await page.locator('.reader-zoom-menu>summary').textContent(),hash=new URL(page.url()).hash;
   async function restored(){
     await expect(activeTab(page)).toHaveText('Details');await expect(activeView(page)).toHaveText('Engineering view');
     await expect(page.locator('.path-chip[aria-pressed="true"]:visible')).toHaveText('Retry delivery');
     await expect(page.locator('.schip[aria-current="true"]:visible')).toHaveText('2');
     await expect(page.locator('.termbar:visible')).toHaveAttribute('data-playback','paused');
-    await expect(panel(page,'queue')).toBeHidden();await expect(page.locator('.explore-zoom:visible')).toHaveText(zoom);
+    await expect(panel(page,'queue')).toBeHidden();await expect(page.locator('.reader-zoom-menu>summary')).toHaveText(zoom);
     const after=await geometry();for(const key of Object.keys(before))expect(after[key],key+' restored').toBeCloseTo(before[key],0);
     expect(new URL(page.url()).hash).toBe(hash);
   }
@@ -176,4 +176,14 @@ test('canonical Tab Views are discovered and restored without losing section mem
   await expect(page.locator('.path-chip[aria-pressed="true"]:visible')).toHaveText('Retry delivery');
   await expect(page.locator('.schip[aria-current="true"]:visible')).toHaveText('2');
   expect(new URL(page.url()).hash).toBe(before);expect(warnings).toEqual([]);
+});
+
+for(const width of [1440,390])test('Choose a View uses live Contents with the sidebar initially closed at '+width,async({page,server})=>{
+  await page.setViewportSize({width,height:900});await page.goto(await build(server,spec()));
+  const toggle=page.locator('.reader-top>button');if(await toggle.getAttribute('aria-expanded')==='true')await toggle.click();
+  await startBoth(page);await expect(heading(page)).toHaveText('Choose a View');await expect(toggle).toHaveAttribute('aria-expanded','false');
+  await page.getByRole('button',{name:'Try the controls',exact:true}).click();await expect(toggle).toBeFocused();await page.keyboard.press('Enter');
+  await expect(page.locator('.reader-contents')).toBeVisible();await page.locator('.reader-tree-view').filter({hasText:'Engineering view'}).click();
+  await expect(activeView(page)).toHaveText('Engineering view');await expect(page.locator('.viewer-diagram-canvas')).toBeVisible();
+  await page.locator('.dv-tour-exit').click();await expect(page.locator('.dv-tour')).toBeHidden();await expect(activeTab(page)).toHaveText('Overview');
 });

@@ -1,7 +1,7 @@
 import {writeFile,readFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {chooseAddDestination,test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {chooseAddDestination,chooseNavigation,test,expect,paste,closeTools} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function diagram(prefix,count,camera,presentation='explore'){
@@ -62,6 +62,7 @@ async function standalone(page,server,raw){
  execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
  await page.goto(server.origin+'/canvas-tab-entry.html');
 }
+async function readerTab(root,name){await chooseNavigation(root.locator('.reader-navigation'),'Tab',name);}
 async function afterTwoFrames(page){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
 async function expectCamera(board,expected,tolerance=1){
  await expect.poll(async()=>{const current=await board.evaluate(b=>({x:b.scrollLeft,y:b.scrollTop}));return Math.max(Math.abs(current.x-expected.x),Math.abs(current.y-expected.y));}).toBeLessThanOrEqual(tolerance);
@@ -82,7 +83,7 @@ test('workbench first entry into a hidden Explore tab frames its diagram',async(
 
 test('reader first entry into a hidden Explore story frames its diagram',async({page,server})=>{
  await standalone(page,server,fixture());
- await page.getByRole('tab',{name:'Large story',exact:true}).click();
+ await readerTab(page,'Large story');
  await expect(page.locator('#section-large [data-dv-node="b0"]')).toBeInViewport();
  await expect(page.locator('#section-large [data-dv-node="b6"]')).toBeInViewport();
 });
@@ -134,7 +135,7 @@ test('workbench entering Explore through an ordinary document tab frames its dia
 test('reader entering Explore through an ordinary document tab frames its diagram',async({page,server})=>{
  await standalone(page,server,mixedFixture());
  const board=page.locator('#section-explore .board');await board.evaluate(el=>el.style.display='none');
- await page.locator('#tab-0-1').click();
+ await readerTab(page,'Explore story');
  await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
  await expect(page.locator('#section-explore [data-view-layout][data-layout-id="explore"]')).toHaveAttribute('aria-pressed','true');
  await afterTwoFrames(page);await expect.poll(()=>board.evaluate(el=>el.clientWidth)).toBe(0);
@@ -143,79 +144,54 @@ test('reader entering Explore through an ordinary document tab frames its diagra
  await expect(page.locator('#section-explore [data-dv-node="x6"]')).toBeInViewport();
 });
 
-test('keyboard tab entry opens the default Explore view of a stepped story',async({page,server})=>{
+test('keyboard Contents entry opens the default Explore view of a stepped story',async({page,server})=>{
  await standalone(page,server,steppedFixture());
- await page.locator('#tab-0-0').focus();await page.keyboard.press('ArrowRight');
- await expect(page.locator('#tab-0-1')).toHaveAttribute('aria-selected','true');
- await expect(page.locator('#tab-0-1')).toBeFocused();
+ const tab=page.locator('.reader-tree-tab').filter({hasText:'Explore story'});await tab.focus();await page.keyboard.press('Enter');
+ const view=page.locator('.reader-tree-view').filter({hasText:/^Explore$/});await view.focus();await page.keyboard.press('Enter');
+ await expect(page.locator('#tab-0-1')).toHaveAttribute('aria-selected','true');await expect(view).toBeFocused();
  await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
  await expect(page.locator('#section-explore [data-view-layout][data-layout-id="explore"]')).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('#section-explore .schip[aria-current="true"]')).toHaveText('1');
- await page.keyboard.press('Home');await expect(page.locator('#tab-0-0')).toBeFocused();
- await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
- await page.keyboard.press('End');await expect(page.locator('#tab-0-1')).toBeFocused();
- await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
+ const standard=page.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab').filter({hasText:'Standard story'})}).getByRole('button',{name:'Standard',exact:true});await standard.focus();await page.keyboard.press('Enter');
+ await expect(standard).toBeFocused();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
+ await view.focus();await page.keyboard.press('Enter');await expect(view).toBeFocused();await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
 });
 
 test('Explore markers preserve labels and follow each tab primary view',async({page,server},info)=>{
  await standalone(page,server,mixedFixture());
- const standardTab=page.getByRole('tab',{name:'Standard story',exact:true});
- const exploreTab=page.getByRole('tab',{name:'Explore story',exact:true});
- await expect(standardTab).not.toHaveAttribute('data-explore-view','true');
- await expect(exploreTab).toHaveAttribute('data-explore-view','true');
- await expect(exploreTab.locator('.explore-indicator-badge')).toHaveCount(1);
- await expect(exploreTab).toHaveAttribute('aria-description',/pan.*zoom/);
- await exploreTab.click();
- const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
- await expect(navigation.locator('.explore-navigation-group:not([hidden]) .explore-navigation-label')).toHaveText(['Tabs','Views']);
- await expect(navigation.getByRole('tab')).toHaveText(['Standard story','Explore story']);
- const destinationViews=page.locator('#section-explore .diagram-view-choice [data-view-layout]');
- await expect(destinationViews).toHaveCount(3);
- for(const name of ['Explore','Fresh view','Authored']){
-  const button=page.getByRole('button',{name,exact:true});await expect(button).toHaveAttribute('data-explore-view','true');
-  await expect(button).toHaveAttribute('aria-description',/pan.*zoom/);
- }
- const desktop=info.outputPath('explore-navigation-desktop.png');await page.screenshot({path:desktop});
- await info.attach('explore-navigation-desktop',{path:desktop,contentType:'image/png'});
- const fresh=page.getByRole('button',{name:'Fresh view',exact:true});await fresh.focus();await page.keyboard.press('Enter');
- await expect(fresh).toHaveAttribute('aria-pressed','true');await page.getByRole('button',{name:'Explore',exact:true}).click();
- await standardTab.click();
- await page.getByRole('button',{name:'Source Explore',exact:true}).click();
- await expect(standardTab).toHaveAttribute('data-explore-view','true');
- await page.getByRole('button',{name:'Standard',exact:true}).click();
- await expect(standardTab).not.toHaveAttribute('data-explore-view','true');
- await page.setViewportSize({width:480,height:720});
- const narrowFixture=mixedFixture();narrowFixture.page.blocks[0].tabs[0].sections[0].diagram.rows=[['s0'],['s1']];
- await standalone(page,server,narrowFixture);await page.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Source Explore'});
- await expect(page.locator('.explore-navigation-tabs')).toBeVisible();await expect(page.locator('.explore-navigation-chapters')).toBeVisible();
- await expect(page.locator('#section-standard [data-dv-node="s0"]')).toBeInViewport();
- await expect(page.locator('#section-standard [data-dv-node="s1"]')).toBeInViewport();
- await expect.poll(()=>page.evaluate(()=>{
-  const shell=document.querySelector('.explore-full-window .viewer-diagram-canvas');
-  const bar=document.querySelector('#docview>.explore-navigation'),tools=shell?.querySelector(':scope > .explore-tools'),stage=shell?.querySelector(':scope > .explore-stage');
-  if(!bar || !stage || !tools)return false;const b=bar.getBoundingClientRect(),s=stage.getBoundingClientRect(),t=tools.getBoundingClientRect();
-  // Reader sizing belongs between navigation and canvas, without overlapping
-  // either surface or leaving the old floating-toolbar gutter.
-  return tools.nextElementSibling===stage && t.height>0 && s.height>0
-   && t.top>=b.bottom && t.top-b.bottom<=1
-   && s.top>=t.bottom && s.top-t.bottom<=1
-   && t.left>=b.left && t.right<=b.right;
- })).toBe(true);
- const narrow=info.outputPath('explore-navigation-narrow.png');await page.screenshot({path:narrow});
- await info.attach('explore-navigation-narrow',{path:narrow,contentType:'image/png'});
+ const standardTab=page.getByRole('tab',{name:'Standard story',exact:true,includeHidden:true});
+ const exploreTab=page.getByRole('tab',{name:'Explore story',exact:true,includeHidden:true});
+ await expect(standardTab).not.toHaveAttribute('data-explore-view','true');await expect(exploreTab).toHaveAttribute('data-explore-view','true');
+ await readerTab(page,'Explore story');const navigation=page.locator('.reader-navigation');
+ await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Standard story','Explore story']);
+ await expect(page.locator('#section-explore .diagram-view-choice [data-view-layout]')).toHaveCount(3);
+ for(const name of ['Explore','Fresh view','Authored']){const button=navigation.getByRole('button',{name,exact:true});await expect(button).toHaveAttribute('data-explore-view','true');await expect(button).toHaveAttribute('aria-description',/pan.*zoom/);}
+ await info.attach('explore-navigation-desktop',{body:await page.screenshot(),contentType:'image/png'});
+ const fresh=navigation.getByRole('button',{name:'Fresh view',exact:true});await fresh.focus();await page.keyboard.press('Enter');await expect(fresh).toHaveAttribute('aria-pressed','true');
+ await navigation.getByRole('button',{name:'Explore',exact:true}).click();await readerTab(page,'Standard story');
+ await navigation.getByRole('button',{name:'Source Explore',exact:true}).click();await expect(standardTab).toHaveAttribute('data-explore-view','true');
+ await navigation.locator('.reader-contents-tab').filter({has:page.locator('.reader-tree-tab').filter({hasText:'Standard story'})}).getByRole('button',{name:'Standard',exact:true}).click();await expect(standardTab).not.toHaveAttribute('data-explore-view','true');
+ await page.setViewportSize({width:480,height:720});const raw=mixedFixture();raw.page.blocks[0].tabs[0].sections[0].diagram.rows=[['s0'],['s1']];await standalone(page,server,raw);
+ await chooseNavigation(page.locator('.reader-navigation'),'View','Source Explore');
+ await expect(page.locator('.reader-contents')).toBeHidden();await expect(page.locator('.reader-view-label')).toHaveText('Source Explore');
+ for(const id of ['s0','s1'])await expect(page.locator('#section-standard [data-dv-node="'+id+'"]').first()).toBeInViewport();
+ const nav=await navigation.boundingBox(),stage=await page.locator('.explore-active-section .explore-stage').boundingBox(),toolbar=await page.locator('.reader-toolbar').boundingBox();
+ expect(stage.y).toBe(nav.y+nav.height);expect(toolbar.y+toolbar.height).toBeLessThanOrEqual(stage.y);expect(toolbar.width).toBe(nav.width);
+ await page.locator('.reader-zoom-menu>summary').click();for(const name of ['Auto','Fit width','Readable'])await expect(page.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toBeVisible();
+ await info.attach('explore-navigation-narrow',{body:await page.screenshot(),contentType:'image/png'});
 });
 
 test('Explore top bar keeps every tab block reachable and restricts section navigation to its View',async({page,server})=>{
  await standalone(page,server,navigationFixture());
  const navigation=page.locator('.explore-navigation');await expect(navigation).toBeVisible();
- await expect(navigation.getByRole('tablist')).toHaveCount(2);
- await expect(navigation.getByRole('tab')).toHaveText(['First','Second','Third','Fourth']);
- await navigation.getByRole('tab',{name:'Fourth',exact:true}).click();
+ await expect(navigation.getByRole('tablist',{includeHidden:true})).toHaveCount(2);
+ await expect(navigation.locator('.reader-tree-tab')).toHaveText(['Navigation hierarchy','First','Second','Third','Fourth']);
+ await chooseNavigation(navigation,'Tab','Fourth');
  await expect(page.locator('#section-fourth [data-dv-node="f0"]')).toBeInViewport();
  await expect(navigation.getByRole('button',{name:'Loose diagram',exact:true})).toHaveCount(0);
  await page.evaluate(()=>{location.hash='d=loose&v=explore';});
  await expect(page.locator('#section-loose [data-dv-node="l0"]')).toBeInViewport();
- await navigation.getByRole('tab',{name:'Second',exact:true}).click();
+ await chooseNavigation(navigation,'Tab','Second');
  await navigation.getByRole('button',{name:'Secondary diagram',exact:true}).click();
  await expect(page.locator('#section-secondary [data-dv-node="s0"]')).toBeInViewport();
 });
@@ -241,11 +217,11 @@ test('native setCanvas preserves persistent tabs and Views and isolates sibling 
  await one.locator('.explore-navigation').evaluate(el=>window.oneNav=el);await two.locator('.explore-navigation').evaluate(el=>window.twoNav=el);
  const sibling=await page.evaluate(()=>two.snapshot());
  await expect(one.getByRole('combobox',{name:'Explore story'})).toHaveCount(0);
- await expect(one.locator('.explore-navigation-tabs')).toBeVisible();await expect(one.locator('.explore-navigation-chapters')).toBeVisible();
- await one.getByRole('tab',{name:'Explore story',exact:true}).click();
+ await expect(one.locator('.reader-contents')).toBeVisible();await expect(one.locator('.reader-tree-views')).toBeVisible();
+ await readerTab(one,'Explore story');
  await expect(one.locator('#section-explore [data-dv-node="x0"]')).toBeInViewport();
  await expect(one.getByRole('button',{name:'Fresh view',exact:true})).toBeVisible();
- await expect(one.getByRole('tab',{name:'Explore story',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await expect(one.getByRole('button',{name:'Explore',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await info.attach('native-monitor-icons',{body:await page.screenshot(),contentType:'image/png'});
+ await expect(one.locator('.reader-tab-label')).toHaveText('Explore story');await expect(one.getByRole('button',{name:'Explore',exact:true})).toHaveAttribute('data-explore-view','true');await info.attach('native-monitor-icons',{body:await page.screenshot(),contentType:'image/png'});
  await expect(two.locator('.explore-navigation')).toHaveCount(1);await expect(two.locator('.explore-navigation .tabbar')).toHaveCount(1);expect(await page.evaluate(()=>two.snapshot())).toEqual(sibling);
  await page.evaluate(()=>one.setCanvas(false));
  expect(await one.locator('.explore-navigation').evaluate(el=>el===window.oneNav)).toBe(true);
@@ -260,22 +236,22 @@ test('native canvas preserves legacy Standard presentation and persistent naviga
  await writeFile(path.join(server.root,'legacy-native.html'),'<style>#host{position:fixed;inset:0}</style><div id="host"></div><script type="module">import {mountNativeViewer} from "./legacy-native.js";window.mount=mountNativeViewer;</script>');
  await page.goto(server.origin+'/legacy-native.html');await page.waitForFunction(()=>!!window.mount);
  await page.evaluate(raw=>{window.viewer=mount(document.querySelector('#host'),raw);viewer.setCanvas(true);},legacyFixture());
- const host=page.locator('#host');await expect(host.locator('.explore-navigation-tabs')).toBeVisible();
+ const host=page.locator('#host');await expect(host.locator('.reader-contents')).toBeVisible();
  await expect(host.locator('.explore-navigation').getByRole('button',{name:'Standard',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(host.locator('.viewer-diagram-canvas')).toHaveCount(0);await host.locator('.explore-navigation').evaluate(el=>window.nativeNav=el);
- await host.getByRole('tab',{name:'Large story',exact:true}).click();
+ await readerTab(host,'Large story');
  await expect(host.locator('#section-large [data-dv-node="b0"]')).toBeInViewport();
  await expect.poll(()=>page.evaluate(()=>viewer.snapshot()?.section)).toBe('large');
  await page.evaluate(()=>viewer.setCanvas(false));expect(await host.locator('.explore-navigation').evaluate(el=>el===window.nativeNav)).toBe(true);
- await expect(host.locator('.explore-navigation .tabbar')).toHaveCount(1);await expect(host.getByRole('tab',{name:'Large story',exact:true})).toHaveAttribute('aria-selected','true');await page.evaluate(()=>viewer.destroy());
+ await expect(host.locator('.explore-navigation .tabbar')).toHaveCount(1);await expect(host.getByRole('tab',{includeHidden:true,name:'Large story',exact:true})).toHaveAttribute('aria-selected','true');await page.evaluate(()=>viewer.destroy());
 });
 
 for(const primary of ['standard','explore'])test('reader tab navigation follows its '+primary+' primary diagram',async({page,server})=>{
  await standalone(page,server,orderedTabFixture(primary,true));
- const tab=page.getByRole('tab',{name:'Combined',exact:true});
+ const tab=page.getByRole('tab',{includeHidden:true,name:'Combined',exact:true});
  if(primary==='explore')await expect(tab).toHaveAttribute('data-explore-view','true');
  else await expect(tab).not.toHaveAttribute('data-explore-view','true');
- await tab.click();
+ await readerTab(page,'Combined');
  if(primary==='explore'){
   await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
   await expect(page.locator('#section-primary [data-dv-node="p0"]')).toBeInViewport();
@@ -287,7 +263,7 @@ for(const primary of ['standard','explore'])test('reader tab navigation follows 
 
 for(const primary of ['standard','explore'])test('reader initial tab state follows its '+primary+' primary diagram',async({page,server})=>{
  await standalone(page,server,orderedTabFixture(primary,false));
- const tab=page.getByRole('tab',{name:'Combined',exact:true});
+ const tab=page.getByRole('tab',{includeHidden:true,name:'Combined',exact:true});
  if(primary==='explore'){
   await expect(tab).toHaveAttribute('data-explore-view','true');
   await expect(page.locator('body')).toHaveClass(/viewer-exploring/);

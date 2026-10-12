@@ -1,4 +1,4 @@
-import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,chooseNavigation} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
@@ -6,24 +6,24 @@ import {repo} from '../helpers/prepare.mjs';
 const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
 async function standalone(page,server,raw){raw=raw || await fixture();raw.page.blocks[0].tabs[0].sections[2].text=Array.from({length:30},()=> 'Section C explains the shared content across Views.');await writeFile(path.join(server.root,'tab-views.json'),JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tab-views.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tab-views.html')]);await page.goto(server.origin+'/tab-views.html');return page.locator('#docview');}
 const nav=root=>root.locator('.explore-navigation').first();
-async function chooseView(root,name){const navigation=nav(root),picker=navigation.getByRole('combobox',{name:'Choose View',exact:true});if(await picker.isVisible())await picker.selectOption({label:name});else await navigation.getByRole('button',{name,exact:true}).click();}
-async function chooseTab(root,name){const navigation=nav(root),picker=navigation.getByRole('combobox',{name:'Choose Tab',exact:true});if(await picker.isVisible())await picker.selectOption({label:name});else await navigation.getByRole('tab',{name,exact:true}).click();}
+async function chooseView(root,name){await chooseNavigation(nav(root),'View',name);}
+async function chooseTab(root,name){await chooseNavigation(nav(root),'Tab',name);}
 const visible=root=>root.locator('.doc-sec[data-dv-section]:visible');
 for(const width of [1280,1440])test(`Tab Views enforce overlap membership and retain browser-top navigation at ${width}`,async({page,server},info)=>{
  await page.setViewportSize({width,height:950});const root=await standalone(page,server);
- await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');
+ await expect(nav(root).getByRole('tab',{name:'Product',exact:true,includeHidden:true})).not.toHaveAttribute('data-explore-view','true');
  await expect(visible(root)).toHaveCount(2);await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-detail')).toBeHidden();
  await nav(root).evaluate(el=>{window.savedNav=el;});
  const geometry=async()=>nav(root).evaluate(el=>({same:el===window.savedNav,y:el.getBoundingClientRect().y,width:el.getBoundingClientRect().width}));
  expect(await geometry()).toEqual({same:true,y:0,width});await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);expect(await geometry()).toEqual({same:true,y:0,width});
- await chooseView(root,'Explore B + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(1);await expect(root.locator('#section-b')).toBeVisible();
- await expect(nav(root).locator('.explore-navigation-diagrams .explore-diagram-button:visible')).toHaveText(['Section B','Section C']);await nav(root).getByRole('button',{name:'Section C',exact:true}).click();await expect(root.locator('#section-c .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();
+ await chooseView(root,'Explore B + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true,includeHidden:true})).toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(1);await expect(root.locator('#section-b')).toBeVisible();
+ await expect(nav(root).locator('.reader-tree-sections[data-reader-view=explore-bc] .reader-tree-section')).toHaveText(['Section B','Section C']);await nav(root).getByRole('button',{name:'Section C',exact:true}).click();await expect(root.locator('#section-c .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();
  await expect(root.locator('.explore-player:visible')).toHaveCount(1);expect(await geometry()).toEqual({same:true,y:0,width});
  await chooseView(root,'Explore A');await expect(root.locator('#section-a .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-c')).toBeHidden();
  await root.locator('#section-a [data-dv-detail]').click();await expect(root.locator('[data-dv-detail-preview]:visible')).toHaveCount(1);await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toBeVisible();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toHaveAttribute('aria-pressed','true');
- await chooseView(root,'Standard A + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(2);await root.locator('#section-a [data-dv-detail]').click();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toBeVisible();expect(await geometry()).toEqual({same:true,y:0,width});
+ await chooseView(root,'Standard A + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true,includeHidden:true})).not.toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(2);await root.locator('#section-a [data-dv-detail]').click();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toBeVisible();expect(await geometry()).toEqual({same:true,y:0,width});
  await info.attach('tab-views-'+width,{body:await page.screenshot(),contentType:'image/png'});
- await page.goto(server.origin+'/tab-views.html#d=b&v=explore-a');await expect(root.locator('#section-b')).toBeVisible();await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(root.locator('#section-a')).toBeHidden();
+ await page.goto(server.origin+'/tab-views.html#d=b&v=explore-a');await expect(root.locator('#section-b')).toBeVisible();await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(nav(root).getByRole('tab',{name:'Product',exact:true,includeHidden:true})).toHaveAttribute('data-explore-view','true');await expect(root.locator('#section-a')).toBeHidden();
 });
 test('Workbench View authoring has one Undo and retains the selected View through content edits',async({page,server})=>{
  const raw=await fixture();await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);const root=page.locator('#docview'),source=page.locator('#src');
@@ -96,8 +96,8 @@ for(const width of [320,390])test(`reader menus and utilities stay reachable at 
  await chooseView(root,'Explore A');expect(await navigation.boundingBox()).toEqual(before);
  await chooseView(root,'Standard A + C');expect(await navigation.boundingBox()).toEqual(before);
  await expect(dock).toBeVisible();
- // Compact pickers keep every Tab reachable without another scrolling lane.
- const tabs=navigation.getByRole('combobox',{name:'Choose Tab',exact:true});await tabs.focus();await tabs.selectOption({label:'Notes'});if(await tabs.isVisible()){await expect(tabs).toBeFocused();await expect(tabs).toHaveValue('1');}else await expect(navigation.getByRole('tab',{name:'Notes',exact:true})).toBeFocused();await chooseTab(root,'Product');await expect(tabs).toBeFocused();
+ // The Contents tree keeps every Tab reachable without scrolling chrome.
+ await chooseTab(root,'Notes');await expect(root.locator('.reader-tab-label')).toHaveText('Notes');await chooseTab(root,'Product');await expect(root.locator('.reader-tab-label')).toHaveText('Product');
  await info.attach('reader-phone',{body:await page.screenshot(),contentType:'image/png'});
 });
 
@@ -156,13 +156,13 @@ for(const width of [870,1280])for(const authored of [false,true])test(`reader Vi
  await expect(node).toBeInViewport({ratio:1});await page.evaluate(()=>document.fonts.ready);
  const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,width:el.querySelector('.boardcanvas>svg').getBoundingClientRect().width}));
  if(authored)expect(await board.evaluate(el=>el.querySelector('.boardcanvas>svg').getBoundingClientRect().width/el.querySelector('.boardcanvas>svg').viewBox.baseVal.width)).toBeCloseTo(.5,3);
- await section.getByRole('button',{name:'Zoom in',exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
+ await navigation.locator('.reader-toolbar').getByRole('button',{name:'Zoom in',exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
  await expect(node).toBeInViewport();
  for(let cycle=0;cycle<3;cycle++){
   await chooseView(root,'Full story');await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);
   await chooseView(root,'Explore story');await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
   // C actually moves before A, not just through a redundant DOM insertion.
-  await chooseView(root,'Reversed subset');expect((await navigation.locator('.explore-navigation-diagrams .explore-diagram-button:visible').allTextContents()).sort()).toEqual(['Section A','Section C']);
+  await chooseView(root,'Reversed subset');expect((await navigation.locator('.reader-tree-sections[data-reader-view=reversed] .reader-tree-section').allTextContents()).sort()).toEqual(['Section A','Section C']);
   expect(await root.locator('.doc-sec[data-dv-section]').evaluateAll(nodes=>nodes.map(n=>n.id).indexOf('section-c')<nodes.map(n=>n.id).indexOf('section-a'))).toBe(true);
   await expect(root.locator('#section-b')).toBeHidden();await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
  }

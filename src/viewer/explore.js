@@ -27,7 +27,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var author=null,scrollTimer=null,scrollEdit=null,marginX=0,marginY=0,graphPixels=0;
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
-  var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0;
+  var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
   var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
@@ -90,7 +90,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function syncTools(){
     // Every reader Explore surface shares the compact row. Workbench canvas
     // controls have their own owner, so its panel sizing stays in the menu.
-    if(active && (!workbenchCanvas || readerCanvas)){shell.insertBefore(tools,stage);tools.appendChild(overlayZoom);}
+    if(active && (!workbenchCanvas || readerCanvas)){shell.insertBefore(tools,stage);(shell.closest('.has-reader-contents')?panelBody:tools).appendChild(overlayZoom);}
     else{stage.appendChild(tools);panelBody.appendChild(overlayZoom);}
   }
   function standardPanels(){
@@ -250,10 +250,16 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     return {zoom:clamp(graphPixels/graphWidth(),.001,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
   }
+  function rememberStableCamera(){
+    // A growing viewport can clamp scrollLeft/Top against the OLD canvas extent
+    // before ResizeObserver paints. Ignore those resize-generated scroll events;
+    // keep the last center measured with the bounds that own these margins.
+    if(active && graphPixels && board.clientWidth===lastWidth && board.clientHeight===lastHeight)stableCamera=camera(lastWidth,lastHeight);
+  }
   function positionCamera(c){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
-    board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
+    board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;rememberStableCamera();
   }
   function scrollState(){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
@@ -266,7 +272,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // are unchanged. Fractional graph heights can otherwise add a pixel on
     // every View switch. Resized destinations still keep the graph center.
     if(saved.camera && !unchanged)positionCamera(saved.camera);
-    else{board.scrollLeft=saved.x;board.scrollTop=saved.y;}
+    else{board.scrollLeft=saved.x;board.scrollTop=saved.y;}rememberStableCamera();
   }
   function saveCamera(token){
     if(!active || retired)return;
@@ -447,7 +453,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     player.setAttribute('data-explore-layout',definition.id);
     var sizing=sizingScale();overlayLabel.textContent=Math.round(sizing*100)+'%';overlayOut.disabled=sizing<=.5;overlayIn.disabled=sizing>=1.25;
     var boundsChanged=b.w!==lastWidth || b.h!==lastHeight;
-    var priorCamera=boundsChanged && graphPixels && lastWidth && lastHeight?camera(lastWidth,lastHeight):memory.layout.camera;
+    var priorCamera=boundsChanged && graphPixels && lastWidth && lastHeight?(stableCamera || camera(lastWidth,lastHeight)):memory.layout.camera;
     if(boundsChanged){
       // Defaults are viewport fractions. Initial mounting and full-browser
       // promotion can both change bounds after panel DOM has been created.
@@ -514,6 +520,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     board.style.setProperty('--explore-canvas-height',(((workbenchCanvas || readerCanvas || onCanvas())?Math.max(board.clientHeight,graphHeight,(extent.y+extent.h)*graphScale()):board.clientHeight)+2*marginY)+'px');
     board.style.setProperty('--explore-canvas-width',(Math.max(board.clientWidth,graphPixels,(extent.x+extent.w)*graphScale())+2*marginX)+'px');
     var percent=graphPixels/natural*100;zoomLabel.textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
+    box.dispatchEvent(new CustomEvent('reader-zoom-change',{bubbles:true}));
     if(preserve && prior)positionCamera(prior);
     else if(preserve){if(memory.layout.camera)positionCamera(memory.layout.camera);else{board.scrollLeft=marginX;board.scrollTop=marginY;}}
   }
@@ -522,7 +529,8 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     zoom=clamp((graphPixels || graphWidth())/graphWidth()*factor,zoomFloor(),4);sizeGraph(true);saveCamera(token);
   }
   function onLegendClick(ev){if(!active || retired)return;if(ev.target.closest('.board-size>.mbtn:not(.board-pan-button)')){var token=beginEdit();if(token===false)return;zoom=null;sizeGraph(true);saveCamera(token);}}
-  if(legend)legend.addEventListener('click',onLegendClick);
+  var sizingControls=legend && legend.querySelector('.board-size');
+  if(sizingControls)sizingControls.addEventListener('click',onLegendClick);
   function raise(w){w.el.style.zIndex=String(++z);}
   function finish(cancel){
     if(!gesture)return;var g=gesture;gesture=null;
@@ -675,7 +683,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(graphObserver)graphObserver.observe(board.querySelector('.boardcanvas'),{childList:true});
     if(tracksObserver && bar)tracksObserver.observe(bar,{childList:true,subtree:true,characterData:true});
     fitHeight();if(memory.controls===undefined)memory.controls=memory.layout.controls?absolute(memory.layout.controls):null;
-    lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
+    stableCamera=null;lastWidth=lastHeight=graphPixels=0;paint();sizeGraph(false);settleFonts();
     if(memory.scroll)restoreScroll(memory.scroll);
     else if(memory.layout.camera)positionCamera(memory.layout.camera);
     else{board.scrollLeft=marginX;board.scrollTop=marginY;}
@@ -686,6 +694,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
     if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
+    // Reader chrome borrows live sizing controls. Return them before Standard
+    // restores its scroll: the legend contributes to the board's scroll extent.
+    shell.dispatchEvent(new CustomEvent('viewer-presentation-changing',{bubbles:true}));
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);
@@ -746,7 +757,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   shell.addEventListener('pointermove',pointerMove);shell.addEventListener('pointerup',pointerEnd);shell.addEventListener('pointercancel',pointerCancel);shell.addEventListener('lostpointercapture',captureLost);shell.addEventListener('keydown',keydown);
   window.addEventListener('pointerup',pointerEnd,true);
-  board.addEventListener('wheel',wheel,{passive:false});board.addEventListener('keydown',scrollKey);
+  board.addEventListener('scroll',rememberStableCamera,{passive:true});board.addEventListener('wheel',wheel,{passive:false});board.addEventListener('keydown',scrollKey);
   board.addEventListener('pointerdown',panStart);document.addEventListener('pointerdown',clearCanvasSelection,true);window.addEventListener('blur',cancel);window.addEventListener('resize',resized);document.addEventListener('fullscreenchange',fullscreenChanged);
   function canvasExtent(){
     var svg=board.querySelector('.boardcanvas>svg'),height=svg && svg.viewBox.baseVal.height || 800;
@@ -877,6 +888,6 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       menu.open=saved.menuOpen;legendMenu.open=!!saved.legendOpen;
     },
     suspend:function(){leave(true);},
-    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(legend)legend.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
+    destroy:function(){if(retired)return;retired=true;pendingFullscreen++;leave();if(isFullscreen() && document.exitFullscreen){var p=document.exitFullscreen();if(p && p.catch)p.catch(function(){});}if(observer)observer.disconnect();if(contentObserver)contentObserver.disconnect();if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();clearScrollEdit();author=null;if(sizingControls)sizingControls.removeEventListener('click',onLegendClick);board.removeEventListener('pointerdown',panStart);board.removeEventListener('scroll',rememberStableCamera);board.removeEventListener('wheel',wheel);board.removeEventListener('keydown',scrollKey);document.removeEventListener('pointerdown',clearCanvasSelection,true);window.removeEventListener('pointerup',pointerEnd,true);window.removeEventListener('blur',cancel);window.removeEventListener('resize',resized);document.removeEventListener('fullscreenchange',fullscreenChanged);if(fontSet && fontSet.removeEventListener)fontSet.removeEventListener('loadingdone',fontsSettled);}
   };
 }

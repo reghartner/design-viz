@@ -68,7 +68,7 @@ test('the default flow covers chooser, controls, branching, both personas, done'
 });
 
 test('every selector class the default config names is rendered by the engine',()=>{
-  const engine=readSource('engine.js')+readSource('viewer/explore.js');
+  const engine=readSource('engine.js')+readSource('viewer/explore.js')+readSource('viewer/contents.js');
   const selectors=[];
   config.steps.forEach(step=>{
     if(step.target)selectors.push(step.target.selector);

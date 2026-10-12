@@ -326,7 +326,7 @@ function initWorkbenchLibrary(opts){
       var header=document.querySelector('.workbench-header');
       function headerSize(){var height=header?Math.ceil(header.getBoundingClientRect().height):0;reader.style.setProperty('--flowview-navigation-top',height+'px');var nav=reader.querySelector('.explore-navigation');if(nav)reader.style.setProperty('--flowview-navigation-bottom',Math.ceil(height+nav.getBoundingClientRect().height+8)+'px');}
       headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}
-      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:edit});
+      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy]});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
       if(opts.savePosition){
         var priorChange=ctl.onChange,wrapped=function(){

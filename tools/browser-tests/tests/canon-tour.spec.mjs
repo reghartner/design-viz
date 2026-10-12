@@ -122,7 +122,8 @@ test('Canon Explore fills the area below app chrome and retires its canvas befor
   const shell=await page.locator('#canon-reader .viewer-diagram-canvas').boundingBox(),nav=await page.locator('#canon-reader .explore-navigation').boundingBox();
   const stage=await page.locator('#canon-reader .explore-stage').boundingBox(),board=await page.locator('#canon-reader .explore-board').boundingBox();
   const header=await page.locator('.workbench-header').boundingBox();expect(nav.y).toBe(header.y+header.height);expect(nav.x).toBe(0);expect(nav.width).toBe(size.width);
-  expect(shell).toEqual({x:0,y:nav.y+nav.height,width:size.width,height:size.height-nav.y-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  const sidebar=await page.locator('#canon-reader .reader-contents').boundingBox();expect(sidebar.width).toBe(284);
+  expect(shell).toEqual({x:sidebar.width,y:nav.y+nav.height,width:size.width-sidebar.width,height:size.height-nav.y-nav.height});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);
   await page.locator('#canon-reader-edit').click();
   await expect(page.locator('#workspace-canvas .explore-board')).toBeVisible();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);

@@ -136,11 +136,21 @@ test('file import cannot preview or save the previous JSON while the replacement
 });
 test('display overrides persist separately from the imported JSON',async t=>{
   const s=await setup(t);s.paste(home);
-  s.el('section').value='1';s.el('focus').value='data';s.el('skin').value='daylight';
+  s.el('section').value='1';s.el('focus').value='data';s.el('skin').value='lilac';
   s.el('focus').dispatchEvent(new s.win.Event('change'));
   s.el('save').click();await settle();const config=s.calls.submits[0].config;
-  assert.equal(config.section,'1');assert.equal(config.focus,'data');assert.equal(config.skin,'daylight');
+  assert.equal(config.section,'1');assert.equal(config.focus,'data');assert.equal(config.skin,'lilac');
+  assert.equal(s.el('skin').querySelector('[value=lilac]').textContent,'Opus Lilac');
   assert.deepEqual(JSON.parse(config.specJson),JSON.parse(home));
+});
+
+for(const skin of ['daylight','editorial'])test('saved legacy '+skin+' stays selectable without rewriting source',async t=>{
+  const s=await setup(t,{config:{specJson:home,skin}});
+  assert.equal(s.el('skin').value,skin);
+  assert.ok(s.el('skin').querySelector('[value='+skin+']'));
+  s.el('save').click();await settle();
+  assert.equal(s.calls.submits[0].config.skin,skin);
+  assert.deepEqual(JSON.parse(s.calls.submits[0].config.specJson),JSON.parse(home));
 });
 
 test('Forge selects the Confluence composition and preserves alternate state through live view switches',async t=>{

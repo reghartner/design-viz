@@ -1878,7 +1878,8 @@ function documentForm(){
     function source(key,value){return commitCascade(function(raw){return planDocumentSource(session.text(),raw,key,value);},{after:refreshFormSoon});}
     var val=doc.page;
     rows.push(frow('Document title',textControl(val.title,function(v){return setting('title',v);},{placeholder:'Untitled story'})));
-    var skin=selectControl(SKIN_NAMES,val.skin || '',function(v){return setting('skin',v);},true);
+    var skin=selectControl(SELECTABLE_SKINS.concat(val.skin && SELECTABLE_SKINS.indexOf(val.skin)<0?[val.skin]:[]),val.skin || '',function(v){return setting('skin',v);},true);
+    Array.from(skin.options).forEach(function(option){if(option.value)option.textContent=skinLabel(option.value);});
     skin.options[0].textContent='Default ('+DEFAULT_SKIN+')';skin.setAttribute('aria-label','Saved default skin');
     rows.push(frow('Saved default skin',skin));
     rows.push(note('Saved in JSON and used when readers open the document. Canvas appearance only changes your preview; “Use document default” previews this saved choice. A hosting site may choose its own skin.'));

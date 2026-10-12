@@ -55,6 +55,8 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   const fitted=await board.evaluate(el=>{const b=el.getBoundingClientRect(),s=el.querySelector('.boardcanvas>svg').getBoundingClientRect();return {width:s.width,available:el.clientWidth,bottom:s.bottom,frameBottom:b.bottom};});
   expect(fitted.width).toBeLessThanOrEqual(fitted.available+1);expect(fitted.bottom).toBeLessThanOrEqual(fitted.frameBottom+1);
   await board.getByRole('button',{name:'Auto',exact:true}).click();
+  // Compare the same full-width surface across the mobile gutter breakpoint.
+  if(surface==='standalone')await page.locator('.reader-top>button').click();
   await page.setViewportSize({width:680,height:1000});const wide=await width(board);
   await page.setViewportSize({width:620,height:1000});
   // Page gutters also change at a mobile breakpoint; the SVG should follow
@@ -81,7 +83,9 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
   const initial={width:await width(board),scroll:await scroll(board)};
   for(const edit of [false,true]){
     await page.getByRole('button',{name:'Explore',exact:true}).click();
+    if(surface==='standalone')await page.locator('.reader-zoom-menu>summary').click();
     await page.getByRole('button',{name:'Fit diagram',exact:true}).click();
+    if(surface==='standalone')await page.keyboard.press('Escape');
     await board.evaluate(el=>{el.scrollLeft+=300;el.scrollTop+=400;});
     if(edit && surface==='workbench'){
       const edited=text.replace('Regular navigation','Renamed navigation');
@@ -156,10 +160,20 @@ for(const embedded of [false,true])test((embedded?'iframe':'standalone')+' Stand
   await expect.poll(pageY).toBeLessThan(before-200);expect(await pageY()).toBeGreaterThanOrEqual(before-300);
   await board.evaluate(el=>{document.querySelector('[data-wheel-top-spacer]').remove();el.scrollLeft=0;el.scrollTop=el.scrollHeight;});
   const camera={width:await width(board),scroll:await scroll(board)};
+  const geometry=()=>board.evaluate(el=>({y:el.scrollTop,max:el.scrollHeight-el.clientHeight,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,width:el.clientWidth,rect:el.getBoundingClientRect().toJSON(),legend:el.querySelector('.lg').getBoundingClientRect().toJSON(),legendHeight:el.querySelector('.lg').offsetHeight,css:el.getAttribute('style'),grid:el.closest('.section-layout-grid')?.getAttribute('style')}));
+  const beforeGeometry=await geometry();
   await resetPage();await reader.getByRole('button',{name:'Explore',exact:true}).click();
   await expect(board).toHaveClass(/explore-board/);
   await expect(board).toHaveCSS('overscroll-behavior-y','contain');
   await reader.getByRole('button',{name:'Standard',exact:true}).click();
+  await info.attach('standard-scroll-geometry',{body:JSON.stringify({before:beforeGeometry,after:await geometry()}),contentType:'application/json'});
+  expect(await width(board)).toBeCloseTo(camera.width,0);expect(await scroll(board)).toEqual(camera.scroll);
+  // Hash/API routing must release the borrowed sizing controls before the
+  // Standard camera is restored, just like a click in Contents.
+  for(const presentation of ['explore','standard']){
+    await reader.locator('body').evaluate((el,presentation)=>{const params=new URLSearchParams(location.hash.slice(1));params.set('d','services');params.set('v',presentation);location.hash=params.toString();},presentation);
+    if(presentation==='explore')await expect(board).toHaveClass(/explore-board/);else await expect(board).not.toHaveClass(/explore-board/);
+  }
   expect(await width(board)).toBeCloseTo(camera.width,0);expect(await scroll(board)).toEqual(camera.scroll);
   await expect(reader.locator('body')).not.toHaveClass(/viewer-exploring/);
   await resetPage();p=await point();await page.mouse.move(p.x,p.y);await page.mouse.wheel(0,600);

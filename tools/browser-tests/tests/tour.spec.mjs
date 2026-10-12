@@ -1,4 +1,4 @@
-import {test,expect} from '../helpers/test.mjs';
+import {test,expect,chooseNavigation} from '../helpers/test.mjs';
 
 // One geometry: every ring rect must carry EXACTLY the attributes of a mask
 // hole rect (x, y, width, height, rx, ry) — hole and ring drawn from one
@@ -288,7 +288,7 @@ test.describe('with motion allowed',()=>{
 test('replaying from a non-first tab still resolves first-tab steps',async({page,server})=>{
   await page.goto(server.origin+'/tour-ambient.html');
   await expect(page.locator('.dv-tour')).toHaveCount(0); // seeded done
-  await page.locator('.tabbtn').nth(1).click();
+  await chooseNavigation(page.locator('.reader-navigation'),'Tab','Two');
   await expect(page.locator('.tabbtn[aria-selected=true]')).toHaveText('Two');
   await page.locator('.dv-tour-replay').click();
   await expect(page.locator('.dv-tour-heading')).toHaveText('Play the story');
@@ -320,7 +320,7 @@ test('an internal render error tears the tour down and leaves the page usable',a
   await expect(page.locator('.doc-title')).toBeVisible();
   // Tab 1 opens in ambient mode (no step chips): prove the page is usable
   // by switching tabs and stepping the second diagram.
-  await page.locator('.tabbtn').nth(1).click();
+  await chooseNavigation(page.locator('.reader-navigation'),'Tab','Two');
   const chip=page.locator('.tabpanel:not([hidden]) .schip').first();
   await chip.click();
   await expect(chip).toHaveAttribute('aria-current','true');

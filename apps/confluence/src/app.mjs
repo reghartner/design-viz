@@ -74,7 +74,7 @@ export async function startConfluenceApp(document, bridge, core){
     return {destroy};
   }
   el('configuration').hidden = false;
-  core.SKIN_NAMES.forEach(name=>skin.add(new document.defaultView.Option(name[0].toUpperCase()+name.slice(1),name)));
+  core.SELECTABLE_SKINS.concat(core.SKIN_NAMES.includes(config.skin) && !core.SELECTABLE_SKINS.includes(config.skin)?[config.skin]:[]).forEach(name=>skin.add(new document.defaultView.Option(core.skinLabel(name),name)));
   input.value = typeof config.specJson === 'string' ? config.specJson : '';
   focus.value = ['spec','home','data'].includes(config.focus) ? config.focus : 'spec';
   skin.value = core.SKIN_NAMES.includes(config.skin) ? config.skin : 'spec';

@@ -76,7 +76,7 @@ test('view-only embeds target their section even without steps or when other sec
  const nav=await page.locator('#docview>.explore-navigation').boundingBox();
  const stage=await page.locator('#section-front-door .explore-stage').boundingBox();
  const board=await page.locator('#section-front-door .explore-board').boundingBox(),viewport=page.viewportSize();
- expect(shell).toEqual({x:0,y:nav.y+nav.height,width:viewport.width,height:viewport.height-nav.y-nav.height});
+ expect(shell).toEqual({x:284,y:nav.y+nav.height,width:viewport.width-284,height:viewport.height-nav.y-nav.height});
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(board.x).toBeGreaterThanOrEqual(stage.x);expect(board.y).toBeGreaterThanOrEqual(stage.y);
  expect(board.x+board.width).toBeLessThanOrEqual(stage.x+stage.width);
@@ -95,7 +95,7 @@ test('tabbed view-only embeds keep Chapters without an empty document Tabs group
  const sec=page.locator('#section-front-door'),nav=page.locator('#docview>.explore-navigation');
  await expect(page.locator('body')).toHaveClass(/dv-embed/);await expect(sec).toHaveClass(/dv-embed-target/);
  await expect(nav.locator('.explore-navigation-tabs')).toBeHidden();await expect(nav.locator('.explore-navigation-tabs .tabbtn')).toHaveCount(0);await expect(nav.locator('.explore-navigation-diagrams')).toBeHidden();await expect(nav.locator('.explore-diagram-button')).toHaveCount(1);await expect(nav.locator('.explore-diagram-button')).toHaveAttribute('aria-pressed','true');await expect(nav.getByRole('button',{name:'Other',exact:true,includeHidden:true})).toHaveCount(0);
- await expect(nav.locator('.explore-navigation-chapters')).toBeVisible();await expect(selected(page)).toHaveText('Service flow');
+ await expect(nav.locator('.reader-contents')).toBeVisible();await expect(nav.locator('.reader-tree-tab')).toHaveText('Target tab');await expect(selected(page)).toHaveText('Service flow');
  await expect(page.locator('#section-other')).toBeHidden();expect(viewOf(page)).toBe('service-flow');
  expect(new URLSearchParams(new URL(page.url()).hash.slice(1)).get('d')).toBe('front-door');
 });

@@ -1,3 +1,4 @@
+import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -101,7 +102,7 @@ test('standalone reader utilities stay reachable below navigation in both presen
   for(const width of [1280,390]){
     await page.setViewportSize({width,height:900});
     for(const name of ['Standard','Explore']){
-      await page.locator('#docview>.explore-navigation').getByRole('button',{name,exact:true}).click();
+      await chooseNavigation(page.locator('#docview>.explore-navigation'),'View',name);
       await expect.poll(()=>page.locator('.reader-page-actions>.tbtn').evaluateAll(buttons=>{
         const nav=document.querySelector('#docview>.explore-navigation').getBoundingClientRect();
         return buttons.filter(button=>!button.hidden).every(button=>{

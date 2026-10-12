@@ -1,3 +1,4 @@
+import {chooseNavigation} from '../helpers/test.mjs';
 import {arrangeChapter} from '../helpers/test.mjs';
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
@@ -134,7 +135,7 @@ for(const legacy of [false,true])test('View presentation migrates '+(legacy?'a l
 });
 
 test('invalid or unrendered JSON and detached view controls cannot rewrite an unrelated story',async({page,server})=>{
-  const original=await open(page,server);await nav(page).getByRole('button',{name:'Engineering',exact:true}).click();await options(page);
+  const original=await open(page,server);await chooseNavigation(nav(page),'View','Engineering');await options(page);
   const held=await settings(page).evaluateHandle(el=>({presentation:el.querySelector('[aria-label="View presentation"]'),name:el.querySelector('[aria-label="View name"]'),
     rename:[...el.querySelectorAll('button')].find(b=>b.textContent==='Rename View'),duplicate:[...el.querySelectorAll('button')].find(b=>b.textContent==='Duplicate View'),default:[...el.querySelectorAll('button')].find(b=>b.textContent==='Make opening View')}));
   async function staleEvents(){await held.evaluate(controls=>{
@@ -156,7 +157,7 @@ for(const size of [{width:1800,height:1200},{width:390,height:844},{width:500,he
   await summary.click();await summary.focus();await page.keyboard.press('Enter');const name=settings(page).getByRole('textbox',{name:'View name',exact:true});
   await reachable(name);const duplicate=settings(page).getByRole('button',{name:'Duplicate View',exact:true});await reachable(duplicate);
   await info.attach('canvas-view-options-'+size.width,{body:await page.screenshot(),contentType:'image/png'});
-  await summary.click();await nav(page).getByRole('button',{name:'Engineering',exact:true}).click();await options(page);
+  await summary.click();await chooseNavigation(nav(page),'View','Engineering');await options(page);
   const makeDefault=settings(page).getByRole('button',{name:'Make opening View',exact:true,includeHidden:true});await reachable(select);await reachable(makeDefault);
   await expect(select).toHaveValue('explore');await expect(page.locator('#src')).toHaveValue(original);
   await makeDefault.focus();await page.keyboard.press('Enter');expect(JSON.parse(await text(page)).page.defaultView).toBe('engineering');

@@ -2088,12 +2088,26 @@ function createExploreNavigation(ctl,options){
   var laneLayoutKey='',lanesCompact=false,hasSectionChoices=false;
   function refreshNavigationLanes(){
     var width=nav.clientWidth,narrow=width<=640;
-    function natural(group,selector){if(group.hidden)return 0;var children=Array.from(group.querySelectorAll(selector));return group.querySelector('.explore-navigation-label').offsetWidth+6+children.reduce(function(sum,el){return sum+el.offsetWidth;},0)+Math.max(0,children.length-1)*6;}
-    var required=natural(tabs,'.tabbar')+natural(chapters,'.diagram-view-choice')+actions.offsetWidth+36+(hasSectionChoices?280:0);
-    // Keep the chosen breakpoint while presentation counters change. Width,
-    // available choices, authoring controls and font changes still remeasure.
+    // Measure the widest presentation state, including its Tab badge and panel
+    // count. A separate normal-layout probe also includes Tab copy buttons that
+    // are positioned outside the flow in compact mode.
     var back=actions.querySelector('.handoff-back'),key=JSON.stringify([width,tabPicker.value,tabChoices.map(function(button){return button.textContent;}),viewButtons.map(function(button){return button.textContent;}),hasSectionChoices,back && back.textContent]);
-    if(key!==laneLayoutKey){laneLayoutKey=key;lanesCompact=required>width-24;}
+    if(key!==laneLayoutKey){
+      laneLayoutKey=key;
+      var owner=ctl.views && ctl.views.owner(current),panelCount=0;
+      if(owner)owner.records.forEach(function(record){var diagram=record.section.diagram;panelCount=Math.max(panelCount,(diagram && Array.isArray(diagram.panels)?diagram.panels.length:0)+(record.runtime.prose?1:0));});
+      var probe=nav.cloneNode(true);probe.classList.remove('navigation-compact','navigation-narrow');probe.setAttribute('aria-hidden','true');probe.inert=true;
+      probe.style.cssText+=';position:absolute;visibility:hidden;pointer-events:none;width:max-content;max-width:none;';
+      var selected=probe.querySelector('.tabbar [aria-selected="true"]');if(selected)setExploreIndicator(selected,true,'');
+      probe.querySelectorAll('.diagram-view-choice button').forEach(function(button){button.style.fontWeight='600';});
+      var summary=probe.querySelector('.explore-panel-menu>summary');if(summary)summary.textContent='Panels · '+panelCount;
+      ctl.view.appendChild(probe);
+      var tabWidth=probe.querySelector('.explore-navigation-tabs').getBoundingClientRect().width,viewWidth=probe.querySelector('.explore-navigation-chapters').getBoundingClientRect().width,actionWidth=probe.querySelector('.explore-navigation-actions').getBoundingClientRect().width;
+      var sectionWidth=hasSectionChoices?96+probe.querySelector('.explore-navigation-diagrams>.explore-navigation-label').getBoundingClientRect().width+2*parseFloat(getComputedStyle(previousSections).width)+18:0;
+      probe.remove();
+      var required=tabWidth+viewWidth+actionWidth+36+sectionWidth;
+      lanesCompact=required>width-24;
+    }
     var compact=lanesCompact,changed=nav.classList.contains('navigation-compact')!==compact,focused=activeElement();
     nav.classList.toggle('navigation-compact',compact);nav.classList.toggle('navigation-narrow',narrow);nav.classList.toggle('navigation-has-sections',hasSectionChoices);
     if(changed){var nextFocus=tabs.contains(focused)?(compact?tabPicker:tabChoices[Number(tabPicker.value)]):chapters.contains(focused)?(compact?viewPicker:viewButtons[Number(viewPicker.value)]):null;if(nextFocus)nextFocus.focus({preventScroll:true});}

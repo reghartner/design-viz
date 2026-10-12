@@ -158,7 +158,7 @@ body .docview .explore-player[data-step-text-position="right"]>.termbar{grid-tem
 .explore-panel-menu>.mbtn,.explore-panel-menu>.explore-overlay-zoom{display:none;}
 .explore-panel-menu[open]>.mbtn,.explore-panel-menu[open]>.explore-overlay-zoom{display:flex;}
 .explore-panel-menu[open]{background:var(--explore-bg);}
-.explore-navigation .viewport-actions{padding:0;border:0;box-shadow:none;background:none;}
+.explore-navigation .viewport-actions{padding:0;border:0;box-shadow:none;background:none;flex:none;flex-wrap:nowrap;}
 .explore-navigation{border-radius:0;box-shadow:none;}
 .explore-panel-body{position:absolute;right:0;top:calc(100% + 6px);width:280px;max-width:calc(100vw - 24px);max-height:65vh;overflow:auto;padding:10px;display:flex;flex-direction:column;gap:6px;background:var(--explore-bg);border:1px solid var(--explore-border);border-radius:10px;box-shadow:0 8px 24px #14244225;}
 .explore-panel-body .explore-panel-choices{position:static;width:auto;min-width:0;max-width:none;padding:0;margin:0;border:0;box-shadow:none;}
@@ -298,13 +298,13 @@ body .docview .section-layout-tile[data-layout-key="steps"]>.termbar{flex:1;min-
  .navigation-compact .explore-navigation-diagrams{grid-column:1 / -1;grid-row:2;}
  .navigation-compact .explore-navigation-actions{grid-column:3;grid-row:1;}
  .navigation-compact .navigation-picker{width:100%;}
- .navigation-narrow,.navigation-narrow:not(.navigation-has-sections){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:34px 34px;gap:6px 8px;}
- .navigation-narrow.navigation-has-sections{grid-template-rows:repeat(3,34px);}
+ .navigation-narrow,.navigation-narrow:not(.navigation-has-sections){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:34px minmax(34px,auto);gap:6px 8px;}
+ .navigation-narrow.navigation-has-sections{grid-template-rows:34px 34px minmax(34px,auto);}
  .navigation-narrow .explore-navigation-tabs{grid-column:1;grid-row:1;}
  .navigation-narrow .explore-navigation-chapters{grid-column:2;grid-row:1;}
  .navigation-narrow .explore-navigation-tabs[hidden]+.explore-navigation-chapters{grid-column:1 / -1;}
  .navigation-narrow .explore-navigation-diagrams{grid-column:1 / -1;grid-row:2;}
- .navigation-narrow .explore-navigation-actions{grid-column:1 / -1;grid-row:-2;max-width:100%;margin-left:auto;flex-wrap:nowrap;}
+ .navigation-narrow .explore-navigation-actions{grid-column:1 / -1;grid-row:-2;min-width:0;max-width:100%;margin-left:auto;flex-wrap:wrap;}
  .navigation-narrow .navigation-picker{width:100%;}
  .navigation-narrow .explore-section-choices>.explore-diagram-button{max-width:min(240px,100cqi);}
 }
@@ -336,3 +336,6 @@ body .docview.has-document-navigation>.explore-navigation .explore-panel-body .m
  body .docview.has-document-navigation>.explore-navigation.navigation-narrow .viewport-expand{width:34px;min-width:34px;padding:5px;font-size:0;}
  body .docview.has-document-navigation>.explore-navigation.navigation-narrow .viewport-expand::before{content:'⛶';font:20px/20px 'IBM Plex Sans',sans-serif;}
 }
+
+/* Host actions may need a second line without covering the Tab/View pickers. */
+.explore-navigation-actions>.welcome-button{min-height:34px;padding:6px 10px;white-space:nowrap;font:500 12px/20px 'IBM Plex Sans',sans-serif;}

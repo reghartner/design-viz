@@ -70,6 +70,18 @@ export const test=base.extend({
   },{auto:true}],
 });
 export {expect,trackResources};
+// Use the actual responsive navigation control, never its hidden desktop copy.
+export async function chooseNavigation(nav,kind,name){
+  await nav.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const picker=nav.getByRole('combobox',{name:'Choose '+kind,exact:true});
+  if(await picker.isVisible()){
+    await picker.selectOption({label:name});await expect(picker.locator('option:checked')).toHaveText(name);
+  }else{
+    const button=nav.getByRole(kind==='Tab'?'tab':'button',{name,exact:true});await button.click();
+    await expect(nav.getByRole(kind==='Tab'?'tab':'button',{name,exact:true})).toHaveAttribute(kind==='Tab'?'aria-selected':'aria-pressed','true');
+  }
+}
+
 export async function expectCompanyBrand(container,brand=activeCompanyBrand){
   const lockup=container.locator('.fv-brand').first();
   await expect(lockup.locator('.fv-brand-name')).toHaveText(brand.app);

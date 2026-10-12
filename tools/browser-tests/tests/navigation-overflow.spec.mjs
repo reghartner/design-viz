@@ -10,6 +10,12 @@ function fixture(){
 }
 async function reader(page,server){const input=path.join(server.root,'navigation-overflow.json');await writeFile(input,JSON.stringify(fixture()));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),path.join(server.root,'navigation-overflow.html')]);await page.goto(server.origin+'/navigation-overflow.html');await page.evaluate(()=>document.fonts.ready);return page.locator('#docview > .explore-navigation');}
 async function view(nav,name){await nav.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const picker=nav.getByRole('combobox',{name:'Choose View',exact:true});if(await picker.isVisible())await picker.selectOption({label:name});else await nav.getByRole('button',{name,exact:true}).click();}
+async function scrollChoices(button,strip,direction){
+ const target=await strip.evaluate((el,direction)=>Math.max(0,Math.min(el.scrollWidth-el.clientWidth,el.scrollLeft+direction*Math.max(120,el.clientWidth*.75))),direction);
+ await button.click();await expect.poll(()=>strip.evaluate((el,target)=>Math.abs(el.scrollLeft-target),target)).toBeLessThanOrEqual(1);
+ const atEnd=await strip.evaluate((el,direction)=>direction<0?el.scrollLeft<=1:el.scrollLeft>=el.scrollWidth-el.clientWidth-1,direction);
+ if(atEnd)await expect(button).toBeDisabled();else await expect(button).toBeEnabled();
+}
 async function contained(control,container){const a=await control.boundingBox(),b=await container.boundingBox();expect(a.x).toBeGreaterThanOrEqual(b.x-1);expect(a.x+a.width).toBeLessThanOrEqual(b.x+b.width+1);}
 
 test('only Sections scroll, arrows preserve selection, and resize and membership remove overflow',async({page,server},info)=>{
@@ -17,10 +23,10 @@ test('only Sections scroll, arrows preserve selection, and resize and membership
  for(const name of ['Full story','Explore story','Create + Review','Review + Backstage'])await expect(nav.getByRole('button',{name,exact:true})).toBeInViewport({ratio:1});
  await view(nav,'Explore story');const label=nav.locator('.explore-navigation-diagrams>.explore-navigation-label'),labelBox=await label.boundingBox(),box=await nav.boundingBox(),board=page.locator('.explore-board:visible'),camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop})),initialCamera=await camera(),hash=new URL(page.url()).hash;
  await expect(left).toBeDisabled();await expect(right).toBeEnabled();
- for(let i=0;i<20 && await right.isEnabled();i++)await right.click();await expect(right).toBeDisabled();await expect(left).toBeEnabled();expect(await label.boundingBox()).toEqual(labelBox);
+ for(let i=0;i<20 && await right.isEnabled();i++)await scrollChoices(right,strip,1);await expect(right).toBeDisabled();await expect(left).toBeEnabled();expect(await label.boundingBox()).toEqual(labelBox);
  const last=strip.locator('.explore-diagram-button:visible').last();await contained(last,strip);
  expect(new URL(page.url()).hash).toBe(hash);expect(await camera()).toEqual(initialCamera);await expect(nav.locator('.explore-diagram-button[aria-pressed=true]')).toHaveText('Section 1 — delivery and review');
- for(let i=0;i<20 && await left.isEnabled();i++)await left.click();await expect(left).toBeDisabled();await expect(right).toBeEnabled();
+ for(let i=0;i<20 && await left.isEnabled();i++)await scrollChoices(left,strip,-1);await expect(left).toBeDisabled();await expect(right).toBeEnabled();
  await strip.hover();await page.mouse.wheel(200,0);await expect.poll(()=>strip.evaluate(el=>el.scrollLeft)).toBeGreaterThan(0);expect(new URL(page.url()).hash).toBe(hash);
  // Keyboard focus reveals a long clipped chip without selecting its section.
  await last.focus();await contained(last,strip);expect(new URL(page.url()).hash).toBe(hash);await last.press('Enter');await expect(last).toHaveAttribute('aria-pressed','true');
@@ -59,9 +65,9 @@ test('Workbench uses the same compact pickers and bounded section strip below ap
 });
 
 
-test('presentation counters cannot move the navigation across a compact breakpoint',async({page,server})=>{
- const nav=await reader(page,server);await nav.evaluate(el=>window.originalNavigation=el);
- for(const width of [1100,1140,1180,1200,1220,1240,1260,1280,1300,1320,1360,1440]){
+for(const font of ['default','Arial'])test('presentation counters cannot move the navigation across a compact breakpoint with '+font,async({page,server})=>{
+ const nav=await reader(page,server);if(font!=='default')await page.addStyleTag({content:'.explore-navigation :is(button,select){font-family:Arial!important}'});await nav.evaluate(el=>window.originalNavigation=el);
+ for(const width of [1100,1140,1180,1200,1220,1240,1250,1260,1270,1280,1300,1320,1360,1440]){
   await page.setViewportSize({width,height:900});await view(nav,'Full story');const box=await nav.boundingBox();
   await view(nav,'Explore story');expect(await nav.boundingBox()).toEqual(box);expect(await nav.evaluate(el=>el===window.originalNavigation)).toBe(true);
   const strip=nav.locator('.explore-section-strip');expect((await strip.boundingBox()).width).toBeGreaterThanOrEqual(96);await contained(strip.locator('[aria-pressed=true]'),strip);

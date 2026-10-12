@@ -161,8 +161,17 @@ reversing the vertical order of a source and join. A proposal must also stay
 near the starting geometry's combined readability cost, so saving a row alone
 does not justify longer, more diagonal connections.
 Final acceptance uses actual viewer paths: no overlaps or card hits, neither
-crossing count may increase, minimum card clearance is preserved, and aligned
-connection count cannot fall below the starting layout. Each accepted step
+crossing count may increase, minimum card clearance is preserved, and clear
+cardinal connection count cannot fall below the starting layout. A cardinal
+corridor occupied by another card does not count as clear adjacency, even when
+the viewer can bow its edge around the obstruction. Row consolidation may trade an additional
+obstructed corridor for a safe smaller layout; actual viewer paths still decide
+card hits and both crossing counts. Balanced frames with at least three parallel
+degree-two branches retain their shared branch row or column and centered hubs
+on opposite sides. Parallel two-card branches retain each existing aligned peer row or column
+independently of whether the other stage is staggered. Geometrically matched
+branches may have an extra link at either card; an alternate side-link path
+does not disqualify the visible peer band. Each accepted step
 reduces occupied area by at least 3%. Width can grow at most 10% overall, occupied
 diagonal cannot grow, center-distance growth is capped at 3.5% and sampled route
 length growth at 5%, all relative to the pass's starting result.
@@ -173,7 +182,7 @@ geometry passes those guards; it does not relax other passes' safety checks.
 Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
-A final flow-clarity pass can rotate a two-to-four-card terminal chain together
+A flow-clarity pass can rotate a two-to-four-card terminal chain together
 with its junction and one directly attached leaf. It also places a junction's
 two leaf neighbors in a straight three-card run, preferring a shared row, and
 can align a junction and its single leaf beside another connected neighbor
@@ -209,6 +218,122 @@ actual path sampling. Both automatically bowed routes and native curves count
 in length and detour measurements. The directed-path snake returns before these
 optional passes, preserving the compact two-row six-node chain. These local
 metrics guide proposals; rendered A/B review is still needed to assess clarity.
+
+A neighborhood pass considers internal degree-two cards at direct corners
+formed by their two neighbors, including moves across both axes at once. It also
+considers placing a leaf beside another leaf attached to the same hub. Terminal
+chains remain the responsibility of the preceding flow pass. Four passes use
+at most 192 proposals each, 36 actual-path checks and six native reroutes, within
+the same 48-node/80-edge ungrouped limit. Candidates are ranked by geometry,
+independently of arrow direction and node labels.
+
+This pass first retains the existing routes. When those routes fail safety,
+it can replace only the moved card's incident routes with native fixed-position
+routes, preserving surrounding route choices. Final viewer scoring still rejects
+card overlaps, card hits, increased nonincident or incident crossings, reduced
+clearance, new blocked cardinal corridors and damaged balanced branch frames.
+Width and height may grow by at most 10%, area and sampled route length by 5%,
+and center distances by 3.5%, relative to the pass's starting result. Accepted
+moves must improve local structure and either clear a blocked corridor or shorten
+actual routes. An equal-benefit early leaf tuck prefers a lower-degree neighbor,
+preserving a hub's outer leaf when a tail can compact equally well.
+
+A junction pass gives nodes with at least three neighbors access to nearby
+neighbor axes, median neighbor coordinates and adjacent cardinal cells. An occupied
+candidate cell can exchange its card with the junction. This search runs after
+connector and sibling cleanup with a separate two-round budget: 16 actual-path
+checks, four selective native reroutes, and at most 192 proposals per round,
+with no more than eight shortlisted placements per junction. Geometry orders
+neighbors and candidates; arrows and names do not determine eligibility.
+
+Junction candidates use the same protected branch frames, clearance, crossing,
+card-safety and growth limits as the neighborhood pass. A candidate must improve
+local structure or reduce total center distances by at least 3%, then pass actual
+viewer-route evaluation. Swaps reroute both moved cards' incident edges when
+repair is needed. Existing surrounding routes remain available to the final
+route selection. This bounded local search does not move arbitrary subgraphs or
+promise to recompose a whole workflow.
+
+A connected-block pass reuses the weak-cut motif partitioner to find
+connected groups attached through one or two edges. Nodes and edges are ordered
+geometrically before the partitioner's 24-block cap. Private nonnumeric aliases
+keep integer-like node IDs from changing the partitioner's index order. Each block can translate or
+turn by quarter rotations in card-pitch coordinates, docking beside an external
+neighbor. All block members move together; narrow vertical gaps expand to proper
+card widths when rotated into a row. Existing balanced frames and peer bands
+remain protected.
+
+Two rounds share 12 actual-path checks and four selective native reroutes, with
+at most 192 shortlisted placements per round divided across detected blocks.
+Accepted changes must reduce occupied area by at least 5% or sampled route
+length by at least 7%, while improving their combined cost. They cannot increase
+card hits, overlaps, either crossing count, blocked cardinal corridors or aspect
+penalty, and retain the incoming minimum clearance. Relative to the pass's
+starting result, width/height may grow by at most 25%, area by 5%, center distances
+by 3%, and actual route length by 2%. This block search can trade shape within
+the preferred band for a substantially smaller connected composition; an extreme
+thin row or column cannot win solely through a smaller bounding rectangle.
+
+After block movement, a final leaf-only completion checks the four cardinal
+slots beside each degree-one card's own neighbor, including leaves without any
+siblings. It uses the existing neighborhood route evaluator, branch protections,
+measured clearance and growth/crossing limits. Four rounds share 64 actual-path
+checks and four selective native reroutes, with at most 192 proposals per round.
+Geometry ranks each leaf's slots; a round-robin schedule gives each eligible leaf
+its first slot before another receives a second. No-op rounds continue through
+untried slots within the same total budget. The pass stops when no unchecked
+eligible proposal remains, or its bounded work is exhausted.
+
+A final internal-block grid pass can reshape up to two elongated weak-cut blocks
+of 5–12 cards with one or two external connections. Blocks containing any recognized balanced-frame member or serial peer-band
+member are excluded before ranking, preserving branch identities, order and
+spacing. Geometry ranks remaining blocks before the cap; normalized grid-axis
+elongation must be at least 1.6. A private opt-in
+lets these small blocks use the existing bounded grid search even with clear
+natural routes. Ordinary grid calls retain their existing bypass. Every proposal
+uses a computed geometry score, never a synthetic crossing or route flag.
+
+Proposal nodes use geometry-ordered nonnumeric aliases and undirected links, so
+names, declarations and arrows do not steer the deterministic grid seed. Each
+block uses the existing 12-run/20,000-step grid budget and at most four finalists.
+Finalists scale to the incoming minimum card clearance and dock in cardinal
+positions around boundary neighbors. At most 128 placements reach the shortlist,
+with 12 full-path checks and four selective native reroutes. Only original diagram
+semantics are used for final routing and evaluation.
+
+A candidate must reduce its block's internal rectangle by at least 10%, then
+improve the whole graph's combined area/route cost, with either at least 5% less
+area or 7% shorter routes. It retains the connected-block safety, branch-frame,
+clearance, shape and growth ceilings. If no candidate passes, the prior result
+is retained. This pass can change internal relationships rather than only rotate
+a rigid block; its bounded grammar still cannot recompose every connected graph.
+
+After block-grid search, a separate final tightening mode may shorten an
+already-cardinal degree-one connection. It keeps the same axis and side of the
+neighbor, uses the existing measured-clearance pitch, and requires at least 54
+logical units and 20% of the original edge distance in both center-distance and
+actual whole-graph route savings. It never turns a branch or squeezes an already
+adjacent card. A leaf with an equally distant opposing leaf or peer with one extra side
+connection is kept in place to preserve the balanced intake. Three rounds share 24 path checks, two selective repairs and at
+most 48 proposals per round.
+
+Tightening reuses neighborhood safety and frame checks, while additionally
+forbidding larger width, height or area and worse blocked corridors, turns,
+diagonals, fan rows or sparse rows. Its explicit distance gain can accept a
+safe straight-edge shortening without the general neighborhood's 75-point
+structural-benefit threshold. Aspect alone does not veto this shortening when
+both occupied dimensions stay bounded.
+
+Before publication, every completed arrangement is translated to consistent
+near-origin margins: its leftmost occupied geometry starts at 45 logical units
+and its topmost at 78. Bounds include card rectangles, nested group outlines and
+exact cubic extrema for both native and automatically avoided routes. The same
+translation applies to every card; endpoint-relative curve controls and label
+nudges remain unchanged, so relative geometry and routing are preserved. The
+stored score is recomputed for the published positions. This removes accidental
+origin padding after block moves without treating translation as a composition
+improvement. Canonical search and spacing tests can isolate this publication
+step from the layout stages they measure.
 
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less

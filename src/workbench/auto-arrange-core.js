@@ -228,13 +228,13 @@ function autoArrangeLeafPositions(d,result){
     var xs=ids.map(function(id){return placed[id].x;}),ys=ids.map(function(id){return placed[id].y;});
     return Math.hypot(Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,Math.max.apply(null,ys)-Math.min.apply(null,ys)+44);
   }
-  var best=null,bestSize=diagonal(positions),bestLength=Infinity;
+  var best=null,bestSize=diagonal(positions),bestLength=Infinity,bestDegree=Infinity;
   // One bounded tuck per seed: terminal leaves may share their neighbor's row or
   // column when that shrinks the card footprint. Native rerouting and scoring
   // still decide whether the placement is safe and has fewer crossings.
   ids.forEach(function(leaf){
     if(degree[leaf]!==1)return;
-    var edge=d.edges.find(function(e){return e.from===leaf || e.to===leaf;}),parent=positions[edge.from===leaf?edge.to:edge.from];
+    var edge=d.edges.find(function(e){return e.from===leaf || e.to===leaf;}),neighbor=edge.from===leaf?edge.to:edge.from,parent=positions[neighbor];
     [[150+AUTO_ARRANGE_CARD_GAP,0],[-150-AUTO_ARRANGE_CARD_GAP,0],[0,44+AUTO_ARRANGE_RANK_GAP],[0,-44-AUTO_ARRANGE_RANK_GAP]].forEach(function(offset){
       var point={x:parent.x+offset[0],y:parent.y+offset[1]};
       if(ids.some(function(id){
@@ -244,7 +244,7 @@ function autoArrangeLeafPositions(d,result){
       }))return;
       var placed=Object.assign(Object.create(null),positions);placed[leaf]=point;
       var size=diagonal(placed),length=Math.hypot(offset[0],offset[1]);
-      if(size<bestSize-.1 || best && Math.abs(size-bestSize)<.1 && length<bestLength){best=placed;bestSize=size;bestLength=length;}
+      if(size<bestSize-.1 || best && Math.abs(size-bestSize)<.1 && (length<bestLength || length===bestLength && degree[neighbor]<bestDegree)){best=placed;bestSize=size;bestLength=length;bestDegree=degree[neighbor];}
     });
   });return best;
 }
@@ -916,13 +916,15 @@ function autoArrangeFoldedPositions(d,result,preserveSeedOrder){
     ids.forEach(function(id,i){var cell=finalist.cells[i];positions[id]={x:120+usedColumns.indexOf(cell%columns)*dx,y:100+usedRows.indexOf(Math.floor(cell/columns))*dy};});return positions;
   });
 }
-function autoArrangeGridPositions(d,result,preserveSeedOrder){
+function autoArrangeGridPositions(d,result,preserveSeedOrder,options){
   var ids=Object.keys(d.nodes),edges=d.edges || [],count=ids.length;
+  var cleanBlock=options && options.cleanBlock===true && count>=5 && count<=12;
   // Spend this optional budget only on unresolved routing. Already natural,
   // crossing-free layouts keep their approved structure and exact positions.
+  // Only the separately bounded small-block caller opts into clean repacking.
   if(count<4 || count>AUTO_ARRANGE_GRID_LIMITS.nodes || edges.length>AUTO_ARRANGE_GRID_LIMITS.edges ||
     ids.some(function(id){return d.nodes[id].group;}) || edges.some(function(e){return e.from===e.to;}) ||
-    !result.score.crossings && !result.edges.some(function(e){return hasCubicCurve(e);}))return [];
+    !cleanBlock && !result.score.crossings && !result.edges.some(function(e){return hasCubicCurve(e);}))return [];
   var old=Object.create(null);result.positions.forEach(function(p){old[p.id]=p;});
   var links=edges.map(function(e){return [ids.indexOf(e.from),ids.indexOf(e.to)];});
   var forward=edges.map(function(e){return old[e.to].y>=old[e.from].y;}),peers=[];
@@ -1045,6 +1047,53 @@ function autoArrangeExpandSpacing(d,result,viz){
   }catch(ex){}
   throw new Error('Could not expand layout spacing with clear cards and connections. The diagram is unchanged.');
 }
+// Count visible cardinal adjacency, excluding a straight corridor occupied by
+// another card even when automatic avoidance manages to bow around that card.
+function autoArrangeVisibleLinks(d,positions){
+  var points=Object.fromEntries(positions.map(function(p){return [p.id,p];})),clear=0,blocked=0;
+  (d.edges || []).forEach(function(e){var a=points[e.from],b=points[e.to];if(!a || !b || a===b)return;
+    var vertical=Math.abs(a.x-b.x)<.1,horizontal=Math.abs(a.y-b.y)<.1;if(!vertical && !horizontal)return;
+    if(positions.some(function(p){return p.id!==a.id && p.id!==b.id && (vertical && Math.abs(p.x-a.x)<75 && (p.y-a.y)*(p.y-b.y)<0 || horizontal && Math.abs(p.y-a.y)<22 && (p.x-a.x)*(p.x-b.x)<0);}))blocked++;else clear++;
+  });return {clear:clear,blocked:blocked};
+}
+// Preserve a recognizable balanced parallel-branch frame when local cleanup
+// starts from one. Membership and orientation are independent of arrowheads.
+function autoArrangeBranchFrames(d,positions){
+  var topology=autoArrangeFlowTopology(d),groups=new Map(),frames=[];
+  topology.ids.forEach(function(id){var neighbors=topology.adj[id];if(neighbors.length!==2)return;var key=JSON.stringify(neighbors.slice().sort());if(!groups.has(key))groups.set(key,{ends:neighbors.slice(),branches:[]});groups.get(key).branches.push(id);});
+  groups.forEach(function(group){if(group.branches.length<3)return;['x','y'].forEach(function(axis){var frame={ends:group.ends,branches:group.branches,axis:axis};if(autoArrangeBranchesIntact(positions,[frame]))frames.push(frame);});});
+  // Parallel two-card branches can have an extra link at either card.
+  // Keep each existing peer row and matched columns together, even when the
+  // other stage is staggered, rather than improving
+  // one branch's cardinal link by pulling it out of the processing band.
+  var bands=new Map();
+  topology.ids.forEach(function(hub){topology.adj[hub].forEach(function(branch){if(topology.adj[branch].length>3)return;
+    topology.adj[branch].forEach(function(store){if(store===hub || topology.adj[store].length<2 || topology.adj[store].length>3)return;
+      topology.adj[store].forEach(function(join){if(join===branch || join===hub)return;var key=JSON.stringify([hub,join]);
+        if(!bands.has(key))bands.set(key,[]);bands.get(key).push([branch,store]);
+      });
+    });
+  });});
+  bands.forEach(function(pairs){if(pairs.length<3)return;
+    ['x','y'].forEach(function(axis){var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),other=axis==='x'?'y':'x';
+      // A side link can create an alternate topological path to the same join.
+      // Match the visible columns/rows before deciding whether peers are unique.
+      var matched=pairs.filter(function(pair){return Math.abs(byId[pair[0]][other]-byId[pair[1]][other])<.1;});
+      if(matched.length<3 || new Set(matched.flat()).size!==matched.length*2)return;
+      var rows=[matched.map(function(p){return p[0];}),matched.map(function(p){return p[1];})];
+      var aligned=rows.map(function(row){return row.every(function(id){return Math.abs(byId[id][axis]-byId[row[0]][axis])<.1;});});
+      var frame={bands:rows,aligned:aligned,axis:axis};if(aligned.some(Boolean) && autoArrangeBranchesIntact(positions,[frame]))frames.push(frame);
+    });
+  });return frames;
+}
+function autoArrangeBranchesIntact(positions,frames){
+  var points=Object.fromEntries(positions.map(function(p){return [p.id,p];}));
+  return frames.every(function(frame){var axis=frame.axis,other=axis==='x'?'y':'x';
+    if(frame.bands)return frame.bands.every(function(band,i){return !frame.aligned[i] || band.every(function(id){return Math.abs(points[id][axis]-points[band[0]][axis])<.1;});}) && frame.bands[0].every(function(id,i){return Math.abs(points[id][other]-points[frame.bands[1][i]][other])<.1;});
+    var row=points[frame.branches[0]][axis],a=points[frame.ends[0]],b=points[frame.ends[1]],values=frame.branches.map(function(id){return points[id][other];}),middle=(Math.min.apply(null,values)+Math.max.apply(null,values))/2;
+    return frame.branches.every(function(id){return Math.abs(points[id][axis]-row)<.1;}) && (a[axis]-row)*(b[axis]-row)<0 && Math.abs(a[other]-middle)<.1 && Math.abs(b[other]-middle)<.1;
+  });
+}
 var AUTO_ARRANGE_READABILITY_LIMITS={nodes:48,edges:80,passes:3,beam:8,slots:8,checks:72,routes:18};
 // Consolidate a sparse row into nearby connected slots after spacing has
 // expanded. Only row-removal proposals may trade aspect for a smaller drawing;
@@ -1057,10 +1106,9 @@ function autoArrangeReadability(d,result,viz){
   function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
   var clearance=Infinity;result.positions.forEach(function(p,i){result.positions.slice(i+1).forEach(function(q){clearance=Math.min(clearance,gap(p,q));});});
   function clear(p,placed){return placed.every(function(q){return gap(p,q)>=clearance-.1;});}
-  function linked(positions){var byId=Object.fromEntries(positions.map(function(p){return [p.id,p];})),aligned=0;edges.forEach(function(e){var a=byId[e.from],b=byId[e.to];if(a===b)return;if(Math.abs(a.x-b.x)<.1 || Math.abs(a.y-b.y)<.1)aligned++;});return aligned;}
   function routeLength(candidate){var out=autoArrangeDiagram(d,candidate),L=layout(out),adjust=autoArrangeAdjust(out,L),sum=0;out.edges.forEach(function(e,i){var p=samplePathD(edgePath(e,L,adjust[i]));for(var j=1;j<p.length;j++)sum+=Math.hypot(p[j].x-p[j-1].x,p[j].y-p[j-1].y);});return sum;}
-  var originalRoutes=routeLength(result),originalAligned=linked(result.positions);
-  function safe(candidate,source){var a=candidate.score,b=source.score,c=original.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.width<=c.width*1.1+.1 && Math.hypot(a.width,a.height)<=Math.hypot(c.width,c.height)+.1 && a.height<b.height-.1 && a.area<=b.area*.97 && a.length<=c.length*1.035 && linked(candidate.positions)>=originalAligned && routeLength(candidate)<=originalRoutes*1.05;}
+  var originalRoutes=routeLength(result),originalLinks=autoArrangeVisibleLinks(d,result.positions),frames=autoArrangeBranchFrames(d,result.positions);
+  function safe(candidate,source){var a=candidate.score,b=source.score,c=original.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.width<=c.width*1.1+.1 && Math.hypot(a.width,a.height)<=Math.hypot(c.width,c.height)+.1 && a.height<b.height-.1 && a.area<=b.area*.97 && a.length<=c.length*1.035 && autoArrangeVisibleLinks(d,candidate.positions).clear>=originalLinks.clear && autoArrangeBranchesIntact(candidate.positions,frames) && routeLength(candidate)<=originalRoutes*1.05;}
   // Cheap center geometry only shortlists candidates. It is never a safety
   // score: final routes, including avoidance bows, decide whether to publish.
   function estimate(positions){var points=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=0,diagonal=0,crossings=0;
@@ -1171,11 +1219,11 @@ function autoArrangeFlowClarity(d,result,viz){
   function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
   var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
   var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),dy=44+Math.max(AUTO_ARRANGE_CARD_GAP*1.5,clearance);
-  var baseline=autoArrangeFlowMetrics(d,result,topology),best=result,bestMetrics=baseline,checks=0,routes=0,chainStage=false;
+  var baseline=autoArrangeFlowMetrics(d,result,topology),frames=autoArrangeBranchFrames(d,result.positions),best=result,bestMetrics=baseline,checks=0,routes=0,chainStage=false;
   function quality(metrics,score){return metrics.blocked*dx+(metrics.turns+(chainStage?0:metrics.diagonal+metrics.fanRows*3))*dy+metrics.routeExcess+metrics.routeLength*.1+
     600*Math.max(0,score.area/result.score.area-1)+150*Math.max(0,metrics.sparseRows-baseline.sparseRows);}
   function safe(candidate,metrics){var a=candidate.score,b=best.score,c=result.score;
-    return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings &&
+    return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && autoArrangeBranchesIntact(candidate.positions,frames) &&
       a.width<=c.width*1.3 && a.height<=c.height*1.3 && a.area<=c.area*1.35 && a.length<=c.length*1.3 && metrics.routeLength<=baseline.routeLength*1.25;
   }
   for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
@@ -1256,7 +1304,277 @@ function autoArrangeFlowClarity(d,result,viz){
   return best;
 }
 
-function autoArrangeCandidates(d,viz,cola){
+// Repair the moved neighborhood while retaining the surrounding route choices.
+// A whole-graph native replacement can introduce unrelated crossings even when
+// its routes incident to the moved card are exactly the repairs we need.
+function autoArrangeRerouteAffected(d,source,positions,moved,viz,order){
+  var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];}));
+  var routed=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed,null,order),{engine:'nop2'}),order);
+  var edges=source.edges.map(function(edge,i){var e=d.edges[i];return moved.has(e.from) || moved.has(e.to)?routed.edges[i]:edge;});
+  return autoArrangeNaturalRoutes(d,{positions:positions,edges:edges},true);
+}
+var AUTO_ARRANGE_NEIGHBOR_LIMITS={nodes:48,edges:80,passes:4,checks:36,routes:6,proposals:192};
+// Separate late budget lets junction proposals explore the central graph without
+// displacing the preceding connector and sibling-leaf refinements.
+var AUTO_ARRANGE_JUNCTION_LIMITS={nodes:48,edges:80,passes:2,checks:16,routes:4,proposals:192};
+var AUTO_ARRANGE_LEAF_LIMITS={nodes:48,edges:80,passes:4,checks:64,routes:4,proposals:192};
+var AUTO_ARRANGE_LEAF_TIGHTEN_LIMITS={nodes:48,edges:80,passes:3,checks:24,routes:2,proposals:48};
+function autoArrangeLeafTighten(d,result,viz){return autoArrangeNeighborhoodClarity(d,result,viz,'tighten');}
+function autoArrangeLeafClarity(d,result,viz){return autoArrangeNeighborhoodClarity(d,result,viz,'leaves');}
+function autoArrangeJunctionClarity(d,result,viz){return autoArrangeNeighborhoodClarity(d,result,viz,true);}
+function autoArrangeNeighborhoodClarity(d,result,viz,junctions){
+  var tighten=junctions==='tighten',leaves=tighten || junctions==='leaves';junctions=junctions===true;
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=tighten?AUTO_ARRANGE_LEAF_TIGHTEN_LIMITS:leaves?AUTO_ARRANGE_LEAF_LIMITS:junctions?AUTO_ARRANGE_JUNCTION_LIMITS:AUTO_ARRANGE_NEIGHBOR_LIMITS;
+  if(ids.length<5 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var topology=autoArrangeFlowTopology(d),seed=Object.fromEntries(result.positions.map(function(p){return [p.id,p];})),tails=new Set();
+  topology.chains.forEach(function(chain){chain.ids.forEach(function(id){tails.add(id);});});
+  ids.sort(function(a,b){return seed[a].x-seed[b].x || seed[a].y-seed[b].y;});
+  function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
+  var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
+  var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),dy=44+Math.max(AUTO_ARRANGE_CARD_GAP*1.5,clearance);
+  var baseline=autoArrangeFlowMetrics(d,result,topology),best=result,metrics=baseline,checks=0,routes=0,tried=new Set();
+  function quality(m,s){return m.blocked*dx+(m.turns+m.diagonal+m.fanRows*3)*dy+m.routeExcess+m.routeLength*.1+
+    600*Math.max(0,s.area/result.score.area-1)+150*Math.max(0,m.sparseRows-baseline.sparseRows);}
+  for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
+    var source=best,sourceMetrics=metrics,points=Object.fromEntries(source.positions.map(function(p){return [p.id,p];})),frames=autoArrangeBranchFrames(d,source.positions),proposals=[],seen=new Set();
+    function propose(id,point){
+      if(proposals.length>=limits.proposals || Math.abs(point.x-points[id].x)<.1 && Math.abs(point.y-points[id].y)<.1)return;
+      var key=id+':'+point.x+','+point.y;if(seen.has(key))return;seen.add(key);
+      var occupant=junctions?source.positions.find(function(p){return p.id!==id && Math.abs(p.x-point.x)<.1 && Math.abs(p.y-point.y)<.1;}):null;
+      var moved=new Set(occupant?[id,occupant.id]:[id]);
+      var positions=source.positions.map(function(p){return p.id===id?{id:id,x:point.x,y:point.y}:occupant && p.id===occupant.id?{id:p.id,x:points[id].x,y:points[id].y}:p;});
+      if(positions.some(function(p){return moved.has(p.id) && positions.some(function(q){return q.id!==p.id && gap(p,q)<clearance-.1;});}))return;
+      if(!autoArrangeBranchesIntact(positions,frames))return;
+      var structure=autoArrangeFlowStructure(d,positions,topology);if(structure.blocked>sourceMetrics.blocked)return;
+      var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];}));
+      structure.routeLength=edges.reduce(function(sum,e){var a=placed[e.from],b=placed[e.to];return sum+Math.hypot(a.x-b.x,a.y-b.y);},0);structure.routeExcess=0;
+      proposals.push({positions:positions,moved:moved,structure:structure,cost:quality(structure,source.score),key:key,id:id,minGain:tighten?Math.max(AUTO_ARRANGE_CARD_GAP,Math.hypot(points[id].x-points[topology.adj[id][0]].x,points[id].y-points[topology.adj[id][0]].y)*.2):0});
+    }
+    var hubs=ids.filter(function(id){return topology.adj[id].length>=3;}),slots=Math.min(8,Math.floor(limits.proposals/Math.max(1,hubs.length)));
+    ids.forEach(function(id){var neighbors=topology.adj[id];
+      if(leaves){
+        if(neighbors.length!==1)return;
+        var hub=points[neighbors[0]];
+        if(tighten){
+          // Preserve the existing axis and side. Shorten only a visibly remote
+          // leaf, without turning it into another branch or squeezing gaps.
+          var current=points[id],horizontal=Math.abs(current.y-hub.y)<.1,vertical=Math.abs(current.x-hub.x)<.1;
+          if(!horizontal && !vertical)return;
+          // Opposing equally spaced leaves or one-side-link peers form a
+          // balanced intake. Moving
+          // just one inward would destroy its symmetry without moving a hub.
+          if(topology.adj[neighbors[0]].some(function(peer){var other=points[peer];return peer!==id && topology.adj[peer].length<=2 && Math.abs(current.x+other.x-2*hub.x)<.1 && Math.abs(current.y+other.y-2*hub.y)<.1;}))return;
+          var distance=Math.hypot(current.x-hub.x,current.y-hub.y),pitch=horizontal?dx:dy;
+          if(distance-pitch<Math.max(AUTO_ARRANGE_CARD_GAP,distance*.2))return;
+          propose(id,{x:horizontal?hub.x+Math.sign(current.x-hub.x)*dx:hub.x,y:vertical?hub.y+Math.sign(current.y-hub.y)*dy:hub.y});
+        }else [[dx,0],[-dx,0],[0,dy],[0,-dy]].forEach(function(offset){propose(id,{x:hub.x+offset[0],y:hub.y+offset[1]});});
+      }else if(junctions){
+        if(neighbors.length<3)return;
+        var nearby=neighbors.slice().sort(function(a,b){return Math.hypot(points[a].x-points[id].x,points[a].y-points[id].y)-Math.hypot(points[b].x-points[id].x,points[b].y-points[id].y) || points[a].x-points[b].x || points[a].y-points[b].y;}).slice(0,4);
+        function median(axis){var values=neighbors.map(function(other){return points[other][axis];}).sort(function(a,b){return a-b;});return (values[Math.floor((values.length-1)/2)]+values[Math.floor(values.length/2)])/2;}
+        var xs=Array.from(new Set([points[id].x,median('x')].concat(nearby.map(function(other){return points[other].x;})))),ys=Array.from(new Set([points[id].y,median('y')].concat(nearby.map(function(other){return points[other].y;})))),targets=[];
+        xs.forEach(function(x){ys.forEach(function(y){targets.push({x:x,y:y});});});
+        nearby.forEach(function(other){var p=points[other];[[dx,0],[-dx,0],[0,dy],[0,-dy]].forEach(function(offset){targets.push({x:p.x+offset[0],y:p.y+offset[1]});});});
+        function localLength(p){return neighbors.reduce(function(sum,other){return sum+Math.hypot(p.x-points[other].x,p.y-points[other].y);},0);}
+        targets.sort(function(a,b){return localLength(a)-localLength(b) || a.x-b.x || a.y-b.y;});
+        var start=proposals.length;
+        for(var target=0;target<targets.length && proposals.length-start<slots;target++)propose(id,targets[target]);
+      }else if(neighbors.length===2 && !tails.has(id)){
+        var a=points[neighbors[0]],b=points[neighbors[1]];
+        // Jump directly to a two-neighbor corner: its one-axis intermediate
+        // can cross a card or increase crossings even when the corner is safe.
+        propose(id,{x:a.x,y:b.y});propose(id,{x:b.x,y:a.y});
+        if(Math.abs(a.y-b.y)<.1)[-1,1].forEach(function(sign){propose(id,{x:(a.x+b.x)/2,y:a.y+sign*dy});});
+        if(Math.abs(a.x-b.x)<.1)[-1,1].forEach(function(sign){propose(id,{x:a.x+sign*dx,y:(a.y+b.y)/2});});
+      }else if(neighbors.length===1){
+        topology.adj[neighbors[0]].filter(function(peer){return peer!==id && topology.adj[peer].length===1;}).forEach(function(peer){var p=points[peer];
+          [[dx,0],[-dx,0],[0,dy],[0,-dy]].forEach(function(offset){propose(id,{x:p.x+offset[0],y:p.y+offset[1]});});
+        });
+      }
+    });
+    proposals.sort(function(a,b){return a.cost-b.cost;});
+    var leafQueues=[];
+    if(leaves){
+      // Every eligible leaf gets its best slot before another gets a second.
+      // Retain attempted slots on no-op rounds so a bounded continuation does
+      // not repeatedly spend its checks on the same rejected candidates.
+      ids.forEach(function(id){var queue=proposals.filter(function(p){return p.id===id && !tried.has(p.key);});if(queue.length)leafQueues.push(queue);});
+      leafQueues.sort(function(a,b){return a[0].cost-b[0].cost || points[a[0].id].x-points[b[0].id].x || points[a[0].id].y-points[b[0].id].y;});
+      proposals=autoArrangeFlowSchedule(leafQueues,limits.proposals);
+    }
+    var next=best,nextMetrics=metrics,started=checks,limit=Math.min(limits.checks,checks+Math.max(Math.ceil(limits.checks/limits.passes),leafQueues.length));
+    function safe(candidate,m){var a=candidate.score,b=source.score,c=result.score;
+      return (!tighten || a.width<=b.width+.1 && a.height<=b.height+.1 && a.area<=b.area+.1 && m.turns<=sourceMetrics.turns+.001 && m.diagonal<=sourceMetrics.diagonal && m.fanRows<=sourceMetrics.fanRows && m.sparseRows<=sourceMetrics.sparseRows) &&
+        !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings &&
+        a.width<=c.width*1.1+.1 && a.height<=c.height*1.1+.1 && a.area<=c.area*1.05 && a.length<=c.length*1.035 &&
+        m.routeLength<=baseline.routeLength*1.05 && m.blocked<=sourceMetrics.blocked && autoArrangeBranchesIntact(candidate.positions,frames);
+    }
+    for(var i=0;i<proposals.length && checks<limit;i++){
+      var proposal=proposals[i],structure=proposal.structure;
+      if(!tighten && structure.blocked>=sourceMetrics.blocked && structure.turns>=sourceMetrics.turns-.25 && structure.diagonal>=sourceMetrics.diagonal && structure.fanRows>=sourceMetrics.fanRows && (!junctions || structure.routeLength>=source.score.length*.97))continue;
+      checks++;if(leaves)tried.add(proposal.key);var candidate=autoArrangeNaturalRoutes(d,{positions:proposal.positions,edges:source.edges.slice()},true),m=autoArrangeFlowMetrics(d,candidate,topology);
+      if(!safe(candidate,m) && routes<limits.routes){
+        routes++;try{candidate=autoArrangeRerouteAffected(d,source,proposal.positions,proposal.moved,viz,ids);m=autoArrangeFlowMetrics(d,candidate,topology);}catch(ex){continue;}
+      }
+      var improves=tighten?m.routeLength<=sourceMetrics.routeLength-proposal.minGain+.1 && m.routeLength<nextMetrics.routeLength-.1:(m.blocked<sourceMetrics.blocked || m.routeLength<sourceMetrics.routeLength) && quality(m,candidate.score)<quality(nextMetrics,next.score)-75;
+      if(safe(candidate,m) && improves){next=candidate;nextMetrics=m;}
+    }
+    if(next===best){if(!leaves || checks===started)break;}else{best=next;metrics=nextMetrics;tried.clear();}
+  }
+  return best;
+}
+
+
+var AUTO_ARRANGE_BLOCK_LIMITS={nodes:48,edges:80,passes:2,checks:12,routes:4,proposals:192};
+// Reuse the weak-cut partitioner with geometric traversal before its block cap.
+// Older motif search retains its own ordering and policy.
+function autoArrangePlacedBlocks(d,positions){
+  var ordered=positions.slice().sort(function(a,b){return a.x-b.x || a.y-b.y;}),ids=ordered.map(function(p){return p.id;}),index=Object.fromEntries(ids.map(function(id,i){return [id,i];}));
+  var edges=(d.edges || []).slice().sort(function(a,b){return Math.min(index[a.from],index[a.to])-Math.min(index[b.from],index[b.to]) || Math.max(index[a.from],index[a.to])-Math.max(index[b.from],index[b.to]);});
+  var canonical={nodes:Object.fromEntries(ids.map(function(id,i){return ['placed_'+i,d.nodes[id]];})),edges:edges.map(function(e){return Object.assign({},e,{from:'placed_'+index[e.from],to:'placed_'+index[e.to]});})};
+  return autoArrangeConnectedMotifs(canonical).blocks.map(function(block){return block.map(function(i){return ids[i];});});
+}
+function autoArrangeBlockClarity(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=AUTO_ARRANGE_BLOCK_LIMITS;
+  if(ids.length<8 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var blocks=autoArrangePlacedBlocks(d,result.positions);if(!blocks.length)return result;
+  var topology=autoArrangeFlowTopology(d),frames=autoArrangeBranchFrames(d,result.positions),baseline=autoArrangeFlowMetrics(d,result,topology),best=result,metrics=baseline,checks=0,routes=0;
+  function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
+  var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
+  var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),dy=44+Math.max(AUTO_ARRANGE_CARD_GAP*1.5,clearance);
+  var order=result.positions.slice().sort(function(a,b){return a.x-b.x || a.y-b.y;}).map(function(p){return p.id;});
+  function rank(score,m){return m.routeLength/baseline.routeLength+Math.sqrt(score.area/result.score.area);}
+  for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
+    var source=best,sourceMetrics=metrics,points=Object.fromEntries(source.positions.map(function(p){return [p.id,p];})),proposals=[],seen=new Set(),slots=Math.floor(limits.proposals/blocks.length);
+    blocks.forEach(function(block){
+      var moved=new Set(block),boundary=edges.filter(function(e){return moved.has(e.from)!==moved.has(e.to);}),queue=[];
+      if(!boundary.length || boundary.length>2)return;
+      boundary.sort(function(a,b){var ai=moved.has(a.from)?a.from:a.to,bi=moved.has(b.from)?b.from:b.to;return points[ai].x-points[bi].x || points[ai].y-points[bi].y;});
+      boundary.forEach(function(edge){var inner=points[moved.has(edge.from)?edge.from:edge.to],outer=points[moved.has(edge.from)?edge.to:edge.from];
+        // Rotate in card-pitch coordinates so a vertical stack becomes a row
+        // with a full card width, rather than rotating narrow physical gaps.
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(dock){[0,1,2,3].forEach(function(turn){
+          var positions=source.positions.map(function(p){if(!moved.has(p.id))return p;var x=(p.x-inner.x)/dx,y=(p.y-inner.y)/dy;
+            var tx=turn===0?x:turn===1?-y:turn===2?-x:y,ty=turn===0?y:turn===1?x:turn===2?-y:-x;
+            return {id:p.id,x:outer.x+dock[0]*dx+tx*dx,y:outer.y+dock[1]*dy+ty*dy};
+          }),key=positions.map(function(p){return p.id+':'+p.x+','+p.y;}).join(';');
+          if(seen.has(key))return;seen.add(key);
+          if(positions.some(function(p,i){return positions.slice(i+1).some(function(q){return gap(p,q)<clearance-.1;});}) || !autoArrangeBranchesIntact(positions,frames))return;
+          var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];})),length=edges.reduce(function(sum,e){return sum+Math.hypot(placed[e.from].x-placed[e.to].x,placed[e.from].y-placed[e.to].y);},0);
+          var xs=positions.map(function(p){return p.x;}),ys=positions.map(function(p){return p.y;}),width=Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,height=Math.max.apply(null,ys)-Math.min.apply(null,ys)+44;
+          if(width>result.score.width*1.25 || height>result.score.height*1.25 || width*height>result.score.area*1.05 || length>result.score.length*1.03 || Math.max(0,Math.log(height/width),Math.log(width/height/(16/9)))>result.score.shape+.1)return;
+          if(width*height>=source.score.area*.95 && length>=source.score.length*.93)return;
+          if(autoArrangeFlowStructure(d,positions,topology).blocked>sourceMetrics.blocked)return;
+          queue.push({positions:positions,moved:moved,cost:length+Math.hypot(width,height)*2});
+        });});
+      });
+      queue.sort(function(a,b){return a.cost-b.cost;});proposals.push.apply(proposals,queue.slice(0,slots));
+    });
+    proposals.sort(function(a,b){return a.cost-b.cost;});var next=best,nextMetrics=metrics,limit=Math.min(limits.checks,checks+Math.ceil(limits.checks/limits.passes));
+    function safe(candidate,m){var a=candidate.score,b=source.score,c=result.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings &&
+      a.shape<=c.shape+1e-9 && a.width<=c.width*1.25+.1 && a.height<=c.height*1.25+.1 && a.area<=c.area*1.05 && a.length<=c.length*1.03 && m.routeLength<=baseline.routeLength*1.02 && m.blocked<=sourceMetrics.blocked && autoArrangeBranchesIntact(candidate.positions,frames);}
+    function improves(candidate,m){return (candidate.score.area<=source.score.area*.95 || m.routeLength<=sourceMetrics.routeLength*.93) && rank(candidate.score,m)<rank(next.score,nextMetrics)-.02;}
+    for(var i=0;i<proposals.length && checks<limit;i++){
+      var proposal=proposals[i];checks++;var candidate=autoArrangeNaturalRoutes(d,{positions:proposal.positions,edges:source.edges.slice()},true),m=autoArrangeFlowMetrics(d,candidate,topology);
+      if((!safe(candidate,m) || !improves(candidate,m)) && routes<limits.routes){routes++;try{candidate=autoArrangeRerouteAffected(d,source,proposal.positions,proposal.moved,viz,order);m=autoArrangeFlowMetrics(d,candidate,topology);}catch(ex){continue;}}
+      if(safe(candidate,m) && improves(candidate,m)){next=candidate;nextMetrics=m;}
+    }
+    if(next===best)break;best=next;metrics=nextMetrics;
+  }
+  return best;
+}
+
+var AUTO_ARRANGE_BLOCK_GRID_LIMITS={nodes:48,edges:80,blocks:2,blockNodes:12,checks:12,routes:4,proposals:128};
+// Reshape only a short, elongated weak-cut block. The ordinary graph-wide grid
+// entry still preserves clear natural layouts; this opt-in has separate caps.
+function autoArrangeBlockGrid(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=AUTO_ARRANGE_BLOCK_GRID_LIMITS;
+  if(ids.length<8 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var points=Object.fromEntries(result.positions.map(function(p){return [p.id,p];})),topology=autoArrangeFlowTopology(d),frames=autoArrangeBranchFrames(d,result.positions),baseline=autoArrangeFlowMetrics(d,result,topology);
+  function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
+  var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
+  var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),dy=44+Math.max(AUTO_ARRANGE_CARD_GAP*1.5,clearance);
+  function bounds(positions){var xs=positions.map(function(p){return p.x;}),ys=positions.map(function(p){return p.y;});return {width:Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,height:Math.max.apply(null,ys)-Math.min.apply(null,ys)+44};}
+  function geometric(a,b){return points[a].x-points[b].x || points[a].y-points[b].y;}
+  var protectedNodes=new Set(frames.flatMap(function(frame){return frame.bands?frame.bands.flat():frame.branches.concat(frame.ends);}));
+  var blocks=autoArrangePlacedBlocks(d,result.positions).filter(function(block){return !block.some(function(id){return protectedNodes.has(id);}) && block.length>=5 && block.length<=limits.blockNodes;}).map(function(block){
+    var moved=new Set(block),boundary=edges.filter(function(e){return moved.has(e.from)!==moved.has(e.to);}),box=bounds(block.map(function(id){return points[id];})),cols=1+(box.width-150)/dx,rows=1+(box.height-44)/dy;
+    return {ids:block.slice().sort(geometric),moved:moved,boundary:boundary,elongation:Math.max(cols/rows,rows/cols),box:box};
+  }).filter(function(block){return block.boundary.length>0 && block.boundary.length<=2 && block.elongation>=1.6;});
+  blocks.sort(function(a,b){return b.elongation-a.elongation || b.ids.length-a.ids.length || geometric(a.ids[0],b.ids[0]);});blocks=blocks.slice(0,limits.blocks);
+  var queues=[],seen=new Set();
+  blocks.forEach(function(block){
+    var index=Object.fromEntries(block.ids.map(function(id,i){return [id,i];})),internal=edges.filter(function(e){return block.moved.has(e.from) && block.moved.has(e.to);});
+    // Nonnumeric aliases and undirected, geometrically ordered proposal links
+    // make the stochastic grid's deterministic seed independent of labels and
+    // arrow direction. Actual routing below always uses the original diagram.
+    var links=internal.map(function(e){return [Math.min(index[e.from],index[e.to]),Math.max(index[e.from],index[e.to])];}).sort(function(a,b){return a[0]-b[0] || a[1]-b[1];});
+    var sub={nodes:Object.fromEntries(block.ids.map(function(id,i){return ['block_'+i,{}];})),edges:links.map(function(pair){return {from:'block_'+pair[0],to:'block_'+pair[1]};})};
+    var seed={positions:block.ids.map(function(id,i){return {id:'block_'+i,x:points[id].x,y:points[id].y};}),edges:links.map(function(){return {};})};seed.score=autoArrangeScore(sub,seed);
+    var finalists=autoArrangeGridPositions(sub,seed,false,{cleanBlock:true}),queue=[];
+    block.boundary.sort(function(a,b){return geometric(block.moved.has(a.from)?a.from:a.to,block.moved.has(b.from)?b.from:b.to);});
+    finalists.forEach(function(finalist){
+      function pitch(axis){var values=Array.from(new Set(finalist.positions.map(function(p){return p[axis];}))).sort(function(a,b){return a-b;});return values.length>1?Math.min.apply(null,values.slice(1).map(function(v,i){return v-values[i];})):1;}
+      var px=pitch('x'),py=pitch('y'),local=Object.fromEntries(finalist.positions.map(function(p,i){return [block.ids[i],{x:p.x/px,y:p.y/py}];}));
+      block.boundary.forEach(function(edge){var inner=block.moved.has(edge.from)?edge.from:edge.to,outer=points[block.moved.has(edge.from)?edge.to:edge.from],anchor=local[inner];
+        [[1,0],[-1,0],[0,1],[0,-1]].forEach(function(dock){[0,1,2,3].forEach(function(turn){
+          var positions=result.positions.map(function(p){if(!block.moved.has(p.id))return p;var x=local[p.id].x-anchor.x,y=local[p.id].y-anchor.y;
+            var tx=turn===0?x:turn===1?-y:turn===2?-x:y,ty=turn===0?y:turn===1?x:turn===2?-y:-x;
+            return {id:p.id,x:outer.x+dock[0]*dx+tx*dx,y:outer.y+dock[1]*dy+ty*dy};
+          }),key=positions.map(function(p){return p.x+','+p.y;}).join(';');
+          if(seen.has(key))return;seen.add(key);
+          if(positions.some(function(p,i){return positions.slice(i+1).some(function(q){return gap(p,q)<clearance-.1;});}) || !autoArrangeBranchesIntact(positions,frames))return;
+          var placed=Object.fromEntries(positions.map(function(p){return [p.id,p];})),box=bounds(positions),inside=bounds(positions.filter(function(p){return block.moved.has(p.id);}));
+          if(inside.width*inside.height>=block.box.width*block.box.height*.9)return;
+          var length=edges.reduce(function(sum,e){return sum+Math.hypot(placed[e.from].x-placed[e.to].x,placed[e.from].y-placed[e.to].y);},0);
+          if(box.width>result.score.width*1.25 || box.height>result.score.height*1.25 || box.width*box.height>result.score.area*1.05 || length>result.score.length*1.03 || autoArrangeFlowStructure(d,positions,topology).blocked>baseline.blocked)return;
+          queue.push({positions:positions,moved:block.moved,cost:length+2*Math.hypot(box.width,box.height)});
+        });});
+      });
+    });
+    queue.sort(function(a,b){return a.cost-b.cost;});queues.push(queue.slice(0,Math.floor(limits.proposals/Math.max(1,blocks.length))));
+  });
+  var proposals=autoArrangeFlowSchedule(queues,limits.proposals),best=result,metrics=baseline,routes=0,order=ids.slice().sort(geometric);
+  function rank(candidate,m){return m.routeLength/baseline.routeLength+Math.sqrt(candidate.score.area/result.score.area);}
+  function safe(candidate,m){var a=candidate.score,b=result.score;return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape+1e-9 && a.width<=b.width*1.25+.1 && a.height<=b.height*1.25+.1 && a.area<=b.area*1.05 && a.length<=b.length*1.03 && m.routeLength<=baseline.routeLength*1.02 && m.blocked<=baseline.blocked && autoArrangeBranchesIntact(candidate.positions,frames);}
+  function improves(candidate,m){return (candidate.score.area<=result.score.area*.95 || m.routeLength<=baseline.routeLength*.93) && rank(candidate,m)<rank(best,metrics)-.02;}
+  for(var i=0;i<proposals.length && i<limits.checks;i++){
+    var proposal=proposals[i],candidate=autoArrangeNaturalRoutes(d,{positions:proposal.positions,edges:result.edges.slice()},true),m=autoArrangeFlowMetrics(d,candidate,topology);
+    if((!safe(candidate,m) || !improves(candidate,m)) && routes<limits.routes){routes++;try{candidate=autoArrangeRerouteAffected(d,result,proposal.positions,proposal.moved,viz,order);m=autoArrangeFlowMetrics(d,candidate,topology);}catch(ex){continue;}}
+    if(safe(candidate,m) && improves(candidate,m)){best=candidate;metrics=m;}
+  }
+  return best;
+}
+
+// Native canvas bounds include the origin. Normalize only at publication so
+// whole-block moves cannot leave the finished graph stranded far from it.
+// Curve controls and label nudges are endpoint-relative and translate with cards.
+function autoArrangeCubicBounds(values){
+  // Solve derivative roots relative to the first point. Treat a nearly linear
+  // derivative as linear, and avoid cancellation in the quadratic formula.
+  var origin=values[0],v=values.map(function(x){return x-origin;}),a=3*v[1]-3*v[2]+v[3],b=2*(-2*v[1]+v[2]),c=v[1],roots=[],points=[v[0],v[3]];
+  if(Math.abs(a)<=1e-12*Math.max(1,Math.abs(b),Math.abs(c))){if(b)roots.push(-c/b);}
+  else {var discriminant=b*b-4*a*c;if(discriminant>=0){var q=-.5*(b+(b<0?-1:1)*Math.sqrt(discriminant));if(q)roots.push(q/a,c/q);else roots.push(-b/(2*a));}}
+  roots.forEach(function(t){if(t>0 && t<1){var u=1-t;points.push(3*u*u*t*v[1]+3*u*t*t*v[2]+t*t*t*v[3]);}});
+  return {min:origin+Math.min.apply(null,points),max:origin+Math.max.apply(null,points)};
+}
+function autoArrangeOccupiedBounds(d,result){
+  var arranged=autoArrangeDiagram(d,result),L=layout(arranged),adjust=autoArrangeAdjust(arranged,L),left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  function include(x,y,w,h){left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+w);bottom=Math.max(bottom,y+h);}
+  Object.keys(L.pos).forEach(function(id){var p=L.pos[id];include(p.cx-p.w/2,p.cy-p.h/2,p.w,p.h);});
+  Object.keys(L.groups).forEach(function(id){var p=L.groups[id];include(p.x,p.y,p.w,p.h);});
+  arranged.edges.forEach(function(e,i){var segments=hasEdgeCurve(e)?edgeCurveSegments(e,L):[placedEdgePoints(e,L,adjust[i])];
+    segments.forEach(function(points){var x=autoArrangeCubicBounds(points.map(function(p){return p.x;})),y=autoArrangeCubicBounds(points.map(function(p){return p.y;}));include(x.min,y.min,x.max-x.min,y.max-y.min);});
+  });return {x:left,y:top,w:right-left,h:bottom-top};
+}
+function autoArrangePublish(d,result){
+  var bounds=autoArrangeOccupiedBounds(d,result),dx=45-bounds.x,dy=78-bounds.y;
+  if(Math.abs(dx)<1e-8 && Math.abs(dy)<1e-8)return result;
+  var published={positions:result.positions.map(function(p){return {id:p.id,x:p.x+dx,y:p.y+dy};}),edges:result.edges};
+  published.score=autoArrangeScore(d,published);return published;
+}
+function autoArrangeCandidates(d,viz,cola){return autoArrangePublish(d,autoArrangeCandidateSearch(d,viz,cola));}
+function autoArrangeCandidateSearch(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
     try{var result=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,direction,positions,aspect),{engine:positions?'nop2':'dot'}));
@@ -1315,7 +1633,7 @@ function autoArrangeCandidates(d,viz,cola){
     // preserve safety, shape and footprint, and shorten center distances.
     if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
-      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz),viz);
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz),viz),viz),viz),viz),viz),viz),viz);
   }
   // Ordered layouts are reproducible seeds, not a constraint on accepted
   // geometry. Unresolved small layouts also try direction-free searches.
@@ -1329,5 +1647,5 @@ function autoArrangeCandidates(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz),viz);
+  return autoArrangeLeafTighten(d,autoArrangeBlockGrid(d,autoArrangeLeafClarity(d,autoArrangeBlockClarity(d,autoArrangeJunctionClarity(d,autoArrangeNeighborhoodClarity(d,autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz),viz);
 }

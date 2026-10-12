@@ -8,9 +8,11 @@ View has an ordered subset of section references and one presentation:
 - **Explore** shows one member section at a time, including its prose and one
   active playback group. The section controls list only that View’s members.
 
-The reader keeps a stable two-row header: a Contents toggle, Tab/View breadcrumb
-and utilities above centered **‹ Page n of m ›** controls. The collapsible
-**Contents** sidebar lists **Tabs → Views → Sections**; full section titles appear
+The reader keeps a stable two-row header: a Contents toggle, active Tab label, visible View choices
+and utilities above centered **‹ Page n of m ›** controls.
+View choices remain available when Contents is closed; on narrow screens they
+wrap within the first header bar. Arrow keys move between View choices, and
+Enter or Space selects one. The collapsible **Contents** sidebar lists **Tabs → Views → Sections**; full section titles appear
 under Explore Views. In Standard, Page arrows scroll through the intact stack;
 in Explore they select only the current View’s ordered members. Desktop Contents
 pushes the canvas; on phones it overlays it with a scrim and closes after a choice.

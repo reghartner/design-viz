@@ -258,8 +258,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function positionCamera(c){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
-    board.scrollLeft=marginX+c.x*graphPixels-board.clientWidth/2;
-    board.scrollTop=marginY+c.y*graphPixels*ratio-board.clientHeight/2;rememberStableCamera();
+    var x=marginX+c.x*graphPixels-board.clientWidth/2,y=marginY+c.y*graphPixels*ratio-board.clientHeight/2;
+    board.scrollLeft=x;board.scrollTop=y;
+    // Scroll offsets can round to whole pixels. An odd/even viewport resize
+    // otherwise loses half a pixel of camera center on every transition. Keep
+    // that fractional remainder in the graph's padding and object origin;
+    // actual edge clamping must never move the authored canvas instead.
+    var dx=board.scrollLeft-x,dy=board.scrollTop-y;
+    if(Math.abs(dx)<1 && x>1 && x<board.scrollWidth-board.clientWidth-1)marginX+=dx;
+    if(Math.abs(dy)<1 && y>1 && y<board.scrollHeight-board.clientHeight-1)marginY+=dy;
+    board.style.setProperty('--explore-margin-x',marginX+'px');board.style.setProperty('--explore-margin-y',marginY+'px');
+    objectLayer.style.transform='translate('+marginX+'px,'+marginY+'px) scale('+graphScale()+')';
+    rememberStableCamera();
   }
   function scrollState(){
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;

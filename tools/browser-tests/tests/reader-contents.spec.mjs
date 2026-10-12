@@ -60,3 +60,16 @@ test('native Contents themes and destruction are isolated between sibling hosts'
   const nativeRoot=await one.locator('flowview-root').boundingBox(),sidebar=await one.locator('.reader-contents').boundingBox();expect(sidebar.y+sidebar.height).toBe(nativeRoot.y+nativeRoot.height);
   await page.evaluate(()=>window.one.destroy());await two.getByRole('button',{name:'Next Page',exact:true}).click();await expect(two.locator('.reader-page-label')).toHaveText('Page 2 of 3');await expect(one.locator('.reader-navigation')).toHaveCount(0);
 });
+
+
+test('desktop Contents closes on transition to phone and releases its focus trap',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:900});const root=await open(page,server),toggle=root.locator('.reader-top>button');
+  await expect(root.locator('.reader-contents')).toBeVisible();await root.locator('.reader-tree-view[aria-current="page"]').focus();
+  await page.setViewportSize({width:390,height:844});
+  await expect(toggle).toHaveAttribute('aria-expanded','false');await expect(toggle).toBeFocused();await expect(root.locator('.reader-scrim')).toBeHidden();
+  await root.getByRole('button',{name:'Next Page',exact:true}).click();await expect(root.locator('.reader-page-label')).toHaveText('Page 2 of 3');
+  await toggle.click();await expect(root.locator('.reader-contents')).toBeVisible();
+  // A height-only resize must preserve a deliberately opened phone overlay.
+  await page.setViewportSize({width:390,height:700});await expect(toggle).toHaveAttribute('aria-expanded','true');
+  await page.keyboard.press('Escape');await expect(toggle).toBeFocused();await expect(toggle).toHaveAttribute('aria-expanded','false');
+});

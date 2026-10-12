@@ -2273,7 +2273,9 @@ function createSectionComposition(box, layout, d, board, bar, base, target, chan
   var layoutWidth=0;
   var layoutSizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(function(entries){
     var width=entries[0].contentRect.width;
-    if(width<=0 || width===layoutWidth)return;
+    // Explore borrows the board while this Standard grid is hidden. Its wider
+    // canvas must not replace the grid scale used to restore Standard scroll.
+    if(grid.hidden || width<=0 || width===layoutWidth)return;
     layoutWidth=width;
     grid.style.setProperty('--section-layout-scale',Math.min(1,width/1000));
     grid.style.setProperty('--section-layout-width',width<1000?'1000px':'auto');
@@ -2635,12 +2637,16 @@ function createBoardNavigation(board, group, legend, changed){
   var listeners={pointerdown:down,pointermove:move,pointerup:up,pointercancel:cancel,lostpointercapture:lost,keydown:key};
   Object.keys(listeners).forEach(function(type){board.addEventListener(type,listeners[type]);});
   board.addEventListener('click',click,true);board.addEventListener('wheel',wheel,{passive:false});window.addEventListener('blur',cancel);
-  function snapshot(){return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop};}
+  function snapshot(){var tolerance=1/displayScale();return paused || {width:board.style.getPropertyValue('--board-zoom-width'),height:board.style.getPropertyValue('--board-viewport-height'),x:board.scrollLeft,y:board.scrollTop,endX:board.scrollLeft>0 && board.scrollLeft+board.clientWidth>=board.scrollWidth-tolerance,endY:board.scrollTop>0 && board.scrollTop+board.clientHeight>=board.scrollHeight-tolerance};}
   function restore(state){
     if(!state || retired)return;
     if(paused)paused=state;
     if(state.width){board.style.setProperty('--board-zoom-width',state.width);board.style.setProperty('--board-viewport-height',state.height);board.classList.add('board-zoomed');}
-    if(enabled()){changed();board.scrollLeft=state.x;board.scrollTop=state.y;}
+    if(enabled()){changed();
+      // CSS zoom rounds scroll metrics differently from scroll assignments.
+      // Overshoot saved endpoints so the browser restores the exact boundary.
+      board.scrollLeft=state.endX?board.scrollWidth:state.x;board.scrollTop=state.endY?board.scrollHeight:state.y;
+    }
   }
   return {refresh:refresh,reset:reset,
     snapshot:snapshot,restore:restore,

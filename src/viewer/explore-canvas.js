@@ -4,7 +4,8 @@
 function initViewerExploreCanvas(ctl,view,opts){
   var container=opts && opts.container || document.body;
   view.classList.toggle('navigation-contained',container!==document.body || !!(opts && opts.contained));
-  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=null;
+  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=null,standardScroll=null;
+  var contained=container!==document.body || !!(opts && opts.contained);
   var fitObserver=new ResizeObserver(function(entries){
     if(!frame && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))frame=requestAnimationFrame(firstFit);
   }),fitRecord=null,fitDefinition=null,fitKey=null;
@@ -43,7 +44,11 @@ function initViewerExploreCanvas(ctl,view,opts){
       // ownership; otherwise a keyboard mode switch can strand focus on body.
       previous.sectionEl.classList.remove('explore-active-section');if(previous.viewport){previous.viewport.setReaderCanvas(false);if(previous.sectionEl.hasAttribute('data-dv-detail-preview'))previous.viewport.setWorkbenchCanvas(false);}
     }
+    if(contained && active && !previous)standardScroll={x:container.scrollLeft,y:container.scrollTop};
     container.classList.toggle('viewer-exploring',!!active);view.classList.toggle('explore-full-window',!!active);
+    // A contained fixed canvas uses its host's scroll origin. Park that origin
+    // while Explore owns the surface, preserving the Standard reading position.
+    if(contained && active){container.scrollLeft=0;container.scrollTop=0;}
     if(!active){
       // Moving the real tab bars changes the height above a routed contract.
       // Keep its reader scroll anchor; dialog/native hosts own their own scroll.
@@ -51,6 +56,7 @@ function initViewerExploreCanvas(ctl,view,opts){
       if(anchor!==document.activeElement)anchor=null;
       var top=anchor && anchor.getBoundingClientRect().top;
       navigation.mount(rec);
+      if(contained && previous && standardScroll){container.scrollLeft=standardScroll.x;container.scrollTop=standardScroll.y;standardScroll=null;}
       if(anchor && anchor.isConnected)window.scrollBy(0,anchor.getBoundingClientRect().top-top);
       return;
     }

@@ -46,7 +46,13 @@ function createReaderContents(ctl,nav,actions,options){
   function geometry(){
     if(retired || !nav.isConnected)return;
     var rect=nav.getBoundingClientRect(),root=view.getRootNode(),host=root.host && root.host.getBoundingClientRect(),bottom=host?Math.min(window.innerHeight,host.bottom):window.innerHeight;
-    var nextNarrow=rect.width<=670;if(nextNarrow!==narrow){narrow=nextNarrow;nav.classList.toggle('reader-narrow',narrow);}
+    // Hidden layouts and browser full-page capture can report a 0–1px viewport.
+    // Preserve the last real layout until usable bounds return.
+    if(rect.width<=1)return;
+    var nextNarrow=rect.width<=670;if(nextNarrow!==narrow){narrow=nextNarrow;nav.classList.toggle('reader-narrow',narrow);
+      // A desktop push sidebar must not become an unsolicited modal overlay.
+      if(narrow && opened){var focused=root.activeElement || doc.activeElement;setOpen(false,sidebar.contains(focused));}
+    }
     if(opened===null){opened=!narrow;sidebar.hidden=!opened;toggle.setAttribute('aria-expanded',String(opened));toggle.setAttribute('aria-label',opened?'Close Contents':'Open Contents');toggle.title=opened?'Close Contents':'Open Contents';view.classList.toggle('reader-contents-open',opened);}
     var containerRect=options.container && (options.container!==document.body || host) && options.container.getBoundingClientRect();if(containerRect)bottom=Math.min(bottom,containerRect.bottom);
     var width=Math.max(0,Math.min(284,rect.width-42));
@@ -127,6 +133,6 @@ function createReaderContents(ctl,nav,actions,options){
     if(themeMenu.open && ['ArrowDown','ArrowUp','Home','End'].indexOf(ev.key)>=0 && themeMenu.contains(ev.target)){ev.preventDefault();var nodes=Array.from(themeOptions.querySelectorAll('button')),index=nodes.indexOf(ev.target);index=ev.key==='Home'?0:ev.key==='End'?nodes.length-1:(index+(ev.key==='ArrowDown'?1:-1)+nodes.length)%nodes.length;nodes[index].focus();}
   }
   var initialFrame=requestAnimationFrame(function(){if(retired)return;expandedTabs.clear();if(owner)expandedTabs.add(owner.path);expandedViews.clear();if(owner && owner.current.presentation==='explore')expandedViews.add(owner.path+':'+owner.current.id);drawTree();});
-  nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
-  return {refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
+  nav.addEventListener('keydown',keydown,true);view.addEventListener('reader-skin-change',updateTheme);view.addEventListener('viewer-presentation-changing',release);view.addEventListener('reader-zoom-change',updateZoom);window.addEventListener('resize',geometry);window.addEventListener('scroll',geometry,true);
+  return {refresh:refresh,geometry:geometry,release:release,retainScroll:function(){if(scrollHeld)return true;if(pinnedTop===null || !current)return false;if(Math.abs(current.sectionEl.getBoundingClientRect().top-pinnedTop)<1)return true;pinnedTop=null;return false;},destroy:function(){retired=true;cancelAnimationFrame(initialFrame);cancelAnimationFrame(holdFrame);release();view.removeEventListener('reader-skin-change',updateTheme);view.removeEventListener('viewer-presentation-changing',release);view.removeEventListener('reader-zoom-change',updateZoom);nav.removeEventListener('keydown',keydown,true);window.removeEventListener('resize',geometry);window.removeEventListener('scroll',geometry,true);view.classList.remove('has-reader-contents','reader-contents-open');view.style.removeProperty('--reader-inset');view.style.removeProperty('--reader-left');view.style.removeProperty('--reader-width');ctl.sections.forEach(function(rec){rec.sectionEl.style.removeProperty('zoom');});}};
 }

@@ -511,23 +511,24 @@ for(const handoffAction of [null,'edit'])test('Canon Explore keeps the real Edit
   const handoff={version:1,id:'checkout',revision:digest(spec),action:handoffAction || 'view'};
   await page.goto(fixture.url+'?canon=checkout#fv='+encodeURIComponent(JSON.stringify(handoff)));
   const edit=page.locator('#canon-reader-edit'),nav=page.locator('#canon-reader .explore-navigation');
+  async function reachableEdit(close=true){const menu=nav.locator('.reader-utilities');if(!await edit.isVisible())await menu.locator('summary').click();await expect(edit).toBeInViewport();await edit.click({trial:true});if(close && await menu.getAttribute('open')!==null)await menu.locator('summary').click();}
   await expect(edit).toBeEnabled();await expect(nav.locator('#canon-reader-edit')).toBeVisible();const original=await edit.elementHandle();
   for(const width of [1440,390,320]){
-    await page.setViewportSize({width,height:1000});await expect(edit).toBeInViewport();
+    await page.setViewportSize({width,height:1000});await reachableEdit();
     await expect(page.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
     await expect.poll(()=>nav.evaluate(el=>{
-      const bounds=el.getBoundingClientRect(),controls=Array.from(el.querySelectorAll('select,button,summary')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({node,rect:node.getBoundingClientRect()}));
+      const bounds=el.getBoundingClientRect(),controls=Array.from(el.querySelectorAll('.reader-top select,.reader-top button,.reader-top summary,.reader-toolbar button,.reader-toolbar summary')).filter(node=>node.checkVisibility({visibilityProperty:true})).map(node=>({node,rect:node.getBoundingClientRect()}));
       return controls.every(({node,rect:r})=>r.left>=bounds.left && r.right<=bounds.right && r.top>=bounds.top && r.bottom<=bounds.bottom && node.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)));
     })).toBe(true);
-    await chooseNavigation(nav,'View','Overview');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await expect(edit).toBeVisible();
-    await chooseNavigation(nav,'Tab','Second tab');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await expect(edit).toBeInViewport();
+    await chooseNavigation(nav,'View','Overview');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);await reachableEdit();
+    await chooseNavigation(nav,'Tab','Second tab');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);await reachableEdit();
     await chooseNavigation(nav,'Tab','First tab');await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
     await chooseNavigation(nav,'View','Engineering');await expect(page.locator('body')).toHaveClass(/viewer-exploring/);
     expect(await original.evaluate(el=>el===document.querySelector('#canon-reader-edit'))).toBe(true);
     await info.attach('canon-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
   }
-  await edit.click();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
+  await reachableEdit(false);await edit.click();await prepareEditorSurface(page);expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);
   await expect(page.locator('#docview [data-dv-node="platform::api"]').first()).toBeVisible();await expect(page.locator('#workspace-provenance')).toContainText('Referenced topology (frozen session)');await expect(page.locator('#undo-builder')).toBeDisabled();
-  await page.goBack();await expect(nav.locator('#canon-reader-edit')).toBeVisible();await edit.click();await prepareEditorSurface(page);
+  await page.goBack();await reachableEdit(false);await edit.click();await prepareEditorSurface(page);
   expect(JSON.parse(await page.locator('#src').inputValue())).toEqual(workspace.source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

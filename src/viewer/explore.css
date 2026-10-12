@@ -175,6 +175,14 @@ body .docview .explore-player>.termbar{flex:none;min-height:0;height:calc((100% 
  .explore-player .schips{flex:none;width:100%;min-height:34px;max-height:var(--explore-tracks-height,34px);}
  .explore-player .stepline{flex:1;min-height:34px;width:100%;}
 }
+/* Side captions need room for transport, prose and paths. Reflow using the
+   actual player width, including a reader sidebar or a narrow host. */
+@container(max-width:760px){
+ body .docview .explore-player:is([data-step-text-position="left"],[data-step-text-position="right"])>.termbar{display:flex;flex-direction:column;flex-wrap:nowrap;gap:6px;padding:6px 10px;overflow:auto;}
+ .explore-player:is([data-step-text-position="left"],[data-step-text-position="right"]) .step-transport{flex-wrap:wrap;flex:none;}
+ body .docview .explore-player:is([data-step-text-position="left"],[data-step-text-position="right"]) .schips{flex:0 0 auto;width:100%;height:var(--explore-tracks-height,34px);min-height:34px;max-height:none;}
+ body .docview .explore-player:is([data-step-text-position="left"],[data-step-text-position="right"]) .stepline{flex:1 0 34px;width:100%;min-height:34px;height:auto;max-height:none;}
+}
 [popover]:not(:popover-open){display:none;}
 .explore-panel-body:popover-open,.explore-edge-legend:popover-open{color:var(--dtext);box-sizing:border-box;overflow:auto;}
 @container(max-width:560px){

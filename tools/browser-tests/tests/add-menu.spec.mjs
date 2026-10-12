@@ -107,7 +107,7 @@ test('Add UI stays within a narrow editor and its modal fits supported skins',as
   for(const id of ['diagram-add']){
     const child=await page.locator('#'+id).boundingBox();expect(child.x+child.width).toBeLessThanOrEqual(box.x+box.width);
   }
-  for(const skin of ['pastel','aurora','daylight','editorial','terminal','blueprint']){
+  for(const skin of ['aurora','pastel','blueprint','terminal','rose','lavender','lilac']){
     await page.locator('#sk-'+skin).click();
     await page.locator('#diagram-add').click();
     const dialog=page.locator('#diagram-add-menu');

@@ -50,7 +50,7 @@ for(const host of ['workbench','reader','native'])for(const placement of ['canva
   await page.screenshot({path:info.outputPath(placement+'-'+height+'.png')});
  }
  if(placement==='canvas'){
-  await page.locator(host==='workbench'?'#workspace-fit':'.explore-diagram-zoom button').filter(host==='workbench'?{}:{hasText:'Fit canvas'}).click();
+  await page.locator(host==='workbench'?'#workspace-fit':'.reader-toolbar>button[aria-label="Fit"]').click();
   await expect(player(page)).toBeInViewport();
  }
 });
@@ -81,7 +81,7 @@ test('Workbench control moves preserve authored size and one Undo after runtime 
  expect((await metrics(page)).overflow).toBeLessThanOrEqual(1);
 });
 
-for(const position of ['below','above','left','right'])test('step text changes refit the '+position+' caption without a window resize',async({page,server})=>{
+for(const position of ['below','above','left','right'])test('step text changes refit the '+position+' caption without a window resize',async({page,server},info)=>{
  const raw=fixture('floating',6,720,position),d=raw.page.sections[0].diagram;
  d.steps[1].text='Detailed explanation of what happens at this step. '.repeat(20);
  await page.setViewportSize({width:1280,height:1100});await open(page,server,raw,'reader');
@@ -89,6 +89,9 @@ for(const position of ['below','above','left','right'])test('step text changes r
  await player(page).getByRole('button',{name:'Next step',exact:true}).click();
  await expect.poll(async()=>(await metrics(page)).height).toBeGreaterThan(before);
  expect(await player(page).locator('.stepline:not(.dv-caption-old)').evaluate(el=>el.scrollHeight-el.clientHeight)).toBeLessThanOrEqual(1);
+ expect(await player(page).locator('.termbar').evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
+ expect((await metrics(page)).overflow).toBeLessThanOrEqual(1);
+ await page.screenshot({path:info.outputPath('caption-'+position+'-with-contents.png')});
 });
 
 test('authored floating controls grow without moving when content fits near the stage bottom',async({page,server})=>{

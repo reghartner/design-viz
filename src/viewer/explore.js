@@ -694,6 +694,9 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
     if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
+    // Reader chrome borrows live sizing controls. Return them before Standard
+    // restores its scroll: the legend contributes to the board's scroll extent.
+    shell.dispatchEvent(new CustomEvent('viewer-presentation-changing',{bubbles:true}));
     if(visibilityObserver)visibilityObserver.disconnect();if(graphObserver)graphObserver.disconnect();if(tracksObserver)tracksObserver.disconnect();if(contentObserver)contentObserver.disconnect();
     moved.slice().reverse().forEach(function(rec){if(rec.anchor.parentNode)rec.anchor.parentNode.replaceChild(rec.node,rec.anchor);});moved=[];
     if(prose)prose.setFloating(false);

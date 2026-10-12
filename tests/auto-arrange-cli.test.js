@@ -80,19 +80,32 @@ test('fresh checkout CLI ignores stale generated code and matches the Workbench 
   }
   const source=diagram('fresh'),input=path.join(directory,'input.json'),output=path.join(directory,'output.json');
   fs.writeFileSync(input,JSON.stringify(source));
-  const Viz=require('../src/workbench/vendor/viz-3.31.0.js'),cola=require('../src/workbench/vendor/webcola-3.4.0.js'),viz=await Viz.instance();
-  const arranged=viewer.autoArrangeCandidates(source,viz,cola);
+  const arranged=viewer.autoArrangeCandidates(source);
   const expected=JSON.parse(JSON.stringify(viewer.autoArrangeDiagram(source,arranged)));
+  const geometry=result=>({positions:JSON.parse(JSON.stringify(result.positions)),edges:JSON.parse(JSON.stringify(result.edges)),frame:JSON.parse(JSON.stringify(result.frame))});
   let posted;
   const worker={TextDecoder,TextEncoder,setTimeout,clearTimeout,location:{href:'https://flowview.test/auto-arrange-worker.js'},postMessage(message){posted=message;}};
   worker.self=worker;vm.runInNewContext(viewer.AUTO_ARRANGE_WORKER_SOURCE,worker);
   await worker.onmessage({data:source});
   assert.equal(posted.error,undefined);
-  assert.deepEqual(JSON.parse(JSON.stringify(posted.result)),JSON.parse(JSON.stringify(arranged)),'embedded worker and headless context use identical arrangement');
+  assert.deepEqual(geometry(posted.result),geometry(arranged),'embedded worker and headless context use identical arrangement');
   for(const generated of [false,true]){
     if(generated)fs.writeFileSync(path.join(directory,'tools/canon/generated-runtime.cjs'),"throw Error('stale generated runtime must not load');\n");
     const result=cp.spawnSync(process.execPath,[path.join(directory,'tools/auto-arrange-spec.cjs'),input,output],{encoding:'utf8'});
     assert.equal(result.status,0,result.stderr);
     assert.deepEqual(JSON.parse(fs.readFileSync(output,'utf8')),expected,generated?'stale build is ignored':'fresh checkout needs no build');
   }
+});
+
+for(const kind of ['same','dot','symlink','hardlink','directory-symlink','retired-report'])test('CLI rejects destination aliases before writing: '+kind,t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-arrange-alias-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));
+ const input=path.join(dir,'in.json'),output=path.join(dir,'out.json'),bytes=JSON.stringify(diagram('safe'));
+ fs.writeFileSync(input,bytes);fs.writeFileSync(output,'keep output');let destination=input,args=[];
+ if(kind==='dot'){fs.mkdirSync(path.join(dir,'nested'));destination=path.join(dir,'nested','..','in.json');}
+ if(kind==='symlink'){destination=path.join(dir,'alias.json');fs.symlinkSync(input,destination);}
+ if(kind==='hardlink'){destination=path.join(dir,'alias.json');fs.linkSync(input,destination);}
+ if(kind==='directory-symlink'){fs.symlinkSync(dir,path.join(dir,'linked'),'dir');destination=path.join(dir,'linked','in.json');}
+ if(kind==='retired-report'){destination=output;args=['--report',input];}
+ const result=run(input,destination,args);assert.notEqual(result.status,0);assert.match(result.stderr,kind==='retired-report'?/Unknown option/:/different files/);
+ assert.equal(fs.readFileSync(input,'utf8'),bytes);assert.equal(fs.readFileSync(output,'utf8'),'keep output');
 });

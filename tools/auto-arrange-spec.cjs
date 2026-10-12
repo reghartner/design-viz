@@ -8,11 +8,6 @@ const fs=require('node:fs');
 const path=require('node:path');
 const core=require('./arrange/core.cjs');
 
-function vendor(name){
-  const bundled=path.join(__dirname,'auto-arrange','vendor',name);
-  const checkout=path.join(__dirname,'../src/workbench/vendor',name);
-  return require(fs.existsSync(bundled)?bundled:checkout);
-}
 
 function diagramRecords(raw){
   if(raw && raw.nodes && Array.isArray(raw.rows))return [{diagram:raw,path:'diagram',section:0}];
@@ -56,10 +51,9 @@ async function arrangeSpec(raw,sectionIds){
     });
   }else if(available.length===1)records=available;
   else throw new Error('Input has multiple diagrams; pass --section INDEX for each new diagram, or --all only when every diagram is new.');
-  const Viz=vendor('viz-3.31.0.js'),cola=vendor('webcola-3.4.0.js'),viz=await Viz.instance();
   for(const record of records){
     try{
-      const result=core.autoArrangeCandidates(record.diagram,viz,cola);
+      const result=core.autoArrangeCandidates(record.diagram);
       const arranged=core.autoArrangeDiagram(record.diagram,result);
       Object.keys(record.diagram).forEach(function(key){delete record.diagram[key];});
       Object.assign(record.diagram,arranged);

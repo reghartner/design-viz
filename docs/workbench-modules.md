@@ -56,6 +56,16 @@ workbench entrypoint orders those bundles and the boot file. Portable builds
 expand that entrypoint into the offline workbench; there is no runtime loader or
 filesystem access. Panel-specific authoring remains in the panel registry and type modules.
 
+## Arrangement
+
+`core/arrange/{placement,routing,graph,groups}.js` are isolated plain-JavaScript
+modules shared by workbench, worker and backend. `workbench/auto-arrange-core.js`
+validates the public limits and adapts native diagrams without changing semantic
+content. `auto-arrange.js` owns worker cancellation, the deadline and freshness;
+`commands/layout.js` validates ports, cubic controls and frame before its single
+source transaction. Keep that source list and allowlist aligned when adding
+geometry fields. Authoring CLIs and the portable kit use the backend implementation.
+
 ## Pure source editing
 
 `source-edit.js` has no DOM, panel, renderer or editor-session dependency. Tests

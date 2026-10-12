@@ -1,20 +1,43 @@
 # Auto-arrange shape baselines
 
+The saved outputs and measurements below are historical examples from the
+pre-promotion algorithm at `14e7acbaa111b5a5c48360e15c561465450d7f14`.
+The current generator overwrites `auto-arranged.spec.json` with shared
+production-arranger output, including explicit ports and cubic routes. It does
+not reproduce the historical geometry or measurements below. See
+[automatic arrangement](../../docs/auto-arrange.md) for current behavior.
+
 This fixed graph set compares auto-arranged output with a human placement
 target. The fictional systems have architectural connections, no playback
 steps and no authored route hints. The three larger cases include a legacy
 monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 
-- Open [the auto-arranged page](auto-arranged.spec.json) in the workbench with
+## Inspecting the historical files
+
+- Open [the historical auto-arranged page](auto-arranged.spec.json) in the workbench with
   **Open file**. Each numbered section is a separate diagram. Drag cards and
   curve handles to show the layout you want, then **Save** the edited JSON.
 - [Graph input](graph-input.spec.json) has the same nodes, color categories and edges with
   neutral row placement. Re-run Auto arrange to compare algorithm changes.
   Keep section IDs, node IDs and edge endpoints stable in the human target.
-- Run `node examples/auto-arrange-baselines/generate.cjs` from the repository
-  root to regenerate the saved result and print metrics. The script uses
-  `autoArrangeCandidates` and `autoArrangeDiagram`, exactly as the workbench
-  does, and validates both specs. No output position or route is hand-authored.
+
+## Generating current output
+
+Run `node examples/auto-arrange-baselines/generate.cjs` from the repository
+root to **overwrite `auto-arranged.spec.json`** with current production output
+and print new metrics. Preserve a copy of the historical file first if it is
+needed for comparison. The script uses the shared `autoArrangeCandidates` and
+`autoArrangeDiagram` pipeline and validates both specs. New output includes
+explicit `fromPort`, `toPort`, cubic `curveControls` and `graphFrame`; no output
+position or route is hand-authored. This command does not update the historical
+tables or notes in this README.
+
+## Historical output metrics and algorithm notes
+
+Everything below describes the checked-in pre-promotion artifacts and the
+retired algorithm that produced them, not the current generator. The recorded
+passes, budgets, route formats and measurements are retained for revision
+comparisons only.
 
 | Section | Nodes | Edges | Shape | Crossings | Occupied width × height | Ratio |
 | --- | ---: | ---: | --- | ---: | ---: | ---: |
@@ -25,9 +48,9 @@ monolith, direct coupling and back edges so they are less tidy than pure DAGs.
 | 05 Media platform | 20 | 24 | Five node colors without group boxes, legacy publishing, direct catalog write and upload retry | 0 | 1290 × 992 | 1.30 |
 | 06 Subscription matrix | 6 | 9 | Complete 3-by-3 bipartite graph (K₃,₃) | 1 | 729 × 504 | 1.45 |
 
-All saved layouts have zero overlapping cards or groups and zero routes through
-unrelated cards according to `autoArrangeScore`. Dimensions enclose cards,
-groups and sampled routes, excluding labels and the viewer's minimum canvas
+The historical layouts recorded zero overlapping cards or groups and zero
+routes through unrelated cards according to the retired `autoArrangeScore`.
+Dimensions enclose cards, groups and sampled routes, excluding labels and the viewer's minimum canvas
 width. The simple chain balances its rows within the four-card limit and
 alternates reading direction, using 285-unit horizontal and 284-unit vertical center spacing rather than
 adding empty space to reach a screen ratio. Its 2.20 ratio is intentional.
@@ -46,9 +69,9 @@ Section 06 is intentionally nonplanar: each of three event streams connects to
 each of three consumers, so at least one crossing is unavoidable. The bounded
 search finds one crossing pair in this fixture, reaching that lower bound.
 
-All saved edges use automatic attachments, with no `fromPort` or `toPort`.
-All six cases use natural automatic curves throughout, with no saved curve
-controls. Automatic
+All edges in the historical saved file use automatic attachments, with no
+`fromPort` or `toPort`. Those six historical layouts use natural automatic
+curves throughout, with no saved curve controls. Automatic
 routes use the viewer's avoidance and have no saved label nudges. Moving cards
 updates their routes and attachment sides; retained native curves remain
 editable. Length tie-breaking uses straight center-to-center distances;
@@ -96,8 +119,8 @@ of curves leaving the same side. This layout has zero ordinary crossings and
 zero intersections between curves sharing a source or destination, beyond
 their common endpoint. All 24 edges use natural curves.
 
-The local alignment pass prioritizes fewer shared centers and regular gaps, checks
-safety before accepting a grid, and keeps source/sink positions in that grid.
+The retired local alignment pass prioritizes fewer shared centers and regular
+gaps, checks safety before accepting a grid, and keeps source/sink positions in that grid.
 Only recognizable ranked, ungrouped diagrams with at most 24 nodes and 48
 edges enter the bounded search. A second bounded search can fold a deep single-source
 unary entrance and swap nodes across a smaller grid; it is limited to 20 nodes
@@ -111,8 +134,8 @@ Graphviz's target-ratio candidates can add whitespace, and labels, symmetry,
 alignment and the overall silhouette still need human judgment. These files
 are algorithm output for that comparison, not manually polished target layouts.
 
-A final optional grid search runs only when the selected layout still has
-crossings or native curve controls. It lets all nodes move, including sources
+The retired algorithm's final optional grid search runs only when the selected
+layout still has crossings or native curve controls. It lets all nodes move, including sources
 and sinks, while strongly preferring the selected layout's forward flow and
 shared branch ranks. This is a soft preference: feedback and an occasional
 local forward edge can point upward when that clears the fan-out. At most 20 nodes and 32
@@ -129,7 +152,8 @@ titles, tints, section IDs, or reference positions. It skips larger stress graph
 The incident-crossing metric also inspects curves sharing a source or
 destination, because they can weave beyond a common automatic attachment.
 The former media proposal had three such crossings despite scoring zero
-ordinary crossings; the current output and latest human target both have zero.
+ordinary crossings; the saved historical output and its corresponding human
+target both have zero.
 The grid search penalizes both kinds. This pass deliberately preserves the
 approved cases 01–04; it does not reopen an already natural layout solely for
 incident crossings, so case 04 retains its two existing incident crossings.

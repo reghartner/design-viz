@@ -84,6 +84,10 @@
     "workbench/io-model.js",
     "workbench/io-browser.js",
     "workbench/io.js",
+    "core/arrange/placement.js",
+    "core/arrange/routing.js",
+    "core/arrange/graph.js",
+    "core/arrange/groups.js",
     "workbench/auto-arrange-core.js",
     "workbench/auto-arrange.js",
     "workbench/edge-curves.js",
@@ -166,6 +170,10 @@
         "compatibility.js",
         "canon.js",
         "validator.js",
+        "core/arrange/placement.js",
+        "core/arrange/routing.js",
+        "core/arrange/graph.js",
+        "core/arrange/groups.js",
         "workbench/auto-arrange-core.js",
         "core/backend.js"
       ],
@@ -175,7 +183,9 @@
         "viewerRouting": "viewerRouting",
         "exportAnonymousLayout": "exportAnonymousLayout",
         "autoArrangeCandidates": "autoArrangeCandidates",
-        "autoArrangeDiagram": "autoArrangeDiagram"
+        "autoArrangeDiagram": "autoArrangeDiagram",
+        "autoArrangeInput": "autoArrangeInput",
+        "arrangeGraph": "autoArrangeGraph"
       },
       "defaultExport": "FlowCanon"
     },
@@ -260,18 +270,13 @@
     },
     "iconLibrary": "icons/library.js",
     "autoArrangeWorker": [
-      "workbench/vendor/viz-3.31.0.js",
-      "workbench/vendor/webcola-3.4.0.js",
       "core/geometry.js",
+      "core/arrange/placement.js",
+      "core/arrange/routing.js",
+      "core/arrange/graph.js",
+      "core/arrange/groups.js",
       "workbench/auto-arrange-core.js",
       "workbench/auto-arrange-worker.js"
-    ],
-    "autoArrangeNotices": [
-      "workbench/vendor/NOTICE.txt",
-      "workbench/vendor/Viz-LICENSE",
-      "workbench/vendor/Graphviz-COPYING",
-      "workbench/vendor/Expat-COPYING",
-      "workbench/vendor/WebCola-LICENSE"
     ]
   }
 }

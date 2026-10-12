@@ -116,6 +116,10 @@ Start with the [packet entry](../SKILL.md); read individual sections here only o
 12. **Write content, then compose.** For a new diagram, write semantic
     nodes, edges, panels and steps with `rows:[[]]` and unpositioned floats;
     run `node <VIZ>/tools/compose-page-layout.cjs --section <zero-based-section> <draft.spec.json> <different-arranged.spec.json>` and use its output.
+    The shared production arranger selects positions, ports, cubic routes and
+    frame from topology; groups and nested groups constrain placement. Its limit
+    is 80 nodes and 160 connections per diagram. Inspect the rendered output;
+    crossings, labels and group titles can need scoped manual refinements.
     This is the initial layout and default, not visual proof. Preserve unrelated
     existing geometry. For ordinary existing edits, preserve layout and routes;
     add nodes only as `{id:"<new-node-id>",side:"below",noSpread:true}` floats.

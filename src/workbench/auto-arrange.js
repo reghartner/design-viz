@@ -11,7 +11,7 @@ function startAutoArrangeWorker(d){
       url=URL.createObjectURL(new Blob([AUTO_ARRANGE_WORKER_SOURCE],{type:'text/javascript'}));
       worker=new Worker(url);
       worker.onmessage=function(event){settle(event.data.error,event.data.result);};
-      worker.onerror=function(event){event.preventDefault();settle('Auto arrange could not start. This browser must allow local workers and WebAssembly.');};
+      worker.onerror=function(event){event.preventDefault();settle('Auto arrange could not start. This browser must allow local workers.');};
       timer=setTimeout(function(){settle('Auto arrange took too long. Try a smaller diagram. The source is unchanged.');},20000);
       worker.postMessage(d);
     }catch(error){settle('Auto arrange is unavailable in this browser. The source is unchanged.');}
@@ -22,7 +22,7 @@ function createAutoArrangeController(opts){
   var life=createWorkbenchLifetime(),button=opts.button,job=null,snapshot=null,invalid=false;
   if(!button)return {destroy:function(){},cancel:function(){}};
   var dialog=opts.document.createElement('dialog');dialog.className='workspace-change-dialog';dialog.id='auto-arrange-dialog';dialog.setAttribute('aria-labelledby','auto-arrange-title');
-  dialog.innerHTML='<h2 id="auto-arrange-title">Auto arrange this diagram?</h2><div data-arrange-details><p data-arrange-warning></p><p>This replaces node placement and edge settings, including ports, bends, curve handles and label nudges. You can tweak the result and undo the entire arrangement with one Undo.</p></div><div class="auto-arrange-activity" data-arrange-activity role="status" aria-live="polite" aria-atomic="true" hidden><span class="auto-arrange-spinner" aria-hidden="true"></span><strong>Calculating optimal node placement</strong></div><p data-arrange-status role="status" aria-live="polite"></p><div><button type="button" data-arrange-cancel>Cancel</button> <button type="button" class="rbtn" data-arrange-confirm>Auto arrange</button></div>';
+  dialog.innerHTML='<h2 id="auto-arrange-title">Auto arrange this diagram?</h2><div data-arrange-details><p data-arrange-warning></p><p>This replaces node placement and edge settings, including ports, bends, curve handles and label nudges. You can tweak the result and undo the entire arrangement with one Undo.</p></div><div class="auto-arrange-activity" data-arrange-activity role="status" aria-live="polite" aria-atomic="true" hidden><span class="auto-arrange-spinner" aria-hidden="true"></span><strong>Arranging nodes and connections</strong></div><p data-arrange-status role="status" aria-live="polite"></p><div><button type="button" data-arrange-cancel>Cancel</button> <button type="button" class="rbtn" data-arrange-confirm>Auto arrange</button></div>';
   opts.document.body.appendChild(dialog);
   var confirm=dialog.querySelector('[data-arrange-confirm]'),cancel=dialog.querySelector('[data-arrange-cancel]'),status=dialog.querySelector('[data-arrange-status]');
   var activity=dialog.querySelector('[data-arrange-activity]'),details=dialog.querySelector('[data-arrange-details]'),title=dialog.querySelector('h2');

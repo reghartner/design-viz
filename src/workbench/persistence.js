@@ -5,7 +5,7 @@ function createBuilderPersistence(options){
   var timer=null, generation=0, disposed=false;
   function sameDraft(a,b){
     return a.text===b.text && a.baseline===b.baseline && a.ledger===b.ledger &&
-      JSON.stringify(a.topologyContext)===JSON.stringify(b.topologyContext);
+      JSON.stringify(a.topologyContext)===JSON.stringify(b.topologyContext) && JSON.stringify(a.checkpoints || [])===JSON.stringify(b.checkpoints || []);
   }
   function validDraft(entry){return entry && typeof entry.text==='string';}
   function archiveEntries(storage){
@@ -39,7 +39,7 @@ function createBuilderPersistence(options){
     try {
       var storage=options.storage();
       storage.setItem(baselineKey,JSON.stringify({text:baseline,draftText:text}));
-      storage.setItem(draftKey,JSON.stringify(Object.assign({text:text,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{})));
+      storage.setItem(draftKey,JSON.stringify(Object.assign({text:text,at:options.now()},artifactFields(artifacts))));
       if(options.status)options.status('saved');
     } catch(ex){if(options.status)options.status('unavailable'); /* unavailable storage does not prevent editing */ }
   }
@@ -47,6 +47,11 @@ function createBuilderPersistence(options){
     generation++;
     if(timer!=null)options.cancel(timer);
     timer=null;
+  }
+  function artifactFields(artifacts){
+    return Object.assign({},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},
+      artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{},
+      artifacts && Array.isArray(artifacts.checkpoints) && artifacts.checkpoints.length?{checkpoints:artifacts.checkpoints}:{});
   }
   return {
     read:read,save:save,
@@ -68,7 +73,7 @@ function createBuilderPersistence(options){
       // durable copy succeeds. Keep the exact text, including unfinished JSON.
       try{
         var storage=options.storage(),entries=archiveEntries(storage);
-        var incoming=Object.assign({text:text,baseline:baseline,at:options.now()},artifacts && typeof artifacts.ledger==='string'?{ledger:artifacts.ledger}:{},artifacts && artifacts.topologyContext?{topologyContext:artifacts.topologyContext}:{});
+        var incoming=Object.assign({text:text,baseline:baseline,at:options.now()},artifactFields(artifacts));
         var recent=recentDrafts(entries);
         if(recent.length===entries.length && recent.length && sameDraft(recent[0],incoming))return;
         var previous=entries.find(function(entry){return !sameDraft(entry,incoming);});

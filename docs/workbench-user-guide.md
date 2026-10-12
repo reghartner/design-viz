@@ -1,5 +1,24 @@
 # The human guide
 
+The toolbar's **History** opens named visual checkpoints for the current project.
+Save an exact copy of the editor source, select it to see a reader preview and
+structural changes from that checkpoint to the current source, then choose
+**Restore checkpoint** to replace the editor in one Undo action. Unfinished or
+invalid JSON is preserved exactly and can be restored, but cannot be previewed.
+Names must be unique (ignoring case), nonblank, and at most 80 characters. Rename
+and delete affect only the checkpoint list. Delete asks for confirmation and
+cannot be undone. Previewing or closing History never changes source or Undo.
+
+History keeps up to 20 checkpoints and 1 MiB of serialized UTF-16 storage per
+project. A full history refuses new checkpoints until you delete one; it never
+silently evicts a named checkpoint. Checkpoints follow browser recovery and
+Earlier drafts when switching projects, including exact source and timestamps.
+They are local browser data, absent from JSON/HTML exports and agent exchanges.
+Check File's recovery status to confirm storage succeeded. Browser data clearing
+removes this history; export current JSON separately when you need a durable copy.
+Restore keeps the current saved baseline and project provider context; it does
+not publish a revision or change the providers used by referenced topology.
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 

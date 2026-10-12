@@ -1530,3 +1530,25 @@ body .docview .viewport-explore .explore-canvas-objects [data-dv-object-menu]:fo
 .section-view-options-body .tab-view-member{display:flex;flex-direction:row;align-items:center;gap:8px;flex:1;min-width:0;}
 .section-view-options-body :is(.tab-view-member,.chapter-diagram-visibility) input{width:15px;height:15px;flex:none;margin:0;}
 .section-view-options-body .fnote{margin:2px 0 0;}
+/* Local history is a modal reader surface with its own scroll containment. */
+.checkpoint-history{width:min(1400px,94vw);height:88vh;max-height:94vh;box-sizing:border-box;padding:24px;border:1px solid #bcc6d6;border-radius:16px;background:#f8fafc;color:#172033;overflow:auto;}
+.checkpoint-history::backdrop{background:rgba(15,23,42,.5);}
+.checkpoint-history>header{display:flex;justify-content:space-between;align-items:start;gap:16px;}
+.checkpoint-history h2,.checkpoint-history h3{margin:0 0 8px;}
+.checkpoint-history header p{margin:0;color:#526176;}
+.checkpoint-note,.checkpoint-status{font-size:13px;line-height:1.5;}
+.checkpoint-status{min-height:20px;}
+.checkpoint-create{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.checkpoint-history input{padding:8px;border:1px solid #9daabe;border-radius:6px;font:inherit;background:white;color:#172033;min-width:120px;}
+.checkpoint-columns{display:grid;grid-template-columns:260px minmax(0,1fr);gap:24px;}
+.checkpoint-list{display:flex;flex-direction:column;gap:10px;align-items:stretch;}
+.checkpoint-row.bbtn{text-align:left;white-space:normal;overflow-wrap:anywhere;padding:12px;}
+.checkpoint-row small{display:block;margin-top:6px;font-weight:400;line-height:1.4;}
+.checkpoint-row[aria-current=true]{outline:2px solid #526ff1;outline-offset:1px;}
+.checkpoint-info{font-size:14px;line-height:1.5;overflow-wrap:anywhere;}
+.checkpoint-info label,.checkpoint-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0;}
+.checkpoint-info details{max-height:220px;overflow:auto;}
+.checkpoint-surface{position:relative;isolation:isolate;margin-top:20px;height:55vh;min-height:240px;overflow:auto;border:1px solid #d0d7e2;border-radius:8px;background:white;}
+.checkpoint-surface.viewer-exploring{overflow:hidden;}
+.checkpoint-view .doc-sec{padding:16px;}
+@media(max-width:760px){.checkpoint-columns{grid-template-columns:1fr;}.checkpoint-list{max-height:230px;overflow:auto;}.checkpoint-history{padding:16px;}}

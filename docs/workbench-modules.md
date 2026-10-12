@@ -19,7 +19,7 @@ inspector, I/O, interaction and lifetime dependencies.
 6. `workbench/commands/narrative.js`: steps, paths, hops, tones and patches.
 7. `workbench/commands/layout.js`: row/node placement, section layouts and views.
 8. `workbench/persistence.js`: injected draft storage and debounce lifetime.
-9. `workbench/session.js`: live source, authored selection, history and project policy.
+9. `workbench/session.js`: live source, authored selection, Undo/Redo, bounded named checkpoints and project policy. `workbench/checkpoints.js` owns the History dialog, structural comparisons, and separate reader-preview lifetime; checkpoint payloads travel only through browser recovery artifacts.
 10. `workbench/field-values.js`: pure field collection and registry metadata views.
 11. `workbench/inspector-model.js`: pure position, effective-state and field-help models.
 12. `workbench/lifetime.js`: local listener, delay and cleanup ownership.

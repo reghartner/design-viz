@@ -1,13 +1,33 @@
 /* Source/history/project policy without DOM ownership. Always read the source
    adapter at a transaction boundary: handwritten text may include invalid JSON
    or whitespace that has never been published through a builder command. */
+/* Browser-only checkpoint payloads. The byte budget counts UTF-16 serialized
+   storage, including escaped source and metadata; never silently evict a name. */
+var BUILDER_CHECKPOINT_LIMIT=20, BUILDER_CHECKPOINT_BYTES=1024*1024;
+function builderCheckpointName(value){return typeof value==='string'?value.trim():'';}
+function builderCheckpointBytes(entries){return JSON.stringify(entries).length*2;}
+function sanitizeBuilderCheckpoints(value){
+  var kept=[];
+  if(!Array.isArray(value))return kept;
+  value.forEach(function(entry){
+    if(!entry || typeof entry.id!=='string' || !entry.id || entry.id.length>100 || typeof entry.text!=='string' ||
+      !Number.isFinite(entry.at) || entry.at<0)return;
+    var name=builderCheckpointName(entry.name);
+    if(!name || name.length>80 || kept.length>=BUILDER_CHECKPOINT_LIMIT || kept.some(function(saved){return saved.id===entry.id || saved.name.toLowerCase()===name.toLowerCase();}))return;
+    var clean={id:entry.id,name:name,at:entry.at,text:entry.text};
+    if(builderCheckpointBytes(kept.concat([clean]))<=BUILDER_CHECKPOINT_BYTES)kept.push(clean);
+  });
+  return kept;
+}
 function createBuilderSession(options){
   var persistence=options.persistence, recovered=persistence.read();
   var initialDraft=recovered.draft, recoveredBaseline=recovered.baseline;
+  if(initialDraft && initialDraft.checkpoints)initialDraft=Object.assign({},initialDraft,{checkpoints:sanitizeBuilderCheckpoints(initialDraft.checkpoints)});
   var baselineText=options.source.read(), projectOpen=!options.deferInitialSave;
   var undoStack=[], redoStack=[], target=null, insertSection=0,historyVersion=0;
   var importedText=null, project=0, disposed=false;
   var topologyContext=null,topologyRevision=0;
+  var checkpoints=sanitizeBuilderCheckpoints(initialDraft && initialDraft.text===baselineText?initialDraft.checkpoints:null),checkpointSequence=0;
   function resolve(raw,context){return typeof FlowTopology==='undefined'?raw:FlowTopology.resolveSource(raw,arguments.length>1?context:topologyContext);}
   function checkTopologyContext(nextContext){
     if(nextContext===topologyContext)return;
@@ -21,7 +41,7 @@ function createBuilderSession(options){
       });
     }
   }
-  function artifacts(){return Object.assign({},options.artifacts?options.artifacts():{},topologyContext?{topologyContext:topologyContext}:{});}
+  function artifacts(){return Object.assign({},options.artifacts?options.artifacts():{},topologyContext?{topologyContext:topologyContext}:{},checkpoints.length?{checkpoints:checkpoints}:{});}
   if(initialDraft && initialDraft.text===baselineText && recoveredBaseline!=null)baselineText=recoveredBaseline;
   function text(){return options.source.read();}
   function parse(value){
@@ -35,7 +55,7 @@ function createBuilderSession(options){
     if(undoStack.length>30)undoStack.shift();
     redoStack.length=0;historyChanged();
   }
-  function save(){if(disposed)return;projectOpen=true;if(options.artifacts || topologyContext)persistence.save(text(),baselineText,artifacts());else persistence.save(text(),baselineText);}
+  function save(){if(disposed)return;projectOpen=true;if(options.artifacts || topologyContext || checkpoints.length)persistence.save(text(),baselineText,artifacts());else persistence.save(text(),baselineText);}
   function render(origin,retention){return options.render({origin:origin,retention:retention || {}});}
   function historyStep(from,to,message){
     if(disposed || !from.length)return false;
@@ -54,7 +74,7 @@ function createBuilderSession(options){
     save();return true;
   }
   function preserveDraft(){
-    if(projectOpen){if(options.artifacts || topologyContext)persistence.preserve(text(),baselineText,artifacts());else persistence.preserve(text(),baselineText);}
+    if(projectOpen){if(options.artifacts || topologyContext || checkpoints.length)persistence.preserve(text(),baselineText,artifacts());else persistence.preserve(text(),baselineText);}
     else if(initialDraft)persistence.preserve(initialDraft.text,recoveredBaseline,initialDraft);
   }
   function invalidateProject(policy){
@@ -74,6 +94,7 @@ function createBuilderSession(options){
     preserveDraft();invalidateProject();persistence.cancel();
     topologyContext=hooks && hooks.topologyContext?JSON.parse(JSON.stringify(hooks.topologyContext)):null;
     topologyRevision++;
+    checkpoints=sanitizeBuilderCheckpoints(hooks && hooks.checkpoints);
     options.source.write(value);baselineText=baseline==null?value:baseline;
     initialDraft=null;insertSection=0;
     if(hooks && hooks.beforeRender)hooks.beforeRender();
@@ -85,6 +106,35 @@ function createBuilderSession(options){
   }
   return {
     text:text,
+    checkpoints:function(){return checkpoints.map(function(entry){return Object.assign({},entry);});},
+    checkpointLimits:function(){return {count:BUILDER_CHECKPOINT_LIMIT,bytes:BUILDER_CHECKPOINT_BYTES,used:builderCheckpointBytes(checkpoints)};},
+    saveCheckpoint:function(name,id){
+      if(disposed)return {error:'This project is closed.'};
+      name=builderCheckpointName(name);
+      if(!name || name.length>80)return {error:'Use a checkpoint name of 1–80 characters.'};
+      if(checkpoints.some(function(entry){return entry.id!==id && entry.name.toLowerCase()===name.toLowerCase();}))return {error:'A checkpoint already has that name. Choose another name.'};
+      var existing=id && checkpoints.find(function(entry){return entry.id===id;});
+      if(id && !existing)return {error:'This checkpoint is no longer available.'};
+      if(existing && existing.name===name)return {id:id,unchanged:true};
+      var at=options.now?options.now():Date.now(),entry=existing?Object.assign({},existing,{name:name}):{id:'checkpoint-'+at+'-'+(++checkpointSequence),name:name,at:at,text:text()};
+      while(!existing && checkpoints.some(function(saved){return saved.id===entry.id;}))entry.id='checkpoint-'+at+'-'+(++checkpointSequence);
+      var next=existing?checkpoints.map(function(saved){return saved.id===id?entry:saved;}):[entry].concat(checkpoints);
+      if(next.length>BUILDER_CHECKPOINT_LIMIT || builderCheckpointBytes(next)>BUILDER_CHECKPOINT_BYTES)return {error:'History is full (20 checkpoints or 1 MiB). Delete a checkpoint before saving another.'};
+      checkpoints=next;save();return {id:entry.id};
+    },
+    deleteCheckpoint:function(id){
+      if(disposed || !checkpoints.some(function(entry){return entry.id===id;}))return false;
+      checkpoints=checkpoints.filter(function(entry){return entry.id!==id;});save();return true;
+    },
+    restoreCheckpoint:function(id,expected){
+      if(disposed || !expected || expected.project!==project || expected.text!==text() || expected.topologyRevision!==topologyRevision)return false;
+      var entry=checkpoints.find(function(saved){return saved.id===id;});
+      if(!entry || entry.text===text())return false;
+      pushUndo(text());options.source.write(entry.text);target=null;
+      var outcome=render('history');
+      if(options.afterCheckpoint)options.afterCheckpoint(outcome);
+      save();return true;
+    },
     resolve:resolve,
     topologyContext:function(){return topologyContext?JSON.parse(JSON.stringify(topologyContext)):null;},
     connectTopology:function(context,expected){
@@ -172,14 +222,14 @@ function createBuilderSession(options){
     earlierDrafts:persistence.archived,
     restoreEarlierDraft:function(entry,hooks){
       if(!entry || typeof entry.text!=='string')return false;
-      var ok=replaceProject(entry.text,entry.baseline,Object.assign({},hooks,{topologyContext:entry.topologyContext}));if(ok && options.restoreArtifacts){options.restoreArtifacts(entry);save();}return ok;
+      var ok=replaceProject(entry.text,entry.baseline,Object.assign({},hooks,{topologyContext:entry.topologyContext,checkpoints:entry.checkpoints}));if(ok && options.restoreArtifacts){options.restoreArtifacts(entry);save();}return ok;
     },
     isProjectOpen:function(){return projectOpen;},
     invalidateProject:invalidateProject,replaceProject:replaceProject,
     restoreDraft:function(hooks){
       if(disposed || !initialDraft)return false;
       var draft=initialDraft,missingBaseline=recoveredBaseline==null;
-      replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,Object.assign({},hooks,{topologyContext:draft.topologyContext}));
+      replaceProject(draft.text,missingBaseline?draft.text:recoveredBaseline,Object.assign({},hooks,{topologyContext:draft.topologyContext,checkpoints:draft.checkpoints}));
       if(options.restoreArtifacts){options.restoreArtifacts(draft);save();}
       return {missingBaseline:missingBaseline};
     },

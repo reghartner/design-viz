@@ -495,10 +495,18 @@ function initWorkbenchBuilder(opts){
          toolbar status keeps the same feedback visible when Inspect is closed. */
       inspectorMessage(message,true,true);
     },
+    afterCheckpoint:function(){
+      setSelected(null);clearMultiSelect();clearStepMarkers();
+      inspectorMessage('Checkpoint restored. Undo returns to the replaced source.',true,true);
+      if(historyStatus){historyStatus.textContent='Checkpoint restored';historyStatus.hidden=false;}
+    },
     artifacts:function(){return typeof agentLedger==='string'?{ledger:agentLedger}:null;},
     restoreArtifacts:function(entry){agentLedger=entry && typeof entry.ledger==='string'?entry.ledger:null;agentLedgerProject=session.snapshot().project;},
     invalidateProject:function(policy){retireProjectUI();if(!policy || !policy.preserveHistory){agentLedger=null;agentLedgerEpoch++;}agentLedgerProject=session.snapshot().project;}
   });
+  var checkpointHistory=initWorkbenchCheckpoints({session:session,source:src,authorView:view,
+    skin:opts.previewSkin,pause:pausePreview});
+  life.own(function(){checkpointHistory.destroy();});
   if(opts.workspace && opts.workspace.setHistory){
     opts.workspace.setHistory(life.guard(session.rememberView));
     life.own(function(){opts.workspace.setHistory(null);});
@@ -1169,6 +1177,7 @@ function initWorkbenchBuilder(opts){
   applyRowGrabs(); /* the boot render happened before this wiring ran */
   function prepareWelcome(){if(session.isProjectOpen())session.save();session.invalidateProject({preserveHistory:true});}
   function retireProjectUI(){
+    if(checkpointHistory)checkpointHistory.close(false);
     if(autoArrange)autoArrange.cancel();
     io.retireProject();
     if (objectClipboard && objectClipboard.cancelPending) objectClipboard.cancelPending();

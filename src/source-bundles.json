@@ -64,6 +64,7 @@
     "workbench/panel-collections.js",
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
+    "workbench/checkpoints.js",
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",

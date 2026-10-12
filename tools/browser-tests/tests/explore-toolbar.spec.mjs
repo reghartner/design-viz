@@ -29,44 +29,38 @@ async function open(page,server,host){
  }
  await page.goto(server.origin+'/toolbar.html');return page.locator('#docview');
 }
-for(const host of ['standalone','embed','native inline','native canvas'])test(host+' Explore has one flush sizing row with equal controls and reachable narrow overflow',async({page,server},info)=>{
- const root=await open(page,server,host),row=root.getByRole('group',{name:'Explore sizing and zoom',exact:true});
+for(const host of ['standalone','embed','native inline','native canvas'])test(host+' reader keeps sizing modes, zoom and panel sizing reachable at both widths',async({page,server},info)=>{
+ const root=await open(page,server,host),nav=root.locator('.reader-navigation'),row=nav.locator('.reader-toolbar'),zoom=nav.locator('.reader-zoom-menu'),panelMenu=nav.locator('.explore-panel-menu');
  await expect(root.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await expect(root.getByRole('button',{name:/Edit in Workbench/i})).toHaveCount(0);
  for(const width of [1440,390]){
-  await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);
-  await expect(row).toBeVisible();
-  const geometry=await row.evaluate(el=>{
-   const r=el.getBoundingClientRect(),shell=el.parentElement,nav=shell.querySelector(':scope>.diagram-views').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();
-   const controls=Array.from(el.querySelectorAll('.mbtn,.explore-zoom')).filter(b=>b.getClientRects().length).map(b=>{const r=b.getBoundingClientRect();return {y:r.y,h:r.height};});
-   return {top:r.top,bottom:r.bottom,height:r.height,navBottom:nav.bottom,stageTop:stage.top,controls};
-  });
-  expect(geometry.top).toBeCloseTo(geometry.navBottom,0);expect(geometry.stageTop).toBeCloseTo(geometry.bottom,0);
-  expect(geometry.height).toBeLessThanOrEqual(45);expect(geometry.controls.length).toBe(10);
-  expect(new Set(geometry.controls.map(b=>b.y)).size).toBe(1);expect(new Set(geometry.controls.map(b=>b.h))).toEqual(new Set([28]));
-  for(const name of ['Auto','Fit width','Readable']){
-   const button=row.getByRole('button',{name,exact:true});await button.focus();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(button).toBeInViewport();
+  await page.setViewportSize({width,height:1000});await page.evaluate(()=>document.fonts.ready);await expect(row).toBeVisible();
+  const geometry=await row.evaluate(el=>{const r=el.getBoundingClientRect(),p=el.querySelector('.reader-page-index').getBoundingClientRect();return {height:r.height,center:(p.left+p.right-r.left-r.right)/2};});
+  expect(geometry.height).toBe(45);expect(Math.abs(geometry.center)).toBeLessThan(1);
+  await zoom.locator('summary').click();await zoom.getByRole('button',{name:'Zoom 150%',exact:true}).click();
+  const graph=root.locator('.explore-board .boardcanvas>svg');const zoomed=await graph.evaluate(el=>el.getBoundingClientRect().width);
+  await zoom.locator('summary').click();
+  for(const name of ['Readable','Fit width','Auto']){
+   const button=zoom.getByRole('button',{name,exact:true});await button.focus();await button.click();await expect(button).toHaveAttribute('aria-pressed','true');await expect(button).toBeInViewport();
+   if(name==='Readable'){const size=await graph.evaluate(el=>({width:el.getBoundingClientRect().width,natural:el.viewBox.baseVal.width}));expect(size.width).toBeCloseTo(size.natural,0);expect(size.width).toBeLessThan(zoomed);}
   }
-  const panel=row.getByRole('button',{name:'Shrink panels and controls',exact:true}),overlayValue=row.locator('.explore-overlay-value');
-  const initialScale=Number((await overlayValue.textContent()).replace('%',''));await panel.focus();await panel.click();await expect(panel).toBeInViewport();await expect(overlayValue).toHaveText((initialScale-10)+'%');
-  await row.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();
-  await row.getByRole('button',{name:'Fit diagram',exact:true}).click();
-  await row.getByRole('button',{name:'Auto',exact:true}).focus();
+  await page.keyboard.press('Escape');await panelMenu.locator('summary').click();
+  const panel=panelMenu.getByRole('button',{name:'Shrink panels and controls',exact:true}),overlayValue=panelMenu.locator('.explore-overlay-value');
+  const initialScale=Number((await overlayValue.textContent()).replace('%',''));await panel.click();await expect(panel).toBeInViewport();await expect(overlayValue).toHaveText((initialScale-10)+'%');
+  await panelMenu.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();await page.keyboard.press('Escape');await row.getByRole('button',{name:'Fit',exact:true}).click();
   await info.attach(host+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
- await chooseNavigation(root.locator('.explore-navigation'),'View','Overview');
- if(host!=='native canvas')await expect(row).toBeHidden();
- await chooseNavigation(root.locator('.explore-navigation'),'View','Engineering');await expect(row).toBeVisible();await expect(row.locator('.explore-overlay-value')).toHaveText('100%');
+ await chooseNavigation(nav,'View','Overview');await expect(row).toBeVisible();if(host!=='native canvas')await expect(root.locator('.explore-board')).toHaveCount(0);
+ await chooseNavigation(nav,'View','Engineering');await panelMenu.locator('summary').click();await expect(panelMenu.locator('.explore-overlay-value')).toHaveText('100%');
 });
 
-test('Page preview uses the reader row while Workbench retains one owned set of controls',async({page,server})=>{
+test('Page preview keeps live reader sizing while Workbench retains its own controls',async({page,server})=>{
  await page.goto(server.origin+'/workbench.html');const source=JSON.stringify(story(),null,2);await paste(page,source);await closeTools(page);
  await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#workspace-zoom-in')).toBeVisible();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
- const preview=page.locator('#page-preview-view'),row=preview.getByRole('group',{name:'Explore sizing and zoom',exact:true});await expect(row).toBeVisible();
- const geometry=await row.evaluate(el=>{const shell=el.parentElement,r=el.getBoundingClientRect(),nav=shell.querySelector('.diagram-views').getBoundingClientRect(),stage=shell.querySelector('.explore-stage').getBoundingClientRect();return {top:r.top,bottom:r.bottom,navBottom:nav.bottom,stageTop:stage.top};});
- expect(geometry.top).toBe(geometry.navBottom);expect(geometry.stageTop).toBe(geometry.bottom);
- await row.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(row.locator('.explore-overlay-value')).toHaveText('90%');
+ const preview=page.locator('#page-preview-view'),nav=preview.locator('.reader-navigation');await expect(nav.locator('.reader-toolbar')).toBeVisible();
+ await nav.locator('.reader-zoom-menu>summary').click();await nav.getByRole('button',{name:'Readable',exact:true}).click();await expect(nav.getByRole('button',{name:'Readable',exact:true})).toHaveAttribute('aria-pressed','true');await page.keyboard.press('Escape');
+ await nav.locator('.explore-panel-menu>summary').click();await nav.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();await expect(nav.locator('.explore-overlay-value')).toHaveText('90%');
  await expect(preview.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
  await page.locator('#close-page-preview').click();await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
  await expect(page.locator('#docview .explore-tools')).toBeHidden();await expect(page.locator('#workspace-zoom-in')).toBeVisible();

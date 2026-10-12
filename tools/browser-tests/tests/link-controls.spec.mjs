@@ -1,7 +1,7 @@
 import {writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,paste,closeTools} from '../helpers/test.mjs';
+import {test,expect,paste,closeTools,chooseNavigation} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function spec(){
@@ -46,9 +46,9 @@ test('standalone unified navigation keeps tab, chapter, step and contract links 
  expect(link.hash).toContain('t=story');expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('v=canvas');expect(link.hash).toContain('s=done');expect(link.hash).toContain('x=delivery');
  await copy.chapter.click();const embed=await copied(page);link=new URL(embed);expect(link.hash).toBe('#embed=delivery&v=canvas');
  await copy.tab.click();link=new URL(await copied(page));expect(link.hash).toContain('t=story');expect(link.hash).toContain('x=delivery');
- await page.setViewportSize({width:390,height:800});
+ await page.setViewportSize({width:390,height:800});await nav.locator('.reader-utilities>summary').click();
  for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
- await nav.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Page'});await expect(copy.contract).toBeVisible();
+ await chooseNavigation(nav,'View','Page');await expect(copy.contract).toBeVisible();
  await copy.contract.click();link=new URL(await copied(page));
  expect(link.hash).toContain('t=story');expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('v=page');expect(link.hash).toContain('c=delivery');expect(link.hash).toContain('x=delivery');
  await page.emulateMedia({media:'print'});for(const button of [copy.tab,copy.chapter,copy.contract])await expect(button).toBeHidden();
@@ -73,16 +73,16 @@ test('canon reader exposes generated link controls instead of suppressing every 
  await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-library').click();await page.getByRole('link',{name:/CANONICAL.*Link controls/}).click();
  const root=page.locator('#canon-reader'),nav=root.locator('.explore-navigation'),copy=controls(root);
  for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
- const referenceCopy=root.getByRole('button',{name:'Copy link to tab Reference',exact:true});await referenceCopy.click();let link=new URL(await copied(page));
+ await chooseNavigation(nav,'Tab','Reference');const referenceCopy=root.getByRole('button',{name:'Copy link to tab Reference',exact:true});await referenceCopy.click();let link=new URL(await copied(page));
  expect(link.search).toBe('?diagram=links');expect(link.hash).toContain('t=reference');
  const restoredPage=await page.context().newPage();await captureClipboard(restoredPage);await restoredPage.goto(link.href);
  const restoredRoot=restoredPage.locator('#canon-reader'),restoredNav=restoredRoot.locator('.explore-navigation'),restoredCopy=controls(restoredRoot);
- await expect(restoredRoot.getByRole('tab',{name:'Reference',exact:true})).toHaveAttribute('aria-selected','true');
- await restoredRoot.getByRole('tab',{name:'Story',exact:true}).click();await restoredRoot.getByRole('button',{name:'Next step',exact:true}).click();
+ await expect(restoredRoot.getByRole('tab',{name:'Reference',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
+ await chooseNavigation(restoredNav,'Tab','Story');await restoredRoot.getByRole('button',{name:'Next step',exact:true}).click();
  await restoredNav.getByRole('button',{name:'Page',exact:true}).click();await expect(restoredCopy.contract).toBeVisible();
  await restoredCopy.contract.click();link=new URL(await copied(restoredPage));expect(link.search).toBe('?diagram=links');
  for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(link.hash).toContain(field);
- await restoredPage.goto(link.href);await restoredPage.reload();await expect(restoredRoot.getByRole('tab',{name:'Story',exact:true})).toHaveAttribute('aria-selected','true');
+ await restoredPage.goto(link.href);await restoredPage.reload();await expect(restoredRoot.getByRole('tab',{name:'Story',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
  await expect(restoredNav.getByRole('button',{name:'Page',exact:true})).toHaveAttribute('aria-pressed','true');await expect(restoredRoot.locator('.stepline')).toContainText('Done');await expect(restoredCopy.contract).toBeVisible();
  await restoredCopy.contract.click();const restored=new URL(await copied(restoredPage));for(const field of ['d=delivery','v=page','s=done','c=delivery'])expect(restored.hash).toContain(field);
  await restoredCopy.chapter.click();const chapter=new URL(await copied(restoredPage));expect(chapter.search).toBe('?diagram=links');expect(chapter.hash).toContain('d=delivery');expect(chapter.hash).not.toContain('embed=');await restoredPage.close();

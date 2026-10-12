@@ -27,11 +27,11 @@ async function open(page,server,raw,native=false){
 }
 
 for(const native of [false,true])test(`${native?'native':'standalone'} story navigation excludes detail-only domains`,async({page,server})=>{
-  const root=await open(page,server,story(true),native),diagrams=root.locator('.explore-navigation-diagrams');
+  const root=await open(page,server,story(true),native),diagrams=root.locator('.reader-tree-sections[data-reader-view=canvas]');
   await expect(diagrams.getByRole('button')).toHaveText(['root story','other story']);
   await root.locator('#section-root [data-dv-detail]').click();
   const child=root.locator('[data-dv-detail-preview]:visible');await expect(child.locator('.explore-board')).toBeVisible();
-  await expect(diagrams.getByRole('button',{name:'root story',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(diagrams.getByRole('button',{name:'root story',exact:true})).toHaveAttribute('aria-current','page');
   await diagrams.getByRole('button',{name:'other story',exact:true}).click();
   await expect(root.locator('[data-dv-detail-preview]')).toHaveCount(0);
   await expect(root.locator('#section-other .explore-board')).toBeVisible();
@@ -59,7 +59,7 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
     const contentTop=host==='workbench'?await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top'))):0;
-    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:0,sy:first.navBottom,sw:viewport.width,sh:viewport.height-first.navBottom};
+    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:284,sy:first.navBottom,sw:viewport.width-284,sh:viewport.height-first.navBottom};
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');
       expect({sx:frame.sx,sy:frame.sy,sw:frame.sw,sh:frame.sh}).toEqual(expectedShell);

@@ -109,7 +109,7 @@ function wireTour(ctl, view, win, config, options){
       // Section controls retain their owner when moved into document navigation.
       // Do not search another section's actions or another viewer's navigation.
       var nav=target.within!=='page' && sectionNavigation(sec);
-      if(!found && nav)found=Array.prototype.slice.call(nav.querySelectorAll(target.selector)).find(function(node){return node.closest('.explore-navigation-actions,.explore-navigation-chapters') && isRendered(node);}) || null;
+      if(!found && nav)found=Array.prototype.slice.call(nav.querySelectorAll(target.selector)).find(function(node){return node.closest('.explore-navigation-actions,.explore-navigation-chapters,.reader-zoom-controls') && isRendered(node);}) || null;
       found=found || matches[0] || null;
       var modal=options.overlayHost && options.overlayHost();
       // Trying a highlighted control can open a native modal. Keep that new
@@ -520,7 +520,7 @@ function wireTour(ctl, view, win, config, options){
           the least primary area.
      The rule that applied is written to data-placement (clear | partial |
      covers-primary) so it can be asserted; it never moves once shown. */
-  function placeUi(primary){
+  function placeUi(primary,workspaceLesson,contentsLesson){
     if (parts.ui.classList.contains('dv-tour-ui-center')){
       parts.ui.style.left = ''; parts.ui.style.top = '';
       parts.ui.style.right = ''; parts.ui.style.bottom = '';
@@ -555,7 +555,7 @@ function wireTour(ctl, view, win, config, options){
     });
     // A full-window Explore surface can be the primary ring. Its player still
     // needs to stay usable when the narration must overlap that broad ring.
-    Array.prototype.forEach.call(view.querySelectorAll('.explore-player,.explore-tools,.explore-window,.viewport-explore>.diagram-views'),function(n){
+    if(!contentsLesson)Array.prototype.forEach.call(view.querySelectorAll('.explore-player,.explore-tools,.explore-window,.viewport-explore>.diagram-views,.reader-zoom-controls,.reader-toolbar>.reader-button,.reader-utility-options .viewport-expand'),function(n){
       if(!isRendered(n))return;var b=n.getBoundingClientRect();others.push({x:b.left,y:b.top,w:b.width,h:b.height});
     });
     var pick = null, mode = 'clear';
@@ -577,7 +577,7 @@ function wireTour(ctl, view, win, config, options){
     }
     if (!pick){
       var least = Infinity,leastOther=Infinity;
-      candidates.forEach(function(c){var a=area(c,primary),other=others.reduce(function(sum,r){return sum+area(c,r);},0);if(a<least || a===least && other<leastOther){least=a;leastOther=other;pick=c;}});
+      candidates.forEach(function(c){var a=area(c,primary),other=others.reduce(function(sum,r){return sum+area(c,r);},0);if(workspaceLesson?(other<leastOther || other===leastOther && a<least):(a<least || a===least && other<leastOther)){least=a;leastOther=other;pick=c;}});
       mode = 'covers-primary';
     }
     parts.ui.setAttribute('data-placement', mode);
@@ -724,9 +724,9 @@ function wireTour(ctl, view, win, config, options){
     // A workspace lesson includes its moved panel/expansion controls. Keep the
     // actual controls clickable without exposing unrelated tabs or Views.
     var nav=sectionNavigation(sec),actions=nav && nav.querySelector('.viewport-actions');
-    if(target.classList.contains('section-viewport') && isRendered(actions)){
-      var actionHole=tourCutoutRect(rectOf(actions),null,6,viewport());
-      actionHole.r=6;actionHole.kind='reveal';holes.push(actionHole);
+    if(target.classList.contains('section-viewport') || target.classList.contains('viewport-actions')){
+      var controls=[actions];if(nav)controls=controls.concat(Array.prototype.slice.call(nav.querySelectorAll('.reader-zoom-controls,.reader-toolbar>.reader-button,.reader-utility-options .viewport-expand')));
+      controls.filter(isRendered).forEach(function(control){var actionHole=tourCutoutRect(rectOf(control),null,6,viewport());actionHole.r=6;actionHole.kind='reveal';holes.push(actionHole);});
     }
     /* every control the copy names is genuinely un-dimmed AND ringed */
     eff.secondaries.forEach(function(item){
@@ -753,7 +753,7 @@ function wireTour(ctl, view, win, config, options){
     });
     render(holes);
     parts.tryControls.hidden=!spotControls().length;
-    placeUi(hole); /* against every ring and note just drawn */
+    placeUi(hole,target.classList.contains('section-viewport'),target.parentElement && target.parentElement.classList.contains('reader-top')); /* preserve live workspace controls before overlapping its broad canvas */
     yieldCounter();
   }
   /* the step counter never sits on a ring: if it would, it steps aside for

@@ -9,7 +9,10 @@ var TINT_SET = ['cmd','auth','data','mqtt','dev'];
 var TONE_SET = ['alert','warn','ok','dim','base'];
 var VIEW_SET = ['ambient','step','ambient-only'];
 
-var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint'];
+var SKIN_NAMES = ['aurora','daylight','editorial','terminal','pastel','blueprint','rose','lavender','lilac'];
+/* Accepted source/host values include legacy skins; pickers offer this catalog. */
+var SELECTABLE_SKINS = ['aurora','pastel','blueprint','terminal','rose','lavender','lilac'];
+function skinLabel(name){return name==='lilac'?'Opus Lilac':name.charAt(0).toUpperCase()+name.slice(1);}
 var DEFAULT_SKIN = 'pastel';
 var SKINS = {
   aurora:   {bg:'#0B1220', grid:'#16233C', halos:true,  glow:true,  retNeutral:'#93A7C9'},

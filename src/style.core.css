@@ -3911,3 +3911,36 @@ body.sk-blueprint .path-timeline{--timeline-bg:#052956;}
 .wire-contract-preview .ctk{width:24%;white-space:normal;overflow-wrap:anywhere;}
 .wire-contract-preview .ctv{width:26%;white-space:normal;overflow-wrap:anywhere;}
 @media print{.wire-contract-marker,.wire-contract-preview{display:none!important;}}
+
+/* Botanical light materials share the complete light control/panel treatment.
+   Rose and Lavender preserve the approved baseline; Lilac is the Opus variant. */
+@media screen{
+ body.sk-rose{--fl-paper:#FFFCF7;--fl-ground:#F7F8F0;--fl-ink:#2F453C;--fl-text:#526557;--fl-muted:#657364;--fl-line:#D8DED0;--fl-accent:#9A3F64;--fl-selected:#F8E6EC;--fl-hover:#EEF1E5;--fl-dot:#D7E2D2;--fl-card:#F0F5E9;--fl-card-line:#BECFBA;--fl-heading:'Newsreader',Georgia,serif;--fl-note:#FFF6F0;--fl-note-line:#EAD4CA;--fl-top:#F8EBEF;--fl-toolbar:#FFFCF7;--fl-sidebar:#FFFCF7;--fl-footer:#F7F4EC;--fl-radius:15px;--fl-wash:#f4dde580;}
+ body.sk-lavender{--fl-paper:#FEFCFF;--fl-ground:#FAF7FC;--fl-ink:#44324F;--fl-text:#5D4968;--fl-muted:#725D7B;--fl-line:#E0D5E8;--fl-accent:#744796;--fl-selected:#EEDFF6;--fl-hover:#F3EBF8;--fl-dot:#DBCEE5;--fl-card:#FFFDF8;--fl-card-line:#CDBADB;--fl-heading:'Lora',Georgia,serif;--fl-note:#F2EAF8;--fl-note-line:#D9C7E7;--fl-top:#FEFCFF;--fl-toolbar:#FEFCFF;--fl-sidebar:#F6F0F9;--fl-footer:#EEE5F5;--fl-radius:8px;--fl-wash:#e8dcf66b;}
+ body.sk-lilac{--fl-paper:#FFFDFB;--fl-ground:#F9F6FB;--fl-ink:#3A2A48;--fl-text:#554163;--fl-muted:#6E5C7E;--fl-line:#E4DAEC;--fl-accent:#7B4397;--fl-selected:#F0E4F7;--fl-hover:#F5EEF9;--fl-dot:#DED2E8;--fl-card:#FFFFFF;--fl-card-line:#D6C6E3;--fl-heading:'Lora',Georgia,serif;--fl-note:#FAF6FC;--fl-note-line:#E2D5EC;--fl-top:linear-gradient(90deg,#EEE3F5,#F4ECF9);--fl-toolbar:#F8F3FB;--fl-sidebar:#FCF9FD;--fl-footer:#F3ECF8;--fl-radius:10px;--fl-wash:#ECE0F680;}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac){background:var(--fl-ground);color:var(--fl-text);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview.docview{--dink:var(--fl-ink);--dtext:var(--fl-text);--dfaint:var(--fl-muted);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) :is(.section-viewport,.explore-navigation){--explore-bg:var(--fl-paper);--explore-border:var(--fl-line);--navigation-accent:var(--fl-accent);--reader-paper:var(--fl-paper);--reader-top:var(--fl-top);--reader-toolbar:var(--fl-toolbar);--reader-sidebar:var(--fl-sidebar);--reader-footer:var(--fl-footer);--reader-selected:var(--fl-selected);--reader-hover:var(--fl-hover);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) :is(.doc-title,.sec-h){font-family:var(--fl-heading);font-weight:600;letter-spacing:-.01em;color:var(--fl-ink);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) :is(.doc-sec,.pwidget,.explore-window,.termbar,.lg,.section-view-options-body){background:var(--fl-paper);border-color:var(--fl-line);color:var(--fl-text);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .board{--dv-board-ground:var(--fl-ground);background:radial-gradient(ellipse at 100% 0%,var(--fl-wash),transparent 48%),radial-gradient(ellipse at 0% 100%,#e7efe250,transparent 45%),var(--fl-ground);border-color:var(--fl-line);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .board .card{fill:var(--fl-card);stroke:var(--fl-card-line);rx:var(--fl-radius);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .board :where(.boardcanvas)>svg pattern circle{fill:var(--fl-dot);opacity:.8;}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) :is(.mbtn,.tbtn,.schip,.pathbtn,.prosetoggle){background:var(--fl-paper);border-color:var(--fl-line);color:var(--fl-text);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) :is(.mbtn,.tbtn,.schip,.pathbtn)[aria-pressed=true]{background:var(--fl-selected);border-color:var(--fl-accent);color:var(--fl-accent);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .explore-prose-window{background:var(--fl-note);border-color:var(--fl-note-line);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .explore-prose-window .explore-window-header{background:var(--fl-note);border-color:var(--fl-note-line);color:var(--fl-accent);font-family:var(--fl-heading);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .explore-prose-window :is(.sec-text,.sec-bullets){font-family:var(--fl-heading);font-size:16px;line-height:1.65;color:var(--fl-ink);}
+ body.sk-rose .reader-top{color:#62374A;border-color:#E6D3D9;}
+ body.sk-rose .reader-theme-label{color:#71475A;}
+ body.sk-lilac .explore-prose-window .explore-window-header{background:linear-gradient(90deg,#F3EBF9,#FAF6FC 72%);}
+ body:is(.sk-lavender,.sk-lilac) .explore-prose-window .explore-window-header:after{content:'';width:22px;height:28px;flex:none;transform:rotate(12deg);background:radial-gradient(closest-side,#7D53A0 85%,transparent) 10px 0/5px 6px no-repeat,radial-gradient(closest-side,#9A73BA 85%,transparent) 7px 4px/6px 6px no-repeat,radial-gradient(closest-side,#8C62AE 85%,transparent) 12px 5px/6px 6px no-repeat,radial-gradient(closest-side,#B597CF 85%,transparent) 6px 9px/7px 6px no-repeat,radial-gradient(closest-side,#9A73BA 85%,transparent) 12px 10px/7px 6px no-repeat,linear-gradient(#7F9A7C,#7F9A7C) 12px 12px/1px 16px no-repeat,radial-gradient(closest-side,#94AE8E 85%,transparent) 4px 21px/9px 4px no-repeat;}
+ body.sk-rose .explore-prose-window .explore-window-header:after{content:'✿';font-size:25px;color:#C97C9B;line-height:1;}
+}
+@media screen{
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview :is(.mbtn,.tbtn,.schip){color:var(--fl-text);background:var(--fl-paper);border-color:var(--fl-line);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .mbtn[aria-pressed=true],body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .schip[aria-current=true]{color:var(--fl-accent);background:var(--fl-selected);border-color:var(--fl-accent);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .stepmode .node.lit .card{stroke:var(--fl-accent);fill:var(--fl-selected);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .t1{fill:var(--fl-ink);}
+ body:is(.sk-rose,.sk-lavender,.sk-lilac) .docview .t2{fill:var(--fl-muted);}
+}

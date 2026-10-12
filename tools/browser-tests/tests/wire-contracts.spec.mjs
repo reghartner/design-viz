@@ -1,7 +1,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFileSync} from 'node:child_process';
 import path from 'node:path';
-import {test,expect,pastePage} from '../helpers/test.mjs';
+import {test,expect,pastePage,chooseNavigation} from '../helpers/test.mjs';
 import {repo} from '../helpers/prepare.mjs';
 
 function fixture(canvas=false){
@@ -45,8 +45,8 @@ test('wire hover, traversable content, pin, source links, keyboard, dismissal an
  await root.getByRole('button',{name:'Next step',exact:true}).click();await expect(marks).toHaveCount(0);await expect(pop).toHaveCount(0);
  await root.getByRole('button',{name:'Previous step',exact:true}).click();await expect(marks).toHaveCount(3);
  await marks.first().click();await root.getByRole('button',{name:'Alternate',exact:true}).click();await expect(marks).toHaveCount(2);await expect(pop).toBeHidden();
- await marks.first().click();await root.getByRole('tab',{name:'Other',exact:true}).click();await expect(pop).toHaveCount(0);
- await root.getByRole('tab',{name:'Flow',exact:true}).click();await expect(marks).toHaveCount(2);
+ await marks.first().click();await chooseNavigation(root.locator('.reader-navigation'),'Tab','Other');await expect(pop).toHaveCount(0);
+ await chooseNavigation(root.locator('.reader-navigation'),'Tab','Flow');await expect(marks).toHaveCount(2);
  await expect(marks.first().locator('.wire-contract-pulse')).toHaveCSS('animation-name','none');
 });
 

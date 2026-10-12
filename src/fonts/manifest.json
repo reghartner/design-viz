@@ -214,5 +214,23 @@
     "profiles": [
       "all"
     ]
+  },
+  {
+    "family": "Lora",
+    "weight": 400,
+    "file": "lora-latin-400-normal.woff2",
+    "license": "lora-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
+  },
+  {
+    "family": "Lora",
+    "weight": 600,
+    "file": "lora-latin-600-normal.woff2",
+    "license": "lora-LICENSE.txt",
+    "profiles": [
+      "all"
+    ]
   }
 ]

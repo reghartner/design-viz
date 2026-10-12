@@ -25,6 +25,8 @@ export async function nativeViewerSource(){
     'flowview-root.native-canvas .docview.explore-full-window{padding:0;}'+
     '.native-canvas .viewer-diagram-canvas{position:absolute;inset:var(--flowview-navigation-height,48px) 0 0;}'+
     '.native-canvas .navigation-contained>.explore-navigation{margin:0 0 0 var(--flowview-host-actions-inline-offset,0px);min-height:var(--flowview-host-actions-block-offset,48px);padding-left:12px;}@media(max-width:1024px){.native-canvas .navigation-contained>.explore-navigation{margin:var(--flowview-host-actions-block-offset,0px) 0 0;min-height:48px;}.native-canvas .docview.explore-full-window .viewer-diagram-canvas{top:calc(var(--flowview-navigation-height,48px) + var(--flowview-host-actions-block-offset,0px));}}'+
+    'flowview-root .has-reader-contents:not(.explore-full-window)>:not(.explore-navigation):not(.document-navigation-space){margin-left:calc(var(--reader-inset,0px) + 12px);}' +
+    '.native-canvas .has-reader-contents .viewer-diagram-canvas{left:var(--reader-inset,0px);}.native-canvas .navigation-contained>.reader-navigation{padding-left:0;margin-left:0;}.native-canvas .reader-navigation>.reader-top{padding-left:calc(var(--flowview-host-actions-inline-offset,0px) + 12px);min-height:max(56px,var(--flowview-host-actions-block-offset,0px));}@media(max-width:1024px){.native-canvas .reader-navigation>.reader-top{padding-left:12px;min-height:56px;}}' +
     '.native-canvas-story{background:var(--explore-bg);padding:7px;border:1px solid var(--explore-border);border-radius:10px;font:12px sans-serif;}'+
     '.native-canvas-story select{font:inherit;max-width:200px;}';
   const assets={css,fonts,icons:shared.icons};

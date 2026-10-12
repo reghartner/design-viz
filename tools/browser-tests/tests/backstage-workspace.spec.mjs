@@ -3,7 +3,7 @@ import {test,expect,resources,trackResources} from '../helpers/test.mjs';
 const overlaps=(a,b)=>!(a.x+a.width<=b.x||a.x>=b.x+b.width||a.y+a.height<=b.y||a.y>=b.y+b.height);
 async function expandedGeometry(dialog){
   const actions=await dialog.getByRole('toolbar',{name:'Diagram actions'}).boundingBox();
-  const nav=await dialog.locator('.explore-navigation').boundingBox(),stage=await dialog.locator('.explore-stage').boundingBox(),row=await dialog.getByRole('group',{name:'Explore sizing and zoom',exact:true}).boundingBox();
+  const nav=await dialog.locator('.explore-navigation').boundingBox(),stage=await dialog.locator('.explore-stage').boundingBox(),row=await dialog.locator('.reader-toolbar').boundingBox();
   const controls=[];
   for(const control of await dialog.locator('.explore-navigation button,.viewport-actions button,.explore-tools button').all()){
     const box=await control.boundingBox();if(box)controls.push(box);
@@ -44,11 +44,12 @@ test('expanded canvas owns the full browser and returns to the same curated view
   expect(await dialog.locator('.explore-navigation').boundingBox()).toEqual(standardNav);
   const shell=await dialog.locator('.viewer-diagram-canvas').boundingBox(),desktop=await expandedGeometry(dialog);
   const board=await dialog.locator('.explore-board').boundingBox();
-  expect(shell).toEqual({x:0,y:desktop.nav.y+desktop.nav.height,width:1600,height:1000-desktop.nav.y-desktop.nav.height});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
-  expect(desktop.row.y).toBe(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.row.y+desktop.row.height);
+  expect(shell).toEqual({x:284,y:desktop.nav.y+desktop.nav.height,width:1600-284,height:1000-desktop.nav.y-desktop.nav.height});expect(desktop.stage.y).toBeGreaterThanOrEqual(desktop.nav.y+desktop.nav.height);expect(board).toEqual(desktop.stage);
+  expect(desktop.row.y+desktop.row.height).toBeLessThanOrEqual(desktop.nav.y+desktop.nav.height);expect(desktop.stage.y).toBe(desktop.nav.y+desktop.nav.height);
+  await dialog.locator('.reader-zoom-menu>summary').click();for(const name of ['Auto','Fit width','Readable'])await expect(dialog.locator('.reader-zoom-options').getByRole('button',{name,exact:true})).toBeVisible();await dialog.locator('.reader-zoom-menu>summary').click();
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   await expect(dialog.getByRole('link',{name:'Build with Claude',exact:true})).toHaveCount(0);
-  expect(desktop.actions.y).toBe(desktop.nav.y);expect(overlaps(desktop.actions,desktop.nav)).toBe(false);
+  expect(desktop.actions.y).toBe(desktop.nav.y);expect(desktop.nav.x).toBe(0);
   expect(desktop.controls.every(control=>!overlaps(desktop.actions,control))).toBe(true);
   const fittedCamera=await canvasCamera(dialog);await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();
   await expect.poll(async()=>(await canvasCamera(dialog)).zoom).toBeGreaterThan(fittedCamera.zoom);
@@ -61,13 +62,13 @@ test('expanded canvas owns the full browser and returns to the same curated view
   expect(await page.evaluate(()=>__host.requests.length)).toBe(2);
   await page.setViewportSize({width:480,height:800});const narrow=await expandedGeometry(dialog);
   expect(narrow.nav.y).toBeGreaterThanOrEqual(narrow.actions.y+narrow.actions.height);
-  expect(narrow.row.y).toBe(narrow.nav.y+narrow.nav.height);expect(narrow.stage.y).toBe(narrow.row.y+narrow.row.height);
+  expect(narrow.row.y+narrow.row.height).toBeLessThanOrEqual(narrow.nav.y+narrow.nav.height);expect(narrow.stage.y).toBe(narrow.nav.y+narrow.nav.height);
   await expect(dialog.getByRole('link',{name:'Edit in Workbench',exact:true})).toBeInViewport();
   expect(narrow.controls.every(control=>!overlaps(narrow.actions,control))).toBe(true);
   await expect(dialog.getByRole('img',{name:'flow diagram'})).toBeVisible();
   await info.attach('backstage-expanded-narrow',{body:await page.screenshot(),contentType:'image/png'});
   await page.setViewportSize({width:1600,height:1000});const restored=await expandedGeometry(dialog);
-  expect(restored.actions.y).toBe(restored.nav.y);expect(overlaps(restored.actions,restored.nav)).toBe(false);
+  expect(restored.actions.y).toBe(restored.nav.y);expect(restored.nav.x).toBe(0);
   await expect.poll(async()=>{const actual=await canvasCamera(dialog);
     return Math.max(...Object.keys(savedCamera).map(key=>Math.abs(actual[key]-savedCamera[key])));
   }).toBeLessThan(.01);
@@ -80,7 +81,7 @@ test('expanded canvas owns the full browser and returns to the same curated view
   ])).toEqual(['','']);
   await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();
   await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();
-  const reopened=await expandedGeometry(dialog);expect(reopened.actions.y).toBe(reopened.nav.y);expect(overlaps(reopened.actions,reopened.nav)).toBe(false);
+  const reopened=await expandedGeometry(dialog);expect(reopened.actions.y).toBe(reopened.nav.y);expect(reopened.nav.x).toBe(0);
   expect(reopened.controls.every(control=>!overlaps(reopened.actions,control))).toBe(true);
   await page.evaluate(()=>__host.left(false));await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.locator('#host-sentinel').click();
@@ -185,12 +186,12 @@ test('visible host Edit opens the exact Explore chapter and step in the Canon re
     await expect(edit).toBeInViewport();await expect(dialog.getByRole('button',{name:/Back to page/i})).toHaveCount(0);
     await expect.poll(()=>dialog.locator('.explore-navigation-actions').evaluate(el=>Array.from(el.querySelectorAll('button,summary')).filter(control=>control.checkVisibility()).map(control=>{const r=control.getBoundingClientRect();return {name:control.textContent,left:r.left,right:r.right};}).filter(r=>r.left<0 || r.right>innerWidth))).toEqual([]);
     const geometry=await expandedGeometry(dialog);expect(geometry.controls.every(control=>!overlaps(geometry.actions,control))).toBe(true);
-    expect(geometry.row.y).toBe(geometry.nav.y+geometry.nav.height);expect(geometry.stage.y).toBe(geometry.row.y+geometry.row.height);
+    expect(geometry.row.y+geometry.row.height).toBeLessThanOrEqual(geometry.nav.y+geometry.nav.height);expect(geometry.stage.y).toBe(geometry.nav.y+geometry.nav.height);
     const url=new URL(await edit.getAttribute('href')),address=new URLSearchParams(url.hash.slice(1)),handoff=JSON.parse(address.get('fv'));
     expect(address.get('v')).toBe('service-flow');expect(address.get('s')).not.toBe('quiet');expect(handoff.action).toBe('edit');expect(handoff.entity).toBe('component:default/recording');
     await info.attach('host-edit-'+width,{body:await page.screenshot(),contentType:'image/png'});
     const popupPromise=page.waitForEvent('popup');await edit.click();const reader=await popupPromise;
-    await expect(reader.locator('#canon-reader .explore-navigation #canon-reader-edit')).toBeVisible();
+    const more=reader.locator('#canon-reader .reader-utilities>summary');if(await more.isVisible())await more.click();await expect(reader.locator('#canon-reader .explore-navigation #canon-reader-edit')).toBeVisible();
     await reader.locator('#canon-reader-edit').click();await expect(reader.locator('#workbench-workspace')).toBeVisible();
     expect(JSON.parse(await reader.locator('#src').inputValue())).toEqual(source);
     await expect(reader.locator('#docview [data-view-id]')).toHaveAttribute('data-view-id','service-flow');await expect(reader.locator('#docview .stepid')).toHaveText(address.get('s'));
@@ -263,12 +264,14 @@ test('an inline Explore camera survives the live expanded portal and return with
  await alpha.locator('.explore-navigation').waitFor();const viewPicker=alpha.getByRole('combobox',{name:'Choose View',exact:true});if(await viewPicker.isVisible())await viewPicker.selectOption({label:'Explore'});else await alpha.getByRole('button',{name:'Explore',exact:true}).click();const board=alpha.locator('.explore-board'),native=await alpha.locator('[data-flowview-native]').elementHandle();
  const camera=container=>canvasCamera(container);
  async function graphInView(container){await expect.poll(()=>container.locator('.explore-board').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top);})).toBe(true);}
- async function closeCamera(container,expected){await expect.poll(async()=>{const actual=await camera(container);return Math.max(...Object.keys(expected).map(key=>Math.abs(actual[key]-expected[key])));}).toBeLessThan(.01);}
+ async function closeCamera(container,expected){try{await expect.poll(async()=>{const actual=await camera(container);return Math.max(...Object.keys(expected).map(key=>Math.abs(actual[key]-expected[key])));}).toBeLessThan(.01);}catch(error){throw new Error(error.message+' Camera: '+JSON.stringify({expected,actual:await camera(container)}));}}
  await graphInView(alpha);const opening=await camera(alpha),sibling=await beta.locator('.stepid').textContent();
  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Canvas: alpha',exact:true});await graphInView(dialog);await closeCamera(dialog,opening);
  expect(await dialog.locator('[data-flowview-native]').evaluate((el,prior)=>el===prior,native)).toBe(true);
  await dialog.getByRole('button',{name:'Zoom in',exact:true}).click();await dialog.locator('.explore-board').evaluate(el=>{el.scrollLeft+=40;el.scrollTop+=25;});const customized=await camera(dialog);
  await dialog.getByRole('button',{name:'Back to entity',exact:true}).click();await closeCamera(alpha,customized);
+ // Growing the board can clamp scrollLeft against its old canvas extent before ResizeObserver runs.
+ // The second expansion must preserve the manually panned center, not that clamped left edge.
  await alpha.getByRole('button',{name:'Expand canvas',exact:true}).click();await closeCamera(dialog,customized);await graphInView(dialog);
  await dialog.getByRole('button',{name:'Business',exact:true}).click();await expect(dialog.locator('.explore-stage')).toBeHidden();await dialog.getByRole('button',{name:'Explore',exact:true}).click();await closeCamera(dialog,customized);
  await page.keyboard.press('Escape');await closeCamera(alpha,customized);await expect(alpha.getByRole('button',{name:'Expand canvas',exact:true})).toBeFocused();await expect(beta.locator('.stepid')).toHaveText(sibling);

@@ -18,7 +18,7 @@ test('local handoffs switch spec tabs in place, return to the source beat and su
  const sourceURL=page.url();
  const next=orders.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true});
  await next.focus();await next.press('Enter');
- await expect(page.getByRole('tab',{name:'Delivery pipeline',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByRole('tab',{name:'Delivery pipeline',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
  await expect(delivery).toBeVisible();await expect(orders).toBeHidden();
  expect(context.pages()).toHaveLength(1);expect(page.url()).toContain('d=delivery');
  await delivery.getByRole('button',{name:'Go to step 3',exact:true}).click();
@@ -52,7 +52,7 @@ test('workbench authors a local handoff atomically, previews its arrow tip and u
  await page.getByRole('button',{name:'Apply handoff',exact:true}).click();
  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.blocks[0].tabs[0].sections[0].diagram.nodes.continue.handoff).toEqual({localSection:'delivery'});
  const arrow=page.locator('[data-dv-handoff="delivery"]');await arrow.focus();await arrow.press('Enter');
- await expect(page.getByRole('tab',{name:'Delivery pipeline',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.getByRole('tab',{name:'Delivery pipeline',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
  await page.getByRole('button',{name:'Back to Order intake',exact:false}).click();
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(source);
  await page.locator('#redo-builder').click();
@@ -125,15 +125,15 @@ test('native local handoffs stay inside their viewer and release navigation on d
  const one=page.locator('#one'),two=page.locator('#two');
  await one.getByRole('button',{name:'Go to step 2',exact:true}).first().click();
  await one.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true}).click();
- await expect(one.getByRole('tab',{name:'Delivery pipeline',exact:true})).toHaveAttribute('aria-selected','true');
- await expect(two.getByRole('tab',{name:'Order intake',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(one.getByRole('tab',{name:'Delivery pipeline',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
+ await expect(two.getByRole('tab',{name:'Order intake',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
  expect(await page.evaluate(()=>first.snapshot().section)).toBe('delivery');
  await one.getByRole('button',{name:'Back to Order intake',exact:false}).click();
  expect(await page.evaluate(()=>first.snapshot().step)).toBe('beat2');
  await page.evaluate(()=>{window.detached=first.root.querySelector('[data-dv-handoff]');first.destroy();window.after=calls;detached?.dispatchEvent(new MouseEvent('click',{bubbles:true}));});
  expect(await page.evaluate(()=>calls)).toBe(await page.evaluate(()=>after));await expect(one).toBeEmpty();
  await two.getByRole('button',{name:'Open Delivery diagram in this spec',exact:true}).click();
- await expect(two.getByRole('tab',{name:'Delivery pipeline',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(two.getByRole('tab',{name:'Delivery pipeline',exact:true,includeHidden:true})).toHaveAttribute('aria-selected','true');
 });
 
 for(const narrow of [false,true])test(`Explore handoff and return preserve the source beat${narrow?' on a narrow screen':''}`,async({page,server},testInfo)=>{
@@ -152,7 +152,7 @@ for(const narrow of [false,true])test(`Explore handoff and return preserve the s
  await next.focus();await next.press('Enter');
  await expect(delivery.locator('.explore-board')).toBeVisible();
  const back=page.locator('#docview>.explore-navigation').getByRole('button',{name:'Back to Order intake',exact:false});
- await expect(back).toBeInViewport();
+ if(narrow)await page.locator('.reader-utilities>summary').click();await expect(back).toBeInViewport();
  await expect(delivery.locator('[data-dv-node="start"]')).toBeInViewport();
  await page.screenshot({path:testInfo.outputPath('handoff-destination.png')});
  await back.click();await expect(orders.locator('.explore-board')).toBeVisible();expect(page.url()).toContain('s=beat2');

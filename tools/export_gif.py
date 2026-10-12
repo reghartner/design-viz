@@ -790,6 +790,21 @@ def capture_frames(
                         "fromSurface": True,
                     }
                     if section_reference is not None:
+                        # Standard exports are diagram-only. Fixed reader chrome
+                        # can otherwise paint over the crop when Chrome captures
+                        # a section near the top of the document. Keep its layout
+                        # space while suppressing its paint; Explore exports keep
+                        # the complete reader surface and its navigation.
+                        devtools.command("Runtime.evaluate", {
+                            "expression": (
+                                "(function(){var sec=document.getElementById('section-' + "
+                                + json.dumps(str(section_reference)) + ");"
+                                "var root=sec && sec.closest('.docview');"
+                                "var nav=root && root.querySelector(':scope > .explore-navigation');"
+                                "if(nav && !sec.classList.contains('explore-active-section'))"
+                                "nav.style.visibility='hidden';})()"
+                            ),
+                        })
                         clip_result = devtools.command("Runtime.evaluate", {
                             "expression": clip_expression(section_reference, margin),
                             "returnByValue": True,

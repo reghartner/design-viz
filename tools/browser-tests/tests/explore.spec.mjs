@@ -39,7 +39,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  const before=await page.locator('.boardcanvas>svg').count();
  const shell=await rect(page.locator('.viewer-diagram-canvas')),nav=await rect(page.locator('.explore-navigation'));
  const stage=await rect(page.locator('.explore-stage')),board=await rect(page.locator('.explore-board')),viewport=page.viewportSize();
- expect(nav.y).toBe(0);expect(shell).toEqual({x:0,y:nav.height,width:viewport.width,height:viewport.height-nav.height});
+ expect(nav.y).toBe(0);expect(shell).toEqual({x:284,y:nav.height,width:viewport.width-284,height:viewport.height-nav.height});
  expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
  expect(stage.x).toBeGreaterThanOrEqual(shell.x);expect(stage.x+stage.width).toBeLessThanOrEqual(shell.x+shell.width);
  expect(board).toEqual(stage);
@@ -61,7 +61,7 @@ test('Business remains standard; linked Explore has a full-height canvas and ind
  await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
  await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-stage')).toBeVisible();
  expect(await page.locator('.boardcanvas>svg').count()).toBe(before);
- await page.getByRole('button',{name:'Fit diagram',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
+ await page.getByRole('button',{name:'Fit',exact:true}).click();await page.screenshot({path:'/tmp/flowview-explore-live.png',fullPage:true});
 });
 test('right and top-right remain free placement; Stack at edge preserves size and wraps left',async({page,server})=>{
  const url=await build(server,{unstacked:true});await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
@@ -92,7 +92,7 @@ test('automatic Explore panels open at readable content size across desktop view
  const url=await build(server);
  for(const [surface,width,height] of [['reader',1280,800],['reader',1440,900],['reader',1920,1200],['workbench',1280,800],['workbench',1440,900]]){
   await page.setViewportSize({width,height});
-  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
+  if(surface==='reader'){await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');await page.locator('.reader-top>button').click();}
   else{await page.goto(url);await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
   await page.evaluate(()=>document.fonts.ready);
   const stage=await rect(page.locator('.explore-stage')),scale=responsiveScale(stage.width);
@@ -131,7 +131,7 @@ test('automatic panels remeasure when a late font changes rendered content metri
  expect((await rect(outcome)).height).toBeGreaterThan(before.height+10);
 });
 test('automatic panels follow richer step content while authored and manual geometry stay fixed',async({page,server},info)=>{
- await page.setViewportSize({width:1440,height:900});await page.goto(await buildDynamic(server));await page.evaluate(()=>document.fonts.ready);
+ await page.setViewportSize({width:1440,height:900});await page.goto(await buildDynamic(server));await page.locator('.reader-top>button').click();await page.evaluate(()=>document.fonts.ready);
  const dynamic=page.locator('[data-explore-panel=dynamic]'),revealed=page.locator('[data-explore-panel=revealed]');
  const authored=page.locator('[data-explore-panel=authored]'),manual=page.locator('[data-explore-panel=manual]');
  await expect(revealed).toBeHidden();await manual.locator('.explore-window-resize').press('ArrowDown');

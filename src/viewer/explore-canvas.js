@@ -15,9 +15,16 @@ function initViewerExploreCanvas(ctl,view,opts){
     if(rec.tabBlock)ctl.tabBlocks[rec.tabBlock-1].select(rec.tab,false);
     ctl.activeTarget={kind:'diagram',section:rec.number};
     if(ctl.onChange)ctl.onChange();
-    show(rec);if(!active)rec.sectionEl.scrollIntoView({block:'start'});
+    show(rec);if(!active){
+      if(container===document.body && !(opts && opts.contained))rec.sectionEl.scrollIntoView({block:'start'});
+      else{
+        var scroller=rec.sectionEl.parentElement;
+        while(scroller){if(/auto|scroll/.test(getComputedStyle(scroller).overflowY))break;scroller=scroller.parentElement || scroller.getRootNode().host;}
+        if(scroller)scroller.scrollTop+=rec.sectionEl.getBoundingClientRect().top-scroller.getBoundingClientRect().top-navigation.element.getBoundingClientRect().height-12;
+      }
+    }
   }
-  var navigation=createExploreNavigation(ctl,{selectSection:selectSection,action:opts && opts.action,isCanvas:function(){return !!active;}});
+  var navigation=createExploreNavigation(ctl,{contents:true,container:container,selectSection:selectSection,action:opts && opts.action,isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;

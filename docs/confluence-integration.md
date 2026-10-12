@@ -34,7 +34,7 @@ await view.submit({
     specJson: "<compact original spec JSON>",
     section: "all", // or a 1-based section ordinal string in rendering order
     focus: "spec",  // spec | home | data
-    skin: "spec"    // spec | aurora | daylight | editorial | terminal | pastel | blueprint
+    skin: "spec"    // spec | aurora | pastel | blueprint | terminal | rose | lavender | lilac (legacy daylight/editorial accepted)
   }
 });
 ```

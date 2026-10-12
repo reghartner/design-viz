@@ -31,6 +31,7 @@
     "viewer/path-timeline.js",
     "viewer/explore.js",
     "viewer/explore-canvas.js",
+    "viewer/contents.js",
     "viewer/tab-views.js",
     "viewer/workspace-handoff.js",
     "viewer/deltas.js",
@@ -208,6 +209,8 @@
         "confluenceSourceUrl": "confluenceSourceUrl",
         "CONFLUENCE_INPUT_BYTES": "CONFLUENCE_INPUT_BYTES",
         "SKIN_NAMES": "SKIN_NAMES",
+        "SELECTABLE_SKINS": "SELECTABLE_SKINS",
+        "skinLabel": "skinLabel",
         "DEFAULT_SKIN": "DEFAULT_SKIN",
         "renderPage": "renderPage",
         "applySkinClasses": "applySkinClasses"

@@ -47,7 +47,7 @@ test('actual entrypoints have unique ordered declarations and deliberate exports
     assert.equal(Object.keys(entry.exports).includes('wireBuilderCommit'),false);
   }
   assert.equal(loader.entrypoint('backend').records.some(record=>record.file==='engine.js'),false);
-  assert.deepEqual(Object.keys(loader.entrypoint('forge').exports),['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage','confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','DEFAULT_SKIN','renderPage','applySkinClasses']);
+  assert.deepEqual(Object.keys(loader.entrypoint('forge').exports),['buildConfluenceExport','buildConfluenceConfig','confluenceSections','confluenceDisplayPage','confluenceSourceUrl','CONFLUENCE_INPUT_BYTES','SKIN_NAMES','SELECTABLE_SKINS','skinLabel','DEFAULT_SKIN','renderPage','applySkinClasses']);
 });
 test('static backend module uses only pure sources and retains the packaged facade and semantic diagnostics',()=>{
   const context={module:{exports:{}}};
@@ -66,11 +66,11 @@ test('asset inventory keeps page CSS raw, ordered panel CSS and the explicit all
   assert.deepEqual(native.styles.map(style=>style.file),['style.flowview.css','style.core.css']);
   assert.equal(native.styles[0].source,fs.readFileSync(path.join(root,'src/style.flowview.css'),'utf8'));
   assert.equal(native.styles[1].source,loader.readStyles('style.core.css'));assert.equal(native.icons,forge.icons);
-  assert.equal(native.fonts.length,22);assert.equal(forge.fonts.length,9);assert.equal(native.licenses.length,7);assert.equal(forge.licenses.length,3);
+  assert.equal(native.fonts.length,24);assert.equal(forge.fonts.length,9);assert.equal(native.licenses.length,8);assert.equal(forge.licenses.length,3);
   assert.deepEqual(forge.fonts.map(font=>[font.family,font.weight]),[
     ['IBM Plex Sans',400],['IBM Plex Sans',500],['IBM Plex Sans',600],['IBM Plex Mono',400],['IBM Plex Mono',500],['IBM Plex Mono',600],['IBM Plex Mono',700],['Sora',600],['Sora',700]]);
   for(const font of native.fonts){assert.ok(native.licenses.some(license=>license.file===font.license));assert.equal(font.data,fs.readFileSync(path.join(root,'src',font.file)).toString('base64'));}
   for(const font of forge.fonts)assert.match(font.fontsource,/^@fontsource\/.+\/latin-\d+\.css$/);
-  assert.equal((loader.fontCss('all').match(/@font-face/g)||[]).length,22);
+  assert.equal((loader.fontCss('all').match(/@font-face/g)||[]).length,24);
   assert.throws(()=>loader.fontAssets('unknown'),/Unknown font profile/);
 });

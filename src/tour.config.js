@@ -29,10 +29,11 @@ var TOUR_DEFAULT_CONFIG = {
     },
     {
       id: 'views',
-      target: {selector: '.tab-view-choices:has(button + button)', within: 'page'},
+      target: {selector: '.reader-navigation[data-reader-multiple-views="true"] .reader-top > button, .tab-view-choices:has(button + button)', within: 'page'},
+      secondary: [{target: {selector: '.reader-tree-views:has([aria-current="page"])', within: 'page'}}],
       copy: {
         heading: 'Choose a View',
-        body: 'Tabs contain sections. Views choose which sections to show: Standard stacks them; Explore shows one at a time. Use Sections to move between the current View’s members. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
+        body: 'Open Contents to choose a Tab and View. Standard stacks the View’s sections; Explore shows one at a time. Use Page or the section titles in Contents to move between the current View’s members. A screen icon on a View marks Explore, where you can pan and zoom the graph.'
       }
     },
     {

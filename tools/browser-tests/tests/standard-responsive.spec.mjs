@@ -81,7 +81,7 @@ test('exported Standard layout scales, remains interactive, and prints without z
   await verifyControls(root);
   const board=root.locator('.section-layout-tile .board'),drawing=board.locator('.boardcanvas>svg');
   const before=await drawing.boundingBox(),frame=await board.boundingBox();
-  await root.getByRole('button',{name:'Zoom in',exact:true}).click();
+  await board.getByRole('button',{name:'Zoom in',exact:true}).click();
   expect((await drawing.boundingBox()).width).toBeCloseTo(before.width*1.25,0);
   expect((await board.boundingBox()).height).toBeCloseTo(frame.height,0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(441);

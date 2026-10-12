@@ -109,7 +109,7 @@ test('invalid drafts retain the last usable Explore reader across host and width
   const beforeCamera=await camera();
   await page.locator('#workspace-appearance>summary').click();await page.locator('#layout-preview-target').selectOption('backstage');await page.locator('#open-page-preview').click();
   await expect(page.locator('#page-preview-surface')).toHaveClass(/viewer-exploring/);
-  await expect(page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true}).locator('.explore-indicator-badge svg')).toBeInViewport();
+  await expect(page.locator('#page-preview-view .explore-navigation').getByRole('button',{name:'Business',exact:true})).toHaveAttribute('aria-pressed','true');await expect(page.locator('#page-preview-view .reader-view-label')).toHaveText('Business');
   for(const host of ['confluence','backstage','default']){
     await page.locator('#layout-preview-target').selectOption(host);
     if(host!=='default'){await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).fill('720');await page.getByRole('spinbutton',{name:'Preview width in pixels',exact:true}).dispatchEvent('change');expect(await page.locator('#page-preview-surface').evaluate(el=>el.clientWidth)).toBe(720);}
@@ -119,7 +119,7 @@ test('invalid drafts retain the last usable Explore reader across host and width
   }
   await page.locator('#page-preview-view').getByRole('button',{name:'Next step',exact:true}).first().click();
   expect(await page.evaluate(()=>location.hash)).toBe(hash);await page.setViewportSize({width:390,height:900});
-  const chapter=page.locator('#page-preview-view .explore-navigation').getByRole('combobox',{name:'Choose View',exact:true});await expect(chapter).toBeInViewport();expect(await chapter.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return el===hit || el.contains(hit);})).toBe(true);await expect(chapter.locator('option:checked')).toHaveText('Business');await expect(page.locator('#page-preview-view .explore-stage')).toBeVisible();
+  const chapter=page.locator('#page-preview-view .reader-view-label');await expect(chapter).toBeInViewport();await expect(chapter).toHaveText('Business');await expect(page.locator('#page-preview-view .explore-stage')).toBeVisible();
   await page.setViewportSize({width:1024,height:760});await page.keyboard.press('Escape');
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const afterCamera=await camera();expect(afterCamera.x).toBeCloseTo(beforeCamera.x,2);expect(afterCamera.y).toBeCloseTo(beforeCamera.y,2);
   expect(await author.evaluate(el=>el.isConnected)).toBe(true);expect(await node.evaluate(el=>el.isConnected)).toBe(true);
@@ -151,7 +151,7 @@ test('page preview opens the selected authored Explore View as a full canvas acr
       return {surface:{x:a.x,y:a.y,width:a.width,height:a.height},canvas:{x:b.x,y:b.y,width:b.width,height:b.height},nav:{x:n.x,y:n.y,width:n.width,height:n.height},hits};
     });
     expect(geometry.nav.height).toBeGreaterThan(0);expect(geometry.nav).toEqual({...geometry.surface,height:geometry.nav.height});
-    expect(geometry.canvas).toEqual({...geometry.surface,y:geometry.nav.y+geometry.nav.height,height:geometry.surface.height-geometry.nav.height});expect(geometry.hits).toEqual([true,true,true,true]);
+    expect(geometry.canvas).toEqual({...geometry.surface,x:geometry.surface.x+(geometry.surface.width>670?284:0),width:geometry.surface.width-(geometry.surface.width>670?284:0),y:geometry.nav.y+geometry.nav.height,height:geometry.surface.height-geometry.nav.height});expect(geometry.hits).toEqual([true,true,true,true]);
   }
   await assertGeometry();
   for(const host of ['backstage','confluence','default']){

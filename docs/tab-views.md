@@ -8,13 +8,28 @@ View has an ordered subset of section references and one presentation:
 - **Explore** shows one member section at a time, including its prose and one
   active playback group. The section controls list only that View’s members.
 
-The document’s navigation stays at the top of the browser or contained viewer:
-**Tabs → Views → Sections**. The same navigation element remains in place across
-presentation changes. Backstage expansion enlarges the container and preserves
-the selected View’s presentation. Workbench navigation sits below app chrome.
-Only the section choices scroll horizontally; small arrow buttons reveal more
-sections without selecting one. Tabs and Views show their full controls when
-space permits and use compact selectors in narrower containers.
+The reader keeps a stable two-row header: a Contents toggle, Tab/View breadcrumb
+and utilities above centered **‹ Page n of m ›** controls. The collapsible
+**Contents** sidebar lists **Tabs → Views → Sections**; full section titles appear
+under Explore Views. In Standard, Page arrows scroll through the intact stack;
+in Explore they select only the current View’s ordered members. Desktop Contents
+pushes the canvas; on phones it overlays it with a scrim and closes after a choice.
+Escape closes an open menu first, then Contents, returning focus to its trigger.
+The tree scrolls independently of its pinned theme footer. Zoom is separate from
+Page navigation; phones use the percentage menu at left and Fit at right. In
+Explore, the Zoom menu also retains Auto, Fit width, and Readable diagram sizing.
+
+The theme picker offers Aurora, Pastel, Blueprint, Terminal, Rose, Lavender, and
+Opus Lilac (`lilac`). Changes affect the live reader without rebuilding its
+sections or editing the source. Daylight and Editorial remain supported in saved
+specs, cookies and host APIs and remain correctly labeled when loaded, but are
+not offered as new choices. Lavender and Opus Lilac bundle Lora locally; the
+restricted Forge font profile retains its existing local font fallback.
+
+Backstage expansion enlarges the container and preserves the selected View’s
+presentation. Workbench retains its authoring navigation below app chrome, with
+compact Tab/View selectors and a horizontally scrollable section strip when
+needed. Its read-only page preview uses Contents.
 
 ```json
 {

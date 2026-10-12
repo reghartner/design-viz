@@ -129,7 +129,7 @@ test('Escape restores paused playback, the selected stop, panel geometry and vis
   await resize.press('Shift+ArrowLeft');await resize.press('Shift+ArrowUp');
   await queue.getByRole('button',{name:'Hide Delivery state',exact:true}).click();
   await page.getByRole('button',{name:'Zoom in',exact:true}).click();
-  const before=await panelRect(page,'status'),zoom=await page.locator('.explore-zoom').textContent(),hash=new URL(page.url()).hash;
+  const before=await panelRect(page,'status'),zoom=await page.locator('.reader-zoom-menu>summary').textContent(),hash=new URL(page.url()).hash;
   await expect(page.locator('.termbar')).toHaveAttribute('data-playback','paused');
   await page.locator('.dv-tour-replay').click();
   await expect(heading(page)).toHaveText('Try the workspace');
@@ -147,7 +147,7 @@ test('Escape restores paused playback, the selected stop, panel geometry and vis
   await expect(page.locator('.termbar')).toHaveAttribute('data-playback','paused');
   await expect(selectedStep(page)).toHaveText('2');
   await expect(queue).toBeHidden();
-  await expect(page.locator('.explore-zoom')).toHaveText(zoom);
+  await expect(page.locator('.reader-zoom-menu>summary')).toHaveText(zoom);
   const after=await panelRect(page,'status');
   for(const key of ['x','y','width','height'])expect(after[key],key+' restored').toBeCloseTo(before[key],0);
   expect(new URL(page.url()).hash).toBe(hash);
@@ -278,5 +278,5 @@ test('tour restoration preserves unvisited views with prototype-name IDs',async(
   await page.getByRole('button',{name:'Engineering view',exact:true}).click();
   await expect(panel(page,'status')).toBeVisible();
   await page.getByRole('button',{name:'Zoom in',exact:true}).click();
-  await expect(page.locator('.explore-zoom')).not.toHaveText('');
+  await expect(page.locator('.reader-zoom-menu>summary')).not.toHaveText('');
 });

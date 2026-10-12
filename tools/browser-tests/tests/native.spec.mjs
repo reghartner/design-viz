@@ -17,10 +17,10 @@ test('native Explore targets retain independent panels and fullscreen ownership 
   const leftPanel=alpha.locator('[data-explore-panel="state"]'),rightPanel=beta.locator('[data-explore-panel="state"]');
   const originalRight=await rightPanel.boundingBox();
   const leftBefore=await leftPanel.boundingBox(),graphBefore=await alpha.locator('.explore-board .boardcanvas>svg').boundingBox();
-  await expect(alpha.locator('.explore-overlay-value')).toHaveText('80%');
+  await alpha.locator('.reader-navigation .explore-panel-menu>summary').click();await expect(alpha.locator('.explore-overlay-value')).toHaveText('100%');
   await alpha.getByRole('button',{name:'Shrink panels and controls',exact:true}).click();
-  await expect(alpha.locator('.explore-overlay-value')).toHaveText('70%');
-  expect((await leftPanel.boundingBox()).width).toBeCloseTo(leftBefore.width*.7/.8,0);
+  await expect(alpha.locator('.explore-overlay-value')).toHaveText('90%');
+  expect((await leftPanel.boundingBox()).width).toBeCloseTo(leftBefore.width*.9,0);
   expect(await rightPanel.boundingBox()).toEqual(originalRight);
   expect(await alpha.locator('.explore-board .boardcanvas>svg').boundingBox()).toEqual(graphBefore);
   await alpha.getByRole('button',{name:'Reset panels and controls size',exact:true}).click();await page.keyboard.press('Escape');

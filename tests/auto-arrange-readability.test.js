@@ -83,9 +83,12 @@ test('full automatic pipeline publishes the compact incident graph after spacing
   const refine=C.autoArrangeReadability,cola=require('../src/workbench/vendor/webcola-3.4.0.js');let before,refined,calls=0;
   let result;try{C.autoArrangeReadability=(diagram,seed,renderer)=>{calls++;before=seed;refined=refine(diagram,seed,renderer);return refined;};result=C.autoArrangeCandidates(d,viz,cola);}
   finally{C.autoArrangeReadability=refine;}
-  assert.equal(calls,1);assert.equal(result,refined,'the final pass output is the published result');assertSafe(before,result);
+  assert.equal(calls,1);assertSafe(before,refined);assert.notEqual(result,refined,'the full pipeline publishes the later flow refinement');
+  assert.equal(result.score.overlaps,0);assert.equal(result.score.hits,0);assert.equal(result.score.crossings,0);assert.equal(result.score.incidentCrossings,0);assert.ok(minGap(result)>=minGap(refined)-.1);
+  assert.ok(result.score.area<=refined.score.area*1.35);assert.ok(C.autoArrangeFlowMetrics(d,result).blocked<C.autoArrangeFlowMetrics(d,refined).blocked);
+  assert.ok(C.autoArrangeFlowMetrics(d,result).routeLength<C.autoArrangeFlowMetrics(d,refined).routeLength);
   assert.ok(new Set(result.positions.map(p=>p.y)).size<=new Set(before.positions.map(p=>p.y)).size-2);
-  assert.ok(result.score.area<before.score.area*.85);assert.deepEqual(plain(C.autoArrangeScore(d,result)),plain(result.score),'stored score measures the final viewer geometry');
+  assert.ok(refined.score.area<before.score.area*.85);assert.deepEqual(plain(C.autoArrangeScore(d,result)),plain(result.score),'stored score measures the final viewer geometry');
   const out=plain(C.autoArrangeDiagram(d,result));assert.deepEqual(out.nodes,d.nodes);assert.deepEqual(out.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
   assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
 });

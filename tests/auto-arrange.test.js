@@ -28,19 +28,19 @@ function minimumCardGap(result){
   return closest;
 }
 function canonicalCandidates(d,viz,cola){
-  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability;
+  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability,flow=C.autoArrangeFlowClarity;
   // These helpers isolate canonical search and affine spacing from final row consolidation.
-  C.autoArrangeReadability=(diagram,result)=>result;
+  C.autoArrangeReadability=(diagram,result)=>result;C.autoArrangeFlowClarity=(diagram,result)=>result;
   try{C.autoArrangeExpandSpacing=(diagram,selected)=>selected;return C.autoArrangeCandidates(d,viz,cola);}
-  finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;}
+  finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;C.autoArrangeFlowClarity=flow;}
 }
 function candidatesWithSelected(d,viz,cola){
-  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability;let selected;
-  C.autoArrangeReadability=(diagram,result)=>result;
+  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability,flow=C.autoArrangeFlowClarity;let selected;
+  C.autoArrangeReadability=(diagram,result)=>result;C.autoArrangeFlowClarity=(diagram,result)=>result;
   try{
     C.autoArrangeExpandSpacing=(diagram,result,renderer)=>{selected=result;return expand(diagram,result,renderer);};
     const result=C.autoArrangeCandidates(d,viz,cola);return {selected,result};
-  }finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;}
+  }finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;C.autoArrangeFlowClarity=flow;}
 }
 
 test('approved 20-node grouped fixture retains groups and native routes with clear final viewer paths',()=>{
@@ -305,10 +305,10 @@ test('spacing reroute fallback preserves exact affine node positions and rejects
 test('small-diagram leaf refinement preserves the selected fork and improves compactness before edge length',()=>{
   const d=require('../examples/auto-arrange-baselines/graph-input.spec.json').page.blocks[1].diagram;
   const seed=C.autoArrangeRead(d,viz.renderJSON(C.autoArrangeDot(d,'TB',null,1.5),{engine:'dot'}));seed.score=C.autoArrangeScore(d,seed);
-  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability;let canonical,attempts=0;
-  C.autoArrangeReadability=(diagram,result)=>result; // Isolate the earlier leaf-refinement stage.
+  const expand=C.autoArrangeExpandSpacing,readability=C.autoArrangeReadability,flow=C.autoArrangeFlowClarity;let canonical,attempts=0;
+  C.autoArrangeReadability=(diagram,result)=>result;C.autoArrangeFlowClarity=(diagram,result)=>result; // Isolate the earlier leaf-refinement stage.
   C.autoArrangeExpandSpacing=(d,r,v)=>{canonical=r;return expand(d,r,v);};
-  let result;try{result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);}finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;}
+  let result;try{result=C.autoArrangeCandidates(d,{renderJSON(...args){attempts++;return viz.renderJSON(...args);}},cola);}finally{C.autoArrangeExpandSpacing=expand;C.autoArrangeReadability=readability;C.autoArrangeFlowClarity=flow;}
   const before=Object.fromEntries(seed.positions.map(p=>[p.id,p])),after=Object.fromEntries(canonical.positions.map(p=>[p.id,p]));
   for(const id of Object.keys(d.nodes).filter(id=>id!=='archive'))assert.deepEqual(plain(after[id]),plain(before[id]),'the fork retains '+id);
   assert.equal(after.archive.y,after.publish.y);assert.equal(after.archive.x-after.publish.x,204);
@@ -407,7 +407,7 @@ test('six canonical baselines reproduce and final readability preserves their se
     if(i>=4)assert.equal(result.score.incidentCrossings,0,'fan-in and fan-out curves do not weave after their shared endpoint');
     if(i===5)assert.ok(result.score.length<3300,'nonplanar graph keeps bounded center distances after spacing expansion');
     if(i>=2 && i<=4){assert.ok(Object.values(d.nodes).some(n=>n.title.startsWith('Legacy')));assert.ok(d.edges.some(e=>e.label));}
-    const final=C.autoArrangeReadability(d,result,viz),published=plain(C.autoArrangeDiagram(d,final));
+    const final=C.autoArrangeFlowClarity(d,C.autoArrangeReadability(d,result,viz),viz),published=plain(C.autoArrangeDiagram(d,final));
     assert.equal(final.score.overlaps,0);assert.equal(final.score.hits,0);assert.ok(final.score.crossings<=result.score.crossings);assert.ok(final.score.incidentCrossings<=result.score.incidentCrossings);
     assert.ok(minimumCardGap(final)>=minimumCardGap(result)-.1);assert.deepEqual(published.nodes,d.nodes);assert.deepEqual(published.groups,d.groups);
     assert.deepEqual(published.edges.map(({from,to,label})=>({from,to,label})),d.edges.map(({from,to,label})=>({from,to,label})));
@@ -660,7 +660,7 @@ test('motif scaffolds find corridors, fans and joins from wiring alone',()=>{
 test('global composition creates reproducible safe shared axes and a square freight scaffold',()=>{
   const input=require('../examples/auto-arrange-large-baselines/graph-input.spec.json'),saved=require('../examples/auto-arrange-large-baselines/auto-arranged.spec.json');
   const motif=C.autoArrangeMotifCandidates,global=C.autoArrangeGlobalLattice,terminal=C.autoArrangeTerminalFolds,geometry=C.autoArrangeMotifGeometry,expand=C.autoArrangeExpandSpacing;
-  const readability=C.autoArrangeReadability;C.autoArrangeReadability=(diagram,result)=>result;
+  const readability=C.autoArrangeReadability,flow=C.autoArrangeFlowClarity;C.autoArrangeReadability=(diagram,result)=>result;C.autoArrangeFlowClarity=(diagram,result)=>result;
   try{
   const timings=[];
   for(const [i,block] of input.page.blocks.entries()){
@@ -723,7 +723,7 @@ test('global composition creates reproducible safe shared axes and a square frei
     assert.deepEqual(plain(C.validate(C.normalize(out)).errors),[]);
   }
   assert.deepEqual(timings.filter(row=>row.ms>=20000).map(row=>row.id),[],JSON.stringify(timings)+' worker deadline');
-  }finally{C.autoArrangeReadability=readability;}
+  }finally{C.autoArrangeReadability=readability;C.autoArrangeFlowClarity=flow;}
 });
 
 test('motif composition keeps unsafe layouts out and bounds routing attempts',()=>{

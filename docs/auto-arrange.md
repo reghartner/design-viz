@@ -174,6 +174,33 @@ geometry passes those guards; it does not relax other passes' safety checks.
 Long chains prioritize the four-card row limit and minimum clearance when those
 constraints prevent the target footprint.
 
+A final flow-clarity pass can rotate a two-to-four-card terminal chain together
+with its junction and one directly attached leaf. It handles ungrouped diagrams
+with 5–48 nodes and at most 80 edges. It favors clearing cards from linked
+horizontal/vertical corridors and straightening simple directed chains; it does
+not rearrange dense shared-hub cores. Junction moves are evaluated against the
+whole graph, including connections outside the moved chain.
+
+This pass can spend space for a structural improvement. Relative to its starting
+result, occupied width and height may grow at most 30%, occupied area at most
+35%, center distances at most 30%, and sampled viewer-path length at most 25%.
+These are conservative experimental envelopes, not a target size. Growth and
+additional sparsely occupied rows receive soft penalties. Minimum card clearance
+is preserved; overlaps, card hits and increases in either crossing count are
+rejected. Straightening a chain without clearing an obstructed corridor must
+also shorten total sampled routes, so unfolding a compact tail alone cannot
+justify longer connections elsewhere. Aspect ratio remains a soft preference.
+
+Three deterministic passes consider at most 288 proposals each, with 48 total
+candidate checks and 12 native reroutes. Chains are ordered by their seed geometry,
+with one feasible proposal per chain in each scheduling round before another
+proposal from any chain. Node names and declaration order cannot consume the
+budget ahead of other chains. Cheap structural rejection precedes
+actual path sampling. Both automatically bowed routes and native curves count
+in length and detour measurements. The directed-path snake returns before these
+optional passes, preserving the compact two-row six-node chain. These local
+metrics guide proposals; rendered A/B review is still needed to assess clarity.
+
 The bounded search does not promise an optimal, crossing-free or in-range
 result. In particular, fewer crossings win even when that requires a less
 compact shape, and target spacing can introduce whitespace. Initial candidate selection uses at most
@@ -351,7 +378,7 @@ monoliths and direct/back couplings, and a deliberately nonplanar K₃,₃.
 Run `node examples/auto-arrange-baselines/generate.cjs` to reproduce
 `auto-arranged.spec.json` using the production algorithm and print occupied
 geometry/crossing metrics. The focused tests verify these outputs exactly,
-including the compact 3+3 snake, a terminal-leaf tuck that preserves its fork,
+including stage-specific snapshots of the compact 3+3 snake and a terminal-leaf tuck that preserves its fork,
 aligned telemetry and fulfillment grids, semantic preservation and collision
 safety. The short chain deliberately
-exceeds 16:9; the five remaining baselines stay between square and 16:9.
+exceeds 16:9. The final refinement passes preserve safety without imposing a universal aspect limit.

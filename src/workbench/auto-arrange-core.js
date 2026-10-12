@@ -31,8 +31,9 @@ function autoArrangeDiagram(d,result){
     if(!hasCubicCurve(e)){delete e.labelDx;delete e.labelDy;}return e;
   });return copy;
 }
-function autoArrangeDot(d,direction,positions,aspect){
+function autoArrangeDot(d,direction,positions,aspect,nodeOrder){
   var ids=autoArrangeInput(d),groups=Object.assign(Object.create(null),d.groups || {});
+  if(nodeOrder)ids=nodeOrder;
   ids.forEach(function(id){var key=d.nodes[id].group;if(key && !groups[key])groups[key]={};});
   var gids=Object.keys(groups),parents=sanitizedGroupParents(groups);
   function quote(s){return JSON.stringify(String(s)).replace(/\\u202[89]/g,' ');}
@@ -48,8 +49,8 @@ function autoArrangeDot(d,direction,positions,aspect){
   source+=(d.edges || []).map(function(e,i){return 'n'+ids.indexOf(e.from)+' -> n'+ids.indexOf(e.to)+' [id="e'+i+'",xlabel='+quote(e.label || '')+'];';}).join('');
   return source+'}';
 }
-function autoArrangeRead(d,json){
-  var ids=Object.keys(d.nodes),positions=[],edges=[],lookup=Object.create(null);
+function autoArrangeRead(d,json,nodeOrder){
+  var ids=nodeOrder || Object.keys(d.nodes),positions=[],edges=[],lookup=Object.create(null);
   (json.objects || []).forEach(function(n){
     if(!/^n\d+$/.test(n.name))return;var id=ids[Number(n.name.slice(1))];if(id==null)return;
     var xy=n.pos.split(',').map(Number);lookup[id]={cx:xy[0],cy:-xy[1],w:150,h:44};
@@ -1109,6 +1110,120 @@ function autoArrangeReadability(d,result,viz){
   return best;
 }
 
+var AUTO_ARRANGE_FLOW_LIMITS={nodes:48,edges:80,passes:3,checks:48,routes:12,proposals:288};
+function autoArrangeFlowTopology(d){
+  var ids=Object.keys(d.nodes),adj=Object.create(null),incoming=Object.create(null),outgoing=Object.create(null),chains=[];
+  ids.forEach(function(id){adj[id]=[];incoming[id]=[];outgoing[id]=[];});
+  (d.edges || []).forEach(function(e){if(e.from===e.to)return;
+    [[e.from,e.to],[e.to,e.from]].forEach(function(pair){if(adj[pair[0]].indexOf(pair[1])<0)adj[pair[0]].push(pair[1]);});
+    if(outgoing[e.from].indexOf(e.to)<0)outgoing[e.from].push(e.to);if(incoming[e.to].indexOf(e.from)<0)incoming[e.to].push(e.from);
+  });
+  ids.forEach(function(id){if(adj[id].length!==1)return;var path=[id],previous=id,current=adj[id][0];
+    while(adj[current].length===2 && path.length<5 && path.indexOf(current)<0){path.push(current);var next=adj[current].filter(function(other){return other!==previous;})[0];previous=current;current=next;}
+    if(adj[current].length>2 && path.length>=2 && path.length<=4)chains.push({anchor:current,ids:path.reverse()});
+  });
+  return {ids:ids,adj:adj,incoming:incoming,outgoing:outgoing,chains:chains};
+}
+function autoArrangeFlowSchedule(queues,limit){
+  var scheduled=[];
+  // Each chain gets its next feasible candidate before any chain gets another.
+  for(var round=0;scheduled.length<limit;round++){
+    var added=false;
+    for(var i=0;i<queues.length && scheduled.length<limit;i++)if(round<queues[i].length){scheduled.push(queues[i][round]);added=true;}
+    if(!added)break;
+  }
+  return scheduled;
+}
+function autoArrangeFlowStructure(d,positions,topology){
+  var points=Object.fromEntries(positions.map(function(p){return [p.id,p];})),blocked=0,turns=0,rows=new Map();
+  (d.edges || []).forEach(function(e){var a=points[e.from],b=points[e.to];positions.forEach(function(p){if(p.id===a.id || p.id===b.id)return;
+    if(Math.abs(a.x-b.x)<.1 && Math.abs(p.x-a.x)<75 && (p.y-a.y)*(p.y-b.y)<0 || Math.abs(a.y-b.y)<.1 && Math.abs(p.y-a.y)<22 && (p.x-a.x)*(p.x-b.x)<0)blocked++;
+  });});
+  topology.ids.forEach(function(id){if(topology.incoming[id].length!==1 || topology.outgoing[id].length!==1)return;
+    var a=points[topology.incoming[id][0]],b=points[id],c=points[topology.outgoing[id][0]],length=Math.hypot(b.x-a.x,b.y-a.y)*Math.hypot(c.x-b.x,c.y-b.y);
+    if(length)turns+=1-((b.x-a.x)*(c.x-b.x)+(b.y-a.y)*(c.y-b.y))/length;
+  });
+  positions.forEach(function(p){var y=Math.round(p.y*100)/100;rows.set(y,(rows.get(y)||0)+1);});
+  return {blocked:blocked,turns:turns,sparseRows:Array.from(rows.values()).filter(function(n){return n<3;}).length};
+}
+function autoArrangeFlowMetrics(d,result,topology){
+  topology=topology || autoArrangeFlowTopology(d);
+  var structure=autoArrangeFlowStructure(d,result.positions,topology),arranged=autoArrangeDiagram(d,result),L=layout(arranged),adjust=autoArrangeAdjust(arranged,L),routeLength=0,routeExcess=0;
+  arranged.edges.forEach(function(e,i){var path=samplePathD(edgePath(e,L,adjust[i])),length=0;
+    for(var j=1;j<path.length;j++)length+=Math.hypot(path[j].x-path[j-1].x,path[j].y-path[j-1].y);
+    routeLength+=length;routeExcess+=Math.max(0,length-Math.hypot(path[path.length-1].x-path[0].x,path[path.length-1].y-path[0].y));
+  });
+  return Object.assign(structure,{routeLength:routeLength,routeExcess:routeExcess});
+}
+// Rotate a terminal chain together with its junction and, if necessary, one
+// attached leaf. A linked column can then become clear without squeezing cards.
+// This explicit structural trade may grow: aspect is not an acceptance gate.
+function autoArrangeFlowClarity(d,result,viz){
+  var ids=Object.keys(d.nodes),edges=d.edges || [],limits=AUTO_ARRANGE_FLOW_LIMITS;
+  if(ids.length<5 || ids.length>limits.nodes || edges.length>limits.edges || ids.some(function(id){return d.nodes[id].group;}))return result;
+  var topology=autoArrangeFlowTopology(d);if(!topology.chains.length)return result;
+  var seedPoints=Object.fromEntries(result.positions.map(function(p){return [p.id,p];}));
+  function geometricOrder(a,b){return seedPoints[a].x-seedPoints[b].x || seedPoints[a].y-seedPoints[b].y;}
+  // Clear cards have distinct centers. Geometry breaks equivalent-topology
+  // ties without consulting identifiers, labels, or declaration order.
+  topology.ids.sort(geometricOrder);
+  topology.chains.sort(function(a,b){return geometricOrder(a.anchor,b.anchor) || geometricOrder(a.ids[0],b.ids[0]);});
+  function gap(a,b){return Math.hypot(Math.max(0,Math.abs(a.x-b.x)-150),Math.max(0,Math.abs(a.y-b.y)-44));}
+  var clearance=Infinity;result.positions.forEach(function(a,i){result.positions.slice(i+1).forEach(function(b){clearance=Math.min(clearance,gap(a,b));});});
+  var dx=150+Math.max(AUTO_ARRANGE_CARD_GAP*2.5,clearance),dy=44+Math.max(AUTO_ARRANGE_CARD_GAP*1.5,clearance);
+  var baseline=autoArrangeFlowMetrics(d,result,topology),best=result,bestMetrics=baseline,checks=0,routes=0;
+  function quality(metrics,score){return metrics.blocked*dx+metrics.turns*dy+metrics.routeExcess+metrics.routeLength*.1+
+    600*Math.max(0,score.area/result.score.area-1)+150*Math.max(0,metrics.sparseRows-baseline.sparseRows);}
+  function safe(candidate,metrics){var a=candidate.score,b=best.score,c=result.score;
+    return !a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings &&
+      a.width<=c.width*1.3 && a.height<=c.height*1.3 && a.area<=c.area*1.35 && a.length<=c.length*1.3 && metrics.routeLength<=baseline.routeLength*1.25;
+  }
+  for(var pass=0;pass<limits.passes && checks<limits.checks;pass++){
+    var source=best,points=Object.fromEntries(source.positions.map(function(p){return [p.id,p];})),queues=[],seen=new Set(),proposed=0;
+    function propose(changes,queue){
+      if(proposed++>=limits.proposals)return;
+      var positions=source.positions.map(function(p){return changes[p.id]?{id:p.id,x:changes[p.id].x,y:changes[p.id].y}:p;}),key=positions.map(function(p){return p.x+','+p.y;}).join(';');
+      if(seen.has(key))return;seen.add(key);
+      if(positions.some(function(a,i){return positions.slice(i+1).some(function(b){return gap(a,b)<clearance-.1;});}))return;
+      var xs=positions.map(function(p){return p.x;}),ys=positions.map(function(p){return p.y;}),width=Math.max.apply(null,xs)-Math.min.apply(null,xs)+150,height=Math.max.apply(null,ys)-Math.min.apply(null,ys)+44;
+      if(width>result.score.width*1.3 || height>result.score.height*1.3 || width*height>result.score.area*1.35)return;
+      queue.push({positions:positions,edges:source.edges.map(function(e,i){return changes[edges[i].from] || changes[edges[i].to]?{}:e;})});
+    }
+    topology.chains.forEach(function(chain){var queue=[];queues.push(queue);[[1,0],[-1,0],[0,1],[0,-1]].forEach(function(direction){[0,1,2].forEach(function(shift){
+      var anchor=points[chain.anchor],changes=Object.create(null),sx=direction[0],sy=direction[1];
+      changes[chain.anchor]={x:anchor.x-sx*dx*shift,y:anchor.y-sy*dy*shift};
+      chain.ids.forEach(function(id,i){changes[id]={x:changes[chain.anchor].x+sx*dx*(i+1),y:changes[chain.anchor].y+sy*dy*(i+1)};});
+      var occupied=source.positions.filter(function(p){return !changes[p.id] && Object.keys(changes).some(function(id){return gap(changes[id],p)<clearance-.1;});});
+      // Only displace a leaf of the same junction; unrelated blockers are not
+      // pushed recursively or assigned arbitrary empty slots.
+      if(occupied.length===1 && topology.adj[occupied[0].id].length===1 && topology.adj[occupied[0].id][0]===chain.anchor)
+        changes[occupied[0].id]={x:changes[chain.anchor].x-sx*dx,y:changes[chain.anchor].y-sy*dy};
+      propose(changes,queue);
+    });});});
+    var proposals=autoArrangeFlowSchedule(queues,limits.checks-checks),next=best,nextMetrics=bestMetrics;
+    for(var i=0;i<proposals.length && checks<limits.checks;i++){
+      checks++;var structure=autoArrangeFlowStructure(d,proposals[i].positions,topology);
+      // Routing cannot improve these structural measures. Reject doomed
+      // proposals before sampling and intersecting the full viewer paths.
+      if(structure.blocked>=bestMetrics.blocked && structure.turns>=bestMetrics.turns-.25)continue;
+      var candidate=autoArrangeNaturalRoutes(d,proposals[i],true),metrics=autoArrangeFlowMetrics(d,candidate,topology);
+      if(!safe(candidate,metrics) && routes<limits.routes){
+        routes++;try{var positions=candidate.positions,placed=Object.fromEntries(positions.map(function(p){return [p.id,p];}));
+          candidate=autoArrangeRead(d,viz.renderJSON(autoArrangeDot(d,'TB',placed,null,topology.ids),{engine:'nop2'}),topology.ids);candidate.positions=positions;
+          candidate=autoArrangeNaturalRoutes(d,candidate,true);metrics=autoArrangeFlowMetrics(d,candidate,topology);
+        }catch(ex){continue;}
+      }
+      // A noticeable structural gain must pay for growth; tiny numerical route
+      // differences cannot author a different composition. Straightening alone
+      // must shorten full-graph routes, including the junction's other links.
+      if(safe(candidate,metrics) && (metrics.blocked<bestMetrics.blocked || metrics.turns<bestMetrics.turns-.25 && metrics.routeLength<bestMetrics.routeLength) &&
+        quality(metrics,candidate.score)<quality(nextMetrics,next.score)-75){next=candidate;nextMetrics=metrics;}
+    }
+    if(next===best)break;best=next;bestMetrics=nextMetrics;
+  }
+  return best;
+}
+
 function autoArrangeCandidates(d,viz,cola){
   var ids=autoArrangeInput(d),candidates=[],small=autoArrangeSmall(d);
   function attempt(direction,positions,aspect){
@@ -1168,7 +1283,7 @@ function autoArrangeCandidates(d,viz,cola){
     // preserve safety, shape and footprint, and shorten center distances.
     if(!grid.score.overlaps && !grid.score.hits && grid.score.crossings<=chosen.score.crossings && grid.score.incidentCrossings<=chosen.score.incidentCrossings &&
       grid.score.shape<=chosen.score.shape && grid.score.length<chosen.score.length &&
-      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz);
+      Math.hypot(grid.score.width,grid.score.height)<=Math.hypot(chosen.score.width,chosen.score.height))return autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,grid,viz),viz),viz);
   }
   // Ordered layouts are reproducible seeds, not a constraint on accepted
   // geometry. Unresolved small layouts also try direction-free searches.
@@ -1182,5 +1297,5 @@ function autoArrangeCandidates(d,viz,cola){
       if(!a.overlaps && !a.hits && a.crossings<=b.crossings && a.incidentCrossings<=b.incidentCrossings && a.shape<=b.shape && a.area<=b.area && a.length<b.length*.97)chosen=candidate;
     });
   }
-  return autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz);
+  return autoArrangeFlowClarity(d,autoArrangeReadability(d,autoArrangeExpandSpacing(d,autoArrangeMotifGeometry(d,autoArrangeTerminalFolds(d,autoArrangeGlobalLattice(d,autoArrangeMotifCandidates(d,autoArrangeLargeAligned(d,chosen),viz),viz),viz),viz),viz),viz),viz);
 }

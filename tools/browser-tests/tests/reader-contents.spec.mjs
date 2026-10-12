@@ -105,7 +105,27 @@ for(const width of [1440,1120,768,390,320,286])test('all top Views wrap without 
     await expect(choice).toBeVisible();const r=await choice.boundingBox();expect(r.x).toBeGreaterThanOrEqual(0);expect(r.x+r.width).toBeLessThanOrEqual(width);expect(r.height).toBeGreaterThanOrEqual(30);expect(r.y+r.height).toBeLessThanOrEqual(box.y+box.height-45);
     await choice.click();await expect(choice).toHaveAttribute('aria-selected','true');expect(await nav.boundingBox()).toEqual(box);
   }
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);
+  // Selection is synchronous, but the shared viewport and header ResizeObservers
+  // finish their layout on subsequent frames. Assert the exact settled document
+  // width, including content outside the header, rather than racing that work.
+  try{await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth)).toBe(width);}
+  catch(error){
+    const diagnostic=await page.evaluate(async()=>{
+      const frames=[];
+      for(let i=0;i<3;i++){
+        if(i)await new Promise(requestAnimationFrame);
+        const limit=document.documentElement.clientWidth;
+        frames.push({root:document.documentElement.scrollWidth,body:document.body.scrollWidth,limit,
+          overflow:[...document.querySelectorAll('*')].filter(el=>{const r=el.getBoundingClientRect();return r.width&&r.right>limit;}).map(el=>{
+            const r=el.getBoundingClientRect(),s=getComputedStyle(el),ancestors=[];
+            for(let parent=el.parentElement;parent;parent=parent.parentElement)ancestors.push({tag:parent.tagName,id:parent.id,class:parent.getAttribute('class'),overflow:getComputedStyle(parent).overflow});
+            return{tag:el.tagName,id:el.id,class:el.getAttribute('class'),x:r.x,right:r.right,width:r.width,scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,position:s.position,overflow:s.overflow,minWidth:s.minWidth,ancestors};
+          })});
+      }
+      return frames;
+    });
+    await info.attach('document-overflow-geometry',{body:JSON.stringify(diagnostic,null,2),contentType:'application/json'});throw error;
+  }
   const center=await nav.locator('.reader-page-index').evaluate(el=>{const r=el.getBoundingClientRect();return(r.left+r.right)/2;});expect(Math.abs(center-width/2)).toBeLessThan(1);
   await strip.getByRole('tab',{name:'Explore story',exact:true}).click();const canvas=await page.locator('.viewer-diagram-canvas').boundingBox();expect(canvas.y).toBe(box.y+box.height);
   if(width>670){const side=await nav.locator('.reader-contents').boundingBox();expect(side.y).toBe(box.y+box.height);}

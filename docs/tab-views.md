@@ -12,6 +12,9 @@ The document’s navigation stays at the top of the browser or contained viewer:
 **Tabs → Views → Sections**. The same navigation element remains in place across
 presentation changes. Backstage expansion enlarges the container and preserves
 the selected View’s presentation. Workbench navigation sits below app chrome.
+Only the section choices scroll horizontally; small arrow buttons reveal more
+sections without selecting one. Tabs and Views show their full controls when
+space permits and use compact selectors in narrower containers.
 
 ```json
 {

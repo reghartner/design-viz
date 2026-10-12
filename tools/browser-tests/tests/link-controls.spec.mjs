@@ -48,7 +48,7 @@ test('standalone unified navigation keeps tab, chapter, step and contract links 
  await copy.tab.click();link=new URL(await copied(page));expect(link.hash).toContain('t=story');expect(link.hash).toContain('x=delivery');
  await page.setViewportSize({width:390,height:800});
  for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
- await nav.getByRole('button',{name:'Page',exact:true}).click();await expect(copy.contract).toBeVisible();
+ await nav.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Page'});await expect(copy.contract).toBeVisible();
  await copy.contract.click();link=new URL(await copied(page));
  expect(link.hash).toContain('t=story');expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('v=page');expect(link.hash).toContain('c=delivery');expect(link.hash).toContain('x=delivery');
  await page.emulateMedia({media:'print'});for(const button of [copy.tab,copy.chapter,copy.contract])await expect(button).toBeHidden();
@@ -61,7 +61,7 @@ test('workbench unified navigation does not hide link controls at mobile width',
  const root=page.locator('#docview'),nav=root.locator('.explore-navigation'),copy=controls(root);
  for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
  await copy.step.click();const link=new URL(await copied(page));expect(link.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('s=send');
- await nav.getByRole('button',{name:'Page',exact:true}).click();await expect(copy.contract).toBeVisible();
+ await nav.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Page'});await expect(copy.contract).toBeVisible();
  await page.setViewportSize({width:900,height:800});await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),previewCopy=controls(preview);for(const button of [previewCopy.tab,previewCopy.chapter,previewCopy.step,previewCopy.contract])await expect(button).toBeVisible();
  await previewCopy.step.click();const previewLink=new URL(await copied(page));expect(previewLink.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(previewLink.hash).toContain('s=send');await page.locator('#close-page-preview').click();

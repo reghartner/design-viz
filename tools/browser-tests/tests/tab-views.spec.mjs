@@ -5,7 +5,9 @@ import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 const fixture=async()=>JSON.parse(await readFile(path.join(repo,'examples/tab-views/tab-views.spec.json'),'utf8'));
 async function standalone(page,server,raw){raw=raw || await fixture();raw.page.blocks[0].tabs[0].sections[2].text=Array.from({length:30},()=> 'Section C explains the shared content across Views.');await writeFile(path.join(server.root,'tab-views.json'),JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),path.join(server.root,'tab-views.json'),path.join(repo,'template/flowview.html'),path.join(server.root,'tab-views.html')]);await page.goto(server.origin+'/tab-views.html');return page.locator('#docview');}
-const nav=root=>root.locator(':scope > .explore-navigation');
+const nav=root=>root.locator('.explore-navigation').first();
+async function chooseView(root,name){const navigation=nav(root),picker=navigation.getByRole('combobox',{name:'Choose View',exact:true});if(await picker.isVisible())await picker.selectOption({label:name});else await navigation.getByRole('button',{name,exact:true}).click();}
+async function chooseTab(root,name){const navigation=nav(root),picker=navigation.getByRole('combobox',{name:'Choose Tab',exact:true});if(await picker.isVisible())await picker.selectOption({label:name});else await navigation.getByRole('tab',{name,exact:true}).click();}
 const visible=root=>root.locator('.doc-sec[data-dv-section]:visible');
 for(const width of [1280,1440])test(`Tab Views enforce overlap membership and retain browser-top navigation at ${width}`,async({page,server},info)=>{
  await page.setViewportSize({width,height:950});const root=await standalone(page,server);
@@ -14,25 +16,25 @@ for(const width of [1280,1440])test(`Tab Views enforce overlap membership and re
  await nav(root).evaluate(el=>{window.savedNav=el;});
  const geometry=async()=>nav(root).evaluate(el=>({same:el===window.savedNav,y:el.getBoundingClientRect().y,width:el.getBoundingClientRect().width}));
  expect(await geometry()).toEqual({same:true,y:0,width});await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);expect(await geometry()).toEqual({same:true,y:0,width});
- await nav(root).getByRole('button',{name:'Explore B + C',exact:true}).click();await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(1);await expect(root.locator('#section-b')).toBeVisible();
- await expect(nav(root).locator('.explore-navigation-diagrams button:visible')).toHaveText(['Section B','Section C']);await nav(root).getByRole('button',{name:'Section C',exact:true}).click();await expect(root.locator('#section-c .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();
+ await chooseView(root,'Explore B + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(1);await expect(root.locator('#section-b')).toBeVisible();
+ await expect(nav(root).locator('.explore-navigation-diagrams .explore-diagram-button:visible')).toHaveText(['Section B','Section C']);await nav(root).getByRole('button',{name:'Section C',exact:true}).click();await expect(root.locator('#section-c .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();
  await expect(root.locator('.explore-player:visible')).toHaveCount(1);expect(await geometry()).toEqual({same:true,y:0,width});
- await nav(root).getByRole('button',{name:'Explore A',exact:true}).click();await expect(root.locator('#section-a .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-c')).toBeHidden();
+ await chooseView(root,'Explore A');await expect(root.locator('#section-a .explore-board')).toBeVisible();await expect(root.locator('#section-b')).toBeHidden();await expect(root.locator('#section-c')).toBeHidden();
  await root.locator('#section-a [data-dv-detail]').click();await expect(root.locator('[data-dv-detail-preview]:visible')).toHaveCount(1);await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toBeVisible();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toHaveAttribute('aria-pressed','true');
- await nav(root).getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(2);await root.locator('#section-a [data-dv-detail]').click();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toBeVisible();expect(await geometry()).toEqual({same:true,y:0,width});
+ await chooseView(root,'Standard A + C');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).not.toHaveAttribute('data-explore-view','true');await expect(visible(root)).toHaveCount(2);await root.locator('#section-a [data-dv-detail]').click();await root.locator('[data-dv-detail-preview]:visible .detail-breadcrumb button').first().click();await expect(nav(root).getByRole('button',{name:'Explore A',exact:true})).toBeVisible();expect(await geometry()).toEqual({same:true,y:0,width});
  await info.attach('tab-views-'+width,{body:await page.screenshot(),contentType:'image/png'});
  await page.goto(server.origin+'/tab-views.html#d=b&v=explore-a');await expect(root.locator('#section-b')).toBeVisible();await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(nav(root).getByRole('tab',{name:'Product',exact:true})).toHaveAttribute('data-explore-view','true');await expect(root.locator('#section-a')).toBeHidden();
 });
 test('Workbench View authoring has one Undo and retains the selected View through content edits',async({page,server})=>{
  const raw=await fixture();await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);const root=page.locator('#docview'),source=page.locator('#src');
- await nav(root).getByRole('button',{name:'Explore B + C',exact:true}).click();const before=await source.inputValue();
+ await chooseView(root,'Explore B + C');const before=await source.inputValue();
  await nav(root).locator('.section-view-options>summary').click();await page.getByRole('button',{name:'Duplicate View',exact:true}).click();
  const duplicated=JSON.parse(await source.inputValue());expect(duplicated.page.blocks[0].tabs[0].views).toHaveLength(4);expect(duplicated.page.blocks[0].tabs[0].sections).toEqual(raw.page.blocks[0].tabs[0].sections);
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(before);await expect(nav(root).getByRole('button',{name:'Explore B + C',exact:true})).toHaveAttribute('aria-pressed','true');
  await nav(root).locator('.section-view-options>summary').click();await nav(root).getByLabel('View name',{exact:true}).fill('Review B and C');await page.getByRole('button',{name:'Rename View',exact:true}).click();await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
  await nav(root).locator('.section-view-options>summary').click();await nav(root).getByLabel('Include Section C',{exact:true}).uncheck();await expect(root.locator('#section-c')).toBeHidden();expect(JSON.parse(await source.inputValue()).page.blocks[0].tabs[0].views[1].sections).toEqual([{section:'b'}]);
  await page.locator('#undo-builder').click();await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
- await nav(root).getByRole('button',{name:'Section C',exact:true}).click();const beforeContent=await source.inputValue();await root.locator('#section-c [data-dv-node=service]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited C');await title.press('Enter');await closeTools(page);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await nav(root).getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await nav(root).getByRole('button',{name:'Review B and C',exact:true}).click();
+ await nav(root).getByRole('button',{name:'Section C',exact:true}).click();const beforeContent=await source.inputValue();await root.locator('#section-c [data-dv-node=service]').click();const title=page.locator('#guide').getByLabel('title',{exact:true});await title.fill('Edited C');await title.press('Enter');await closeTools(page);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await chooseView(root,'Standard A + C');await expect(root.locator('#section-c [data-dv-node=service]')).toContainText('Edited C');await chooseView(root,'Review B and C');
  await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeContent);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');await expect(root.locator('#section-c')).toBeVisible();
  await page.locator('#diagram-add').click();await page.locator('.diagram-add-structure>summary').click();await page.locator('#add-section').click();const added=JSON.parse(await source.inputValue());expect(added.page.blocks[0].tabs[0].sections).toHaveLength(5);expect(added.page.blocks[0].tabs[0].views[1].sections.at(-1).section).toBe(added.page.blocks[0].tabs[0].sections.at(-1).id);await page.locator('#undo-builder').click();await expect(source).toHaveValue(beforeContent);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toHaveAttribute('aria-pressed','true');
  const saved=await source.inputValue();await page.reload();await expect(source).toHaveValue(saved);await expect(nav(root).getByRole('button',{name:'Review B and C',exact:true})).toBeVisible();
@@ -40,9 +42,9 @@ test('Workbench View authoring has one Undo and retains the selected View throug
 test('native Views keep host-top nav, reject cross-View destinations and isolate sibling mounts',async({page,server})=>{
  await writeFile(path.join(server.root,'tab-native.js'),await readFile(path.join(repo,'apps/backstage/src/generated/nativeViewer.js')));await writeFile(path.join(server.root,'tab-native.html'),'<style>body{margin:0}.host{height:700px;overflow:auto;position:relative;width:48%;display:inline-block;vertical-align:top}</style><div class="host" id="one"></div><div class="host" id="two"></div><script type="module">import {mountNativeViewer} from "./tab-native.js";window.mount=mountNativeViewer;</script>');await page.goto(server.origin+'/tab-native.html');await page.waitForFunction(()=>!!window.mount);await page.evaluate(raw=>{window.first=mount(document.querySelector('#one'),raw);window.second=mount(document.querySelector('#two'),raw);first.setCanvas(true);},await fixture());
  const one=page.locator('#one'),two=page.locator('#two'),navbar=one.locator('.explore-navigation');await navbar.evaluate(el=>window.savedNav=el);const geometry=()=>navbar.evaluate(el=>({same:el===window.savedNav,y:el.getBoundingClientRect().top,width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height}));const initial=await geometry();
- await navbar.getByRole('button',{name:'Explore B + C',exact:true}).click();expect(await page.evaluate(()=>first.snapshot())).toMatchObject({section:'b',view:'explore-bc'});await expect(two.locator('#section-a')).toBeVisible();await expect(two.locator('#section-b')).toBeHidden();
+ await chooseView(one,'Explore B + C');expect(await page.evaluate(()=>first.snapshot())).toMatchObject({section:'b',view:'explore-bc'});await expect(two.locator('#section-a')).toBeVisible();await expect(two.locator('#section-b')).toBeHidden();
  expect(await page.evaluate(()=>{try{first.navigate({section:'c',view:'explore-a'});return false;}catch{return true;}})).toBe(true);await expect(one.locator('#section-b')).toBeVisible();
- await navbar.getByRole('button',{name:'Standard A + C',exact:true}).click();await expect(one.locator('#section-a')).toBeVisible();await expect(one.locator('#section-c')).toBeVisible();expect(await geometry()).toEqual(initial);await navbar.getByRole('button',{name:'Explore A',exact:true}).click();expect(await geometry()).toEqual(initial);
+ await chooseView(one,'Standard A + C');await expect(one.locator('#section-a')).toBeVisible();await expect(one.locator('#section-c')).toBeVisible();expect(await geometry()).toEqual(initial);await chooseView(one,'Explore A');expect(await geometry()).toEqual(initial);
  await page.evaluate(()=>first.destroy());await expect(one.locator('.explore-navigation')).toHaveCount(0);await expect(two.locator('.explore-navigation')).toHaveCount(1);await page.evaluate(()=>{second.destroy();window.legacy=mount(document.querySelector('#two'),{sections:[{id:'plain',diagram:{nodes:{a:{title:'A'}},rows:[['a']]}}]});legacy.navigate({section:'plain',view:'flow'});});await expect(two.locator('#section-plain')).toBeVisible();await page.evaluate(()=>legacy.destroy());
 });
 
@@ -73,12 +75,12 @@ test('compound contract routes retain the second member navigation through tour 
 
 for(const width of [320,390])test(`reader menus and utilities stay reachable at ${width}px`,async({page,server},info)=>{
  await page.setViewportSize({width,height:900});const root=await standalone(page,server),navigation=nav(root);
- await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();
+ await chooseView(root,'Explore B + C');
  const before=await navigation.boundingBox();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
  const samples=await navigation.locator('.explore-panel-menu>summary').evaluate(async summary=>{
   const body=summary.parentElement.querySelector('.explore-panel-body'),frames=[];
   const sample=()=>{if(body.getClientRects().length)frames.push(body.getBoundingClientRect().toJSON());};
-  summary.click();sample();for(let i=0;i<8;i++){await new Promise(requestAnimationFrame);sample();}return frames;
+  summary.focus();summary.click();sample();for(let i=0;i<8;i++){await new Promise(requestAnimationFrame);sample();}return frames;
  });
  expect(samples.length).toBeGreaterThan(0);for(const box of samples){expect(box.x).toBeGreaterThanOrEqual(12);expect(box.right).toBeLessThanOrEqual(width-12);expect(box.bottom).toBeLessThanOrEqual(900-12);}
  await info.attach('opening-menu-frames',{body:JSON.stringify(samples,null,2),contentType:'application/json'});
@@ -91,11 +93,11 @@ for(const width of [320,390])test(`reader menus and utilities stay reachable at 
  await dock.locator('.dv-tour-discovery').evaluate(el=>el.textContent='New features to explore and recently added controls');await separated();
  await page.setViewportSize({width:width+90,height:760});await separated();
  await page.setViewportSize({width,height:900});await separated();
- await navigation.getByRole('button',{name:'Explore A',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
- await navigation.getByRole('button',{name:'Standard A + C',exact:true}).click();expect(await navigation.boundingBox()).toEqual(before);
+ await chooseView(root,'Explore A');expect(await navigation.boundingBox()).toEqual(before);
+ await chooseView(root,'Standard A + C');expect(await navigation.boundingBox()).toEqual(before);
  await expect(dock).toBeVisible();
- // Offscreen tab chips remain reachable by keyboard and reveal in their lane.
- const notes=navigation.getByRole('tab',{name:'Notes',exact:true});await notes.focus();await expect(notes).toBeInViewport();
+ // Compact pickers keep every Tab reachable without another scrolling lane.
+ const tabs=navigation.getByRole('combobox',{name:'Choose Tab',exact:true});await tabs.focus();await tabs.selectOption({label:'Notes'});if(await tabs.isVisible()){await expect(tabs).toBeFocused();await expect(tabs).toHaveValue('1');}else await expect(navigation.getByRole('tab',{name:'Notes',exact:true})).toBeFocused();await chooseTab(root,'Product');await expect(tabs).toBeFocused();
  await info.attach('reader-phone',{body:await page.screenshot(),contentType:'image/png'});
 });
 
@@ -104,7 +106,7 @@ test('Legend follows the selected member section and omits empty keys',async({pa
  const raw=await fixture(),diagram=raw.page.blocks[0].tabs[0].sections[2].diagram;
  diagram.nodes.target={title:'Published event'};diagram.rows=[['service','target']];diagram.edges=[{id:'publish',from:'service',to:'target',kind:'evt',label:'Publish'}];
  const root=await standalone(page,server,raw),navigation=nav(root);
- await navigation.getByRole('button',{name:'Explore B + C',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
+ await chooseView(root,'Explore B + C');await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
  await navigation.getByRole('button',{name:'Section C',exact:true}).click();await navigation.locator('.explore-legend-menu>summary').click();
  await expect(navigation.getByRole('group',{name:'Edge legend',exact:true})).toBeVisible();await expect(navigation.locator('.explore-edge-legend .li')).toHaveCount(1);
  await page.keyboard.press('Escape');await navigation.getByRole('button',{name:'Section B',exact:true}).click();await expect(navigation.locator('.explore-legend-menu')).toBeHidden();
@@ -119,7 +121,7 @@ for(const skin of ['pastel','aurora'])test(`dense phone playback keeps wrapped c
  section.diagram.autoplay=false;
  const input=path.join(server.root,'dense-caption-'+skin+'.json'),output=path.join(server.root,'dense-caption-'+skin+'.html');
  await writeFile(input,JSON.stringify(raw));execFileSync('python3',[path.join(repo,'tools/inject.py'),input,path.join(repo,'template/flowview.html'),output]);
- await page.goto(server.origin+'/dense-caption-'+skin+'.html');await nav(page.locator('#docview')).getByRole('tab',{name:'04 · Backstage',exact:true}).click();await page.evaluate(()=>document.fonts.ready);
+ await page.goto(server.origin+'/dense-caption-'+skin+'.html');await chooseTab(page.locator('#docview'),'04 · Backstage');await page.evaluate(()=>document.fonts.ready);
  const root=page.locator('#section-backstage'),player=root.locator('.explore-player'),bar=player.locator('.termbar'),caption=bar.locator('.stepline'),dock=page.locator('#docview > .reader-page-actions'),board=root.locator('.explore-board');
  await expect(bar.locator('.schips button')).toHaveCount(7);
  const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop}));
@@ -149,7 +151,7 @@ for(const width of [870,1280])for(const authored of [false,true])test(`reader Vi
  ];tab.defaultView='full-story';
  if(authored){const d=tab.sections[2].diagram;d.defaultLayout='shared';d.layouts=[{id:'shared',name:'Shared arrangement',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:8}]},exploreLayout:{camera:{zoom:.5,x:.5,y:.5}}}];}
  const root=await standalone(page,server,raw),navigation=nav(root),section=root.locator('#section-c'),board=section.locator('.explore-board'),node=section.locator('[data-dv-node=service]');
- await navigation.getByRole('button',{name:'Explore story',exact:true}).click();await navigation.getByRole('button',{name:'Section C',exact:true}).click();
+ await chooseView(root,'Explore story');await navigation.getByRole('button',{name:'Section C',exact:true}).click();
  // No Fit gesture: first entry and every later transition must show the graph.
  await expect(node).toBeInViewport({ratio:1});await page.evaluate(()=>document.fonts.ready);
  const camera=()=>board.evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,width:el.querySelector('.boardcanvas>svg').getBoundingClientRect().width}));
@@ -157,10 +159,10 @@ for(const width of [870,1280])for(const authored of [false,true])test(`reader Vi
  await section.getByRole('button',{name:'Zoom in',exact:true}).click();await board.evaluate(el=>{el.scrollLeft+=24;el.scrollTop+=12;});const saved=await camera();
  await expect(node).toBeInViewport();
  for(let cycle=0;cycle<3;cycle++){
-  await navigation.getByRole('button',{name:'Full story',exact:true}).click();await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);
-  await navigation.getByRole('button',{name:'Explore story',exact:true}).click();await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
+  await chooseView(root,'Full story');await page.evaluate(()=>scrollTo(0,500));await expect.poll(()=>page.evaluate(()=>scrollY)).toBeGreaterThan(100);
+  await chooseView(root,'Explore story');await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
   // C actually moves before A, not just through a redundant DOM insertion.
-  await navigation.getByRole('button',{name:'Reversed subset',exact:true}).click();expect((await navigation.locator('.explore-navigation-diagrams button:visible').allTextContents()).sort()).toEqual(['Section A','Section C']);
+  await chooseView(root,'Reversed subset');expect((await navigation.locator('.explore-navigation-diagrams .explore-diagram-button:visible').allTextContents()).sort()).toEqual(['Section A','Section C']);
   expect(await root.locator('.doc-sec[data-dv-section]').evaluateAll(nodes=>nodes.map(n=>n.id).indexOf('section-c')<nodes.map(n=>n.id).indexOf('section-a'))).toBe(true);
   await expect(root.locator('#section-b')).toBeHidden();await expect(node).toBeInViewport();await expect.poll(camera).toEqual(saved);
  }

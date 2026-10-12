@@ -260,7 +260,7 @@ test('wrapped native host actions keep More links inside a phone viewport',async
 test('an inline Explore camera survives the live expanded portal and return without needing Fit',async({page,server})=>{
  await page.setViewportSize({width:1440,height:900});await page.addInitScript(trackResources);await page.goto(server.origin+'/native/index.html');await page.waitForFunction(()=>!!window.__host);
  const baseline=await resources(page);await page.evaluate(()=>{__host.left(true);__host.right(true);});const alpha=page.locator('#alpha'),beta=page.locator('#beta');
- await alpha.getByRole('button',{name:'Explore',exact:true}).click();const board=alpha.locator('.explore-board'),native=await alpha.locator('[data-flowview-native]').elementHandle();
+ await alpha.locator('.explore-navigation').waitFor();const viewPicker=alpha.getByRole('combobox',{name:'Choose View',exact:true});if(await viewPicker.isVisible())await viewPicker.selectOption({label:'Explore'});else await alpha.getByRole('button',{name:'Explore',exact:true}).click();const board=alpha.locator('.explore-board'),native=await alpha.locator('[data-flowview-native]').elementHandle();
  const camera=container=>canvasCamera(container);
  async function graphInView(container){await expect.poll(()=>container.locator('.explore-board').evaluate(el=>{const a=el.getBoundingClientRect(),b=el.querySelector('svg').getBoundingClientRect();return Math.min(a.right,b.right)>Math.max(a.left,b.left)&&Math.min(a.bottom,b.bottom)>Math.max(a.top,b.top);})).toBe(true);}
  async function closeCamera(container,expected){await expect.poll(async()=>{const actual=await camera(container);return Math.max(...Object.keys(expected).map(key=>Math.abs(actual[key]-expected[key])));}).toBeLessThan(.01);}

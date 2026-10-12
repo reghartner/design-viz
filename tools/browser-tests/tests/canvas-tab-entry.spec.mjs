@@ -186,7 +186,7 @@ test('Explore markers preserve labels and follow each tab primary view',async({p
  await expect(standardTab).not.toHaveAttribute('data-explore-view','true');
  await page.setViewportSize({width:480,height:720});
  const narrowFixture=mixedFixture();narrowFixture.page.blocks[0].tabs[0].sections[0].diagram.rows=[['s0'],['s1']];
- await standalone(page,server,narrowFixture);await page.getByRole('button',{name:'Source Explore',exact:true}).click();
+ await standalone(page,server,narrowFixture);await page.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Source Explore'});
  await expect(page.locator('.explore-navigation-tabs')).toBeVisible();await expect(page.locator('.explore-navigation-chapters')).toBeVisible();
  await expect(page.locator('#section-standard [data-dv-node="s0"]')).toBeInViewport();
  await expect(page.locator('#section-standard [data-dv-node="s1"]')).toBeInViewport();

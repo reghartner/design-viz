@@ -151,6 +151,7 @@ var BUILDER_GUIDES = {
       ['icon', 'Browse icons to search by name or category; default gear'],
       ['tint', 'chip color (default cmd)'],
       ['group', 'containment-boundary id — members get a dashed box'],
+      ['position lock', 'prevents graph placement changes; content, links, playback and deletion remain editable'],
       ['float', 'Free placement enables arbitrary dragging and Float X/Y; Auto above/below releases the pin; in rows restores row placement'],
       ['link', 'permalink URL — clickable ↗ on the card corner'],
       ['detail', 'inner flow: choose a section for a focused drilldown with an overview map; map parent beats or link an external destination in Domain detail']

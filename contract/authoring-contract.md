@@ -514,6 +514,10 @@ with no `title` shows its id:
   `data` = stores, `mqtt` = brokers, `dev` = end devices.
 - `link` — optional permalink URL for this component (from the design doc).
   Renders a small clickable ↗ on the card corner (new tab).
+- `locked` — optional boolean. `true` locks this ordinary graph node's current
+  position against Workbench row, float, drag, keyboard, align/distribute,
+  stack/swap, group/row move, and Auto arrange operations. It does not lock the
+  node's content, links, edges, story state, copy, playback, or deletion.
 - `handoff` — arrow-shaped endpoint that continues to another diagram.
   Use `{localSection:"stable-section-id"}` to switch to an ordinary diagram
   section in this spec, including its tab. The mounted destination retains its
@@ -673,6 +677,12 @@ In the workbench, select **float → Free placement** or drag any floating node
 to pin it. **Float X/Y** provide numeric control. Select **Auto above/below** to
 release the pin, or **in rows** to return the node to the grid. Row nodes retain
 their row insertion/swap gestures. See `docs/free-node-placement.md`.
+
+The **Layers** rail lists the active section's ordinary graph nodes in authored
+placement order (rows and stacks, then floats, then unplaced definitions), with
+search, selection sync, and per-node position locks. The same lock is available
+in **Inspect → position lock**. Layers works in Standard and Explore; imported
+topology members, groups, panels, visibility, and z-order are not layers.
 
 Optional `dx` / `dy` (numbers, px) manually nudge a float from its computed
 spot — a below float pinned under a tall last row can be raised into the

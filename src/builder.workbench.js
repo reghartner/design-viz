@@ -414,7 +414,8 @@ function initWorkbenchBuilder(opts){
   var life=createWorkbenchLifetime(),outlineLife=createWorkbenchLifetime(),diffLife=createWorkbenchLifetime();
   life.own(function(){outlineLife.destroy();});life.own(function(){diffLife.destroy();});
   var view = opts.view, src = opts.src;
-  function render(request){ hideDiff();var result=opts.render(request || {origin:'navigation'});refreshClipboardActions();return result; }
+  var layers=null;
+  function render(request){ hideDiff();var result=opts.render(request || {origin:'navigation'});refreshClipboardActions();if(layers)layers.sync();return result; }
   var guide = document.getElementById('guide');
   var diffbox = document.getElementById('diffbox');
   var diffBtn = document.getElementById('spec-diff');
@@ -545,7 +546,7 @@ function initWorkbenchBuilder(opts){
   interactions=createBuilderInteractions({document:document,window:window,view:view,src:src,session:session,
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
-    selectionChanged:refreshClipboardActions,
+    selectionChanged:function(){refreshClipboardActions();if(layers)layers.sync();},
     refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();if(diagramImport)diagramImport.refresh();refreshClipboardActions();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
@@ -590,6 +591,12 @@ function initWorkbenchBuilder(opts){
   function commitCascade(planFor,opt){return inspector.transact(planFor,opt);}
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
   function parseEditor(){return session.snapshot();}
+  layers=createBuilderLayers({document:document,view:view,source:src,session:session,
+    section:function(){return session.insertSection;},selection:function(){return session.target;},
+    select:function(target){var el=findTargetEl(target);selectTarget(Object.assign({},target,{el:el}),false,true);if(layers)layers.sync();if(el)el.scrollIntoView({block:'nearest'});},
+    lock:function(section,id,value){var ok=applyPlan(planSetNodeLocked(session.text(),parseEditor().raw,section,id,value),{after:function(){if(layers)layers.sync();}});if(ok && layers)layers.sync();return ok;}
+  });
+  life.own(function(){if(layers)layers.destroy();layers=null;});
   function openDocumentSettings(){
     if(interactions.busy()){inspectorMessage('Finish the current canvas action before opening document settings.');return;}
     clearMultiSelect();selectTarget({kind:'document'},false);
@@ -940,7 +947,7 @@ function initWorkbenchBuilder(opts){
 
   life.listen(view,'workbench-view-section',function(ev){
     var parsed=session.snapshot();if(parsed.error || !specSectionPaths(parsed.raw)[ev.detail])return;
-    session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();
+    session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();if(layers)layers.sync();
     if(diagramImport)diagramImport.refresh();
   });
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({

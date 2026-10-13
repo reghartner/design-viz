@@ -165,11 +165,18 @@ cancel without changing the spec. Render handwritten JSON edits before starting.
 Ctrl/Cmd/Shift-click still control multiselect; ordinary drags still move nodes.
 Finish **ADD TO STEP** before using the quick connection shortcut.
 
-The left rail opens independent **Agent**, **Inspect**, **Steps**, **Outline**,
+The left rail opens independent **Agent**, **Inspect**, **Layers**, **Steps**, **Outline**,
 **JSON**, and **File** windows. Multiple windows can stay open. Drag a header to
 move it, drag its corner to resize, or use arrow keys on those handles (Shift
 moves farther). Close a window with × and reopen it from the rail. Existing
 forms, drafts, selection and disclosure state remain intact.
+
+**Layers** is a searchable active-section list of ordinary graph nodes in their
+authored placement order. Selecting a layer selects the rendered node without
+adding history. **Lock position** (also in Inspect) writes `locked: true` as one
+undoable edit and prevents graph-placement gestures and commands from moving that
+node. Content edits, connections, story state, copy, playback, and deletion stay
+available. Auto arrange asks you to unlock affected nodes first.
 
 A fresh editor leaves these windows closed so the view controls and authored
 panels are available immediately. The first object selection opens **Inspect**

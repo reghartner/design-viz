@@ -3,9 +3,9 @@ function workspacePrefs(raw){
   var prefs={tool:'inspect',windows:{}},value;
   try{value=JSON.parse(raw);}catch(ex){return prefs;}
   if(!value || typeof value!=='object' || Array.isArray(value))return prefs;
-  if(['agent','brief','inspect','steps','outline','json','file'].includes(value.tool))prefs.tool=value.tool;
+  if(['agent','brief','inspect','layers','steps','outline','json','file'].includes(value.tool))prefs.tool=value.tool;
   Object.keys(value.windows || {}).forEach(function(name){
-    if(!['agent','brief','inspect','steps','outline','json','file'].includes(name))return;
+    if(!['agent','brief','inspect','layers','steps','outline','json','file'].includes(name))return;
     var saved=value.windows[name];if(!saved || typeof saved!=='object')return;
     var rect={open:saved.open===true};
     ['x','y','w','h'].forEach(function(key){if(Number.isFinite(saved[key]))rect[key]=saved[key];});
@@ -108,7 +108,7 @@ function initWorkbenchReaderPreview(opts){
 function initWorkbenchWorkspace(){
   var wrap=document.querySelector('.workwrap'),editor=document.getElementById('spec-editor');
   if(!wrap || !editor)return null;
-  var names=['agent','brief','inspect','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
+  var names=['agent','brief','inspect','layers','steps','outline','json','file'],labels={agent:'Agent',brief:'Story brief',inspect:'Inspect',layers:'Layers',steps:'Story steps',outline:'Outline',json:'JSON source',file:'Project files'};
   var tabs={},panes={},windows={},key='dv-workbench-floating-v1',raw=null,z=80,gesture=null,hidden=false,history=null;
   try{raw=localStorage.getItem(key) || localStorage.getItem('dv-workbench-layout-v2');}catch(ex){}
   var prefs=workspacePrefs(raw),hasSaved=Object.keys(prefs.windows).length>0,revealFreshInspect=!hasSaved;

@@ -16,6 +16,15 @@ function planBindNodeService(text, raw, sectionIdx, nodeId, binding){
   return planSetFields(text, raw, got.path.concat(['nodes', nodeId]), fields);
 }
 
+function planSetNodeLocked(text,raw,sectionIdx,nodeId,locked){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  var node=got.d.nodes && got.d.nodes[nodeId];
+  if(!node || typeof node!=='object' || Array.isArray(node))return {error:'node not found'};
+  if(typeof locked!=='boolean')return {error:'Choose locked or unlocked.'};
+  if((node.locked===true)===locked && (locked || node.locked===undefined))return {error:'Node position is already '+(locked?'locked.':'unlocked.')};
+  return planSetField(text,raw,got.path.concat(['nodes',nodeId]),'locked',locked?'true':null);
+}
+
 function planAddNode(text, raw, sectionIdx, preset){
   /* preset (optional): {icon, tint, title} from NODE_PRESETS — the id stem
      follows the icon so the spec reads well (db1, antenna1, ...) */

@@ -1,6 +1,15 @@
 /* Pure authored placement, layout and named-view commands. Measured boxes
    are inputs; DOM measurements and pointer lifetimes belong to controllers. */
 
+function builderLockedNodeIds(d,ids){
+  var nodes=d && d.nodes || {},wanted=ids && new Set(ids);
+  return Object.keys(nodes).filter(function(id){return (!wanted || wanted.has(id)) && nodes[id] && nodes[id].locked===true;});
+}
+function builderPositionLockError(d,ids,action){
+  var locked=builderLockedNodeIds(d,ids);if(!locked.length)return null;
+  return {error:'Unlock '+locked.map(function(id){return '“'+id+'”';}).join(', ')+' in Layers or Inspect before '+(action || 'changing its graph position')+'.'};
+}
+
 function planEdgeCurve(text,raw,sectionIdx,index,points,cubic){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   if(!got.d.edges || !got.d.edges[index])return {error:'Connection not found.'};
@@ -18,6 +27,7 @@ function planMoveRow(text, raw, sectionIdx, fromIdx, toIdx){
   if (got.error) return got;
   var rows = got.d.rows;
   if (!Array.isArray(rows) || !rows[fromIdx]) return {error: 'row not found'};
+  var locked=builderPositionLockError(got.d,builderFlatRowIds([rows[fromIdx]]),'moving this row');if(locked)return locked;
   if (toIdx < 0 || toIdx >= rows.length) return {error: 'no row slot there'};
   if (toIdx === fromIdx) return {error: 'already there'};
   var r = builderRewrite(text, raw, got.path.concat(['rows']), function(copy){
@@ -37,6 +47,7 @@ function planMoveGroup(text, raw, sectionIdx, groupKey, drop){
     if (nodes[id] && nodes[id].group === groupKey) members[id] = true;
   });
   if (!Object.keys(members).length) return {error: 'group "' + groupKey + '" not found'};
+  var locked=builderPositionLockError(got.d,Object.keys(members),'moving this group');if(locked)return locked;
   var rows = got.d.rows;
   if (!builderFlatRowIds(rows).some(function(id){ return members[id]; }))
     return {error: 'group "' + groupKey + '" has no nodes placed in rows'};
@@ -112,6 +123,7 @@ function planMoveNode(text, raw, sectionIdx, id, drop){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
+  var locked=builderPositionLockError(got.d,[id],'moving this node');if(locked)return locked;
   var inRows = builderFlatRowIds(got.d.rows).indexOf(id) >= 0;
   var floating = (got.d.floats || []).some(function(f){ return f && f.id === id; });
   if (!inRows && !floating) return {error: 'node "' + id + '" has no layout slot (rows or floats) to move'};
@@ -132,6 +144,7 @@ function planMoveNode(text, raw, sectionIdx, id, drop){
 function planPlaceFloat(text,raw,sectionIdx,id,x,y){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
   if(!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes,id))return {error:'node not found'};
+  var locked=builderPositionLockError(got.d,[id],'moving this node');if(locked)return locked;
   if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
   return builderRewrite(text,raw,got.path,function(d){
     if(builderFlatRowIds(d.rows).indexOf(id)>=0){
@@ -285,6 +298,7 @@ function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
   if (got.error) return got;
   if (!got.d.nodes || !Object.prototype.hasOwnProperty.call(got.d.nodes, id))
     return {error: 'node "' + id + '" not found'};
+  var locked=builderPositionLockError(got.d,[id],'changing this node’s placement');if(locked)return locked;
   var side = sideOrNull == null || sideOrNull === '' ? null : sideOrNull;
   if(side==='free'){
     var p=layout(got.d).pos[id] || {cx:W/2,cy:70};
@@ -342,6 +356,7 @@ function planSwapNodes(text, raw, sectionIdx, idA, idB){
   if (!rec) return {error: 'section not found — reselect and try again'};
   var d = specValueAt(raw, rec.diagram);
   if (!d) return {error: 'no diagram in this section'};
+  var locked=builderPositionLockError(d,[idA,idB],'swapping these nodes');if(locked)return locked;
   var found = {a: false, b: false};
   function sw(id){
     if (id === idA){ found.a = true; return idB; }
@@ -387,6 +402,7 @@ function planStackNodes(text, raw, sectionIdx, nodeIds){
   (nodeIds || []).forEach(function(id){ if (typeof id === 'string') want[id] = true; });
   var wantList = Object.keys(want);
   if (wantList.length < 2) return {error: 'select at least two nodes to stack'};
+  var locked=builderPositionLockError(d,wantList,'stacking these nodes');if(locked)return locked;
   /* flat-row order of the selected ids, and which of them actually sit in rows */
   var ordered = [], seen = {};
   d.rows.forEach(function(row){
@@ -732,6 +748,7 @@ function sectionLayoutDetachSteps(d,items){
 
 function planAutoArrange(text,raw,section,result){
   var got=builderDiagram(text,raw,section);if(got.error)return got;
+  var locked=builderPositionLockError(got.d,null,'using Auto arrange');if(locked)return locked;
   try{
     var ids=autoArrangeInput(got.d);
     if(!result || !Array.isArray(result.positions) || result.positions.length!==ids.length ||
@@ -850,6 +867,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,
 /* Shared placement validation for measured selection actions. */
 function builderMovableSpatial(text,raw,targets,layoutId,rects){
   var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+  var locked=builderPositionLockError(got.d,targets.filter(function(t){return t.kind==='node';}).map(function(t){return t.id;}),'moving or distributing the selection');if(locked)return locked;
   if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Row nodes follow the row layout. Use Free placement for every selected node to move or distribute them.'};
   var definition=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!definition || definition.presentation!=='explore'))return {error:'Select an Explore view before moving panels.'};

@@ -182,12 +182,20 @@ function initWorkbenchLibrary(opts){
   var grid=document.getElementById('welcome-library-grid'),status=document.getElementById('welcome-library-status');
   var reader=document.getElementById('canon-reader'),error=document.getElementById('canon-reader-error');
   var edit=document.getElementById('canon-reader-edit'),title=document.getElementById('canon-reader-title');
+  var intro=document.getElementById('canon-reader-intro'),toolbar=intro.querySelector('.canon-reader-toolbar'),headerTitle=document.getElementById('workbench-reader-title');
   var retry=document.getElementById('welcome-library-retry'),readerRetry=document.getElementById('canon-reader-retry');
   var copy=document.getElementById('canon-reader-copy');
   var specRequests=new Map(),headerObserver=null;
   var pending=null,entries=[],origin='',published=false,ctl=null,tour=null,exploreCanvas=null,deepLinks=null,positionChange=null,active=null,sequence=0,current=null,openedBuild=false,backendContext=null;
+  function retireHeader(){
+    if(title.parentElement!==intro){intro.prepend(toolbar);toolbar.after(title);}
+    headerTitle.hidden=true;title.removeAttribute('title');
+  }
+  function showHeader(){
+    title.title=title.textContent;headerTitle.append(title,toolbar);headerTitle.hidden=false;
+  }
   function retireViewer(){
-    if(headerObserver)headerObserver.disconnect();headerObserver=null;document.body.classList.remove('canon-reader-active');reader.style.removeProperty('--flowview-navigation-top');
+    if(headerObserver)headerObserver.disconnect();headerObserver=null;document.body.classList.remove('canon-reader-active');retireHeader();reader.style.removeProperty('--flowview-navigation-top');reader.style.removeProperty('--flowview-navigation-bottom');
     if(positionChange && ctl && ctl.onChange===positionChange.wrapped)ctl.onChange=positionChange.prior;
     positionChange=null;
     if(exploreCanvas)exploreCanvas.destroy();exploreCanvas=null;
@@ -323,6 +331,7 @@ function initWorkbenchLibrary(opts){
       if(handoff)applyWorkspaceTarget(ctl,page,handoff.target);
       edit.textContent=handoff && handoff.action==='build'?'Build with Claude →':'Edit in Workbench →';
       document.body.classList.add('canon-reader-active');
+      showHeader();
       var header=document.querySelector('.workbench-header');
       function headerSize(){var height=header?Math.ceil(header.getBoundingClientRect().height):0;reader.style.setProperty('--flowview-navigation-top',height+'px');var nav=reader.querySelector('.explore-navigation');if(nav)reader.style.setProperty('--flowview-navigation-bottom',Math.ceil(height+nav.getBoundingClientRect().height+8)+'px');}
       headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}

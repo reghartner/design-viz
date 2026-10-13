@@ -485,8 +485,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
     var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
     var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom,stageRect=stage.getBoundingClientRect();
-    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getClientRects().length && canvasTools.getBoundingClientRect();
-    function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-insetBottom);}
+    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),readerTools=readerCanvas && shell.closest('.docview') && shell.closest('.docview').querySelector(':scope > .reader-page-actions');
+    // The reader action wrapper spans the viewport so its children can align
+    // right while the wrapper itself remains pointer-transparent. Only the
+    // visible controls occupy panel space.
+    var obstacleNodes=readerTools?Array.from(readerTools.children):canvasTools?[canvasTools]:[];
+    var obstacleRects=obstacleNodes.filter(function(node){return node.getClientRects().length;}).map(function(node){return node.getBoundingClientRect();});
+    var toolRect=obstacleRects.length && obstacleRects.reduce(function(union,r){return {left:Math.min(union.left,r.left),right:Math.max(union.right,r.right),top:Math.min(union.top,r.top),bottom:Math.max(union.bottom,r.bottom)};});
+    function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-12);}
     var columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
     stacked.forEach(function(w){
@@ -494,7 +500,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
       var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
-      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-insetBottom){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
       if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
       r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);

@@ -151,7 +151,7 @@ test('automatic panels follow richer step content while authored and manual geom
  const controls=await rect(page.locator('.explore-player'));for(const panel of visible)expect(overlaps(panel,controls)).toBe(false);
  await info.attach('dynamic-panels-1280x800',{body:await page.screenshot(),contentType:'image/png'});
 });
-for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and sends the following panel left',async({page,server})=>{
+for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-height stacked panel full-size and arranges every panel without overlap',async({page,server})=>{
  const url=await build(server,{unstacked:true,oversized:true});
  if(surface==='reader')await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');
  else{await page.goto(server.origin+'/workbench.html');await paste(page,await readFile(path.join(server.root,'explore.json'),'utf8'));await closeTools(page);await page.getByRole('button',{name:'Service flow',exact:true}).click();}
@@ -159,17 +159,21 @@ for(const surface of ['reader','workbench'])test(surface+' keeps a maximum-heigh
  const beforeOversized=await rect(oversized),beforeFollowing=await rect(following);
  const tools=surface==='workbench'?await rect(page.locator('#workspace-canvas-controls')):null;
  const utilities=surface==='reader'?await rect(page.locator('#docview > .reader-page-actions')):null;
+ const utilityControls=surface==='reader'?await page.locator('#docview > .reader-page-actions > .tbtn:visible').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height};})):[];
  const insetBottom=tools?Math.max(68,stage.y+stage.height-tools.y+12):stage.y+stage.height-utilities.y+12,laneHeight=stage.height-12-insetBottom;
- if(surface==='workbench')expect(beforeOversized.height).toBeGreaterThan(laneHeight);
- else expect(beforeOversized.height).toBeCloseTo(laneHeight,0);
+ expect(beforeOversized.height).toBeGreaterThanOrEqual(laneHeight);
  await page.locator('.explore-panel-menu summary').click();await page.getByRole('button',{name:'Stack at edge',exact:true}).click();await page.keyboard.press('Escape');
  const afterOversized=await rect(oversized),afterFollowing=await rect(following);
+ const arranged=await Promise.all((await floats(page).all()).map(rect));
  expect(afterOversized.width).toBeCloseTo(beforeOversized.width,0);expect(afterOversized.height).toBeCloseTo(beforeOversized.height,0);
  expect(afterFollowing.width).toBeCloseTo(beforeFollowing.width,0);expect(afterFollowing.height).toBeCloseTo(beforeFollowing.height,0);
- expect(afterOversized.y).toBeCloseTo(stage.y+12,0);expect(afterFollowing.y).toBeCloseTo(stage.y+12,0);
+ expect(afterOversized.y).toBeCloseTo(stage.y+12,0);
  if(surface==='workbench')expect(afterOversized.y+afterOversized.height).toBeGreaterThan(stage.y+stage.height-insetBottom);
- else{expect(afterOversized.y+afterOversized.height).toBeCloseTo(utilities.y-12,0);expect(overlaps(afterOversized,utilities)).toBe(false);}
- expect(afterFollowing.x+afterFollowing.width).toBeCloseTo(afterOversized.x-8,0);
+ else{expect(afterOversized.y+afterOversized.height).toBeLessThanOrEqual(stage.y+stage.height-12);for(const control of utilityControls)expect(overlaps(afterOversized,control)).toBe(false);}
+ for(const panel of arranged){expect(panel.x).toBeGreaterThanOrEqual(stage.x+11);expect(panel.x+panel.width).toBeLessThanOrEqual(stage.x+stage.width-11);expect(panel.y).toBeGreaterThanOrEqual(stage.y+11);expect(panel.y+panel.height).toBeLessThanOrEqual(stage.y+stage.height-11);}
+ for(let a=0;a<arranged.length;a++)for(let b=a+1;b<arranged.length;b++)expect(overlaps(arranged[a],arranged[b])).toBe(false);
+ if(surface==='workbench'){const canvasTools=await rect(page.locator('#workspace-canvas-controls'));for(const panel of arranged)expect(overlaps(panel,canvasTools)).toBe(false);}
+ else for(const panel of arranged)for(const control of utilityControls)expect(overlaps(panel,control)).toBe(false);
 });
 test('panels resize inward below 210px, detach, cancel, hide and restore independently',async({page,server})=>{
  const url=await build(server);await page.goto(url+'#d=doorbell&v=service-flow&m=step&s=quiet');

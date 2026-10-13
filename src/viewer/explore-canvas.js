@@ -25,7 +25,7 @@ function initViewerExploreCanvas(ctl,view,opts){
       }
     }
   }
-  var navigation=createExploreNavigation(ctl,{contents:true,container:container,selectSection:selectSection,action:opts && opts.action,isCanvas:function(){return !!active;}});
+  var navigation=createExploreNavigation(ctl,{contents:true,container:container,selectSection:selectSection,action:opts && opts.action,singleShareAction:!!(opts && opts.singleShareAction),isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;

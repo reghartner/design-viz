@@ -2109,6 +2109,8 @@ test('host-owned deep links bind current-state copies without changing host rout
   assert.strictEqual(h.windowListeners.hashchange, undefined);
   h.ctl.onChange();
   assert.deepStrictEqual(h.historyCalls, []);
+  assert.strictEqual(h.channel.currentURL(),
+    'https://host.example.test/workbench#t=overview');
   h.button.listeners.click();
   assert.strictEqual(h.copied[0],
     'https://host.example.test/workbench#t=overview');

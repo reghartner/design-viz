@@ -130,10 +130,10 @@ function createReaderContents(ctl,nav,actions,options){
     tabLabel.textContent=owner?ownerLabel(owner):'Document';tabLabel.title=tabLabel.textContent;
     if(owner){expandedTabs.add(owner.path);if(owner.current && owner.current.presentation==='explore')expandedViews.add(owner.path+':'+owner.current.id);}
     var index=members.indexOf(current);pageLabel.textContent='Page '+(index+1 || 1)+' of '+(members.length || 1);previous.disabled=index<=0;next.disabled=index<0 || index>=members.length-1;
-    // Shared utility controls remain live. The hidden original Tab bar still
-    // owns routing; surface its real copy control alongside section copy.
+    // Shared utility controls remain live. Ordinary readers surface the hidden
+    // Tab bar's real copy control; a host-owned share action consolidates it.
     release();
-    if(owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
+    if(!options.singleShareAction && owner && owner.tabBlock){var block=ctl.tabBlocks[owner.tabBlock-1],copy=block.copyButtons[owner.tab];if(copy){var anchor=doc.createComment('reader tab copy');copy.before(anchor);actions.prepend(copy);moved.push({node:copy,anchor:anchor});}}
     Array.from(actions.children).filter(function(node){return node!==utilities && !node.classList.contains('viewport-actions');}).forEach(function(node){var anchor=doc.createComment('reader utility');node.before(anchor);utilityBody.appendChild(node);moved.push({node:node,anchor:anchor});});
     var expand=actions.querySelector('.viewport-expand');if(expand){var anchor=doc.createComment('reader expand');expand.before(anchor);utilityBody.appendChild(expand);moved.push({node:expand,anchor:anchor});}
     utilities.hidden=!utilityBody.children.length;

@@ -326,7 +326,7 @@ function initWorkbenchLibrary(opts){
       var header=document.querySelector('.workbench-header');
       function headerSize(){var height=header?Math.ceil(header.getBoundingClientRect().height):0;reader.style.setProperty('--flowview-navigation-top',height+'px');var nav=reader.querySelector('.explore-navigation');if(nav)reader.style.setProperty('--flowview-navigation-bottom',Math.ceil(height+nav.getBoundingClientRect().height+8)+'px');}
       headerSize();if(header){headerObserver=new ResizeObserver(headerSize);headerObserver.observe(header);}
-      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy]});
+      exploreCanvas=initViewerExploreCanvas(ctl,reader,{action:[edit,copy],singleShareAction:true});
       tour=wireTour(ctl,reader,window,tourUsableConfig(page.tour)?page.tour:TOUR_DEFAULT_CONFIG);
       if(opts.savePosition){
         var priorChange=ctl.onChange,wrapped=function(){
@@ -342,7 +342,7 @@ function initWorkbenchLibrary(opts){
       else {title.textContent='Diagram unavailable';error.textContent=ex.message;error.hidden=false;readerRetry.hidden=false;}
     }
   }
-  bindCopyControl(window,copy,function(){return canonDiagramURL(location.href,current.id);});
+  bindCopyControl(window,copy,function(){return deepLinks?deepLinks.currentURL():canonDiagramURL(location.href,current.id);});
   function refresh(){pending=null;specRequests.clear();show(active,opts.selected());}
   retry.addEventListener('click',refresh);readerRetry.addEventListener('click',refresh);
   edit.addEventListener('click',function(){

@@ -1199,7 +1199,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .canon-library-card:hover{border-color:#a79acb;box-shadow:0 8px 26px #71639514}.canon-library-card strong{font-size:23px;line-height:1.4}.canon-library-card>span{font-size:13px}
 .canon-library-badge{font:10px/1.4 system-ui,sans-serif!important;font-weight:750!important;letter-spacing:1.2px;color:#6a6090;background:#eae5f4;padding:6px 9px;border-radius:6px}
 .canon-library-owner{color:#7a8194;overflow-wrap:anywhere}.canon-library-action{margin-top:auto;color:#7161a3;font-weight:650}
-.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:108px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
+.canon-reader-toolbar{display:flex;align-items:center;gap:18px;margin-bottom:18px}.canon-reader-toolbar .welcome-back{margin:0}.canon-reader-toolbar #canon-reader-copy{margin-left:auto;min-width:34px}.canon-reader-toolbar #canon-reader-copy svg{width:18px;height:18px}.canon-reader-toolbar .copyfallback{flex:1;min-width:140px;max-width:450px}
 #canon-reader{margin:28px 0 50px;max-width:none}
 .canon-reader-active .workbench-header{position:sticky;top:0;z-index:110;max-width:none;background:#f7f8fc;}
 #welcome-reader-screen h1{font-size:29px;letter-spacing:-.6px}

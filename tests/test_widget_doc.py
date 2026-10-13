@@ -18,6 +18,8 @@ CONTRACT = ROOT / "contract" / "authoring-contract.md"
 # Discover authored panel modules; there is no central type allowlist.
 PANEL_TYPES = sorted(p.stem for p in (ROOT / "src/panels/types").glob("*.js"))
 assert len(PANEL_TYPES) >= 17, "panel modules not discovered"
+# A fork's company/panels/types are documented by company/contract fragments.
+PANEL_TYPES = sorted(PANEL_TYPES + [p.stem for p in (ROOT / "company/panels/types").glob("*.js")])
 
 _spec = importlib.util.spec_from_file_location("widget_doc", TOOL)
 widget_doc = importlib.util.module_from_spec(_spec)
@@ -46,7 +48,7 @@ class WidgetDocTest(unittest.TestCase):
             self.assertIn(text, p.stdout, text)
 
     def test_each_type_extracts_its_own_block(self):
-        contract = CONTRACT.read_text()
+        contract = widget_doc.contract_text(ROOT)
         for t in PANEL_TYPES:
             p = run(t)
             self.assertEqual(p.returncode, 0, "%s: %s" % (t, p.stderr))
@@ -69,7 +71,10 @@ class WidgetDocTest(unittest.TestCase):
             # widget: expectation computed from the contract independently
             # of the parser (bullet start to the next bullet / section tail)
             start = contract.index("\n- `%s` " % t) + 1
-            ends = [contract.find(m, start + 1) for m in ("\n- `", "\nPatches are SPARSE")]
+            # Company fragment bullets end at the next bullet, prose, heading or fragment.
+            ends = [contract.find(m, start + 1) for m in ("\n- `", "\nPatches are SPARSE")] + \
+                [m.start() for m in [re.compile(r"\n(?![ \t\n])").search(contract, contract.index("\n", start))] if m] + \
+                [len(contract)]
             end = min(e for e in ends if e != -1)
             expected = contract[start:end].rstrip()
             got = p.stdout.split("\n- `%s` " % t, 1)[1]

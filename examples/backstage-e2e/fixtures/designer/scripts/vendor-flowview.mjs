@@ -32,9 +32,11 @@ export async function vendorFlowview(source, destination) {
   // Generate portable pages from tracked source, never ignored local HTML. Build
   // before replacing the destination; failure leaves its existing runtime intact.
   const buildRoot = await mkdtemp(path.join(tmpdir(), 'flowview-vendor-build-'));
+  // Offline-kit examples carry an .agent-kit marker; company/ is the fork overlay.
+  const marked = tracked.filter(name => name.startsWith('examples/') && path.posix.basename(name) === '.agent-kit')
+    .map(name => path.posix.dirname(name) + '/');
   const inputs = ['src/', 'tools/', 'apps/backstage/', 'contract/', 'cookbook/', 'docs/',
-    '.claude/skills/hld-to-page/', 'examples/canon/', 'examples/contract-blocks/',
-    'examples/data-contract/', 'examples/doorbell-chime/', 'examples/independent-extraction/', 'diagrams/'];
+    '.claude/skills/hld-to-page/', 'examples/canon/', ...marked, 'company/', 'diagrams/'];
   try {
     for (const name of tracked.filter(name => ['canon.json', 'LICENSE'].includes(name) || inputs.some(prefix => name.startsWith(prefix)))) {
       const target = path.join(buildRoot, name);

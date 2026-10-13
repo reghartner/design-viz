@@ -6,6 +6,10 @@ picker examples, styles, layout capabilities, reference paths and release metada
 All built-in types use this contract. There is no central panel allowlist,
 picker table, import list or compatibility entry to update.
 
+A company fork puts its own panel types in `company/panels/types/`, shared
+helpers in `company/panels/`, and each type's documentation in
+`company/contract/`; see [company forks](company-overlay.md).
+
 Add a panel definition and its tests, then rebuild generated artifacts. A new
 kind of shared control or animation may still require a shared API change.
 Panel code is trusted repository code shipped in a Flowview release; specs cannot
@@ -143,7 +147,9 @@ the historical cascade against shared rules; new panels normally need no orderin
 metadata. Shared styles contain matching type-independent order markers. Do not
 duplicate rules between modules.
 
-`src/source-bundles.json` discovers `panels/types/*.js` deterministically. The
+`src/source-bundles.json` discovers `panels/types/*.js` deterministically, then
+the optional company overlay globs `@company/panels/*.js` (before the types)
+and `@company/panels/types/*.js` (after them). The
 validator bundle includes DOM-free definitions; the viewer adds the engine and
 the workbench adds generic editing code. Named entrypoints order these bundles
 and select shared assets and deliberate exports. `tools/source-loader.cjs` owns

@@ -23,7 +23,9 @@
     "panels/shared.js",
     "panels/notifications.js",
     "panels/audio.js",
-    "panels/types/*.js"
+    "@company/panels/*.js",
+    "panels/types/*.js",
+    "@company/panels/types/*.js"
   ],
   "engine.js": [
     "viewer/prose.js",

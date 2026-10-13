@@ -4,15 +4,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const sourceRoot = path.join(__dirname, '../src');
+/* Fork-owned overlay. Upstream ships only company/README.md there, so forks keep
+   panels, contract fragments, examples and tests out of upstream-owned files.
+   Only this checkout's own source tree is overlaid; synthetic test roots are not. */
+const COMPANY_PREFIX = '@company/';
+function companyDir(root = sourceRoot) {
+  return path.resolve(root) === sourceRoot ? path.join(sourceRoot, '../company') : null;
+}
+function sourcePath(root, file) {
+  if (!file.startsWith(COMPANY_PREFIX)) return path.join(root, file);
+  const company = companyDir(root);
+  if (!company) throw new Error('Company overlay source outside the checkout: ' + file);
+  return path.join(company, file.slice(COMPANY_PREFIX.length));
+}
 function manifest(root) { return JSON.parse(fs.readFileSync(path.join(root, 'source-bundles.json'), 'utf8')); }
 function sourceFiles(name, root = sourceRoot) {
   const config = manifest(root), entries = Object.hasOwn(config, name) ? config[name] : [name];
   if (!Array.isArray(entries)) throw new Error('Not a logical source bundle: ' + name);
   return entries.flatMap((entry) => {
-    if (!entry.endsWith('/*.js')) return [entry];
+    const company = entry.startsWith(COMPANY_PREFIX);
+    if (!entry.endsWith('/*.js')) {
+      if (company) throw new Error('Company overlay entries must be directory globs: ' + entry);
+      return [entry];
+    }
     const directory = entry.slice(0, -5);
-    const files = fs.readdirSync(path.join(root, directory)).filter(file => file.endsWith('.js')).sort();
-    if (!files.length) throw new Error('Empty source glob: ' + entry);
+    // Overlay globs are optional: an absent or empty company directory adds nothing.
+    if (company && (!companyDir(root) || !fs.existsSync(sourcePath(root, directory)))) return [];
+    const files = fs.readdirSync(sourcePath(root, directory), {withFileTypes:true})
+      .filter(file => file.isFile() && file.name.endsWith('.js')).map(file => file.name).sort();
+    if (!files.length && !company) throw new Error('Empty source glob: ' + entry);
     return files.map(file => directory + '/' + file);
   });
 }
@@ -21,7 +41,7 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
   return files.map(file => {
     if (seen.has(file)) throw new Error('Duplicate physical source: ' + file);
     seen.add(file);
-    let source = fs.readFileSync(path.join(root, file), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
+    let source = fs.readFileSync(sourcePath(root, file), 'utf8').replace(/\r\n?/g, '\n').trimEnd();
     if (file === 'workbench/auto-arrange.js' && substitute) {
       const files = manifest(root).assets.autoArrangeWorker;
       const worker = files.map(file => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');
@@ -37,8 +57,11 @@ function sourceRecords(names, root = sourceRoot, substitute = true) {
     return {file, source};
   });
 }
+function displayPath(file) {
+  return file.startsWith(COMPANY_PREFIX) ? 'company/' + file.slice(COMPANY_PREFIX.length) : 'src/' + file;
+}
 function formatSources(records) {
-  return records.map(record => '/* ---- src/' + record.file + ' ---- */\n' + record.source).join('\n');
+  return records.map(record => '/* ---- ' + displayPath(record.file) + ' ---- */\n' + record.source).join('\n');
 }
 function readSource(name, root = sourceRoot) { return sourceRecords([name], root).map(record => record.source).join('\n'); }
 function composeSources(names, root = sourceRoot) { return formatSources(sourceRecords(names, root)); }
@@ -165,7 +188,7 @@ function entrypointAssets(name, root = sourceRoot) {
   }),icons:entry.icons ? iconAssets(root) : '',
     ...(entry.fonts ? fontAssets(entry.fonts,root) : {fonts:[],licenses:[]})};
 }
-module.exports = { sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
+module.exports = { companyDir, sourcePath, sourceFiles, sourceRecords, composeSources, readSource, entrypoint, moduleSource,
   panelAssets, readStyles, fontAssets, fontCss, entrypointAssets };
 if (require.main === module) {
   const [mode, ...names] = process.argv.slice(2);

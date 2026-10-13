@@ -1,5 +1,22 @@
 # Changelog
 
+## Company overlay for forks (2026-10-13)
+
+- A company fork can keep its customizations in `company/`, which upstream
+  never ships content in beyond `company/README.md`. Panel types
+  (`company/panels/types/`) and their helper modules (`company/panels/`) are
+  bundled into every viewer, the workbench and the validator; contract
+  fragments (`company/contract/*.md`) are appended to the authoring contract
+  for `widget_doc`, authoring packets and the folder-agent kit; example
+  folders (`company/examples/`) join the kit and must validate; tests
+  (`company/tests/`) run in the normal Node and Python suites; release notes go
+  in `company/CHANGELOG.md`. See [company forks](docs/company-overlay.md).
+- Upstream examples join the offline folder-agent kit through an `.agent-kit`
+  marker file instead of hand-maintained lists in the kit, the image tests and
+  the Dockerfile. The workbench image copies `examples/` and `company/`.
+- Without an overlay, the viewer, runtime and diagram library outputs are
+  byte-identical to before.
+
 ## Imported-node alignment (2026-10-13)
 
 - Imported topology nodes can join local nodes in multi-selection and align

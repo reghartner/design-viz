@@ -1,0 +1,9 @@
+{"page":{"title":"Ticket triage","blocks":[{"heading":"Closing tickets","diagram":{
+  "nodes":{"queue":{"title":"Queue"},"team":{"title":"Team"}},
+  "rows":[["queue","team"]],
+  "edges":[{"from":"queue","to":"team"}],
+  "panels":[{"id":"tickets","type":"ticket-board","title":"Tickets","total":4,"initial":{"done":0}}],
+  "steps":[
+    {"edge":"queue->team","text":"The team takes two tickets.","panels":{"tickets":{"done":2}}},
+    {"edge":"queue->team","text":"The team closes the rest.","panels":{"tickets":{"done":4}}}
+  ]}}]}}

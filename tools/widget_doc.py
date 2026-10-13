@@ -6,7 +6,9 @@ Usage:
   python3 tools/widget_doc.py --list                # valid type names
   python3 tools/widget_doc.py --contract-card       # the message-contract card section
 
-Reads contract/authoring-contract.md live (no generated copies to drift).
+Reads contract/authoring-contract.md live (no generated copies to drift),
+with any company/contract/*.md fragments appended. A fragment documents its
+panels under its own `### panels` heading, one `- `type` ` bullet each.
 The panels-section intro (declaration mechanics) always prints before the
 requested widget blocks, and the shared tail (sparse-patch folding,
 enterOnce) always prints after them. Unknown names exit 2 and print the
@@ -16,7 +18,11 @@ import re
 import sys
 from pathlib import Path
 
-CONTRACT = Path(__file__).resolve().parent.parent / "contract" / "authoring-contract.md"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from company_overlay import contract_text  # noqa: E402
+
+ROOT = Path(__file__).resolve().parent.parent
+CONTRACT = ROOT / "contract" / "authoring-contract.md"
 PANELS_HEAD = "### panels"
 CARD_HEAD = "### message-contract card"
 BULLET_RE = re.compile(r"^- `([a-z][a-z0-9-]*)` ")
@@ -76,11 +82,29 @@ def load_sections(text):
             intro.append(line)
     if cur_type:
         blocks[cur_type] = "\n".join(cur).rstrip()
+    # Later `### panels` sections (company contract fragments) add bullets only.
+    starts = [i for i, l in enumerate(lines) if l.startswith(PANELS_HEAD)]
+    for start in starts[1:]:
+        extra_type, extra = None, []
+        for line in lines[start + 1:] + ["## end"]:
+            m = BULLET_RE.match(line)
+            if extra_type and not m and (not line or line.startswith((" ", "\t"))):
+                extra.append(line)
+                continue
+            if extra_type:
+                if extra_type in blocks:
+                    raise ValueError("panel type documented twice: " + extra_type)
+                blocks[extra_type] = "\n".join(extra).rstrip()
+                extra_type = None
+            if line.startswith("### ") or line.startswith("## "):
+                break
+            if m:
+                extra_type, extra = m.group(1), [line]
     return card, "\n".join(intro).rstrip(), "\n".join(tail).strip(), blocks
 
 
 def main(argv):
-    card, intro, tail, blocks = load_sections(CONTRACT.read_text())
+    card, intro, tail, blocks = load_sections(contract_text(ROOT))
     if "--list" in argv:
         print(" ".join(sorted(blocks)))
         return 0

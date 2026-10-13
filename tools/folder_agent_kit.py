@@ -5,6 +5,10 @@ import hashlib
 import json
 import subprocess
 from pathlib import Path
+try:
+    from company_overlay import CONTRACT, contract_text, kit_examples
+except ModuleNotFoundError:
+    from tools.company_overlay import CONTRACT, contract_text, kit_examples
 
 
 def folder_agent_kit(root, runtime):
@@ -12,19 +16,20 @@ def folder_agent_kit(root, runtime):
     files = {}
     for directory, patterns in [('src/starters', ('*.json',)), ('contract', ('*.md',)),
                                  ('cookbook', ('*.md',)), ('docs', ('*.md',)),
-                                 # Small maintained examples linked by focused contracts.
-                                 ('examples/contract-blocks', ('*.spec.json',)),
-                                 ('examples/data-contract', ('*.spec.json',)),
-                                 ('examples/doorbell-chime', ('*.spec.json',)),
-                                 ('examples/canon/topology', ('*.json',)),
-                                 ('examples/independent-extraction', ('*.md', '*.spec.json')),
                                  ('.claude/skills/hld-to-page', ('*.md', '*.py', '*.cjs'))]:
         for pattern in patterns:
             for path in sorted((root / directory).rglob(pattern)):
                 relative = path.relative_to(root)
                 if not any(part in ('node_modules', 'agents', 'research') for part in relative.parts):
                     files[relative.as_posix()] = path.read_text()
-    for name in ['LICENSE', 'tools/widget_doc.py', 'tools/validate.js',
+    # Company contract fragments travel inside the contract, never beside it.
+    if (root / CONTRACT).is_file():
+        files[CONTRACT] = contract_text(root)
+    # Small maintained examples: upstream folders marked with .agent-kit, plus
+    # every company/examples folder.
+    for name in kit_examples(root):
+        files[name] = (root / name).read_text()
+    for name in ['LICENSE', 'tools/widget_doc.py', 'tools/company_overlay.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs', 'tools/authoring-packet.py', 'tools/visibility-check.cjs',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:
         files[name] = (root / name).read_text()

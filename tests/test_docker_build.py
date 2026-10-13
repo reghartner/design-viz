@@ -12,6 +12,8 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / 'tools'))
+from company_overlay import kit_examples  # noqa: E402
 
 
 class DockerSourceBuildTests(unittest.TestCase):
@@ -56,10 +58,8 @@ class DockerSourceBuildTests(unittest.TestCase):
             self.assertIsNotNone(match)
             envelope = json.loads(match.group(1))
             files = json.loads(gzip.decompress(base64.b64decode(envelope['gzip'])))['files']
-            for name in ['tools/compose-page-layout.cjs', 'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
-                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs',
-                         'tools/authoring-packet.py', 'tools/visibility-check.cjs',
-                         'examples/contract-blocks/contract-blocks.spec.json',
+            examples = kit_examples(ROOT)
+            for name in ['examples/contract-blocks/contract-blocks.spec.json',
                          'examples/data-contract/data-contract.spec.json',
                          'examples/doorbell-chime/doorbell-chime.spec.json',
                          'examples/independent-extraction/README.md',
@@ -69,6 +69,11 @@ class DockerSourceBuildTests(unittest.TestCase):
                          'examples/canon/topology/checkout.json',
                          'examples/canon/topology/checkout-positioned.json',
                          'examples/canon/topology/checkout-subset.json']:
+                self.assertIn(name, examples)
+            for name in ['tools/compose-page-layout.cjs', 'tools/arrange/core.cjs', 'tools/arrange/estimate.cjs',
+                         'tools/arrange/measure.cjs', 'tools/arrange/solver.cjs',
+                         'tools/authoring-packet.py', 'tools/visibility-check.cjs',
+                         'tools/company_overlay.py', *examples]:
                 self.assertEqual(files[name], (ROOT / name).read_text(), name)
             self.assertIn('state', json.loads(files['tools/arrange/layouts.json']))
             self.assertFalse(any(name.endswith(('generated-native.html', 'setup.cjs', 'package-lock.json')) for name in files))

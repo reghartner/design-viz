@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 from widget_doc import load_sections, CLIP_CUE, CLIP_CUE_TYPES
+from company_overlay import contract_text
 
 ROOT = Path(__file__).resolve().parent.parent
 CONTRACT = 'contract/authoring-contract.md'
@@ -90,6 +91,11 @@ def normalize_links(text, source):
     return '\n'.join(lines)
 
 
+def read_document(path):
+    """Maintained text; the contract includes company/contract fragments."""
+    return contract_text(ROOT) if path == CONTRACT else (ROOT / path).read_text()
+
+
 def section(text, title):
     """Extract exactly one Markdown section, stopping at the next heading.
     Ignore headings inside fences (e.g. the contract's JSON examples).
@@ -156,7 +162,7 @@ def infer(raw):
 
 
 def generate(panel_names, feature_names, mode='new', raw=None):
-    contract = (ROOT / CONTRACT).read_text()
+    contract = read_document(CONTRACT)
     card, intro, tail, blocks = load_sections(contract)
     explicit_panels, explicit_features = set(panel_names), set(feature_names)
     inferred_panels, inferred_features = infer(raw) if raw is not None else (set(), set())
@@ -171,7 +177,7 @@ def generate(panel_names, feature_names, mode='new', raw=None):
         features = expanded
     parts, provenance, loaded = [], [], {}
     def add(path, heading=None, content=None):
-        if path not in loaded: loaded[path] = (ROOT / path).read_text()
+        if path not in loaded: loaded[path] = read_document(path)
         text = content if content is not None else section(loaded[path], heading) if heading else loaded[path].strip()
         text = normalize_links(text, path)
         parts.append('<!-- Source: ' + path + (' # ' + heading if heading else '') + ' -->\n' + text)
@@ -213,7 +219,7 @@ def generate(panel_names, feature_names, mode='new', raw=None):
     route_text = '\n'.join('- `' + path + '`' for path in sorted(routes) if (ROOT / path).exists())
     document = '# Focused authoring packet\n\nMode: ' + mode + '. Selection is the union of explicit choices and spec inference.\n\nPanels: ' + (', '.join(sorted(panels)) or 'none') + '. Features: ' + (', '.join(sorted(features)) or 'none') + '.\n\nThis packet is the primary authoring guidance: use its selected rules instead of preloading the full workflow, contract, cookbook or session manual. Linked references are on demand unless this packet names a needed worksheet/source route. Follow the active collaboration protocol for candidate approval; a packet does not grant publication or new story decisions. Fully specified small edits retain the scoped-edit exception below. Full documentation remains available on demand; source paths and relative links resolve from VIZ, not the packet output folder.\n\n' + '\n\n'.join(parts) + '\n\n## On-demand routes and examples\n\n' + route_text + '\n'
     baseline_paths = [CONTRACT, SKILL, WORKFLOW, REFS + 'worked-example.md', 'cookbook/README.md']
-    baseline = '\n\n'.join((ROOT / path).read_text() for path in baseline_paths)
+    baseline = '\n\n'.join(read_document(path) for path in baseline_paths)
     metadata = {'version': 1, 'mode': mode, 'selectionPolicy': 'union; explicit selections never narrow inferred requirements',
                 'explicit': {'panels': sorted(explicit_panels), 'features': sorted(explicit_features)},
                 'inferred': {'panels': sorted(inferred_panels), 'features': sorted(inferred_features)},

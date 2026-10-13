@@ -49,6 +49,7 @@ var CONTRACT = [
   '    "brand": {"app":"<company/app name>", "icon":"house", "accent":"#318585"}, // optional shared panel brand',
   '    "nodes":  {"<id>": {"title":"<name>", "sub":"<one-line detail>",',
   '                        "icon":"<icon>", "tint":"<tint>",',
+  '                        "image":"data:image/png;base64,...", "alt":"<description>", // optional embedded raster node',
   '                        "group":"<groupId>",          // optional: containment boundary',
   '                        "link":"<permalink URL>"}},   // optional: clickable arrow on the card',
   '    "groups": {"<groupId>": {"title":"<boundary title>", "icon":"<icon>"}}, // optional icon; dashed box around members',

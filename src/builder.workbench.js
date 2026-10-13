@@ -781,6 +781,19 @@ function initWorkbenchBuilder(opts){
       },{after:function(plan){clearMultiSelect();selectTarget({kind:t.kind,section:t.kind === 'section' ? plan.index : t.section,id:plan.id,index:plan.index},false);}});
     }
   }) : null;
+  function imageNodeSurface(section){
+    var sec=view.querySelector('.doc-sec[data-dv-section="'+section+'"]');if(!sec)return null;
+    var boards=Array.from(sec.querySelectorAll('.section-viewport .board')).filter(function(board){return board.querySelector('.boardcanvas>svg');});
+    return boards.find(function(board){return board.isConnected && (!board.getClientRects || board.getClientRects().length);}) || null;
+  }
+  var imageNodes=typeof initBuilderImageNodes==='function'?initBuilderImageNodes(document,{
+    view:view,isActive:opts.isActive,currentSection:function(){return session.insertSection;},surface:imageNodeSurface,
+    snapshot:function(){return session.snapshot();},blocked:function(){return !!(interactions.busy() || inspector.busy(view));},message:inspectorMessage,
+    apply:function(plan,snapshot,section){return applyPlan(plan,{after:function(){
+      clearMultiSelect();var target={kind:'node',section:section,id:plan.id};selectTarget(Object.assign(target,{el:findTargetEl(target)}),false);
+    }},snapshot);}
+  }):null;
+  if(imageNodes)life.own(function(){imageNodes.destroy();});
 
   /* ---- searchable document outline ---- */
   var outline = document.getElementById('sec-outline');

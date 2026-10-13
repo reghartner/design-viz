@@ -499,6 +499,12 @@ with no `title` shows its id:
 - `title` — display name, ~16 characters max (the card is fixed-width).
 - `sub` — one-line detail under the title (a role, a topic, a port). Monospace;
   ~20 characters max.
+- Node `image` — optional embedded PNG, JPEG or WebP data URL, at most 512 KiB
+  decoded. Remote URLs, SVG, GIF and mislabeled binary data are rejected.
+  In Workbench, drop or paste one local image on the active Standard or Explore
+  canvas. Each add is one Undo action; ordinary text paste stays native.
+- Node `alt` — required accessible description when `image` is present. Edit it
+  with the node title in Inspect.
 - `icon` — a known ID from the [shared icon library](../docs/shared-icons.md#icon-ids).
   Default `gear`. Pick the closest metaphor
   (db = storage, antenna = broker/radio, chip = embedded device, key = signing,

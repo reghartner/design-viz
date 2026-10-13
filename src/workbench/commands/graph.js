@@ -40,6 +40,37 @@ function planAddNode(text, raw, sectionIdx, preset){
   if (!r2) return {error: 'could not edit nodes in the editor text'};
   return {text: r2.text, start: r2.start, end: r2.end, kind: 'node', id: id};
 }
+
+function builderImageTitle(filename){
+  var name=typeof filename==='string'?filename.split(/[\\/]/).pop():'';
+  name=name.replace(/\.(?:png|jpe?g|webp)$/i,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();
+  if(!name)return 'Pasted image';
+  return name.slice(0,1).toUpperCase()+name.slice(1,80);
+}
+function builderImageIdStem(title){
+  var stem=String(title || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,32);
+  if(!/^[a-z]/.test(stem))stem='image'+(stem?'-'+stem:'');
+  return stem || 'image';
+}
+function planAddImageNode(text,raw,sectionIdx,asset,placement){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  if(!asset || !embeddedImageKind(asset.data))return {error:'Choose a readable PNG, JPEG or WebP image up to 512 KiB.'};
+  var d=got.d,title=builderImageTitle(asset.name),id=builderUniqueKey(d.nodes || {},builderImageIdStem(title));
+  var node={title:title,alt:typeof asset.alt==='string' && asset.alt.trim()?asset.alt.trim():title,image:asset.data};
+  var placed=text,rows=builderClone(Array.isArray(d.rows)&&d.rows.length?d.rows:[[]]);
+  if(rows.some(function(row){return !Array.isArray(row);}))return {error:'Correct the diagram rows before adding an image.'};
+  if(placement){
+    if(!Number.isInteger(placement.row) || !Array.isArray(rows[placement.row]) || !Number.isInteger(placement.slot) || placement.slot<0 || placement.slot>rows[placement.row].length)
+      return {error:'The drop position is no longer available. Drop the image again.'};
+    rows[placement.row].splice(placement.slot,0,id);
+  }else rows[rows.length-1].push(id);
+  var rowEdit=jsonSetField(placed,got.path,'rows',JSON.stringify(rows));
+  if(!rowEdit)return {error:'Could not place the image in this diagram.'};
+  placed=rowEdit.text;
+  var inserted=jsonInsertMember(placed,got.path.concat(['nodes']),id,JSON.stringify(node));
+  if(!inserted)return {error:'Could not add the image node to this diagram.'};
+  return {text:inserted.text,start:inserted.start,end:inserted.end,kind:'node',id:id};
+}
 function planAddEdge(text, raw, sectionIdx){
   var got = builderDiagram(text, raw, sectionIdx);
   if (got.error) return got;

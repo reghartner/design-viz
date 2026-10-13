@@ -495,7 +495,10 @@ function nodeForm(val, ctx){
       })),
       frow('float', floatControl)
     ].concat(floatRows,[
-      frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); })),
+      frow('sub', textControl(val.sub, function(v){ return commitSimple('sub', v == null ? null : JSON.stringify(v)); }))
+    ],val.image ? [
+      frow('image alt text', textControl(val.alt, function(v){ return commitSimple('alt', v == null ? null : JSON.stringify(v)); }, {required:'Describe the image for readers who cannot see it.'}))
+    ] : [],[
       frow('icon', iconPickerControl(selectControl(ICON_SET, val.icon || 'gear', function(v){ return commitSimple('icon', JSON.stringify(v || 'gear')); }))),
       frow('tint', selectControl(TINT_SET, val.tint || 'cmd', function(v){ return commitSimple('tint', JSON.stringify(v || 'cmd')); })),
       frow('link', textControl(val.link, function(v){ return commitSimple('link', v == null ? null : JSON.stringify(v)); }, {placeholder: 'permalink URL'})),

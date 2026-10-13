@@ -172,7 +172,9 @@ function initWorkbenchAgentReview(opts){
       var raw=JSON.parse(source),resolved=opts.resolve?(shown.topologyContext?opts.resolve(raw,shown.topologyContext):opts.resolve(raw)):raw;
       var page=normalize(resolved),findings=validate(page);if(findings.errors.length)throw Error(findings.errors.join('\n'));
       ctl=renderPage(el('view'),page,page.skin,null,{autoplay:false});
-      canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll')});rendered=true;decorate();
+      // Review opens on the changed diagram rather than spending its limited
+      // comparison space on the optional document outline.
+      canvas=initViewerExploreCanvas(ctl,el('view'),{container:el('scroll'),initialContentsOpen:false,presentation:{panelsHiddenWhenGraphVisible:true,overlayScale:.5},forceFit:true,refitOnResize:true,fitInsets:{left:24,right:24,top:20,bottom:24}});rendered=true;decorate();
       var Observer=doc.defaultView && doc.defaultView.MutationObserver;
       if(Observer){observer=new Observer(function(records){if(records.some(function(record){return record.type==='childList';}))decorate();});observer.observe(el('view'),{childList:true,subtree:true});}
       el('commit').disabled=!shown.review.ok || viewing!=='proposed';

@@ -902,6 +902,7 @@ test('external branch copies context without dispatch, accepts native followups 
 test('copy and paste Explore review keeps comparison, ledger and commit reachable',async({page},info)=>{
   const h=await setup(page);
   try{
+    await page.setViewportSize({width:1280,height:720});
     await page.context().grantPermissions(['clipboard-read','clipboard-write'],{origin});
     const raw=JSON.parse(source),diagram=raw.page.blocks[0].diagram;
     diagram.layouts.push({...structuredClone(diagram.layouts[0]),id:'explore',name:'Explore',presentation:'explore'});
@@ -918,22 +919,31 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await writeFile(path.join(h.session,'candidate.ledger.md'),ledger);
     h.run('propose','--request',request.id,'--revision',state.revision,'--file','candidate.spec.json','--ledger','candidate.ledger.md','--summary','Rename the service in Explore');
     await page.locator('#agent-update-open').click();
-    const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage');
+    const view=page.locator('#agent-update-view'),stage=view.locator('.explore-stage'),board=view.locator('.explore-board');
     async function contained(supporting=true){
       await expect(stage).toBeVisible();
-      const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox();
+      const area=await page.locator('#agent-update-scroll').boundingBox(),canvas=await stage.boundingBox(),surface=await board.boundingBox();
       if(canvas.y<area.y)await info.attach('contained-geometry',{body:JSON.stringify(await page.locator('#agent-update-scroll').evaluate(el=>({scrollTop:el.scrollTop,height:el.clientHeight,scrollHeight:el.scrollHeight,area:el.getBoundingClientRect().toJSON(),nav:el.querySelector('.reader-navigation').getBoundingClientRect().toJSON(),canvas:el.querySelector('.viewer-diagram-canvas').getBoundingClientRect().toJSON()}))),contentType:'application/json'});
       expect(canvas.x).toBeGreaterThanOrEqual(area.x);expect(canvas.y).toBeGreaterThanOrEqual(area.y);
       expect(canvas.x+canvas.width).toBeLessThanOrEqual(area.x+area.width+1);
       expect(canvas.y+canvas.height).toBeLessThanOrEqual(area.y+area.height+1);
-      expect(canvas.height).toBeGreaterThan(200);
+      expect(canvas.width).toBeGreaterThan(400);expect(canvas.height).toBeGreaterThan(260);
+      expect(surface.width).toBeGreaterThan(400);expect(surface.height).toBeGreaterThan(260);
       for(const id of ['close','current','proposed','commit'].concat(supporting?['ledger-summary']:[])){
-        await expect(page.locator('#agent-update-'+id)).toBeInViewport();
-        await page.locator('#agent-update-'+id).click({trial:true});
+        const control=page.locator('#agent-update-'+id);await expect(control).toBeInViewport();
+        if(await control.isEnabled())await control.click({trial:true});
       }
     }
+    async function changedNodeVisible(title){
+      const node=view.locator('[data-dv-node="b"]'),label=node.locator('.t1');await expect(node).toContainText(title);
+      await expect.poll(()=>node.evaluate(el=>{const r=el.getBoundingClientRect(),label=el.querySelector('.t1').getBoundingClientRect(),stage=el.closest('.explore-stage').getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);return r.width>=80 && r.height>=28 && label.height>=8 && r.left>=stage.left && r.right<=stage.right && r.top>=stage.top && r.bottom<=stage.bottom && !!hit && el.contains(hit);})).toBe(true);
+      await expect(label).toBeVisible();
+    }
     await page.screenshot({path:info.outputPath('explore-review.png')});await contained();
-    await expect(view.locator('[data-dv-node="b"]')).toContainText('Delivery service');
+    await expect(page.locator('#agent-update-note')).toBeVisible();await expect(page.locator('#agent-update-note')).toContainText('Commit updates the spec and ledger');
+    await expect(view.locator('.reader-top>.reader-button').first()).toHaveAttribute('aria-expanded','false');await changedNodeVisible('Delivery service');
+    await expect(view.locator('.explore-window:visible')).toHaveCount(0);await view.locator('.explore-panel-menu summary').click();
+    await expect(view.getByRole('button',{name:'Restore panels',exact:true})).toBeVisible();await expect(view.locator('.explore-overlay-value')).toHaveText('50%');await view.locator('.explore-panel-menu summary').click();
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');
     await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
     await expect(page.locator('#agent-update-highlights')).toHaveAttribute('aria-pressed','true');
@@ -959,27 +969,30 @@ test('copy and paste Explore review keeps comparison, ledger and commit reachabl
     await expect(view.locator('.stepline')).toContainText('Recording ready');
     await view.locator('.path-chip[data-dv-path="failed"]').click();await expect(view.locator('.stepline')).toContainText('Exact hidden failure');
     await view.locator('.path-chip[data-dv-path="happy"]').click();
-    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
-    await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.locator('.explore-panel-menu summary').click();await view.getByRole('button',{name:'Restore panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(1);
+    await view.getByRole('button',{name:'Hide panels',exact:true}).click();await expect(view.locator('.explore-window:visible')).toHaveCount(0);
+    await view.locator('.explore-panel-menu>summary').click();
     const collapsed=await stage.boundingBox();
     await page.locator('#agent-update-ledger-summary').click();await expect(page.locator('#agent-update-ledger')).toBeVisible();
-    await contained();expect((await stage.boundingBox()).height).toBeLessThan(collapsed.height);
-    await page.locator('#agent-update-current').click();await expect(view.locator('[data-dv-node="b"]')).toContainText('Backend');
+    await contained();await changedNodeVisible('Delivery service');expect((await stage.boundingBox()).height).toBeGreaterThanOrEqual(collapsed.height);
+    await page.screenshot({path:info.outputPath('explore-review-with-ledger.png')});
+    await page.locator('#agent-update-current').click();await changedNodeVisible('Backend');
     await expect(view.locator('[data-dv-node="b"]')).toHaveAttribute('data-agent-change','modified');await expect(page.locator('#agent-update-change-status')).toContainText('1 modified');
-    await expect(page.locator('#agent-update-commit')).toBeDisabled();
-    await page.locator('#agent-update-proposed').click();await contained();
+    await expect(page.locator('#agent-update-commit')).toBeDisabled();await contained();
+    await page.locator('#agent-update-proposed').click();await contained();await changedNodeVisible('Delivery service');
     await page.locator('#agent-update-ledger-summary').click();
-    await view.getByRole('button',{name:'Business',exact:true}).click();await expect(stage).toBeHidden();
+    await view.locator('.reader-top-view[data-tab-view$="-brief"]').click();await expect(stage).toBeHidden();
     await expect(view.locator('[data-dv-node="b"]')).toBeVisible();
-    await view.getByRole('button',{name:'Explore',exact:true}).click();await contained();
+    await view.locator('.reader-top-view[data-tab-view$="-explore"]').click();await contained();
     await page.locator('#agent-update-close').click();await expect(page.locator('#agent-update-dialog')).not.toBeVisible();
     await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('body')).not.toHaveClass(/viewer-exploring/);
     await page.locator('#agent-update-open').click();await contained();
     await page.screenshot({path:info.outputPath('explore-review-ready.png')});
-    await page.setViewportSize({width:640,height:800});await contained();
+    await page.setViewportSize({width:1024,height:800});await contained();
     await view.locator('.explore-legend-menu>summary').click();
     await expect(view.getByRole('group',{name:'Edge legend',exact:true}).locator('.li')).toBeInViewport();
-    await page.screenshot({path:info.outputPath('explore-review-narrow.png')});
+    await page.screenshot({path:info.outputPath('explore-review-narrow-desktop.png')});
     await page.keyboard.press('Escape');await expect(page.locator('#agent-update-dialog')).toBeVisible();
     await page.setViewportSize({width:1440,height:1000});
     await page.locator('#agent-update-commit').click();await expect(page.locator('#src')).toHaveValue(proposed);

@@ -8,6 +8,15 @@ from welcome, during editing, and in Focus workspace. The guide ships inside
 `workbench/flowspec.html`, including downloaded/offline copies and company nginx
 installations. No separate documentation service is required.
 
+During editing, **Help → Keyboard shortcuts** opens the compact key reference;
+press **?** outside a text field to open it directly. Canvas keys include
+**⌘/Ctrl A** for every visible node in the active section (including referenced
+read-only nodes), **F** for Fit diagram, **Shift F** for Fit selection, and
+**F2** to open Inspect and focus the selected object’s first editable field.
+Existing copy, paste, duplicate, delete, nudge, object-menu, pan, and quick-connect
+keys are listed there too. These navigation and selection actions do not edit the
+JSON or add Undo history.
+
 Start with **Your first diagram** for a complete walkthrough. The chapter list
 then covers the workspace, rows and free placement, quick connections, step
 playback, alternate paths, panels, Home editing, named views, catalogs and code

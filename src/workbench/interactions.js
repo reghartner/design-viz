@@ -310,6 +310,16 @@ function createBuilderInteractions(opts){
     multiSel=targets;multiSel.forEach(function(t){t.el.classList.add('dv-sel');});
     session.insertSection=targets[0].section;selectionChanged();renderMultiInspector();
   }
+  function inspectSelection(focus){
+    if(!multiSel.length && !session.target)return false;
+    if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true,focus:!!focus});
+    if(multiSel.length)renderMultiInspector();else renderInspector();
+    if(focus && guide){
+      var field=guide.querySelector('input:not([type="hidden"]):not([disabled]),textarea:not([disabled]),select:not([disabled]),[contenteditable="true"]');
+      if(field){field.focus({preventScroll:true});if(field.select && (field.tagName==='INPUT' || field.tagName==='TEXTAREA'))field.select();}
+    }
+    return true;
+  }
   /* Reference actions apply in both Standard and Canvas. Resolve provenance at
      the gesture boundary, before the ordinary Canvas object-menu listener. */
   var referenceMenu=null,referenceMenuLife=null,referenceOpener=null;
@@ -406,7 +416,7 @@ function createBuilderInteractions(opts){
   var spatial=createBuilderSpatialSelection({document:document,window:window,view:view,src:src,session:session,isActive:opts.isActive,
     targetFromEvent:targetFromEvent,selection:function(){return multiSel.length?multiSel:session.target?[Object.assign({},session.target,{el:findTargetEl(session.target)})]:[];},
     select:selectSpatial,toggle:toggleMultiSelect,find:findTargetEl,apply:applyPlan,busy:function(){return !!(addToStep || connect || nodeDrag || groupDrag || rowDrag || drag);},
-    inspect:function(){if(opts.workspace)opts.workspace.showTool('inspect',{closeUtilities:true});if(multiSel.length)renderMultiInspector();else renderInspector();}
+    inspect:function(){inspectSelection(false);}
   });
   life.own(function(){spatial.destroy();});
 
@@ -1675,6 +1685,8 @@ function createBuilderInteractions(opts){
     clearHome:life.guard(function(){clipboardHomeTarget=null;}),
     adding:function(){return life.alive()?addToStep:null;},connecting:function(){return life.alive()?connect:null;},
     selection:function(){return life.alive()?multiSel:[];},
+    selectAllNodes:function(){return life.alive() && spatial.selectAllNodes();},
+    inspectSelection:life.guard(inspectSelection),
     spatialActions:function(host,lifetime){return spatial.actions(host,lifetime);},
     busy:function(){return life.alive() && !!(addToStep || connect || drag || rowDrag || nodeDrag || groupDrag || curveEditor.busy());},
     toggleAdding:life.guard(function(t){if(addToStep){cancelAddToStep(null);return;}if(connect)cancelConnect(null);addToStep={section:t.section,step:t.index};addToStepStatus();renderInspector();}),

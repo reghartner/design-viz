@@ -86,6 +86,15 @@ it. Arrow keys nudge the selection by 10 graph units; Shift+Arrow uses 50, indep
 of zoom. Repeated arrows are one Undo action when all held arrows are released;
 Escape cancels the held movement. Row nodes explain that Free placement is required.
 Text fields, panel widgets, playback and resize handles retain their own shortcuts.
+Choose **Help → Keyboard shortcuts**, or press **?** outside a text field, for the
+complete canvas key sheet. With canvas focus, **⌘/Ctrl A** selects every visible
+node in the active section, including referenced read-only nodes; ordinary
+`type:"text"` nodes participate like every other node. **F** runs Fit diagram,
+**Shift F** runs Fit selection, and **F2** opens Inspect for the current selection
+and focuses its first editable field. Enter keeps its existing focused-object and
+text-field behavior. These shortcuts pause for native fields, selected prose,
+panel widgets, dialogs, read-only preview, and inactive editor surfaces. Select,
+fit, and help never change source or add Undo history.
 Inspect and the shared object menu offer **Distribute horizontally/vertically** for
 three or more free objects. They equalize rendered edge-to-edge gaps, preserving
 outer bounds, dimensions and the other axis, with one Undo action. Disabled controls

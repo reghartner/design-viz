@@ -508,10 +508,15 @@ test('handoff authoring rejects the current section without changing source',()=
 test('imported nodes are spatially addressable and the multi-node Inspector aligns them without provider bulk edits',()=>{
  const fs=require('node:fs'),path=require('node:path'),specs=['platform','checkout'].map(id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8')));
  const raw=specs[1],ctx={version:1,id:'checkout',specs},h=ui(raw);h.session.replaceProject(h.text,null,{topologyContext:ctx});
- const section=h.view.appendChild(h.element());section.className='doc-sec';section.setAttribute('data-dv-section','0');
+ const section=h.view.appendChild(h.element());section.className='doc-sec workspace-active-section';section.setAttribute('data-dv-section','0');
  const surface=section.appendChild(h.element());surface.className='section-viewport';const node=surface.appendChild(h.element('g'));node.setAttribute('data-dv-node','platform::api');
- const spatial=h.C.createBuilderSpatialSelection({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,targetFromEvent:()=>null,selection:()=>[],select(){},toggle(){},find(){},apply(){},busy:()=>false,inspect(){}});
+ node.getBoundingClientRect=()=>({width:120,height:60});node.getClientRects=()=>[{}];surface.getClientRects=()=>[{}];
+ const query=surface.querySelector.bind(surface),queryAll=surface.querySelectorAll.bind(surface);surface.querySelector=selector=>selector==='.boardcanvas [data-dv-node]'?node:query(selector);surface.querySelectorAll=selector=>selector.indexOf('.boardcanvas [data-dv-node]')===0?[node]:queryAll(selector);
+ let selected=[];h.session.insertSection=0;
+ const spatial=h.C.createBuilderSpatialSelection({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,targetFromEvent:()=>null,selection:()=>selected,select(value){selected=value;},toggle(){},find(){},apply(){},busy:()=>false,inspect(){}});
  const target=spatial.target(node);assert.equal(target.kind,'node');assert.equal(target.id,'platform::api');assert.equal(target.section,0);assert.equal(target.el,node);assert.equal(target.imported,true);spatial.destroy();
+ const selectAll=h.C.createBuilderSpatialSelection({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,targetFromEvent:()=>null,selection:()=>selected,select(value){selected=value;},toggle(){},find(){},apply(){},busy:()=>false,inspect(){}});
+ assert.equal(selectAll.selectAllNodes(),true);assert.equal(selected.length,1);assert.equal(selected[0].id,'platform::api');assert.equal(selected[0].imported,true);selectAll.destroy();
  h.inspector.renderMulti([{kind:'node',section:0,id:'platform::api'},{kind:'node',section:0,id:'platform::store'}]);
  assert.equal(h.field('group'),undefined);assert.equal(h.button('mark delta'),undefined);assert.equal(h.button('delete 2 nodes'),undefined);
  const align=h.button('Align vertical');assert.ok(align);assert.equal(align.disabled,false);align.fire('click');

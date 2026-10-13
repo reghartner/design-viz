@@ -1199,6 +1199,15 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 .human-guide :focus-visible{outline:2px solid #796ab5;outline-offset:3px}.human-guide section:focus{outline:none}
 @media(max-width:760px){.human-guide-header{padding:18px 20px}.human-guide h2{font-size:23px}.human-guide-body{grid-template-columns:175px minmax(0,1fr);height:calc(100% - 137px)}.human-guide-content{padding:24px}.human-guide-nav{padding:14px 6px}.human-guide-glossary{grid-template-columns:1fr;gap:4px}.human-guide dd{margin-bottom:10px}.human-guide-timeline>div{grid-template-columns:80px repeat(5,1fr);gap:4px}.human-guide-timeline{padding:12px}.human-guide-timeline span{width:25px;height:25px}}
 
+.keyboard-shortcuts{width:min(840px,calc(100vw - 28px));max-height:min(760px,calc(100dvh - 28px));box-sizing:border-box;overflow:auto;padding:0;border:1px solid #dcdce7;border-radius:18px;background:#fffdf9;color:#29354a;box-shadow:0 26px 90px #1d23464d;font:14px/1.5 system-ui,sans-serif}
+.keyboard-shortcuts::backdrop{background:#20263d80;backdrop-filter:blur(4px)}
+.keyboard-shortcuts>header{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;padding:24px 28px;border-bottom:1px solid #e5e4ec;background:linear-gradient(110deg,#f0edfc,#f7fbf7)}
+.keyboard-shortcuts>header span{font-size:9px;font-weight:750;letter-spacing:1.4px;color:#686086}.keyboard-shortcuts h2{margin:5px 0 4px;font-size:27px;line-height:1.2}.keyboard-shortcuts header p{margin:0;color:#596275;font-size:12px}
+.keyboard-shortcuts kbd,.workspace-help kbd{font:10px ui-monospace,monospace;background:#efedf5;border:1px solid #dedbe9;border-radius:4px;padding:2px 5px;white-space:nowrap}
+.keyboard-shortcuts-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;padding:10px 28px 28px}.keyboard-shortcuts-grid section{padding:18px 20px}.keyboard-shortcuts-grid h3{margin:0 0 13px;font-size:15px}.keyboard-shortcuts-grid dl{display:grid;grid-template-columns:minmax(105px,max-content) 1fr;gap:10px 14px;margin:0}.keyboard-shortcuts-grid dt{font-weight:650}.keyboard-shortcuts-grid dd{margin:0;color:#596275}
+.keyboard-shortcuts :focus-visible{outline:2px solid #796ab5;outline-offset:3px}
+@media(max-width:620px){.keyboard-shortcuts>header{padding:18px;position:sticky;top:0;z-index:1}.keyboard-shortcuts>header p{display:none}.keyboard-shortcuts h2{font-size:21px}.keyboard-shortcuts-grid{grid-template-columns:1fr;padding:6px 10px 18px}.keyboard-shortcuts-grid section{padding:14px 10px}.keyboard-shortcuts-grid dl{grid-template-columns:minmax(92px,max-content) 1fr;font-size:12px}}
+
 /* Published diagrams use the same viewer without any editor bindings. */
 .welcome-library-entry{display:flex;justify-content:space-between;align-items:center;gap:24px;width:100%;margin:20px 0 0;padding:19px 25px;border:1px solid #d6d1e5;border-radius:14px;background:linear-gradient(110deg,#f1edfa,#f3f8f5);text-align:left;color:#343c55;cursor:pointer;font:inherit}
 .welcome-library-entry>span:first-child{display:flex;align-items:baseline;gap:20px}.welcome-library-entry b{font-size:16px}.welcome-library-entry span span{font-size:13px;color:#667084}

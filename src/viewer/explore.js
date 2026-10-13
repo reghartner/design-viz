@@ -527,8 +527,13 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     }
     playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
     var previousControls=playerWindow.rect,r=constrain(playerWindow,scaledRect(playerWindow,controls));
-    r=fittedControlsRect(r,insets,automaticControls);
-    if(automaticControls)r.y=Math.max(12,b.h-r.h-insetBottom);
+    // The desktop toolbar can occupy a separate right-hand lane. At narrow
+    // widths it spans the player lane, so reserve its actual vertical space.
+    var controlsBottom=insetBottom;
+    if(automaticControls && toolRect && r.x<toolRect.right-stageRect.left && r.x+r.w>toolRect.left-stageRect.left)controlsBottom=Math.max(controlsBottom,b.h-(toolRect.top-stageRect.top)+12);
+    var controlInsets={top:insetTop,bottom:controlsBottom};
+    r=fittedControlsRect(r,controlInsets,automaticControls);
+    if(automaticControls)r.y=Math.max(12,b.h-r.h-controlsBottom);
     apply(playerWindow,r);
     if(canvasWindow(playerWindow) && previousControls && Math.abs(previousControls.h-r.h)>.01)canvasGeometryChanged=true;
     focus.textContent=memory.focus?'Restore panels':'Hide panels';focus.setAttribute('aria-pressed',String(memory.focus));

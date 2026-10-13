@@ -10,13 +10,31 @@ const {execFileSync,spawnSync}=require('node:child_process');
 const ROOT=path.join(__dirname,'..');
 const {GENERATED,copyCheckout,inventory,kitFiles}=require('./helpers/checkout-copy.js');
 const FIXTURE=path.join(__dirname,'fixtures/company-overlay');
+const FULL_SUITE_CHILD='FLOWVIEW_COMPANY_OVERLAY_FULL_SUITE_CHILD';
 
-let checkout,before;
+let checkout,before,plainValidation;
 test.before(()=>{
   checkout=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-company-overlay-'));
   copyCheckout(checkout);
+  execFileSync('git',['init','-q'],{cwd:checkout});
+  execFileSync('python3',['tools/build.py','--no-config'],{cwd:checkout,encoding:'utf8',timeout:120000,maxBuffer:20*1024*1024});
+  plainValidation=spawnSync(process.execPath,['tools/validate.js',path.join(FIXTURE,'examples/ticket-board/ticket-board.spec.json')],{
+    cwd:checkout,encoding:'utf8'
+  });
+  for(const file of GENERATED)fs.rmSync(path.join(checkout,file),{force:true});
   before=inventory(checkout);
   fs.cpSync(FIXTURE,path.join(checkout,'company'),{recursive:true});
+  fs.writeFileSync(path.join(checkout,'company/company.json'),JSON.stringify({
+    version:1,companyName:'Fixture Co',repository:'https://github.com/fixture/design-viz',brand:'brand.json'
+  }));
+  fs.writeFileSync(path.join(checkout,'company/brand.json'),JSON.stringify({
+    companyName:'Fixture Flow',logo:'FF',primaryColor:'#2463EB',secondaryColor:'#FFFFFF'
+  }));
+  fs.writeFileSync(path.join(checkout,'workbench/site.json'),JSON.stringify({version:1,landing:{
+    spec:'../company/examples/ticket-board/ticket-board.spec.json',title:'Fixture architecture',label:'Company example'
+  }}));
+  execFileSync('git',['add','-A'],{cwd:checkout});
+  execFileSync('git',['-c','user.name=Flowview fixture','-c','user.email=fixture@invalid.example','commit','-qm','fixture checkout'],{cwd:checkout});
   execFileSync('python3',['tools/build.py'],{cwd:checkout,encoding:'utf8',timeout:120000,maxBuffer:20*1024*1024});
 });
 test.after(()=>{if(checkout)fs.rmSync(checkout,{recursive:true,force:true});});
@@ -33,8 +51,7 @@ test('the overlay panel and its helper are bundled into every built output and t
   const overlaid=execFileSync(process.execPath,['tools/validate.js',spec],{cwd:checkout,encoding:'utf8'});
   assert.match(overlaid,/0 errors, 0 warnings/);
   // Without the overlay the type is unknown, so the overlay made the difference.
-  const plain=spawnSync(process.execPath,['tools/validate.js',path.join(checkout,spec)],{cwd:ROOT,encoding:'utf8'});
-  assert.match(plain.stdout+plain.stderr,/unknown panel type "ticket-board"/);
+  assert.match(plainValidation.stdout+plainValidation.stderr,/unknown panel type "ticket-board"/);
 });
 
 test('the folder-agent kit carries the company example and the contract with its fragment appended',()=>{
@@ -107,11 +124,26 @@ test('company tests and example validation run in the normal Node and Python sui
   assert.match(python.stderr,/test_company_overlay_fixture_panel_doc_is_extractable/);
 });
 
+test('the complete upstream Python and Node suites pass with overlay, identity and site config',
+  {skip:process.env[FULL_SUITE_CHILD]==='1'},()=>{
+    const env={...process.env,[FULL_SUITE_CHILD]:'1'};
+    delete env.NODE_TEST_CONTEXT;
+    const python=spawnSync('python3',['-m','unittest','discover','-s','tests'],{
+      cwd:checkout,env,encoding:'utf8',timeout:1200000,maxBuffer:64*1024*1024
+    });
+    assert.equal(python.status,0,python.stdout+python.stderr);
+    execFileSync('python3',['tools/build.py'],{cwd:checkout,env,encoding:'utf8',timeout:120000,maxBuffer:20*1024*1024});
+    const node=spawnSync('sh',['-c','node --test tests/*.test.js'],{
+      cwd:checkout,env,encoding:'utf8',timeout:1200000,maxBuffer:64*1024*1024
+    });
+    assert.equal(node.status,0,node.stdout+node.stderr);
+});
+
 test('no upstream-owned file changed; only the overlay and generated outputs are new',()=>{
   const after=inventory(checkout);
   for(const [name,hash] of Object.entries(before))assert.equal(after[name],hash,name);
   const added=Object.keys(after).filter(name=>!Object.hasOwn(before,name));
-  assert.deepEqual(added.filter(name=>!name.startsWith('company/')&&!GENERATED.has(name)),[]);
+  assert.deepEqual(added.filter(name=>!name.startsWith('company/')&&name!=='workbench/site.json'&&!GENERATED.has(name)),[]);
   assert.ok(added.includes('company/CHANGELOG.md'));
   assert.equal(fs.readFileSync(path.join(checkout,'CHANGELOG.md'),'utf8'),fs.readFileSync(path.join(ROOT,'CHANGELOG.md'),'utf8'));
 });

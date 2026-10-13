@@ -39,7 +39,7 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertGreater(count, 20)
 
     def test_all_emitted_links_resolve_from_viz_and_preserve_anchors_and_external_urls(self):
-        types = packet.load_sections((ROOT / packet.CONTRACT).read_text())[3]
+        types = packet.load_sections(packet.read_document(packet.CONTRACT))[3]
         text, _ = packet.generate(types, packet.FEATURES)
         self.assert_local_links_resolve(text, ROOT)
         self.assertIn('(docs/shared-icons.md#icon-ids)', text)
@@ -64,12 +64,12 @@ class AuthoringPacketTests(unittest.TestCase):
         self.assertLess(meta['size']['bytes'], meta['size']['baselineBytes'] * .6)
         self.assertEqual(meta['size']['bytes'], len(text.encode()))
         self.assertEqual(meta['size']['characters'], len(text))
-        baseline = '\n\n'.join((ROOT / name).read_text() for name in meta['size']['baselinePaths'])
+        baseline = '\n\n'.join(packet.read_document(name) for name in meta['size']['baselinePaths'])
         self.assertEqual(meta['size']['baselineBytes'], len(baseline.encode()))
         self.assertEqual(meta['size']['baselineCharacters'], len(baseline))
         for entry in meta['provenance']:
             self.assertTrue((ROOT / entry['path']).is_file())
-            self.assertEqual(entry['sha256'], hashlib.sha256((ROOT / entry['path']).read_bytes()).hexdigest())
+            self.assertEqual(entry['sha256'], hashlib.sha256(packet.read_document(entry['path']).encode()).hexdigest())
 
     def test_entry_packet_carries_required_workflow_without_full_reference_preload(self):
         for mode in ('new', 'edit'):

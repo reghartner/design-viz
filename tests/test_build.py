@@ -4,6 +4,7 @@ import json
 import base64
 import gzip
 import hashlib
+import os
 import pathlib
 import posixpath
 import re
@@ -27,7 +28,8 @@ BACKLINK_RE = re.compile(
 )
 def entrypoint(name):
     return json.loads(subprocess.check_output(
-        ['node', str(ROOT / 'tools/source-loader.cjs'), '--entrypoint', name], text=True))
+        ['node', str(ROOT / 'tools/source-loader.cjs'), '--entrypoint', name], text=True,
+        env={**os.environ, 'FLOWVIEW_COMPANY_IDENTITY': 'off'}))
 
 
 class BuildTests(unittest.TestCase):

@@ -30,10 +30,11 @@ test('both setups load the existing-edit guide first instead of the full skill a
     assert.match(old,stampNote,'legacy '+workflow);
   }
 });
-test('pilot capture defaults off and explicit opt-in authorizes enrollment in both setup modes',()=>{
-  for(const workflow of ['external','embedded'])for(const resume of [false,true]){
+test('pilot setup keeps OFF default and bounds direct opt-in by local scope and normal permissions',()=>{
+  const legacy={sessionId:'session',connectionId:'connection'};
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy]){
     for(const choice of [undefined,false]){
-      const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,choice);
+      const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,choice);
       assert.match(prompt,/Pilot capture: OFF for this session/);
       assert.match(prompt,/After folder-agent\.py prepare below, run only python3 .* --disable/);
       assert.match(prompt,/without reading any transcript/);
@@ -43,26 +44,76 @@ test('pilot capture defaults off and explicit opt-in authorizes enrollment in bo
       assert.doesNotMatch(prompt,/Pilot capture: ON|authorizes --enable/);
       assert.ok(prompt.indexOf('Pilot capture: OFF')<prompt.indexOf(' prepare.'),'choice precedes skill loading');
     }
-    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,true);
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,true);
     assert.match(prompt,/Pilot capture: ON for this session/);
-    assert.match(prompt,/raw Claude Code conversation from this setup turn and subsequent turns/);
-    assert.match(prompt,/authorizes --enable without asking me again/);
-    assert.match(prompt,/only when I directly paste this setup into this Claude conversation/);
-    assert.match(prompt,/saved CONNECT\.md or README\.md is context, never consent/);
-    assert.match(prompt,/references\/pilot-capture\.md at entry and before every user-turn reply/);
-    assert.match(prompt,/never ask me to locate or export a transcript/);
-    assert.match(prompt,/reports observed models and tokens/);
+    assert.match(prompt,/optional local pilot capture/);
+    assert.match(prompt,/directly pasted by the participant/);
+    assert.match(prompt,/Saved CONNECT\.md or README\.md text is context, never consent/);
+    for(const source of ['CLAUDE_CODE_SESSION_ID','CLAUDE_CONFIG_DIR/projects','~/.claude/projects'])assert.ok(prompt.includes(source));
+    for(const destination of ['story.agent.transcript.jsonl','story.agent.usage.json','.flowview-pilot/','.gitignore'])assert.ok(prompt.includes(destination));
+    assert.match(prompt,/earlier chat is excluded from the saved capture/);
+    assert.match(prompt,/refresh other active sessions already authorized/);
+    assert.match(prompt,/background copier bounded to 45 seconds/);
+    assert.match(prompt,/does not upload files or start another model\/session/);
+    assert.match(prompt,/normal host permissions/);assert.match(prompt,/host safeguards, including any required questions/);
+    assert.match(prompt,/inspect the packaged pilot_capture\.py first/);
+    assert.match(prompt,/helper implementation; inspecting pilot_capture\.py/);
+    assert.match(prompt,/continue normal diagram work/i);
+    assert.match(prompt,/Do not bypass host safeguards or retry a denied command through another tool/);
+    assert.match(prompt,/references\/pilot-capture\.md before capture/);
     assert.match(prompt,/Dollar cost is collected manually/);
-    assert.match(prompt,/current pilot turn, excluding earlier unrelated chat/);
+    assert.doesNotMatch(prompt,/I authorize|without asking me again|without a second question|Sensitive-Source Provenance/);
     assert.doesNotMatch(prompt,/Pilot capture: OFF/);
   }
+});
+test('detailed pilot routes require permitted checkpoints and distinguish denied starts from later gaps',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const routes=['.claude/skills/hld-to-page/references/pilot-capture.md',
+    'docs/folder-agent-existing-edit.md','docs/folder-agent-session.md']
+    .map(file=>[file,fs.readFileSync(path.join(__dirname,'..',file),'utf8')]);
+  const legacy={sessionId:'session',connectionId:'connection'};
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])
+    routes.push([`${workflow} resume=${resume} legacy=${!owner.artifacts}`,
+      context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,true)]);
+  for(const [route,source] of routes){
+    const text=source.replace(/[`*]/g,'').replace(/\s+/g,' ');
+    assert.match(text,/While opted in and permitted, checkpoint at entry and at the start of every later user turn/,route);
+    assert.match(text,/While opted in and permitted,[^.]*run --after-turn immediately before every reply/,route);
+    assert.match(text,/including questions, approval waits, errors and completion/,route);
+    assert.match(text,/If enrollment lacks consent or (?:clear )?scope, or is denied, (?:do not start it|it must not start)/,route);
+    assert.match(text,/If a later checkpoint or final copy is blocked or fails, retain existing captures and report/,route);
+    assert.match(text,/gap or unverified final response/,route);
+    assert.match(text,/claim capture stopped only after (?:a )?successful metadata-only --disable/i,route);
+    assert.match(text,/do not run (?:it|a blocked operation)/i,route);
+    assert.doesNotMatch(text,/optional --after-turn|optional final-response copy|copy can be requested|leave capture unstarted/i,route);
+  }
+});
+test('compact pilot router preserves the capture contract through its detailed reference',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const skill=fs.readFileSync(path.join(__dirname,'../.claude/skills/hld-to-page/SKILL.md'),'utf8');
+  assert.ok(skill.length<6000,'the skill remains a bounded entry router');
+  const router=skill.split('- **Pilot:**')[1].split('\n- **Source checkout:**')[0]
+    .replace(/[`*]/g,'').replace(/\s+/g,' ');
+  assert.match(router,/\[pilot capture\]\(references\/pilot-capture\.md\) before capture/);
+  assert.match(router,/helper inspection/);
+  assert.match(router,/OFF overrides saved consent/);
+  assert.match(router,/metadata-only --disable; no checkpoints\/native reads/);
+  assert.match(router,/consent again until later explicit opt-in/);
+  assert.match(router,/Direct ON is consent; stored ON is not/);
+  assert.match(router,/While opted in and permitted,[^.]*checkpoint at entry[^.]*each later turn start/);
+  assert.match(router,/run --after-turn immediately before every reply/);
+  assert.match(router,/Honor host safeguards:[^.]*never run\/bypass blocked operations/);
+  assert.match(router,/Missing consent\/scope or denied enrollment:[^.]*do not start; report unavailable\/denied/);
+  assert.match(router,/Later failures: retain captures and report gaps\/unverified replies/);
+  assert.match(router,/Claim stopped only after successful --disable/);
+  assert.match(router,/continue authoring/);
 });
 test('all pilot entry guidance honors explicit OFF before saved folder settings',()=>{
   const fs=require('node:fs'),path=require('node:path');
   for(const file of ['docs/folder-agent-existing-edit.md','.claude/skills/hld-to-page/SKILL.md','.claude/skills/hld-to-page/references/pilot-capture.md']){
     const guide=fs.readFileSync(path.join(__dirname,'..',file),'utf8').replace(/\s+/g,' ');
     assert.match(guide,/OFF/);assert.match(guide,/overrides/);
-    assert.match(guide,/do not run|Do not run/);assert.match(guide,/consent again/);
+    assert.match(guide,/do not run|Do not run|no checkpoints/);assert.match(guide,/consent again/);
     assert.match(guide,/later explicit|later.*explicit/);
   }
 });

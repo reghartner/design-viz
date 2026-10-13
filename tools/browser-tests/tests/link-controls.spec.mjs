@@ -61,6 +61,8 @@ test('workbench unified navigation does not hide link controls at mobile width',
  const root=page.locator('#docview'),nav=root.locator('.explore-navigation'),copy=controls(root);
  await nav.locator('.reader-utilities>summary').click();
  for(const button of [copy.chapter,copy.step])await expect(button).toBeVisible();await expect(copy.tab).toHaveCount(0);
+ const clear=await copy.step.evaluate(button=>{const a=button.getBoundingClientRect(),tools=document.querySelector('.workspace-canvas-controls').getBoundingClientRect(),hit=document.elementFromPoint(a.left+a.width/2,a.top+a.height/2);return {overlap:Math.min(a.right,tools.right)-Math.max(a.left,tools.left)>1&&Math.min(a.bottom,tools.bottom)-Math.max(a.top,tools.top)>1,hit:button.contains(hit)};});
+ expect(clear).toEqual({overlap:false,hit:true});
  await copy.step.click();const link=new URL(await copied(page));expect(link.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('s=send');
  await chooseNavigation(nav,'View','Page');await expect(copy.contract).toBeVisible();
  await page.setViewportSize({width:900,height:800});await page.locator('#workspace-more>summary').click();await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();

@@ -2342,6 +2342,12 @@ function renderMultiInspector(multiSel){
       }, {placeholder: 'lane id from page.lanes — empty removes'})));
     }
     var acts = actionGroup('Selected '+kind+' actions','inspector-actions');
+    if(kind==='node' && !includesImported)acts.appendChild(actionButton('Create domain from selected nodes',function(){
+      if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
+        formError('Choose nodes from a single section to create a domain.');return;
+      }
+      renderExtractionPreview(multiSel);
+    }));
     if(!clipboardToolbar() && clipboard() && (kind === 'panel' || kind === 'node' && !includesImported)){
       acts.appendChild(actionButton('Copy selected',function(){clipboard().copy(multiSel);}));
       acts.appendChild(actionButton('Duplicate selected',function(){clipboard().duplicate(multiSel);}));
@@ -2371,12 +2377,6 @@ function renderMultiInspector(multiSel){
         alignmentHelp.textContent=reason || '';alignmentHelp.hidden=!reason;
       };
       invalidateAlignment();acts.appendChild(alignmentHelp);
-      if(!includesImported)acts.appendChild(actionButton('Create domain from selected nodes',function(){
-        if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
-          formError('Choose nodes from a single section to create a domain.');return;
-        }
-        renderExtractionPreview(multiSel);
-      }));
       if(!includesImported)acts.appendChild(actionButton('stack together', function(){
         var secs = {};
         multiSel.forEach(function(t){ secs[t.section] = true; });

@@ -25,6 +25,12 @@ Alignment and each group drag take one Undo action. Select **Free placement**
 first for nodes that currently use rows; selections spanning sections cannot be
 aligned or dragged together.
 
+Imported topology nodes can participate in the same selected drag, including a
+group made only of imported nodes or one mixed with local free nodes. Starting
+the drag from any selected local or imported node moves every movable member by
+the same delta and stores only consumer-owned placement overrides; provider
+topology remains unchanged. Locked local members remain selected and fixed.
+
 - **Float X / Float Y** set the node center precisely in diagram units. They are
   independent of Auto, Fit width and Readable sizing. X increases rightward; Y
   increases downward. Negative coordinates are supported. The canvas expands

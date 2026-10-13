@@ -1353,6 +1353,8 @@ function createBuilderInteractions(opts){
                     x0: ev.clientX, y0: ev.clientY, moved: false, target: null, pick: null, line: null};
         var startSnapshot=parseEditor(),startRecord=!startSnapshot.error && specSectionPaths(startSnapshot.raw)[ndGi];
         var startDiagram=startRecord && specValueAt(startSnapshot.raw,startRecord.diagram);
+        var selectedGroup=!blockHandle && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;});
+        var topologyContext=session.topologyContext?session.topologyContext():null;
         if(startDiagram && session.resolve && typeof FlowTopology!=='undefined'){
           var resolvedDiagram;
           try{resolvedDiagram=specValueAt(session.resolve(startSnapshot.raw),startRecord.diagram);}catch(ex){cancelNodeDrag();inspectorMessage(ex.message);return;}
@@ -1362,25 +1364,29 @@ function createBuilderInteractions(opts){
               cancelNodeDrag();inspectorMessage('Open the authored consumer from Canon to move its imported block.');return;
             }
             startDiagram=resolvedDiagram;nodeDrag.topologyImport=imported;nodeDrag.wholeImport=!!blockHandle;
-            nodeDrag.contextKey=JSON.stringify(session.topologyContext());
+            nodeDrag.contextKey=JSON.stringify(topologyContext);
             nodeDrag.topologyBoundaries=Array.from(ndSec.querySelectorAll('.dv-topology-boundary')).filter(function(boundary){
               var name=boundary.getAttribute('data-topology-import');return nodeDrag.wholeImport && (name===imported.as || name.indexOf(imported.as+'::')===0);
             });
-            var importPositions=layout(startDiagram).pos;
-            nodeDrag.members=(nodeDrag.wholeImport?imported.nodes:[nodeDrag.id]).map(function(id){
-              var el=findTargetEl({kind:'node',section:ndGi,id:id});return {id:id,el:el,xy:el && nodeTranslateXY(el),origin:importPositions[id]};
-            });
-            if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))nodeDrag.selectionError='Render all imported nodes before moving the block.';
+            if(!selectedGroup){
+              var importPositions=layout(startDiagram).pos;
+              nodeDrag.members=(nodeDrag.wholeImport?imported.nodes:[nodeDrag.id]).map(function(id){
+                var el=findTargetEl({kind:'node',section:ndGi,id:id});return {id:id,el:el,xy:el && nodeTranslateXY(el),origin:importPositions[id]};
+              });
+              if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))nodeDrag.selectionError='Render all imported nodes before moving the block.';
+            }
           }
         }
-        if(!nodeDrag.topologyImport && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;})){
-          var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel);
+        if(selectedGroup){
+          var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel,topologyContext);
           nodeDrag.selectionError=selected.error || selected.noop && 'Every selected graph node is position-locked; nothing moved.';
           if(!selected.error){
-            var positions=layout(startDiagram).pos;
             nodeDrag.selection=multiSel.map(function(t){return {kind:'node',section:t.section,id:t.id};});
-            nodeDrag.members=multiSel.map(function(t){
-              var el=findTargetEl(t);return {id:t.id,el:el,xy:el && nodeTranslateXY(el),origin:positions[t.id],locked:builderNodePositionLocked(startDiagram,t.id)};
+            nodeDrag.diagram=selected.effective;
+            if(selected.records.some(function(record){return !record.local;}))nodeDrag.contextKey=JSON.stringify(topologyContext);
+            nodeDrag.members=selected.records.map(function(record){
+              var target=multiSel.find(function(t){return t.kind==='node' && t.section===ndGi && t.id===record.id;}),el=target && findTargetEl(target);
+              return {id:record.id,el:el,xy:el && nodeTranslateXY(el),origin:record.position,locked:record.local && builderNodePositionLocked(selected.d,record.id)};
             });
             if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))
               nodeDrag.selectionError='Render all selected nodes before moving them together.';
@@ -1391,8 +1397,8 @@ function createBuilderInteractions(opts){
           if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
             cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
           }
-          nodeDrag.floating=true;nodeDrag.snapshot=startSnapshot;nodeDrag.diagram=startDiagram;
-          nodeDrag.origin=layout(startDiagram).pos[nodeDrag.id];
+          nodeDrag.floating=true;nodeDrag.snapshot=startSnapshot;nodeDrag.diagram=nodeDrag.diagram || startDiagram;
+          nodeDrag.origin=layout(nodeDrag.diagram).pos[nodeDrag.id];
         }
         ev.preventDefault(); /* no text selection while dragging */
       }
@@ -1440,7 +1446,7 @@ function createBuilderInteractions(opts){
       if (!nodeDrag.moved) return;
       if(nodeDrag.selectionError){var message=nodeDrag.selectionError;cancelNodeDrag();inspectorMessage(message);return;}
       if(nodeDrag.floating){
-        if(session.text()!==nodeDrag.snapshot.text || nodeDrag.topologyImport && JSON.stringify(session.topologyContext())!==nodeDrag.contextKey){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(session.text()!==nodeDrag.snapshot.text || nodeDrag.contextKey!==undefined && JSON.stringify(session.topologyContext?session.topologyContext():null)!==nodeDrag.contextKey){cancelNodeDrag();inspectorMessage('The source changed during the drag. Move cancelled.');return;}
         if(nodeDrag.members){updateSelectedFloatGhosts(ev);return;}
         nodeDrag.el.classList.add('dv-dragsrc');updateNodeDragGhost(ev);return;
       }
@@ -1504,15 +1510,15 @@ function createBuilderInteractions(opts){
       if (ndParsed.error){ inspectorMessage(ndParsed.error); return; }
       var ndPlan;
       if(nd.floating){
-        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project || !nd.el.isConnected || ndParsed.renderedText!=null && ndParsed.renderedText!==ndParsed.text || nd.topologyImport && JSON.stringify(session.topologyContext())!==nd.contextKey){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
-        if(nd.topologyImport){
+        if(ndParsed.text!==nd.snapshot.text || ndParsed.project!==nd.snapshot.project || !nd.el.isConnected || ndParsed.renderedText!=null && ndParsed.renderedText!==ndParsed.text || nd.contextKey!==undefined && JSON.stringify(session.topologyContext?session.topologyContext():null)!==nd.contextKey){inspectorMessage('The source changed during the drag. Move cancelled.');return;}
+        if(nd.selection){
+          ndPlan=planTransformFloats(session.text(),ndParsed.raw,nd.selection,{type:'move',dx:nd.delta.dx,dy:nd.delta.dy},session.topologyContext?session.topologyContext():null);
+          applyPlan(ndPlan,null,ndParsed);return;
+        }else if(nd.topologyImport){
           ndPlan=nd.wholeImport?planPlaceTopologyImport(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,
             nd.topologyImport.position.x+nd.delta.dx,nd.topologyImport.position.y+nd.delta.dy):
             planPlaceTopologyNode(session.text(),ndParsed.raw,nd.gi,nd.topologyImport.as,nd.id,
               nd.origin.cx+nd.delta.dx,nd.origin.cy+nd.delta.dy,session.topologyContext());
-        }else if(nd.selection){
-          ndPlan=planTransformFloats(session.text(),ndParsed.raw,nd.selection,{type:'move',dx:nd.delta.dx,dy:nd.delta.dy});
-          applyPlan(ndPlan,null,ndParsed);return;
         }else ndPlan=planPlaceFloat(session.text(),ndParsed.raw,nd.gi,nd.id,nd.position.x,nd.position.y);
       }else if (nd.target){
         ndPlan = planSwapNodes(session.text(), ndParsed.raw, nd.gi, nd.id,

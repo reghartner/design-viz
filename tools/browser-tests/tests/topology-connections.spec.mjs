@@ -4,12 +4,13 @@ import {digest} from '../../canon/drift.mjs';
 const diagram=raw=>raw.page.sections[0].diagram;
 const node=(page,id)=>page.locator('#docview g.node[data-dv-node="'+id+'"]');
 const source=page=>page.locator('#src').inputValue();
-async function fixture(page,server,mode='file',view='ambient'){
+async function fixture(page,server,mode='file',view='ambient',configure){
   const model=(id,d)=>({page:{title:id,canon:{version:1,id,kind:'canonical',owner:'group:default/test'},sections:[{id:'main',diagram:d}]}});
   const provider=model('provider',{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store',label:'Persist'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}});
   const consumer=model('consumer',{nodes:{local:{title:'Local'},other:{title:'Other'}},rows:[['local','other']],topologyImports:[{spec:'provider',export:'core',as:'shared'}],edges:[{from:'local',to:'shared::api',label:'Request'}],steps:[{id:'request',edge:'local->shared::api',text:'Request'},{id:'persist',edge:'shared::api->shared::store',text:'Persist'}],autoplay:false});
   if(view==='step')diagram(consumer).view='step';
   if(view==='explore')diagram(consumer).layouts=[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:10}]}}];
+  if(configure)configure(provider,consumer);
   const catalog={version:3,diagrams:[provider,consumer].map(spec=>({id:spec.page.canon.id,title:spec.page.title,canon:spec.page.canon,counts:{nodes:2,steps:0,panels:0},revision:digest(spec),specUrl:spec.page.canon.id+'.json'}))};
   await page.route('**/diagrams.json',route=>route.fulfill({json:catalog}));
   for(const spec of [provider,consumer])await page.route('**/'+spec.page.canon.id+'.json',route=>route.fulfill({json:spec}));
@@ -207,9 +208,50 @@ for(const view of ['ambient','explore'])test('imported node arrangement survives
   await info.attach('custom-import-arrangement',{body:await page.locator('#docview').screenshot(),contentType:'image/png'});
 });
 
+for(const [view,selection] of [['ambient','Shift'],['explore','Alt marquee']])test(view+' imported groups drag together after '+selection+' selection from imported and local initiators',async({page,server})=>{
+  const {provider}=await fixture(page,server,'file',view,(_provider,consumer)=>{
+    const d=diagram(consumer);d.rows=[[]];d.floats=[{id:'local',x:200,y:520},{id:'other',x:900,y:520}];
+    Object.assign(d.topologyImports[0],{position:{x:200,y:180},nodePositions:{api:{x:0,y:0},store:{x:260,y:0}}});
+  });
+  const providerSource=JSON.stringify(provider),all=['local','other','shared::api','shared::store'];
+  async function centers(){return Object.fromEntries(await Promise.all(all.map(async id=>[id,await node(page,id).evaluate(n=>{const m=n.transform.baseVal.consolidate().matrix,c=n.querySelector('.card');return {x:m.e+Number(c.getAttribute('width'))/2,y:m.f+Number(c.getAttribute('height'))/2};})])));}
+  async function select(ids){
+    await closeTools(page);
+    if(selection==='Shift'){
+      await node(page,ids[0]).click();await node(page,ids[1]).click({modifiers:['Shift']});
+    }else{
+      const bounds=await page.locator(ids.map(id=>'#docview [data-dv-node="'+id+'"] .card').join(',')).evaluateAll(cards=>{
+        const board=cards[0].closest('.board').getBoundingClientRect(),boxes=cards.map(card=>card.getBoundingClientRect());
+        return {x:board.left+20,y:board.top+20,right:Math.min(board.right-3,Math.max(...boxes.map(b=>b.right))+10),bottom:Math.min(board.bottom-3,Math.max(...boxes.map(b=>b.bottom))+10)};
+      });
+      await page.keyboard.down('Alt');await page.mouse.move(bounds.x,bounds.y);await page.mouse.down();await page.mouse.move(bounds.right,bounds.bottom,{steps:8});await page.mouse.up();await page.keyboard.up('Alt');
+    }
+    await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(ids.length);
+    for(const id of ids)await expect(node(page,id)).toHaveClass(/dv-sel/);
+  }
+  async function move(ids,initiator,holdShift=false){
+    await select(ids);const before=await source(page),beforeCenters=await centers(),box=await node(page,initiator).locator('.card').boundingBox();
+    const scale=await node(page,initiator).evaluate(n=>n.ownerSVGElement.getScreenCTM().a),x=box.x+box.width/2,y=box.y+box.height/2;
+    if(holdShift)await page.keyboard.down('Shift');
+    await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(x+65*scale,y+45*scale,{steps:8});
+    await expect(page.locator('#docview .dv-ghost')).toHaveCount(ids.length);await expect(page.locator('#src')).toHaveValue(before);
+    await page.mouse.up();if(holdShift)await page.keyboard.up('Shift');
+    const after=await source(page),afterCenters=await centers(),delta={x:afterCenters[ids[0]].x-beforeCenters[ids[0]].x,y:afterCenters[ids[0]].y-beforeCenters[ids[0]].y};
+    expect(after).not.toBe(before);for(const id of ids){expect(afterCenters[id].x-beforeCenters[id].x).toBeCloseTo(delta.x,1);expect(afterCenters[id].y-beforeCenters[id].y).toBeCloseTo(delta.y,1);}
+    for(const id of all.filter(id=>!ids.includes(id))){expect(afterCenters[id].x).toBeCloseTo(beforeCenters[id].x,1);expect(afterCenters[id].y).toBeCloseTo(beforeCenters[id].y,1);}
+    const authored=diagram(JSON.parse(after));expect(Object.keys(authored.nodes)).toEqual(['local','other']);expect(JSON.stringify(provider)).toBe(providerSource);
+    await expect(page.locator('#docview g.node.dv-sel')).toHaveCount(ids.length);
+    await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+    await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
+  }
+  await move(['shared::api','shared::store'],'shared::api',selection==='Shift');
+  await move(['local','shared::api'],'local',selection==='Shift');
+  await move(['local','shared::api'],'shared::api',selection==='Shift');
+});
+
 
 test('imported node drags retire when rendering, replacing provider context or destroying the editor',async({page,server})=>{
-  const {provider,consumer}=await fixture(page,server,'lifetime');const before=await source(page);
+  const {provider,consumer}=await fixture(page,server,'lifetime','ambient',(_provider,value)=>{const d=diagram(value);d.rows=[[]];d.floats=[{id:'local',x:800,y:500},{id:'other',x:1050,y:500}];});const before=await source(page);
   async function hold(){
     await closeTools(page);const box=await node(page,'shared::store').locator('.card').boundingBox();
     await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();
@@ -218,7 +260,9 @@ test('imported node drags retire when rendering, replacing provider context or d
   }
   await hold();await page.evaluate(()=>document.querySelector('#go').click());await page.mouse.up();
   await expect(page.locator('#src')).toHaveValue(before);await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);
-  await hold();diagram(provider).nodes.api.title='Updated provider';
+  await closeTools(page);await node(page,'local').click();await node(page,'shared::api').click({modifiers:['Shift']});
+  const localBox=await node(page,'local').locator('.card').boundingBox();await page.mouse.move(localBox.x+localBox.width/2,localBox.y+localBox.height/2);await page.mouse.down();await page.mouse.move(localBox.x+localBox.width/2+70,localBox.y+localBox.height/2+50,{steps:8});
+  await expect(page.locator('#docview .dv-ghost')).toHaveCount(2);diagram(provider).nodes.api.title='Updated provider';
   await page.evaluate(({text,context})=>__editorTest.builder.loadText(text,context),{text:before,context:{version:1,id:'consumer',specs:[provider,consumer]}});
   await page.mouse.up();await expect(page.locator('#src')).toHaveValue(before);await expect(node(page,'shared::api')).toContainText('Updated provider');
   await expect(page.locator('#docview .dv-ghost,.dv-free-edge-preview')).toHaveCount(0);

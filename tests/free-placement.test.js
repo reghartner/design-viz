@@ -166,6 +166,29 @@ test('Inspector alignment supports imported-only and mixed nodes using only cons
   }
 });
 
+test('selected imported-only and mixed nodes move atomically by one delta without changing provider topology',()=>{
+  for(const ids of [['platform::api','platform::store'],['client','platform::api']]){
+    const {specs,raw,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]),source=JSON.stringify(raw);
+    const before=importedDiagram(C.FlowTopology.resolveSource(raw,ctx)),beforePos=C.layout(before).pos,selected=importedTargets(...ids);
+    const plan=C.planTransformFloats(source,raw,selected,{type:'move',dx:37.5,dy:-22.5},ctx);
+    assert.equal(plan.error,undefined);assert.notEqual(plan.noop,true);
+    const authored=JSON.parse(plan.text),out=importedDiagram(authored),effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),afterPos=C.layout(effective).pos;
+    for(const id of ids){assert.equal(afterPos[id].cx,beforePos[id].cx+37.5);assert.equal(afterPos[id].cy,beforePos[id].cy-22.5);}
+    for(const id of ['client','platform::api','platform::store'].filter(id=>!ids.includes(id)))assert.deepEqual(plain(afterPos[id]),plain(beforePos[id]));
+    assert.deepEqual(Object.keys(out.nodes),['client']);assert.equal(JSON.stringify(specs[0]),provider);assert.equal(JSON.stringify(raw),source);
+  }
+});
+
+test('a locked local selection member stays fixed while imported members move together',()=>{
+  const {specs,raw,d,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]);d.nodes.client.locked=true;const source=JSON.stringify(raw);
+  const ids=['client','platform::api','platform::store'],before=importedDiagram(C.FlowTopology.resolveSource(raw,ctx)),beforePos=C.layout(before).pos;
+  const plan=C.planTransformFloats(JSON.stringify(raw),raw,importedTargets(...ids),{type:'move',dx:45,dy:30},ctx);
+  assert.equal(plan.error,undefined);const authored=JSON.parse(plan.text),effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),afterPos=C.layout(effective).pos;
+  assert.deepEqual(plain(afterPos.client),plain(beforePos.client));
+  for(const id of ids.slice(1)){assert.equal(afterPos[id].cx,beforePos[id].cx+45);assert.equal(afterPos[id].cy,beforePos[id].cy+30);}
+  assert.equal(JSON.stringify(specs[0]),provider);assert.equal(JSON.stringify(raw),source);
+});
+
 test('right-click spatial alignment supports imported-only and mixed nodes with frozen-context and no-op guards',()=>{
   {
     const {specs,raw,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx));

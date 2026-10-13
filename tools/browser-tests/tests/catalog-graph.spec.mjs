@@ -25,7 +25,8 @@ test('homepage seeds selected services with catalog bindings, optional edges and
   await page.locator('#catalog-search').fill('');await expect(page.locator('#catalog-preview')).toContainText('3 new nodes · 0 already on the diagram · 2 new connections');
   const dialog=page.locator('#catalog-picker');expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await testInfo.attach('catalog-picker',{body:await dialog.screenshot(),contentType:'image/png'});
-  await page.locator('#catalog-add').click();await expect(dialog).toBeHidden();await expect(page.locator('#workbench-workspace')).toBeVisible();
+  await page.setViewportSize({width:390,height:800});const create=page.locator('#catalog-add');await expect(create).toHaveText('Create diagram');expect(await create.evaluate(el=>el.scrollWidth<=el.clientWidth+1&&el.getBoundingClientRect().width>100)).toBe(true);await page.screenshot({path:testInfo.outputPath('catalog-picker-390.png')});
+  await page.locator('#catalog-add').click();await expect(dialog).toBeHidden();await expect(page.locator('#workbench-workspace')).toBeVisible();await page.setViewportSize({width:1280,height:720});
   const created=await spec(page),d=created.page.blocks[0].diagram;
   expect(d.routing).toBeUndefined();await expect(page.locator('#docview .lane-bridge')).toHaveCount(0);
   expect(created.page.title).toBe('Doorbell platform');expect(d.edges).toHaveLength(2);expect(d.steps).toEqual([]);

@@ -1508,8 +1508,8 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
  .workspace-canvas:not(.canon-reader-active) .workbench-reader-title{flex:1 1 auto;min-width:0;max-width:none;}
  .workspace-canvas #workbench-editor-title{display:-webkit-box;max-height:34px;font-size:13px;line-height:17px;white-space:normal;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;}
  .workspace-canvas .workspace-tools{flex:0 0 auto;min-width:0;overflow:visible;}
- .workspace-canvas .editor-add-button{box-sizing:border-box;width:36px;padding:6px;}
- .workspace-canvas .editor-add-label,.workspace-canvas .editor-add-chevron{display:none;}
+ .workspace-canvas #diagram-add{box-sizing:border-box;width:36px;padding:6px;}
+ .workspace-canvas #diagram-add :is(.editor-add-label,.editor-add-chevron){display:none;}
  .workspace-canvas .workspace-provenance{display:none;}
  .workspace-canvas .workspace-save{gap:3px;}
  .workspace-canvas .workspace-tools :is(.bbtn,.rbtn){padding:6px;font-size:11px;}

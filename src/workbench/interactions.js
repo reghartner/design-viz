@@ -892,8 +892,10 @@ function createBuilderInteractions(opts){
     var dx=here.x-start.x,dy=here.y-start.y;if(!Number.isFinite(dx) || !Number.isFinite(dy))return;
     nd.delta={dx:dx,dy:dy};
     (nd.topologyBoundaries || []).forEach(function(boundary){boundary.setAttribute('transform','translate('+dx+' '+dy+')');boundary.classList.add('dv-topology-boundary-drag');});
-    var draft=builderClone(nd.diagram),ids=nd.members.map(function(member){return member.id;});
+    var draft=builderClone(nd.diagram);builderFreezeLockedPositions(draft,layout(nd.diagram).pos);
+    var ids=nd.members.filter(function(member){return !member.locked;}).map(function(member){return member.id;});
     nd.members.forEach(function(member){
+      if(member.locked)return;
       member.el.classList.add('dv-dragsrc');
       if(!member.ghost){member.ghost=nodeGhostClone(member.el);member.el.parentNode.appendChild(member.ghost);}
       member.ghost.setAttribute('transform','translate('+(member.xy.x+dx)+' '+(member.xy.y+dy)+')');
@@ -1074,11 +1076,32 @@ function createBuilderInteractions(opts){
       });
     });
   }
+  function applyPositionLocks(){
+    Array.prototype.forEach.call(view.querySelectorAll('g.node.dv-position-locked'),function(node){
+      node.classList.remove('dv-position-locked');node.removeAttribute('data-dv-position-locked');
+    });
+    Array.prototype.forEach.call(view.querySelectorAll('.dv-position-lock-badge'),function(badge){badge.remove();});
+    var parsed=parseEditor();if(parsed.error)return;
+    specSectionPaths(parsed.raw).forEach(function(record,section){
+      var d=specValueAt(parsed.raw,record.diagram),sec=view.querySelector('.doc-sec[data-dv-section="'+section+'"]');if(!d || !sec || inDetailPreview(sec))return;
+      Object.keys(d.nodes || {}).forEach(function(id){
+        if(!builderNodePositionLocked(d,id))return;
+        var node=sec.querySelector('g.node[data-dv-node="'+cssQuote(id)+'"]');if(!node)return;
+        var card=node.querySelector('.card'),box=card && {width:parseFloat(card.getAttribute('width') || card.getAttribute('data-node-width')),height:parseFloat(card.getAttribute('height') || card.getAttribute('data-node-height'))};
+        if(!box || !Number.isFinite(box.width) || !Number.isFinite(box.height)){try{box=node.getBBox();}catch(_){return;}}
+        node.classList.add('dv-position-locked');node.setAttribute('data-dv-position-locked','true');
+        var badge=document.createElementNS(SVG_NS,'g');badge.setAttribute('class','dv-position-lock-badge');badge.setAttribute('role','img');badge.setAttribute('aria-label','Position locked');badge.setAttribute('transform','translate(6 '+Math.max(4,box.height-16)+')');
+        var rect=document.createElementNS(SVG_NS,'rect');rect.setAttribute('width','14');rect.setAttribute('height','12');rect.setAttribute('rx','3');badge.appendChild(rect);
+        var path=document.createElementNS(SVG_NS,'path');path.setAttribute('d','M3.5 5V4a3.5 3.5 0 0 1 7 0v1M7 8v2');badge.appendChild(path);node.appendChild(badge);
+      });
+    });
+  }
   function applyRowGrabs(){
     opts.refreshLayout();
-    spatial.refresh();
     applyPanelEditorControls();
     applyTopologyBoundaries();
+    applyPositionLocks();
+    spatial.refresh();
     /* inject one grab handle per layout row, left of the row band —
        workbench-only chrome (this file never runs on published pages).
        Handles are skipped when any row has no drawn nodes: without a
@@ -1147,7 +1170,7 @@ function createBuilderInteractions(opts){
       var ids = builderFlatRowIds([rows[rd.row]]);
       for (var i = 0; i < ids.length; i++){
         var el = rd.secEl.querySelector('g.node[data-dv-node="' + cssQuote(ids[i]) + '"]');
-        if (el){ el.classList.add('dv-dragsrc'); rd.memberEls.push(el); }
+        if (el && !el.classList.contains('dv-position-locked')){ el.classList.add('dv-dragsrc'); rd.memberEls.push(el); }
       }
       if (rd.grabEl) rd.grabEl.classList.add('dv-grabbing');
     }
@@ -1210,9 +1233,8 @@ function createBuilderInteractions(opts){
       gd.members = Object.create(null);
       Object.keys(got.d.nodes || {}).forEach(function(id){
         if (got.d.nodes[id] && got.d.nodes[id].group === gd.key){
-          gd.members[id] = true;
           var el = gd.secEl.querySelector('g.node[data-dv-node="' + cssQuote(id) + '"]');
-          if (el){ el.classList.add('dv-dragsrc'); gd.memberEls.push(el); }
+          if (el && !el.classList.contains('dv-position-locked')){gd.members[id] = true;el.classList.add('dv-dragsrc');gd.memberEls.push(el);}
         }
       });
       gd.el.classList.add('dv-grabbing');
@@ -1281,7 +1303,7 @@ function createBuilderInteractions(opts){
     }
     /* The planner is also the no-op oracle, including whole-row removals
        and non-contiguous groups. Only a real destination gets a line. */
-    if (planFor(pick).error) return;
+    var previewPlan=planFor(pick);if (previewPlan.error || previewPlan.noop) return;
     gd.pick = pick;
     if (!gd.line){
       gd.line = document.createElementNS(SVG_NS, 'line');
@@ -1344,18 +1366,19 @@ function createBuilderInteractions(opts){
         }
         if(!nodeDrag.topologyImport && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ndGi && t.id===nodeDrag.id;})){
           var selected=startSnapshot.error?{error:startSnapshot.error}:builderSelectedFloats(startSnapshot.text,startSnapshot.raw,multiSel);
-          nodeDrag.selectionError=selected.error;
+          nodeDrag.selectionError=selected.error || selected.noop && 'Every selected graph node is position-locked; nothing moved.';
           if(!selected.error){
             var positions=layout(startDiagram).pos;
             nodeDrag.selection=multiSel.map(function(t){return {kind:'node',section:t.section,id:t.id};});
             nodeDrag.members=multiSel.map(function(t){
-              var el=findTargetEl(t);return {id:t.id,el:el,xy:el && nodeTranslateXY(el),origin:positions[t.id]};
+              var el=findTargetEl(t);return {id:t.id,el:el,xy:el && nodeTranslateXY(el),origin:positions[t.id],locked:builderNodePositionLocked(startDiagram,t.id)};
             });
             if(nodeDrag.members.some(function(member){return !member.el || !member.xy || !member.origin;}))
               nodeDrag.selectionError='Render all selected nodes before moving them together.';
           }
         }
-        if(!nodeDrag.selectionError && startDiagram && (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;})){
+        if(!nodeDrag.topologyImport && !nodeDrag.selection && startDiagram && builderNodePositionLocked(startDiagram,nodeDrag.id))nodeDrag.selectionError='This graph node is position-locked; unlock it in Layers or Inspect to move it.';
+        if(!nodeDrag.selectionError && startDiagram && (nodeDrag.selection || (startDiagram.floats || []).some(function(f){return f && f.id===nodeDrag.id;}))){
           if(startSnapshot.renderedText!=null && startSnapshot.renderedText!==startSnapshot.text){
             cancelNodeDrag();inspectorMessage('The JSON changed since the preview. Render it before moving a float.');return;
           }
@@ -1415,7 +1438,7 @@ function createBuilderInteractions(opts){
       nodeDrag.el.classList.add('dv-dragsrc');
       var over = document.elementFromPoint(ev.clientX, ev.clientY);
       var tgt = over && over.closest ? over.closest('g.node[data-dv-node]') : null;
-      if (tgt && (tgt === nodeDrag.el || !nodeDrag.secEl.contains(tgt))) tgt = null;
+      if (tgt && (tgt === nodeDrag.el || !nodeDrag.secEl.contains(tgt) || tgt.classList.contains('dv-position-locked'))) tgt = null;
       if (nodeDrag.target && nodeDrag.target !== tgt) nodeDrag.target.classList.remove('dv-droptgt');
       if (tgt) tgt.classList.add('dv-droptgt');
       nodeDrag.target = tgt;

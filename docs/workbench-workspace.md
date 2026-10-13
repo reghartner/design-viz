@@ -174,9 +174,15 @@ forms, drafts, selection and disclosure state remain intact.
 **Layers** is a searchable active-section list of ordinary graph nodes in their
 authored placement order. Selecting a layer selects the rendered node without
 adding history. **Lock position** (also in Inspect) writes `locked: true` as one
-undoable edit and prevents graph-placement gestures and commands from moving that
-node. Content edits, connections, story state, copy, playback, and deletion stay
-available. Auto arrange asks you to unlock affected nodes first.
+undoable edit and pins the node's center as explicit free placement. **Lock row**
+does the same for every member with one Undo; it does not create a second kind of
+lock. Unlocking retains the pinned position. Mixed Shift/Ctrl/Cmd selections and
+box selections keep locked members selected while drag, arrow movement,
+alignment, and distribution move only unlocked members. Auto arrange preserves
+pins and arranges unlocked nodes around them; an all-locked action is a no-op.
+Content and size edits, connections, story state, copy, playback, and deletion
+stay available. The solid lock border and badge appear only on the editing canvas,
+not in readers, read-only preview, embeds, or exported SVG.
 
 A fresh editor leaves these windows closed so the view controls and authored
 panels are available immediately. The first object selection opens **Inspect**

@@ -32,8 +32,8 @@ function createAutoArrangeController(opts){
   function stale(){if(!snapshot)return;calculating(false);invalid=true;if(job)job.cancel();status.textContent='The diagram or active section changed. Close this dialog and try again.';confirm.disabled=true;}
   life.listen(button,'click',function(){
     var current=opts.context();if(current.error){opts.message(current.error);return;}
-    var lockError=builderPositionLockError(current.diagram,null,'using Auto arrange');if(lockError){opts.message(lockError.error);return;}
     try{autoArrangeInput(current.diagram);}catch(error){opts.message(error.message);return;}
+    if(builderLockedNodeIds(current.diagram).length===Object.keys(current.diagram.nodes || {}).length){opts.message('Every graph node is position-locked, so there is nothing to auto arrange. Unlock a node in Layers or Inspect to arrange it.');return;}
     snapshot=current;invalid=false;calculating(false);status.textContent='';confirm.disabled=false;cancel.textContent='Cancel';
     dialog.querySelector('[data-arrange-warning]').textContent=current.label || 'Arrange the active diagram.';
     opts.pause();dialog.showModal();cancel.focus();

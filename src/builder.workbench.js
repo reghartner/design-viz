@@ -592,9 +592,10 @@ function initWorkbenchBuilder(opts){
   function panelEditorForTarget(target){return inspector.panelForTarget(target);}
   function parseEditor(){return session.snapshot();}
   layers=createBuilderLayers({document:document,view:view,source:src,session:session,
-    section:function(){return session.insertSection;},selection:function(){return session.target;},
+    section:function(){return session.insertSection;},selection:function(){var many=interactions?interactions.selection():[];return many.length?many:session.target?[session.target]:[];},
     select:function(target){var el=findTargetEl(target);selectTarget(Object.assign({},target,{el:el}),false,true);if(layers)layers.sync();if(el)el.scrollIntoView({block:'nearest'});},
-    lock:function(section,id,value){var ok=applyPlan(planSetNodeLocked(session.text(),parseEditor().raw,section,id,value),{after:function(){if(layers)layers.sync();}});if(ok && layers)layers.sync();return ok;}
+    lock:function(section,id,value){var parsed=parseEditor();if(parsed.error)return false;var ok=applyPlan(planSetNodeLocked(session.text(),parsed.raw,section,id,value),{after:function(){if(layers)layers.sync();}});if(ok && layers)layers.sync();return ok;},
+    lockMany:function(section,ids,value){var parsed=parseEditor();if(parsed.error)return false;var ok=applyPlan(planSetNodesLocked(session.text(),parsed.raw,section,ids,value),{after:function(){if(layers)layers.sync();}});if(ok && layers)layers.sync();return ok;}
   });
   life.own(function(){if(layers)layers.destroy();layers=null;});
   function openDocumentSettings(){

@@ -937,8 +937,8 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
     var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
-    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + (n.locked === true ? ' node-position-locked' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
-         (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + (n.locked === true?' data-dv-position-locked="true"':'') + ' transform="translate(' + x + ' ' + y + ')">' +
+    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
+         (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
          (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
@@ -963,7 +963,6 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
            '<circle cx="' + backlinkX + '" cy="14" r="9" fill="transparent"/>' +
            '<text x="' + backlinkX + '" y="18" text-anchor="middle">&#8599;</text></g>' : '') +
          (n.detail ? '<g class="detail-trigger" role="button" tabindex="0" data-dv-detail="' + esc(id) + '" aria-label="Explore ' + esc(nodeTitle) + '"><title>' + 'Explore ' + esc(nodeTitle) + '</title><rect x="' + (p.w-30) + '" y="' + (p.h-25) + '" width="26" height="22" rx="6"/><text x="' + (p.w-17) + '" y="' + (p.h-9) + '" text-anchor="middle">⊞</text></g>' : '') +
-         (n.locked === true ? '<g class="node-position-lock" aria-hidden="true" transform="translate(6 '+(p.h-15)+')"><rect width="13" height="11" rx="3"/><path d="M3.5 4V3a3 3 0 0 1 6 0v1M6.5 7v2"/></g>' : '') +
          '</g>';
   });
   s += '</svg>';

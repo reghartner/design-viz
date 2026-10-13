@@ -13,9 +13,10 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   'animate','animateMotion','animateTransform','set','.pkt','.comm-failure',
   '.dv-connect-preview','.dv-free-edge-preview','.dv-topology-boundary',
   '.dv-topology-handle','.dv-rowgrab','.dv-rowline','.dv-slotline',
+  '.dv-position-lock-badge',
   '.nlink','.nbackref','.nrefs-trigger','.detail-trigger'
 ].join(',');
-var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
+var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-locked|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
 
 function svgExportSlug(value){
   value=typeof value==='string'?value:'';

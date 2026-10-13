@@ -226,7 +226,7 @@ function planReplacePanel(text,raw,sectionIdx,panelIdx,type,validateSource){
   if(failed)return failed;
   var plan=planReplaceValue(out,raw,got.path.concat(['panels',panelIdx]),JSON.stringify(entry,null,2));
   if(plan.error)return plan;
-  var errors=(validateSource?validateSource(JSON.parse(plan.text)):validate(normalize(JSON.parse(plan.text)))).errors;
+  var errors=builderValidateSource(JSON.parse(plan.text),validateSource).errors;
   if(errors.length)return {error:'The replacement would be invalid: '+errors.join('; ')};
   plan.kind='panel';plan.index=panelIdx;plan.replacement=review;return plan;
 }

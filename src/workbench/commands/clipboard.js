@@ -81,7 +81,7 @@ function builderClipboardOffset(item, room){
   }
   return out;
 }
-function planPasteBuilderClipboard(text,raw,data,destination){
+function planPasteBuilderClipboard(text,raw,data,destination,validateSource){
   try {
     var checked = builderClipboardParse(JSON.stringify(data)); if (checked.error) return checked;
     data = checked.data;
@@ -173,7 +173,7 @@ function planPasteBuilderClipboard(text,raw,data,destination){
         target={kind:'node',section:destination.section,id:ids[Object.keys(ids)[0]]};
       }
     }
-    var errors = validate(normalize(next)).errors;
+    var errors = builderValidateSource(next,validateSource).errors;
     if(errors.length)throw new Error('Paste was not applied: '+errors[0]);
     return {text:JSON.stringify(next,null,2),target:target};
   } catch(ex){return {error:ex.message};}

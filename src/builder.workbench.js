@@ -787,7 +787,7 @@ function initWorkbenchBuilder(opts){
       var parsed=parseEditor(),panel;
       if(!parsed.error){var got=builderDiagram(session.text(),parsed.raw,dest.section);if(!got.error)panel=(got.d.panels || [])[dest.index];}
       return 'Destination: section '+(dest.section+1)+(panel ? ' · '+(panel.title || panel.id) : '')+'. Select a Home panel first to paste a room, device, or subject.';
-    },apply:applyClipboardPlan,
+    },apply:applyClipboardPlan,validateSource:session.validate,
     canDuplicate:function(targets){return targets.length===1 && ['node','section','step'].indexOf(targets[0].kind)>=0;},
     duplicate:function(targets){
       if(targets.length !== 1 || ['node','section','step'].indexOf(targets[0].kind)<0)return null;
@@ -814,7 +814,7 @@ function initWorkbenchBuilder(opts){
   var diagramImport=typeof initBuilderDiagramImport==='function'?initBuilderDiagramImport(document,{
     view:view,isActive:opts.isActive,currentSection:function(){return session.insertSection;},surface:imageNodeSurface,
     snapshot:function(){return session.snapshot();},blocked:function(){return !!(interactions.busy() || inspector.busy(view));},message:inspectorMessage,
-    apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
+    validateSource:session.validate,apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
       clearMultiSelect();interactions.selectSpatial(plan.targets.map(function(target){return Object.assign({},target,{el:findTargetEl(target)});}).filter(function(target){return target.el;}));
     }},snapshot);}
   }):null;
@@ -954,7 +954,7 @@ function initWorkbenchBuilder(opts){
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
     locked:function(){return !!interactions.adding() || !!interactions.connecting();},
-    editView:function(section,id,action,value){var nextId,ok=commitCascade(function(raw){var plan=planTabViewEdit(session.text(),raw,section,id,action,value);nextId=plan.viewId;return plan;});return ok?nextId:null;},
+    editView:function(section,id,action,value){var nextId,ok=commitCascade(function(raw){var plan=planTabViewEdit(session.text(),raw,section,id,action,value,session.validate);nextId=plan.viewId;return plan;});return ok?nextId:null;},
     commit:function(section,target,items,id){
       return commitCascade(function(raw){return planSectionLayout(session.text(),raw,section,target,items,id);});
     },

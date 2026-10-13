@@ -22,7 +22,7 @@ function prepareBuilderDiagramImport(text){
     return {raw:raw,sections:sections,todos:todos};
   }catch(ex){return {error:ex.message};}
 }
-function planAddBuilderDiagram(text,raw,source,sourceSection,destination,point){
+function planAddBuilderDiagram(text,raw,source,sourceSection,destination,point,validateSource){
   try{
     var rec=specSectionPaths(source)[sourceSection],d=rec && specValueAt(source,rec.diagram);
     var got=builderDiagram(text,raw,destination);if(got.error)return got;
@@ -58,7 +58,7 @@ function planAddBuilderDiagram(text,raw,source,sourceSection,destination,point){
     // placement rather than silently filtering broken references during Copy.
     var data={format:BUILDER_CLIPBOARD_FORMAT,version:1,kind:'nodes',value:{nodes:d.nodes,groups:groups,rows:d.rows || [],floats:d.floats || [],edges:d.edges || []},protocols:Object.create(null)};
     (d.edges || []).forEach(function(e){var key=e.kind || 'int';data.protocols[key]=protocols[key];});
-    var mapped=planPasteBuilderClipboard(text,raw,data,{section:destination});if(mapped.error)return mapped;
+    var mapped=planPasteBuilderClipboard(text,raw,data,{section:destination},validateSource);if(mapped.error)return mapped;
     var next=JSON.parse(mapped.text),nextRec=specSectionPaths(next)[destination],merged=specValueAt(next,nextRec.diagram);
     var added=Object.keys(merged.nodes).filter(function(id){return !own(got.d.nodes,id);});
     var addedSet=Object.create(null);added.forEach(function(id){addedSet[id]=true;});
@@ -83,7 +83,7 @@ function planAddBuilderDiagram(text,raw,source,sourceSection,destination,point){
         result={text:'{"page":{"title":"","sections":[{"diagram":'+result.text+'}],"protocols":'+JSON.stringify(nextPage.protocols)+'}}'};
       }else {var changed=jsonSetField(result.text,raw.page?['page']:[],'protocols',JSON.stringify(nextPage.protocols));if(!changed)throw new Error('Could not add protocol definitions.');result=changed;}
     }
-    var errors=validate(normalize(JSON.parse(result.text))).errors;if(errors.length)throw new Error(errors[0]);
+    var errors=builderValidateSource(JSON.parse(result.text),validateSource).errors;if(errors.length)throw new Error(errors[0]);
     result.targets=added.map(function(id){return {kind:'node',section:destination,id:id};});result.target=result.targets[0];
     result.counts={nodes:added.length,groups:Object.keys(groups).length,edges:(d.edges || []).length};return result;
   }catch(ex){return {error:'Diagram was not added: '+ex.message};}

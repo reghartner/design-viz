@@ -54,7 +54,7 @@ function initBuilderClipboard(document, options){
     if(options.blocked()){say('Finish the current drag, connection, or ADD TO STEP action first.');return false;}
     if(dest.text !== options.text()){feedback.textContent='The destination changed. Close and reopen Paste to choose it again.';say(feedback.textContent);return false;}
     var plan;
-    try{plan=planPasteBuilderClipboard(options.text(),JSON.parse(options.text()),data,dest);}catch(ex){plan={error:'Fix the destination JSON before pasting.'};}
+    try{plan=planPasteBuilderClipboard(options.text(),JSON.parse(options.text()),data,dest,options.validateSource);}catch(ex){plan={error:'Fix the destination JSON before pasting.'};}
     if(plan.error){say(plan.error);feedback.textContent=plan.error;return false;}
     if(!options.apply(plan))return false;
     say('Pasted '+builderClipboardLabel(data)+'. Undo restores the previous spec.');return true;

@@ -51,16 +51,16 @@ function extractionChildSpec(raw, section, report){
   return {page:page};
 }
 
-function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options){
+function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options,validateSource){
   options=options || {};
   try{
-    var before=validate(normalize(raw));
+    var before=builderValidateSource(raw,validateSource);
     if(before.errors.length)return {error:'Fix the source validation errors before extracting: '+before.errors.join('\n')};
     // Preserve support for the bare-diagram authoring shorthand. Undo still
     // restores the exact caller text because only the returned plan is applied.
     if(raw && !raw.page && !raw.blocks && !raw.sections && raw.nodes && raw.rows){
       var wrapped={page:{sections:[{heading:'Overview',diagram:builderClone(raw)}]}};
-      return planExtractIndependentDiagram(JSON.stringify(wrapped,null,2),wrapped,sectionIdx,ids,options);
+      return planExtractIndependentDiagram(JSON.stringify(wrapped,null,2),wrapped,sectionIdx,ids,options,validateSource);
     }
     var got=builderDiagram(text,raw,sectionIdx);
     if(got.error)return got;
@@ -235,7 +235,7 @@ function planExtractIndependentDiagram(text,raw,sectionIdx,ids,options){
     });
     if(cascaded.error)return cascaded;
     result.text=cascaded.text;
-    var findings=validate(normalize(JSON.parse(result.text))),childFindings=validate(normalize(childSpec));
+    var findings=builderValidateSource(JSON.parse(result.text),validateSource),childFindings=builderValidateSource(childSpec);
     if(findings.errors.length || childFindings.errors.length)return {error:'Extraction could not preserve valid references: '+findings.errors.concat(childFindings.errors).join('\n')};
     var range=jsonLocate(result.text,got.path.concat(['nodes',domainId]));
     return {text:result.text,start:range.start,end:range.end,kind:'node',id:domainId,section:sectionIdx,

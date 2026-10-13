@@ -71,6 +71,13 @@ function builderNewNodeFloats(d, ids){
    depth. */
 
 function builderClone(v){ return JSON.parse(JSON.stringify(v)); }
+/* Planners operate on authored source, which can intentionally omit topology
+   supplied by a frozen Workbench session. Callers editing a live document pass
+   session.validate; standalone command tests and import preparation retain the
+   ordinary source validator fallback. */
+function builderValidateSource(raw, validateSource){
+  return validateSource ? validateSource(raw) : validate(normalize(raw));
+}
 function builderRewrite(text, raw, path, mutate){
   /* Rewrite the value at path from a mutated deep copy. mutate(copy) edits
      in place and may return {error}. */

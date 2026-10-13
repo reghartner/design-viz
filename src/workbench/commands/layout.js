@@ -1015,7 +1015,7 @@ function builderTabViewOwner(raw,section){
   var page=normalize(raw),record=sectionRecords(page)[section],owner=tabViewOwners(page).find(function(o){return o.tabBlock===record.tabBlock && o.tab===record.tab;});
   return {path:path,owner:owner};
 }
-function planTabViewEdit(text,raw,section,id,action,value){
+function planTabViewEdit(text,raw,section,id,action,value,validateSource){
   if(raw.nodes && raw.rows){text='{\n  "sections": [{"diagram": '+text+'}]\n}';raw=JSON.parse(text);}
   var got=builderTabViewOwner(raw,section);if(!got)return {error:'Select a section first.'};
   var owner=got.owner,views=tabViewDefinitions(owner),opening=tabViewDefault(owner,views),current=views.find(function(v){return v.id===id;}) || tabViewDefault(owner,views),next=text;
@@ -1049,6 +1049,6 @@ function planTabViewEdit(text,raw,section,id,action,value){
   else if(action==='default')set(got.path,'defaultView',selected.id);
   else return {error:'Unknown View action.'};
   set(got.path,'views',views);
-  var findings=validate(normalize(JSON.parse(next)));if(findings.errors.length)return {error:findings.errors.join('\n')};
+  var findings=builderValidateSource(JSON.parse(next),validateSource);if(findings.errors.length)return {error:findings.errors.join('\n')};
   return {text:next,viewId:resultId};
 }

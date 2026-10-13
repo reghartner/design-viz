@@ -36,6 +36,11 @@ async function roundtrip(page,before){
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(after);
   return after;
 }
+async function viewOptions(page){
+  const navigation=page.locator('#docview>.explore-navigation'),settings=navigation.locator('.section-view-settings');
+  if(!await settings.isVisible() && await navigation.locator('.reader-utilities>summary').isVisible())await navigation.locator('.reader-utilities>summary').click();
+  const options=settings.locator('details');if(await options.getAttribute('open')===null)await options.getByText('View',{exact:true}).click();return settings;
+}
 for(const mode of ['file','canon'])for(const view of ['ambient','step','explore'])test('saved import edges survive '+mode+' open, save and reload in '+view,async({page,server},info)=>{
   const {provider}=await fixture(page,server,mode,view);await painted(page);
   await page.screenshot({path:info.outputPath('initial-'+mode+'-'+view+'.png')});
@@ -118,6 +123,18 @@ test('consumer story activates saved cross and provider edges without changing o
     await closeTools(page);
   }
   await expect(page.locator('#src')).toHaveValue(before);
+});
+
+test('New View and Duplicate View accept an edge-bearing referenced topology document',async({page,server})=>{
+  await page.setViewportSize({width:1440,height:1000});const {consumer}=await fixture(page,server),before=await source(page);
+  let settings=await viewOptions(page);await settings.getByRole('button',{name:'New View',exact:true}).click();
+  const created=await source(page),createdRaw=JSON.parse(created);expect(createdRaw.page.views).toHaveLength(2);
+  expect(diagram(createdRaw).topologyImports).toEqual(diagram(consumer).topologyImports);expect(diagram(createdRaw).topologyProvenance).toBeUndefined();
+  settings=await viewOptions(page);await settings.getByRole('button',{name:'Duplicate View',exact:true}).click();
+  const duplicated=await source(page),duplicatedRaw=JSON.parse(duplicated);expect(duplicatedRaw.page.views).toHaveLength(3);
+  expect(diagram(duplicatedRaw).topologyImports).toEqual(diagram(consumer).topologyImports);expect(Object.keys(diagram(duplicatedRaw).nodes)).toEqual(['local','other']);
+  await painted(page);await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(created);
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(before);
 });
 
 

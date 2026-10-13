@@ -33,7 +33,7 @@ function initBuilderDiagramImport(document,options){
     }
     var prepared=pending.prepared;
     if(!prepared || prepared.error){status.textContent=prepared && prepared.error || 'Paste Flowview JSON or a Mermaid sequenceDiagram, or choose a file.';return;}
-    var plan=planAddBuilderDiagram(pending.snapshot.text,pending.snapshot.raw,prepared.raw,Number(select.value),pending.ref.section,pending.point);
+    var plan=planAddBuilderDiagram(pending.snapshot.text,pending.snapshot.raw,prepared.raw,Number(select.value),pending.ref.section,pending.point,options.validateSource);
     pending.plan=plan;
     if(plan.error){status.textContent=plan.error;return;}
     function count(n,noun){return n+' '+noun+(n===1?'':'s');}

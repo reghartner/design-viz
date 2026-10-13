@@ -518,3 +518,25 @@ test('imported nodes are spatially addressable and the multi-node Inspector alig
  const authored=JSON.parse(h.text),imp=authored.page.sections[0].diagram.topologyImports[0];assert.ok(imp.position);assert.ok(imp.nodePositions.store);
  assert.deepEqual(Object.keys(authored.page.sections[0].diagram.nodes),['client']);assert.equal(authored.page.sections[0].diagram.floats,undefined);
 });
+
+test('imported-node right-click alignment enables each direction from its own plan',()=>{
+ const fs=require('node:fs'),path=require('node:path'),specs=['platform','checkout'].map(id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8')));
+ const raw=specs[1],diagram=raw.page.sections[0].diagram,ctx={version:1,id:'checkout',specs};
+ diagram.rows=[[]];diagram.floats=[{id:'client',x:900,y:600}];diagram.topologyImports[0].position={x:-99900,y:0};
+ const h=ui(raw);h.session.replaceProject(h.text,null,{topologyContext:ctx});
+ const section=h.view.appendChild(h.element());section.className='doc-sec';section.setAttribute('data-dv-section','0');
+ const surface=section.appendChild(h.element());surface.className='section-viewport';surface.getBoundingClientRect=()=>({left:0,top:0,right:1200,bottom:800,width:1200,height:800});
+ const append=surface.appendChild.bind(surface);surface.appendChild=child=>{if(child.className==='dv-object-menu')child.getBoundingClientRect=()=>({left:0,top:0,right:240,bottom:240,width:240,height:240});return append(child);};
+ const board=surface.appendChild(h.element('svg'));board.className='boardcanvas';board.getScreenCTM=()=>({inverse(){return this;}});
+ h.win.DOMPoint=class{constructor(x,y){this.x=x;this.y=y;}matrixTransform(){return this;}};h.win.innerWidth=1200;h.win.innerHeight=800;
+ function renderedNode(id,rect){const node=board.appendChild(h.element('g'));node.setAttribute('data-dv-node',id);node.getBoundingClientRect=()=>({...rect,right:rect.left+rect.width,bottom:rect.top+rect.height});return node;}
+ const client=renderedNode('client',{left:840,top:570,width:120,height:60}),api=renderedNode('platform::api',{left:-99870,top:120,width:120,height:60});
+ let selected=[{kind:'node',section:0,id:'client',el:client},{kind:'node',section:0,id:'platform::api',el:api}],applied=0;
+ const spatial=h.C.createBuilderSpatialSelection({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,targetFromEvent:()=>null,selection:()=>selected,select(value){selected=value;},toggle(){},find(){},apply(plan,opt,snapshot){applied++;return h.session.accept(plan,{snapshot});},busy:()=>false,inspect(){}});
+ h.view.fire('contextmenu',{target:client,clientX:900,clientY:600});
+ const buttons=surface.querySelectorAll('button'),horizontal=buttons.find(button=>button.textContent==='Align horizontally'),vertical=buttons.find(button=>button.textContent==='Align vertically');
+ assert.ok(horizontal);assert.ok(vertical);assert.equal(horizontal.getAttribute('aria-disabled'),null);assert.match(vertical.title,/Relative node position exceeds/);
+ vertical.fire('click');assert.equal(applied,0);horizontal.fire('click');assert.equal(applied,1);
+ const authored=JSON.parse(h.session.text()),imp=authored.page.sections[0].diagram.topologyImports[0];assert.ok(imp.nodePositions.api);assert.equal(imp.nodePositions.api.y,600);assert.deepEqual(Object.keys(authored.page.sections[0].diagram.nodes),['client']);
+ spatial.destroy();
+});

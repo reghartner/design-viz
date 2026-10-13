@@ -145,7 +145,6 @@ function createBuilderSpatialSelection(opts){
     var topologyContext=opts.session.topologyContext?opts.session.topologyContext():null,topologyKey=JSON.stringify(topologyContext);
     var id=layoutId(shell),geometry=rects(targets,shell),spatial=targets.every(function(x){return x.kind==='node' || x.kind==='panel';});
     var anchorIndex=targets.findIndex(function(x){return x.section===t.section && x.kind===t.kind && (t.id!=null?x.id===t.id:x.index===t.index);});
-    var alignment=planAlignSpatial(s.text,s.raw,targets,id,'horizontal',geometry,anchorIndex,topologyContext);
     var selectedNodes=targets.filter(function(target){return target.kind==='node';}),ownership=selectedNodes.length?builderNodeArrangementTargets(s.text,s.raw,selectedNodes,topologyContext):null;
     var authored=selectedNodes.length?builderDiagram(s.text,s.raw,selectedNodes[0].section):null;
     var containsImported=!!(ownership && !ownership.error && ownership.records.some(function(record){return !record.local;})) ||
@@ -159,7 +158,7 @@ function createBuilderSpatialSelection(opts){
     item('Inspect',function(){opts.inspect();});
     item('Delete',function(){var plan=planBulkDelete(s.text,targets);if(opts.apply(plan,null,s))opts.select([]);},containsImported?'Imported structure belongs to its provider.':targets.some(function(t){return t.kind==='step-controls';})?'Step controls belong to the section and cannot be deleted.':!spatial && targets.length>1?'Select one kind to delete.':null);
     item('Duplicate',function(){opts.apply(planDuplicateSpatial(s.text,s.raw,targets,id,geometry),null,s);},containsImported?'Imported structure belongs to its provider.':spatial?null:'Duplicate supports nodes and canvas panels.');
-    ['horizontal','vertical'].forEach(function(direction){item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(!plan.noop)opts.apply(plan,null,s);},alignment.error);});
+    ['horizontal','vertical'].forEach(function(direction){var alignment=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);item('Align '+(direction==='horizontal'?'horizontally':'vertically'),function(){var plan=planAlignSpatial(s.text,s.raw,targets,id,direction,geometry,anchorIndex,topologyContext);if(!plan.noop)opts.apply(plan,null,s);},alignment.error);});
     ['horizontal','vertical'].forEach(function(direction){var plan=planDistributeSpatial(s.text,s.raw,targets,id,direction,geometry);item('Distribute '+(direction==='horizontal'?'horizontally':'vertically'),function(){distribute(direction);},plan.error);});
     item('Fit selection',fitSelection,fitReason(context()));
     shell.appendChild(menu);var bounds=shell.getBoundingClientRect();menu.style.maxHeight=Math.max(80,Math.min(win.innerHeight,bounds.bottom)-Math.max(8,bounds.top)-8)+'px';if(menu.showPopover)menu.showPopover();var r=menu.getBoundingClientRect(),x=ev.clientX||t.el.getBoundingClientRect().left,y=ev.clientY||t.el.getBoundingClientRect().top;

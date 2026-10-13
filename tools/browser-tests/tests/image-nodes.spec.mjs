@@ -24,7 +24,10 @@ async function transfer(page,kind,{base64=PNG,name='camera-capture.png',type='im
 test('drop and paste add ordinary image nodes in Standard and Explore with one Undo each',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');const raw=fixture(),original=JSON.stringify(raw,null,2);await pastePage(page,original);await closeTools(page);
   await transfer(page,'dragenter');
+  await expect(page.locator('.file-drop-overlay:visible')).toHaveCount(0);
+  await expect(board(page)).toHaveClass(/dv-image-drop-target/);
   await transfer(page,'dragover');await expect(board(page)).toHaveClass(/dv-image-drop-target/);
+  await expect(page.locator('.file-drop-overlay:visible')).toHaveCount(0);
   expect(await transfer(page,'drop')).toBe(true);
   const image=page.locator('#docview [data-dv-node-image="true"]');await expect(image).toHaveCount(1);
   await expect(page.locator('.file-drop-overlay:visible')).toHaveCount(0);

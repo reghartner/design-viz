@@ -93,11 +93,13 @@ function initBuilderImageNodes(document,options){
     try{reader.readAsDataURL(file);}catch(ex){reader=null;say('The image could not be read. The diagram is unchanged.');return false;}
     return true;
   }
-  life.listen(view,'dragover',function(ev){
+  function highlightImageDrag(ev){
     var ref=surfaceFor(ev.target),payload=builderImageTransfer(ev.dataTransfer);if(!ref || !payload)return;
     ev.preventDefault();if(ev.dataTransfer)ev.dataTransfer.dropEffect='copy';
     if(highlight!==ref.board){clearHighlight();highlight=ref.board;highlight.classList.add('dv-image-drop-target');}
-  });
+  }
+  life.listen(view,'dragenter',highlightImageDrag);
+  life.listen(view,'dragover',highlightImageDrag);
   life.listen(view,'dragleave',function(ev){if(highlight && (!ev.relatedTarget || !highlight.contains(ev.relatedTarget)))clearHighlight();});
   life.listen(view,'drop',function(ev){
     var ref=surfaceFor(ev.target),payload=builderImageTransfer(ev.dataTransfer);if(!ref || !payload || !payload.file)return;

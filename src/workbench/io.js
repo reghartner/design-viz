@@ -84,8 +84,8 @@ function createStagedFileImport(opts){
     if(trigger)listen(trigger,'click',function(){input.value='';input.click();});
     listen(input,'change',function(){start(input.files);input.value='';});
   }
-  listen(surface,'dragenter',function(ev){if(!active() || !external(ev))return;ev.preventDefault();depth++;overlay.hidden=false;});
-  listen(surface,'dragover',function(ev){if(!active() || !external(ev))return;ev.preventDefault();if(ev.dataTransfer)ev.dataTransfer.dropEffect='copy';});
+  listen(surface,'dragenter',function(ev){if(ev.defaultPrevented){hideOverlay();return;}if(!active() || !external(ev))return;ev.preventDefault();depth++;overlay.hidden=false;});
+  listen(surface,'dragover',function(ev){if(ev.defaultPrevented){hideOverlay();return;}if(!active() || !external(ev))return;ev.preventDefault();if(ev.dataTransfer)ev.dataTransfer.dropEffect='copy';});
   listen(surface,'dragleave',function(ev){if(!external(ev))return;depth=Math.max(0,depth-1);if(!depth)overlay.hidden=true;});
   listen(surface,'drop',function(ev){if(!active() || !external(ev))return;ev.preventDefault();hideOverlay();start(ev.dataTransfer.files);});
   /* Canvas image drops stop bubbling after ingestion; retire the file overlay

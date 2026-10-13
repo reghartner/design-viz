@@ -49,9 +49,11 @@ test('Layers syncs selection, row and node lock history, source lifecycle, keybo
 
  await search.fill('back');await expect(rows).toHaveCount(1);await expect(rows.first()).toContainText('Backend');await search.fill('');
  const navigation=page.locator('#docview .explore-navigation');
- await navigation.getByRole('button',{name:'Notes only',exact:true}).click();
+ await navigation.getByRole('button',{name:'Next Page',exact:true}).click();
+ await expect(navigation.locator('.reader-page-label')).toHaveText('Page 2 of 2');
  await expect(win.locator('.layers-empty')).toContainText('no diagram');
- await navigation.getByRole('button',{name:'Delivery',exact:true}).click();
+ await navigation.getByRole('button',{name:'Previous Page',exact:true}).click();
+ await expect(navigation.locator('.reader-page-label')).toHaveText('Page 1 of 2');
  await expect(rows).toHaveCount(3);
 
  await page.locator('#src').evaluate(el=>{const raw=JSON.parse(el.value);delete raw.page.blocks[0].diagram;el.value=JSON.stringify(raw,null,2);el.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -82,7 +84,7 @@ test('mixed Shift/Meta and Alt-marquee selections keep pins fixed during pointer
  const afterB=await center(node(page,'b').locator('.card'));expect(afterB.x).toBeCloseTo(beforeB.x,1);expect(afterB.y).toBeCloseTo(beforeB.y,1);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(beforeDrag);await expect(page.locator('#undo-builder')).toBeDisabled();
 
- await chooseNavigation(page.locator('#docview .explore-navigation'),'View','Explore');await expect(page.locator('.workspace-active-section .explore-stage')).toBeVisible();await page.locator('#workspace-fit').click();
+ await chooseNavigation(page.locator('#docview .explore-navigation'),'View','Explore');await expect(page.locator('.workspace-active-section .explore-stage')).toBeVisible();await page.locator('#docview .explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
  const bounds=await page.locator('.explore-board').evaluate(el=>{const boxes=[...el.querySelectorAll('[data-dv-node]')].map(n=>n.getBoundingClientRect());const r=el.getBoundingClientRect();return {x:Math.max(r.left+4,Math.min(...boxes.map(b=>b.left))-12),y:Math.max(r.top+4,Math.min(...boxes.map(b=>b.top))-12),right:Math.min(r.right-4,Math.max(...boxes.map(b=>b.right))+12),bottom:Math.min(r.bottom-4,Math.max(...boxes.map(b=>b.bottom))+12)};});
  await page.keyboard.down('Alt');await page.mouse.move(bounds.x,bounds.y);await page.mouse.down();await page.mouse.move(bounds.right,bounds.bottom,{steps:10});await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('#docview .dv-sel[data-dv-node]')).toHaveCount(3);
  const beforeNudge=await source(page),nudgeDiagram=JSON.parse(beforeNudge).page.blocks[0].diagram;await node(page,'a').focus();await page.keyboard.press('ArrowRight');

@@ -6,7 +6,10 @@ function fixture(){return {page:{title:'Shortcut contract',sections:[{heading:'A
 }},{heading:'Inactive section',diagram:{nodes:{other:{title:'Other'}},rows:[['other']]}}]}};}
 async function open(page,server,path='/lifetime/index.html'){
   await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+path);await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+path);
-  await pastePage(page,JSON.stringify(fixture()));await closeTools(page);await expect(page.locator('#workspace-fit')).toBeVisible();
+  await pastePage(page,JSON.stringify(fixture()));await closeTools(page);
+  // Reader navigation owns the visible Fit control; its legacy action remains
+  // the shortcut target. Wait on the active canvas and its retained control.
+  await expect(page.locator('.workspace-active-section [data-dv-node]').first()).toBeVisible();await expect(page.locator('#workspace-fit-selection')).toBeVisible();
 }
 const activeNodes=page=>page.locator('.workspace-active-section [data-dv-node]');
 
@@ -25,6 +28,8 @@ test('canvas workflow keys select active visible nodes, call existing fit action
 
 test('shortcut sheet is discoverable and stays usable in the narrow workspace',async({page,server},info)=>{
   await open(page,server,'/workbench.html');await page.setViewportSize({width:390,height:740});
+  await expect(page.locator('#workspace-more')).not.toHaveAttribute('open','');
+  await page.locator('#workspace-more > summary').click();
   const help=page.locator('.workspace-help'),shortcutButton=help.getByRole('button',{name:/Keyboard shortcuts/});await help.locator('summary').click();await expect(shortcutButton).toBeVisible();await shortcutButton.click();
   const dialog=page.getByRole('dialog',{name:'Keyboard shortcuts'});await expect(dialog).toBeVisible();await expect(dialog).toContainText('Select every visible node');const box=await dialog.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.x+box.width).toBeLessThanOrEqual(390);expect(box.y+box.height).toBeLessThanOrEqual(740);await info.attach('narrow shortcut sheet',{body:await page.screenshot(),contentType:'image/png'});await dialog.getByRole('button',{name:/Close/}).click();
   await expect(shortcutButton).toBeFocused();await page.keyboard.type('?');await expect(dialog).toBeVisible();

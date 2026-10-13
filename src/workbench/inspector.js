@@ -523,7 +523,9 @@ function textBoxForm(val){
     }
     var area=document.createElement('textarea');area.className='fctl';area.rows=5;area.value=val.text;
     commitOnChange(area,null,function(value){return edit({text:value});});
-    var rows=[frow('Text',area),frow('Font',selectControl(TEXT_BOX_FONTS,style.fontFamily,function(v){return format('fontFamily',v);})),
+    var rows=[frow('Text',area),frow('Position lock',checkboxControl(val.locked===true,function(on){
+        return commitCascade(function(raw){return planSetNodeLocked(session.text(),raw,t.section,t.id,on);},{after:function(){renderInspector();}});
+      })),frow('Font',selectControl(TEXT_BOX_FONTS,style.fontFamily,function(v){return format('fontFamily',v);})),
       frow('Font size',numberControl(style.fontSize,function(v){return format('fontSize',v);})),
       frow('Bold',checkboxControl(style.bold,function(v){return format('bold',v);})),
       frow('Italic',checkboxControl(style.italic,function(v){return format('italic',v);})),

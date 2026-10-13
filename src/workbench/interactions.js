@@ -351,6 +351,10 @@ function createBuilderInteractions(opts){
   function openReferenceMenu(ev){
     if(opts.isActive && !opts.isActive() || addToStep || connect || nodeDrag || groupDrag || rowDrag || drag)return;
     var ref=referenceTarget(ev.target);if(!ref)return;
+    // A selected imported node participates in the ordinary multi-object menu;
+    // leave this event for spatial selection so mixed/imported alignment is
+    // reachable without surrendering the reference menu for single members.
+    if(ref.target.kind==='node' && multiSel.length>1 && multiSel.some(function(t){return t.kind==='node' && t.section===ref.target.section && t.id===ref.target.id;}))return;
     ev.preventDefault();ev.stopImmediatePropagation();closeReferenceMenu(false);if(spatial)spatial.clear();pausePreview();
     var context=session.topologyContext(),contextKey=JSON.stringify(context),url=referenceURL(context,ref.imp);
     function current(){var now=parseEditor();return !now.error && now.project===ref.s.project && now.text===ref.s.text && (now.renderedText==null || now.renderedText===now.text) && JSON.stringify(session.topologyContext())===contextKey && ref.el && ref.el.isConnected && (!opts.isActive || opts.isActive());}

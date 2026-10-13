@@ -2287,9 +2287,17 @@ function renderMultiInspector(multiSel){
     if(!homogeneous){if(exportForm)guide.appendChild(exportForm);else{var summary=document.createElement('p');summary.textContent=multiSel.map(function(t){return t.kind+': '+(t.id || t.index);}).join(' · ');guide.appendChild(summary);}finishForm(previous);return;}
     var form = document.createElement('div');
     form.className = 'iform';
+    var multiTopologyContext=session.topologyContext(),multiTopologyKey=JSON.stringify(multiTopologyContext),includesImported=false;
+    if(kind==='node'){
+      var ownershipSnapshot=parseEditor(),ownership=!ownershipSnapshot.error && builderNodeArrangementTargets(ownershipSnapshot.text,ownershipSnapshot.raw,multiSel,multiTopologyContext);
+      var ownershipDiagram=!ownershipSnapshot.error && builderDiagram(ownershipSnapshot.text,ownershipSnapshot.raw,multiSel[0].section);
+      includesImported=!!(ownership && !ownership.error && ownership.records.some(function(record){return !record.local;})) ||
+        !!(ownershipDiagram && !ownershipDiagram.error && multiSel.some(function(t){return !Object.prototype.hasOwnProperty.call(ownershipDiagram.d.nodes || {},t.id);}));
+      if(includesImported){var importedNote=document.createElement('p');importedNote.className='fnote';importedNote.textContent='Imported node structure stays provider-owned. Alignment saves only this consumer’s node arrangement.';form.appendChild(importedNote);}
+    }
     /* every control writes the SAME value to every selected element;
        an empty value removes the field from all of them */
-    if (kind === 'node'){
+    if (kind === 'node' && !includesImported){
       var parsed = parseEditor();
       var values = [], diagrams = [], nodeIcons = [];
       if (!parsed.error) multiSel.forEach(function(t){
@@ -2331,11 +2339,11 @@ function renderMultiInspector(multiSel){
       }, {placeholder: 'lane id from page.lanes — empty removes'})));
     }
     var acts = actionGroup('Selected '+kind+' actions','inspector-actions');
-    if(!clipboardToolbar() && clipboard() && (kind === 'node' || kind === 'panel')){
+    if(!clipboardToolbar() && clipboard() && (kind === 'panel' || kind === 'node' && !includesImported)){
       acts.appendChild(actionButton('Copy selected',function(){clipboard().copy(multiSel);}));
       acts.appendChild(actionButton('Duplicate selected',function(){clipboard().duplicate(multiSel);}));
     }
-    if (kind === 'node' || kind === 'edge' || kind === 'step'){
+    if (kind === 'edge' || kind === 'step' || kind === 'node' && !includesImported){
       acts.appendChild(actionButton('mark delta', function(){ return applyBulkField('delta', 'true'); }));
       acts.appendChild(actionButton('clear delta', function(){ return applyBulkField('delta', null); }));
     }
@@ -2345,27 +2353,28 @@ function renderMultiInspector(multiSel){
         var button=actionButton('Align '+direction,function(){
           var snapshot=parseEditor();
           if(snapshot.error){formError(snapshot.error);return;}
+          if(JSON.stringify(session.topologyContext())!==multiTopologyKey){formError('The source or provider context changed. Render and reselect before aligning.');return;}
           if(snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text){
             formError('The JSON changed since the preview. Render it before aligning nodes.');return;
           }
-          return applyPlan(planTransformFloats(snapshot.text,snapshot.raw,multiSel,{type:direction}),null,snapshot);
+          var plan=planTransformFloats(snapshot.text,snapshot.raw,multiSel,{type:direction},multiTopologyContext);return plan.noop?false:applyPlan(plan,null,snapshot);
         });
-        button.title='Set the same '+(direction==='horizontal'?'Y':'X')+' center as the first selected float';
+        button.title='Set the same '+(direction==='horizontal'?'Y':'X')+' center as the first selected node';
         alignmentButtons.push({button:button,title:button.title});acts.appendChild(button);
       });
       invalidateAlignment=function(){
-        var snap=parseEditor(),reason=snap.error || (snap.renderedText!=null && snap.renderedText!==snap.text?'The JSON changed since the preview. Render it before aligning nodes.':builderSelectedFloats(snap.text,snap.raw,multiSel).error);
+        var snap=parseEditor(),reason=snap.error || (JSON.stringify(session.topologyContext())!==multiTopologyKey?'The source or provider context changed. Render and reselect before aligning.':snap.renderedText!=null && snap.renderedText!==snap.text?'The JSON changed since the preview. Render it before aligning nodes.':builderSelectedFloats(snap.text,snap.raw,multiSel,multiTopologyContext).error);
         alignmentButtons.forEach(function(item){item.button.disabled=!!reason;item.button.title=reason || item.title;});
         alignmentHelp.textContent=reason || '';alignmentHelp.hidden=!reason;
       };
       invalidateAlignment();acts.appendChild(alignmentHelp);
-      acts.appendChild(actionButton('Create domain from selected nodes',function(){
+      if(!includesImported)acts.appendChild(actionButton('Create domain from selected nodes',function(){
         if(multiSel.some(function(t){return t.section!==multiSel[0].section;})){
           formError('Choose nodes from a single section to create a domain.');return;
         }
         renderExtractionPreview(multiSel);
       }));
-      acts.appendChild(actionButton('stack together', function(){
+      if(!includesImported)acts.appendChild(actionButton('stack together', function(){
         var secs = {};
         multiSel.forEach(function(t){ secs[t.section] = true; });
         if (Object.keys(secs).length !== 1){
@@ -2377,7 +2386,7 @@ function renderMultiInspector(multiSel){
         commitGroup(function(raw){ return planStackNodes(session.text(), raw, sec, ids); });
       }));
     }
-    acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
+    if(!(kind==='node' && includesImported))acts.appendChild(actionButton('delete ' + multiSel.length + ' ' + kind + 's',
       opts.selection.removeMany, 'bdanger'));
     guide.appendChild(acts);
     if (form.childNodes.length) guide.appendChild(form);

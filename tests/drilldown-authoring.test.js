@@ -238,7 +238,7 @@ function ui(spec=fixture(),options={}){
   }
   Object.assign(doc,element('document'));doc.createElement=element;doc.body=doc.appendChild(element('body'));doc.createTextNode=text=>Object.assign(element('span'),{textContent:text});
   const C={document:doc,URL};vm.createContext(C);
-  for(const name of ['canon','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
+  for(const name of ['canon','canon-topology','validator','workbench/source-edit','workbench/targets','workbench/commands/common','workbench/commands/topology','workbench/commands/graph','workbench/commands/document','workbench/commands/narrative','workbench/commands/layout','workbench/commands/extraction','workbench/commands/detail-mapping',
     'workbench/session','workbench/field-values','workbench/inspector-model','workbench/controls','workbench/lifetime','workbench/detail-mapping','workbench/icon-picker','workbench/brand','workbench/inspector','workbench/io-model','workbench/edge-curves','workbench/spatial-selection','workbench/interactions'])vm.runInContext(readSource(name+'.js'),C);
   const guide=doc.body.appendChild(element()),view=doc.body.appendChild(element()),src=element('textarea'),win=element('window');
   let text=JSON.stringify(spec,null,2),renders=0;
@@ -503,4 +503,18 @@ test('handoff authoring rejects the current section without changing source',()=
  const raw=fixture(),text=JSON.stringify(raw);
  const result=B.planSetNodeHandoff(text,raw,0,'domain',{localSection:'overview'});
  assert.match(result.error,/different diagram section/);assert.equal(result.text,undefined);assert.equal(JSON.stringify(raw),text);
+});
+
+test('imported nodes are spatially addressable and the multi-node Inspector aligns them without provider bulk edits',()=>{
+ const fs=require('node:fs'),path=require('node:path'),specs=['platform','checkout'].map(id=>JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/'+id+'.json'),'utf8')));
+ const raw=specs[1],ctx={version:1,id:'checkout',specs},h=ui(raw);h.session.replaceProject(h.text,null,{topologyContext:ctx});
+ const section=h.view.appendChild(h.element());section.className='doc-sec';section.setAttribute('data-dv-section','0');
+ const surface=section.appendChild(h.element());surface.className='section-viewport';const node=surface.appendChild(h.element('g'));node.setAttribute('data-dv-node','platform::api');
+ const spatial=h.C.createBuilderSpatialSelection({document:h.doc,window:h.win,view:h.view,src:h.src,session:h.session,targetFromEvent:()=>null,selection:()=>[],select(){},toggle(){},find(){},apply(){},busy:()=>false,inspect(){}});
+ const target=spatial.target(node);assert.equal(target.kind,'node');assert.equal(target.id,'platform::api');assert.equal(target.section,0);assert.equal(target.el,node);assert.equal(target.imported,true);spatial.destroy();
+ h.inspector.renderMulti([{kind:'node',section:0,id:'platform::api'},{kind:'node',section:0,id:'platform::store'}]);
+ assert.equal(h.field('group'),undefined);assert.equal(h.button('mark delta'),undefined);assert.equal(h.button('delete 2 nodes'),undefined);
+ const align=h.button('Align vertical');assert.ok(align);assert.equal(align.disabled,false);align.fire('click');
+ const authored=JSON.parse(h.text),imp=authored.page.sections[0].diagram.topologyImports[0];assert.ok(imp.position);assert.ok(imp.nodePositions.store);
+ assert.deepEqual(Object.keys(authored.page.sections[0].diagram.nodes),['client']);assert.equal(authored.page.sections[0].diagram.floats,undefined);
 });

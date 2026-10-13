@@ -57,7 +57,7 @@
       <div class="welcome-actions" aria-label="Choose how to begin">
         <button type="button" class="welcome-action" id="welcome-catalog"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">⌘</span><span class="welcome-action-copy"><strong>From service catalog</strong><span>Choose services. Map their connections.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action" id="welcome-paste"><span class="welcome-action-icon welcome-icon-lilac" aria-hidden="true">{ }</span><span class="welcome-action-copy"><strong>Paste JSON</strong><span>Pick up where your agent left off.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
-        <button type="button" class="welcome-action" id="welcome-open"><span class="welcome-action-icon welcome-icon-mint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 3h9l-2 10H3V7Zm0 0V4h7l2 3h7v3"/></svg></span><span class="welcome-action-copy"><strong>Import file</strong><span>Preview Flowview JSON or a Mermaid sequence.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
+        <button type="button" class="welcome-action" id="welcome-open"><span class="welcome-action-icon welcome-icon-mint" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 3h9l-2 10H3V7Zm0 0V4h7l2 3h7v3"/></svg></span><span class="welcome-action-copy"><strong>Open file</strong><span>Bring a Flowview JSON file.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
         <button type="button" class="welcome-action welcome-action-primary" id="welcome-new"><span class="welcome-action-icon welcome-icon-blue" aria-hidden="true">+</span><span class="welcome-action-copy"><strong>Start new project</strong><span>A useful example or a blank canvas.</span></span><span class="welcome-arrow" aria-hidden="true">↗</span></button>
       </div>
       <button type="button" class="welcome-resume" id="welcome-resume" hidden><span class="welcome-resume-icon" aria-hidden="true">↶</span><span><strong id="welcome-resume-title">Resume your draft</strong><span id="welcome-resume-detail"></span></span><span aria-hidden="true">Continue →</span></button>
@@ -127,7 +127,7 @@
       </div>
       <div class="welcome-agent-return"><span>Already have the result?</span><button type="button" class="welcome-text-button" id="welcome-agent-paste">Paste your JSON <span aria-hidden="true">→</span></button><span class="welcome-note">Your agent runs in your own tools.</span></div>
     </div>
-    <input type="file" id="welcome-file" accept=".spec.json,.json,.mmd,.mermaid,.md,.markdown,application/json,text/plain,text/markdown" hidden>
+    <input type="file" id="welcome-file" accept=".json,application/json" hidden>
     <p id="welcome-file-error" class="welcome-error" role="alert" hidden></p>
     <div class="welcome-footer"><span class="welcome-footer-dot" aria-hidden="true"></span>File imports are processed in your browser.<span>Built for ideas worth explaining.</span></div>
   </section>

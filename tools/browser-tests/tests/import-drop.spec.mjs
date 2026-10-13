@@ -26,6 +26,14 @@ test('Welcome stages dropped Flowview and Markdown imports before opening the wo
   await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.title).toBe('Converted sequence');
 });
 
+test('Welcome Open keeps the established immediate Flowview JSON behavior',async({page,server})=>{
+  await page.goto(server.origin+'/workbench.html');
+  await page.locator('#welcome-file').setInputFiles({name:'opened.spec.json',mimeType:'application/json',buffer:Buffer.from(story('Opened directly'))});
+  await expect(page.locator('#workbench-workspace')).toBeVisible();
+  await expect(page.locator('.file-import-dialog:visible')).toHaveCount(0);
+  await expect.poll(async()=>JSON.parse(await page.locator('#src').inputValue()).page.title).toBe('Opened directly');
+});
+
 test('editor file import confirms once, cancels with Escape, and Undo restores the source',async({page,server})=>{
   const original=story('Original editor story');await page.goto(server.origin+'/workbench.html');await paste(page,original);
   const mermaid='sequenceDiagram\nparticipant Web\nparticipant API\nWeb->>API: POST /orders';

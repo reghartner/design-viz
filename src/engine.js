@@ -1628,6 +1628,7 @@ function attachStepper(secBox, boardDiv, termbar, d, prefix, board, lanes, panel
       captionGhost = captionLine.cloneNode(true);
       captionGhost.classList.add('dv-caption-old');
       captionGhost.setAttribute('aria-hidden', 'true');
+      captionGhost.removeAttribute('data-comment-target'); captionGhost.setAttribute('data-uncommentable', '');
       captionGhost.style.left = (lineRect.left - barRect.left) + 'px';
       captionGhost.style.top = (lineRect.top - barRect.top) + 'px';
       captionGhost.style.width = lineRect.width + 'px';
@@ -2902,7 +2903,12 @@ function buildSection(container, sec, gi, sectionReference, protos, skin, lanes,
   var btnNext = document.createElement('button'); btnNext.className = 'tbtn'; btnNext.innerHTML = '&#8250;'; btnNext.setAttribute('aria-label', 'Next step');
   var chips = document.createElement('div'); chips.className = 'schips';
   if (diagramPathList(d).length > 1) bar.classList.add('has-paths');
-  var line = document.createElement('div'); line.className = 'stepline';
+  /* claude.ai artifact comments anchor a click anywhere in the caption to the
+     whole line, so a comment records "STEP n/N", lane and text. The line keeps
+     no per-step id: the host hides a comment while the anchored element's text
+     differs and shows it again on that step, but places a comment whose
+     anchor id is missing at its saved position on every step. */
+  var line = document.createElement('div'); line.className = 'stepline'; line.setAttribute('data-comment-target', '');
   var stepN = document.createElement('b'); var stepText = document.createElement('div');stepText.className='step-text';
   var sharedStatus=document.createElement('span');sharedStatus.className='step-shared-note';sharedStatus.hidden=true;
   var failureStatus = document.createElement('span'); failureStatus.className = 'comm-status'; failureStatus.hidden = true;

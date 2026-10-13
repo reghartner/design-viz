@@ -41,7 +41,7 @@ test('visible Connect action and the Add menu share cancellation and invalid-tar
   await page.locator('#workspace-window-inspect .workspace-window-close').click();
   for(const target of ['a','b','z']){await start(page);await node(page,target).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);}
   await start(page);await page.keyboard.press('Escape');await clean(page);await expect(page.locator('#src')).toHaveValue(original);
-  await start(page);await page.locator('#workbench-editor-title').click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);
+  await start(page);await page.locator('.board:visible').first().click({position:{x:5,y:5}});await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#diagram-add').click();await page.locator('[data-add-kind=edge]').click();
   await closeTools(page);
   await node(page,'b').click();await expect(page.locator('.dv-connect-hint')).toContainText('Gateway');await node(page,'c').click();

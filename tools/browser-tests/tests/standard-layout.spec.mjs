@@ -115,12 +115,13 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   };
   const box=await handle.boundingBox();
   const start={x:box.x+box.width/2,y:box.y+box.height/2};
+  const scale=await page.locator('.section-layout-grid').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--section-layout-scale')) || 1),dragDistance=4*40*scale;
   const before=await sample('before-drag',start);await testInfo.attach('before-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   await page.mouse.move(start.x,start.y);await page.mouse.down();
-  await page.mouse.move(start.x,start.y-160,{steps:8});await settle(page);
-  const during=await sample('during-drag',{x:start.x,y:start.y-160});await testInfo.attach('during-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  await page.mouse.move(start.x,start.y-dragDistance,{steps:8});await settle(page);
+  const during=await sample('during-drag',{x:start.x,y:start.y-dragDistance});await testInfo.attach('during-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   await page.mouse.up();await settle(page);
-  const after=await sample('after-drag',{x:start.x,y:start.y-160});await testInfo.attach('after-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  const after=await sample('after-drag',{x:start.x,y:start.y-dragDistance});await testInfo.attach('after-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   expect({during:[during.windowY,during.workmainY],after:[after.windowY,after.workmainY]}).toEqual({during:[before.windowY,before.workmainY],after:[before.windowY,before.workmainY]});
   expect(during.pointer.y-during.tile.y).toBeCloseTo(before.pointer.y-before.tile.y,0);
   expect(after.pointer.y-after.tile.y).toBeCloseTo(during.pointer.y-during.tile.y,0);

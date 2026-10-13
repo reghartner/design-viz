@@ -1483,7 +1483,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
 #page-preview-surface.viewer-exploring{overflow:hidden;}
 .diagram-add-destination-picker{margin:0 20px 16px;}
 .diagram-add-destination-picker select{width:100%;margin-top:8px;}
-@media(max-width:1050px){
+@media(max-width:1180px){
  .workspace-canvas:not(.welcome-active) .workbench-brand>span{display:none;}
  .workspace-canvas .workspace-tools{gap:5px;}
  .workspace-canvas #docview .explore-navigation-actions{flex:none;}

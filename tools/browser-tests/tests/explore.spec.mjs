@@ -111,6 +111,10 @@ test('automatic Explore panels open at readable content size across desktop view
   for(let a=0;a<windows.length;a++)for(let b=a+1;b<windows.length;b++)expect(overlaps(windows[a],windows[b]),windows[a].id+' overlaps '+windows[b].id).toBe(false);
   const controls=await rect(page.locator('.explore-player'));
   for(const win of windows)expect(overlaps(win,controls),win.id+' overlaps controls').toBe(false);
+  if(surface==='workbench'){
+   const canvasControls=await rect(page.locator('.workspace-canvas-controls'));
+   for(const win of windows)expect(overlaps(win,canvasControls),win.id+' overlaps canvas controls').toBe(false);
+  }
   await info.attach(surface+'-'+width+'x'+height+'-geometry',{body:JSON.stringify({stage,scale,footprint,windows,controls}),contentType:'application/json'});
   await info.attach(surface+'-'+width+'x'+height,{body:await page.screenshot(),contentType:'image/png'});
   if(width===1280)await page.screenshot({path:'/tmp/explore-'+surface+'-1280x800-responsive.png'});

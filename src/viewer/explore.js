@@ -339,7 +339,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */
-    return w===playerWindow?300:w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
+    return w===playerWindow?(workbenchCanvas && bounds().w<1000?240:300):w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
   }
   function savedOverlayGeometry(layout){
     return !!(layout && (layout.controls && layout.controls.w || layout.prose && layout.prose.w || layout.panels && layout.panels.length));
@@ -379,7 +379,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function constrain(w,r){
     if(canvasWindow(w))return {x:clamp(r.x,-10000,10000),y:clamp(r.y,-10000,10000),w:clamp(r.w,minimum(w),10000),h:clamp(r.h,72,10000)};
-    var b=bounds(),bottom=workbenchCanvas?12:stackInsets().bottom,scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
+    var b=bounds(),bottom=12,scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
     var minH=w===playerWindow?Math.min(104*scale,Math.max(72,b.h-24)):32+40*scale;
     var maxW=w===playerWindow?b.w:b.w*scale,maxH=w===playerWindow?b.h*scale:32+(b.h-32)*scale;
     var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-bottom-12,maxH)));
@@ -428,7 +428,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Pristine notes keep fitting fluid type through viewport changes.
     // Gestures and authored rectangles leave automatic sizing explicitly.
   }
-  function fittedControlsRect(r,insets){
+  function fittedControlsRect(r,insets,automatic){
     // Probe at the current width, including the narrow-container layout. Keep
     // the content fit transient: authored geometry and its Undo history belong
     // to gestures, not viewport/font/path changes.
@@ -459,7 +459,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
     // Reader utilities reserve space for floating controls. Workbench toolbar
     // insets still apply only to automatic docks, not authored geometry.
-    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(workbenchCanvas?12:insets.bottom)));
+    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(automatic?insets.bottom:12)));
     return r;
   }
   function paint(){
@@ -483,15 +483,19 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
     windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
-    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
-    var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
-    var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
+    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
+    var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom,stageRect=stage.getBoundingClientRect();
+    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getClientRects().length && canvasTools.getBoundingClientRect();
+    function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-insetBottom);}
+    var columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
     stacked.forEach(function(w){
       var r=constrain(w,scaledRect(w,w.state));
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
-      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;}
+      var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
+      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-insetBottom){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
       r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
     });
@@ -510,12 +514,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
     var automaticControls=!controls;
     if(!controls){
-      var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
-      controls={x:workbenchCanvas?84:12,y:12,w:controlWidth,h:146};
+      var controlLeft=workbenchCanvas?84:12,right=12,minControls=minimum(playerWindow);
+      if(maxWidth){var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,besideWidth=b.w-(maxWidth+28)-besideLeft;if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+28;}}
+      var controlWidth=workbenchCanvas?Math.max(minControls,b.w-right-controlLeft):b.w-right-controlLeft;
+      controls={x:controlLeft,y:12,w:controlWidth,h:146};
     }
     playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
     var previousControls=playerWindow.rect,r=constrain(playerWindow,scaledRect(playerWindow,controls));
-    r=fittedControlsRect(r,insets);
+    r=fittedControlsRect(r,insets,automaticControls);
     if(automaticControls)r.y=Math.max(12,b.h-r.h-insetBottom);
     apply(playerWindow,r);
     if(canvasWindow(playerWindow) && previousControls && Math.abs(previousControls.h-r.h)>.01)canvasGeometryChanged=true;

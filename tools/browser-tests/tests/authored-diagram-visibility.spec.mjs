@@ -34,7 +34,7 @@ for(const width of [1280,1800])test('chapter diagram visibility saves and restor
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(hidden);await expect(section(page).locator('.board')).toBeHidden();
   await chooseNavigation(page.locator('#docview>.explore-navigation'),'Tab','Second tab');await expect(page.locator('#docview .doc-sec[data-dv-section="1"] .board')).toBeVisible();
   await chooseNavigation(page.locator('#docview>.explore-navigation'),'Tab','First tab');await expect(section(page).locator('.board')).toBeHidden();await expect(page.locator('#src')).toHaveValue(hidden);
-  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Service flow',exact:true}).click();await expect(section(page).locator('.boardcanvas>svg')).toBeVisible();
+  await chooseNavigation(page.locator('#docview>.explore-navigation'),'View','Service flow');await expect(section(page).locator('.boardcanvas>svg')).toBeVisible();
   await change(page,false);const exploreHidden=await source(page);
   await expect(section(page).locator('.boardcanvas>svg')).toBeHidden();await expect(section(page).locator('.explore-canvas-objects [data-explore-panel="outcome"]')).toBeVisible();await expect(section(page).locator('.explore-player')).toBeVisible();
   await chapterOptions(page,section(page));await expect(checkbox(page)).not.toBeChecked();await page.screenshot({path:'/tmp/authored-visibility-explore-hidden-'+width+'.png'});await page.keyboard.press('Escape');

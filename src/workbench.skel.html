@@ -182,6 +182,7 @@
         <div class="specrow editor-clipboard">
         <span class="bgroup" role="group" aria-label="Object clipboard"><button class="bbtn" id="object-copy" title="Copy selected objects (⌘/Ctrl C)">Copy</button><button class="bbtn" id="object-paste" aria-haspopup="dialog">Paste…</button><button class="bbtn" id="object-duplicate" title="Duplicate selected objects (⌘/Ctrl D)">Duplicate</button></span>
         <p id="object-clipboard-status" class="object-clipboard-status" role="status"></p>
+        <button class="bbtn" id="diagram-import-open" type="button" aria-haspopup="dialog">Add / Paste diagram…</button>
         </div>
       </div>
       <div class="editor-pane" id="editor-steps" role="tabpanel" aria-labelledby="editor-tab-steps" hidden>
@@ -355,6 +356,7 @@
       <button type="button" id="add-bullet" data-add-kind="bullet" data-add-prose><span class="diagram-add-symbol" aria-hidden="true">•</span><span><b>Bullet point</b><small>Start a list or add its next point</small></span></button>
       <button type="button" id="add-catalog" data-add-kind="catalog" aria-haspopup="dialog" aria-controls="catalog-picker"><span class="diagram-add-symbol" aria-hidden="true">⌘</span><span><b>Services from catalog</b><small>Select services and their connections</small></span></button>
       <button type="button" id="add-topology" data-add-kind="topology" aria-haspopup="dialog" aria-controls="topology-picker"><span class="diagram-add-symbol" aria-hidden="true">◇</span><span><b>Referenced topology</b><small>Reuse a provider’s exported structure</small></span></button>
+      <button type="button" id="add-diagram-import" data-add-kind="diagram" aria-haspopup="dialog" aria-controls="diagram-import"><span class="diagram-add-symbol" aria-hidden="true">⊞</span><span><b>Add / Paste diagram</b><small>Merge a Flowview or Mermaid graph into this canvas</small></span></button>
     </div>
     <div id="diagram-add-nodes" hidden>
       <button type="button" class="bbtn" id="diagram-add-back">← All additions</button>

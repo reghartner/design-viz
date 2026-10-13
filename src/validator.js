@@ -81,7 +81,7 @@ function deltaWarnings(value, path, warnings){
   }
 }
 function resolveProtocols(page){
-  var out = {};
+  var out = Object.create(null);
   Object.keys(BUILTIN_PROTOCOLS).forEach(function(k){ out[k] = BUILTIN_PROTOCOLS[k]; });
   var extra = page.protocols || {};
   Object.keys(extra).forEach(function(k){

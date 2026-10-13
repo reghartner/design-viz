@@ -309,6 +309,20 @@ test('mixed Fit can use a narrow free region beside a large floating panel',asyn
  await page.getByRole('button',{name:'Zoom in',exact:true}).click();await page.getByRole('button',{name:'Zoom out',exact:true}).click();expect((await graphPoint(page,{x:0,y:0})).scale).toBeCloseTo(fitted,2);
 });
 
+test('Workbench Fit uses the free board beside tall top controls',async({page,server})=>{
+ const raw=fixture(),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
+ layout.panelPlacement='canvas';layout.controlsPlacement='floating';layout.controls={x:.01,y:.01,w:.27,h:.94};
+ await page.setViewportSize({width:1280,height:800});await open(page,server,raw,'workbench');await fit(page,'workbench');
+ const geometry=await page.evaluate(()=>{
+  const board=document.querySelector('.explore-board').getBoundingClientRect(),controls=document.querySelector('.explore-stage>.explore-player').getBoundingClientRect();
+  const free={left:Math.max(board.left,controls.right),top:board.top,right:board.right,bottom:board.bottom};
+  const nodeIntersects=[...document.querySelectorAll('.boardcanvas [data-dv-node]')].some(el=>{const r=el.getBoundingClientRect();return r.right>free.left && r.left<free.right && r.bottom>free.top && r.top<free.bottom;});
+  return {board:{top:board.top,height:board.height},controls:{top:controls.top,height:controls.height},nodeIntersects};
+ });
+ expect(geometry.controls.top).toBeLessThan(geometry.board.top+geometry.board.height/2);expect(geometry.controls.height).toBeGreaterThan(geometry.board.height*.8);
+ expect(parseFloat(await page.locator('#workspace-zoom').textContent())).toBeGreaterThanOrEqual(10);expect(geometry.nodeIntersects).toBe(true);
+});
+
 async function controlsPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.locator('.explore-panel-menu').getByLabel('Step controls placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
 const player=page=>page.locator('.explore-player');
 const controlsRect=page=>player(page).evaluate(el=>Object.fromEntries(['x','y','w','h'].map(k=>[k,parseFloat(el.style.getPropertyValue('--float-'+k))])));

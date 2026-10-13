@@ -7,7 +7,7 @@ on:
 jobs:
   browser-contract-shards:
     name: Browser contracts (shard ${{ matrix.shard }}/12)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     strategy:
       fail-fast: false
@@ -42,7 +42,7 @@ jobs:
 
   browser-contracts:
     name: browser-contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     needs: browser-contract-shards
     steps:

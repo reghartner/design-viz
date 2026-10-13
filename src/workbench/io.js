@@ -8,17 +8,117 @@ function createBuilderFileOpening(opts,current){
     var now=opts.session.snapshot();
     return now.project===expected.project && now.text===expected.text && now.topologyRevision===expected.topologyRevision;
   }
-  return {current:active,open:async function(source){
+  async function stage(source){
     if(!active())return false;
     var context=await opts.prepare(source);
-    if(!active())return false;
-    return opts.publish(source,context);
+    return active()?context:false;
+  }
+  function publish(source,context){return active()?opts.publish(source,context):false;}
+  return {current:active,stage:stage,publish:publish,open:async function(source){
+    var context=await stage(source);return context===false?false:publish(source,context);
+  }};
+}
+
+/* One controller is mounted for each visible drop surface. Reading and
+   preparation are staged; only the confirmation button owns publication. */
+function createStagedFileImport(opts){
+  var document=opts.document,browser=opts.browser,surface=opts.surface,input=opts.input,trigger=opts.trigger;
+  var disposed=false,version=0,reader=null,depth=0,pending=null,returnFocus=null;
+  function element(tag,cls){var node=document.createElement(tag);node.className=cls;return node;}
+  var overlay=element('div','file-drop-overlay');overlay.hidden=true;overlay.setAttribute('aria-hidden','true');overlay.textContent='Drop to preview import';
+  var status=element('p','file-import-status');status.hidden=true;status.setAttribute('role','alert');
+  var dialog=element('dialog','file-import-dialog');dialog.setAttribute('aria-label','Import preview');
+  var title=element('h2','');title.textContent='Import preview';
+  var detail=element('p','file-import-detail'),summary=element('p','file-import-summary');
+  var actions=element('div','file-import-actions'),confirm=element('button','welcome-button welcome-button-primary'),cancel=element('button','welcome-button');
+  confirm.type=cancel.type='button';confirm.textContent='Import';cancel.textContent='Cancel';actions.appendChild(confirm);actions.appendChild(cancel);
+  dialog.appendChild(title);dialog.appendChild(detail);dialog.appendChild(summary);dialog.appendChild(actions);
+  document.body.appendChild(overlay);document.body.appendChild(status);document.body.appendChild(dialog);
+  var listeners=[];
+  function listen(target,type,fn,capture){target.addEventListener(type,fn,capture);listeners.push(function(){target.removeEventListener(type,fn,capture);});}
+  function active(){return !disposed && surface && surface.isConnected && (!opts.active || opts.active());}
+  function message(text){if(!active())return;status.textContent=text;status.hidden=false;if(opts.message)opts.message(text);}
+  function durableMessage(text){
+    var target=opts.durableStatus;
+    if(!target || !target.isConnected)return false;
+    target.textContent=text;target.hidden=false;return true;
+  }
+  function clearDurable(){var target=opts.durableStatus;if(target){target.textContent='';target.hidden=true;}}
+  function external(ev){
+    var dt=ev.dataTransfer;if(!dt)return false;
+    var types=Array.from(dt.types || []);if(types.indexOf('Files')<0)return false;
+    var items=Array.from(dt.items || []);return !items.length || items.some(function(item){return item.kind==='file';});
+  }
+  function hideOverlay(){depth=0;overlay.hidden=true;}
+  function cancelRead(){version++;if(reader && reader.abort)reader.abort();reader=null;}
+  function close(refocus){pending=null;if(dialog.open)dialog.close();if(refocus && returnFocus && returnFocus.isConnected)returnFocus.focus();returnFocus=null;}
+  function retire(reason){var had=!!reader || !!pending || dialog.open;cancelRead();hideOverlay();close(false);if(had && reason)message(reason);}
+  async function loaded(file,text,run,opening){
+    if(!active() || run!==version)return;
+    try{
+      /* The opening owner validates after resolving any approved topology
+         providers; pure callers retain io-model's direct validation default. */
+      var prepared=prepareFlowviewFileImport({name:file.name,size:file.size,type:file.type},String(text),function(){});
+      var context=await opening.stage(prepared.text);
+      if(!active() || run!==version)return;
+      if(context===false){message('Import cancelled because the document changed while the file was loading.');return;}
+      pending={run:run,prepared:prepared,opening:opening,context:context};
+      status.hidden=true;detail.textContent=prepared.name+' · '+prepared.type;summary.textContent=prepared.summary.text;
+      returnFocus=document.activeElement;dialog.showModal();confirm.focus();
+    }catch(ex){if(active() && run===version)message('Could not import “'+file.name+'”. '+(ex.message || ex));}
+  }
+  function start(files){
+    if(!active())return;
+    var list=Array.from(files || []);retire();status.hidden=true;clearDurable();
+    if(list.length!==1){message(list.length?'Choose one file at a time.':'No file was provided.');return;}
+    var file=list[0];
+    if(typeof file.size==='number' && file.size>FLOWVIEW_IMPORT_MAX_BYTES){message('Could not import “'+file.name+'”. Use a file no larger than 4 MiB.');return;}
+    var run=version,opening;
+    try{opening=opts.begin(function(){return active() && run===version;});reader=browser.reader();}
+    catch(ex){message('Could not start the import. The document is unchanged.');return;}
+    reader.onload=function(){if(run!==version)return;var result=reader.result;reader=null;loaded(file,result,run,opening);};
+    reader.onerror=function(){if(run!==version)return;reader=null;message('Could not read “'+file.name+'”. The document is unchanged.');};
+    try{reader.readAsText(file);}catch(ex){reader=null;message('Could not read “'+file.name+'”. The document is unchanged.');}
+  }
+  if(input){
+    if(trigger)listen(trigger,'click',function(){input.value='';input.click();});
+    listen(input,'change',function(){start(input.files);input.value='';});
+  }
+  listen(surface,'dragenter',function(ev){if(ev.defaultPrevented){hideOverlay();return;}if(!active() || !external(ev))return;ev.preventDefault();depth++;overlay.hidden=false;});
+  listen(surface,'dragover',function(ev){if(ev.defaultPrevented){hideOverlay();return;}if(!active() || !external(ev))return;ev.preventDefault();if(ev.dataTransfer)ev.dataTransfer.dropEffect='copy';});
+  listen(surface,'dragleave',function(ev){if(!external(ev))return;depth=Math.max(0,depth-1);if(!depth)overlay.hidden=true;});
+  listen(surface,'drop',function(ev){if(!active() || !external(ev))return;ev.preventDefault();hideOverlay();start(ev.dataTransfer.files);});
+  /* Canvas image drops stop bubbling after ingestion; retire the file overlay
+     during capture so it cannot remain above a successfully added image. */
+  listen(document,'dragend',hideOverlay);listen(document,'drop',hideOverlay,true);
+  listen(confirm,'click',function(){
+    var staged=pending;if(!staged)return;pending=null;if(dialog.open)dialog.close();
+    try{
+      var ok=staged.opening.publish(staged.prepared.text,staged.context);
+      version++;
+      if(!ok){message('Import cancelled because the document changed before confirmation.');return;}
+      if(opts.confirmed)opts.confirmed(staged.prepared);
+      if(opts.restoreFocusOnConfirm!==false && returnFocus && returnFocus.isConnected)returnFocus.focus();
+      returnFocus=null;
+    }catch(ex){version++;message('Import failed. '+(ex.message || ex));}
+  });
+  listen(cancel,'click',function(){version++;close(true);});
+  listen(dialog,'cancel',function(ev){
+    if(!pending)return;ev.preventDefault();version++;close(true);
+  });
+  return {start:start,retire:retire,destroy:function(reason){
+    if(disposed)return;
+    var had=!!reader || !!pending || dialog.open;
+    retire();
+    if(had && reason)durableMessage(reason);
+    disposed=true;listeners.splice(0).forEach(function(remove){remove();});overlay.remove();status.remove();dialog.remove();
   }};
 }
 
 function createBuilderIO(opts){
   var document=opts.document,src=opts.sourceElement,session=opts.session,browser=opts.browser;
   var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null,svgCopyRun=0;
+  var stagedImport=null;
   var retireTraceUI=function(){};
   var traceFileVersion=0,traceReader=null,traceReading=false;
   function parseEditor(){return session.snapshot();}
@@ -55,6 +155,7 @@ function createBuilderIO(opts){
   function retireProject(){
     if(disposed)return;
     cancelFileRead();cancelTraceRead();cancelExport();closeExportMenu();confluenceCopyRun++;closeSvgFallback();
+    if(stagedImport)stagedImport.retire('Import cancelled because the project changed.');
     if(importBox)importBox.hidden=true;
     retireTraceUI();
     if(confluenceBox)confluenceBox.hidden=true;
@@ -64,8 +165,10 @@ function createBuilderIO(opts){
   var fileInput = document.getElementById('file-input');
   var openBtn = document.getElementById('file-open');
   var saveBtn = document.getElementById('file-save');
-  if (openBtn && fileInput){
-    listen(openBtn,'click',function(){ fileInput.click(); });
+  if (fileInput){
+    /* Keep programmatic/embedded repairable-source opening compatible; the
+       shipped File panel exposes only the staged importer. */
+    if(openBtn)listen(openBtn,'click',function(){ fileInput.click(); });
     listen(fileInput,'change',function(){
       var f = fileInput.files && fileInput.files[0];
       if (!f) return;
@@ -90,6 +193,14 @@ function createBuilderIO(opts){
       try{reader.readAsText(f);}catch(ex){fileReader=null;if(active())inspectorMessage('could not read "'+f.name+'" — the editor is unchanged');}
       fileInput.value = ''; /* allow re-opening the same file */
     });
+  }
+  var stagedInput=document.getElementById('file-import-input'),stagedBtn=document.getElementById('file-import');
+  if(stagedInput && stagedBtn && opts.beginFileImport){
+    stagedImport=createStagedFileImport({document:document,browser:browser,surface:document.getElementById('workbench-workspace'),
+      input:stagedInput,trigger:stagedBtn,active:function(){return !disposed && (!opts.isActive || opts.isActive());},
+      begin:opts.beginFileImport,message:inspectorMessage,durableStatus:document.getElementById('workbench-import-status'),confirmed:function(prepared){
+        if(prepared.todos.length)importMessage('w',prepared.todos.length+' todo(s) added to the spec — enrich by hand');
+      }});
   }
   var exportMenu=document.getElementById('workspace-export');
   var exportTrigger=document.getElementById('workspace-export-trigger');
@@ -516,7 +627,9 @@ function createBuilderIO(opts){
     download:downloadTextFile,
     retireProject:retireProject,
     destroy:function(){
-      if(disposed)return;retireProject();disposed=true;clearListeners();
+      if(disposed)return;
+      if(stagedImport){stagedImport.destroy('Import cancelled because the editor was closed. The document is unchanged.');stagedImport=null;}
+      retireProject();disposed=true;clearListeners();
       Array.from(urls.keys()).forEach(releaseUrl);
     }
   };

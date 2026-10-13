@@ -28,9 +28,14 @@ inspector, I/O, interaction and lifetime dependencies.
 composer; the inspector supplies its transactions and form lifetime.
 
 14. `workbench/inspector.js`: forms, panel editor cache and refresh lifetime.
-15. `workbench/io-model.js`: pure Mermaid preparation, filenames and HTML injection.
+15. `workbench/io-model.js`: pure bounded file classification/preparation,
+    Mermaid conversion, filenames and HTML injection.
 16. `workbench/io-browser.js`: bound browser resource adapters.
-17. `workbench/io.js`: import/export controls and independent operation lifetimes.
+17. `workbench/io.js`: import/export controls, staged file/drop confirmation and
+    independent operation lifetimes. External drops are classified only after a
+    bounded text read; confirmation is the sole publication boundary. Welcome
+    publishes through project opening, while an open editor uses one source
+    transaction so Undo restores the prior document.
 18. `workbench/edge-curves.js`: direct curve gestures and temporary SVG handles,
 owned and retired by `workbench/interactions.js`, which coordinates selection,
 board markers, modes and graph gestures. Curve geometry stays in the shared

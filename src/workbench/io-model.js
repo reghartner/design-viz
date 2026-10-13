@@ -85,6 +85,85 @@ function mermaidToSpec(text){
   }]}, todos: todos};
 }
 
+/* ---------------- staged local file import ---------------- */
+
+/* Folder-backed authoring uses the same 4 MiB source ceiling. Keep the browser
+   entry point bounded before and after decoding so a misleading File.size does
+   not create a second, larger source path. */
+var FLOWVIEW_IMPORT_MAX_BYTES = 4 * 1024 * 1024;
+
+function importUtf8Bytes(text){
+  if(typeof TextEncoder!=='undefined')return new TextEncoder().encode(text).length;
+  return unescape(encodeURIComponent(text)).length;
+}
+
+function importLooksBinary(text){
+  if(text.indexOf('\0')>=0 || text.indexOf('\ufffd')>=0)return true;
+  var sample=text.slice(0,8192),controls=0;
+  for(var i=0;i<sample.length;i++){
+    var code=sample.charCodeAt(i);
+    if(code<32 && code!==9 && code!==10 && code!==12 && code!==13)controls++;
+  }
+  return !!sample.length && controls>Math.max(2,Math.floor(sample.length/100));
+}
+
+function importValidate(raw){
+  var findings=validate(normalize(raw));
+  if(findings.errors.length)throw Error(findings.errors.join('\n'));
+}
+
+function flowviewImportSummary(raw){
+  var page=raw && (raw.page || raw),title=page && typeof page.title==='string' && page.title.trim() || 'Untitled diagram';
+  var sections=[];
+  if(page){
+    if(Array.isArray(page.sections))sections=page.sections;
+    else if(Array.isArray(page.blocks))sections=page.blocks;
+    else if(page.diagram || page.nodes || page.rows)sections=[page];
+  }
+  return {title:title,sections:sections.length,
+    text:title+' · '+sections.length+' section'+(sections.length===1?'':'s')};
+}
+
+function mermaidImportSummary(spec){
+  var diagram=spec.page.sections[0].diagram,participants=Object.keys(diagram.nodes).length,messages=diagram.steps.length,todos=spec.todos.length;
+  return {title:spec.page.title,participants:participants,messages:messages,todos:todos,
+    text:participants+' participant'+(participants===1?'':'s')+' · '+messages+' message'+(messages===1?'':'s')+
+      (todos?' · '+todos+' Mermaid todo'+(todos===1?'':'s'):'')};
+}
+
+/* Classification deliberately combines bounded metadata with parsed content.
+   Extensions select useful error language; they never make invalid bytes valid
+   or prevent a correctly formed supported format from being recognized. */
+function prepareFlowviewFileImport(meta,text,check){
+  meta=meta || {};var name=typeof meta.name==='string' && meta.name.trim()?meta.name.trim():'untitled file';
+  if(typeof meta.size==='number' && (meta.size<0 || meta.size>FLOWVIEW_IMPORT_MAX_BYTES))
+    throw Error('Use a file no larger than 4 MiB.');
+  if(typeof text!=='string')throw Error('The file could not be read as text.');
+  if(importUtf8Bytes(text)>FLOWVIEW_IMPORT_MAX_BYTES)throw Error('Use a file no larger than 4 MiB.');
+  if(importLooksBinary(text))throw Error('Binary files are not supported. Choose Flowview JSON, Mermaid, or Markdown with a Mermaid sequence.');
+  var source=text.replace(/^\ufeff/,''),trimmed=source.trim();
+  if(!trimmed)throw Error('The file is empty.');
+  var raw,jsonError=null,mermaidError=null;
+  if(/^[\[{]/.test(trimmed) || /\.json$/i.test(name)){
+    try{raw=JSON.parse(source);}
+    catch(ex){jsonError=ex;}
+    if(raw!==undefined){
+      (check || importValidate)(raw);
+      return {name:name,kind:'flowview',type:'Flowview JSON',text:source,raw:raw,summary:flowviewImportSummary(raw),todos:[]};
+    }
+  }
+  if(/(^|\n)\s*sequenceDiagram\s*(\n|$)/.test(trimmed) || /^```mermaid\s*$/m.test(source) || /\.(mmd|mermaid|md|markdown)$/i.test(name)){
+    try{
+      var converted=mermaidToSpec(source);(check || importValidate)(converted);
+      return {name:name,kind:'mermaid',type:/\.(md|markdown)$/i.test(name)?'Markdown Mermaid sequence':'Mermaid sequence',
+        text:JSON.stringify(converted,null,2),raw:converted,summary:mermaidImportSummary(converted),todos:converted.todos.slice()};
+    }catch(ex){mermaidError=ex;}
+  }
+  if(jsonError)throw Error('Invalid Flowview JSON: '+jsonError.message);
+  if(mermaidError)throw Error('Invalid Mermaid sequence: '+mermaidError.message);
+  throw Error('Unsupported file. Choose Flowview .spec.json/.json, Mermaid .mmd/.mermaid, or Markdown containing a Mermaid sequence.');
+}
+
 /* ---------------- durability: filenames ---------------- */
 
 function specFileName(raw){

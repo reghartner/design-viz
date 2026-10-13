@@ -144,7 +144,7 @@ test('Canon success keeps its document title in a compact unobscured app header 
       const contents=document.querySelector('#canon-reader .reader-contents');
       return {header:box(header),brand:box(brand),title:box(title),back:box(back),nav:box(nav),surface:box(surface),
         contents:contents && contents.checkVisibility()?box(contents):null,intro:getComputedStyle(document.querySelector('#canon-reader-intro')).display,
-        titleFits:title.scrollHeight<=title.clientHeight+1,titleText:title.textContent};
+        titleFits:title.scrollHeight<=title.clientHeight+1 && title.scrollWidth<=title.clientWidth+1,titleText:title.textContent};
     });
   }
   await page.getByRole('button',{name:'User guide',exact:true}).click();await expect(guide(page)).toBeVisible();await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();

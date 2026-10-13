@@ -1433,7 +1433,7 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112px;}
 .workspace-canvas:not(.welcome-active) .workbench-header{inset:0 0 auto;min-height:54px;padding:7px 12px;border:0;border-bottom:1px solid var(--line);border-radius:0;box-shadow:none;box-sizing:border-box;}
 .workspace-canvas .workspace-tools{flex:1;min-width:0;}
-.workspace-canvas .workbench-reader-title{flex:0 1 360px;max-width:min(360px,30vw);}
+.workspace-canvas:not(.canon-reader-active) .workbench-reader-title{flex:0 1 360px;max-width:min(360px,30vw);}
 .workspace-more{display:flex;flex:1;min-width:0;}
 .workspace-more-body{display:flex;align-items:center;gap:6px;flex:1;min-width:0;}
 .workspace-more>summary{display:none;}

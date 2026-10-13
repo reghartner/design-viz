@@ -1235,7 +1235,7 @@ g.node.dv-connect-target .card{stroke-width:4!important;stroke-dasharray:none;fi
 body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-canvas #workbench-workspace>.wrap,.workspace-canvas:not(.welcome-active)>footer{display:none;}
 .workspace-canvas .workwrap{display:block;padding:0;}
-.workspace-canvas .workmain{position:fixed;inset:0;max-height:none;overflow:auto;overscroll-behavior:contain;background-color:var(--bg);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
+.workspace-canvas .workmain{position:fixed;inset:0;max-height:none;overflow:auto;overflow-anchor:none;overscroll-behavior:contain;background-color:var(--bg);background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:20px 20px;scrollbar-width:none;}
 .workspace-canvas .workmain::-webkit-scrollbar{display:none;}
 #workspace-canvas-space{position:relative;min-width:100%;min-height:100%;}
 #workspace-canvas-world{position:relative;width:100%;padding:140px 84px 100px;box-sizing:border-box;}
@@ -1352,11 +1352,11 @@ body.workspace-canvas:not(.welcome-active){margin:0;overflow:hidden;}
 .workspace-canvas #workbench-workspace:not([hidden]){min-height:100dvh;}
 
 /* Drill-downs keep their return path visible above the active diagram. */
-.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:var(--workspace-content-top);left:84px;z-index:90;max-width:calc(100vw - 112px);padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-head{display:block;container-type:normal;position:fixed;top:var(--workspace-content-top);left:calc(var(--reader-host-inset,0px) + 84px);z-index:90;max-width:calc(100vw - var(--reader-host-inset,0px) - 112px);padding:8px 12px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
 .workspace-diagram .workspace-active-section>.detail-head>:not(.detail-head-intro),.workspace-diagram .workspace-active-section>.detail-head .detail-head-intro>:not(.detail-breadcrumb):not(.sec-heading-row){display:none;}
 .workspace-diagram .workspace-active-section>.detail-head .sec-h{font-size:14px;margin:4px 0 0;}
-.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:84px;bottom:72px;z-index:95;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
-.dv-connect-canvas-hint{position:fixed;top:var(--workspace-content-top);left:84px;z-index:146;max-width:calc(100vw - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+.workspace-diagram:not(.welcome-active) .workspace-active-section>.detail-notice:not(:empty){display:block;position:fixed;left:calc(var(--reader-host-inset,0px) + 84px);bottom:72px;z-index:95;max-width:calc(100vw - var(--reader-host-inset,0px) - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
+.dv-connect-canvas-hint{position:fixed;top:var(--workspace-content-top);left:calc(var(--reader-host-inset,0px) + 84px);z-index:146;max-width:calc(100vw - var(--reader-host-inset,0px) - 112px);padding:10px 14px;background:var(--card);border:1px solid var(--line);border-radius:10px;}
 
 @media(max-width:700px){.workspace-canvas:has(.extraction-preview) .workspace-history,.workspace-canvas:has(.extraction-preview) .workspace-selection,.workspace-canvas:has(.extraction-preview) .workspace-canvas-controls{visibility:hidden;}}
 

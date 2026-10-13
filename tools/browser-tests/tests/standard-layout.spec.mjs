@@ -37,12 +37,13 @@ for(const attached of [true,false])test(`Standard diagram grows beyond the viewp
       const margins=Array.from(el.querySelector('.diagramcol').children).reduce((sum,child)=>{
         const style=getComputedStyle(child);return sum+parseFloat(style.marginTop)+parseFloat(style.marginBottom);
       },0);
-      return {available:col.height-(controls?.height || 0)-(mode?.height || 0)-margins,board:board.height,
+      const scale=parseFloat(getComputedStyle(el.closest('.section-layout-grid')).getPropertyValue('--section-layout-scale')) || 1;
+      return {available:col.height-(controls?.height || 0)-(mode?.height || 0)-margins,board:board.height,scale,
         revealed:Math.min(board.bottom,drawing.bottom)-Math.max(board.top,drawing.top)};
     });
     expect(sizes.board).toBeGreaterThan(800*.7);
     expect(Math.abs(sizes.available-sizes.board)).toBeLessThan(2);
-    if(previous){expect(sizes.board-previous.board).toBeCloseTo(8*40,0);expect(sizes.revealed).toBeGreaterThan(previous.revealed+200);}
+    if(previous){expect(sizes.board-previous.board).toBeCloseTo(8*40*sizes.scale,0);expect(sizes.revealed).toBeGreaterThan(previous.revealed+200);}
     previous=sizes;
   }
 });
@@ -106,9 +107,9 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   const sample=async(label,pointer)=>{
     const value=await page.evaluate(({label,pointer})=>{
       const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};
-      const tile=document.querySelector('[data-layout-key="panel:home"]'),grid=tile.closest('.section-layout-grid'),main=document.querySelector('.workmain');
+      const tile=document.querySelector('[data-layout-key="panel:home"]'),grid=tile.closest('.section-layout-grid'),stage=document.querySelector('.layout-preview-stage'),main=document.querySelector('.workmain');
       return {label,pointer,windowY:window.scrollY,documentY:document.documentElement.scrollTop,bodyY:document.body.scrollTop,
-        workmainY:main.scrollTop,tile:rect(tile),grid:rect(grid),gridHeight:grid.style.minHeight};
+        workmainY:main.scrollTop,workmain:{height:main.clientHeight,scrollHeight:main.scrollHeight},tile:rect(tile),grid:rect(grid),gridHeight:grid.style.minHeight,stage:rect(stage),stageHeight:stage.style.minHeight};
     },{label,pointer});
     await testInfo.attach(label,{body:JSON.stringify(value,null,2),contentType:'application/json'});return value;
   };

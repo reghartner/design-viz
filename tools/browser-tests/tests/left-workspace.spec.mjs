@@ -20,7 +20,7 @@ test('floating tools leave the diagram full-window and global actions available'
   const size=page.viewportSize();
   const shell=await page.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('.explore-navigation').boundingBox();
   const stage=await page.locator('.explore-stage').boundingBox(),board=await page.locator('.explore-board').boundingBox();
-  const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:size.width-96,height:size.height-contentTop-12});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
+  const chrome=await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0}));expect(chrome.top).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84+chrome.inset,y:chrome.top,width:size.width-96-chrome.inset,height:size.height-chrome.top-12});expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);
   expect(board).toEqual(stage);
   await expect(page.locator('#workspace-columns')).toBeHidden();
   for(const name of ['inspect','steps','outline','json','file']){

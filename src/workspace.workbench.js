@@ -63,7 +63,12 @@ function initWorkbenchReaderPreview(opts){
   function hide(refocus){
     if(!state)return;
     var restore=state;state=null;destroyReader();if(dialog.open)dialog.close();restoreAuthoring(restore);
-    if(refocus!==false && restore.focused && restore.focused.isConnected){menu.open=true;syncNavigationPopover(menu);restore.focused.focus({preventScroll:true});}
+    if(refocus!==false && restore.focused && restore.focused.isConnected){
+      // Preview lives inside nested responsive menus. Reopen every ancestor so
+      // focus returns to a visible command rather than an inert hidden button.
+      for(var owner=restore.focused.closest('details');owner;owner=owner.parentElement && owner.parentElement.closest('details')){owner.open=true;syncNavigationPopover(owner);}
+      restore.focused.focus({preventScroll:true});
+    }
   }
   function renderReader(){
     var reading=ctl?workbenchReaderPreviewSnapshot(state.page,ctl):state.reading;

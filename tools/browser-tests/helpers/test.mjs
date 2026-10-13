@@ -176,3 +176,12 @@ export async function canvasTools(page){
  if(await menu.getAttribute('open')===null)await menu.locator('summary').click();
  return menu;
 }
+
+export async function workspaceAction(page,id){
+ const action=page.locator('#'+id);
+ if(!await action.isVisible()){
+  const more=page.locator('#workspace-more');
+  if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();
+ }
+ await expect(action).toBeVisible();return action;
+}

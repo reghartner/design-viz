@@ -1,4 +1,4 @@
-import {test,expect,paste,chooseNavigation} from '../helpers/test.mjs';
+import {test,expect,paste,chooseNavigation,workspaceAction} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
 import {mkdir,writeFile,readFile,rm} from 'node:fs/promises';
@@ -91,7 +91,7 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   // Contextual reopening resets only the guide chapter, not the folder form.
   await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
   await page.locator('#human-guide-close').click();await expect(help).toBeFocused();
-  await page.locator('#folder-agent-close-guide').click();await page.locator('#undo-builder').click();
+  await page.locator('#folder-agent-close-guide').click();await (await workspaceAction(page,'undo-builder')).click();
   await expect(page.locator('#src')).toHaveValue(source);
 });
 

@@ -17,7 +17,7 @@ async function childCanvas(root,page){
   const shell=await child.locator('.viewer-diagram-canvas,.workbench-diagram-canvas').boundingBox();
   const board=await child.locator('.explore-board').boundingBox(),nav=await root.locator('.explore-navigation').boundingBox(),head=await child.locator('.detail-head').boundingBox();
   const viewport=page.viewportSize(),workbench=await page.locator('body').evaluate(el=>el.classList.contains('workspace-diagram'));
-  if(workbench){const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(shell.x).toBe(84);expect(shell.y).toBe(contentTop);expect(shell.width).toBe(viewport.width-96);expect(shell.height).toBe(viewport.height-contentTop-12);expect(shell.y).toBeGreaterThanOrEqual(nav.y+nav.height);}
+  if(workbench){const metrics=await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0}));expect(shell.x).toBe(84+metrics.inset);expect(shell.y).toBe(metrics.top);expect(shell.width).toBe(viewport.width-96-metrics.inset);expect(shell.height).toBe(viewport.height-metrics.top-12);expect(shell.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(head.x).toBe(shell.x);}
   else{expect(shell.x).toBe(284);expect(nav.y).toBe(0);expect(shell.y).toBe(nav.y+nav.height);expect(shell.width).toBe(viewport.width-284);expect(shell.height).toBe(viewport.height-nav.height);}
   expect(board.x).toBeGreaterThanOrEqual(shell.x);expect(board.x+board.width).toBeLessThanOrEqual(shell.x+shell.width);
   expect(board.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board.y+board.height).toBeLessThanOrEqual(shell.y+shell.height);
@@ -28,6 +28,7 @@ async function childCanvas(root,page){
 
 test('editor canvas follows nested details, returns to its camera and edits the real child section',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');await paste(page,editorSource);
+  await expect(page.locator('#workbench-editor-title')).toBeVisible();await expect(page.locator('#workbench-editor-title')).toHaveText('Doorbell domains · from event to notification');
   await canvasTools(page);await page.getByRole('button',{name:'Hide tools',exact:true}).click();
   const root=page.locator('#docview'),parent=root.locator('#section-doorbell-domains');
   await expect(parent.locator('.explore-board')).toBeVisible();

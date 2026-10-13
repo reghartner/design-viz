@@ -8,6 +8,7 @@ function initWorkbenchCanvas(){
   });
   var header=document.querySelector('.workbench-header'),headerTitle=document.getElementById('workbench-reader-title'),editorTitle=document.getElementById('workbench-editor-title'),measuredNav=null;
   function paintTitle(){var page=getPage(),text=page && typeof page.title==='string' && page.title.trim()?page.title.trim():'Untitled story';editorTitle.textContent=text;editorTitle.title=text;editorTitle.hidden=false;headerTitle.hidden=false;}
+  window.addEventListener('workbench-editor-visible',paintTitle);
   function measureChrome(){
     if(document.body.classList.contains('welcome-active') || document.body.classList.contains('workbench-reader-preview-active'))return;
     var head=header.getBoundingClientRect().bottom;document.body.style.setProperty('--workspace-header-bottom',head+'px');
@@ -134,7 +135,7 @@ function initWorkbenchCanvas(){
     paintZoom();
   }
   function cancelFit(){cancelAnimationFrame(fitPending);fitPending=0;fitObserver.disconnect();}
-  function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(autoFit);}
+  function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(function(){fitPending=requestAnimationFrame(autoFit);});}
   function autoFit(){
     fitPending=0;if(!diagramMode())return;
     var rec=current(),vp=viewport(),definition=vp && vp.viewDefinition(),target=board();

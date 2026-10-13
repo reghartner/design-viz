@@ -240,6 +240,7 @@ function initWorkbenchWelcome(opts){
     root.hidden = true; editor.hidden = false; headerResume.hidden = true;
     document.body.classList.remove('welcome-active');
     window.dispatchEvent(new Event('resize'));
+    window.dispatchEvent(new CustomEvent('workbench-editor-visible'));
     if(focus!==false){window.scrollTo(0, 0);el('workspace-home').focus({preventScroll:true});}
   }
   function displayWelcome(name,focus){

@@ -3005,8 +3005,7 @@ function renderPage(view, page, skin, backlinks, options){
     var headerBrandHTML = FlowBrand.render(headerBrand, {className:'doc-company-brand-lockup'});
     if (headerBrandHTML){
       var brand = document.createElement('div');
-      brand.className = 'doc-company-brand';
-      if (page.brand != null && page.brand !== false) brand.classList.add('doc-company-brand-authored');
+      brand.className = 'doc-company-brand' + (page.brand != null && page.brand !== false ? ' doc-company-brand-authored' : '');
       brand.innerHTML = headerBrandHTML;
       heading.appendChild(brand);
     }

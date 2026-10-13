@@ -23,7 +23,7 @@
     </div>
 
     <span class="bgroup workspace-history" role="group" aria-label="history"><button class="bbtn" id="undo-builder" title="Undo (⌘/Ctrl Z)" disabled>Undo</button><button class="bbtn" id="redo-builder" title="Redo (⌘/Ctrl Shift Z)" disabled>Redo</button></span>
-    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><details id="workspace-export" class="workspace-export"><summary id="workspace-export-trigger" class="rbtn">Export</summary><div class="workspace-help-body workspace-export-body" role="group" aria-label="Export format"><button class="bbtn" type="button" id="file-save">JSON only</button><button class="bbtn" type="button" id="file-export-html" title="Download an offline HTML snapshot with imported topology included">Static HTML</button><button class="bbtn" type="button" id="file-export-both">Both</button></div></details></div>
+    <div class="workspace-save"><button type="button" id="folder-agent-working" class="agent-working-indicator" aria-live="polite" aria-atomic="true" hidden><span aria-hidden="true"></span><b>Agent working</b></button><span id="workspace-provenance" class="workspace-provenance" title="Changes stay in this local draft until you submit them through your team’s review process.">Local draft</span><details class="workspace-help"><summary>Help</summary><div class="workspace-help-body"><button class="bbtn" type="button" data-open-human-guide aria-haspopup="dialog">User guide</button></div></details><details id="workspace-export" class="workspace-export"><summary id="workspace-export-trigger" class="rbtn">Export</summary><div class="workspace-help-body workspace-export-body" role="group" aria-label="Export format"><button class="bbtn" type="button" id="file-save">JSON only</button><button class="bbtn" type="button" id="file-export-html" title="Download an offline HTML snapshot with imported topology included">Static HTML</button><button class="bbtn" type="button" id="file-export-both">Both</button><hr><button class="bbtn" type="button" id="file-export-svg" title="Download only the active section’s rendered diagram graph">Download SVG <small>· diagram only</small></button><button class="bbtn" type="button" id="file-copy-svg" title="Copy only the active section’s rendered diagram graph">Copy SVG <small>· diagram only</small></button></div></details></div>
   </div>
 </header>
 <div id="workbench-draft-recovery" class="workbench-draft-recovery" hidden>
@@ -449,6 +449,13 @@
 
 
 </main>
+<dialog id="svg-handoff" class="object-clipboard-dialog" hidden aria-labelledby="svg-copy-title">
+  <h2 id="svg-copy-title">Copy diagram-only SVG</h2>
+  <p id="svg-copy-status"></p>
+  <label for="svg-copy-text">Standalone SVG for the active section’s rendered graph</label>
+  <textarea id="svg-copy-text" readonly spellcheck="false"></textarea>
+  <button class="bbtn" type="button" id="svg-copy-close">Close</button>
+</dialog>
   <dialog id="page-preview" class="page-preview" aria-label="Read-only page preview"><header><b>Page preview</b><button type="button" class="bbtn" id="close-page-preview">Close preview</button></header><div id="page-preview-surface"><div id="page-preview-view" class="docview" aria-label="Read-only rendered documentation page"></div></div></dialog>
 
 

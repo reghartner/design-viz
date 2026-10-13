@@ -413,7 +413,7 @@ var workbenchBuilder=initWorkbenchBuilder({view: view, src: src, render: functio
     }
   },
   renderedText:workbenchPreview.renderedText,
-  ctl:workbenchPreview.controller});
+  ctl:workbenchPreview.controller,page:workbenchPreview.page});
 var workbenchReaderPreview=initWorkbenchReaderPreview({page:workbenchPreview.page,controller:workbenchPreview.controller,skin:currentSkin,render:renderWorkbenchReaderPreview});
 var welcome;
 if(workbenchPractice){

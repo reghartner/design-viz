@@ -18,7 +18,7 @@ function createBuilderFileOpening(opts,current){
 
 function createBuilderIO(opts){
   var document=opts.document,src=opts.sourceElement,session=opts.session,browser=opts.browser;
-  var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null;
+  var disposed=false,listeners=[],urls=new Map(),exportVersion=0,exportRequest=null,svgCopyRun=0;
   var retireTraceUI=function(){};
   var traceFileVersion=0,traceReader=null,traceReading=false;
   function parseEditor(){return session.snapshot();}
@@ -54,7 +54,7 @@ function createBuilderIO(opts){
   function exportCurrent(run){return !disposed && run===exportVersion;}
   function retireProject(){
     if(disposed)return;
-    cancelFileRead();cancelTraceRead();cancelExport();closeExportMenu();confluenceCopyRun++;
+    cancelFileRead();cancelTraceRead();cancelExport();closeExportMenu();confluenceCopyRun++;closeSvgFallback();
     if(importBox)importBox.hidden=true;
     retireTraceUI();
     if(confluenceBox)confluenceBox.hidden=true;
@@ -94,6 +94,7 @@ function createBuilderIO(opts){
   var exportMenu=document.getElementById('workspace-export');
   var exportTrigger=document.getElementById('workspace-export-trigger');
   var htmlBtn=document.getElementById('file-export-html'),bothBtn=document.getElementById('file-export-both');
+  var svgDownload=document.getElementById('file-export-svg'),svgCopy=document.getElementById('file-copy-svg');
   function closeExportMenu(refocus){
     if(!exportMenu)return;
     var wasOpen=exportMenu.open;exportMenu.open=false;
@@ -285,6 +286,44 @@ function createBuilderIO(opts){
   if(exportBtn)listen(exportBtn,'click',function(){exportFiles('both');});
   if(bothBtn)listen(bothBtn,'click',function(){exportFiles('both');});
   if(htmlBtn)listen(htmlBtn,'click',function(){exportFiles('html');});
+
+  /* ---- diagram-only SVG: serialize the live active graph, never the source ---- */
+  var svgBox=document.getElementById('svg-handoff'),svgText=document.getElementById('svg-copy-text');
+  var svgStatus=document.getElementById('svg-copy-status'),svgClose=document.getElementById('svg-copy-close');
+  function closeSvgFallback(){
+    svgCopyRun++;if(!svgBox)return;
+    if(svgBox.open && svgBox.close)svgBox.close();svgBox.hidden=true;
+    if(svgText)svgText.value='';if(svgStatus)svgStatus.textContent='';
+  }
+  function svgFallback(built,run){
+    if(disposed || run!==svgCopyRun || built.current && !built.current())return;
+    if(!svgBox || !svgText || !svgStatus){inspectorMessage('Copy SVG is unavailable in this browser. Use Download SVG instead.');return;}
+    svgText.value=built.text;svgStatus.textContent='Automatic image/svg+xml copy was unavailable. The diagram-only SVG is selected below; press ⌘C / Ctrl+C to copy it.';
+    svgBox.hidden=false;if(svgBox.showModal && !svgBox.open)svgBox.showModal();svgText.focus();svgText.select();
+    var copied=false;try{copied=browser.copySelection();}catch(ex){}
+    if(copied)svgStatus.textContent='Copied as selectable SVG text because image/svg+xml clipboard access was unavailable.';
+  }
+  function svgExportAction(copy){
+    closeExportMenu(true);var run=++svgCopyRun,built=opts.svgExport && opts.svgExport();
+    if(!built || built.error){inspectorMessage(built && built.error || 'SVG export is unavailable.');return;}
+    if(built.current && !built.current()){inspectorMessage('SVG export was cancelled because the project or preview changed.');return;}
+    if(!copy){
+      try{downloadTextFile(built.name,built.text,'image/svg+xml');}
+      catch(ex){inspectorMessage('SVG download failed: '+errorText(ex));return;}
+      inspectorMessage((built.note?built.note+' ':'')+'Downloaded diagram-only SVG for “'+built.section+'”.');return;
+    }
+    var pending;
+    try{pending=browser.copySvg?browser.copySvg(built.text):null;}catch(ex){svgFallback(built,run);return;}
+    if(!pending){svgFallback(built,run);return;}
+    Promise.resolve(pending).then(function(){
+      if(disposed || run!==svgCopyRun || built.current && !built.current())return;
+      inspectorMessage((built.note?built.note+' ':'')+'Copied diagram-only SVG for “'+built.section+'” as image/svg+xml.');
+    },function(){svgFallback(built,run);});
+  }
+  if(svgDownload)listen(svgDownload,'click',function(){svgExportAction(false);});
+  if(svgCopy)listen(svgCopy,'click',function(){svgExportAction(true);});
+  if(svgText)listen(svgText,'input',function(){svgCopyRun++;});
+  if(svgClose)listen(svgClose,'click',function(){closeSvgFallback();if(svgCopy)svgCopy.focus();});
 
   /* ---- inline Mermaid import ---- */
   var importBtn = document.getElementById('import-mermaid');

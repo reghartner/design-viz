@@ -23,13 +23,13 @@ function harness(adapters={},options={}){
   const doc={activeElement:null};
   function element(tag='div',id=''){
     const handlers=new Map(),attrs=new Map();let content='';
-    const el={tagName:tag.toUpperCase(),id,value:'',hidden:false,disabled:false,files:[],children:[],handlers,
+    const el={tagName:tag.toUpperCase(),id,value:'',hidden:false,disabled:false,open:false,files:[],children:[],handlers,
       addEventListener(type,fn){if(!handlers.has(type))handlers.set(type,new Set());handlers.get(type).add(fn);},
       removeEventListener(type,fn){handlers.get(type)?.delete(fn);},
       setAttribute(k,v){attrs.set(k,String(v));},getAttribute:k=>attrs.get(k),
       appendChild(child){el.children.push(child);child.parentNode=el;return child;},
       remove(){if(el.parentNode)el.parentNode.children=el.parentNode.children.filter(c=>c!==el);el.parentNode=null;},
-      focus(){doc.activeElement=el;},select(){el.selected=true;},
+      focus(){doc.activeElement=el;},select(){el.selected=true;},showModal(){el.open=true;el.hidden=false;},close(){el.open=false;},
       fire(type,props={}){const ev={key:'',target:el,preventDefault(){this.defaultPrevented=true;},stopPropagation(){},...props};
         for(const fn of [...(handlers.get(type)||[])])fn(ev);return ev;},
       click(){if(tag==='a'){if(adapters.anchorClick)adapters.anchorClick(el);downloads.push({name:el.download,url:el.href});}else el.fire('click');}
@@ -41,13 +41,14 @@ function harness(adapters={},options={}){
   Object.assign(doc,element('document'),{createElement:tag=>element(tag),getElementById:id=>elements[id]||null});
   doc.body=element('body');
   const ids=['src','msgs','file-input','file-open','file-save','file-export-html','file-export-both','file-export','confluence-handoff','confluence-json',
+    'file-export-svg','file-copy-svg','svg-handoff','svg-copy-text','svg-copy-status','svg-copy-close',
     'confluence-status','confluence-copy','confluence-export','confluence-close','import-mermaid','importbox','import-mermaid-text',
     'import-mermaid-convert','import-mermaid-cancel','import-trace','tracebox','trace-text','trace-feedback','trace-file','trace-scope',
     'trace-root','trace-service','trace-convert','trace-preview-box','trace-search','trace-fields','trace-id','trace-url',
     'trace-root-label','trace-service-label','trace-clear-focus','trace-search-results','trace-search-count','trace-preview',
     'trace-summary','trace-breadcrumbs','trace-warnings','trace-services','trace-cancel','trace-open'];
-  for(const id of ids)elements[id]=element(id==='src'||id.endsWith('text')||id==='confluence-json'?'textarea':'button',id);
-  for(const id of ['confluence-handoff','importbox','tracebox','trace-preview-box'])elements[id].hidden=true;
+  for(const id of ids)elements[id]=element(id==='src'||id.endsWith('text')||id==='confluence-json'?'textarea':id==='svg-handoff'?'dialog':'button',id);
+  for(const id of ['confluence-handoff','svg-handoff','importbox','tracebox','trace-preview-box'])elements[id].hidden=true;
   elements['trace-scope'].value='all';elements.src.value=INITIAL;
   const blobs=new Map(),browser={
     reader(){const reader={abortCount:0,abort(){this.abortCount++;},readAsText(file){this.file=file;},
@@ -56,7 +57,7 @@ function harness(adapters={},options={}){
     abortController:()=>new AbortController(),
     objectUrl(text,mime){const url='blob:'+ ++serial;blobs.set(url,{text,mime});return url;},
     revokeUrl(url){revoked.push(url);},schedule(fn,ms){const id=++serial;timers.set(id,{fn,ms});return id;},cancel:id=>timers.delete(id),
-    copyText:()=>null,copySelection:()=>true,...adapters
+    copyText:()=>null,copySvg:()=>null,copySelection:()=>true,...adapters
   };
   const storage=new Map(),persistence=C.createBuilderPersistence({storage:()=>({getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)}),
     now:()=>1,schedule:browser.schedule,cancel:browser.cancel});
@@ -181,6 +182,34 @@ test('scoped draft downloads share cleanup without saving or changing the parent
   const callbacks=[...h.timers.values()];release();release();callbacks.forEach(({fn})=>fn());
   assert.deepEqual(h.revoked,[h.downloads[0].url]);assert.equal(h.timers.size,0);assert.equal(h.doc.body.children.length,0);
   h.io.destroy();assert.equal(held('old.spec.json',child,'application/json'),undefined);assert.equal(h.downloads.length,1);
+});
+
+test('diagram SVG download and MIME clipboard keep source/history untouched and reuse URL cleanup',async()=>{
+  const current=()=>true,built={name:'story-section.svg',text:'<svg xmlns="http://www.w3.org/2000/svg"/>',section:'Section',current};
+  const copied=deferred(),h=harness({copySvg:text=>{assert.equal(text,built.text);return copied.promise;}},{svgExport:()=>built});
+  h.click('file-export-svg');assert.equal(h.downloads.length,1);assert.equal(h.downloads[0].name,built.name);
+  assert.deepEqual(h.blobs.get(h.downloads[0].url),{text:built.text,mime:'image/svg+xml'});
+  assert.equal(h.text,INITIAL);assert.equal(h.session.canUndo(),false);assert.match(h.messages.at(-1),/diagram-only SVG/);
+  h.click('file-copy-svg');copied.resolve();await settle();assert.match(h.messages.at(-1),/image\/svg\+xml/);
+  h.flush();assert.deepEqual(h.revoked,[h.downloads[0].url]);assert.equal(h.text,INITIAL);
+});
+
+test('SVG clipboard denial exposes selected text while retirement suppresses held completion',async()=>{
+  const built={name:'story.svg',text:'<svg/>',section:'Story',current:()=>true},denied=deferred();
+  const h=harness({copySvg:()=>denied.promise,copySelection:()=>false},{svgExport:()=>built});
+  h.click('file-copy-svg');denied.reject(Error('denied'));await settle();
+  assert.equal(h.e['svg-handoff'].hidden,false);assert.equal(h.e['svg-copy-text'].value,built.text);assert.equal(h.e['svg-copy-text'].selected,true);
+  assert.match(h.e['svg-copy-status'].textContent,/selected below/);
+  h.session.replaceProject('{}');assert.equal(h.e['svg-handoff'].hidden,true);assert.equal(h.e['svg-handoff'].open,false);
+  assert.equal(h.e['svg-copy-text'].value,'');assert.equal(h.e['svg-copy-status'].textContent,'');
+  const held=deferred(),stale=harness({copySvg:()=>held.promise},{svgExport:()=>built});stale.click('file-copy-svg');
+  stale.session.replaceProject('{}');held.resolve();await settle();assert.deepEqual(stale.messages,[]);assert.equal(stale.e['svg-handoff'].hidden,true);
+});
+
+test('SVG preparation failures publish no download or clipboard content',()=>{
+  const h=harness({copySvg(){throw Error('must not copy');}},{svgExport:()=>({error:'The active section has no rendered diagram graph.'})});
+  h.click('file-export-svg');h.click('file-copy-svg');assert.equal(h.downloads.length,0);assert.equal(h.e['svg-handoff'].hidden,true);
+  assert.deepEqual(h.messages,['The active section has no rendered diagram graph.','The active section has no rendered diagram graph.']);
 });
 
 test('retired clipboard rejection does not select or focus fallback, and current fallback still works',async()=>{

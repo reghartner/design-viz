@@ -23,13 +23,21 @@ skin and source line, the preview-only **Canvas appearance** controls, and
 **Initially collapse prose** for section paragraphs and bullets. Document edits
 use the same Save/Export and Undo path as other inspector fields.
 
-The toolbar **Export** menu offers **JSON only**, **Static HTML**, and **Both**.
+The toolbar **Export** menu offers **JSON only**, **Static HTML**, **Both**,
+**Download SVG**, and **Copy SVG**.
 JSON only downloads the editable source, including repairable invalid JSON.
 Static HTML downloads one standalone reader page with imports included and no
 dynamic provider lookups. Both uses a folder picker when available and otherwise
 downloads the two files. **File → export…** retains that same two-file action.
 HTML export needs valid JSON and the viewer template served beside the workbench;
 if it fails, use **Export → JSON only** to keep your source.
+
+Download/Copy SVG exports only the active section's rendered diagram graph. It
+preserves the live View, step visibility and skin, embeds the styles and icon
+symbols it needs, and excludes prose, panels, playback controls and editing
+chrome. Copy uses `image/svg+xml` when the browser permits it and otherwise opens
+the same standalone SVG as selected text for manual copy. Invalid source may keep
+the last usable preview; the export message calls that out explicitly.
 
 Both keeps the stamped authored JSON and creates a separate
 read-only HTML snapshot of the current page. Shared topology stays referenced

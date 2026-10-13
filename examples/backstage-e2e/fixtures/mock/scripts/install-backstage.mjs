@@ -38,10 +38,13 @@ export async function preparePluginPackage(root = process.cwd(), execute = run) 
       await execute('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], publisher);
       await execute('npm', ['run', 'build'], publisher);
     }
-    const result = JSON.parse(await execute('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packed], publisher, true));
-    const item = result[0];
-    if (result.length !== 1 || item.name !== manifest.name || path.basename(item.filename) !== item.filename)
-      throw new Error('npm pack did not produce the expected Flowview package.');
+    const output = await execute('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', packed], publisher, true);
+    // npm 11 prints an array of artifacts; npm 12 an object keyed by package name.
+    const result = JSON.parse(output);
+    const records = Array.isArray(result) ? result : Object.values(result ?? {});
+    const item = records[0];
+    if (records.length !== 1 || item?.name !== manifest.name || typeof item.filename !== 'string' || path.basename(item.filename) !== item.filename)
+      throw new Error('npm pack did not produce the expected Flowview package.\n' + output);
     return await stagePluginTarball(path.join(packed, item.filename), path.join(root, 'sandbox/backstage'));
   } finally { await rm(packed, {recursive: true, force: true}); }
 }

@@ -45,7 +45,11 @@ export async function vendorFlowview(source, destination) {
     const publisher = path.join(buildRoot, 'apps/backstage');
     execFileSync('npm', ['ci', '--no-audit', '--no-fund'], {cwd:publisher, stdio:'inherit'});
     execFileSync('npm', ['run', 'build'], {cwd:publisher, stdio:'inherit'});
-    const [packed] = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', buildRoot], {cwd:publisher, encoding:'utf8'}));
+    const output = execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', buildRoot], {cwd:publisher, encoding:'utf8'});
+    // npm 11 prints an array of artifacts; npm 12 an object keyed by package name.
+    const result = JSON.parse(output);
+    const packed = (Array.isArray(result) ? result : Object.values(result ?? {})).find(record => typeof record?.filename === 'string');
+    if (!packed) throw new Error('npm pack reported no Flowview package artifact.\n' + output);
 
     // The pinned plugin is generator-owned, including deletions on upgrades.
     await rm(path.join(destination, 'apps/backstage'), {recursive:true, force:true});

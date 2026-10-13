@@ -260,6 +260,7 @@ Everything here — content and tooling — came out of an agent-driven loop:
 
 | path | what it is |
 |---|---|
+| `company/` | Fork-owned overlay. Upstream ships only its README. Company forks add panel types and helpers, contract fragments, examples, tests and release notes here, and the build and test suites discover them without upstream list edits. `company/company.json` sets the fork's name, repository, brand and package identity. See [company forks](docs/company-overlay.md). |
 | `src/panels/types/<type>.js` | One complete panel definition: validation, state rules, renderer, editor controls/metadata, picker example, styles, layout/reference capabilities and release metadata. Shared primitives stay in `src/panels/shared.js`; see [panel development](docs/panel-modularity.md). |
 | `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Viewer/workbench HTML is ignored and generated for local use, CI artifacts and image builds. Authored diagram exports remain independent. Runtime JavaScript and copied declarations/licenses are ignored build outputs too. Local commands and CI generate them before tests and packaging; see [build and distribution instructions](docs/build-entrypoints.md#build-outputs-and-distribution). The Canon index is regenerated during the build. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
@@ -277,7 +278,8 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `examples/cumulus/` | End-to-end proof. `cumulus-hld.md` is a realistic fixture design doc (mermaid + prose-only flow + facts buried in paragraphs). `cumulus-page.spec.json` was generated from it by GPT-5.6 given only the contract; `cumulus-page.spec.v2.json` applied three plain-English "meeting feedback" items. `cumulus-flow.html` is the rendered v2 output. |
 | `mockups/` | The hand-built design explorations that defined the target: `flowline-mockups.html` (four visual treatments; mockup 04 "Aurora Combined" is the chosen direction), `device-lens.html` (click-through with a device-internals inspector), `doorbell-northstar.html` (the northstar: three synchronized panels — flow board, two-chip hardware view with wake states, camera viewfinder that visibly starts recording). |
 
-Panel modules are discovered through `src/source-bundles.json`. For headless
+Panel modules are discovered through `src/source-bundles.json`, including a
+company fork's `company/panels/` overlay. For headless
 Node tools or VM tests, load `readSource('validator.js')` from
 `tools/source-loader.cjs`, then the assembled engine when needed; raw validator
 and engine file reads omit the registered panel implementations.

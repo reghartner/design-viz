@@ -6,6 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os');
 const {execFileSync,spawnSync}=require('node:child_process');
 const ROOT=path.join(__dirname,'..');
 const {probeHttp}=require('./helpers/http-probe.js');
+const {markedExamples,kitExamples}=require('./helpers/kit-examples.js');
 const {imageContainerPort}=require('./helpers/container-port.js');
 const dockerAvailable=spawnSync('docker',['info','--format','{{.ServerVersion}}'],{encoding:'utf8',timeout:10000}).status===0;
 
@@ -17,11 +18,18 @@ test('production and prebuilt images recursively copy the diagram tree',()=>{
   }
 });
 
-function prepareImageContext(directory){
+const COMPANY_FIXTURE=path.join(__dirname,'fixtures/company-overlay');
+function kitFiles(html){
+  const envelope=JSON.parse(html.match(/<script[^>]+id="flowview-folder-kit"[^>]*>(.*?)<\/script>/s)[1]);
+  return JSON.parse(require('node:zlib').gunzipSync(Buffer.from(envelope.gzip,'base64'))).files;
+}
+
+function prepareImageContext(directory,{company=path.join(ROOT,'company')}={}){
   for(const folder of ['deploy/workbench','tools/canon','workbench','src','contract','cookbook','docs','.claude/skills/hld-to-page','examples/canon',
-    'examples/contract-blocks','examples/data-contract','examples/doorbell-chime','examples/independent-extraction']){
+    ...markedExamples()]){
     fs.cpSync(path.join(ROOT,folder),path.join(directory,folder),{recursive:true});
   }
+  fs.cpSync(company,path.join(directory,'company'),{recursive:true});
   fs.copyFileSync(path.join(ROOT,'LICENSE'),path.join(directory,'LICENSE'));
   fs.rmSync(path.join(directory,'tools/canon/generated-runtime.cjs'),{force:true});
   // Exercise a fresh source-only image context, even if the local checkout was built.
@@ -68,13 +76,25 @@ test('image source fixture builds without Docker or preexisting generated arrang
   for(const file of ['tools/arrange/generated-native.html','tools/arrange/node_modules','tools/canon/generated-runtime.cjs','workbench/flowspec.html'])
     assert.equal(fs.existsSync(path.join(directory,file)),false,file);
   execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
-  const html=fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8');
-  const envelope=JSON.parse(html.match(/<script[^>]+id="flowview-folder-kit"[^>]*>(.*?)<\/script>/s)[1]);
-  const kit=JSON.parse(require('node:zlib').gunzipSync(Buffer.from(envelope.gzip,'base64'))).files;
+  const kit=kitFiles(fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8'));
+  const expected=kitExamples().filter(file=>!file.startsWith('company/'));
   for(const file of ['examples/contract-blocks/contract-blocks.spec.json','examples/data-contract/data-contract.spec.json',
-    'examples/doorbell-chime/doorbell-chime.spec.json','examples/independent-extraction/README.md','examples/independent-extraction/before.spec.json']){
-    assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),`Offline kit reference: ${file}`);
-  }
+    'examples/doorbell-chime/doorbell-chime.spec.json','examples/independent-extraction/README.md','examples/independent-extraction/before.spec.json'])
+    assert.ok(expected.includes(file),`Marked example: ${file}`);
+  for(const file of expected)assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),`Offline kit reference: ${file}`);
+});
+
+test('image source fixture bundles a company overlay without upstream edits',t=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-image-company-'));
+  t.after(()=>fs.rmSync(directory,{recursive:true,force:true}));
+  prepareImageContext(directory,{company:COMPANY_FIXTURE});
+  execFileSync('python3',['tools/build.py'],{cwd:directory,encoding:'utf8',timeout:60000,maxBuffer:20*1024*1024});
+  const html=fs.readFileSync(path.join(directory,'workbench/flowspec.html'),'utf8');
+  assert.ok(html.includes("PanelRegistry.define('ticket-board'"));
+  const kit=kitFiles(html);
+  assert.equal(kit['company/examples/ticket-board/ticket-board.spec.json'],
+    fs.readFileSync(path.join(COMPANY_FIXTURE,'examples/ticket-board/ticket-board.spec.json'),'utf8'));
+  assert.match(kit['contract/authoring-contract.md'],/- `ticket-board` — closed tickets/);
 });
 
 test('nginx image publishes central canon membership and replaces a stale library',{skip:!dockerAvailable && !process.env.CI,timeout:240000},async t=>{
@@ -86,7 +106,8 @@ test('nginx image publishes central canon membership and replaces a stale librar
     spawnSync('docker',['image','rm',image],{timeout:10000,stdio:'ignore'});
     fs.rmSync(directory,{recursive:true,force:true});
   });
-  const {source,spec,manifest}=prepareImageContext(directory);
+  // The real Dockerfile must carry a company overlay into the built editor.
+  const {source,spec,manifest}=prepareImageContext(directory,{company:COMPANY_FIXTURE});
   const docker=args=>execFileSync('docker',args,{encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
   docker(['build','-f',path.join(directory,'deploy/workbench/Dockerfile'),'-t',image,directory]);
   // FLOWVIEW_IMAGE_PORT, else the image's single exposed TCP port, else 80.
@@ -118,6 +139,7 @@ test('nginx image publishes central canon membership and replaces a stale librar
   assert.equal(licenseResponse.body,fs.readFileSync(path.join(ROOT,'LICENSE'),'utf8'));
   const editorResponse=await probeHttp('http://127.0.0.1:'+port+'/workbench/flowspec.html',2000);
   assert.equal(editorResponse.status,200);assert.match(editorResponse.body,/id="workbench-welcome"/);
+  assert.ok(editorResponse.body.includes("PanelRegistry.define('ticket-board'"),'company overlay panel in the image');
   const viewerResponse=await probeHttp('http://127.0.0.1:'+port+'/template/flowview.html',2000);
   assert.equal(viewerResponse.status,200);assert.match(viewerResponse.body,/id="flowspec"/);
   assert.deepEqual(JSON.parse(fs.readFileSync(source)),spec);

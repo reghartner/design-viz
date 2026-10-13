@@ -1,5 +1,40 @@
 # Changelog
 
+## Company identity from configuration (2026-10-13)
+
+- `company/company.json` sets a fork's `companyName`, `repository`,
+  `revision`, `brand` file and Backstage `package` identity. The workbench
+  header GitHub link, repository field, authoring-skill link, repository-root
+  example and reader-tour guide link use the repository; the **Company
+  repository** and **Company service** labels (and the onboarding tour and
+  user guide that name them) use the company name; the brand file replaces
+  the placeholder brand in every viewer, the workbench and the runtime. Forks no
+  longer edit `src/workbench.skel.html`, `src/welcome.workbench.js`,
+  `src/canon.workbench.js`, `src/workbench/inspector.js` or
+  `src/company-brand.config.js`. Without the file, outputs are byte-identical;
+  `build.py --no-config` ignores it.
+- `node tools/backstage-pack.mjs pack|publish` stamps `repository.url` and
+  `publishConfig.registry` from `company.json` or `FLOWVIEW_PACKAGE_*`
+  variables at pack/publish time instead of edits to
+  `apps/backstage/package.json`. CI packs the plugin release with it.
+
+## Company overlay for forks (2026-10-13)
+
+- A company fork can keep its customizations in `company/`, which upstream
+  never ships content in beyond `company/README.md`. Panel types
+  (`company/panels/types/`) and their helper modules (`company/panels/`) are
+  bundled into every viewer, the workbench and the validator; contract
+  fragments (`company/contract/*.md`) are appended to the authoring contract
+  for `widget_doc`, authoring packets and the folder-agent kit; example
+  folders (`company/examples/`) join the kit and must validate; tests
+  (`company/tests/`) run in the normal Node and Python suites; release notes go
+  in `company/CHANGELOG.md`. See [company forks](docs/company-overlay.md).
+- Upstream examples join the offline folder-agent kit through an `.agent-kit`
+  marker file instead of hand-maintained lists in the kit, the image tests and
+  the Dockerfile. The workbench image copies `examples/` and `company/`.
+- Without an overlay, the viewer, runtime and diagram library outputs are
+  byte-identical to before.
+
 ## Fork-portable package and image checks (2026-10-13)
 
 - `tools/verify-backstage-package.mjs` reads `npm pack --json` output from npm

@@ -40,6 +40,12 @@ notices. Save/Export stamps these automatically. Agent-authored specs should use
 requirements when editing. See [release compatibility](../docs/runtime-compatibility.md)
 for supported capabilities, CI checks and the company fork release workflow.
 
+In a company fork, Markdown files in `company/contract/` extend this contract
+(for example, the fork's own panel types). Read them as part of it.
+`tools/widget_doc.py`, authoring packets and the workbench's folder-agent kit
+append them under "Company contract additions". See
+[company forks](../docs/company-overlay.md).
+
 ## Output rules
 
 - Output **only** the JSON object. No markdown fences, no commentary, no

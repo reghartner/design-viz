@@ -219,7 +219,7 @@ function initWorkbenchLibrary(opts){
         if(!contextResponse.ok)throw new Error('Company story unavailable ('+contextResponse.status+').');
         var context=await contextResponse.json();
         if(context.source)backendContext=context;
-        raw={version:1,diagrams:[{id:opts.legacyCanon,spec:context.spec}]};published=true;origin='Company repository snapshot';
+        raw={version:1,diagrams:[{id:opts.legacyCanon,spec:context.spec}]};published=true;origin=/*@company:name*/'Company repository snapshot';
       }else if(location.protocol!=='file:'){
         var response=await fetch('diagrams.json',{cache:'no-cache'});
         if(response.status!==404){

@@ -51,12 +51,15 @@ patches an existing `supply` card in the `app` panel.
 
 ## Share a company name and mark
 
-The source-controlled global default lives in
-[`src/company-brand.config.js`](../src/company-brand.config.js). Replace the
-conspicuous `YOUR COMPANY` values there once to update the shared document
-header plus every inheriting Phone, Device app, Camera screen and Security
-monitoring surface. `logo` accepts either a 1–4 character monogram or a complete
-embedded PNG/JPEG/WebP data URI. `primaryColor` and `secondaryColor` accept
+Upstream's placeholder default lives in
+[`src/company-brand.config.js`](../src/company-brand.config.js). A company fork
+does not edit that file: it points `brand` in its `company/company.json` at a
+brand file (for example `company/brand.json`) with the same fields, and the
+build uses those values for the shared document header plus every inheriting
+Phone, Device app, Camera screen and Security monitoring surface. See
+[company forks](company-overlay.md#company-identity). `logo` accepts either a 1–4 character monogram or a complete
+embedded PNG/JPEG/WebP data URI; in a brand file it may also be a relative path
+to a PNG, JPEG or WebP file of up to 512 KiB, which the build embeds. `primaryColor` and `secondaryColor` accept
 `#RGB` or `#RRGGBB`. The file is bundled into every viewer; it never fetches a
 runtime logo or configuration.
 
@@ -170,8 +173,9 @@ them to the existing 21-symbol sprite, preserving legacy diagram tint behavior.
 `symbols({newOnly:false})` emits all 63 for consumers that have no legacy sprite.
 Do not append the full set to a document that already contains those IDs.
 
-[`src/company-brand.config.js`](../src/company-brand.config.js) is the one global
-company-brand edit point. [`src/icons/brand.js`](../src/icons/brand.js) converts
+[`src/company-brand.config.js`](../src/company-brand.config.js) holds upstream's
+placeholder global brand; `tools/source-loader.cjs` replaces it with the brand
+file named by a fork's `company/company.json`. [`src/icons/brand.js`](../src/icons/brand.js) converts
 it into the safe immutable model and owns `FlowBrand.clean`, `resolve`,
 `effective`, `warnings`, and `render`. [`src/panels/media.js`](../src/panels/media.js) owns the
 shared embedded-raster validator used by images, app screens and branding.

@@ -9,6 +9,9 @@ export const repo=path.resolve(fileURLToPath(new URL('../../..',import.meta.url)
 const fixture=name=>fileURLToPath(new URL('../fixtures/'+name,import.meta.url));
 
 export default async function prepare(){
+  // Contracts assert upstream labels and brand: ignore a fork's company.json
+  // here and in workers, matching build.py --no-config below.
+  process.env.FLOWVIEW_COMPANY_IDENTITY='off';
   // Fail before building anything if the pinned browser is unavailable.
   let browser;
   try{browser=await chromium.launch();console.log('Required Chromium: '+browser.version());}

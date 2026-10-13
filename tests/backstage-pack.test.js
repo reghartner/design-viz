@@ -60,6 +60,8 @@ test('packing with configured identity changes only repository.url and publishCo
   assert.equal(identity.manifest.repository.url,'git+https://github.com/acme/design-viz.git');
   assert.equal(identity.manifest.repository.directory,source.repository.directory);
   assert.deepEqual(identity.manifest.publishConfig,{registry:'https://npm.acme.test/'});
-  delete identity.manifest.publishConfig;identity.manifest.repository.url=source.repository.url;
+  if(source.publishConfig)identity.manifest.publishConfig=source.publishConfig;
+  else delete identity.manifest.publishConfig;
+  identity.manifest.repository.url=source.repository.url;
   assert.deepEqual(identity.manifest,source);
 });

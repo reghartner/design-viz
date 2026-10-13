@@ -6,7 +6,7 @@
   }
   PanelRegistry.define('ticket-board', {
     label: 'Ticket board',
-    since: '1.0.0',
+    since: '0.2.0',
     render: function (host, panel, state) {
       var done = CompanyTicketMath.valid(state.done) ? state.done : 0;
       var pct = CompanyTicketMath.percent(done, panel.total);

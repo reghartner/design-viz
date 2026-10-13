@@ -28,7 +28,11 @@ def folder_agent_kit(root, runtime):
     # Small maintained examples: upstream folders marked with .agent-kit, plus
     # every company/examples folder.
     for name in kit_examples(root):
-        files[name] = (root / name).read_text()
+        try:
+            files[name] = (root / name).read_text()
+        except UnicodeDecodeError as error:
+            raise ValueError(name + ': the folder-agent kit bundles UTF-8 text only; '
+                             'narrow the folder\'s .agent-kit globs') from error
     for name in ['LICENSE', 'tools/widget_doc.py', 'tools/company_overlay.py', 'tools/validate.js',
                  'tools/auto-arrange-spec.cjs', 'tools/authoring-packet.py', 'tools/visibility-check.cjs',
                  'tools/compatibility.js', 'tools/canon/core.cjs']:

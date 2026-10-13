@@ -77,8 +77,12 @@ test('the overlay panel and its helper are bundled into every built output and t
 
 test('the folder-agent kit carries the company example and the contract with its fragment appended',()=>{
   const kit=kitFiles(fs.readFileSync(path.join(checkout,'workbench/flowspec.html'),'utf8'));
-  for(const file of ['company/examples/ticket-board/ticket-board.spec.json','company/examples/ticket-board/README.md'])
+  for(const file of ['company/examples/ticket-board/ticket-board.spec.json','company/examples/ticket-board/README.md',
+    'company/examples/ticket-board-notes/notes.txt'])
     assert.equal(kit[file],fs.readFileSync(path.join(FIXTURE,file.slice('company/'.length)),'utf8'),file);
+  // A folder's .agent-kit globs replace the default *.md / *.json selection.
+  assert.equal('company/examples/ticket-board-notes/README.md' in kit,false);
+  assert.equal(Object.keys(kit).some(file=>file.endsWith('.agent-kit')),false);
   const contract=kit['contract/authoring-contract.md'];
   assert.ok(contract.startsWith(fs.readFileSync(path.join(ROOT,'contract/authoring-contract.md'),'utf8').trimEnd()));
   assert.match(contract,/## Company contract additions[\s\S]*<!-- company\/contract\/ticket-board\.md -->\n### panels — company additions\n\n- `ticket-board` — closed tickets/);
@@ -88,6 +92,15 @@ test('the folder-agent kit carries the company example and the contract with its
   assert.equal(Object.keys(kit).some(file=>file.startsWith('company/tests/')||file.startsWith('company/panels/')),false);
   for(const file of ['examples/contract-blocks/contract-blocks.spec.json','examples/independent-extraction/README.md'])
     assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),file);
+});
+
+test('a company example file that is not UTF-8 text fails the build with its path',t=>{
+  const binary=path.join(checkout,'company/examples/ticket-board-notes/logo.txt');
+  fs.writeFileSync(binary,Buffer.from([0xff,0xfe,0x00,0x81]));
+  t.after(()=>fs.rmSync(binary,{force:true}));
+  const result=spawnSync('python3',['-c','import sys;sys.path.insert(0,"tools");from folder_agent_kit import folder_agent_kit;folder_agent_kit(".","")'],{cwd:checkout,encoding:'utf8'});
+  assert.notEqual(result.status,0);
+  assert.match(result.stderr,/company\/examples\/ticket-board-notes\/logo\.txt: the folder-agent kit bundles UTF-8 text only/);
 });
 
 test('widget_doc and authoring packets document the company panel from its fragment',()=>{

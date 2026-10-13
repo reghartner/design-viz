@@ -1,0 +1,2 @@
+# The kit takes these files from this folder (default: *.md and *.json).
+*.txt

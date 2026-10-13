@@ -66,15 +66,20 @@ directly in a fork must also read `company/contract/*.md`; the contract says so.
 
 ## Examples
 
-Put each example in its own folder, `company/examples/<name>/`. Every `*.md` and
-`*.json` file in it is bundled into the offline folder-agent kit, and every
-`*.spec.json` must validate without errors in the normal Node test suite
+Put each example in its own folder, `company/examples/<name>/`. Every example
+folder is bundled into the offline folder-agent kit. By default the kit takes
+its `*.md` and `*.json` files (in the folder and below). To choose other files,
+add a `.agent-kit` file to the folder that lists file globs, one per line (`#`
+starts a comment); the globs then replace the default for that folder and its
+subfolders. The kit is a text bundle, so a selected file that is not UTF-8
+text fails the build with its path. Every `*.spec.json` under
+`company/examples/` must validate without errors in the normal Node test suite
 (`tests/company-overlay.test.js`). The workbench image build copies `company/`
 too (`deploy/workbench/Dockerfile`).
 
 Upstream examples join the kit the same way without a list: a folder under
-`examples/` that holds a `.agent-kit` file is bundled, using the file globs
-listed in that file, one per line (`#` starts a comment).
+`examples/` that holds a `.agent-kit` file is bundled, using its globs. A
+marker whose globs match no files fails the build.
 
 ## Tests
 

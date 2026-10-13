@@ -12,7 +12,7 @@ Everything below is discovered automatically. No upstream list needs an edit.
 | `company/panels/*.js` | Shared helper modules for company panels. Bundled before every panel type. |
 | `company/panels/types/*.js` | Company panel types, one `PanelRegistry.define(...)` per file, bundled after the upstream types into every viewer, the workbench and the validator. |
 | `company/contract/*.md` | Authoring-contract fragments, one per panel or topic, appended in file-name order to `contract/authoring-contract.md` for agents, `tools/widget_doc.py`, authoring packets and the folder-agent kit. Document a panel under a `### panels` heading with one ``- `type` `` bullet. |
-| `company/examples/<name>/` | Example folders. Their `*.md` and `*.json` files are bundled into the folder-agent kit, and every `*.spec.json` must validate in the normal test suite. |
+| `company/examples/<name>/` | Example folders, bundled into the folder-agent kit: their `*.md` and `*.json` files, or the globs listed in a `.agent-kit` file in the folder. Every `*.spec.json` must validate in the normal test suite. |
 | `company/tests/*.test.js` | Node tests, run by `node --test tests/*.test.js` through `tests/company-overlay.test.js`. |
 | `company/tests/test_*.py` | Python tests, run by `python3 -m unittest discover -s tests` through `tests/test_company_overlay.py`. |
 | `company/CHANGELOG.md` | The fork's release notes. Keep upstream's `CHANGELOG.md` unedited. |

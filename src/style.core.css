@@ -321,6 +321,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .sk-daylight .card{fill:#FFFFFF; stroke:#E0DCD1; stroke-width:1.2; filter:drop-shadow(0 1px 2px rgba(40,36,22,.10));}
 .sk-daylight .t1{fill:#23272E;}
 .sk-daylight .t2{fill:#79808B;}
+.node-image-backed .node-image{pointer-events:none;}
 .sk-daylight .lbl{fill:#6B6F7A;}
 .sk-daylight .coin circle{fill:#4956C9;}
 .sk-daylight .coin text{fill:#FFFFFF;}

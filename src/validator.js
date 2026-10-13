@@ -391,6 +391,11 @@ function validateSection(sec, P, protos, lanes, errors, warnings){
       warnings.push(DP + '.nodes.' + id + '.delta: must be true or false — ignored');
     if (n.icon && ICON_SET.indexOf(n.icon) < 0) warnings.push(DP + '.nodes.' + id + '.icon: unknown icon "' + n.icon + '" — using "gear" (valid: ' + ICON_SET.join(' ') + ')');
     if (n.tint && TINT_SET.indexOf(n.tint) < 0) warnings.push(DP + '.nodes.' + id + '.tint: unknown tint "' + n.tint + '" — using "cmd" (valid: ' + TINT_SET.join(' ') + ')');
+    if (n.image != null && !embeddedImageKind(n.image))
+      errors.push(DP + '.nodes.' + id + '.image: use a real embedded PNG, JPEG or WebP data URL up to 512 KiB; remote URLs, SVG, GIF and mislabeled files are not supported');
+    if (n.image != null && (typeof n.alt !== 'string' || !n.alt.trim()))
+      errors.push(DP + '.nodes.' + id + '.alt: describe the image for readers who cannot see it');
+    else if (n.alt != null && typeof n.alt !== 'string') warnings.push(DP + '.nodes.' + id + '.alt: expected text');
     if (n.link && typeof n.link !== 'string') warnings.push(DP + '.nodes.' + id + '.link: must be a URL string — link ignored');
     if (n.group && !groups[n.group]) warnings.push(DP + '.nodes.' + id + '.group: group "' + n.group + '" not declared in diagram.groups — drawing an untitled boundary');
   });

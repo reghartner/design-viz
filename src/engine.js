@@ -930,20 +930,26 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
+    var nodeImage = !n.handoff && embeddedImageKind(n.image) ? n.image : null;
     var siblingPages = typeof n.title === 'string' &&
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];
     var nodeLink = n.link || (typeof FlowCanon!=='undefined' && n.binding && FlowCanon.http(n.binding.catalogUrl));
     var hasNodeLink = nodeLink && typeof nodeLink === 'string';
     var hasReferences=nodeReferenceLinks(d,id).length>0,referenceX=p.w-(hasNodeLink?38:15);
     var backlinkX = p.w - 15 - (hasNodeLink?23:0) - (hasReferences?23:0);
-    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '" transform="translate(' + x + ' ' + y + ')">' +
-         (L.routing === 'lanes' ? '<title>'+esc(nodeTitle)+'</title>' : '') +
+    s += '<g class="node tint-' + tint + (n.handoff ? ' node-handoff' : '') + (nodeImage ? ' node-image-backed' : '') + (n.delta === true ? ' dvd' : '') + '" id="' + prefix + '-n-' + esc(id) + '" data-dv-node="' + esc(id) + '"' +
+         (nodeImage ? ' data-dv-node-image="true" aria-label="' + esc(nodeTitle + '. ' + n.alt) + '"' : '') + ' transform="translate(' + x + ' ' + y + ')">' +
+         (L.routing === 'lanes' || nodeImage ? '<title>'+esc(nodeImage ? nodeTitle + ' — ' + n.alt : nodeTitle)+'</title>' : '') +
          (n.handoff ? handoffNodeContent(n,p,id,prefix,options) :
          '<rect class="card" width="' + p.w + '" height="' + p.h + '" rx="12"/>' +
-         '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
-         '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
-         '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
-         '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>') +
+         (nodeImage ?
+           '<image class="node-image" href="' + esc(nodeImage) + '" x="7" y="7" width="38" height="' + (p.h-14) + '" preserveAspectRatio="xMidYMid slice" aria-hidden="true"/>' +
+           '<text class="t1" x="52" y="' + (small?19:23) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="52" y="' + (small?34:40) + '">' + esc(n.sub || 'Embedded image') + '</text>' :
+           '<rect class="icbg" x="12" y="' + (small?9:14) + '" width="26" height="26" rx="8"/>' +
+           '<use href="#i-' + icon + '" x="17" y="' + (small?14:19) + '" width="16" height="16"/>' +
+           '<text class="t1" x="46" y="' + (small?22:25) + '">' + esc(nodeTitle) + '</text>' +
+           '<text class="t2" x="46" y="' + (small?36:41) + '">' + esc(n.sub || '') + '</text>')) +
          (hasNodeLink ?
            '<a class="nlink" href="' + esc(nodeLink) + '" target="_blank" rel="noopener" aria-label="Source for ' + esc(nodeTitle) + '">' +
            '<circle cx="' + (p.w - 15) + '" cy="14" r="9" fill="transparent"/>' +

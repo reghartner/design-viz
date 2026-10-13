@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
+import npmPackJson from './npm-pack-json.cjs';
 
 const runFile = promisify(execFile);
 const source = fileURLToPath(new URL('../apps/backstage/', import.meta.url));
@@ -197,7 +198,7 @@ try {
   } else {
     if (!args.includes('--skip-build')) await run(npm, ['run', 'build'], source);
     const packed = await run(npm, ['pack', '--json', '--ignore-scripts', '--pack-destination', temp], source, { quiet: true });
-    const artifact = JSON.parse(packed.stdout)[0];
+    const artifact = npmPackJson.packedArtifact(packed.stdout, packed.stderr);
     tarball = path.join(temp, artifact.filename);
     console.log('Packed ' + artifact.id + ' (' + artifact.entryCount + ' files, ' + artifact.size + ' bytes).');
   }

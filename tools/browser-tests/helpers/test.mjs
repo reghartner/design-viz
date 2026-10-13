@@ -150,7 +150,8 @@ export async function chooseAddDestination(page,index){
   await page.locator('#diagram-add-close').click();
 }
 export async function chapterOptions(page,section){
-  const options=page.locator('#docview .explore-navigation').locator('.section-view-options');
+  const navigation=page.locator('#docview .explore-navigation'),options=navigation.locator('.section-view-options');
+  if(!await options.isVisible() && await navigation.locator('.reader-utilities>summary').isVisible())await navigation.locator('.reader-utilities>summary').click();
   if(await options.getAttribute('open')===null)await options.locator('summary').click();
   return options;
 }

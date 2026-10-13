@@ -16,9 +16,9 @@ test('saved document metadata and initial prose collapse survive Save/export, Un
   const original=JSON.stringify(raw,null,'\t');await page.goto(server.origin+'/workbench.html');await paste(page,original);await prepareEditorSurface(page);
   const section=page.locator('#docview .doc-sec').first();await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Second',exact:true}).click();
   await settings(page);await edit(page,'Document title','Design notes');
-  await expect(page.locator('#docview .doc-title')).toHaveText('Design notes');await expect(section).toHaveAttribute('data-view-id','second');
-  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(section).toHaveAttribute('data-view-id','second');
-  await page.locator('#redo-builder').click();await settings(page);
+  await expect(page.locator('#docview .doc-title')).toHaveText('Design notes');await expect(page.locator('#workbench-editor-title')).toHaveText('Design notes');await expect(section).toHaveAttribute('data-view-id','second');
+  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#workbench-editor-title')).toHaveText('Before');await expect(section).toHaveAttribute('data-view-id','second');
+  await page.locator('#redo-builder').click();await expect(page.locator('#workbench-editor-title')).toHaveText('Design notes');await settings(page);
   await edit(page,'Source URL','https://example.test/design');await edit(page,'Source description','Design specification');await edit(page,'Source version','v2');await edit(page,'Source date','2026-09-29');
   await expect(page.locator('#docview .generated-from')).toHaveText('Generated from Design specification · v2 · 2026-09-29');
   await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-terminal').click();

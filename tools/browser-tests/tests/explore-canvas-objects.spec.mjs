@@ -44,7 +44,7 @@ const clip=page=>page.locator('[data-explore-panel=clip]');
 const board=page=>page.locator('.explore-board');
 const source=page=>page.locator('#src').inputValue();
 async function selectPlacement(page,value){await page.locator('.explore-panel-menu summary').click();await page.getByLabel('Default panel placement',{exact:true}).selectOption(value);await page.keyboard.press('Escape');}
-async function fit(page,host){if(host==='workbench')await page.locator('#workspace-fit').click();else await page.locator('.reader-toolbar').getByRole('button',{name:'Fit',exact:true}).click();}
+async function fit(page,host){await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();}
 async function graphPoint(page,point){return board(page).evaluate((el,p)=>{const svg=el.querySelector('.boardcanvas>svg'),r=svg.getBoundingClientRect(),scale=r.width/svg.viewBox.baseVal.width;return {x:(p.x-r.x)/scale,y:(p.y-r.y)/scale,scale};},point);}
 async function drag(page,locator,dx,dy){const r=await locator.boundingBox();await page.mouse.move(r.x+r.width/2,r.y+r.height/2);await page.mouse.down();await page.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:5});await page.mouse.up();}
 async function selectCanvas(locator){await locator.focus();await expect(locator).toHaveAttribute('aria-current','true');}
@@ -397,8 +397,8 @@ test('Standard chapters remain usable before and after canvas step controls acti
  const raw=fixture(),diagram=raw.page.sections[0].diagram;diagram.defaultLayout='home-story';diagram.layouts[1].exploreLayout.controlsPlacement='canvas';
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw));await closeTools(page);
  await expect(page.locator('.doc-sec[data-view-id=home-story]')).toBeVisible();await expect(page.locator('.explore-stage')).toBeHidden();
- await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');const original=await source(page);
- await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#workspace-fit')).toHaveText('Fit canvas');
- await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#workspace-fit')).toHaveText('Fit diagram');
+ await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();const original=await source(page);
+ await page.getByRole('button',{name:'Service flow',exact:true}).click();await expect(page.locator('.explore-canvas-objects>.explore-player')).toBeVisible();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Home story',exact:true}).click();await expect(page.locator('.explore-stage')).toBeHidden();await expect(page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true})).toBeVisible();
  await expect(page.locator('#src')).toHaveValue(original);
 });

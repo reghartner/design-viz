@@ -69,11 +69,13 @@ its block. Node/edge labels and panel values remain plain text. See
 [prose markup](../contract/authoring-contract.md#section-object) for syntax and examples.
 
 Each Tab defines **Views** over ordered subsets of its sections. **Standard**
-stacks its member sections; **Explore** shows one member at a time. The shared
-**Tabs → Views → Sections** navigation stays directly below app chrome across
-both modes. Section buttons include only the active View's members. Content stays
-in sections and may appear in many Views. See [the View contract](tab-views.md)
-for authoring, migration and source ownership.
+stacks its member sections; **Explore** shows one member at a time. The editor and
+reader share the same shell: Views across the top, centered Page controls below,
+and a collapsible **Contents** sidebar for Tabs, Views, and Explore members. The
+compact app bar keeps the document title visible; on phones, **More project
+actions** contains File, Undo/Redo, Preview, Help, and Export. Content stays in
+sections and may appear in many Views. See [the View contract](tab-views.md) for
+authoring, migration and source ownership.
 
 In Explore, use **Pan** (or hold Space), zoom, and **Fit diagram** to navigate. Hold **Ctrl** or **Cmd** while scrolling over the graph to zoom; trackpad pinch uses the same gesture. Plain scrolling pans the graph.
 **Fit selection** beside Fit diagram frames the selected nodes and on-canvas panels

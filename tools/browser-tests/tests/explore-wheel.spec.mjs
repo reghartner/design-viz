@@ -57,7 +57,7 @@ for(const surface of ['standalone','workbench','native'])test(surface+' Ctrl-scr
   expect(await page.evaluate(()=>({w:innerWidth,h:innerHeight,scale:visualViewport.scale}))).toEqual(viewport);
   if(surface==='workbench'){
     await page.clock.fastForward(400);await expect(page.locator('#src')).toHaveValue(text);await expect(page.locator('#undo-builder')).toBeDisabled();
-    expect(Number((await page.locator('#workspace-zoom').textContent()).replace('%',''))).toBe(100);
+    expect(Number((await page.locator('#docview>.explore-navigation .reader-zoom-menu>summary').textContent()).replace(/[^0-9]/g,''))).toBe(100);
   }
   if(sibling){expect(await width(sibling)).toBe(originalSibling);expect(new URL(page.url()).hash).toBe(hash);}
 });

@@ -2,7 +2,7 @@ import {chooseNavigation} from '../helpers/test.mjs';
 import {test,expect,paste,closeTools,chapterOptions,chooseAddDestination,arrangeChapter} from '../helpers/test.mjs';
 import {editorSpec} from '../fixtures/editor-spec.mjs';
 function fixture(){
- const raw=editorSpec(),first=raw.page.blocks[0];first.id='primary';first.text='The notes belong to this chapter.';
+ const raw=editorSpec(),first=raw.page.blocks[0];raw.page.title='Sections and Views · Product journey';first.id='primary';first.text='The notes belong to this chapter.';
  const d=first.diagram;delete d.layouts[0].steps;d.layouts[0].presentation='explore';d.layouts[0].name='Engineering';
  d.layouts.push({...structuredClone(d.layouts[0]),id:'standard',name:'Overview',presentation:'standard'});
  const other=structuredClone(first);other.id='secondary';other.heading='Second diagram';
@@ -13,38 +13,52 @@ const nav=page=>page.locator('#docview .explore-navigation');
 const selected=page=>page.locator('#docview .workspace-active-section');
 async function camera(page){return selected(page).locator('.explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,width:el.style.getPropertyValue('--explore-width')}));}
 
-test('one measured navigation surface keeps original tabs, all diagrams and compact mode icons across widths',async({page,server},info)=>{
+test('editor shares the Contents, Views and Page shell without covering its authoring tools',async({page,server},info)=>{
  const source=await open(page,server);
  await expect(page.getByRole('button',{name:'Back to page',exact:true})).toHaveCount(0);
- await expect(nav(page)).toHaveCount(1);await expect(nav(page).locator('.explore-navigation-diagrams .explore-diagram-button:not([hidden])')).toHaveCount(2);
- await expect(nav(page).getByRole('tab',{name:'Main story',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();
- await expect(nav(page).getByRole('button',{name:'Engineering',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();
+ await expect(nav(page)).toHaveCount(1);await expect(nav(page).locator('.reader-contents')).toBeVisible();
+ await expect(nav(page).locator('.explore-navigation-diagrams')).toBeHidden();
+ await expect(nav(page).getByRole('tab',{name:'Engineering',exact:true})).toHaveAttribute('aria-selected','true');
+ await expect(page.locator('#workbench-editor-title')).toHaveText(fixture().page.title);await expect(page.locator('#workbench-editor-title')).toHaveAttribute('title',fixture().page.title);
+ await expect(nav(page).locator('.embedcopy')).toHaveCount(1);
+ await nav(page).locator('.reader-theme-menu>summary').click();await nav(page).getByRole('menuitemradio',{name:'Opus Lilac',exact:true}).click();await expect(page.locator('#docview')).toHaveClass(/sk-lilac/);await expect(page.locator('#src')).toHaveValue(source);
+ const contentsToggle=nav(page).locator('.reader-top>button');await contentsToggle.click();await expect(nav(page).locator('.reader-contents')).toBeHidden();
+ await page.locator('#editor-tab-inspect').click();await page.locator('#document-settings').click();const title=page.locator('#guide').getByLabel('Document title',{exact:true});await title.fill('Edited Product journey');await title.press('Enter');
+ await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await expect(page.locator('.workspace-rail')).toHaveCSS('left','12px');
+ await page.locator('#undo-builder').click();await expect(page.locator('#workbench-editor-title')).toHaveText(fixture().page.title);await expect(nav(page).locator('.reader-contents')).toBeHidden();await page.locator('#redo-builder').click();await expect(page.locator('#workbench-editor-title')).toHaveText('Edited Product journey');await expect(nav(page).locator('.reader-contents')).toBeHidden();await page.locator('#undo-builder').click();await closeTools(page);await contentsToggle.click();await expect(nav(page).locator('.reader-contents')).toBeVisible();
  for(const width of [1440,1024,768,390]){
   await page.setViewportSize({width,height:1000});
+  await expect.poll(()=>page.locator('.workbench-header').evaluate(el=>el.getBoundingClientRect().height)).toBeLessThanOrEqual(54);
   await expect.poll(()=>nav(page).evaluate(el=>{const r=el.getBoundingClientRect(),header=document.querySelector('.workbench-header').getBoundingClientRect();return Math.abs(r.top-header.bottom);})).toBeLessThanOrEqual(1);
-  const geometry=await nav(page).evaluate(el=>{const r=el.getBoundingClientRect(),stage=document.querySelector('.workspace-active-section .explore-stage').getBoundingClientRect(),undo=document.querySelector('#undo-builder').getBoundingClientRect(),player=document.querySelector('.workspace-active-section .explore-player').getBoundingClientRect(),tools=document.querySelector('.workspace-canvas-controls').getBoundingClientRect();return {bottom:r.bottom,stageTop:stage.top,undoLeft:undo.left,undoRight:undo.right,playerRight:player.right,playerBottom:player.bottom,toolsTop:tools.top};});
-  if(width===1440)expect(geometry.bottom).toBeLessThanOrEqual(112);
+  const geometry=await nav(page).evaluate(el=>{const r=el.getBoundingClientRect(),stage=document.querySelector('.workspace-active-section .explore-stage').getBoundingClientRect(),player=document.querySelector('.workspace-active-section .explore-player').getBoundingClientRect(),tools=document.querySelector('.workspace-canvas-controls').getBoundingClientRect(),rail=document.querySelector('.workspace-rail').getBoundingClientRect(),side=el.querySelector('.reader-contents').getBoundingClientRect(),pager=el.querySelector('.reader-page-index').getBoundingClientRect();return {bottom:r.bottom,stageTop:stage.top,playerRight:player.right,playerBottom:player.bottom,toolsTop:tools.top,railLeft:rail.left,sideRight:side.right,sideVisible:!!side.width,pageCenter:(pager.left+pager.right)/2};});
   expect(geometry.stageTop).toBeGreaterThanOrEqual(geometry.bottom);
-  expect(geometry.undoLeft).toBeGreaterThanOrEqual(0);expect(geometry.undoRight).toBeLessThanOrEqual(width);
+  expect(Math.abs(geometry.pageCenter-width/2)).toBeLessThanOrEqual(2);
+  if(width>670){expect(geometry.sideVisible).toBe(true);expect(geometry.railLeft).toBeGreaterThanOrEqual(geometry.sideRight+11);}else{expect(geometry.sideVisible).toBe(false);expect(geometry.railLeft).toBe(12);}
   expect(geometry.playerRight).toBeLessThanOrEqual(width);expect(geometry.playerBottom).toBeLessThanOrEqual(geometry.toolsTop-6);
   for(const selector of ['.step-transport','.schips','.stepline']){const content=selected(page).locator('.explore-player '+selector);await expect(content).toBeInViewport();const r=await content.boundingBox(),dock=await selected(page).locator('.explore-player').boundingBox();expect(r.x).toBeGreaterThanOrEqual(dock.x);expect(r.x+r.width).toBeLessThanOrEqual(dock.x+dock.width+1);expect(r.y+r.height).toBeLessThanOrEqual(dock.y+dock.height+1);}
   await info.attach('navigation-'+width,{body:await page.screenshot(),contentType:'image/png'});
  }
  await chooseNavigation(nav(page),'View','Overview');
  await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(nav(page)).toHaveCount(1);
- await expect(nav(page).getByRole('combobox',{name:'Choose View',exact:true}).locator('option:checked')).toHaveText('Overview');await expect(nav(page).locator('.tabbtn[aria-selected=true]')).not.toHaveAttribute('data-explore-view','true');
+ await expect(nav(page).getByRole('tab',{name:'Overview',exact:true})).toHaveAttribute('aria-selected','true');await expect(page.locator('#docview>.doc-heading')).toBeHidden();
+ await expect(page.locator('#section-primary')).toBeVisible();await expect(page.locator('#section-secondary')).toBeVisible();
  await expect(page.locator('#section-primary .playback-mode-rail')).toBeVisible();await page.locator('#section-primary .playback-mode-rail').getByRole('button',{name:'AMBIENT',exact:true}).click();await expect(page.locator('#section-primary .termbar')).toBeHidden();await page.locator('#section-primary .playback-mode-rail').getByRole('button',{name:'STEP',exact:true}).click();await expect(page.locator('#section-primary .termbar')).toBeVisible();
- await page.setViewportSize({width:1440,height:1000});await expect(nav(page).getByRole('button',{name:'Engineering',exact:true}).locator('.explore-indicator-badge svg')).toBeVisible();await page.setViewportSize({width:390,height:1000});
- await nav(page).getByRole('button',{name:'Second diagram',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(nav(page).getByRole('button',{name:'Second diagram',exact:true})).toHaveAttribute('aria-pressed','true');
- await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(page.locator('#section-primary')).toHaveAttribute('data-view-id','standard');
+ await page.setViewportSize({width:390,height:1000});await chooseNavigation(nav(page),'View','Engineering');
+ if(!await nav(page).locator('.reader-contents').isVisible())await nav(page).locator('.reader-top>button').click();
+ await nav(page).getByRole('button',{name:'Second diagram',exact:true}).click();await expect(page.locator('body')).toHaveClass(/workspace-diagram/);await expect(selected(page)).toHaveAttribute('id','section-secondary');
+ await nav(page).locator('.reader-top>button').click();await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(selected(page)).toHaveAttribute('id','section-primary');
+ const narrow=await page.locator('#workbench-editor-title').evaluate(el=>({clientHeight:el.clientHeight,scrollHeight:el.scrollHeight,clientWidth:el.clientWidth,scrollWidth:el.scrollWidth,pageWidth:document.documentElement.scrollWidth}));
+ expect(narrow.scrollHeight).toBeLessThanOrEqual(narrow.clientHeight);expect(narrow.scrollWidth).toBeLessThanOrEqual(narrow.clientWidth);expect(narrow.pageWidth).toBeLessThanOrEqual(390);
+ const more=page.locator('#workspace-more>summary');await expect(more).toHaveAttribute('aria-label','More project actions');await more.focus();await page.keyboard.press('Enter');await expect(page.locator('#workspace-file')).toBeVisible();await expect(page.locator('#undo-builder')).toBeVisible();await expect(page.locator('#workspace-export-trigger')).toBeVisible();
+ await page.locator('#workspace-export-trigger').click();await expect(page.locator('#file-save')).toBeVisible();await expect(page.locator('#workspace-more')).toHaveAttribute('open','');
  await expect(page.locator('#src')).toHaveValue(source);
 });
 
 test('Add follows prose tabs and deliberate destination changes while stale source remains blocked',async({page,server})=>{
- const original=await open(page,server);await nav(page).getByRole('tab',{name:'Notes',exact:true}).click();
+ const original=await open(page,server);await chooseNavigation(nav(page),'Tab','Notes');
  await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeEnabled();await expect(page.locator('#diagram-add-destination')).toContainText('Notes');
  await page.locator('.diagram-add-destination-picker summary').click();await page.locator('#diagram-add-target').selectOption('1');
- await expect(nav(page).getByRole('tab',{name:'Main story',exact:true})).toHaveAttribute('aria-selected','true');await expect(selected(page)).toHaveAttribute('id','section-secondary');
+ await expect(selected(page)).toHaveAttribute('id','section-secondary');
  await expect(page.locator('#add-node')).toBeEnabled();await page.locator('#add-node').click();await page.locator('#diagram-add-presets').getByRole('button',{name:'Service',exact:true}).click();
  let changed=JSON.parse(await page.locator('#src').inputValue());expect(Object.keys(changed.page.blocks[0].tabs[0].sections[1].diagram.nodes)).toHaveLength(4);expect(Object.keys(changed.page.blocks[0].tabs[0].sections[0].diagram.nodes)).toHaveLength(3);
  await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
@@ -53,7 +67,7 @@ test('Add follows prose tabs and deliberate destination changes while stale sour
 });
 
 test('page preview is isolated and explicit camera commands author one undoable change',async({page,server})=>{
- const original=await open(page,server);await page.locator('#workspace-zoom-in').click();
+ const original=await open(page,server);await nav(page).getByRole('button',{name:'Zoom in',exact:true}).click();
  await page.locator('#workspace-appearance>summary').click();await page.locator('#sk-lilac').click();await page.locator('#layout-preview-target').selectOption('backstage');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const before=await camera(page);await page.locator('#open-page-preview').click();
  await expect(page.locator('#page-preview-surface')).toHaveClass(/viewer-exploring/);await expect(page.locator('#page-preview-view')).toHaveClass(/sk-lilac/);await chooseNavigation(page.locator('#page-preview-view .explore-navigation'),'Tab','Notes');await page.locator('#close-page-preview').click();
  await expect(selected(page)).toHaveAttribute('id','section-primary');expect(await camera(page)).toEqual(before);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
@@ -65,15 +79,16 @@ test('page preview is isolated and explicit camera commands author one undoable 
 });
 
 test('long navigation labels reveal the selected chapter and detail insertion explains its source boundary',async({page,server},info)=>{
+ test.slow();
  const raw=fixture(),primary=raw.page.blocks[0].tabs[0].sections[0],d=primary.diagram;
  for(let i=0;i<9;i++){d.layouts.push({...structuredClone(d.layouts[0]),id:'long-'+i,name:'View '+i+' — detailed engineering view'});raw.page.blocks[0].tabs[0].views.push({id:'long-'+i,name:'View '+i+' — detailed engineering view',presentation:'explore',sections:[{section:'primary',layout:'long-'+i},'context-notes']});}
  const detail=structuredClone(primary);detail.id='detail-source';detail.heading='Detailed source';detail.detailOnly=true;d.nodes.a.detail={section:'detail-source'};raw.page.blocks.push(detail);
  raw.page.blocks[0].tabs[0].sections.push({id:'context-notes',heading:'Architecture context without a diagram',text:'Editable prose in this tab.'});
- const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);await page.setViewportSize({width:390,height:1000});
- const last=nav(page).getByRole('combobox',{name:'Choose View',exact:true}),name='View 8 — detailed engineering view';await chooseNavigation(nav(page),'View',name);await last.focus();await expect(last).toBeFocused();await expect(last).toBeInViewport({ratio:1});await expect(last).toHaveAttribute('title',name);await expect(selected(page).locator('.explore-board')).toBeVisible();
+ const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await page.locator('#welcome-paste').click();await page.locator('#welcome-json').evaluate((el,value)=>{el.value=value;el.dispatchEvent(new Event('input',{bubbles:true}));},source);await page.locator('#welcome-paste-form button[type=submit]').click();await expect(page.locator('#src')).toHaveValue(source);await closeTools(page);await page.setViewportSize({width:390,height:1000});
+ const name='View 8 — detailed engineering view';await chooseNavigation(nav(page),'View',name);const last=nav(page).getByRole('tab',{name,exact:true});await last.focus();await expect(last).toBeFocused();await expect(last).toBeInViewport({ratio:1});await expect(last).toHaveAttribute('title',name);await expect(selected(page).locator('.explore-board')).toBeVisible();
  await chapterOptions(page);const mode=nav(page).getByRole('combobox',{name:'View presentation',exact:true});await mode.focus();await page.keyboard.press('Escape');await expect(nav(page).locator('.section-view-options>summary')).toBeFocused();await expect(nav(page).locator('.section-view-options')).not.toHaveAttribute('open','');
- await nav(page).getByRole('button',{name:'Architecture context without a diagram',exact:true}).click();await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeEnabled();await expect(page.locator('#diagram-add-destination')).toContainText('Architecture context');await page.locator('#diagram-add-close').click();
- await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(last.locator('option:checked')).toHaveText(name);await expect(last).toBeInViewport({ratio:1});await info.attach('long-chapter-narrow',{body:await page.screenshot(),contentType:'image/png'});
+ if(!await nav(page).locator('.reader-contents').isVisible())await nav(page).locator('.reader-top>button').click();await nav(page).getByRole('button',{name:'Architecture context without a diagram',exact:true}).click();await page.locator('#diagram-add').click();await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeEnabled();await expect(page.locator('#diagram-add-destination')).toContainText('Architecture context');await page.locator('#diagram-add-close').click();
+ if(!await nav(page).locator('.reader-contents').isVisible())await nav(page).locator('.reader-top>button').click();await nav(page).getByRole('button',{name:'Delivery',exact:true}).click();await expect(last).toHaveAttribute('aria-selected','true');await expect(last).toBeInViewport({ratio:1});await info.attach('long-chapter-narrow',{body:await page.screenshot(),contentType:'image/png'});
  await page.setViewportSize({width:1440,height:1000});await selected(page).locator('[data-dv-detail=a]').click();await page.locator('#diagram-add').click();await expect(page.locator('#diagram-add-error')).toContainText('Detail previews');await expect(page.locator('#add-node')).toBeDisabled();await expect(page.locator('#add-paragraph')).toBeDisabled();await page.locator('#diagram-add-close').click();
  await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
@@ -109,6 +124,6 @@ test('arranger stays above Inspect and retires cleanly on Escape, chapter, tab a
  await arranger.getByRole('combobox',{name:'Arrangement profile',exact:true}).focus();await page.keyboard.press('Escape');await expect(arranger).toHaveCount(0);await expect(nav(page).locator('.section-view-options>summary')).toBeFocused();
  await arrangeChapter(page);await arranger.getByRole('button',{name:'Done arranging',exact:true}).click();await expect(arranger).toHaveCount(0);await expect(nav(page).locator('.section-view-options>summary')).toBeFocused();
  await arrangeChapter(page);await nav(page).getByRole('button',{name:'Engineering',exact:true}).click();await expect(arranger).toHaveCount(0);
- await arrangeChapter(page);await nav(page).getByRole('tab',{name:'Notes',exact:true}).click();await expect(arranger).toHaveCount(0);await nav(page).getByRole('tab',{name:'Main story',exact:true}).click();await expect(arranger).toHaveCount(0);
+ await arrangeChapter(page);await chooseNavigation(nav(page),'Tab','Notes');await expect(arranger).toHaveCount(0);await chooseNavigation(nav(page),'Tab','Main story');await expect(arranger).toHaveCount(0);
  await arrangeChapter(page);await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(arranger).toHaveCount(0);await page.locator('#editor-tab-json').click();await page.locator('#go').click();await expect(arranger).toHaveCount(0);await expect(page.locator('#src')).toHaveValue(original+' ');
 });

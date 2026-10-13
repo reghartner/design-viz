@@ -79,7 +79,7 @@ async function expectWorkbenchCanvas(page){
   const section=page.locator('.workspace-active-section'),viewport=page.viewportSize();
   const shell=await section.locator('.workbench-diagram-canvas').boundingBox(),nav=await page.locator('#docview > .explore-navigation').boundingBox();
   const stage=await section.locator('.explore-stage').boundingBox(),board=await section.locator('.explore-board').boundingBox();
-  const contentTop=await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')));expect(contentTop).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84,y:contentTop,width:viewport.width-96,height:viewport.height-contentTop-12});
+  const metrics=await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0}));expect(metrics.top).toBe(Math.ceil(nav.y+nav.height+10));expect(shell).toEqual({x:84+metrics.inset,y:metrics.top,width:viewport.width-96-metrics.inset,height:viewport.height-metrics.top-12});
   expect(stage.y).toBeGreaterThanOrEqual(nav.y+nav.height);expect(board).toEqual(stage);
 }
 async function copyRequest(page,text){
@@ -721,7 +721,7 @@ test('diagram itself fills the browser and pans and zooms without editing source
   try{
     const raw=JSON.parse(source);raw.page.blocks[0].diagram.layouts.forEach(view=>view.presentation='explore');const input=JSON.stringify(raw,null,2);
     await page.locator('#welcome-paste').click();await page.locator('#welcome-json').fill(input);await page.locator('#welcome-paste-form button[type=submit]').click();
-    await canvasTools(page);await page.locator('#workspace-panels').click();await page.locator('#workspace-fit').click();
+    await canvasTools(page);await page.locator('#workspace-panels').click();await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
     const canvas=page.locator('.workspace-active-section .explore-board');
     await expectWorkbenchCanvas(page);
     await expect(page.locator('#docview .doc-title')).toBeHidden();
@@ -729,8 +729,8 @@ test('diagram itself fills the browser and pans and zooms without editing source
     const before=await position(),node=page.locator('[data-dv-node="a"]').first(),n=await node.boundingBox();
     await page.locator('#workspace-pan').click();await page.mouse.move(n.x+10,n.y+10);await page.mouse.down();await page.mouse.move(n.x+90,n.y+70,{steps:5});await page.mouse.up();
     expect((await position()).x).toBeCloseTo(before.x-80,0);expect((await position()).y).toBeCloseTo(before.y-60,0);
-    const z=await page.locator('#workspace-zoom').textContent();await page.locator('#workspace-zoom-in').click();expect(await page.locator('#workspace-zoom').textContent()).not.toBe(z);
-    await page.locator('#workspace-fit').click();await expect(node).toBeInViewport();await expect(page.locator('#src')).toHaveValue(input);
+    const zoom=page.locator('#docview>.explore-navigation .reader-zoom-menu>summary');const z=await zoom.textContent();await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();expect(await zoom.textContent()).not.toBe(z);
+    await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();await expect(node).toBeInViewport();await expect(page.locator('#src')).toHaveValue(input);
     await page.screenshot({path:info.outputPath('diagram-canvas.png')});expect(h.errors).toEqual([]);
   }finally{await page.close();await h.cleanup();}
 });
@@ -771,7 +771,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await canvasTools(page);await page.locator('#workspace-panels').click();
     await page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true}).click();
     await expect(page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true})).toHaveAttribute('aria-pressed','true');
-    await page.locator('#workspace-fit').click();
+    await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
     await chooseAddDestination(page,'1');
     await expectWorkbenchCanvas(page);
     await expect(page.locator('[data-dv-node="customer"]')).toBeInViewport();
@@ -779,7 +779,7 @@ test('diagram canvas switches sections and views, keeps its camera after edits, 
     await expect(page.locator('.workspace-active-section .explore-player')).toBeVisible();
     await chooseAddDestination(page,'0');
     await expect(page.locator('#docview > .explore-navigation').getByRole('button',{name:'Technical',exact:true})).toHaveAttribute('aria-pressed','true');
-    await page.locator('#workspace-zoom-out').click();
+    await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom out',exact:true}).click();
     const camera=()=>page.locator('.workspace-active-section .explore-board').evaluate(el=>({x:el.scrollLeft,y:el.scrollTop,zoom:el.style.getPropertyValue('--explore-width')}));
     await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));const prior=await camera();
     await page.locator('#editor-tab-json').click();

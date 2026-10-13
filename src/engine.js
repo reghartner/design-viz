@@ -2118,7 +2118,7 @@ function createExploreNavigation(ctl,options){
   nav.appendChild(tabs);nav.appendChild(chapters);nav.appendChild(diagrams);nav.appendChild(actions);
   var contents=options.contents?createReaderContents(ctl,nav,actions,options):null;
   nav.addEventListener('keydown',function(ev){if(ev.key==='Escape'){var popover=ev.target.closest('details[open]');if(popover){ev.preventDefault();ev.stopPropagation();popover.open=false;popover.querySelector('summary').focus();}else if(current && current.viewport && current.viewport.navigationKeydown)current.viewport.navigationKeydown(ev);return;}if(ev.target.closest('input,textarea,select,summary,button') && !((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase()==='z'))ev.stopPropagation();});
-  nav.addEventListener('toggle',function(ev){if(ev.target.tagName!=='DETAILS')return;if(ev.target.open)nav.querySelectorAll('details[open]').forEach(function(other){if(other!==ev.target)other.open=false;});syncNavigationPopover(ev.target);},true);
+  nav.addEventListener('toggle',function(ev){if(ev.target.tagName!=='DETAILS')return;if(ev.target.open)nav.querySelectorAll('details[open]').forEach(function(other){if(other!==ev.target && !other.contains(ev.target) && !ev.target.contains(other))other.open=false;});syncNavigationPopover(ev.target);},true);
   function refreshNavigationGeometry(){if(!nav.isConnected)return;refreshNavigationLanes();var bounds=nav.getBoundingClientRect();ctl.view.style.setProperty('--flowview-navigation-height',Math.ceil(bounds.height)+'px');ctl.view.style.setProperty('--flowview-navigation-bottom',Math.ceil(bounds.bottom+8)+'px');nav.querySelectorAll('details[open]').forEach(syncNavigationPopover);if(contents)contents.geometry();}
   var navigationSize=new ResizeObserver(function(){refreshNavigationGeometry();revealSection(sectionChoices.querySelector('[aria-pressed="true"]'));});
   var navigationFonts=doc.fonts;function navigationFontsLoaded(){laneLayoutKey='';refreshNavigationGeometry();if(nav.isConnected)revealSection(sectionChoices.querySelector('[aria-pressed="true"]'));}
@@ -3006,6 +3006,7 @@ function renderPage(view, page, skin, backlinks, options){
     if (headerBrandHTML){
       var brand = document.createElement('div');
       brand.className = 'doc-company-brand';
+      if (page.brand != null && page.brand !== false) brand.classList.add('doc-company-brand-authored');
       brand.innerHTML = headerBrandHTML;
       heading.appendChild(brand);
     }

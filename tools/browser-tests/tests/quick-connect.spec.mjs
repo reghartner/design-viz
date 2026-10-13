@@ -93,7 +93,7 @@ test('modifier selection, ordinary dragging and zoomed connection creation coexi
   const f=node(page,'f'),box=await f.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2-70,box.y+box.height/2-20,{steps:8});await page.mouse.up();
   expect((await diagram(page)).floats[0].x).not.toBe(850);await clean(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-  await page.locator('#workspace-zoom-in').click();
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
   await start(page);await expect(page.locator('.dv-connect-hint')).toBeVisible();
   await expect(page.getByRole('button',{name:'Cancel connection',exact:true})).toBeVisible();
   await node(page,'c').hover();await expect(arrow(page)).toHaveAttribute('d',/^M /);

@@ -50,7 +50,7 @@ for(const host of ['workbench','reader','native'])for(const placement of ['canva
   await page.screenshot({path:info.outputPath(placement+'-'+height+'.png')});
  }
  if(placement==='canvas'){
-  await page.locator(host==='workbench'?'#workspace-fit':'.reader-toolbar>button[aria-label="Fit"]').click();
+  await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
   await expect(player(page)).toBeInViewport();
  }
 });

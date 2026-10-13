@@ -1,0 +1,42 @@
+{
+  "id": "61b0eb79065bb7898570",
+  "type": "drift",
+  "status": "open",
+  "createdAt": "2026-09-16T03:45:12.207Z",
+  "reference": {
+    "id": "receiveButton",
+    "label": "receiveButton",
+    "repository": "https://github.com/reghartner/design-viz",
+    "path": "examples/canon/doorbell-app/src/porch-hub.js",
+    "revision": "dd74202e5740e2882159521ed1553b082dd9002e",
+    "anchor": {
+      "start": "// flow:receiveButton:start",
+      "end": "// flow:receiveButton:end"
+    },
+    "startLine": 4,
+    "endLine": 13,
+    "purpose": "The sample handler validates a doorbell.pressed event with a resident, then waits for recording before sending a notification."
+  },
+  "head": "40cbc892eceda0693828ef2fcbb9ff8aca03a9fe",
+  "before": {
+    "startLine": 4,
+    "endLine": 13,
+    "text": "// flow:receiveButton:start\nexport async function receiveButton(event, ports) {\n  if (event?.type !== 'doorbell.pressed' || !event.residentId) {\n    throw new Error('Expected a doorbell press with a resident.');\n  }\n  const recording = await createRecording(event, ports);\n  await notifyResident(recording, ports);\n  return {status: 'recorded-and-notified', recordingId: recording.id};\n}\n// flow:receiveButton:end"
+  },
+  "after": {
+    "startLine": 4,
+    "endLine": 14,
+    "text": "// flow:receiveButton:start\nexport async function receiveButton(event, ports) {\n  if (event?.type !== 'doorbell.pressed' || !event.residentId) {\n    throw new Error('Expected a doorbell press with a resident.');\n  }\n  // Finish recording before notifying; a failed recording must not send a push.\n  const recording = await createRecording(event, ports);\n  await notifyResident(recording, ports);\n  return {status: 'recorded-and-notified', recordingId: recording.id};\n}\n// flow:receiveButton:end"
+  },
+  "impacts": [
+    {
+      "diagramId": "doorbell-github",
+      "section": 0,
+      "sectionId": "Button press → saved recording → notification",
+      "kind": "step",
+      "targetId": "press",
+      "description": "The sample handler validates a doorbell.pressed event with a resident, then waits for recording before sending a notification.",
+      "referenceId": "receiveButton"
+    }
+  ]
+}

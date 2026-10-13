@@ -85,11 +85,16 @@ Optional consumer-owned placement lives only on the import:
 Both must be finite numbers in `[-100000,100000]`; translated member coordinates
 must also fit that range. Unknown placement fields fail validation. Without a
 position, blocks start at X=110 below existing parent nodes/floats, in declaration
-order. Dragging any imported node moves **all** nodes and incident edge previews
-and saves a position on that import, with one Undo/Redo. Internal structure stays
-read-only. Escape, blur, invalid placement or a source change during drag cancels
-without writing. Saved positions survive provider layout updates on explicit
-reload/reopen; the internal geometry is freshly derived around the same origin.
+order. Dragging the reference handle moves **all** imported nodes and their
+incident edge previews and saves a position on that import. Dragging one imported
+node saves a consumer-owned position override for that member. Imported nodes can
+also move in one selected group with other imported nodes or local free nodes;
+every movable member receives the same delta while locked local members stay put.
+Each completed drag is one Undo/Redo, and provider structure stays read-only.
+Escape, blur, invalid placement, a source change or a provider-context change
+during drag cancels without writing. Saved positions survive provider layout
+updates on explicit reload/reopen; the internal geometry is freshly derived
+around the same origin.
 
 An import-only parent may omit nodes/rows/edges. Its derived layout uses an empty
 row scaffold `[[]]` for renderer compatibility; imported IDs never enter rows.

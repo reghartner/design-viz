@@ -66,9 +66,9 @@ test('pilot setup keeps OFF default and bounds direct opt-in by local scope and 
     assert.doesNotMatch(prompt,/Pilot capture: OFF/);
   }
 });
-test('all pilot routes require permitted checkpoints and distinguish denied starts from later gaps',()=>{
+test('detailed pilot routes require permitted checkpoints and distinguish denied starts from later gaps',()=>{
   const fs=require('node:fs'),path=require('node:path');
-  const routes=['.claude/skills/hld-to-page/SKILL.md','.claude/skills/hld-to-page/references/pilot-capture.md',
+  const routes=['.claude/skills/hld-to-page/references/pilot-capture.md',
     'docs/folder-agent-existing-edit.md','docs/folder-agent-session.md']
     .map(file=>[file,fs.readFileSync(path.join(__dirname,'..',file),'utf8')]);
   const legacy={sessionId:'session',connectionId:'connection'};
@@ -88,12 +88,32 @@ test('all pilot routes require permitted checkpoints and distinguish denied star
     assert.doesNotMatch(text,/optional --after-turn|optional final-response copy|copy can be requested|leave capture unstarted/i,route);
   }
 });
+test('compact pilot router preserves the capture contract through its detailed reference',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const skill=fs.readFileSync(path.join(__dirname,'../.claude/skills/hld-to-page/SKILL.md'),'utf8');
+  assert.ok(skill.length<6000,'the skill remains a bounded entry router');
+  const router=skill.split('- **Pilot:**')[1].split('\n- **Source checkout:**')[0]
+    .replace(/[`*]/g,'').replace(/\s+/g,' ');
+  assert.match(router,/\[pilot capture\]\(references\/pilot-capture\.md\) before capture/);
+  assert.match(router,/helper inspection/);
+  assert.match(router,/OFF overrides saved consent/);
+  assert.match(router,/metadata-only --disable; no checkpoints\/native reads/);
+  assert.match(router,/consent again until later explicit opt-in/);
+  assert.match(router,/Direct ON is consent; stored ON is not/);
+  assert.match(router,/While opted in and permitted,[^.]*checkpoint at entry[^.]*each later turn start/);
+  assert.match(router,/run --after-turn immediately before every reply/);
+  assert.match(router,/Honor host safeguards:[^.]*never run\/bypass blocked operations/);
+  assert.match(router,/Missing consent\/scope or denied enrollment:[^.]*do not start; report unavailable\/denied/);
+  assert.match(router,/Later failures: retain captures and report gaps\/unverified replies/);
+  assert.match(router,/Claim stopped only after successful --disable/);
+  assert.match(router,/continue authoring/);
+});
 test('all pilot entry guidance honors explicit OFF before saved folder settings',()=>{
   const fs=require('node:fs'),path=require('node:path');
   for(const file of ['docs/folder-agent-existing-edit.md','.claude/skills/hld-to-page/SKILL.md','.claude/skills/hld-to-page/references/pilot-capture.md']){
     const guide=fs.readFileSync(path.join(__dirname,'..',file),'utf8').replace(/\s+/g,' ');
     assert.match(guide,/OFF/);assert.match(guide,/overrides/);
-    assert.match(guide,/do not run|Do not run/);assert.match(guide,/consent again/);
+    assert.match(guide,/do not run|Do not run|no checkpoints/);assert.match(guide,/consent again/);
     assert.match(guide,/later explicit|later.*explicit/);
   }
 });

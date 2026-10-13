@@ -66,20 +66,16 @@ After the packet, load a guide only for starting-material or handoff details:
   source/revision and atomic proposal/result protocol. Keep worksheet notes
   and questions in chat. Read [session details](../../../docs/local-agent-session.md)
   only for protocol uncertainty or recovery.
-- **Pilot:** explicit OFF overrides saved consent and enrollment: after folder
-  preparation run metadata-only `--disable`; do not run checkpoints, read native
-  transcripts or ask for consent again. Only later explicit opt-in changes OFF.
-  Directly pasted ON requests optional local capture; stored ON is not consent.
-  Read [pilot capture](references/pilot-capture.md) for scope, permissions and
-  ON/OFF handling before capture; inspecting the packaged helper is allowed.
-  While opted in and permitted, checkpoint at entry and at the start of every
-  later user turn; run `--after-turn` immediately before every reply, including
-  questions, approval waits, errors and completion. If enrollment lacks consent
-  or scope, or is denied, do not start it; report unavailable/denied. If a later
-  checkpoint or final copy is blocked or fails, retain existing captures and
-  report the gap or unverified final response. Claim capture stopped only after
-  successful metadata-only `--disable`. Do not run a blocked operation or bypass
-  host safeguards; continue authoring. See the reference for status handling.
+- **Pilot:** read [pilot capture](references/pilot-capture.md) before capture;
+  helper inspection is allowed. OFF overrides saved consent: after prepare run
+  metadata-only `--disable`; no checkpoints/native reads or asking for consent
+  again until later explicit opt-in. Direct ON is consent; stored ON is not.
+  While opted in and permitted, checkpoint at entry and each later turn start;
+  run `--after-turn` immediately before every reply. Honor host safeguards:
+  never run/bypass blocked operations. Missing consent/scope or denied enrollment:
+  do not start; report unavailable/denied. Later failures: retain captures and
+  report gaps/unverified replies. Claim stopped only after successful `--disable`;
+  continue authoring.
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.

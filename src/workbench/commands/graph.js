@@ -66,6 +66,26 @@ function planAddNode(text, raw, sectionIdx, preset){
   return {text: r2.text, start: r2.start, end: r2.end, kind: 'node', id: id};
 }
 
+function planAddTextBox(text,raw,sectionIdx){
+  var plan=planAddNode(text,raw,sectionIdx,{icon:'text',title:'Text'});
+  if(plan.error)return plan;
+  var next=JSON.parse(plan.text),got=builderDiagram(plan.text,next,sectionIdx);
+  var edit=jsonReplaceValue(plan.text,got.path.concat(['nodes',plan.id]),JSON.stringify({type:'text',text:'Type your text',textStyle:{fontSize:24,width:280,height:80}}));
+  return edit?Object.assign({},plan,edit):{error:'Could not create the text box.'};
+}
+function planEditTextBox(text,raw,sectionIdx,id,changes){
+  var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
+  var node=got.d.nodes && got.d.nodes[id];if(!node || node.type!=='text')return {error:'Text box not found.'};
+  changes=Object.assign({},changes);
+  if(changes.textStyle && typeof changes.textStyle==='object' && !Array.isArray(changes.textStyle)){
+    changes.textStyle=Object.assign({},changes.textStyle);
+    if(changes.textStyle.color==null || typeof changes.textStyle.color==='string' && !changes.textStyle.color.trim())delete changes.textStyle.color;
+  }
+  var next=Object.assign({},node,changes),errors=[];validateTextBox(next,'Text box',errors);
+  if(errors.length)return {error:errors.join('. ')};
+  return planSetFields(text,raw,got.path.concat(['nodes',id]),Object.keys(changes).map(function(key){return [key,JSON.stringify(changes[key])];}));
+}
+
 function builderImageTitle(filename){
   var name=typeof filename==='string'?filename.split(/[\\/]/).pop():'';
   name=name.replace(/\.(?:png|jpe?g|webp)$/i,'').replace(/[_-]+/g,' ').replace(/\s+/g,' ').trim();

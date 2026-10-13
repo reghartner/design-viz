@@ -595,7 +595,7 @@ body .docview .layout-has-attached-controls>.layout-docked-card>.termbar{
 .stepmode .edge.retm.lit{opacity:1; animation:dash20 1.2s linear infinite;}
 .stepmode .halo{opacity:.04;}
 .stepmode .pkt.loopdot{display:none;}
-.stepmode .node:not(.lit){opacity:var(--dv-dim, .45);}
+.stepmode .node:not(.lit):not(.node-text){opacity:var(--dv-dim, .45);}
 .stepmode .lbl{opacity:var(--dv-dim, .35);}
 .stepmode .lbl.lit{opacity:1;}
 .stepmode .coin:not(.lit){opacity:var(--dv-dim, .4);}
@@ -1132,7 +1132,7 @@ body.sk-editorial .sk-daylight .tint-mqtt,
 body.sk-editorial .sk-daylight .tint-dev{color:var(--ed-accent);}
 body.sk-editorial .halo{opacity:.035;}
 body.sk-editorial .pkt{filter:none !important;}
-body.sk-editorial .stepmode .node:not(.lit){opacity:var(--dv-dim, .64);}
+body.sk-editorial .stepmode .node:not(.lit):not(.node-text){opacity:var(--dv-dim, .64);}
 body.sk-editorial .stepmode .lbl{opacity:var(--dv-dim, .58);}
 body.sk-editorial .stepmode .lbl.lit{opacity:1;}
 body.sk-editorial .stepmode .edge:not(.lit){opacity:var(--dv-dim, .3);}

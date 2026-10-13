@@ -76,6 +76,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Copy/share steps across paths, converge after translation, continue an ending, or detach a shared step | `docs/workbench-step-reuse.md`; `docs/alternate-paths.md` for shared middle blocks and endings (reuse consecutive IDs, not copies; paths can split and rejoin again) |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
 | Add a Flowview/Mermaid graph onto an existing canvas | `docs/workbench-clipboard.md` → Add a diagram; preview the source section and counts, then merge graph-only with one Undo; local section/timeline dependencies and unresolved topology must be resolved first |
+| Plain text annotations on the diagram canvas, with fonts and formatting | Canvas text boxes below; executable `examples/text-boxes/text-boxes.spec.json` |
 | Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
 | Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |
@@ -318,6 +319,29 @@ new arithmetic, no new attributions.
   overflowing edge label gets shortened, not nudged.
 
 ## Graph placement and connection schema
+
+### Canvas text boxes
+
+Use an ordinary node with `type:"text"`, a plain `text` string (newlines allowed),
+and optional `textStyle`. Place it using the same float rules as other nodes.
+It retains selection, connections, grouping, copying and node identity, and stays
+readable outside the current step's focus. Authored hidden diagram views still
+hide it. Do not store HTML or combine a text box with image/handoff/detail content.
+
+`textStyle` supports `fontFamily` (IBM Plex Sans, IBM Plex Mono, Sora, Lora,
+Newsreader, Source Sans 3), `fontSize` (8–160), `width` (48–2000), `height`
+(32–2000, a minimum), boolean `bold`/`italic`/`underline`, six-digit hex `color`,
+and `align` (left/center/right). Defaults are 24px IBM Plex Sans, 280×80, theme
+color and left alignment. Height grows with wrapping. Omit color for the theme.
+Limits are 12,000 UTF-16 code units, 200 wrapped lines and 8,000 effective height;
+shorten text, reduce font size or widen the box if validation rejects it.
+
+Start from `examples/text-boxes/text-boxes.spec.json`. Humans use **Add → Text**,
+double-click/Enter for native multiline editing, Ctrl/Command+Enter to save,
+Escape to cancel, and Inspect for formatting. Drag the selected corner to resize;
+an unlocked box preserves the opposite corner, while a locked box preserves its
+center. Each completed operation is one Undo. See `docs/workbench-user-guide.md`
+for the human workflow; no full-contract preload is needed for this schema.
 
 For ordinary new-diagram authoring, follow the packet/workflow rule 12: use unpositioned
 floats and automatic connections, then run the bundled pure Node

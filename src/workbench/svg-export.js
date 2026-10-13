@@ -6,7 +6,7 @@ var SVG_EXPORT_STYLE_PROPERTIES=[
   'stroke-linejoin','stroke-miterlimit','marker-start','marker-mid','marker-end',
   'paint-order','vector-effect','shape-rendering','text-rendering','font-family',
   'font-size','font-style','font-weight','font-stretch','letter-spacing','word-spacing',
-  'text-anchor','dominant-baseline','alignment-baseline','filter','clip-path','mask'
+  'text-anchor','dominant-baseline','alignment-baseline','filter','clip-path','mask','text-decoration'
 ];
 var SVG_EXPORT_REMOVED_SELECTOR=[
   'script','foreignObject','image','audio','video','iframe','object','embed','style',
@@ -15,6 +15,7 @@ var SVG_EXPORT_REMOVED_SELECTOR=[
   '.dv-topology-handle','.dv-rowgrab','.dv-rowline','.dv-slotline',
   '.dv-position-lock-badge',
   '.nlink','.nbackref','.nrefs-trigger','.detail-trigger'
+  ,'.dv-text-resize','.dv-text-resize-preview','.text-box-hit'
 ].join(',');
 var SVG_EXPORT_EDITOR_CLASSES=/^(?:dv-(?:sel|instep|inserttarget|dragsrc|droptgt|ghost|ghostback|grabbing|position-locked|connect-(?:source|candidate|target|replaced)|free-edge-source|topology-boundary-drag)|view-focus)$/;
 

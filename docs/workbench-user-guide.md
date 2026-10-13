@@ -1,5 +1,17 @@
 # The human guide
 
+Choose **Add → Text** for a plain canvas text box in Diagram or Explore. Double-click
+the text, or focus it and press Enter, to edit using the normal text caret,
+selection and clipboard. Enter inserts a newline, Ctrl/Command+Enter saves,
+Escape cancels, and clicking away saves. Inspect offers bundled font families,
+font size, bold, italic, underline, text color, alignment and width. Drag the box
+to move it or its selected bottom-right corner to resize. Text wraps and the
+box grows vertically so all lines remain visible. Each edit or gesture has one
+Undo. Copy, duplicate, save and reopen preserve the text and formatting.
+Text boxes allow up to 12,000 characters, 200 wrapped lines and 8,000 units of
+height. A rejected edit leaves the saved source intact; shorten the text, reduce
+the font size or widen the box. Clearing Color restores the theme color.
+
 The workspace chapter explains top inspector actions, collapsed muted section
 headers, same-selection expansion retention, and group-scoped Apply controls.
 

@@ -930,6 +930,14 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
+    if(n.type==='text'){
+      var ts=textBoxStyle(n),tx=ts.align==='center'?p.w/2:ts.align==='right'?p.w-8:8;
+      s+='<g class="node node-text" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'" data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
+        '<rect class="text-box-hit" width="'+p.w+'" height="'+p.h+'" fill="transparent" pointer-events="all"/>'+
+        '<text xml:space="preserve" font-family="'+esc(ts.fontFamily)+'" font-size="'+ts.fontSize+'" font-weight="'+(ts.bold?'700':'400')+'" font-style="'+(ts.italic?'italic':'normal')+'" text-decoration="'+(ts.underline?'underline':'none')+'" fill="'+(ts.color || 'var(--dtext)')+'" text-anchor="'+({left:'start',center:'middle',right:'end'}[ts.align])+'">'+
+        textBoxLines(n).map(function(line,i){return '<tspan x="'+tx+'" y="'+(8+ts.fontSize+i*ts.fontSize*1.25)+'">'+esc(line)+'</tspan>';}).join('')+'</text></g>';
+      return;
+    }
     var nodeImage = !n.handoff && embeddedImageKind(n.image) ? n.image : null;
     var siblingPages = typeof n.title === 'string' &&
       Object.prototype.hasOwnProperty.call(backlinks || {}, n.title) ? backlinks[n.title] : [];

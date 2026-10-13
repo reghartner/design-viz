@@ -69,6 +69,8 @@ function initDiagramAddMenu(opts){
   }
   function invalidate(){if(dialog.open){invalid=true;paint(opts.context());}}
   life.listen(button,'click',open);
+  var textButton=doc.getElementById('add-text-box');
+  if(textButton)life.listen(textButton,'click',function(){confirm(function(){opts.addText();});});
   life.listen(target,'change',function(){
     var current=opts.context(),index=Number(target.value);
     if(invalid || !same(current)){invalid=true;paint(current);return;}

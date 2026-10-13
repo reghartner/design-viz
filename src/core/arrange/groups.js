@@ -10,7 +10,7 @@ function arrange(diagram,options){
   for(const id of ids){const group=nodes[id].group||null;add(direct,group,id);let g=group;while(g!=null&&!active.has(g)){active.add(g);g=parents[g]??null;}}
   for(const g of [...active].sort())add(children,parents[g]??null,g);
   function build(group){
-    const units=(direct.get(group)||[]).map(id=>({id:'node:'+id,width:150,height:44,members:[{id,x:0,y:0,width:150,height:44}]}));
+    const units=(direct.get(group)||[]).map(id=>{const size=nodes[id].type==='text'?textBoxSize(nodes[id]):{w:150,h:44};return {id:'node:'+id,width:size.w,height:size.h,members:[{id,x:0,y:0,width:size.w,height:size.h}]};});
     for(const child of children.get(group)||[]){const unit=build(child);units.push({...unit,id:'group:'+child});}
     units.sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
     const owner=new Map();units.forEach((unit,i)=>unit.members.forEach(p=>owner.set(p.id,i)));

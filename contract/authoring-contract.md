@@ -1,5 +1,21 @@
 # Flowspec authoring contract
 
+Canvas annotations are ordinary nodes with `type: "text"` and a plain `text`
+string (including newlines). Place them in `floats` for free canvas positioning;
+they retain normal node selection, connections, grouping and clipboard behavior.
+Optional `textStyle` controls `fontFamily` (IBM Plex Sans, IBM Plex Mono, Sora,
+Lora, Newsreader or Source Sans 3), `fontSize` (8–160), `width` (48–2000),
+`height` (32–2000, a minimum), boolean `bold`, `italic`, `underline`, six-digit
+hex `color`, and `align` (left/center/right). Defaults are IBM Plex Sans 24px,
+280×80, theme text color and left alignment. Wrapping is deterministic; height
+grows to show all lines. Content is always escaped plain text, never HTML.
+Each box permits at most 12,000 UTF-16 code units, 200 wrapped lines, and 8,000
+units of effective height. Validation rejects over-budget content or styles;
+reduce text/font size or widen the box. Direct rendering of invalid input stays
+bounded and marks truncated text with an ellipsis. Clearing the inspector color
+removes the explicit color and restores the theme color.
+See `examples/text-boxes/text-boxes.spec.json` for a complete example.
+
 You are producing a **flowspec**: one JSON document that a rendering template
 ("Flowview") turns into an interactive technical-documentation page — a page
 title, tabbed groups of content, accent-colored sections with prose and bullets,

@@ -451,6 +451,7 @@ function deltaControls(val){
   }
 
 function nodeForm(val, ctx){
+    if(val.type==='text')return textBoxForm(val);
     var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
     var floatSide = '',floatEntry=null;
@@ -508,6 +509,34 @@ function nodeForm(val, ctx){
       frow('delta (change marker)', checkboxControl(val.delta === true, function(on){ return commitSimple('delta', on ? 'true' : null); })),
       deltaControls(val)
     ],[handoffControls(val),detailControls(val,ctx)],catalogControls(val),[frow('Code references JSON',jsonFieldControl('codeRefs',val.codeRefs,'jsonArr'))]);
+  }
+
+function textBoxForm(val){
+    var t=session.target,style=textBoxStyle(val);
+    function edit(changes){return commitCascade(function(raw){return planEditTextBox(session.text(),raw,t.section,t.id,changes);});}
+    function format(key,value){
+      var parsed=parseEditor();if(parsed.error)return false;
+      var got=builderDiagram(session.text(),parsed.raw,t.section);if(got.error)return false;
+      var accepted=edit({textStyle:Object.assign({},got.d.nodes[t.id].textStyle || {},{[key]:value})});
+      if(accepted && key==='color')refreshFormSoon();
+      return accepted;
+    }
+    var area=document.createElement('textarea');area.className='fctl';area.rows=5;area.value=val.text;
+    commitOnChange(area,null,function(value){return edit({text:value});});
+    var rows=[frow('Text',area),frow('Font',selectControl(TEXT_BOX_FONTS,style.fontFamily,function(v){return format('fontFamily',v);})),
+      frow('Font size',numberControl(style.fontSize,function(v){return format('fontSize',v);})),
+      frow('Bold',checkboxControl(style.bold,function(v){return format('bold',v);})),
+      frow('Italic',checkboxControl(style.italic,function(v){return format('italic',v);})),
+      frow('Underline',checkboxControl(style.underline,function(v){return format('underline',v);})),
+      frow('Alignment',selectControl(['left','center','right'],style.align,function(v){return format('align',v);})),
+      frow('Width',numberControl(style.width,function(v){return format('width',v);})),
+      frow('Minimum height',numberControl(style.height,function(v){return format('height',v);})),
+      frow('Color',textControl(style.color,function(v){return format('color',v);},{placeholder:'#336699 (blank uses theme)'}))];
+    var color=document.createElement('input');color.type='color';color.className='fctl';color.value=style.color || '#334155';
+    commitOnChange(color,null,function(v){return format('color',v);});rows.push(frow('Choose color',color));
+    var hint=document.createElement('p');hint.className='fnote';hint.textContent='Double-click text on the canvas (or focus it and press Enter) to type. Enter adds a line; Ctrl/⌘+Enter saves; Escape cancels. Drag the corner to resize. Height grows to fit all text.';rows.push(hint);
+    rows.forEach(function(row){var label=row.querySelector('.flab'),control=row.querySelector('input,select,textarea');if(label && control)control.setAttribute('aria-label',label.textContent);});
+    return rows;
   }
 
 function handoffControls(val){
@@ -2453,6 +2482,7 @@ function renderInspector(){
     try{if(!parsed.error && session.resolve)resolved=session.resolve(parsed.raw);}catch(ex){}
     var resolvedPath=!parsed.error?builderTargetPath(resolved,t):null;
     var resolvedValue=resolvedPath?specValueAt(resolved,resolvedPath):null;
+    if(t.kind==='node' && resolvedValue && resolvedValue.type==='text')head.textContent='Text box';
     var resolvedRec=!parsed.error?specSectionPaths(resolved)[t.section]:null;
     var resolvedDiagram=resolvedRec?specValueAt(resolved,resolvedRec.diagram):null;
     var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(resolvedDiagram,
@@ -2575,7 +2605,7 @@ function renderInspector(){
         connectButton.className+=' node-connect-button';
         connectButton.title='Alt/Option-click a node, then click its destination. Escape cancels.';
         acts.appendChild(connectButton);
-        if(!val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
+        if(val.type!=='text' && !val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
           commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
             {after:function(plan){
               session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;

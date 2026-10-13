@@ -246,7 +246,8 @@ function layout(spec){
       var cx = f.noSpread===true ? f.x : xs[spreadIndex++] + (typeof f.dx === 'number' ? f.dx : 0);
       var cy = fy + (typeof f.dy === 'number' ? f.dy : 0);
       if(positionedFloat(f)){cx=f.x;cy=f.y;}
-      pos[f.id] = {cx:cx, cy:cy, w:150, h:FLOAT_H, row:-1, flow:-1, stack:false, float:true};
+      var floatSize=spec.nodes[f.id] && spec.nodes[f.id].type==='text'?textBoxSize(spec.nodes[f.id]):{w:150,h:FLOAT_H};
+      pos[f.id] = {cx:cx, cy:cy, w:floatSize.w, h:floatSize.h, row:-1, flow:-1, stack:false, float:true};
       if(positionedFloat(f))pos[f.id].free=true;
     });
   });
@@ -264,14 +265,19 @@ function layout(spec){
     });
     var insertX=existingRight+160,occupied=Object.keys(pos).map(function(id){return pos[id];});
     inserted.forEach(function(f){
-      var y=42+FLOAT_H/2;
+      var size=spec.nodes[f.id] && spec.nodes[f.id].type==='text'?textBoxSize(spec.nodes[f.id]):{w:150,h:FLOAT_H};
+      var y=42+size.h/2;
       while(occupied.some(function(p){
-        return Math.abs(insertX-p.cx)<(150+p.w)/2+24 && Math.abs(y-p.cy)<(FLOAT_H+p.h)/2+24;
-      }))y+=FLOAT_H+40;
-      pos[f.id]={cx:insertX,cy:y,w:150,h:FLOAT_H,row:-1,flow:-1,stack:false,float:true};
+        return Math.abs(insertX-p.cx)<(size.w+p.w)/2+24 && Math.abs(y-p.cy)<(size.h+p.h)/2+24;
+      }))y+=size.h+40;
+      pos[f.id]={cx:insertX,cy:y,w:size.w,h:size.h,row:-1,flow:-1,stack:false,float:true};
       occupied.push(pos[f.id]);
     });
   }
+
+  Object.keys(pos).forEach(function(id){
+    var node=spec.nodes[id];if(node && node.type==='text'){var size=textBoxSize(node);pos[id].w=size.w;pos[id].h=size.h;}
+  });
 
   /* group bounding boxes over member node positions */
   var groupBoxes = Object.create(null);
@@ -319,6 +325,11 @@ function layout(spec){
      a float member's row) — widen the drawable area instead of clipping.
      Flat specs keep vb = {0, 0, W, H}, so their markup stays identical. */
   var vbX = 0, vbY = 0, vbR = W;
+  Object.keys(pos).forEach(function(id){
+    if(!spec.nodes[id] || spec.nodes[id].type!=='text')return;
+    var p=pos[id];vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);
+    vbR=Math.max(vbR,p.cx+p.w/2+24);H=Math.max(H,p.cy+p.h/2+24);
+  });
   floats.forEach(function(f){
     var p=f && pos[f.id];if(!p || !positionedFloat(f) && f.noSpread!==true)return;
     vbX=Math.min(vbX,p.cx-p.w/2-24);vbY=Math.min(vbY,p.cy-p.h/2-24);

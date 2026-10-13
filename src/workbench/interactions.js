@@ -26,12 +26,21 @@ function createBuilderInteractions(opts){
       session.target={section:section,kind:'edge',index:index};rehighlight();renderInspector();
     }});
   life.own(function(){curveEditor.destroy();});
+  var textEditor=createTextBoxEditor({view:view,document:document,window:window,src:src,session:session,
+    disabled:function(){return !!(addToStep || connect) || opts.isActive && !opts.isActive();},pause:pausePreview,
+    commit:function(plan,snapshot,section,id){
+      if(plan.error){inspectorMessage(plan.error);return;}
+      if(!session.accept(plan,{snapshot:snapshot,beforePublish:clearMultiSelect}))return;
+      session.target={section:section,kind:'node',id:id};rehighlight();renderInspector();
+    }});
+  life.own(function(){textEditor.destroy();});
   function selectionChanged(){if(opts.selectionChanged)opts.selectionChanged();if(spatial)spatial.sync();}
   function setSelected(el){
     if (selectedEl) selectedEl.classList.remove('dv-sel');
     selectedEl = el || null;
     if (selectedEl) selectedEl.classList.add('dv-sel');
     curveEditor.refresh(selectedEl);
+    textEditor.refresh(selectedEl);
     selectionChanged();
   }
 
@@ -1671,6 +1680,7 @@ function createBuilderInteractions(opts){
   life.listen(src,'input',function(){if(connect)cancelConnect('Connection cancelled — the source changed.');});
   life.listen(window,'blur',function(){if(connect)cancelConnect('Connection cancelled');});
   function beforeReplace(request){
+    textEditor.clear();
     var retention=request && request.retention || {};
     cancelGestures();
     if(!retention.multi && multiSel.length){clearMultiSelect();dropMultiUI();}
@@ -1679,6 +1689,7 @@ function createBuilderInteractions(opts){
     setSelected(null);
   }
   function retire(){
+    textEditor.clear();
     curveEditor.clear();
     cancelGestures();clearConnectChrome();addToStep=null;connect=null;clipboardHomeTarget=null;suppressClick=false;
     if(buildRow)buildRow.classList.remove('dv-connectmode');

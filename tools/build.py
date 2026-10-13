@@ -10,10 +10,13 @@ The source loader owns entrypoint expansion, exports and asset inventory.
 Deterministic: same src -> byte-identical output. Run from anywhere.
 """
 import argparse
+import html
 import json
+import os
 import pathlib
 import sys
 import subprocess
+import urllib.parse
 try:
     from folder_agent_kit import folder_agent_kit
 except ModuleNotFoundError:
@@ -119,6 +122,38 @@ def workbench_landing(config=None, *, no_config=False, runtime=None) -> str:
         raise SystemExit(f'Invalid site config {path}: {error}') from error
 
 
+UPSTREAM_REPOSITORY = 'https://github.com/reghartner/design-viz'
+SKILL_PATH = '/.claude/skills/hld-to-page/SKILL.md'
+
+
+@lru_cache(maxsize=None)
+def company() -> dict:
+    """Fork identity from company/company.json; the source loader validates it."""
+    return json.loads(loader('--company')) or {}
+
+
+def company_markers() -> dict:
+    """Workbench skeleton values. Without company config they equal upstream's."""
+    config = company()
+    repository = config.get('repository') or UPSTREAM_REPOSITORY
+    revision = config.get('revision') or 'main'
+    return {key: html.escape(value, quote=True) for key, value in {
+        'COMPANY_REPOSITORY': repository,
+        'COMPANY_REVISION': revision,
+        'COMPANY_SKILL_URL': repository + '/blob/' + urllib.parse.quote(revision, safe='') + SKILL_PATH,
+    }.items()}
+
+
+def human_guide() -> str:
+    """The user guide names the same company labels as the workbench."""
+    guide = read('workbench/human-guide.html')
+    name = company().get('companyName')
+    if name:
+        for label in ('Company service', 'Company repository'):
+            guide = guide.replace(label, html.escape(name) + label[len('Company'):])
+    return guide
+
+
 def read(name: str) -> str:
     return (SRC / name).read_text()
 
@@ -182,8 +217,11 @@ def main() -> int:
     parser.add_argument("--runtime-only", action="store_true", help="build packaged backend and measurement runtimes only")
     config = parser.add_mutually_exclusive_group()
     config.add_argument('--config', type=pathlib.Path, help='company site JSON; spec paths resolve relative to this file')
-    config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json')
+    config.add_argument('--no-config', action='store_true', help='build the upstream sample, ignoring workbench/site.json and company/company.json')
     args = parser.parse_args()
+    if args.no_config:
+        # Every loader subprocess (and the kit's arrangement tool) inherits this.
+        os.environ['FLOWVIEW_COMPANY_IDENTITY'] = 'off'
     if args.runtime_only and args.config is not None:
         parser.error('--config requires an HTML build')
     runtime = canon_runtime()
@@ -215,7 +253,8 @@ def main() -> int:
             mapping['WORKBENCH_CANON'] = workbench_canon()
             mapping['WORKBENCH_ONBOARDING'] = json.dumps(json.loads(read('starters/onboarding.json')), ensure_ascii=True).replace('<', '\\u003c')
             mapping['WORKBENCH_LANDING'] = landing
-            mapping['HUMAN_GUIDE'] = read('workbench/human-guide.html')
+            mapping['HUMAN_GUIDE'] = human_guide()
+            mapping.update(company_markers())
             mapping['FOLDER_AGENT_KIT'] = folder_agent_kit(ROOT, runtime)
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(fill(read(skeleton), mapping))

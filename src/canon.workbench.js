@@ -4,7 +4,7 @@ function initCanonWorkbench(opts){
   var context={catalog:null,revision:null}, catalogPriority=0, host=document.querySelector('#editor-company') || document.querySelector('.workspace-tools');
   if(!host) return context;
   var details=document.createElement('details');details.className='canon-tools';
-  var summary=document.createElement('summary');summary.textContent='Company repository';details.appendChild(summary);
+  var summary=document.createElement('summary');summary.textContent=/*@company:name*/'Company repository';details.appendChild(summary);
   var status=document.createElement('p');status.setAttribute('role','status');status.textContent='Service and API choices come from the catalog bundled with this editor.';details.appendChild(status);
   var label=document.createElement('label');label.textContent='Catalog JSON';
   var input=document.createElement('textarea'),inputDirty=false;input.rows=4;input.setAttribute('aria-label','Catalog JSON');label.appendChild(input);details.appendChild(label);
@@ -68,7 +68,7 @@ function initCanonWorkbench(opts){
     }catch(e){status.textContent=e.message;}finally{save.disabled=!attached;}
   });save.disabled=true;
   fetch('/api/canon/context?id='+encodeURIComponent(id)+(review?'&review='+encodeURIComponent(review):''))
-    .then(function(r){if(!r.ok)throw new Error('Company repository unavailable. Use the local portal or import a catalog snapshot.');return r.json();})
+    .then(function(r){if(!r.ok)throw new Error(/*@company:name*/'Company repository unavailable. Use the local portal or import a catalog snapshot.');return r.json();})
     .then(function(data){if(!attached)return;acceptCatalog(data.catalog,1,'company context');context.revision=data.revision;context.topologyContext=data.topologyContext;opts.loadSpec(data.source || data.spec,data.topologyContext);status.textContent=(data.simulated?'SIMULATED · ':'')+id+' · changes are submitted for review.';save.disabled=false;})
     .catch(function(e){if(!attached)return;status.textContent=e.message;details.open=true;});
   return context;

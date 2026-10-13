@@ -113,6 +113,14 @@ Backstage app repository pins and upgrades that dependency through its own PR.
 Configure the `@flowview` registry/authentication in your normal package-manager
 configuration. This repository's build does not publish to any registry.
 
+Pack or publish with `node tools/backstage-pack.mjs pack|publish [npm options]`
+to stamp the fork's package identity without editing `package.json`: the
+package's `repository.url` comes from `FLOWVIEW_PACKAGE_REPOSITORY_URL`, then
+`package.repositoryUrl` or `repository` in `company/company.json`, and
+`publishConfig.registry` from `FLOWVIEW_PACKAGE_REGISTRY`, then
+`package.registry`. Without either, the command is `npm pack|publish` for this
+package. See [company forks](../../docs/company-overlay.md#package-identity).
+
 The package ships prebuilt JavaScript and bundled declarations. Consumers do not
 compile or lint Flowview source, enable `allowJs`, or edit files in the installed
 package. Both ESM and CommonJS entry points have matching declaration exports.

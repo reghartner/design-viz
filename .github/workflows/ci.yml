@@ -131,7 +131,9 @@ jobs:
       - name: Pack the reviewed release without rebuilding on install
         run: |
           mkdir -p release
-          npm pack --ignore-scripts --pack-destination release
+          # Same as npm pack here unless company/company.json or the
+          # FLOWVIEW_PACKAGE_* variables set a fork's package identity.
+          node ../../tools/backstage-pack.mjs pack --ignore-scripts --pack-destination release
       - uses: actions/upload-artifact@v4
         with:
           name: backstage-plugin-package

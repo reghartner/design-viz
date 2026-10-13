@@ -9,7 +9,7 @@ every fork customization in files that upstream never ships or edits.
 
 | Path | Owner | Notes |
 |---|---|---|
-| `company/**` except `company/README.md` | Fork | Upstream ships only `company/README.md` in this directory and never adds or edits other files here. Do not edit the README; add files beside it. |
+| `company/**` except `company/README.md` | Fork | Upstream ships only `company/README.md` in this directory and never adds or edits other files here. Do not edit the README; add files beside it. Includes `company/company.json` (name, repository, brand, package identity). |
 | `workbench/site.json` | Fork | Optional company landing page; upstream ships only `workbench/site.example.json`. See [the workbench landing](homepage-example.md). |
 | `canon.json`, `diagrams/**` | Fork | Company diagram membership and diagram folders. |
 | Everything else | Upstream | Avoid edits; each one is a future integration conflict. |
@@ -103,6 +103,65 @@ including a contract fragment for each type.
 Keep fork release notes in `company/CHANGELOG.md`. Do not add entries to
 upstream's `CHANGELOG.md`; every upstream entry would conflict with them.
 
+## Company identity
+
+Put the fork's name, repository and brand in `company/company.json`. The build
+reads it through `tools/source-loader.cjs` (`node tools/source-loader.cjs
+--company` prints the validated values) and fails with the field to fix when a
+value is invalid. Every field except `version` is optional.
+
+```json
+{
+  "version": 1,
+  "companyName": "Acme",
+  "repository": "https://github.com/acme/design-viz",
+  "revision": "main",
+  "brand": "brand.json",
+  "package": {
+    "repositoryUrl": "git+https://github.com/acme/design-viz.git",
+    "registry": "https://npm.acme.example/"
+  }
+}
+```
+
+| Field | Used for | Without it |
+|---|---|---|
+| `companyName` | The workbench labels **Company repository** (File menu), its unavailable-catalog error, the imported snapshot origin and **Company service** (node inspector, onboarding tour, user guide) become **Acme repository** and **Acme service**. | "Company" |
+| `repository` | The header GitHub link, the welcome form's repository field, the **Read the authoring skill** link, the repository-root example in its validation message, and the reader-tour guide link in the inspector. An `https://` repository root; a trailing `.git` is removed. | `https://github.com/reghartner/design-viz` (the example message keeps `https://github.com/your-team/design-viz`) |
+| `revision` | The branch in the authoring-skill and tour-guide links and the welcome form's revision field. | `main` |
+| `brand` | A brand file path inside `company/`, relative to `company.json`, with `companyName`, `logo`, `primaryColor` and `secondaryColor` (the fields of `src/company-brand.config.js`). `logo` is a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative path (inside `company/`) to a PNG/JPEG/WebP file of up to 512 KiB that the build embeds. The brand's `companyName` defaults to the top-level `companyName`. Every viewer, the workbench and the validator runtime use it as the global brand. | The placeholders in `src/company-brand.config.js` |
+| `package` | Backstage package identity; see below. | Upstream `package.json` values |
+
+The values replace marked text at build time: sources mark each literal with
+`/*@company:name*/`, `/*@company:repository*/` or
+`/*@company:example-repository*/`, and `src/workbench.skel.html` uses
+`{{COMPANY_REPOSITORY}}`, `{{COMPANY_REVISION}}` and `{{COMPANY_SKILL_URL}}`.
+Without `company.json`, the build emits the upstream text, so the generated
+viewer, workbench and runtime are byte-identical to a build without this
+feature. `python3 tools/build.py --no-config` ignores `company.json` as well as
+`workbench/site.json`; the browser contracts build that way and set
+`FLOWVIEW_COMPANY_IDENTITY=off` so they keep asserting upstream labels.
+
+## Package identity
+
+`node tools/backstage-pack.mjs pack|publish [npm options]` packs or publishes
+`apps/backstage` with the fork's identity, without editing
+`apps/backstage/package.json`:
+
+- `repository.url`: `FLOWVIEW_PACKAGE_REPOSITORY_URL`, else
+  `package.repositoryUrl`, else `git+<repository>.git` from `company.json`.
+- `publishConfig.registry`: `FLOWVIEW_PACKAGE_REGISTRY`, else
+  `package.registry`.
+
+npm always runs with `apps/backstage` as its working directory, so that
+folder's `.npmrc` (for example registry authentication) applies in both modes.
+With neither value the command runs `npm pack` or `npm publish` for the package
+with the same options. With a value it builds once (unless `--ignore-scripts`),
+copies exactly the files npm would pack into a staging folder with the adjusted
+`package.json`, and runs `npm pack|publish <staging folder> --ignore-scripts`.
+A relative `--pack-destination` resolves from the current directory, which is
+also the default. The CI `backstage-plugin` job packs the release this way.
+
 ## Verifying a fork
 
 `tests/company-overlay-fixture.test.js` builds a copy of the checkout with the
@@ -111,4 +170,6 @@ module, a contract fragment, an example folder, Node and Python tests and a
 release note). It checks that the build, validation, the folder-agent kit,
 `widget_doc`, authoring packets and both test runners pick the overlay up while
 every upstream-owned file stays byte-identical. Copy that fixture as a starting
-point for a real overlay.
+point for a real overlay. `tests/company-identity.test.js` does the same for a
+`company.json` with a name, repository and brand, and
+`tests/backstage-pack.test.js` for package identity.

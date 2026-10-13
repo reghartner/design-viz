@@ -10,7 +10,7 @@ function welcomeRepository(raw, revision){
     return {error:'Use an HTTPS repository URL without credentials, a query, or a fragment.'};
   var path = url.pathname.replace(/\/+$/, '').replace(/\.git$/, '');
   if (path.split('/').filter(Boolean).length !== 2)
-    return {error:'Use the repository root, such as https://github.com/your-team/design-viz.'};
+    return {error:/*@company:example-repository*/'Use the repository root, such as https://github.com/your-team/design-viz.'};
   revision = String(revision || '').trim();
   if (!revision || /[\s?#]/.test(revision)) return {error:'Enter a branch, tag, or commit without spaces, ? or #.'};
   var repository = url.origin + path;

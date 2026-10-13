@@ -48,7 +48,7 @@ function builderOutline(raw, query){
     sectionContracts(sec).forEach(function(rec){
       add('contract',rec.value.title || 'On the wire',{card:rec.key});
     });
-    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || id) + ' · ' + id, {id: id}); });
+    Object.keys(d.nodes || {}).forEach(function(id){ add('node', ((d.nodes[id] || {}).title || (d.nodes[id] || {}).text || id) + ' · ' + id, {id: id}); });
     Object.keys(d.groups || {}).forEach(function(id){ add('group', ((d.groups[id] || {}).title || id) + ' · ' + id, {id: id}); });
     (Array.isArray(d.edges) ? d.edges : []).forEach(function(e, index){
       if (e) add('edge', e.from + ' → ' + e.to + (e.label ? ' · ' + e.label : ''), {index: index});
@@ -1043,6 +1043,7 @@ function initWorkbenchBuilder(opts){
     if(kind==='para' || kind==='bullet')revealProseTarget(identity);
     selectRange(plan);
     if(kind==='para' || kind==='bullet')inspector.focusProse();
+    return el;
   }
   var addButtons = {
     'add-step': ['step', planAddStep],
@@ -1177,6 +1178,12 @@ function initWorkbenchBuilder(opts){
   var diagramImportBtn=document.getElementById('add-diagram-import');
   if(diagramImportBtn)life.listen(diagramImportBtn,'click',function(){confirmAddition(function(){if(diagramImport)diagramImport.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
+    addText:function(){
+      var el=runInsert('node',function(text,raw,si){return planAddTextBox(text,raw,si);});
+      var board=el && el.closest('.board');if(!board)return;
+      var fit=board.classList.contains('explore-board')?document.getElementById('workspace-fit-selection'):board.querySelector('[aria-label="Fit diagram"]');
+      if(fit && !fit.disabled)fit.click();
+    },
     addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
     chooseSection:function(index){
       var parsed=parseEditor();if(parsed.error || interactions.adding() || interactions.connecting())return;

@@ -13,6 +13,7 @@
     "core/state.js",
     "core/visibility-evidence.js",
     "core/geometry.js",
+    "core/text-box.js",
     "core/details.js",
     "core/tab-views.js",
     "core/handoffs.js",
@@ -96,6 +97,7 @@
     "workbench/auto-arrange.js",
     "workbench/edge-curves.js",
     "workbench/shortcuts.js",
+    "workbench/text-boxes.js",
     "workbench/spatial-selection.js",
     "workbench/interactions.js",
     "workbench/add-menu.js",
@@ -277,6 +279,7 @@
     "iconLibrary": "icons/library.js",
     "autoArrangeWorker": [
       "core/geometry.js",
+      "core/text-box.js",
       "core/arrange/placement.js",
       "core/arrange/routing.js",
       "core/arrange/graph.js",

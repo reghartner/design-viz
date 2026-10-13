@@ -1092,6 +1092,12 @@ body.sk-aurora.sk-blueprint{
 .dv-curve-hit{fill:none;stroke:transparent;stroke-width:16;pointer-events:stroke;cursor:grab;vector-effect:non-scaling-stroke;}
 .dv-curve-point{fill:var(--bg,#fff);stroke:var(--accent,#448aff);stroke-width:2;cursor:grab;pointer-events:all;vector-effect:non-scaling-stroke;}
 .dv-curve-point:focus{outline:none;stroke-width:4;}
+.node-text.dv-sel>.text-box-hit,.node-text:focus>.text-box-hit{stroke:var(--accent,#448aff);stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke;}
+.node-text:focus{outline:none;}
+.dv-text-editing>text{visibility:hidden;}
+.dv-text-editor{overflow:visible;}
+.dv-text-resize{fill:var(--accent,#448aff);stroke:white;stroke-width:1;cursor:nwse-resize;pointer-events:all;vector-effect:non-scaling-stroke;}
+.dv-text-resize-preview{fill:none;stroke:var(--accent,#448aff);stroke-width:2;stroke-dasharray:5 3;pointer-events:none;vector-effect:non-scaling-stroke;}
 .dv-connect-preview{pointer-events:none;}
 .dv-connect-line{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-dasharray:6 4;}
 .dv-connect-arrow{fill:var(--accent);}

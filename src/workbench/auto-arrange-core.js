@@ -12,7 +12,7 @@ function autoArrangeInput(d){
 function autoArrangeCandidates(d,options){
   var ids=autoArrangeInput(d);options=FlowArrangeGraph.optionsChecked(options || {});
   var result=ids.some(function(id){return !!d.nodes[id].group;})?FlowArrangeGroups.arrange(d,options):
-    FlowArrangeGraph.arrangeGraph({nodes:ids.map(function(id){return {id:id,width:150,height:44};}),edges:d.edges || []},options);
+    FlowArrangeGraph.arrangeGraph({nodes:ids.map(function(id){var node=d.nodes[id],textBox=node.type==='text' && (Object.prototype.hasOwnProperty.call(node,'text') || Object.prototype.hasOwnProperty.call(node,'textStyle')),size=textBox?textBoxSize(node):{w:150,h:44};return {id:id,width:size.w,height:size.h};}),edges:d.edges || []},options);
   if(ids.some(function(id){return d.nodes[id].locked===true;}))result=autoArrangeAroundLocked(d,result);
   if(result.metrics.cardIntrusions)throw new Error('Some connections could not be routed clear of nodes. The source is unchanged.');
   if(!validGraphFrame(result.frame) || result.edges.some(function(e){return !validCurveControls(e.curveControls) || !validEdgePort(e.fromPort) || !validEdgePort(e.toPort);}))

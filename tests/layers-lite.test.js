@@ -76,6 +76,14 @@ test('auto arrange preserves visible pins, routes around them, and is one undoab
  assert.equal(C.planAutoArrange(JSON.stringify(all),all,0,{}).noop,true);
 });
 
+test('auto arrange measures a locked text box, preserves its center, and clears movable nodes around it',()=>{
+ const raw=fixture(),d=diagram(raw);d.nodes.r.locked=true;d.nodes.r.textStyle={width:420,height:120};
+ d.rows=[[]];d.floats=[{id:'r',x:500,y:260,noSpread:true},{id:'x',x:520,y:260,noSpread:true}];d.edges=[];
+ const result=C.autoArrangeCandidates(d,{restarts:1,iterations:100}),positions=Object.fromEntries(result.positions.map(p=>[p.id,p]));
+ assert.deepEqual({x:positions.r.x,y:positions.r.y,width:positions.r.width,height:positions.r.height},{x:500,y:260,width:420,height:120});
+ assert.ok(Math.abs(positions.x.x-positions.r.x)>=(positions.x.width+positions.r.width)/2+24 || Math.abs(positions.x.y-positions.r.y)>=(positions.x.height+positions.r.height)/2+24);
+});
+
 test('locked validates as boolean and lock affordance is Workbench/export scoped',()=>{
  const raw=fixture();diagram(raw).nodes.a.locked='yes';
  const findings=C.validate(C.normalize(raw));assert.ok(findings.warnings.some(w=>w.includes('.nodes.a.locked: must be true or false')));

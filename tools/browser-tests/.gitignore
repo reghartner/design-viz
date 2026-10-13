@@ -1,5 +1,10 @@
 /test-results/
 /playwright-report/
 /report.json
+/blob-report/
+/all-blob-reports/
+/merged-html-report/
+/merged-report.json
+/shard-results/
 
 /test-results-*/

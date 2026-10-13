@@ -19,9 +19,16 @@ npm test --prefix tools/browser-tests
 On Linux, install Chromium and its system dependencies with
 `npm exec --prefix tools/browser-tests -- playwright install --with-deps chromium`.
 Changing the pinned Playwright version requires its matching browser download and
-a full contract run. There are no retries or missing-browser skips. The
-`browser-contracts` CI job runs on every pull request and main push alongside the
-existing pure, build and host checks; merge only after this job passes too.
+a full contract run. There are no retries or missing-browser skips. Twelve isolated
+`browser-contract-shards` CI jobs run on every pull request and main push. CI uses
+Playwright's test-level sharding to keep large spec files from becoming
+indivisible long poles, while every shard retains one worker because its
+checkout's generated fixtures share fixed paths. Each job explicitly selects Node
+24 and installs the Chromium build pinned by Playwright 1.63.0's lockfile.
+`fail-fast` is disabled so failures do not discard other shards' diagnostics.
+The stable `browser-contracts` job merges their blob reports, uploads the merged
+HTML/JSON plus each shard's traces and screenshots, and fails unless every shard
+passed; use that aggregate as the required check.
 
 ## What runs
 
@@ -77,6 +84,10 @@ Reports stay in ignored `playwright-report/`, `test-results/` and `report.json`.
 A failed case retains its trace, screenshots (including extra pages) and strict
 browser audit. CI uploads these results even on failure. A launch failure has no
 page to screenshot and is reported as a global setup error.
+
+The ordinary local command above remains serialized and writes the usual HTML and
+JSON reports. `playwright.ci.config.mjs` is reserved for isolated CI checkouts and
+writes a mergeable blob report instead.
 
 ```sh
 npm exec --prefix tools/browser-tests -- playwright show-report tools/browser-tests/playwright-report

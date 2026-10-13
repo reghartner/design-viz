@@ -117,7 +117,7 @@ function harness(d=fixture()){
     const e={children:[],style:{setProperty(k,v){this[k]=v;}},
       classList:{add:k=>classes.add(k),remove:k=>classes.delete(k),contains:k=>classes.has(k),toggle(k,on){if(on)classes.add(k);else classes.delete(k);}},
       appendChild(n){this.children.push(n);n.parentNode=this;return n;},removeChild(n){this.children.splice(this.children.indexOf(n),1);},
-      setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,
+      setAttribute(k,v){attrs[k]=String(v);},getAttribute:k=>attrs[k]??null,removeAttribute(k){delete attrs[k];},
       addEventListener(k,fn){(events[k]??=[]).push(fn);},fire(k){(events[k]||[]).forEach(fn=>fn({stopPropagation(){}}));},
       dispatchEvent(event){if(event.type==='dv:pathchange')navigation.push(event.type);},
       querySelectorAll(selector){return descendants(this).filter(n=>selector[0]==='.' && n.classList.contains(selector.slice(1)));},

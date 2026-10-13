@@ -16,7 +16,7 @@ function element(){
     appendChild(el){ if(el.parentNode) el.parentNode.removeChild(el); this.children.push(el); el.parentNode=this; return el; },
     insertBefore(el,before){ if(el.parentNode) el.parentNode.removeChild(el); this.children.splice(this.children.indexOf(before),0,el); el.parentNode=this; return el; },
     removeChild(el){ this.children=this.children.filter(child=>child!==el); el.parentNode=null; },
-    setAttribute(k,v){ attrs[k]=String(v); }, getAttribute:k=>attrs[k] ?? null,
+    setAttribute(k,v){ attrs[k]=String(v); }, getAttribute:k=>attrs[k] ?? null, removeAttribute(k){ delete attrs[k]; },
     querySelectorAll(){ return []; }, getBoundingClientRect(){ return {left:0,top:0,width:100,height:20}; },
     cloneNode(){ return element(); },
     dispatchEvent(){},

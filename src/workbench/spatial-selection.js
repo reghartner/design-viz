@@ -65,6 +65,19 @@ function createBuilderSpatialSelection(opts){
     sync();
   }
   function candidates(shell){return Array.from(shell.querySelectorAll('.boardcanvas [data-dv-node],.explore-canvas-objects [data-explore-panel],.explore-canvas-objects .explore-player')).map(target).filter(function(t){var r=t && t.el.getBoundingClientRect();return r && r.width>0 && r.height>0 && t.el.getClientRects().length;});}
+  function activeSurface(){
+    var section=view.querySelector('.doc-sec.workspace-active-section') || view.querySelector('.doc-sec[data-dv-section="'+opts.session.insertSection+'"]');
+    if(!section)return null;
+    return Array.from(section.querySelectorAll('.section-viewport')).find(function(shell){
+      return shell.getClientRects().length && shell.querySelector('.boardcanvas [data-dv-node]');
+    }) || null;
+  }
+  function selectAllNodes(){
+    if(!active() || opts.busy())return false;
+    var shell=activeSurface(),nodes=shell && candidates(shell).filter(function(item){return item.kind==='node';});
+    if(!nodes || !nodes.length)return false;
+    opts.select(nodes);sync();return true;
+  }
   function layoutId(shell){var p=shell.querySelector('[data-explore-layout]');return p && p.getAttribute('data-explore-layout');}
   function rects(targets,shell){
     var svg=shell.querySelector('.boardcanvas > svg'),matrix=svg && svg.getScreenCTM();if(!matrix)return [];
@@ -202,5 +215,5 @@ function createBuilderSpatialSelection(opts){
   life.listen(opts.src,'input',clear);
   life.listen(view,'click',function(ev){if(ev.target.closest('[data-view-layout],[data-tab-view]')){clear();opts.select([]);}},true);
   life.listen(view,'dv:pathchange',clear);
-  return {actions:actions,sync:sync,target:target,clear:clear,refresh:refresh,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
+  return {actions:actions,sync:sync,target:target,clear:clear,refresh:refresh,selectAllNodes:selectAllNodes,busy:function(){return !!marquee;},destroy:function(){life.destroy();clear();restoreFocusNodes();}};
 }

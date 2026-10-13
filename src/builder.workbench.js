@@ -553,6 +553,14 @@ function initWorkbenchBuilder(opts){
       return false;
     }
   });
+  var workflowShortcuts=typeof createBuilderWorkflowShortcuts==='function'?createBuilderWorkflowShortcuts({
+    document:document,window:window,view:view,isActive:opts.isActive,
+    selectAll:function(){return interactions.selectAllNodes();},
+    fitDiagram:function(){var button=document.getElementById('workspace-fit');if(!button || button.disabled)return false;button.click();return true;},
+    fitSelection:function(){var button=document.getElementById('workspace-fit-selection');if(!button || button.disabled)return false;button.click();return true;},
+    inspect:function(){return interactions.inspectSelection(true);}
+  }):null;
+  if(workflowShortcuts)life.own(function(){workflowShortcuts.destroy();});
   function setSelected(){if(interactions)return interactions.setSelected.apply(null,arguments); }
   function updateTargetLabel(){if(interactions)return interactions.updateTargetLabel.apply(null,arguments); }
   function markInsertTarget(){if(interactions)return interactions.markInsertTarget.apply(null,arguments); }

@@ -50,7 +50,7 @@ for(const host of ['workbench','reader','native'])for(const placement of ['canva
   await page.screenshot({path:info.outputPath(placement+'-'+height+'.png')});
  }
  if(placement==='canvas'){
-  await page.locator(host==='workbench'?'#workspace-fit':'.reader-toolbar>button[aria-label="Fit"]').click();
+  await page.locator(host==='workbench'?'#docview>.explore-navigation':'.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
   await expect(player(page)).toBeInViewport();
  }
 });
@@ -96,7 +96,7 @@ for(const position of ['below','above','left','right'])test('step text changes r
 
 test('authored floating controls grow without moving when content fits near the stage bottom',async({page,server})=>{
  const raw=fixture('floating'),layout=raw.page.sections[0].diagram.layouts[1].exploreLayout;
- layout.controls={x:.08,y:.64,w:.6,h:.1};
+ layout.controls={x:.08,y:.6,w:.6,h:.1};
  await page.setViewportSize({width:1280,height:1100});await open(page,server,raw,'workbench');
  const source=page.locator('#src'),original=await source.inputValue();
  for(const height of [1100,1400,1100]){

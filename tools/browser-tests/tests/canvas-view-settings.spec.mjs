@@ -19,6 +19,7 @@ function fixture(twoSections=false){
 }
 const section=(page,index=0)=>page.locator('#docview .doc-sec[data-dv-section="'+index+'"]');
 const nav=page=>page.locator('#docview>.explore-navigation');
+const topView=(page,name)=>nav(page).getByRole('tab',{name,exact:true});
 const settings=page=>nav(page).locator('.section-view-settings');
 const presentation=(page,index=0)=>settings(page,index).locator('select[aria-label="View presentation"]');
 const text=page=>page.locator('#src').inputValue();
@@ -26,9 +27,10 @@ const text=page=>page.locator('#src').inputValue();
 const migratedLayout=legacy=>({columns:24,...Object.fromEntries(Object.entries(legacy).map(([profile,tiles])=>[profile,tiles.map(tile=>({...tile,x:tile.x*2,w:tile.w*2}))]))});
 async function open(page,server,raw=fixture()){
   const source=JSON.stringify(raw,null,2);await page.goto(server.origin+'/workbench.html');await paste(page,source);await closeTools(page);
-  await expect(page.locator('#workspace-view')).toHaveCount(0);await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(settings(page)).toBeVisible();await options(page);return source;
+  await expect(page.locator('#workspace-view')).toHaveCount(0);await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await options(page);await expect(settings(page)).toBeVisible();return source;
 }
 async function options(page,index=0){
+  if(!await settings(page,index).isVisible() && await nav(page).locator('.reader-utilities>summary').isVisible())await nav(page).locator('.reader-utilities>summary').click();
   const details=settings(page,index).locator('details');
   if(await details.getAttribute('open')===null)await details.getByText('View',{exact:true}).click();
   return details;
@@ -45,7 +47,7 @@ async function reachable(control){
 test('canvas view settings edit only the selected sibling and save one undoable opening choice',async({page,server,context})=>{
   const raw=fixture(true),original=await open(page,server,raw);
   await expect(page.locator('.workbench-diagram-canvas')).toHaveCount(0);await expect(presentation(page)).toHaveValue('standard');await expect(settings(page).getByRole('button',{name:'Opening View',exact:true,includeHidden:true})).toBeDisabled();
-  await nav(page).getByRole('button',{name:'Engineering',exact:true}).click();
+  await topView(page,'Engineering').click();
   await expect(section(page)).toHaveAttribute('data-view-id','engineering');await expect(presentation(page)).toHaveValue('explore');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
   await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await options(page);await presentation(page).selectOption('standard');await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);
@@ -59,7 +61,7 @@ test('canvas view settings edit only the selected sibling and save one undoable 
   await expect(settings(page).getByRole('button',{name:'Opening View',exact:true,includeHidden:true})).toBeDisabled();
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   await page.locator('#redo-builder').click();await expect(page.locator('#src')).toHaveValue(saved);
-  await nav(page).getByRole('button',{name:'Resident story',exact:true}).click();
+  await topView(page,'Resident story').click();
   await expect(presentation(page)).toHaveValue('standard');await expect(page.locator('#src')).toHaveValue(saved);
   await expect(settings(page).getByRole('button',{name:'Make opening View',exact:true,includeHidden:true})).toBeEnabled();
   await chooseAddDestination(page,'1');await expect(settings(page,1)).toBeVisible();
@@ -86,10 +88,10 @@ test('View options duplicates and renames a sibling without changing its source 
   await settings(page).getByRole('button',{name:'Duplicate View',exact:true}).click();
   const duplicated=await text(page),saved=JSON.parse(duplicated).page,copy=saved.views[1];
   expect(saved.views).toHaveLength(3);expect(saved.blocks).toEqual(raw.page.blocks);expect(saved.defaultView).toBe('resident');expect(copy.sections).toEqual(raw.page.views[0].sections);expect(copy.presentation).toBe('standard');
-  await expect(nav(page).locator('[data-tab-view="'+copy.id+'"]')).toHaveAttribute('aria-pressed','true');await expect(presentation(page)).toHaveValue('standard');
+  await expect(nav(page).locator('.reader-top-view[data-tab-view="'+copy.id+'"]')).toHaveAttribute('aria-selected','true');await expect(presentation(page)).toHaveValue('standard');
   await options(page);await presentation(page).selectOption('explore');const explored=await text(page);expect(JSON.parse(explored).page.blocks).toEqual(raw.page.blocks);
   await options(page);const name=settings(page).getByRole('textbox',{name:'View name',exact:true});await name.fill('Workshop');await settings(page).getByRole('button',{name:'Rename View',exact:true}).click();
-  await expect(nav(page).getByRole('button',{name:'Workshop',exact:true})).toBeVisible();
+  await expect(topView(page,'Workshop')).toBeVisible();
   const renamed=JSON.parse(await text(page));expect(renamed.page.views[1]).toEqual({...copy,presentation:'explore',name:'Workshop'});
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(explored);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(duplicated);
@@ -120,7 +122,7 @@ test('a pending view-name draft does not consume a physical Duplicate view click
   // One physical click: do not retry a locator after blur or pre-commit with Tab.
   await page.mouse.click(r.x+r.width/2,r.y+r.height/2);
   const saved=JSON.parse(await text(page)).page;expect(saved.views).toHaveLength(3);expect(saved.blocks).toEqual(raw.page.blocks);
-  expect(saved.views[1].name).not.toContain('Uncommitted');await expect(nav(page).locator('[data-tab-view="'+saved.views[1].id+'"]')).toHaveAttribute('aria-pressed','true');
+  expect(saved.views[1].name).not.toContain('Uncommitted');await expect(nav(page).locator('.reader-top-view[data-tab-view="'+saved.views[1].id+'"]')).toHaveAttribute('aria-selected','true');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });
 
@@ -169,7 +171,7 @@ test('an arranging sibling cannot steal view navigation, and the selected chapte
   const input=fixture(true);
   await open(page,server,input);
   await arrangeChapter(page,section(page));
-  await chooseAddDestination(page,'1');await nav(page).getByRole('button',{name:'Billing · Engineering',exact:true}).click();
+  await chooseAddDestination(page,'1');await topView(page,'Billing · Engineering').click();
   await expect(section(page,1)).toHaveClass(/workspace-active-section/);
   await expect(page.locator('#diagram-add-target')).toHaveValue('1');
   await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
@@ -182,9 +184,9 @@ test('an arranging sibling cannot steal view navigation, and the selected chapte
 
 test('changing automatic Data to Explore preserves Home and its opening default',async({page,server})=>{
   const input=fixture(),d=input.page.blocks[0].diagram;delete input.page.views;delete input.page.defaultView;delete d.layouts;delete d.defaultLayout;d.primaryPanel='home';
-  const original=await open(page,server,input),opening=await nav(page).locator('[data-tab-view][aria-pressed=true]').getAttribute('data-tab-view');await nav(page).getByRole('button',{name:'Data flow',exact:true}).click();await options(page);await presentation(page).selectOption('explore');
+  const original=await open(page,server,input),opening=await nav(page).locator('.reader-top-view[aria-selected=true]').getAttribute('data-tab-view');await topView(page,'Data flow').click();await options(page);await presentation(page).selectOption('explore');
   const saved=JSON.parse(await text(page)).page;expect(saved.blocks[0].diagram).toEqual(d);expect(saved.defaultView).toBe(opening);expect(saved.views.find(v=>v.id===saved.defaultView)).toMatchObject({name:'Home',presentation:'standard'});expect(saved.views.find(v=>v.name==='Data flow').presentation).toBe('explore');
   await expect(section(page)).toHaveAttribute('data-view-id','flow');await expect(page.locator('body')).toHaveClass(/workspace-diagram/);
-  await nav(page).getByRole('button',{name:'Home',exact:true}).click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(presentation(page)).toHaveValue('standard');
+  await topView(page,'Home').click();await expect(page.locator('body')).not.toHaveClass(/workspace-diagram/);await expect(presentation(page)).toHaveValue('standard');
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
 });

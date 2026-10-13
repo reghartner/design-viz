@@ -41,7 +41,7 @@ test('visible Connect action and the Add menu share cancellation and invalid-tar
   await page.locator('#workspace-window-inspect .workspace-window-close').click();
   for(const target of ['a','b','z']){await start(page);await node(page,target).click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);}
   await start(page);await page.keyboard.press('Escape');await clean(page);await expect(page.locator('#src')).toHaveValue(original);
-  await start(page);await page.locator('#docview h2').first().click();await clean(page);await expect(page.locator('#src')).toHaveValue(original);
+  await start(page);await page.locator('.board:visible').first().click({position:{x:5,y:5}});await clean(page);await expect(page.locator('#src')).toHaveValue(original);
   await page.locator('#diagram-add').click();await page.locator('[data-add-kind=edge]').click();
   await closeTools(page);
   await node(page,'b').click();await expect(page.locator('.dv-connect-hint')).toContainText('Gateway');await node(page,'c').click();
@@ -93,7 +93,7 @@ test('modifier selection, ordinary dragging and zoomed connection creation coexi
   const f=node(page,'f'),box=await f.boundingBox();await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.down();await page.mouse.move(box.x+box.width/2-70,box.y+box.height/2-20,{steps:8});await page.mouse.up();
   expect((await diagram(page)).floats[0].x).not.toBe(850);await clean(page);
   await page.locator('#undo-builder').click();await expect(page.locator('#src')).toHaveValue(original);
-  await page.locator('#workspace-zoom-in').click();
+  await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
   await start(page);await expect(page.locator('.dv-connect-hint')).toBeVisible();
   await expect(page.getByRole('button',{name:'Cancel connection',exact:true})).toBeVisible();
   await node(page,'c').hover();await expect(arrow(page)).toHaveAttribute('d',/^M /);

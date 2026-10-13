@@ -106,7 +106,7 @@ function initWorkbenchAgentChat(opts){
   var composeSettings=element('div','folder-agent-compose-settings');composeSettings.append(contextDetails,detailSettings);
   var copyFallback=element('details','folder-agent-copy-fallback'),copySummary=element('summary','','Prepared request'),copyPreview=element('textarea'),copyBack=button('copy-back','Back to draft');
   copyPreview.id='folder-agent-copy-preview';copyPreview.readOnly=true;copyPreview.setAttribute('aria-label','Prepared agent request');copyPreview.rows=5;
-  copyFallback.hidden=true;copyFallback.append(copySummary,copyBack,copyPreview);composer.append(composeSettings,form,copyFallback);
+  copyFallback.hidden=true;copyFallback.append(copySummary,copyPreview,copyBack);composer.append(composeSettings,form,copyFallback);
   life.listen(copyBack,'click',function(){
     copyFallback.hidden=true;copyFallback.open=false;
     // Return the draft and its action together, even in a short workflow scroller.

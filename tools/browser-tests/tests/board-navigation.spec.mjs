@@ -62,7 +62,10 @@ for(const surface of ['standalone','workbench'])test(surface+' regular diagram p
   // Page gutters also change at a mobile breakpoint; the SVG should follow
   // its actual column, never jump back to the old 1180px readable floor.
   expect(await width(board)).toBeCloseTo(await board.evaluate(el=>el.clientWidth),0);
-  expect(Math.abs(await width(board)-wide)).toBeLessThan(100);
+  // The pushed Contents column closes at the compact breakpoint, returning its
+  // width to the Standard page rather than preserving a desktop-sized gutter.
+  if(surface==='workbench')expect(await width(board)).toBeGreaterThan(wide);
+  else expect(Math.abs(await width(board)-wide)).toBeLessThan(100);
   expect(await board.evaluate(el=>el.scrollWidth-el.clientWidth)).toBeLessThanOrEqual(1);
   await page.screenshot({path:testInfo.outputPath('regular-navigation.png'),fullPage:true});
 });
@@ -84,7 +87,7 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
   for(const edit of [false,true]){
     await page.getByRole('button',{name:'Explore',exact:true}).click();
     if(surface==='standalone')await page.locator('.reader-zoom-menu>summary').click();
-    await page.getByRole('button',{name:'Fit diagram',exact:true}).click();
+    await page.getByRole('button',{name:surface==='workbench'?'Fit':'Fit diagram',exact:true}).click();
     if(surface==='standalone')await page.keyboard.press('Escape');
     await board.evaluate(el=>{el.scrollLeft+=300;el.scrollTop+=400;});
     if(edit && surface==='workbench'){
@@ -94,7 +97,7 @@ for(const surface of ['standalone','workbench'])test(surface+' keeps regular nav
       await page.locator('#src').evaluate((el,text)=>{el.value=text;el.dispatchEvent(new Event('input',{bubbles:true}));},edited);
       await page.locator('#go').evaluate(el=>el.click());
       await expect(page.locator('#src')).toHaveValue(edited);
-      await expect(page.getByRole('heading',{name:'Renamed navigation',exact:true,includeHidden:true})).toHaveCount(1);
+      await expect(page.getByRole('heading',{name:'Renamed navigation',exact:true})).toHaveCount(1);
       await expect(board).toHaveClass(/explore-board/);
     }
     await page.getByRole('button',{name:'Standard',exact:true}).click();

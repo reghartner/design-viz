@@ -2,11 +2,13 @@
 function initWorkbenchCanvas(){
   var surface=document.getElementById('workspace-canvas'),view=document.getElementById('docview');
   var selectionKey=null,selecting=false,getController=function(){return null;},getPage=function(){return null;};
-  var savedSelection=null,savedOwnerSections=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null;
+  var savedSelection=null,savedOwnerSections=null,section=0,hand=false,spaceHeld=false,drag=null,saved=null,skipCapture=false,fitPending=0,fitRequests=new Set(),activeCanvas=null,history=null,activeDetail=null,detailStates=[],savedDetail=null,navigation=null,navigationController=null,contentsOpen=null;
   var fitObserver=new ResizeObserver(function(entries){
     if(!fitPending && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))fitPending=requestAnimationFrame(autoFit);
   });
-  var header=document.querySelector('.workbench-header'),measuredNav=null;
+  var header=document.querySelector('.workbench-header'),headerTitle=document.getElementById('workbench-reader-title'),editorTitle=document.getElementById('workbench-editor-title'),measuredNav=null;
+  function paintTitle(){var page=getPage(),text=page && typeof page.title==='string' && page.title.trim()?page.title.trim():'Untitled story';editorTitle.textContent=text;editorTitle.title=text;editorTitle.hidden=false;headerTitle.hidden=false;}
+  window.addEventListener('workbench-editor-visible',paintTitle);
   function measureChrome(){
     if(document.body.classList.contains('welcome-active') || document.body.classList.contains('workbench-reader-preview-active'))return;
     var head=header.getBoundingClientRect().bottom;document.body.style.setProperty('--workspace-header-bottom',head+'px');
@@ -133,7 +135,7 @@ function initWorkbenchCanvas(){
     paintZoom();
   }
   function cancelFit(){cancelAnimationFrame(fitPending);fitPending=0;fitObserver.disconnect();}
-  function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(autoFit);}
+  function scheduleFit(){cancelFit();fitPending=requestAnimationFrame(function(){fitPending=requestAnimationFrame(autoFit);});}
   function autoFit(){
     fitPending=0;if(!diagramMode())return;
     var rec=current(),vp=viewport(),definition=vp && vp.viewDefinition(),target=board();
@@ -143,6 +145,7 @@ function initWorkbenchCanvas(){
   }
   function select(index){
     if(selecting)return;selecting=true;cancelFit();
+    paintTitle();
     var changedSection=section!==index;finish(true);saveDetail();section=index;
     var ctl=getController(),base=records().find(function(r){return r.number===section+1;}),details=ctl && ctl.details,snapshot=details && details.snapshot();
     if(snapshot && base && snapshot.section!==base.reference)details.close(true);
@@ -166,7 +169,7 @@ function initWorkbenchCanvas(){
     var key=identity(rec),requestedFit=fitRequests.has(fitIdentity(rec));selectionKey=key;
     activeCanvas=rec;activeDetail=child;
     document.body.classList.toggle('workspace-diagram',diagramMode());
-    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
+    if(ctl && navigationController!==ctl){if(navigation)navigation.destroy();navigation=createExploreNavigation(ctl,{contents:true,skipTabShare:true,insetTarget:document.body,initialOpen:contentsOpen,onOpenChange:function(value){contentsOpen=value;},fit:function(){if(!diagramMode())return false;fit();return true;},selectSection:function(target){view.dispatchEvent(new CustomEvent('workbench-view-section',{detail:target.number-1}));select(target.number-1);}});navigationController=ctl;}
     // Measure navigation in its selected, visible section before the viewport
     // restores its camera. Hidden navigation reports zero height and would cause
     // an unnecessary resize (and camera rounding) immediately after restoration.

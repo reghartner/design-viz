@@ -150,7 +150,8 @@ export async function chooseAddDestination(page,index){
   await page.locator('#diagram-add-close').click();
 }
 export async function chapterOptions(page,section){
-  const options=page.locator('#docview .explore-navigation').locator('.section-view-options');
+  const navigation=page.locator('#docview .explore-navigation'),options=navigation.locator('.section-view-options');
+  if(!await options.isVisible() && await navigation.locator('.reader-utilities>summary').isVisible())await navigation.locator('.reader-utilities>summary').click();
   if(await options.getAttribute('open')===null)await options.locator('summary').click();
   return options;
 }
@@ -174,4 +175,13 @@ export async function canvasTools(page){
  const menu=page.locator('#workspace-canvas-tools');
  if(await menu.getAttribute('open')===null)await menu.locator('summary').click();
  return menu;
+}
+
+export async function workspaceAction(page,id){
+ const action=page.locator('#'+id);
+ if(!await action.isVisible()){
+  const more=page.locator('#workspace-more');
+  if(await more.getAttribute('open')===null)await more.locator(':scope > summary').click();
+ }
+ await expect(action).toBeVisible();return action;
 }

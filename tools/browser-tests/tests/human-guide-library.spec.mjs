@@ -1,4 +1,4 @@
-import {test,expect,paste} from '../helpers/test.mjs';
+import {test,expect,paste,chooseNavigation,workspaceAction} from '../helpers/test.mjs';
 import {source,editorSpec} from '../fixtures/editor-spec.mjs';
 import {pathToFileURL} from 'node:url';
 import {mkdir,writeFile,readFile,rm} from 'node:fs/promises';
@@ -91,7 +91,7 @@ for(const offline of [false,true])test('agent walkthrough opens at its chapter a
   // Contextual reopening resets only the guide chapter, not the folder form.
   await help.click();await expect(page.locator('#hg-agent')).toBeFocused();
   await page.locator('#human-guide-close').click();await expect(help).toBeFocused();
-  await page.locator('#folder-agent-close-guide').click();await page.locator('#undo-builder').click();
+  await page.locator('#folder-agent-close-guide').click();await (await workspaceAction(page,'undo-builder')).click();
   await expect(page.locator('#src')).toHaveValue(source);
 });
 
@@ -119,6 +119,58 @@ test('canon browsing is read-only and editing opens a separate project while pre
   await page.locator('#workspace-home').click();await page.locator('#welcome-earlier-drafts>summary').click();
   await page.locator('#welcome-earlier-list').getByRole('button',{name:/^Browser contract ·/}).click();
   await expect(page.locator('#src')).toHaveValue(source);await expect(page.locator('#undo-builder')).toBeDisabled();
+});
+
+test('Canon success keeps its document title in a compact unobscured app header across reader modes',async({page,server},info)=>{
+  const data=library(),title='Sections and Views · Product journey',diagram=data.diagrams[0].spec.page.blocks[0].diagram;
+  data.diagrams[0].title=data.diagrams[0].spec.page.title=title;
+  diagram.layouts=[
+    {id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}},
+    {id:'explore',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}
+  ];diagram.defaultLayout='standard';
+  const second=structuredClone(data.diagrams[0]);second.id=second.spec.page.canon.id='inventory';second.title=second.spec.page.title='Inventory handoff';data.diagrams.push(second);
+  await page.route('**/diagrams.json',route=>route.fulfill({json:data}));
+  await page.goto(server.origin+'/workbench.html?diagram=delivery');
+  const heading=page.getByRole('heading',{name:title,exact:true}),nav=page.locator('#canon-reader>.explore-navigation');
+  await expect(heading).toBeVisible();await expect(heading).toHaveAttribute('title',title);
+  await expect(page.locator('#workbench-reader-title')).toContainText(title);
+  async function geometry(){
+    await page.evaluate(()=>document.fonts.ready);
+    return page.evaluate(()=>{
+      const box=node=>{const r=node.getBoundingClientRect();return {top:r.top,right:r.right,bottom:r.bottom,left:r.left,width:r.width,height:r.height};};
+      const header=document.querySelector('.workbench-header'),brand=document.querySelector('.workbench-brand'),title=document.querySelector('#canon-reader-title');
+      const back=document.querySelector('.canon-reader-toolbar .welcome-back'),nav=document.querySelector('#canon-reader>.explore-navigation');
+      const surface=Array.from(document.querySelectorAll('#canon-reader .board')).find(node=>node.checkVisibility());
+      const contents=document.querySelector('#canon-reader .reader-contents');
+      return {header:box(header),brand:box(brand),title:box(title),back:box(back),nav:box(nav),surface:box(surface),
+        contents:contents && contents.checkVisibility()?box(contents):null,intro:getComputedStyle(document.querySelector('#canon-reader-intro')).display,
+        titleFits:title.scrollHeight<=title.clientHeight+1 && title.scrollWidth<=title.clientWidth+1,titleText:title.textContent};
+    });
+  }
+  await page.getByRole('button',{name:'User guide',exact:true}).click();await expect(guide(page)).toBeVisible();await page.keyboard.press('Escape');await expect(guide(page)).not.toBeVisible();
+  for(const width of [1440,900,390]){
+    await page.setViewportSize({width,height:900});
+    for(const mode of ['Standard','Explore']){
+      await chooseNavigation(nav,'View',mode);const g=await geometry();
+      expect(g.header.height).toBe(54);expect(Math.abs(g.nav.top-g.header.bottom)).toBeLessThanOrEqual(1);
+      expect(g.title.left).toBeGreaterThanOrEqual(g.brand.right);expect(g.title.right).toBeLessThanOrEqual(g.back.left+1);
+      expect(g.title.top).toBeGreaterThanOrEqual(g.header.top);expect(g.title.bottom).toBeLessThanOrEqual(g.header.bottom);
+      expect(g.surface.top).toBeGreaterThanOrEqual(g.nav.bottom-1);if(g.contents)expect(g.contents.top).toBeGreaterThanOrEqual(g.nav.bottom-1);
+      expect(g.intro).toBe('none');expect(g.titleFits).toBe(true);expect(g.titleText).toBe(title);
+      await info.attach('canon-header-'+mode.toLowerCase()+'-'+width,{body:await page.screenshot(),contentType:'image/png'});
+    }
+  }
+  const titleNode=await heading.elementHandle();await page.setViewportSize({width:900,height:900});
+  await page.locator('.canon-reader-toolbar .welcome-back').click();await expect(page.locator('#welcome-home')).toBeVisible();await page.locator('#welcome-library').click();await expect(screen(page,'library')).toBeVisible();
+  await page.getByRole('link',{name:/Inventory handoff/}).click();await expect(page.getByRole('heading',{name:'Inventory handoff',exact:true})).toBeVisible();
+  expect(await titleNode.evaluate(node=>node===document.querySelector('#canon-reader-title'))).toBe(true);
+  await page.locator('#canon-reader-edit').click();await expect(page.locator('#workbench-workspace')).toBeVisible();
+  await page.goBack();await expect(page.getByRole('heading',{name:'Inventory handoff',exact:true})).toBeVisible();
+  await page.locator('.canon-reader-toolbar .welcome-back').click();await expect(screen(page,'library')).toBeVisible();
+  await expect(page.locator('#workbench-reader-title')).toBeHidden();await expect(page.locator('#canon-reader-intro>#canon-reader-title')).toHaveCount(1);
+  await page.goto(server.origin+'/workbench.html?diagram=missing');
+  await expect(page.getByRole('heading',{name:'Diagram unavailable',exact:true})).toBeVisible();await expect(page.locator('#canon-reader-error')).toBeVisible();
+  await expect(page.locator('body')).not.toHaveClass(/canon-reader-active/);await expect(page.locator('#workbench-reader-title')).toBeHidden();
 });
 
 test('Canon edit and browser Back preserve the selected chapter, path and step with stale-state fallback',async({page,server},info)=>{

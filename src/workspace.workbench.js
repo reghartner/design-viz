@@ -13,13 +13,13 @@ function workspacePrefs(raw){
   });
   return prefs;
 }
-function workspacePanelRect(rect,width,height,chromeTop,chromeBottom){
+function workspacePanelRect(rect,width,height,chromeTop,chromeBottom,chromeLeft){
   // The measured navigation edge reserves space for every wrapped lane.
-  var top=Number.isFinite(chromeTop)?chromeTop:72,bottom=Number.isFinite(chromeBottom)?chromeBottom:12,availableH=Math.max(1,height-top-bottom);
-  var minW=Math.min(300,Math.max(1,width-24)),minH=Math.min(240,availableH);
-  var w=Math.max(minW,Math.min(width-24,Number.isFinite(rect.w)?rect.w:380));
+  var top=Number.isFinite(chromeTop)?chromeTop:72,bottom=Number.isFinite(chromeBottom)?chromeBottom:12,left=Number.isFinite(chromeLeft)?chromeLeft:12,availableH=Math.max(1,height-top-bottom);
+  var minW=Math.min(300,Math.max(1,width-left-12)),minH=Math.min(240,availableH);
+  var w=Math.max(minW,Math.min(width-left-12,Number.isFinite(rect.w)?rect.w:380));
   var h=Math.max(minH,Math.min(availableH,Number.isFinite(rect.h)?rect.h:640));
-  return {x:Math.max(12,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
+  return {x:Math.max(left,Math.min(width-w-12,Number.isFinite(rect.x)?rect.x:84)),
     y:Math.max(top,Math.min(height-h-bottom,Number.isFinite(rect.y)?rect.y:84)),w:w,h:h};
 }
 
@@ -63,7 +63,12 @@ function initWorkbenchReaderPreview(opts){
   function hide(refocus){
     if(!state)return;
     var restore=state;state=null;destroyReader();if(dialog.open)dialog.close();restoreAuthoring(restore);
-    if(refocus!==false && restore.focused && restore.focused.isConnected){menu.open=true;syncNavigationPopover(menu);restore.focused.focus({preventScroll:true});}
+    if(refocus!==false && restore.focused && restore.focused.isConnected){
+      // Preview lives inside nested responsive menus. Reopen every ancestor so
+      // focus returns to a visible command rather than an inert hidden button.
+      for(var owner=restore.focused.closest('details');owner;owner=owner.parentElement && owner.parentElement.closest('details')){owner.open=true;syncNavigationPopover(owner);}
+      restore.focused.focus({preventScroll:true});
+    }
   }
   function renderReader(){
     var reading=ctl?workbenchReaderPreviewSnapshot(state.page,ctl):state.reading;
@@ -112,9 +117,12 @@ function initWorkbenchWorkspace(){
   document.addEventListener('toggle',function(ev){
     var selector='.workbench-header details,#workspace-canvas-tools,#docview .explore-navigation details';
     if(!ev.target.matches(selector))return;
-    if(ev.target.open)document.querySelectorAll(selector).forEach(function(other){if(other!==ev.target && other.open){other.open=false;syncNavigationPopover(other);}});
+    if(ev.target.open)document.querySelectorAll(selector).forEach(function(other){if(other!==ev.target && other.open && !(other===more && compactActions===false) && !other.contains(ev.target) && !ev.target.contains(other)){other.open=false;syncNavigationPopover(other);}});
     syncNavigationPopover(ev.target);
   },true);
+  var more=document.getElementById('workspace-more'),compactActions=null;
+  function paintMore(){var compact=matchMedia('(max-width:1180px)').matches;if(compact===compactActions)return;compactActions=compact;more.open=!compact;}
+  paintMore();window.addEventListener('resize',paintMore);
   var rail=document.querySelector('.workspace-rail');rail.setAttribute('role','toolbar');
   rail.removeAttribute('aria-orientation');
   function persist(){try{localStorage.setItem(key,JSON.stringify(prefs));}catch(ex){}}
@@ -122,7 +130,8 @@ function initWorkbenchWorkspace(){
   function boundRect(value){
     var tools=document.getElementById('workspace-canvas-controls'),r=tools && tools.getBoundingClientRect();
     var bottom=r && r.height?innerHeight-r.top+12:12;
-    return workspacePanelRect(value,innerWidth,innerHeight,parseFloat(getComputedStyle(document.body).getPropertyValue('--workspace-content-top')) || 72,bottom);
+    var styles=getComputedStyle(document.body),left=(parseFloat(styles.getPropertyValue('--reader-host-inset')) || 0)+12;
+    return workspacePanelRect(value,innerWidth,innerHeight,parseFloat(styles.getPropertyValue('--workspace-content-top')) || 72,bottom,left);
   }
   function rect(name){return boundRect(prefs.windows[name]);}
   function paint(name){

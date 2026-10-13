@@ -141,6 +141,10 @@
   .folder-agent-workflow-body .folder-agent-header-controls{max-height:26px;}
   #editor-agent[data-workflow="external"] .folder-agent-context-card{padding:3px 7px;}
   .folder-agent-workflow-body{grid-template-rows:auto minmax(32px,1fr) auto;}
+  #editor-agent[data-workflow="external"] .folder-agent-workflow-body:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-header,
+  #editor-agent[data-workflow="external"] .folder-agent-workflow-body:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-history-frame{display:none;}
+  #editor-agent[data-workflow="external"] .folder-agent-workflow-body:has(.folder-agent-copy-fallback[open]:not([hidden]))>.folder-agent-composer{min-height:0;overflow:auto;}
+  #editor-agent[data-workflow="external"] .folder-agent-copy-fallback textarea{height:24px;min-height:24px;resize:none;}
 }
 
 #editor-agent[data-connected="false"] .folder-agent-workflow-body{display:block;overflow:auto;}

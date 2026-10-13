@@ -1,4 +1,4 @@
-import {test,expect,pastePage,inspectPageElement} from '../helpers/test.mjs';
+import {test,expect,pastePage,inspectPageElement,workspaceAction} from '../helpers/test.mjs';
 const fixture=()=>({page:{title:'Replacement review',sections:[{heading:'Work',diagram:{
  nodes:{n:{title:'Worker'}},rows:[['n']],primaryPanel:'work',
  panels:[{id:'work',type:'queue',title:'Work waiting',visible:true,initial:{state:'full'},futureSetup:{secret:'keep in backup'}},{id:'keep',type:'gauge',title:'Other panel',initial:{value:8}}],
@@ -56,5 +56,5 @@ test('replacement review retires on same-source project replacement and builder 
  await page.evaluate(()=>__editorTest.remount());await open(page);await review(page);await page.setViewportSize({width:720,height:800});
  const picker=page.locator('#panel-picker');expect(await picker.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
  await expect(page.locator('#panel-picker-add')).toBeInViewport();await info.attach('replacement-review-narrow',{body:await picker.screenshot(),contentType:'image/png'});
- await page.locator('#panel-picker-add').click();await expect(panel(page)).toHaveClass(/pt-timeline/);await page.locator('#undo-builder').click();await expect(src).toHaveValue(original);
+ await page.locator('#panel-picker-add').click();await expect(panel(page)).toHaveClass(/pt-timeline/);await (await workspaceAction(page,'undo-builder')).click();await expect(src).toHaveValue(original);
 });

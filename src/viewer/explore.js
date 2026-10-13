@@ -28,6 +28,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   var presentationOverride=null,definition=null, items=[], memories=Object.create(null), otherMemories=Object.create(null), memory=null,canvasBoardHidden=false;
   var panelSource=grid;
   var moved=[], windows=[], gesture=null, selectedCanvasWindow=null, z=1, zoom=null, fitFloor=null, lastWidth=0, lastHeight=0, stableCamera=null;
+  var fitFrame=0,cameraRevision=0;
   var shell=document.createElement('div');shell.className='section-viewport';
   toolbar.parentNode.insertBefore(shell,toolbar);shell.appendChild(toolbar);shell.appendChild(grid);
   var stage=document.createElement('div');stage.className='explore-stage';stage.hidden=true;shell.appendChild(stage);
@@ -250,6 +251,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     return {zoom:clamp(graphPixels/graphWidth(),.001,4),x:(board.scrollLeft+(width || board.clientWidth)/2-marginX)/(graphPixels || 1),y:(board.scrollTop+(height || board.clientHeight)/2-marginY)/((graphPixels || 1)*ratio)};
   }
+  function cancelDeferredFit(){
+    cameraRevision++;
+    if(fitFrame){cancelAnimationFrame(fitFrame);fitFrame=0;}
+  }
   function rememberStableCamera(){
     // A growing viewport can clamp scrollLeft/Top against the OLD canvas extent
     // before ResizeObserver paints. Ignore those resize-generated scroll events;
@@ -276,6 +281,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return {x:board.scrollLeft,y:board.scrollTop,width:lastWidth,height:lastHeight,graphWidth:graphPixels,graphHeight:graphPixels*ratio,marginX:marginX,marginY:marginY,camera:readerCanvas || workbenchCanvas?camera(lastWidth,lastHeight):undefined};
   }
   function restoreScroll(saved){
+    cancelDeferredFit();
     var svg=board.querySelector('.boardcanvas>svg'),ratio=svg && svg.viewBox.baseVal.height/svg.viewBox.baseVal.width || 1;
     var unchanged=saved.width===board.clientWidth && saved.height===board.clientHeight && saved.graphWidth===graphPixels && saved.graphHeight===graphPixels*ratio && saved.marginX===marginX && saved.marginY===marginY;
     // Avoid a lossy normalized-camera round trip when the viewport and graph
@@ -294,6 +300,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function clearScrollEdit(){if(scrollTimer!==null)window.clearTimeout(scrollTimer);scrollTimer=null;scrollEdit=null;}
   function scrollIntent(){
     if(!active || retired || gesture)return false;
+    cancelDeferredFit();
     if(!author)return true;
     if(!scrollEdit){var token=beginEdit();if(token===false)return false;scrollEdit={token:token};}
     if(scrollTimer!==null)window.clearTimeout(scrollTimer);
@@ -332,7 +339,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function minimum(w){
     /* Portrait screens can become much narrower than charts and maps. */
-    return w===playerWindow?300:w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
+    return w===playerWindow?(workbenchCanvas && bounds().w<1000?240:300):w.prose?220:/^(phone|deviceapp)$/.test(w.panel.type)?112:/^(screen|homemap|image)$/.test(w.panel.type)?140:128;
   }
   function savedOverlayGeometry(layout){
     return !!(layout && (layout.controls && layout.controls.w || layout.prose && layout.prose.w || layout.panels && layout.panels.length));
@@ -372,18 +379,20 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function constrain(w,r){
     if(canvasWindow(w))return {x:clamp(r.x,-10000,10000),y:clamp(r.y,-10000,10000),w:clamp(r.w,minimum(w),10000),h:clamp(r.h,72,10000)};
-    var b=bounds(),bottom=workbenchCanvas?12:stackInsets().bottom,scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
+    var b=bounds(),bottom=12,scale=windowScale(w),minW=Math.min(w===playerWindow?minimum(w):Math.max(96,minimum(w)*scale),Math.max(80,b.w-24));
     var minH=w===playerWindow?Math.min(104*scale,Math.max(72,b.h-24)):32+40*scale;
     var maxW=w===playerWindow?b.w:b.w*scale,maxH=w===playerWindow?b.h*scale:32+(b.h-32)*scale;
     var width=clamp(r.w,minW,Math.max(minW,Math.min(b.w-24,maxW))),height=clamp(r.h,minH,Math.max(minH,Math.min(b.h-bottom-12,maxH)));
     return {x:clamp(r.x,12,Math.max(12,b.w-width-12)),y:clamp(r.y,12,Math.max(12,b.h-height-bottom)),w:width,h:height};
   }
   function stackInsets(){
-    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),toolRect=canvasTools && canvasTools.getBoundingClientRect();
     var owner=readerCanvas && shell.closest('.docview'),utilities=owner && owner.querySelector(':scope > .reader-page-actions');
     var utilityRect=utilities && utilities.getClientRects().length && utilities.getBoundingClientRect();
     var readerBottom=utilityRect?Math.max(12,stage.getBoundingClientRect().bottom-utilityRect.top+12):12;
-    return {top:12,bottom:workbenchCanvas?Math.max(68,toolRect?stage.getBoundingClientRect().bottom-toolRect.top+12:68):readerBottom};
+    // Workbench playback owns the free lane left of the automatic panel stack,
+    // so its bottom toolbar must not shorten every panel column. The fixed
+    // canvas controls remain clear of the fitted playback lane.
+    return {top:12,bottom:workbenchCanvas?12:readerBottom};
   }
   function apply(w,r){
     w.rect=r;Object.keys(r).forEach(function(k){w.el.style.setProperty('--float-'+k,r[k]+'px');});
@@ -419,7 +428,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Pristine notes keep fitting fluid type through viewport changes.
     // Gestures and authored rectangles leave automatic sizing explicitly.
   }
-  function fittedControlsRect(r,insets){
+  function fittedControlsRect(r,insets,automatic){
     // Probe at the current width, including the narrow-container layout. Keep
     // the content fit transient: authored geometry and its Undo history belong
     // to gestures, not viewport/font/path changes.
@@ -450,7 +459,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     player.style.setProperty('--explore-tracks-height',Math.max(34,Math.min(rowHeight,trackRoom))+'px');
     // Reader utilities reserve space for floating controls. Workbench toolbar
     // insets still apply only to automatic docks, not authored geometry.
-    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(workbenchCanvas?12:insets.bottom)));
+    if(!canvasWindow(playerWindow))r.y=clamp(r.y,12,Math.max(12,bounds().h-r.h-(automatic?insets.bottom:12)));
     return r;
   }
   function paint(){
@@ -474,16 +483,26 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Reveal before measuring so a panel hidden during the last paint can use
     // its current content and the current stage bounds.
     windows.forEach(function(w){w.el.style.setProperty('--explore-overlay-scale',String(canvasWindow(w)?1:windowScale(w)));if(w.state.automatic && visible(w)){w.el.hidden=false;sizeAutomaticWindow(w);}});
-    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}),gap=8,canvasGeometryChanged=false;
-    var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom;
-    var stackBottom=Math.max(insetTop,b.h-insetBottom),laneHeight=Math.max(0,stackBottom-insetTop),columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
+    var stacked=windows.filter(function(w){return !canvasWindow(w) && visible(w) && w.state.stacked;}).sort(function(a,b){return constrain(b,scaledRect(b,b.state)).h-constrain(a,scaledRect(a,a.state)).h;}),gap=8,canvasGeometryChanged=false;
+    var insets=stackInsets(),insetTop=insets.top,insetBottom=insets.bottom,stageRect=stage.getBoundingClientRect();
+    var canvasTools=workbenchCanvas && document.getElementById('workspace-canvas-controls'),readerTools=readerCanvas && shell.closest('.docview') && shell.closest('.docview').querySelector(':scope > .reader-page-actions');
+    // The reader action wrapper spans the viewport so its children can align
+    // right while the wrapper itself remains pointer-transparent. Only the
+    // visible controls occupy panel space.
+    var obstacleNodes=readerTools?Array.from(readerTools.children):canvasTools?[canvasTools]:[];
+    var obstacleRects=obstacleNodes.filter(function(node){return node.getClientRects().length;}).map(function(node){return node.getBoundingClientRect();});
+    var toolRect=obstacleRects.length && obstacleRects.reduce(function(union,r){return {left:Math.min(union.left,r.left),right:Math.max(union.right,r.right),top:Math.min(union.top,r.top),bottom:Math.max(union.bottom,r.bottom)};});
+    function columnBottom(left,right){return toolRect && left<toolRect.right-stageRect.left && right>toolRect.left-stageRect.left?Math.max(insetTop,toolRect.top-stageRect.top-12):Math.max(insetTop,b.h-12);}
+    var columnRight=b.w-12,columnWidth=0,y=insetTop,stackLeft=b.w;
     var stackRects=new Map();
     stacked.forEach(function(w){
       var r=constrain(w,scaledRect(w,w.state));
       // Never compress a panel to fit the lane. An oversized panel owns a
       // top-aligned column (and may overflow below); the next panel wraps left.
-      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;}
-      r.x=columnRight-r.w;r.y=y;stackRects.set(w,r);
+      var width=Math.max(columnWidth,r.w),stackBottom=columnBottom(columnRight-width,columnRight),laneHeight=Math.max(0,stackBottom-insetTop);
+      if(y===insetTop && r.h>laneHeight && stackBottom<b.h-12){columnRight-=r.w+gap;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);laneHeight=Math.max(0,stackBottom-insetTop);}
+      if(y>insetTop && (r.h>laneHeight || y+r.h>stackBottom)){columnRight-=columnWidth+gap;columnWidth=0;y=insetTop;width=r.w;stackBottom=columnBottom(columnRight-width,columnRight);}
+      r.x=Math.max(12,columnRight-r.w);r.y=y;stackRects.set(w,r);
       y+=r.h+gap;columnWidth=Math.max(columnWidth,r.w);stackLeft=Math.min(stackLeft,r.x);
     });
     var maxWidth=stacked.length?b.w-stackLeft:0;
@@ -501,12 +520,14 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var controls=canvasWindow(playerWindow)?canvasState(playerWindow,0):memory.controls;
     var automaticControls=!controls;
     if(!controls){
-      var right=maxWidth && b.w-maxWidth>420?maxWidth+28:12,controlWidth=workbenchCanvas?Math.max(300,b.w-right-84):b.w-right-12;
-      controls={x:workbenchCanvas?84:12,y:12,w:controlWidth,h:146};
+      var controlLeft=workbenchCanvas?84:12,right=12,minControls=minimum(playerWindow);
+      if(maxWidth){var besideLeft=workbenchCanvas && b.w-maxWidth<420?12:controlLeft,besideWidth=b.w-(maxWidth+28)-besideLeft;if(besideWidth>=minControls){controlLeft=besideLeft;right=maxWidth+28;}}
+      var controlWidth=workbenchCanvas?Math.max(minControls,b.w-right-controlLeft):b.w-right-controlLeft;
+      controls={x:controlLeft,y:12,w:controlWidth,h:146};
     }
     playerWindow.state=canvasWindow(playerWindow)?controls:memory.controls || Object.assign({},controls);
     var previousControls=playerWindow.rect,r=constrain(playerWindow,scaledRect(playerWindow,controls));
-    r=fittedControlsRect(r,insets);
+    r=fittedControlsRect(r,insets,automaticControls);
     if(automaticControls)r.y=Math.max(12,b.h-r.h-insetBottom);
     apply(playerWindow,r);
     if(canvasWindow(playerWindow) && previousControls && Math.abs(previousControls.h-r.h)>.01)canvasGeometryChanged=true;
@@ -529,13 +550,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     var svg=board.querySelector('.boardcanvas>svg'),graphHeight=svg && svg.viewBox.baseVal.width?graphPixels*svg.viewBox.baseVal.height/svg.viewBox.baseVal.width:0;
     board.style.setProperty('--explore-canvas-height',(((workbenchCanvas || readerCanvas || onCanvas())?Math.max(board.clientHeight,graphHeight,(extent.y+extent.h)*graphScale()):board.clientHeight)+2*marginY)+'px');
     board.style.setProperty('--explore-canvas-width',(Math.max(board.clientWidth,graphPixels,(extent.x+extent.w)*graphScale())+2*marginX)+'px');
+    // The browser can otherwise clamp the first camera write against the old
+    // scroll extent. A pushed Contents sidebar makes that stale maximum much
+    // smaller, leaving the graph far outside the visible stage.
+    void board.scrollWidth;
     var percent=graphPixels/natural*100;zoomLabel.textContent=(percent<1?Math.round(percent*100)/100:Math.round(percent))+'%';
     box.dispatchEvent(new CustomEvent('reader-zoom-change',{bubbles:true}));
     if(preserve && prior)positionCamera(prior);
     else if(preserve){if(memory.layout.camera)positionCamera(memory.layout.camera);else{board.scrollLeft=marginX;board.scrollTop=marginY;}}
   }
   function changeZoom(factor){
-    if(!active || retired)return;clearScrollEdit();var token=beginEdit();if(token===false)return;
+    if(!active || retired)return;cancelDeferredFit();clearScrollEdit();var token=beginEdit();if(token===false)return;
     zoom=clamp((graphPixels || graphWidth())/graphWidth()*factor,zoomFloor(),4);sizeGraph(true);saveCamera(token);
   }
   function onLegendClick(ev){if(!active || retired)return;if(ev.target.closest('.board-size>.mbtn:not(.board-pan-button)')){var token=beginEdit();if(token===false)return;zoom=null;sizeGraph(true);saveCamera(token);}}
@@ -560,6 +585,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function begin(ev,w,kind,handle){
     if(!active || ev.button!==0 || gesture)return;
+    cancelDeferredFit();
     ev.preventDefault();ev.stopPropagation();handle.focus({preventScroll:true});
     /* Leaving an Inspector field can synchronously rebuild this viewport. */
     if(retired || !active || !handle.isConnected)return;
@@ -591,6 +617,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   }
   function keyboard(ev,w,kind){
     var dirs={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]},dir=dirs[ev.key];if(!dir)return;
+    cancelDeferredFit();
     var token=beginEdit(true);if(token===false)return;
     ev.preventDefault();ev.stopPropagation();raise(w);
     var before=Object.assign({},w.state),r=Object.assign({},w.rect),automatic=w===playerWindow && !canvasWindow(w) && !memory.controls;
@@ -673,6 +700,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     board.classList.toggle('authored-diagram-hidden',active && canvasBoardHidden);
   }
   function enter(){
+    cancelDeferredFit();
     if(active || !definition || !workbenchCanvas && definition.presentation!=='explore')return;
     if(boardSize && boardSize.suspend)boardSize.suspend();
     active=true;choices.replaceChildren();memory=memories[definition.id] || (memories[definition.id]={panels:Object.create(null),focus:false,scroll:null,zoom:null,layout:copy(definition.exploreLayout || {})});
@@ -701,6 +729,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
   function leave(holdNavigation){
     // Composition temporarily reparents the board through hidden grids. Keep
     // the regular camera suspended until the destination layout is mounted.
+    cancelDeferredFit();
     if(holdNavigation && boardSize && boardSize.suspend)boardSize.suspend();
     if(!active)return;clearScrollEdit();finish(true);selectCanvasWindow(null);
     if(graphPixels && board.clientWidth && board.clientHeight){memory.scroll=scrollState();memory.zoom=zoom;memory.fitFloor=fitFloor;}active=false;
@@ -753,9 +782,10 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     // Escape still cancel first; losing capture while held also cancels.
     finish((ev.buttons&1)!==0);
   }
-  function resized(){cancel();fitHeight();paint();}
+  function resized(){cancelDeferredFit();cancel();fitHeight();paint();}
   function panStart(ev){
     if(!active || ev.button!==0 || gesture || ev.target.closest('.explore-window,.explore-player,a,button,input,select,textarea,[role="button"],[data-dv-node],[data-dv-step],[data-dv-edge],[data-dv-group],[data-dv-row]'))return;
+    cancelDeferredFit();
     clearScrollEdit();var token=beginEdit();if(token===false)return;
     ev.preventDefault();gesture={token:token,kind:'pan',handle:board,id:ev.pointerId,startX:ev.clientX,startY:ev.clientY,left:board.scrollLeft,top:board.scrollTop};board.setPointerCapture(ev.pointerId);shell.classList.add('viewport-gesturing');
   }
@@ -776,7 +806,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     return {x:x,y:y,w:right-x,h:bottom-y};
   }
   function fitCanvas(insets,selection,extraObstacles){
-      if(!active)return;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
+      if(!active)return;cancelDeferredFit();var revision=cameraRevision;insets=insets || (workbenchCanvas?{left:84,right:24,top:145,bottom:canvasWindow(playerWindow)?24:180}:{left:24,right:windows.length?260:24,top:108,bottom:canvasWindow(playerWindow)?24:180});
       insets=Object.assign({},insets);
       if(onCanvas() && !selection)insets.right=24;
       // Subtract fixed overlays into free rectangles, then choose the rectangle
@@ -804,7 +834,17 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
       // canvas extent. Keep that reachable through subsequent zoom gestures.
       fitFloor=(selection || onCanvas())?Math.max(.001,Math.min(w/extent.w,h/extent.h)):null;
       zoom=clamp(Math.min(w/extent.w,h/extent.h,1.5),zoomFloor(),4);sizeGraph(false);
-      board.scrollLeft=marginX+(extent.x+extent.w/2)*graphScale()-(insets.left+w/2);board.scrollTop=marginY+(extent.y+extent.h/2)*graphScale()-(insets.top+h/2);
+      var svg=board.querySelector('.boardcanvas>svg'),origin=selection && svg?svg.viewBox.baseVal:{x:0,y:0};
+      // Selection bounds use SVG coordinates. A graph containing far-negative
+      // authored nodes expands its viewBox origin, while canvas overlays keep
+      // the ordinary zero-based graph coordinates.
+      var fitLeft=marginX+(extent.x-origin.x+extent.w/2)*graphScale()-(insets.left+w/2),fitTop=marginY+(extent.y-origin.y+extent.h/2)*graphScale()-(insets.top+h/2);
+      function placeFit(){if(!active || retired || revision!==cameraRevision)return;board.scrollLeft=fitLeft;board.scrollTop=fitTop;rememberStableCamera();}
+      placeFit();
+      // A zoom-out shrinks the scroll extent through CSS custom properties.
+      // Reapply once layout has committed so the browser cannot clamp against
+      // the preceding, larger canvas and strand the fitted objects offscreen.
+      fitFrame=requestAnimationFrame(function(){fitFrame=requestAnimationFrame(function(){fitFrame=0;placeFit();});});
   }
   return {
     isWorkbenchCanvas:function(){return workbenchCanvas;},
@@ -834,7 +874,7 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     panelPlacement:function(){return onCanvas()?'canvas':'floating';},
     canvasCommand:function(){return expand;},
     navigationKeydown:keydown,
-    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
+    canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();cancelDeferredFit();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
     fitCanvas:fitCanvas,
     fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},

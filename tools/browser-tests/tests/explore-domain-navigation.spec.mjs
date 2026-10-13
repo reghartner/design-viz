@@ -58,8 +58,8 @@ for(const host of ['standalone','native','workbench'])test(`${host} nested Explo
     await parent.locator('[data-dv-detail]').click();
     await expect.poll(()=>page.evaluate(()=>window.domainFrames.length)).toBeGreaterThanOrEqual(20);
     const frames=await page.evaluate(()=>window.domainFrames);
-    const contentTop=host==='workbench'?await page.locator('body').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top'))):0;
-    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84,sy:contentTop,sw:viewport.width-96,sh:viewport.height-contentTop-12}:{sx:284,sy:first.navBottom,sw:viewport.width-284,sh:viewport.height-first.navBottom};
+    const chrome=host==='workbench'?await page.locator('body').evaluate(el=>({top:parseFloat(getComputedStyle(el).getPropertyValue('--workspace-content-top')),inset:parseFloat(getComputedStyle(el).getPropertyValue('--reader-host-inset'))||0})):null;
+    const first=frames[0],viewport=page.viewportSize(),expectedShell=host==='workbench'?{sx:84+chrome.inset,sy:chrome.top,sw:viewport.width-96-chrome.inset,sh:viewport.height-chrome.top-12}:{sx:284,sy:first.navBottom,sw:viewport.width-284,sh:viewport.height-first.navBottom};
     for(const frame of frames){
       expect(frame.opacity).toBe('1');expect(frame.transform).toBe('none');
       expect({sx:frame.sx,sy:frame.sy,sw:frame.sw,sh:frame.sh}).toEqual(expectedShell);

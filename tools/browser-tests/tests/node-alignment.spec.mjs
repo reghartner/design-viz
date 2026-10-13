@@ -144,7 +144,7 @@ for(const presentation of ['standard','explore'])for(const direction of ['horizo
     }
     await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));
     if(presentation==='standard')await page.locator('#docview .board').getByRole('button',{name:'Readable',exact:true}).click();
-    else {await closeTools(page);await page.locator('#workspace-fit').click();await page.locator('.explore-board').dispatchEvent('wheel',{clientX:520,clientY:400,deltaY:-180,ctrlKey:true,bubbles:true,cancelable:true});}
+    else {await closeTools(page);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();await page.locator('.explore-board').dispatchEvent('wheel',{clientX:520,clientY:400,deltaY:-180,ctrlKey:true,bubbles:true,cancelable:true});}
     await node(page,'a').click();await node(page,'b').click({modifiers:['Shift']});
     const before=await source(page),authored=JSON.parse(before).page.blocks[0].diagram.floats,beforeGeometry=await cardCenters(page,['a','b']);
     await node(page,'b').click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align '+direction+'ly',exact:true}).click();
@@ -181,7 +181,7 @@ for(const presentation of ['standard','explore'])for(const direction of ['horizo
       d.layouts=[{id:'canvas',name:'Explore',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}];d.defaultLayout='canvas';
     }
     await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(raw,null,2));await closeTools(page);
-    if(presentation==='explore')await page.locator('#workspace-fit').click();
+    if(presentation==='explore')await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Fit',exact:true}).click();
     else await page.locator('#docview .board').getByRole('button',{name:'Fit diagram',exact:true}).click();
     await select(page);const before=await source(page),beforeGeometry=await cardCenters(page,['a','b','c']),beforeDiagram=await diagram(page);
     expect(beforeGeometry[0][direction==='horizontal'?'y':'x']).not.toBeCloseTo(beforeGeometry[1][direction==='horizontal'?'y':'x'],3);

@@ -30,8 +30,8 @@ test('panel and multiselection actions precede long forms at short height',async
   await actions.getByRole('button',{name:'Change panel type…',exact:true}).click();
   await page.keyboard.press('Escape');await expect(src).toHaveValue(original);
   await expect(actions.getByRole('button',{name:'Change panel type…',exact:true})).toBeFocused();
-  await page.locator('#section-overview [data-dv-node="a"] .t1').click();
-  await page.locator('#section-overview [data-dv-node="b"] .t1').click({modifiers:['Shift']});
+  await page.locator('#section-overview [data-dv-node="a"]').focus();await page.keyboard.press('Enter');
+  await page.locator('#section-overview [data-dv-node="b"]').focus();await page.keyboard.press('Shift+Enter');
   await expect(guide).toContainText('2 nodes selected');await before(actions,guide.locator(':scope > .iform'));
   await expect(actions.getByRole('button',{name:'Create domain from selected nodes',exact:true})).toBeInViewport();
   await expect(src).toHaveValue(original);

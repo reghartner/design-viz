@@ -1,5 +1,5 @@
 import {readFile} from 'node:fs/promises';
-import {test,expect,paste,canvasTools} from '../helpers/test.mjs';
+import {test,expect,paste,canvasTools,workspaceAction} from '../helpers/test.mjs';
 
 const spec={page:{title:'Independent domains',sections:[{id:'overview',heading:'Overview',diagram:{
   nodes:{outside:{title:'Caller'},a:{title:'Validate'},b:{title:'Store'},end:{title:'Receiver'}},
@@ -64,7 +64,7 @@ test('separate document downloads before Apply, remains usable at phone width an
   await preview.getByRole('button',{name:'Apply extraction',exact:true}).click();
   const result=JSON.parse(await src.inputValue());expect(result.page.sections).toHaveLength(1);
   expect(result.page.sections[0].diagram.nodes.domain1.handoff).toEqual({spec:'approved-orders',section:'domain1-detail'});
-  await page.locator('#undo-builder').click();await expect(src).toHaveValue(source);
+  await (await workspaceAction(page,'undo-builder')).click();await expect(src).toHaveValue(source);
 });
 
 test('an extracted child opens empty and later plays its own steps independently of the parent path',async({page,server})=>{

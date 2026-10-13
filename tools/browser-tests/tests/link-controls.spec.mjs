@@ -59,10 +59,11 @@ test('workbench unified navigation does not hide link controls at mobile width',
  await captureClipboard(page);await page.setViewportSize({width:390,height:800});
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(spec(),null,2));await closeTools(page);
  const root=page.locator('#docview'),nav=root.locator('.explore-navigation'),copy=controls(root);
- for(const button of [copy.tab,copy.chapter,copy.step])await expect(button).toBeVisible();
+ await nav.locator('.reader-utilities>summary').click();
+ for(const button of [copy.chapter,copy.step])await expect(button).toBeVisible();await expect(copy.tab).toHaveCount(0);
  await copy.step.click();const link=new URL(await copied(page));expect(link.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(link.hash).toContain('d=delivery');expect(link.hash).toContain('s=send');
- await nav.getByRole('combobox',{name:'Choose View',exact:true}).selectOption({label:'Page'});await expect(copy.contract).toBeVisible();
- await page.setViewportSize({width:900,height:800});await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
+ await chooseNavigation(nav,'View','Page');await expect(copy.contract).toBeVisible();
+ await page.setViewportSize({width:900,height:800});await page.locator('#workspace-more>summary').click();await page.locator('#workspace-appearance>summary').click();await page.locator('#open-page-preview').click();
  const preview=page.locator('#page-preview-view'),previewCopy=controls(preview);for(const button of [previewCopy.tab,previewCopy.chapter,previewCopy.step,previewCopy.contract])await expect(button).toBeVisible();
  await previewCopy.step.click();const previewLink=new URL(await copied(page));expect(previewLink.href.split('#')[0]).toBe(page.url().split('#')[0]);expect(previewLink.hash).toContain('s=send');await page.locator('#close-page-preview').click();
 });

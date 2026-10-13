@@ -39,11 +39,13 @@ test('shared renderPage header shows the global lockup and honors page overrides
   h.context.renderPage(view,{title:'System map',sections:[]},'aurora');
   assert.equal(view.children[0].className,'doc-heading');
   assert.equal(view.children[0].children[0].textContent,'System map');
+  assert.equal(view.children[0].children[1].className,'doc-company-brand');
   assert.match(view.children[0].children[1].innerHTML,/doc-company-brand-lockup/);
   assertRenderedBrand(view.children[0].children[1].innerHTML,global);
 
   const local=h.element(),localName=global.app==='Local Co'?'Local Override':'Local Co';
   h.context.renderPage(local,{title:'Local',brand:{app:localName,logo:'LC'},sections:[]},'aurora');
+  assert.equal(local.children[0].children[1].className,'doc-company-brand doc-company-brand-authored');
   const localHtml=local.children[0].children[1].innerHTML;
   assertRenderedBrand(localHtml,{...global,app:localName,logo:'LC',logoImage:undefined});
   assert.doesNotMatch(localHtml,new RegExp('<span class="fv-brand-name">'+escapeRegex(escapeHtml(global.app))+'</span>'));

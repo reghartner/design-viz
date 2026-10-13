@@ -37,12 +37,13 @@ for(const attached of [true,false])test(`Standard diagram grows beyond the viewp
       const margins=Array.from(el.querySelector('.diagramcol').children).reduce((sum,child)=>{
         const style=getComputedStyle(child);return sum+parseFloat(style.marginTop)+parseFloat(style.marginBottom);
       },0);
-      return {available:col.height-(controls?.height || 0)-(mode?.height || 0)-margins,board:board.height,
+      const scale=parseFloat(getComputedStyle(el.closest('.section-layout-grid')).getPropertyValue('--section-layout-scale')) || 1;
+      return {available:col.height-(controls?.height || 0)-(mode?.height || 0)-margins,board:board.height,scale,
         revealed:Math.min(board.bottom,drawing.bottom)-Math.max(board.top,drawing.top)};
     });
     expect(sizes.board).toBeGreaterThan(800*.7);
     expect(Math.abs(sizes.available-sizes.board)).toBeLessThan(2);
-    if(previous){expect(sizes.board-previous.board).toBeCloseTo(8*40,0);expect(sizes.revealed).toBeGreaterThan(previous.revealed+200);}
+    if(previous){expect(sizes.board-previous.board).toBeCloseTo(8*40*sizes.scale,0);expect(sizes.revealed).toBeGreaterThan(previous.revealed+200);}
     previous=sizes;
   }
 });
@@ -106,20 +107,21 @@ test('Standard arrangement drag keeps the scrolled desktop viewport stable',asyn
   const sample=async(label,pointer)=>{
     const value=await page.evaluate(({label,pointer})=>{
       const rect=el=>{const r=el.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom};};
-      const tile=document.querySelector('[data-layout-key="panel:home"]'),grid=tile.closest('.section-layout-grid'),main=document.querySelector('.workmain');
+      const tile=document.querySelector('[data-layout-key="panel:home"]'),grid=tile.closest('.section-layout-grid'),stage=document.querySelector('.layout-preview-stage'),main=document.querySelector('.workmain');
       return {label,pointer,windowY:window.scrollY,documentY:document.documentElement.scrollTop,bodyY:document.body.scrollTop,
-        workmainY:main.scrollTop,tile:rect(tile),grid:rect(grid),gridHeight:grid.style.minHeight};
+        workmainY:main.scrollTop,workmain:{height:main.clientHeight,scrollHeight:main.scrollHeight},tile:rect(tile),grid:rect(grid),gridHeight:grid.style.minHeight,stage:rect(stage),stageHeight:stage.style.minHeight};
     },{label,pointer});
     await testInfo.attach(label,{body:JSON.stringify(value,null,2),contentType:'application/json'});return value;
   };
   const box=await handle.boundingBox();
   const start={x:box.x+box.width/2,y:box.y+box.height/2};
+  const scale=await page.locator('.section-layout-grid').evaluate(el=>parseFloat(getComputedStyle(el).getPropertyValue('--section-layout-scale')) || 1),dragDistance=4*40*scale;
   const before=await sample('before-drag',start);await testInfo.attach('before-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   await page.mouse.move(start.x,start.y);await page.mouse.down();
-  await page.mouse.move(start.x,start.y-160,{steps:8});await settle(page);
-  const during=await sample('during-drag',{x:start.x,y:start.y-160});await testInfo.attach('during-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  await page.mouse.move(start.x,start.y-dragDistance,{steps:8});await settle(page);
+  const during=await sample('during-drag',{x:start.x,y:start.y-dragDistance});await testInfo.attach('during-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   await page.mouse.up();await settle(page);
-  const after=await sample('after-drag',{x:start.x,y:start.y-160});await testInfo.attach('after-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
+  const after=await sample('after-drag',{x:start.x,y:start.y-dragDistance});await testInfo.attach('after-drag-screenshot',{body:await page.screenshot(),contentType:'image/png'});
   expect({during:[during.windowY,during.workmainY],after:[after.windowY,after.workmainY]}).toEqual({during:[before.windowY,before.workmainY],after:[before.windowY,before.workmainY]});
   expect(during.pointer.y-during.tile.y).toBeCloseTo(before.pointer.y-before.tile.y,0);
   expect(after.pointer.y-after.tile.y).toBeCloseTo(during.pointer.y-during.tile.y,0);

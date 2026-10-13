@@ -110,7 +110,7 @@ test('main canvas Explore gestures author one history entry each and survive sta
 
 test('authored Explore rectangles and camera use final full-canvas bounds in editor and fresh export',async({page,server,context},info)=>{
   // The player needs 92 px; use a feasible normalized height in the 514 px editor stage.
-  const layout={panels:[{panel:'home',x:.2,y:.4,w:.2,h:.25,stacked:false}],controls:{x:.08,y:.72,w:.52,h:.22},camera:{zoom:.7,x:.5,y:.5}};
+  const layout={panels:[{panel:'home',x:.2,y:.4,w:.2,h:.25,stacked:false}],controls:{x:.08,y:.64,w:.52,h:.32},camera:{zoom:.7,x:.5,y:.5}};
   const raw=fixture(layout);await open(page,server,raw);const original=await source(page);
   await expectSavedGeometry(page,layout);await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#undo-builder')).toBeDisabled();
   const reader=await exported(context,server,original,'canvas-authored-export');await expectSavedGeometry(reader,layout);
@@ -142,7 +142,7 @@ for(const authoredCamera of [false,true])test('canvas navigation stays temporary
   for(const navigation of ['wheel','ordinary drag','toolbar zoom']){
     const before=await camera(page);
     if(navigation==='toolbar zoom'){
-      await page.locator('#workspace-zoom-in').click();
+      await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Zoom in',exact:true}).click();
       await expect.poll(async()=>(await camera(page)).zoom).toBeGreaterThan(before.zoom);
     }else{
       const point=await emptyBoardPoint(page);await page.mouse.move(point.x,point.y);

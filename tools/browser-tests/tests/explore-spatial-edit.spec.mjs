@@ -4,7 +4,9 @@ import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 import {test,expect,paste,pastePage,closeTools} from '../helpers/test.mjs';
 function fixture(row=false){return {page:{title:'Spatial edit',skin:'pastel',sections:[{heading:'Explore objects',diagram:{autoplay:false,nodes:{a:{title:'Anchor'},b:{title:'Second'}},rows:row?[['a','b']]:[[]],floats:row?[]:[{id:'a',x:180,y:100},{id:'b',x:500,y:320}],edges:[{from:'a',to:'b'}],panels:[{id:'p',type:'state',title:'Canvas status',states:['Ready'],initial:{state:'Ready'}},{id:'q',type:'state',title:'Floating status',states:['Ready'],initial:{state:'Ready'}}],layouts:[{id:'canvas',name:'Canvas',presentation:'explore',sectionLayout:{default:[{x:0,y:0,w:8,h:12},{panel:'p',x:8,y:0,w:4,h:4},{panel:'q',x:8,y:4,w:4,h:4}]},exploreLayout:{panelPlacement:'canvas',panelPlacements:[{panel:'q',placement:'floating'}],canvas:{panels:[{panel:'p',x:700,y:80,w:240,h:400}]}}}]}}]}};}
-async function open(page,server,row=false,skin='pastel'){await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');const raw=fixture(row);raw.page.skin=skin;await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await page.locator('#workspace-fit').click();await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
+const navigation=page=>page.locator('#docview>.explore-navigation');
+async function fit(page){await navigation(page).getByRole('button',{name:'Fit',exact:true}).click();}
+async function open(page,server,row=false,skin='pastel'){await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');const raw=fixture(row);raw.page.skin=skin;await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);await fit(page);await expect(page.locator('[data-explore-panel=p]')).toBeVisible();}
 const node=page=>page.locator('[data-dv-node=a]');
 const panel=page=>page.locator('[data-explore-panel=p]');
 const menu=page=>page.getByRole('menu',{name:'Object actions'});
@@ -22,8 +24,8 @@ test('marquee selects intersecting nodes and canvas panels without source or pan
  const mr=await menu(page).boundingBox();expect(mr.x).toBeGreaterThanOrEqual(0);expect(mr.x+mr.width).toBeLessThanOrEqual(1280);expect(mr.y+mr.height).toBeLessThanOrEqual(800);
  await menu(page).getByRole('menuitem',{name:'Inspect',exact:true}).click();await expect(page.locator('#guide')).toContainText('3 objects selected');
  await closeTools(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Align horizontally',exact:true}).click();const aligned=await source(page);expect(aligned).not.toBe(original);let d=JSON.parse(aligned).page.sections[0].diagram,p=d.layouts[0].exploreLayout.canvas.panels[0];expect(d.floats[0].y).toBeCloseTo(d.floats[1].y,1);expect(p.y+p.h/2).toBeCloseTo(d.floats[0].y,1);expect(p.h).toBeLessThan(400);await history(page,original,aligned);
- await closeTools(page);await page.locator('#workspace-fit').click();await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Duplicate',exact:true}).click();const duplicated=await source(page);d=JSON.parse(duplicated).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(4);expect(d.panels).toHaveLength(3);expect(d.layouts[0].exploreLayout.canvas.panels).toHaveLength(2);await history(page,aligned,duplicated);
- await closeTools(page);await page.locator('#workspace-fit').click();await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();const deleted=await source(page);d=JSON.parse(deleted).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(0);expect(d.panels.map(p=>p.id)).toEqual(['q']);await history(page,duplicated,deleted);
+ await closeTools(page);await fit(page);await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Duplicate',exact:true}).click();const duplicated=await source(page);d=JSON.parse(duplicated).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(4);expect(d.panels).toHaveLength(3);expect(d.layouts[0].exploreLayout.canvas.panels).toHaveLength(2);await history(page,aligned,duplicated);
+ await closeTools(page);await fit(page);await marquee(page);await node(page).click({button:'right'});await menu(page).getByRole('menuitem',{name:'Delete',exact:true}).click();const deleted=await source(page);d=JSON.parse(deleted).page.sections[0].diagram;expect(Object.keys(d.nodes)).toHaveLength(0);expect(d.panels.map(p=>p.id)).toEqual(['q']);await history(page,duplicated,deleted);
 });
 test('context-menu alignment keeps the nonfirst clicked panel as the visual anchor with one Undo',async({page,server})=>{
  await open(page,server);const before=await source(page),authored=JSON.parse(before).page.sections[0].diagram.layouts[0].exploreLayout.canvas.panels[0];await marquee(page);
@@ -51,7 +53,7 @@ test('menu covers panel body border and header, modifiers preserve selection, Es
  await node(page).click();await panel(page).click({position:{x:4,y:4},modifiers:['Shift']});await expect(node(page)).toHaveClass(/dv-sel/);await expect(panel(page)).toHaveClass(/dv-sel/);
  await panel(page).click({button:'right',position:{x:4,y:4}});await expect(menu(page).getByRole('menuitem',{name:/Align horizontally/})).toHaveAttribute('aria-disabled','true');await expect(menu(page)).toContainText('Free placement');await page.keyboard.press('Escape');await expect(menu(page)).toHaveCount(0);expect(await source(page)).toBe(original);
  await panel(page).focus();await panel(page).locator('.explore-window-grip').click({button:'right'});await expect(menu(page)).toBeVisible();await page.keyboard.press('ArrowDown');await expect(menu(page).getByRole('menuitem',{name:'Delete',exact:true})).toBeFocused();await page.keyboard.press('Escape');
- await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
+ await panel(page).focus();await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
  await node(page).click({modifiers:['Alt']});await expect(page.locator('.dv-connect-hint')).toBeVisible();await page.keyboard.press('Escape');
 });
 test('marquee follows zoom; source handwriting retires the menu and view actions clear selection',async({page,server})=>{
@@ -59,9 +61,9 @@ test('marquee follows zoom; source handwriting retires the menu and view actions
  for(const delta of [0,150,-250]){
   if(delta)await page.locator('.explore-board').dispatchEvent('wheel',{clientX:430,clientY:400,deltaY:delta,ctrlKey:true,bubbles:true,cancelable:true});
   const r=await node(page).boundingBox();await page.keyboard.down('Alt');await page.mouse.move(r.x+r.width+10,r.y-10);await page.mouse.down();await page.mouse.move(r.x+r.width-4,r.y+6,{steps:5});await page.mouse.up();await page.keyboard.up('Alt');
-  await expect(node(page)).toHaveClass(/dv-sel/);await expect(page.locator('.dv-sel')).toHaveCount(1);expect(await source(page)).toBe(original);await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
+  await expect(node(page)).toHaveClass(/dv-sel/);await expect(page.locator('.dv-sel')).toHaveCount(1);expect(await source(page)).toBe(original);await node(page).focus();await page.keyboard.press('Escape');await expect(page.locator('.dv-sel')).toHaveCount(0);
  }
- await page.locator('#workspace-fit').click();await marquee(page,true);await page.keyboard.press('Escape');await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
+ await fit(page);await marquee(page,true);await page.keyboard.press('Escape');await page.mouse.up();await page.keyboard.up('Alt');await expect(page.locator('.dv-selection-marquee')).toHaveCount(0);await expect(page.locator('.dv-sel')).toHaveCount(0);
  await node(page).click({button:'right'});await expect(menu(page)).toBeVisible();await page.locator('#src').evaluate(el=>{el.value+=' ';el.dispatchEvent(new Event('input',{bubbles:true}));});await expect(menu(page)).toHaveCount(0);await expect(node(page)).toHaveClass(/dv-sel/);await page.locator('#docview>.explore-navigation').getByRole('button',{name:'Canvas',exact:true}).click();await expect(page.locator('.dv-sel')).toHaveCount(0);expect(await source(page)).toBe(original+' ');
 });
 
@@ -134,7 +136,7 @@ async function graphBoxes(page){return page.locator('.explore-board').evaluate(b
 test('keyboard selects and nudges mixed objects in graph units with one Undo per held sequence at different zooms',async({page,server})=>{
  await open(page,server);const original=await source(page);await keyboardSelectAll(page);expect(await source(page)).toBe(original);
  for(const zoom of [false,true]){
-  if(zoom)await page.locator('#workspace-zoom-out').click();
+  if(zoom)await navigation(page).getByRole('button',{name:'Zoom out',exact:true}).click();
   await keyboardSelectAll(page);await node(page).focus();const before=await source(page),boxes=await graphBoxes(page);
   await page.keyboard.down('ArrowRight');await page.keyboard.down('ArrowRight');await page.keyboard.down('ArrowRight');expect(await source(page)).toBe(before);
   await page.keyboard.up('ArrowRight');await expect(node(page)).toBeFocused();const after=await source(page),moved=await graphBoxes(page);
@@ -155,9 +157,9 @@ test('mixed distribution uses equal rendered gaps from menu and Inspector at two
   if(direction==='vertical'){
    // Move the second node and panel down to create room along the vertical axis.
    await page.locator('[data-dv-node=b]').focus();await page.keyboard.press('Enter');for(let i=0;i<5;i++)await page.keyboard.press('Shift+ArrowDown');
-   await panel(page).focus();await page.keyboard.press('Enter');for(let i=0;i<16;i++)await page.keyboard.press('Shift+ArrowDown');await page.locator('#workspace-fit').click();
+   await panel(page).focus();await page.keyboard.press('Enter');for(let i=0;i<16;i++)await page.keyboard.press('Shift+ArrowDown');await fit(page);
   }
-  await keyboardSelectAll(page);if(direction==='vertical')await page.locator('#workspace-zoom-out').click();
+  await keyboardSelectAll(page);if(direction==='vertical')await navigation(page).getByRole('button',{name:'Zoom out',exact:true}).click();
   const before=await source(page),boxes=await graphBoxes(page),axis=direction==='horizontal'?'x':'y',size=direction==='horizontal'?'w':'h',min=Math.min(...boxes.map(r=>r[axis])),max=Math.max(...boxes.map(r=>r[axis]+r[size]));
   await node(page).focus();await page.keyboard.press('Shift+F10');
   if(direction==='horizontal')await menu(page).getByRole('menuitem',{name:'Distribute horizontally',exact:true}).click();
@@ -175,7 +177,7 @@ for(const width of [1280,1440])test('Fit selection frames mixed bounds around In
   const geometry=await page.evaluate(()=>{const b=document.querySelector('.explore-board').getBoundingClientRect(),selected=[...document.querySelectorAll('.dv-sel')].map(el=>el.getBoundingClientRect()),obstacles=[...document.querySelectorAll('.workspace-window:not([hidden]),.workspace-canvas-controls,.explore-stage > .explore-window:not([hidden]),.explore-player:not([hidden])')].map(el=>el.getBoundingClientRect());return {board:{x:b.left,y:b.top,right:b.right,bottom:b.bottom},selected:selected.map(r=>({x:r.left,y:r.top,right:r.right,bottom:r.bottom})),overlap:selected.some(a=>obstacles.some(o=>o.width&&o.height&&a.left<o.right&&a.right>o.left&&a.top<o.bottom&&a.bottom>o.top))};});
   expect(geometry.selected).toHaveLength(3);for(const r of geometry.selected){expect(r.x).toBeGreaterThanOrEqual(geometry.board.x);expect(r.y).toBeGreaterThanOrEqual(geometry.board.y);expect(r.right).toBeLessThanOrEqual(geometry.board.right);expect(r.bottom).toBeLessThanOrEqual(geometry.board.bottom);}expect(geometry.overlap).toBe(false);expect(await source(page)).toBe(before);await expect(page.locator('#undo-builder')).toBeDisabled();
   if(entry==='toolbar'){await page.screenshot({path:'/tmp/explore-fit-selection-'+width+'.png'});await info.attach('Fit selection '+width,{body:await page.screenshot(),contentType:'image/png'});}
-  await page.locator('#workspace-fit').click();
+  await fit(page);
  }
  await page.locator('#workspace-fit-selection').click();await page.screenshot({path:'/tmp/explore-spatial-polish-'+width+'.png'});
  await panel(page).focus();await page.keyboard.press('Enter');await page.locator('#workspace-fit-selection').click();await expect(page.locator('.dv-sel')).toHaveCount(1);const single=await panel(page).boundingBox(),inspector=await page.locator('#workspace-window-inspect').boundingBox();expect(single.x<inspector.x+inspector.width && single.x+single.width>inspector.x && single.y<inspector.y+inspector.height && single.y+single.height>inspector.y).toBe(false);expect(await source(page)).toBe(before);
@@ -183,5 +185,6 @@ for(const width of [1280,1440])test('Fit selection frames mixed bounds around In
 
 test('Fit selection can frame distant free nodes without any canvas panels',async({page,server})=>{
  await page.setViewportSize({width:1280,height:800});await page.goto(server.origin+'/standalone.html');await page.evaluate(()=>localStorage.clear());await page.goto(server.origin+'/workbench.html');const raw=fixture(),d=raw.page.sections[0].diagram;delete d.panels;d.layouts[0].sectionLayout.default=[{x:0,y:0,w:12,h:12}];delete d.layouts[0].exploreLayout;d.floats[0].x=-20000;d.floats[1].x=20000;await paste(page,JSON.stringify(raw));await closeTools(page);await page.evaluate(()=>document.fonts.ready);const before=await source(page);
- await node(page).focus();await page.keyboard.press('Enter');await page.locator('[data-dv-node=b]').focus();await page.keyboard.press('Shift+Enter');await page.locator('#workspace-fit-selection').click();const board=await page.locator('.explore-board').boundingBox();for(const id of ['a','b']){const r=await page.locator('[data-dv-node='+id+']').boundingBox();expect(r.x).toBeGreaterThanOrEqual(board.x);expect(r.x+r.width).toBeLessThanOrEqual(board.x+board.width);expect(r.y).toBeGreaterThanOrEqual(board.y);expect(r.y+r.height).toBeLessThanOrEqual(board.y+board.height);}expect(await source(page)).toBe(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+ await node(page).focus();await page.keyboard.press('Enter');await page.locator('[data-dv-node=b]').focus();await page.keyboard.press('Shift+Enter');await page.locator('#workspace-fit-selection').click();for(const id of ['a','b'])await expect.poll(async()=>{const board=await page.locator('.explore-board').boundingBox(),r=await page.locator('[data-dv-node='+id+']').boundingBox();return r.x>=board.x && r.x+r.width<=board.x+board.width && r.y>=board.y && r.y+r.height<=board.y+board.height;}).toBe(true);expect(await source(page)).toBe(before);await expect(page.locator('#undo-builder')).toBeDisabled();
+ const manual=await page.locator('.explore-board').evaluate(board=>{document.querySelector('#workspace-fit-selection').click();board.dispatchEvent(new WheelEvent('wheel',{deltaY:1,bubbles:true,cancelable:true}));board.scrollLeft+=61;return board.scrollLeft;});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));expect(await page.locator('.explore-board').evaluate(board=>board.scrollLeft)).toBe(manual);
 });

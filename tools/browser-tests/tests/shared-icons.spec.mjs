@@ -1,9 +1,9 @@
-import {test,expect,pastePage as paste,inspectPageElement,expectCompanyBrand} from '../helpers/test.mjs';
+import {test,expect,pastePage as paste,inspectPageElement} from '../helpers/test.mjs';
 import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {repo} from '../helpers/prepare.mjs';
 const png='iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a6E0AAAAASUVORK5CYII=';
-const fixture=()=>({page:{title:'Shared icon language',sections:[{heading:'A branded camera story',diagram:{view:'step',autoplay:false,
+const fixture=()=>({page:{title:'Shared icon language',brand:{app:'Cedar',icon:'house'},sections:[{heading:'A branded camera story',diagram:{view:'step',autoplay:false,
  brand:{app:'Cedar',icon:'house'},nodes:{camera:{title:'Camera',icon:'camera'},cloud:{title:'Cloud',icon:'cloud'}},rows:[['camera','cloud']],edges:[{from:'camera',to:'cloud',kind:'https'}],
  panels:[{id:'app',type:'deviceapp',title:'Phone',fields:[{id:'heat',label:'Temperature',icon:'temperature'}],initial:{heat:{value:22,status:'ready'}}},{id:'video',type:'screen',title:'Camera feed',scene:'person-through-door',initial:{mode:'active'}},{id:'monitor',type:'security',title:'Monitoring',initial:{status:'armed'}}],
  steps:[{id:'normal',text:'Normal',nodes:['camera']},{id:'hot',text:'Too hot',panels:{app:{heat:{value:60,icon:'hot'}},video:{mode:'unavailable',reason:'Thermal pause'},monitor:{status:'reviewing'}}}]
@@ -34,7 +34,8 @@ test('visual icon picker searches, filters, chooses one transaction, and closes 
 test('company logo upload is shared across panels with override, opt-out and Undo',async({page,server},info)=>{
  await page.goto(server.origin+'/workbench.html');await paste(page,JSON.stringify(fixture(),null,2));
  const root=page.locator('#docview');
- await expectCompanyBrand(root.locator('.doc-heading .doc-company-brand'));
+ const heading=root.locator('.doc-heading'),headerBrand=heading.locator('.doc-company-brand');await expect(headerBrand.locator('.fv-brand-name')).toHaveText('Cedar');await expect(headerBrand.locator('.fv-brand-mark')).toBeVisible();await expect(headerBrand).toBeVisible();await expect(heading.locator('.doc-title')).toBeHidden();
+ const headingBox=await heading.boundingBox(),brandBox=await headerBrand.boundingBox();expect(headingBox.height).toBeLessThanOrEqual(32);expect(brandBox.height).toBeGreaterThan(0);
  await expect(root.locator('.pt-deviceapp .fv-brand-name')).toHaveText('Cedar');
  await inspectPageElement(page,root.locator('.pt-deviceapp .ptitle'));
  const guide=page.locator('#guide'),brand=guide.locator('.fv-brand-editor');await brand.evaluate(el=>{el.open=true;});

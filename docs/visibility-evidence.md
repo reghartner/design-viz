@@ -19,7 +19,7 @@ consequences; do not restart the worksheet or invent a question batch.
 Write `candidate.visibility.json` for supported targets and run from VIZ:
 
 ```sh
-node tools/visibility-check.cjs <candidate.spec.json> <candidate.visibility.json>
+node tools/visibility-check.cjs <candidate.spec.json> <candidate.visibility.json> [<provider.spec.json> ...]
 python3 .claude/skills/hld-to-page/scripts/spec_walk.py <candidate.spec.json> --state --expect '<path>/<step>:<panel>.<field>=<value>'
 ```
 
@@ -33,9 +33,11 @@ failure before claiming that requirement is met; keep genuine tool limits explic
 Diagram-only beats and unsupported panel internals may be **N/A to automated
 visibility**, with the exact target and reason in the ledger and actual review
 still outstanding. Do not create empty or fake assertions to get a passing result.
-For Canon imports, use the resolved authorized Canon/Workbench preview; standalone
-walk/visibility tools do not resolve imports. Preserve authored declarations and
-record that limitation instead of flattening the source.
+For Canon imports, pass the complete authorized provider closure after the
+expectations file. The visibility checker resolves that authored snapshot only in
+memory. `spec_walk.py` has no provider arguments, so use its resolved authorized
+Canon/Workbench input when pairing value checks. Preserve authored declarations;
+neither workflow requires flattening the source.
 
 Before proposing, summarize actual validation, value/icon and visibility results
 and outstanding review in the ledger and proposal. In a file-only session say
@@ -78,6 +80,7 @@ without a central panel-type switch. Its address is trusted repository metadata.
 
 ```sh
 node tools/visibility-check.cjs story.spec.json story.visibility.json
+node tools/visibility-check.cjs checkout.spec.json checkout.visibility.json platform.spec.json
 ```
 
 The command works with Node in a source checkout or extracted authoring
@@ -87,6 +90,11 @@ reachable stops use the same filter normalization as playback. Unknown,
 ambiguous, excluded or filtered targets fail even when `visible:false` was
 requested. It never navigates an editor-only preview to reveal hidden stops.
 Intentionally hidden content is separate from an unreachable story beat.
+Provider arguments may be in any order, but must include every direct and
+transitive import used by the consumer. Duplicate Canon identities, missing
+providers or exports, cycles and invalid materialized references are input errors
+(exit 2). Evidence mismatches remain check failures (exit 1). Source,
+expectations and provider files are never modified.
 
 ## Optional authorized rendered audit
 
@@ -114,9 +122,10 @@ separately; these checks are not a substitute for a rich, source-grounded story.
 
 Both tools are read-only, do not fetch source links, and emit machine-readable
 results identifying each target and reason. Exit 0 means every applicable check
-passed; 1 means a failed/unsupported/invalid expectation; 2 means malformed input
-or a tool failure. Browser absence never passes. Page/console errors, failed/HTTP
+passed; 1 means a failed/unsupported/invalid expectation; 2 means malformed input,
+broken topology, or a tool failure. Browser absence never passes. Page/console errors, failed/HTTP
 error requests and blocked outbound requests fail the browser audit. No user
-selectors or scripts are accepted. Shared topology must be checked in its
-resolved authorized preview; unresolved imports are rejected without modifying
-or flattening accepted source.
+selectors or scripts are accepted. The standalone visibility checker accepts the
+authorized provider files needed to resolve shared topology in memory; the browser
+audit still requires a resolved authorized preview. Neither modifies or flattens
+accepted source.

@@ -15,6 +15,27 @@ const core = require('./canon/core.cjs');
    results and in-page results cannot drift. No DOM renderer is loaded. */
 
 const fs = require('fs');
+const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+function hasTopologyDeclarations(raw){
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false;
+  if (own(raw, 'topologyImports') || own(raw, 'topologyExports')) return true;
+  return core.sections(raw).some(section => {
+    const diagram = section.diagram;
+    return diagram && typeof diagram === 'object' &&
+      (own(diagram, 'topologyImports') || own(diagram, 'topologyExports'));
+  });
+}
+
+function topologyDiagnosticFile(entries, error){
+  const message = error && error.message ? error.message : String(error);
+  const matched = entries.find(entry => {
+    const canon = entry.raw && entry.raw.page && entry.raw.page.canon;
+    return canon && typeof canon.id === 'string' && message.startsWith('Topology ' + canon.id);
+  });
+  return (matched || entries.find(entry => hasTopologyDeclarations(entry.raw)) || entries[0]).file;
+}
+
 function main(argv){
   const args = argv.slice(2);
   const quiet = args.includes('--quiet');
@@ -25,6 +46,7 @@ function main(argv){
   }
   const C = core.viewerRouting();
   let anyErrors = false;
+  const entries = [];
 
   for (const file of files){
     let raw;
@@ -36,6 +58,24 @@ function main(argv){
       anyErrors = true;
       continue;
     }
+    entries.push({file, raw});
+  }
+
+  let resolved = entries.map(entry => entry.raw);
+  if (entries.some(entry => hasTopologyDeclarations(entry.raw))){
+    try {
+      resolved = core.materializeTopology(resolved);
+    } catch (error){
+      const file = topologyDiagnosticFile(entries, error);
+      const message = error && error.message ? error.message : String(error);
+      console.log(file + ': ERROR ' + message);
+      console.log(file + ': 1 errors, 0 warnings');
+      return 1;
+    }
+  }
+
+  entries.forEach((entry, index) => {
+    const file = entry.file, raw = resolved[index];
     const page = C.normalize(raw);
     const v = core.validateSpec(raw);
     for (const message of core.compatibility.check(raw).messages)
@@ -49,7 +89,7 @@ function main(argv){
     console.log(file + ': ' + v.errors.length + ' errors, ' +
                 (v.warnings.length + lint.length) + ' warnings');
     if (v.errors.length) anyErrors = true;
-  }
+  });
   return anyErrors ? 1 : 0;
 }
 

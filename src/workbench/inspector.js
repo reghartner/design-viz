@@ -2239,7 +2239,7 @@ function renderExtractionPreview(multiSel){
       if(key===draftKey)return;
       releaseDownloads();downloadedKey=null;draftKey=key;draft=null;apply.disabled=true;download.disabled=true;status.textContent='';report.innerHTML='';
       if(!config.title){showError('Give the domain a title.');return;}
-      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config);
+      var plan=planExtractIndependentDiagram(snapshot.text,snapshot.raw,selected[0].section,selected.map(function(t){return t.id;}),config,session.validate);
       if(plan.error){showError(plan.error);return;}
       showError('');draft={plan:plan,childText:JSON.stringify(plan.childSpec,null,2)+'\n'};
       var summary=document.createElement('p');summary.className='extraction-summary';

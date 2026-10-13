@@ -1,5 +1,6 @@
 'use strict';
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const loader=require('../tools/source-loader.cjs');
 const ctx=require('./workbench-command-context.cjs')(['graph','document','narrative','layout']);
 const fixture=()=>JSON.parse(fs.readFileSync('examples/tab-views/tab-views.spec.json','utf8'));
 const plain=v=>JSON.parse(JSON.stringify(v));
@@ -84,4 +85,39 @@ test('legacy prose plus a Standard arrangement has distinct aggregate and diagra
  const raw={sections:[{id:'intro',text:'Introduction'},{id:'story',heading:'Story',diagram:{nodes:{a:{}},rows:[['a']],layouts:[
   {id:'standard',name:'Standard',presentation:'standard',sectionLayout:{default:[{x:0,y:0,w:12,h:12}]}}]}}]};
  const owner=ctx.tabViewOwners(ctx.normalize(raw))[0];assert.deepEqual(plain(ctx.tabViewDefinitions(owner).map(v=>v.name)),['Standard','Story · Standard']);
+});
+
+function topologyViewsHarness(){
+ const context={URL,TextEncoder};vm.createContext(context);vm.runInContext(loader.composeSources(['canon.js','validator.js','workbench/source-edit.js','workbench/targets.js','workbench/commands/common.js','workbench/commands/layout.js','workbench/session.js']),context);return context;
+}
+function topologyViewsFixture(){
+ const canon=id=>({version:1,id,kind:'canonical',owner:'group:default/views'});
+ const provider={page:{title:'Provider',canon:canon('provider'),sections:[{id:'services',diagram:{nodes:{api:{title:'API'},store:{title:'Store'}},rows:[['api','store']],edges:[{from:'api',to:'store'}],topologyExports:{core:{nodes:['api','store'],edges:['api->store']}}}}]}};
+ const consumer={page:{title:'Consumer',canon:canon('consumer'),sections:[{id:'story',diagram:{topologyImports:[{spec:'provider',export:'core',as:'shared',nodes:['api','store'],edges:['api->store']}],nodes:{client:{title:'Client'}},rows:[['client']],edges:[{from:'client',to:'shared::api'}],steps:[{id:'request',edge:'client->shared::api'},{id:'store',edge:'shared::api->shared::store'}]}}],views:[{id:'main',name:'Main',presentation:'standard',sections:['story']}],defaultView:'main'}};
+ return {provider,consumer,context:{version:1,id:'consumer',specs:[provider,consumer]}};
+}
+test('New View and Duplicate View validate through frozen imported topology and commit one authored transaction',()=>{
+ const c=topologyViewsHarness();
+ for(const action of ['create','duplicate']){
+  const fixture=topologyViewsFixture(),original=JSON.stringify(fixture.consumer,null,2),frozen=JSON.stringify(fixture.context);let text=original,preview,saved;
+  const session=c.createBuilderSession({source:{read:()=>text,write:value=>text=value},persistence:{read:()=>({}),preserve(){},cancel(){},save:(source,baseline,artifacts)=>saved={source,baseline,artifacts}},render(){preview=session.resolve(JSON.parse(text));}});
+  session.replaceProject(original,null,{topologyContext:fixture.context});const snapshot=session.snapshot();
+  const plan=c.planTabViewEdit(text,snapshot.raw,0,'main',action,undefined,session.validate);
+  assert.equal(plan.error,undefined,action);assert.equal(session.accept(plan,{snapshot}),true,action);
+  const authored=JSON.parse(text),diagram=authored.page.sections[0].diagram;
+  assert.equal(authored.page.views.length,2);assert.deepEqual(plain(diagram.topologyImports),plain(fixture.consumer.page.sections[0].diagram.topologyImports));
+  assert.deepEqual(Object.keys(diagram.nodes),['client']);assert.equal(diagram.topologyProvenance,undefined);
+  const rendered=preview.page.sections[0].diagram;assert.ok(rendered.nodes['shared::api']);assert.ok(rendered.edges.some(edge=>edge.from==='shared::api' && edge.to==='shared::store'));
+  assert.equal(JSON.stringify(session.topologyContext()),frozen);assert.equal(JSON.stringify(saved.artifacts.topologyContext),frozen);
+  assert.equal(session.undo(),true);assert.equal(text,original);assert.equal(session.canUndo(),false);
+ }
+});
+test('View edits still reject unresolved or invalid imported topology without publishing a candidate',()=>{
+ const c=topologyViewsHarness(),fixture=topologyViewsFixture(),text=JSON.stringify(fixture.consumer,null,2);
+ const disconnected=c.planTabViewEdit(text,fixture.consumer,0,'main','duplicate');
+ assert.match(disconnected.error,/unresolved topology declarations/);assert.equal(disconnected.text,undefined);
+ let source=text;const session=c.createBuilderSession({source:{read:()=>source,write:value=>source=value},persistence:{read:()=>({}),preserve(){},cancel(){},save(){}},render(){}});
+ const missing={...fixture.context,specs:[fixture.consumer]};session.replaceProject(text,null,{topologyContext:missing});
+ const invalid=c.planTabViewEdit(text,fixture.consumer,0,'main','create',undefined,session.validate);
+ assert.match(invalid.error,/missing spec provider/);assert.equal(invalid.text,undefined);
 });

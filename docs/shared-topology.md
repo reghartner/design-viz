@@ -322,11 +322,14 @@ platform provider, default-floating checkout consumer, explicitly positioned
 
 ```sh
 python3 tools/build.py
+node tools/validate.js examples/canon/topology/checkout.json examples/canon/topology/platform.json
 node tools/canon/library.mjs --registry examples/canon/topology/registry.json --out .local/topology/diagrams.json
 node --test tests/canon-topology.test.js
 ```
 
 For central canon, enroll both folders in root `canon.json`; its folder-derived
-IDs replace the legacy example registry's IDs. Standalone `tools/validate.js`
-intentionally rejects unresolved declarations: validate the materialized output,
-or run the canon publisher to validate and resolve the complete source snapshot.
+IDs replace the legacy example registry's IDs. For local validation, pass the
+authored consumer and its complete provider closure to `tools/validate.js` in one
+invocation. It resolves that batch in memory, reports results against the original
+filenames, and never writes a flattened source. The Canon publisher remains the
+authority for validating and resolving the centrally enrolled source snapshot.

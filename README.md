@@ -264,7 +264,8 @@ Everything here — content and tooling — came out of an agent-driven loop:
 | `src/` + `tools/build.py` | The engine source of truth. `build.py` assembles both single-file pages and `tools/canon/generated-runtime.cjs` for Node backends from `src/`. Viewer/workbench HTML is ignored and generated for local use, CI artifacts and image builds. Authored diagram exports remain independent. Runtime JavaScript and copied declarations/licenses are ignored build outputs too. Local commands and CI generate them before tests and packaging; see [build and distribution instructions](docs/build-entrypoints.md#build-outputs-and-distribution). The Canon index is regenerated during the build. |
 | `tests/` + `.github/workflows/ci.yml` | Python + Node unit tests (zero dependencies): injection anchoring, build determinism, spec validation, lint rules, layout math, panel-state folding, tool exports, and end-to-end CLI checks over seeded fixtures. CI runs them plus an examples-build and spec-validation check on every push and PR. |
 | `tools/browser-tests/` | Required pinned-Chromium contracts for offline HTML, editor source/history and teardown, native React isolation, and copied Forge resources. [Commands and boundaries](tools/browser-tests/README.md). |
-| `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json>` prints errors, warnings, and lint findings with field paths; exit 1 on errors. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
+| `tools/validate.js` | Validator + lint CLI: `node tools/validate.js <spec.json> [<provider.json> ...]` prints errors, warnings, and lint findings with field paths; exit 1 on errors. When any input declares shared topology, all inputs form one authored snapshot that is resolved only in memory before each file is checked. `--quiet` for CI. Loads the same validator the pages ship, so CLI and in-page results cannot drift. |
+| `tools/visibility-check.cjs` | Presentation-eligibility CLI: `node tools/visibility-check.cjs <spec.json> <expectations.json> [<provider.json> ...]`. Provider arguments supply the complete authored topology snapshot for an importing consumer; resolution is read-only and in memory. |
 | `tools/export-layout.cjs` | Local diagnostic export: writes only anonymous node bounds, numeric edge topology and the exact rendered SVG edge paths. It never writes titles, source IDs, labels, prose, panels or metadata. |
 | `template/flowview.html` | The render target (generated locally, not tracked — edit `src/`). Self-contained single file: layout engine, themes, protocol-keyed legend, tabs, step player, containment groups, synchronized inspector panels (state machine, LEDs, gauge, log, camera screen), permalink affordances. Reads its spec from an embedded JSON block. |
 | `tools/inject.py` | The injection step: `inject.py <spec.json> <template.html> <out.html>`. Validates the JSON, refuses unescaped `</script`, sets the page title from `page.title`, and discovers derived sibling links when the conventional output root already has `crossref.json`. |
@@ -614,12 +615,18 @@ validator or compatibility CLI. Downloaded folder-agent kits already include it.
 python3 tools/build.py --runtime-only
 node tools/validate.js my-page.spec.json          # errors + warnings + lint, field paths
 node tools/validate.js --quiet my-page.spec.json  # errors + summary only
+node tools/validate.js consumer.spec.json provider.spec.json  # resolve shared topology in memory, then check both
 ```
 
 An authoring agent's loop is: emit JSON → run the CLI → fix what it names → inject.
 Lint findings are advisory layout heuristics (label longer than its edge, crowded
 row corridors, unused declared protocols, 3+ rows);
 they never block rendering.
+
+Pass every authored provider needed by an importing spec in the same invocation.
+The CLI never writes a flattened snapshot: diagnostics remain associated with the
+input filenames, and missing providers, broken exports, duplicate identities and
+import cycles fail with topology-specific errors.
 
 ## Comparing spec revisions
 

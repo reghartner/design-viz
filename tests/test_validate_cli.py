@@ -14,6 +14,7 @@ import unittest
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CLI = ROOT / "tools" / "validate.js"
 FIXTURES = ROOT / "tests" / "fixtures"
+TOPOLOGY = ROOT / "examples" / "canon" / "topology"
 
 EXAMPLES = [
     "examples/cumulus/cumulus-page.spec.json",
@@ -106,6 +107,30 @@ class ValidateCliTest(unittest.TestCase):
                         self.assertIn(f"{bad}: 1 errors, 0 warnings", r.stdout)
                         self.assertIn(f"{good}: 0 errors, 0 warnings", r.stdout)
                         self.assertLess(r.stdout.index(str(bad)), r.stdout.index(str(good)))
+
+    def test_both_alias_topology_batch_resolves_and_missing_provider_fails(self):
+        with tempfile.TemporaryDirectory() as temp:
+            temp = pathlib.Path(temp)
+            consumer = temp / "checkout.json"
+            provider = temp / "platform.json"
+            consumer_raw = json.loads((TOPOLOGY / "checkout.json").read_text())
+            consumer_raw["page"]["blocks"] = consumer_raw["page"]["sections"]
+            consumer_raw["page"]["sections"] = []
+            consumer.write_text(json.dumps(consumer_raw))
+            shutil.copyfile(TOPOLOGY / "platform.json", provider)
+            before = (consumer.read_bytes(), provider.read_bytes())
+
+            resolved = run_cli(str(consumer), str(provider))
+            self.assertEqual(resolved.returncode, 0, resolved.stdout + resolved.stderr)
+            self.assertIn(f"{consumer}: 0 errors", resolved.stdout)
+            self.assertIn(f"{provider}: 0 errors", resolved.stdout)
+            self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
+
+            missing = run_cli(str(consumer))
+            self.assertEqual(missing.returncode, 1, missing.stdout + missing.stderr)
+            self.assertIn(f"{consumer}: ERROR Topology checkout", missing.stdout)
+            self.assertIn("missing spec platform", missing.stdout)
+            self.assertEqual((consumer.read_bytes(), provider.read_bytes()), before)
 
 
 class ContractCardCliTest(unittest.TestCase):

@@ -2,6 +2,14 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {check}=require('../tools/visibility-check.cjs');
 const {fixture,expectation}=require('./fixtures/visibility-evidence.cjs');
 const report=(spec,rows)=>check(spec,{version:1,expectations:rows});
+function topologyFixture(){
+ const fs=require('node:fs'),path=require('node:path'),consumer=fixture();
+ consumer.page.canon={version:1,id:'visibility-consumer',kind:'design',owner:'group:default/test'};
+ consumer.page.sections[0].diagram.topologyImports=[{spec:'platform',export:'core',as:'platform'}];
+ consumer.page.blocks=consumer.page.sections;consumer.page.sections=[];
+ const provider=JSON.parse(fs.readFileSync(path.join(__dirname,'../examples/canon/topology/platform.json'),'utf8'));
+ return {consumer,provider};
+}
 
 test('visibility distinguishes carried values from home, hidden card and carried whole-panel eligibility without mutation',()=>{
  const raw=fixture(),before=JSON.stringify(raw);
@@ -55,5 +63,30 @@ test('CLI reports nonzero failures and malformed input without writing either in
   const fail=run();assert.equal(fail.status,1);assert.equal(JSON.parse(fail.stdout).results[0].status,'fail');
   assert.deepEqual([fs.readFileSync(spec,'utf8'),fs.readFileSync(expect,'utf8')],before);
   fs.writeFileSync(expect,'{"version":2}');assert.equal(run().status,2);
+ }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('both-alias imported topology resolves from providers without mutating programmatic inputs',()=>{
+ const {consumer,provider}=topologyFixture(),expectations={version:1,expectations:[expectation({step:'open'})]};
+ const before=structuredClone([consumer,provider,expectations]);
+ const output=check(consumer,expectations,[provider]);
+ assert.equal(output.ok,true);assert.deepEqual([consumer,provider,expectations],before);
+ assert.throws(()=>check(consumer,expectations),/Topology visibility-consumer.*missing spec platform/);
+});
+
+test('CLI accepts providers for both-alias topology and reserves exit 2 for missing topology',()=>{
+ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),{spawnSync}=require('node:child_process');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'visibility-topology-cli-'));
+ try{
+  const {consumer,provider}=topologyFixture(),spec=path.join(dir,'consumer.json'),providerFile=path.join(dir,'platform.json'),expect=path.join(dir,'expect.json');
+  fs.writeFileSync(spec,JSON.stringify(consumer));fs.writeFileSync(providerFile,JSON.stringify(provider));
+  fs.writeFileSync(expect,JSON.stringify({version:1,expectations:[expectation({step:'open'})]}));
+  const before=[spec,providerFile,expect].map(file=>fs.readFileSync(file,'utf8'));
+  const cli=require.resolve('../tools/visibility-check.cjs');
+  const success=spawnSync(process.execPath,[cli,spec,expect,providerFile],{encoding:'utf8'});
+  assert.equal(success.status,0,success.stderr);assert.equal(JSON.parse(success.stdout).ok,true);
+  const missing=spawnSync(process.execPath,[cli,spec,expect],{encoding:'utf8'});
+  assert.equal(missing.status,2);assert.match(missing.stderr,/missing spec platform/);
+  assert.deepEqual([spec,providerFile,expect].map(file=>fs.readFileSync(file,'utf8')),before);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
 });

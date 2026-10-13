@@ -221,6 +221,7 @@ function initWorkbenchWelcome(opts){
   }
   function selectScreen(name, focus){
     retireRead();
+    if(welcomeImport)welcomeImport.retire();
     screen = name;
     Object.keys(screens).forEach(function(key){ el(screens[key]).hidden = key !== name; });
     error('welcome-file-error', '');
@@ -235,7 +236,7 @@ function initWorkbenchWelcome(opts){
     }
   }
   function displayEditor(focus){
-    retireRead();screen='editor';
+    retireRead();if(welcomeImport)welcomeImport.retire();screen='editor';
     recovery.hidden=true;
     root.hidden = true; editor.hidden = false; headerResume.hidden = true;
     document.body.classList.remove('welcome-active');
@@ -312,6 +313,9 @@ function initWorkbenchWelcome(opts){
   });});
   el('welcome-agent-paste').addEventListener('click', function(){ navigation.go('paste'); json.focus(); });
   root.querySelectorAll('[data-welcome-back]').forEach(function(button){ button.addEventListener('click', function(){ navigation.back(); }); });
+  var welcomeImport=createStagedFileImport({document:document,browser:createBuilderBrowserIO(document,window),surface:root,input:file,
+    active:function(){return !root.hidden;},begin:function(current){return builder.beginFileOpen(current,false);},
+    restoreFocusOnConfirm:false,message:function(message){error('welcome-file-error',message);},confirmed:function(){error('welcome-file-error','');enterEditor();}});
   ['welcome-open', 'welcome-paste-file'].forEach(function(id){ el(id).addEventListener('click', function(){ file.value = ''; file.click(); }); });
   el('welcome-paste-form').addEventListener('submit', function(ev){
     ev.preventDefault();
@@ -319,28 +323,6 @@ function initWorkbenchWelcome(opts){
     catch (ex){ error('welcome-paste-error', ex.message || 'This JSON could not be opened.'); json.setAttribute('aria-invalid', 'true'); json.focus(); }
   });
   json.addEventListener('input', function(){ error('welcome-paste-error', ''); json.removeAttribute('aria-invalid'); });
-  file.addEventListener('change', function(){
-    var selected = file.files && file.files[0];
-    if (!selected) return;
-    retireRead();
-    var token = operation, reader = new FileReader();activeReader=reader;
-    function current(){return token===operation && root.isConnected && file.isConnected;}
-    var opening=builder.beginFileOpen(current,false);
-    error('welcome-file-error', '');
-    reader.onload = async function(){
-      if (!opening.current()) return;
-      activeReader=null;
-      try { if(await opening.open(String(reader.result)) && current())enterEditor(); }
-      catch (ex){ if(opening.current()){error('welcome-file-error', 'Could not open “' + selected.name + '”. ' + (ex.message || 'Check the JSON and try again.')); el('welcome-file-error').scrollIntoView({block:'nearest'});} }
-    };
-    reader.onerror = function(){
-      if (!opening.current()) return;
-      activeReader=null;
-      error('welcome-file-error', 'Could not read “' + selected.name + '”. Choose the file again.');
-      el('welcome-file-error').scrollIntoView({block:'nearest'});
-    };
-    try{reader.readAsText(selected);}catch(ex){reader.onerror();}
-  });
   function artwork(entry){
     var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 300 117'); svg.setAttribute('aria-hidden', 'true');

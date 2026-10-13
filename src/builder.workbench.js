@@ -667,9 +667,17 @@ function initWorkbenchBuilder(opts){
   session.saveInitial();
 
   function closeInsertMenu(){if(addMenu)addMenu.close(false);}
+  function beforeImported(kind){
+    setSelected(null);session.target=null;session.insertSection=0;
+    if(interactions.connecting())cancelConnect(null);
+    if(kind==='mermaid')closeInsertMenu();else clearMultiSelect();
+    clearStepMarkers();if(guide)guide.hidden=true;
+    if(kind==='trace')retireInspector();
+  }
+  function afterImported(spec){updateTargetLabel(spec);}
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
-    replaceProject:replaceProject,beginFileOpen:beginFileOpen,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
+    replaceProject:replaceProject,beginFileOpen:beginFileOpen,beginFileImport:beginFileImport,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
     svgExport:function(){
       var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
       if(snapshot.renderedText==null || !preview || !page)return {error:'SVG export is unavailable because there is no usable diagram preview.'};
@@ -683,14 +691,7 @@ function initWorkbenchBuilder(opts){
       return built;
     },
     isActive:opts.isActive,canUndoImport:function(){return !interactions.adding();},
-    beforeImport:function(kind){
-      setSelected(null);session.target=null;session.insertSection=0;
-      if(interactions.connecting())cancelConnect(null);
-      if(kind==='mermaid')closeInsertMenu();else clearMultiSelect();
-      clearStepMarkers();if(guide)guide.hidden=true;
-      if(kind==='trace')retireInspector();
-    },
-    afterImport:updateTargetLabel
+    beforeImport:beforeImported,afterImport:afterImported
   });
 
   /* ---- structural diff; reuse the finding jump and source locator ---- */
@@ -1235,6 +1236,20 @@ function initWorkbenchBuilder(opts){
         return context;
       },
       publish:function(text,context){return replaceProject(text,undefined,context);}
+    },current);
+  }
+  function beginFileImport(current){
+    return createBuilderFileOpening({session:session,alive:function(){return life.alive() && src.isConnected;},
+      prepare:async function(text){
+        var raw=JSON.parse(text),context=await prepareAuthoredTopology(raw,session.topologyContext());
+        var nextContext=context || session.topologyContext(),findings=session.validate(raw,nextContext);
+        if(findings.errors.length)throw Error(findings.errors.join('\n'));
+        return {raw:raw,topologyContext:nextContext};
+      },
+      publish:function(text,prepared){
+        return session.accept({text:text},{topologyContext:prepared.topologyContext,
+          beforePublish:function(){beforeImported('file');},afterRender:function(){afterImported(prepared.raw);}});
+      }
     },current);
   }
   function restoreDraft(){

@@ -39,12 +39,20 @@ chrome. Copy uses `image/svg+xml` when the browser permits it and otherwise open
 the same standalone SVG as selected text for manual copy. Invalid source may keep
 the last usable preview; the export message calls that out explicitly.
 
+Drop a Flowview `.spec.json`/`.json`, Mermaid `.mmd`/`.mermaid`, or Markdown
+file containing a Mermaid sequence onto Welcome or the open Workbench. The File
+panel's **import Flowview / Mermaid…** button provides the same keyboard route.
+Flowview inspects the bounded local file in your browser and shows its detected
+type and a short summary before anything changes. Choose **Import** once to
+continue, or **Cancel**/Escape to leave the current document and Undo history
+untouched. In an open Workbench, one Undo restores the entire pre-import source.
+
 Both keeps the stamped authored JSON and creates a separate
 read-only HTML snapshot of the current page. Shared topology stays referenced
 in JSON; the HTML contains the visible resolved nodes and edges with no provider
 context or topology declarations/provenance. Local providers can export offline
 once the viewer template is available. Imported consumers require their approved
-frozen providers already loaded in Workbench; **Open file**, opening an agent
+frozen providers already loaded in Workbench; **Import Flowview / Mermaid…**, opening an agent
 diagram folder, or opening from Canon acquires them from the approved catalog.
 The exported HTML then opens without those sources and never refreshes itself.
 

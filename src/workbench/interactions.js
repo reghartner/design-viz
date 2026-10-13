@@ -1667,6 +1667,7 @@ function createBuilderInteractions(opts){
     reapplyMultiSel:life.guard(reapplyMultiSel),
     bulkDeleteSelected:life.guard(bulkDeleteSelected),
     selectTarget:life.guard(selectTarget),
+    selectSpatial:life.guard(selectSpatial),
     toggleMultiSelect:life.guard(toggleMultiSelect),
     cancelAddToStep:life.guard(cancelAddToStep),
     cancelConnect:life.guard(cancelConnect),

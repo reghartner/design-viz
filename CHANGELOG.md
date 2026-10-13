@@ -35,6 +35,15 @@
 - Without an overlay, the viewer, runtime and diagram library outputs are
   byte-identical to before.
 
+## Fork-portable package and image checks (2026-10-13)
+
+- `tools/verify-backstage-package.mjs` reads `npm pack --json` output from npm
+  11 (an array) and npm 12 (an object keyed by package name), and reports
+  npm's stdout and stderr when no artifact is found.
+- The workbench image test publishes the image's container port from
+  `FLOWVIEW_IMAGE_PORT`, else the image's single exposed TCP port, else 80, so
+  forks with an unprivileged nginx image on 8080 need no test edit.
+
 ## Imported-node alignment (2026-10-13)
 
 - Imported topology nodes can join local nodes in multi-selection and align

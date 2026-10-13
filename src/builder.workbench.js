@@ -546,7 +546,7 @@ function initWorkbenchBuilder(opts){
     inspector:inspector,guide:guide,targetLabel:targetLabel,addModeExit:addModeExit,
     apply:applyPlan,selectRange:selectRange,ctl:opts.ctl,workspace:opts.workspace,isActive:opts.isActive,renderedText:opts.renderedText,
     selectionChanged:refreshClipboardActions,
-    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();refreshClipboardActions();},
+    refreshInsertion:function(){if(opts.workspace && opts.workspace.canvas)opts.workspace.canvas.select(session.insertSection);if(panelPicker)panelPicker.refresh();if(addMenu)addMenu.refresh();if(diagramImport)diagramImport.refresh();refreshClipboardActions();},
     syncStory:function(){if(stepList)stepList.sync();},refreshLayout:function(){if(sectionLayoutEditor)sectionLayoutEditor.refresh();},
     dismissOverlay:function(){
       if(diffbox && !diffbox.hidden){hideDiff();diffBtn.focus();return true;}
@@ -795,6 +795,14 @@ function initWorkbenchBuilder(opts){
     }},snapshot);}
   }):null;
   if(imageNodes)life.own(function(){imageNodes.destroy();});
+  var diagramImport=typeof initBuilderDiagramImport==='function'?initBuilderDiagramImport(document,{
+    view:view,isActive:opts.isActive,currentSection:function(){return session.insertSection;},surface:imageNodeSurface,
+    snapshot:function(){return session.snapshot();},blocked:function(){return !!(interactions.busy() || inspector.busy(view));},message:inspectorMessage,
+    apply:function(plan,snapshot){return applyPlan(plan,{after:function(){
+      clearMultiSelect();interactions.selectSpatial(plan.targets.map(function(target){return Object.assign({},target,{el:findTargetEl(target)});}).filter(function(target){return target.el;}));
+    }},snapshot);}
+  }):null;
+  if(diagramImport)life.own(function(){diagramImport.destroy();});
 
   /* ---- searchable document outline ---- */
   var outline = document.getElementById('sec-outline');
@@ -925,6 +933,7 @@ function initWorkbenchBuilder(opts){
   life.listen(view,'workbench-view-section',function(ev){
     var parsed=session.snapshot();if(parsed.error || !specSectionPaths(parsed.raw)[ev.detail])return;
     session.insertSection=ev.detail;updateTargetLabel(parsed.raw);if(addMenu)addMenu.refresh();
+    if(diagramImport)diagramImport.refresh();
   });
   var sectionLayoutEditor=typeof initSectionLayoutEditor === 'function' ? initSectionLayoutEditor({
     view:view,src:src,ctl:opts.ctl,previewSkin:opts.previewSkin,render:function(){return render({origin:'layout-preview'});},renderedText:opts.renderedText,pause:pausePreview,
@@ -1149,6 +1158,8 @@ function initWorkbenchBuilder(opts){
   });
   var topologyBtn=document.getElementById('add-topology');
   if(topologyBtn)life.listen(topologyBtn,'click',function(){confirmAddition(function(){if(topologyPicker)topologyPicker.open();});});
+  var diagramImportBtn=document.getElementById('add-diagram-import');
+  if(diagramImportBtn)life.listen(diagramImportBtn,'click',function(){confirmAddition(function(){if(diagramImport)diagramImport.open();});});
   var addMenu=initDiagramAddMenu({document:document,src:src,pause:pausePreview,context:additionContext,
     addNode:function(preset){runInsert('node',function(text,raw,si){return planAddNode(text,raw,si,preset);});},
     chooseSection:function(index){

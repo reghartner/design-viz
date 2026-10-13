@@ -33,7 +33,15 @@ test('panel and multiselection actions precede long forms at short height',async
   await page.locator('#section-overview [data-dv-node="a"]').focus();await page.keyboard.press('Enter');
   await page.locator('#section-overview [data-dv-node="b"]').focus();await page.keyboard.press('Shift+Enter');
   await expect(guide).toContainText('2 nodes selected');await before(actions,guide.locator(':scope > .iform'));
-  await expect(actions.getByRole('button',{name:'Create domain from selected nodes',exact:true})).toBeInViewport();
+  await info.attach('multiselection-layout',{body:JSON.stringify(await page.evaluate(()=>{
+    const selectors=['#workspace-window-inspect','#editor-inspect','#guide','#guide>.inspector-actions','.editor-clipboard','#diagram-import-open'];
+    return selectors.map(selector=>{const el=document.querySelector(selector),r=el.getBoundingClientRect(),s=getComputedStyle(el);return {selector,rect:r.toJSON(),clientHeight:el.clientHeight,scrollHeight:el.scrollHeight,scrollTop:el.scrollTop,font:s.font,padding:s.padding,gap:s.gap};}).concat(Array.from(document.querySelectorAll('#guide>.inspector-actions>*')).map(el=>({text:el.textContent,rect:el.getBoundingClientRect().toJSON()})));
+  }),null,2),contentType:'application/json'});
+  await page.screenshot({path:info.outputPath('multiselection-actions-short.png')});
+  await expect(actions.getByRole('button',{name:'Create domain from selected nodes',exact:true})).toBeInViewport({ratio:1});
+  const importDiagram=page.getByRole('group',{name:'Document actions'}).getByRole('button',{name:'Add / Paste diagram…',exact:true});
+  await expect(importDiagram).toBeInViewport({ratio:1});await importDiagram.focus();await page.keyboard.press('Enter');
+  await expect(page.locator('#diagram-import')).toBeVisible();await page.keyboard.press('Escape');await expect(importDiagram).toBeFocused();
   await expect(src).toHaveValue(original);
 });
 

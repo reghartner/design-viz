@@ -75,6 +75,7 @@ These capabilities already exist. Load the matching recipe/guide, not every row:
 | Inline backticks or fenced code in descriptions, bullets, notes or step captions | `contract/authoring-contract.md` → Prose markup; labels inside nodes and panels stay plain |
 | Copy/share steps across paths, converge after translation, continue an ending, or detach a shared step | `docs/workbench-step-reuse.md`; `docs/alternate-paths.md` for shared middle blocks and endings (reuse consecutive IDs, not copies; paths can split and rejoin again) |
 | Copy/paste Home elements, panels, nodes or sections between diagrams | `docs/workbench-clipboard.md`; copies are independent, with fresh IDs where scopes overlap |
+| Add a Flowview/Mermaid graph onto an existing canvas | `docs/workbench-clipboard.md` → Add a diagram; preview the source section and counts, then merge graph-only with one Undo; local section/timeline dependencies and unresolved topology must be resolved first |
 | Open a step view paused or playing; clarify Play / Pause state | `contract/authoring-contract.md` → `view` and `autoplay` |
 | A large home map, live Home / Data flow switching, or per-step placement | `cookbook/home-story.md`, `docs/homemap-workbench.md` |
 | Outside grounds, a centered whole house, a porch/entry split, or doors in walls | `cookbook/outdoor-home.md`, `docs/homemap-workbench.md` |

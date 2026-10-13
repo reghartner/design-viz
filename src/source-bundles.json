@@ -67,6 +67,7 @@
     "workbench/inspector-model.js",
     "workbench/lifetime.js",
     "workbench/image-nodes.js",
+    "workbench/diagram-import.js",
     "workbench/agent-merge.js",
     "workbench/agent-session.js",
     "workbench/folder-agent.js",
@@ -105,6 +106,7 @@
   ],
   "clipboard.workbench.js": [
     "workbench/commands/clipboard.js",
+    "workbench/commands/diagram-import.js",
     "clipboard.workbench.js"
   ],
   "reuse.workbench.js": [

@@ -7,6 +7,7 @@ const {execFileSync,spawnSync}=require('node:child_process');
 const ROOT=path.join(__dirname,'..');
 const {probeHttp}=require('./helpers/http-probe.js');
 const {markedExamples,kitExamples}=require('./helpers/kit-examples.js');
+const {imageContainerPort}=require('./helpers/container-port.js');
 const dockerAvailable=spawnSync('docker',['info','--format','{{.ServerVersion}}'],{encoding:'utf8',timeout:10000}).status===0;
 
 test('production and prebuilt images recursively copy the diagram tree',()=>{
@@ -109,8 +110,10 @@ test('nginx image publishes central canon membership and replaces a stale librar
   const {source,spec,manifest}=prepareImageContext(directory,{company:COMPANY_FIXTURE});
   const docker=args=>execFileSync('docker',args,{encoding:'utf8',timeout:180000,maxBuffer:20*1024*1024});
   docker(['build','-f',path.join(directory,'deploy/workbench/Dockerfile'),'-t',image,directory]);
-  docker(['run','--rm','-d','--name',name,'-p','127.0.0.1::80',image]);
-  const port=docker(['inspect','--format','{{(index (index .NetworkSettings.Ports "80/tcp") 0).HostPort}}',name]).trim();
+  // FLOWVIEW_IMAGE_PORT, else the image's single exposed TCP port, else 80.
+  const containerPort=imageContainerPort(image);
+  docker(['run','--rm','-d','--name',name,'-p','127.0.0.1::'+containerPort,image]);
+  const port=docker(['inspect','--format','{{(index (index .NetworkSettings.Ports "'+containerPort+'/tcp") 0).HostPort}}',name]).trim();
   assert.match(port,/^\d+$/);
   const url='http://127.0.0.1:'+port+'/workbench/diagrams.json';
   let response;

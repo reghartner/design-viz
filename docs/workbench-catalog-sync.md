@@ -224,6 +224,12 @@ docker build -f deploy/workbench/Dockerfile -t flowview-workbench .
 docker run --rm -p 8080:80 flowview-workbench
 ```
 
+The image test in `tests/workbench-image.test.js` publishes the container port
+the image listens on. It uses `FLOWVIEW_IMAGE_PORT` when set, otherwise the
+image's single exposed TCP port (`EXPOSE`), otherwise 80. A fork that builds an
+unprivileged nginx image listening on 8080 declares `EXPOSE 8080` and needs no
+test change.
+
 Open `http://localhost:8080/`. The image contains the generated workbench/viewer
 and starter assets and serves catalog JSON with revalidation. Place it behind the
 company’s existing authentication. Connect your normal main-branch image build

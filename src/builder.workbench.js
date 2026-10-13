@@ -670,6 +670,18 @@ function initWorkbenchBuilder(opts){
   var io=createBuilderIO({
     document:document,sourceElement:src,session:session,browser:createBuilderBrowserIO(document,window),
     replaceProject:replaceProject,beginFileOpen:beginFileOpen,message:inspectorMessage,saved:hideDiff,closeInsertMenu:closeInsertMenu,
+    svgExport:function(){
+      var snapshot=session.snapshot(),preview=opts.ctl && opts.ctl(),page=opts.page && opts.page();
+      if(snapshot.renderedText==null || !preview || !page)return {error:'SVG export is unavailable because there is no usable diagram preview.'};
+      var invalid=!!snapshot.error;
+      if(!invalid && snapshot.raw){try{invalid=session.validate(snapshot.raw).errors.length>0;}catch(ex){invalid=true;}}
+      if(snapshot.renderedText!==snapshot.text && !invalid)return {error:'SVG export stopped because the rendered preview is stale. Render the current source, then try again.'};
+      var built=captureWorkbenchSvgExport({controller:preview,page:page,activeSection:session.insertSection});if(built.error)return built;
+      var expected={project:snapshot.project,text:snapshot.text,rendered:snapshot.renderedText,controller:preview};
+      built.current=function(){var now=session.snapshot();return now.project===expected.project && now.text===expected.text && now.renderedText===expected.rendered && opts.ctl && opts.ctl()===expected.controller;};
+      if(snapshot.renderedText!==snapshot.text)built.note='Current source is invalid; this is the last usable preview.';
+      return built;
+    },
     isActive:opts.isActive,canUndoImport:function(){return !interactions.adding();},
     beforeImport:function(kind){
       setSelected(null);session.target=null;session.insertSection=0;

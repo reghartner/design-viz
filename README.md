@@ -599,6 +599,12 @@ the standalone bootloader to load that external spec when no spec is embedded;
 use an exported/injected page for a self-contained embed. The HTML host's own
 login, CSP and iframe permissions remain deployment requirements.
 
+For a portable picture instead of a reader, use **Export → Download SVG** or
+**Copy SVG**. SVG export is deliberately **diagram-only**: it takes the active
+section's live rendered graph in its current View/step and skin, but omits prose,
+panels, playback controls and Workbench selection/editing chrome. The result has
+its styles and referenced icon symbols embedded and does not fetch page assets.
+
 ## Validating a spec (the agent loop)
 
 From a source checkout, build once after checkout/update before calling the

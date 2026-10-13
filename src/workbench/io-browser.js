@@ -12,6 +12,12 @@ function createBuilderBrowserIO(document,window){
       return typeof navigator!=='undefined' && navigator.clipboard && navigator.clipboard.writeText?
         navigator.clipboard.writeText(text):null;
     },
+    copySvg:function(text){
+      if(typeof navigator==='undefined' || !navigator.clipboard || !navigator.clipboard.write ||
+        typeof window.ClipboardItem!=='function' || typeof window.Blob!=='function')return null;
+      var blob=new window.Blob([text],{type:'image/svg+xml'}),item=new window.ClipboardItem({'image/svg+xml':blob});
+      return navigator.clipboard.write([item]);
+    },
     copySelection:function(){return document.execCommand('copy');}
   };
 }

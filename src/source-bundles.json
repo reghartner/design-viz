@@ -82,6 +82,7 @@
     "workbench/brand.js",
     "workbench/inspector.js",
     "workbench/io-model.js",
+    "workbench/svg-export.js",
     "workbench/io-browser.js",
     "workbench/io.js",
     "core/arrange/placement.js",

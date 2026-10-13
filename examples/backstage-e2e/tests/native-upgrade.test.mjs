@@ -89,6 +89,12 @@ test('install preparation builds and packs the publisher, and changed bytes refr
     return (await exec(command, args, {cwd})).stdout;
   });
   assert.equal((await exec('tar', ['-xOf', prebuilt, 'package/dist/index.js'])).stdout, 'export const version = 2;\n');
+  // npm 12 reports the artifact in an object keyed by package name.
+  const keyed = await preparePluginPackage(mock, async (command, args, cwd) => {
+    const [record] = JSON.parse((await exec(command, args, {cwd})).stdout);
+    return JSON.stringify({[record.name]: record});
+  });
+  assert.equal(keyed, prebuilt, 'The npm 12 report shape stages the same package');
 });
 
 test('runtime vendoring builds distributions and excludes source and unrelated private files', async t => {

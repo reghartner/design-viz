@@ -7,7 +7,7 @@ function createTextBoxEditor(opts){
     if(snapshot.error || !sec || snapshot.renderedText!=null && snapshot.renderedText!==snapshot.text)return null;
     var section=Number(sec.getAttribute('data-dv-section')),id=el.getAttribute('data-dv-node');
     var got=builderDiagram(snapshot.text,snapshot.raw,section);if(got.error)return null;
-    var node=got.d.nodes[id];if(!node || node.type!=='text')return null;
+    var node=got.d.nodes[id];if(!isTextBoxNode(node))return null;
     return {snapshot:snapshot,section:section,id:id,node:node,p:layout(got.d).pos[id],el:el,svg:el.ownerSVGElement};
   }
   function fresh(c){var now=opts.session.snapshot();return c.el.isConnected && now.project===c.snapshot.project && now.text===c.snapshot.text;}

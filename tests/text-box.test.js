@@ -29,6 +29,12 @@ test('malformed text/style is rejected and planner fails without publication',()
   }
   assert.deepEqual(plain(C.validate(C.normalize(fixture())).errors),[]);
 });
+test('legacy generic nodes named text remain ordinary nodes',()=>{
+  const legacy={type:'text',title:'Plain text'};assert.equal(C.isTextBoxNode(legacy),false);
+  const errors=[];C.validateTextBox(legacy,'nodes.note',errors);assert.deepEqual(errors,[]);
+  assert.equal(C.isTextBoxNode({type:'text',text:'Annotation'}),true);
+  assert.equal(C.isTextBoxNode({type:'text',textStyle:{width:280}}),true);
+});
 test('text budgets reject excess characters, lines and effective height and bound unvalidated layout',()=>{
   const errors=node=>{const result=[];C.validateTextBox(node,'note',result);return result;};
   const node=(text,textStyle)=>({type:'text',text,textStyle});

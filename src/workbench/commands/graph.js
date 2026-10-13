@@ -75,7 +75,7 @@ function planAddTextBox(text,raw,sectionIdx){
 }
 function planEditTextBox(text,raw,sectionIdx,id,changes){
   var got=builderDiagram(text,raw,sectionIdx);if(got.error)return got;
-  var node=got.d.nodes && got.d.nodes[id];if(!node || node.type!=='text')return {error:'Text box not found.'};
+  var node=got.d.nodes && got.d.nodes[id];if(!isTextBoxNode(node))return {error:'Text box not found.'};
   changes=Object.assign({},changes);
   if(changes.textStyle && typeof changes.textStyle==='object' && !Array.isArray(changes.textStyle)){
     changes.textStyle=Object.assign({},changes.textStyle);

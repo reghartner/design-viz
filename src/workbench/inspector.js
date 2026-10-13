@@ -451,7 +451,7 @@ function deltaControls(val){
   }
 
 function nodeForm(val, ctx){
-    if(val.type==='text')return textBoxForm(val);
+    if(isTextBoxNode(val))return textBoxForm(val);
     var t = session.target;
     ensureGroupDatalist([ctx.diagram]);
     var floatSide = '',floatEntry=null;
@@ -2482,7 +2482,7 @@ function renderInspector(){
     try{if(!parsed.error && session.resolve)resolved=session.resolve(parsed.raw);}catch(ex){}
     var resolvedPath=!parsed.error?builderTargetPath(resolved,t):null;
     var resolvedValue=resolvedPath?specValueAt(resolved,resolvedPath):null;
-    if(t.kind==='node' && resolvedValue && resolvedValue.type==='text')head.textContent='Text box';
+    if(t.kind==='node' && isTextBoxNode(resolvedValue))head.textContent='Text box';
     var resolvedRec=!parsed.error?specSectionPaths(resolved)[t.section]:null;
     var resolvedDiagram=resolvedRec?specValueAt(resolved,resolvedRec.diagram):null;
     var imported=typeof FlowTopology!=='undefined' && FlowTopology.origin(resolvedDiagram,
@@ -2605,7 +2605,7 @@ function renderInspector(){
         connectButton.className+=' node-connect-button';
         connectButton.title='Alt/Option-click a node, then click its destination. Escape cancels.';
         acts.appendChild(connectButton);
-        if(val.type!=='text' && !val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
+        if(!isTextBoxNode(val) && !val.detail && val.handoff==null)acts.appendChild(actionButton('Create detail flow',function(){
           commitCascade(function(raw){return planCreateNodeDetail(session.text(),raw,t.section,t.id);},
             {after:function(plan){
               session.target={section:plan.index,kind:'section'};session.insertSection=plan.index;

@@ -1,6 +1,9 @@
 /* Plain-text canvas nodes. Shared by layout, validation, editor and SVG output. */
 var TEXT_BOX_FONTS = ['IBM Plex Sans','IBM Plex Mono','Sora','Lora','Newsreader','Source Sans 3'];
 var TEXT_BOX_LIMITS = {characters:12000,lines:200,height:8000};
+function isTextBoxNode(node){
+  return !!(node && node.type==='text' && (Object.prototype.hasOwnProperty.call(node,'text') || Object.prototype.hasOwnProperty.call(node,'textStyle')));
+}
 function textBoxStyle(node){
   var s=node.textStyle || {};
   return {fontFamily:TEXT_BOX_FONTS.indexOf(s.fontFamily)>=0?s.fontFamily:'IBM Plex Sans',
@@ -64,7 +67,7 @@ function textBoxResize(node,position,width,height){
     cy:position.cy+(node.locked===true?0:(size.h-position.h)/2)};
 }
 function validateTextBox(node,at,errors){
-  if(node.type!=='text')return;
+  if(!isTextBoxNode(node))return;
   if(typeof node.text!=='string')errors.push(at+'.text: text boxes require a plain text string');
   if(typeof node.text==='string'){
     var bounded=textBoxLayout(node);

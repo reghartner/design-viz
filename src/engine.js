@@ -930,7 +930,7 @@ function renderBoard(el, d, prefix, skin, protos, backlinks, options){
     var tint = TINT_SET.indexOf(n.tint) >= 0 ? n.tint : 'cmd';
     var x = p.cx - p.w/2, y = p.cy - p.h/2;
     var nodeTitle = n.title || id;
-    if(n.type==='text'){
+    if(isTextBoxNode(n)){
       var ts=textBoxStyle(n),tx=ts.align==='center'?p.w/2:ts.align==='right'?p.w-8:8;
       s+='<g class="node node-text" id="'+prefix+'-n-'+esc(id)+'" data-dv-node="'+esc(id)+'" data-dv-text-box="true" tabindex="0" role="group" aria-label="Text box: '+esc(textBoxDisplayText(n) || 'Empty text')+'" transform="translate('+x+' '+y+')">'+
         '<rect class="text-box-hit" width="'+p.w+'" height="'+p.h+'" fill="transparent" pointer-events="all"/>'+

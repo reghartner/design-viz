@@ -45,6 +45,7 @@ test('invalid selections and out of bounds member moves fail atomically; repeate
   for(const change of [{type:'move',dx:100000,dy:0},{type:'move',dx:NaN,dy:2},{type:'diagonal'}])
     assert.ok(C.planTransformFloats(text,raw,targets('a','b'),change).error);
   const first=C.planTransformFloats(text,raw,targets('a','b'),{type:'horizontal'});
-  assert.ok(C.planTransformFloats(first.text,JSON.parse(first.text),targets('a','b'),{type:'horizontal'}).error);
+  const repeat=C.planTransformFloats(first.text,JSON.parse(first.text),targets('a','b'),{type:'horizontal'});
+  assert.equal(repeat.noop,true);assert.equal(repeat.error,undefined);assert.equal(repeat.text,undefined);
   assert.equal(JSON.stringify(raw),text);
 });

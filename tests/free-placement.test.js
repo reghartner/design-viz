@@ -137,3 +137,54 @@ test('a custom center cannot displace a later automatically positioned imported 
   const after=importedDiagram(C.FlowTopology.resolveSource(JSON.parse(plan.text),ctx));
   for(const f of before.floats.filter(f=>f.id!=='platform::store'))assert.deepEqual(plain(after.floats.find(p=>p.id===f.id)),plain(f));
 });
+
+function importedAlignment(){
+  const specs=importedFixture(),raw=specs[1],d=importedDiagram(raw);
+  d.rows=[[]];d.floats=[{id:'client',x:900,y:600,custom:'keep'}];
+  return {specs,raw,d,ctx:{version:1,id:'checkout',specs}};
+}
+function nodeRects(d,ids){const pos=C.layout(d).pos;return ids.map(id=>{const p=pos[id];return {x:p.cx-p.w/2,y:p.cy-p.h/2,w:p.w,h:p.h};});}
+function importedTargets(...ids){return ids.map(id=>({kind:'node',section:0,id}));}
+
+test('Inspector alignment supports imported-only and mixed nodes using only consumer placement overrides',()=>{
+  {
+    const {specs,raw,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx));
+    const selected=importedTargets('platform::api','platform::store'),plan=C.planTransformFloats(source,raw,selected,{type:'vertical'},ctx);
+    assert.equal(plan.error,undefined);const authored=JSON.parse(plan.text),out=importedDiagram(authored),imp=out.topologyImports[0];
+    assert.deepEqual(Object.keys(out.nodes),['client']);assert.deepEqual(out.floats,[{id:'client',x:900,y:600,custom:'keep'}]);
+    assert.deepEqual(imp.position,plain(resolved.topologyProvenance.imports[0].position));assert.equal(imp.nodePositions.store.x,imp.nodePositions.api?.x ?? 0);
+    const effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),pos=C.layout(effective).pos;
+    assert.equal(pos['platform::api'].cx,pos['platform::store'].cx);assert.equal(JSON.stringify(specs[0]),provider);assert.equal(JSON.stringify(raw),source);
+    const repeat=C.planTransformFloats(plan.text,authored,selected,{type:'vertical'},ctx);assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
+  }
+  {
+    const {specs,raw,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]),source=JSON.stringify(raw),selected=importedTargets('client','platform::api');
+    const plan=C.planTransformFloats(source,raw,selected,{type:'horizontal'},ctx);assert.equal(plan.error,undefined);
+    const authored=JSON.parse(plan.text),out=importedDiagram(authored),effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),pos=C.layout(effective).pos;
+    assert.deepEqual(out.floats,[{id:'client',x:900,y:600,custom:'keep'}]);assert.ok(out.topologyImports[0].nodePositions.api);
+    assert.equal(pos.client.cy,pos['platform::api'].cy);assert.equal(JSON.stringify(specs[0]),provider);assert.equal(JSON.stringify(raw),source);
+  }
+});
+
+test('right-click spatial alignment supports imported-only and mixed nodes with frozen-context and no-op guards',()=>{
+  {
+    const {specs,raw,ctx}=importedAlignment(),provider=JSON.stringify(specs[0]),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx));
+    const ids=['platform::api','platform::store'],selected=importedTargets(...ids),plan=C.planAlignSpatial(source,raw,selected,null,'vertical',nodeRects(resolved,ids),0,ctx);
+    assert.equal(plan.error,undefined);const authored=JSON.parse(plan.text),effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),pos=C.layout(effective).pos;
+    assert.equal(pos[ids[0]].cx,pos[ids[1]].cx);assert.deepEqual(Object.keys(importedDiagram(authored).nodes),['client']);assert.equal(JSON.stringify(specs[0]),provider);assert.equal(JSON.stringify(raw),source);
+    const alignedRects=nodeRects(effective,ids),repeat=C.planAlignSpatial(plan.text,authored,selected,null,'vertical',alignedRects,0,ctx);
+    assert.equal(repeat.noop,true);assert.equal(repeat.text,undefined);
+  }
+  {
+    const {raw,ctx}=importedAlignment(),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx)),ids=['client','platform::api'],selected=importedTargets(...ids);
+    const plan=C.planAlignSpatial(source,raw,selected,null,'horizontal',nodeRects(resolved,ids),0,ctx);assert.equal(plan.error,undefined);
+    const authored=JSON.parse(plan.text),effective=importedDiagram(C.FlowTopology.resolveSource(authored,ctx)),pos=C.layout(effective).pos;
+    assert.equal(pos.client.cy,pos['platform::api'].cy);assert.deepEqual(importedDiagram(authored).floats,[{id:'client',x:900,y:600,custom:'keep'}]);
+  }
+  {
+    const {raw,ctx}=importedAlignment(),source=JSON.stringify(raw),resolved=importedDiagram(C.FlowTopology.resolveSource(raw,ctx)),ids=['platform::api','platform::store'],selected=importedTargets(...ids),rects=nodeRects(resolved,ids);
+    assert.match(C.planAlignSpatial(source,raw,selected,null,'vertical',rects,0).error,/frozen provider context/);
+    assert.ok(C.planAlignSpatial(source,raw,selected,null,'vertical',rects,0,{version:1,id:'checkout',specs:[]}).error);
+    assert.equal(JSON.stringify(raw),source);
+  }
+});

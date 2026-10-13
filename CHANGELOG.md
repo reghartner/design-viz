@@ -1,5 +1,12 @@
 # Changelog
 
+## Imported-node alignment (2026-10-13)
+
+- Imported topology nodes can join local nodes in multi-selection and align
+  horizontally or vertically from the object menu or Inspector. The consumer
+  saves only `topologyImports[].position` / `nodePositions`; provider topology
+  remains read-only.
+
 ## View-specific alternate paths (2026-10-01)
 
 - Named views can declare `layouts[].paths` to show only the outcomes intended

@@ -187,40 +187,97 @@ function planResetTopologyArrangement(text,raw,sectionIdx,namespace){
   return planSetField(text,raw,got.path.concat(['topologyImports',indexes[0]]),'nodePositions',null);
 }
 
-/* Selection order defines the alignment anchor. Automatic floats are resolved
-   together before pinning, so moving one cannot move another's starting point. */
-function builderSelectedFloats(text,raw,targets){
-  if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
+/* Resolve node ownership without ever treating provider-derived nodes/floats as
+   authored consumer structure. A direct import owns nested imported members too;
+   their nodePositions key is the identity relative to that direct namespace. */
+function builderNodeArrangementTargets(text,raw,targets,context){
+  if(!Array.isArray(targets) || !targets.length)return {error:'Select nodes to arrange.'};
   var section=targets[0].section;
   if(targets.some(function(t){return t.kind!=='node' || t.section!==section;}))
-    return {error:'Choose floating nodes from a single section.'};
+    return {error:'Choose nodes from a single section.'};
   var got=builderDiagram(text,raw,section);if(got.error)return got;
   var ids=targets.map(function(t){return t.id;});
   if(new Set(ids).size!==ids.length)return {error:'Select each node only once.'};
-  if(ids.some(function(id){return !Object.prototype.hasOwnProperty.call(got.d.nodes || {},id) ||
-      !(got.d.floats || []).some(function(f){return f && f.id===id;});}))
-    return {error:'Use Free placement for every selected node before aligning or moving them together.'};
-  got.ids=ids;return got;
+  var hasImports=Array.isArray(got.d.topologyImports) && got.d.topologyImports.length;
+  var needsProvider=ids.some(function(id){return !Object.prototype.hasOwnProperty.call(got.d.nodes || {},id);});
+  if(needsProvider && !context)return {error:'Open this authored spec from Canon to load its frozen provider context.'};
+  var effectiveRaw=raw;
+  if(hasImports && context){
+    if(typeof FlowTopology==='undefined')return {error:'Topology provider resolution is unavailable.'};
+    try{effectiveRaw=FlowTopology.resolveSource(raw,context);}catch(ex){return {error:ex.message};}
+  }
+  var effectiveRecord=specSectionPaths(effectiveRaw)[section],effective=effectiveRecord && specValueAt(effectiveRaw,effectiveRecord.diagram);
+  if(!effective)return {error:'An object changed. Render and select it again.'};
+  var positions=layout(effective).pos,records=[];
+  for(var i=0;i<ids.length;i++){
+    var id=ids[i],materializedOwner=typeof FlowTopology!=='undefined' && FlowTopology.origin(got.d,'nodes',id);
+    if(materializedOwner)return {error:'Open the authored consumer from Canon to arrange imported nodes.'};
+    var local=Object.prototype.hasOwnProperty.call(got.d.nodes || {},id),owner=null,index=-1;
+    if(!local){
+      owner=typeof FlowTopology!=='undefined' && FlowTopology.origin(effective,'nodes',id);
+      if(!owner)return {error:'An object changed. Render and select it again.'};
+      var indexes=[];(got.d.topologyImports || []).forEach(function(imp,j){if(imp && imp.as===owner.as)indexes.push(j);});
+      if(indexes.length!==1 || !owner.position)return {error:'Open the authored consumer from Canon to arrange this imported node.'};
+      index=indexes[0];
+    }
+    var p=positions[id];if(!p && !local)return {error:'Render the selected nodes before arranging them.'};
+    records.push({id:id,local:local,owner:owner,importIndex:index,position:p});
+  }
+  got.ids=ids;got.records=records;got.effective=effective;return got;
 }
-function planTransformFloats(text,raw,targets,change){
-  var got=builderSelectedFloats(text,raw,targets);if(got.error)return got;
+function builderSelectedFloats(text,raw,targets,context){
+  if(!Array.isArray(targets) || targets.length<2)return {error:'Select at least two floating nodes.'};
+  var got=builderNodeArrangementTargets(text,raw,targets,context);if(got.error)return got;
+  if(got.records.some(function(record){return record.local && !(got.d.floats || []).some(function(f){return f && f.id===record.id;});}))
+    return {error:'Use Free placement for every selected local node before aligning or moving them together.'};
+  if(got.records.some(function(record){return !record.position;}))return {error:'Render the selected nodes before arranging them.'};
+  return got;
+}
+function planTransformFloats(text,raw,targets,change,context){
+  var got=builderSelectedFloats(text,raw,targets,context);if(got.error)return got;
   if(!change || ['horizontal','vertical','move'].indexOf(change.type)<0)return {error:'Choose horizontal or vertical alignment, or a move.'};
   if(change.type==='move' && (!Number.isFinite(change.dx) || !Number.isFinite(change.dy)))return {error:'Move distances must be finite.'};
-  var positions=layout(got.d).pos,anchor=positions[got.ids[0]],updated=Object.create(null);
-  for(var i=0;i<got.ids.length;i++){
-    var id=got.ids[i],p=positions[id];
-    if(!p || !anchor)return {error:'Render the selected nodes before arranging them.'};
+  var anchor=got.records[0].position,updated=Object.create(null),different=false;
+  for(var i=0;i<got.records.length;i++){
+    var record=got.records[i],id=record.id,p=record.position;
     var x=change.type==='vertical'?anchor.cx:p.cx+(change.type==='move'?change.dx:0);
     var y=change.type==='horizontal'?anchor.cy:p.cy+(change.type==='move'?change.dy:0);
     if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'X and Y must be finite coordinates between -100000 and 100000.'};
     updated[id]={x:Math.round(x*10)/10,y:Math.round(y*10)/10};
+    if(!record.local && (!floatCoordinate(updated[id].x-record.owner.position.x) || !floatCoordinate(updated[id].y-record.owner.position.y)))
+      return {error:'Relative node position exceeds the supported coordinate range.'};
+    if(Math.abs(updated[id].x-p.cx)>=.0001 || Math.abs(updated[id].y-p.cy)>=.0001)different=true;
   }
-  var floats=got.d.floats.map(function(f){
-    if(!updated[f.id])return f;
-    var next=Object.assign({},f,updated[f.id]);delete next.dx;delete next.dy;return next;
+  if(!different)return {noop:true};
+  if(got.records.every(function(record){return record.local;})){
+    var floats=got.d.floats.map(function(f){
+      if(!updated[f.id])return f;
+      var next=Object.assign({},f,updated[f.id]);delete next.dx;delete next.dy;return next;
+    });
+    return planSetField(text,raw,got.path,'floats',JSON.stringify(floats));
+  }
+  return builderRewrite(text,raw,got.path,function(d){
+    var localChanged=false;
+    got.records.forEach(function(record){
+      var next=updated[record.id];
+      if(record.local){
+        var f=(d.floats || []).find(function(item){return item && item.id===record.id;});
+        if(Math.abs(record.position.cx-next.x)>=.0001 || Math.abs(record.position.cy-next.y)>=.0001)localChanged=true;
+        f.x=next.x;f.y=next.y;delete f.dx;delete f.dy;return;
+      }
+      var imp=d.topologyImports[record.importIndex],origin=record.owner.position;
+      imp.position=builderClone(origin);if(!imp.nodePositions)imp.nodePositions={};
+      var relative={x:Math.round((next.x-origin.x)*10)/10,y:Math.round((next.y-origin.y)*10)/10};
+      Object.defineProperty(imp.nodePositions,record.id.slice(record.owner.as.length+2),{value:relative,enumerable:true,writable:true,configurable:true});
+    });
+    // Moving a local float can change the automatic origin chosen for later
+    // imports. Freeze those current origins so unrelated rendered placement is
+    // stable across the same transaction.
+    if(localChanged)((got.effective.topologyProvenance || {}).imports || []).forEach(function(owner){
+      var index=(d.topologyImports || []).findIndex(function(imp){return imp && imp.as===owner.as;});
+      if(index>=0 && !d.topologyImports[index].position)d.topologyImports[index].position=builderClone(owner.position);
+    });
   });
-  if(JSON.stringify(floats)===JSON.stringify(got.d.floats))return {error:'The selected nodes are already there.'};
-  return planSetField(text,raw,got.path,'floats',JSON.stringify(floats));
 }
 
 function planSetNodeFloat(text, raw, sectionIdx, id, sideOrNull){
@@ -694,21 +751,26 @@ function planAutoArrange(text,raw,section,result){
 
 /* Spatial object actions operate on one authored diagram. Measurements are
    effective graph-space rectangles supplied by the interaction owner. */
-function builderSpatialTargets(text,raw,targets){
+function builderSpatialTargets(text,raw,targets,context){
   if(!targets || !targets.length)return {error:'Select nodes or canvas panels.'};
   var section=targets[0].section,got=builderDiagram(text,raw,section);if(got.error)return got;
   if(targets.some(function(t){return t.section!==section || ['node','panel'].indexOf(t.kind)<0;}))return {error:'Choose nodes and canvas panels from one section.'};
+  var nodeTargets=targets.filter(function(t){return t.kind==='node';}),nodes=nodeTargets.length?builderNodeArrangementTargets(text,raw,nodeTargets,context):null;
+  if(nodes && nodes.error)return nodes;
+  var byId=Object.create(null);if(nodes)nodes.records.forEach(function(record){byId[record.id]=record;});
   for(var i=0;i<targets.length;i++){
-    var t=targets[i],value=t.kind==='node'?(got.d.nodes || {})[t.id]:(got.d.panels || []).find(function(p){return p.id===t.id;});
+    var t=targets[i],value=t.kind==='node'?byId[t.id]:(got.d.panels || []).find(function(p){return p.id===t.id;});
     if(!value)return {error:'An object changed. Render and select it again.'};
   }
+  got.records=targets.map(function(t){return t.kind==='node'?byId[t.id]:{id:t.id,local:true,panel:true};});
+  got.effective=nodes?nodes.effective:got.d;
   return got;
 }
-function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex){
-  var got=builderSpatialTargets(text,raw,targets);if(got.error)return got;
+function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex,context){
+  var got=builderSpatialTargets(text,raw,targets,context);if(got.error)return got;
   if(targets.length<2)return {error:'Select at least two objects to align.'};
   if(['horizontal','vertical'].indexOf(direction)<0)return {error:'Choose an alignment direction.'};
-  if(targets.some(function(t){return t.kind==='node' && !(got.d.floats || []).some(function(f){return f.id===t.id;});}))return {error:'Use Free placement for every selected node before aligning.'};
+  if(got.records.some(function(record){return !record.panel && record.local && !(got.d.floats || []).some(function(f){return f.id===record.id;});}))return {error:'Use Free placement for every selected local node before aligning.'};
   var view=(got.d.layouts || []).find(function(v){return v.id===layoutId;});
   if(targets.some(function(t){return t.kind==='panel';}) && (!view || view.presentation!=='explore'))return {error:'Select an Explore view before aligning panels.'};
   if(!rects || rects.length!==targets.length || rects.some(function(r){return !r || ![r.x,r.y,r.w,r.h].every(Number.isFinite) || r.w<=0 || r.h<=0;}))return {error:'Render all selected objects before aligning.'};
@@ -716,7 +778,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
   if(!Number.isInteger(anchorIndex) || anchorIndex<0 || anchorIndex>=targets.length)return {error:'Choose a selected object as the alignment anchor.'};
   var axis=direction==='vertical'?'x':'y',size=direction==='vertical'?'w':'h',anchorCenter=rects[anchorIndex][axis]+rects[anchorIndex][size]/2;
   if(rects.every(function(r){return Math.abs(r[axis]+r[size]/2-anchorCenter)<.0001;}))return {noop:true};
-  var effectiveBefore=layout(got.d).pos,selectedNodes=Object.create(null);targets.forEach(function(t){if(t.kind==='node')selectedNodes[t.id]=true;});
+  var effectiveBefore=layout(got.d).pos,selectedNodes=Object.create(null);targets.forEach(function(t){if(t.kind==='node' && Object.prototype.hasOwnProperty.call(got.d.nodes || {},t.id))selectedNodes[t.id]=true;});
   var changed=false,plan=builderRewrite(text,raw,got.path,function(d){
     // Context-menu alignment can anchor a later selection member. Fixed
     // anchors retain their authored placement; automatic anchors are pinned
@@ -725,7 +787,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
     function coordinate(value){var tenth=Math.round(value*10)/10;return Math.abs(value-tenth)<.0001?tenth:value;}
     function assign(object,key,value){value=coordinate(value);if(!Number.isFinite(object[key]) || Math.abs(object[key]-value)>=.0001){object[key]=value;changed=true;}}
     function remove(object,key){if(Object.prototype.hasOwnProperty.call(object,key)){delete object[key];changed=true;}}
-    var automaticChanged=false,anchor=rects[anchorIndex],anchorTarget=targets[anchorIndex],anchorFloat=anchorTarget.kind==='node' && d.floats.find(function(f){return f.id===anchorTarget.id;});
+    var automaticChanged=false,localChanged=false,anchor=rects[anchorIndex],anchorTarget=targets[anchorIndex],anchorRecord=got.records[anchorIndex],anchorFloat=anchorTarget.kind==='node' && anchorRecord.local && d.floats.find(function(f){return f.id===anchorTarget.id;});
     var cx=positionedFloat(anchorFloat)?anchorFloat.x:coordinate(anchor.x+anchor.w/2),cy=positionedFloat(anchorFloat)?anchorFloat.y:coordinate(anchor.y+anchor.h/2);
     var definition=(d.layouts || []).find(function(v){return v.id===layoutId;});
     for(var i=0;i<targets.length;i++){
@@ -733,7 +795,16 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
       var t=targets[i],r=rects[i],x=direction==='vertical'?cx:coordinate(r.x+r.w/2),y=direction==='horizontal'?cy:coordinate(r.y+r.h/2);
       if(!floatCoordinate(x) || !floatCoordinate(y))return {error:'Alignment is outside the supported canvas coordinates.'};
       if(t.kind==='node'){
+        var record=got.records[i];
+        if(!record.local){
+          var imp=d.topologyImports[record.importIndex],origin=record.owner.position;
+          imp.position=builderClone(origin);if(!imp.nodePositions)imp.nodePositions={};
+          var relative={x:coordinate(x-origin.x),y:coordinate(y-origin.y)};
+          if(!floatCoordinate(relative.x) || !floatCoordinate(relative.y))return {error:'Relative node position exceeds the supported coordinate range.'};
+          Object.defineProperty(imp.nodePositions,record.id.slice(record.owner.as.length+2),{value:relative,enumerable:true,writable:true,configurable:true});changed=true;
+        }else{
         var f=d.floats.find(function(f){return f.id===t.id;});
+        localChanged=true;
         if(!positionedFloat(f)){
           // Once one automatic axis is aligned, pin both rendered centers so
           // the layout continues to honor the edit and retains its other axis.
@@ -741,6 +812,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
           assign(f,'x',x);assign(f,'y',y);remove(f,'dx');remove(f,'dy');
         }else if(direction==='vertical'){assign(f,'x',x);remove(f,'dx');}
         else {assign(f,'y',y);remove(f,'dy');}
+        }
       }else{
         var explore=definition.exploreLayout || (definition.exploreLayout={}),canvas=explore.canvas || (explore.canvas={}),panels=canvas.panels || (canvas.panels=[]);
         var p=panels.find(function(p){return p.panel===t.id;});if(!p){p={panel:t.id};panels.push(p);changed=true;}
@@ -750,6 +822,7 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
     if(changed && anchorFloat && !positionedFloat(anchorFloat)){
       if(!floatCoordinate(cx) || !floatCoordinate(cy))return {error:'Alignment is outside the supported canvas coordinates.'};
       automaticChanged=true;
+      localChanged=true;
       assign(anchorFloat,'x',cx);assign(anchorFloat,'y',cy);remove(anchorFloat,'dx');remove(anchorFloat,'dy');
     }
     // Fix only automatic, unselected floats whose computed center would change
@@ -767,6 +840,10 @@ function planAlignSpatial(text,raw,targets,layoutId,direction,rects,anchorIndex)
         if(!preserved)break;
       }
     }
+    if(localChanged)((got.effective.topologyProvenance || {}).imports || []).forEach(function(owner){
+      var index=(d.topologyImports || []).findIndex(function(imp){return imp && imp.as===owner.as;});
+      if(index>=0 && !d.topologyImports[index].position){d.topologyImports[index].position=builderClone(owner.position);changed=true;}
+    });
   });
   return (plan.error || changed)?plan:{noop:true};
 }

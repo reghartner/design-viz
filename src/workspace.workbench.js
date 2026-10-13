@@ -121,7 +121,7 @@ function initWorkbenchWorkspace(){
     syncNavigationPopover(ev.target);
   },true);
   var more=document.getElementById('workspace-more'),compactActions=null;
-  function paintMore(){var compact=matchMedia('(max-width:1050px)').matches;if(compact===compactActions)return;compactActions=compact;more.open=!compact;}
+  function paintMore(){var compact=matchMedia('(max-width:1180px)').matches;if(compact===compactActions)return;compactActions=compact;more.open=!compact;}
   paintMore();window.addEventListener('resize',paintMore);
   var rail=document.querySelector('.workspace-rail');rail.setAttribute('role','toolbar');
   rail.removeAttribute('aria-orientation');

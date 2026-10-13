@@ -17,8 +17,9 @@ from pathlib import Path
 CONTRACT = 'contract/authoring-contract.md'
 CONTRACT_ADDITIONS = '## Company contract additions'
 # Upstream examples join the offline kit by carrying this marker; each line is a
-# file glob, matched in the marker's folder and below. Company example folders
-# always join: with a marker, its globs; without one, COMPANY_EXAMPLE_PATTERNS.
+# file glob, matched in the marker's folder and below, where the nearest marker
+# above a file decides. Company example folders always join: files with no
+# marker above them use COMPANY_EXAMPLE_PATTERNS.
 # The kit is a text bundle, so every selected file must be UTF-8 text.
 KIT_MARKER = '.agent-kit'
 COMPANY_EXAMPLE_PATTERNS = ('*.md', '*.json')
@@ -101,22 +102,33 @@ def _marked(root, directory):
     return marked
 
 
+def _select(root, base, default):
+    """Files below base: each file belongs to its nearest .agent-kit folder and
+    is selected by that marker's globs; files with no marker above them use
+    default (None selects nothing). A marker that selects nothing fails."""
+    marked = _marked(root, base)
+
+    def owner(path):
+        folders = [folder for folder in marked if path.is_relative_to(folder)]
+        return max(folders, key=lambda folder: len(folder.parts)) if folders else None
+
+    files = set()
+    for folder, patterns in marked.items():
+        found = {name for name in _example_files(root, folder, patterns) if owner(root / name) == folder}
+        if not found:
+            raise ValueError((folder / KIT_MARKER).relative_to(root).as_posix() + ': globs match no files')
+        files |= found
+    if default:
+        files |= {name for name in _example_files(root, base, default) if owner(root / name) is None}
+    return files
+
+
 def kit_examples(root):
     """Sorted example files for the folder-agent kit: upstream folders marked
     with .agent-kit, plus every company example folder."""
     root = Path(root)
-    files = set()
-    for folder, patterns in _marked(root, root / 'examples').items():
-        found = _example_files(root, folder, patterns)
-        if not found:
-            raise ValueError((folder / KIT_MARKER).relative_to(root).as_posix() + ': globs match no files')
-        files |= found
+    files = _select(root, root / 'examples', None)
     examples = company_dir(root) / 'examples'
     if examples.is_dir():
-        marked = _marked(root, examples)
-        for folder, patterns in marked.items():
-            files |= _example_files(root, folder, patterns)
-        # Unmarked company folders use the default text patterns.
-        files |= {name for name in _example_files(root, examples, COMPANY_EXAMPLE_PATTERNS)
-                  if not any((root / name).is_relative_to(folder) for folder in marked)}
+        files |= _select(root, examples, COMPANY_EXAMPLE_PATTERNS)
     return sorted(files)

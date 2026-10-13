@@ -94,6 +94,25 @@ test('the folder-agent kit carries the company example and the contract with its
     assert.equal(kit[file],fs.readFileSync(path.join(ROOT,file),'utf8'),file);
 });
 
+test('the nearest .agent-kit marker selects a file, and a marker that selects nothing fails',t=>{
+  const notes=path.join(checkout,'company/examples/ticket-board-notes');
+  const nested=path.join(notes,'nested');
+  t.after(()=>fs.rmSync(nested,{recursive:true,force:true}));
+  fs.mkdirSync(nested);
+  fs.writeFileSync(path.join(nested,'.agent-kit'),'*.md\n');
+  fs.writeFileSync(path.join(nested,'guide.md'),'# Nested guide\n');
+  fs.writeFileSync(path.join(nested,'skip.txt'),'The parent marker selects *.txt, but this folder has its own marker.\n');
+  const examples=()=>spawnSync('python3',['-c','import json,sys;sys.path.insert(0,"tools");from company_overlay import kit_examples;print(json.dumps(kit_examples(".")))'],{cwd:checkout,encoding:'utf8'});
+  const listed=JSON.parse(examples().stdout);
+  assert.ok(listed.includes('company/examples/ticket-board-notes/nested/guide.md'));
+  assert.ok(listed.includes('company/examples/ticket-board-notes/notes.txt'));
+  assert.equal(listed.includes('company/examples/ticket-board-notes/nested/skip.txt'),false);
+  fs.writeFileSync(path.join(nested,'.agent-kit'),'*.yaml\n');
+  const empty=examples();
+  assert.notEqual(empty.status,0);
+  assert.match(empty.stderr,/company\/examples\/ticket-board-notes\/nested\/\.agent-kit: globs match no files/);
+});
+
 test('a company example file that is not UTF-8 text fails the build with its path',t=>{
   const binary=path.join(checkout,'company/examples/ticket-board-notes/logo.txt');
   fs.writeFileSync(binary,Buffer.from([0xff,0xfe,0x00,0x81]));

@@ -377,7 +377,11 @@ test('pilot capture is an explicit session choice and resets when changing or re
     await page.locator('#welcome-agent').click();
     const choice=page.locator('#folder-agent-pilot-capture');
     await expect(choice).not.toBeChecked();
-    await expect(page.locator('#folder-agent-pilot-explanation')).toContainText('Dollar cost is collected manually');
+    const explanation=page.locator('#folder-agent-pilot-explanation');
+    await expect(explanation).toContainText('normal host permissions');
+    await expect(explanation).toContainText('background for up to 45 seconds');
+    await expect(explanation).toContainText('If capture is unavailable or denied, diagram work continues');
+    await expect(explanation).toContainText('Dollar cost is collected manually');
     await page.locator('#folder-agent-connect').click();
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await expect(page.locator('#folder-agent-pilot-review')).toContainText('Off for this session');
@@ -392,7 +396,13 @@ test('pilot capture is an explicit session choice and resets when changing or re
     await expect(page.locator('#folder-agent-copy')).toBeEnabled();
     await expect(page.locator('#folder-agent-pilot-review')).toContainText('On for this session');
     await expect(page.locator('#folder-agent-pilot-review')).toContainText('Dollar cost is collected manually');
-    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/authorizes --enable without asking me again/);
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('requested, not yet verified');
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('normal host permissions');
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('background for up to 45 seconds');
+    await expect(page.locator('#folder-agent-pilot-review')).toContainText('If capture is unavailable or denied, diagram work continues');
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/directly pasted by the participant/);
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/inspect the packaged pilot_capture\.py first/);
+    await expect(page.locator('#folder-agent-instructions')).not.toHaveValue(/without asking me again/);
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('Pilot capture: ON for this session');
     await page.screenshot({path:info.outputPath('pilot-capture-review.png')});
     await closeGuide(page);await page.locator('#folder-agent-open-setup').click();

@@ -4,10 +4,12 @@ Read after `prepare`. VIZ is the `CONNECT.md` authoring directory.
 
 Pilot OFF overrides saved consent. Run metadata-only `--disable`; do not run
 capture checkpoints, read native transcripts or ask for consent again. Only a
-later explicit opt-in changes OFF. Pasted ON authorizes `--enable`; stored ON does
-not. Follow [pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md).
-While opted in, checkpoint at entry and before every reply. Run capture commands
-alone; inspect status/editor/transcript with separate Read calls.
+later explicit opt-in changes OFF. Directly pasted ON requests optional local
+capture; stored ON is not consent. Read
+[pilot capture](../.claude/skills/hld-to-page/references/pilot-capture.md) for scope
+and commands before capture; inspecting the packaged helper is allowed. Normal
+host safeguards apply. If scope or consent is unclear, or capture is denied,
+leave it unstarted, report that status and continue diagram authoring.
 
 ## Packet entry for new and edited diagrams
 
@@ -20,7 +22,8 @@ inference unions them. See [packet options](authoring-packets.md).
 
 The [compact skill router](../.claude/skills/hld-to-page/SKILL.md) covers other
 starting materials. Do not preload the full workflow, contract, examples, session
-manual or helper implementation. The packet includes essential story, state,
+manual or helper implementation, except pilot helper inspection to verify capture
+scope. The packet includes essential story, state,
 placement, evidence and verification rules. Fully specified edits need no fresh
 question batch or worksheet. Use the [folder session](folder-agent-session.md)
 only for protocol uncertainty or recovery.

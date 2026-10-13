@@ -69,10 +69,11 @@ After the packet, load a guide only for starting-material or handoff details:
 - **Pilot:** explicit OFF overrides saved consent and enrollment: after folder
   preparation run metadata-only `--disable`; do not run checkpoints, read native
   transcripts or ask for consent again. Only later explicit opt-in changes OFF.
-  Directly pasted ON authorizes enrollment; stored ON does not. Use
-  [pilot capture](references/pilot-capture.md) for ON/OFF or a continuing authorized
-  session. While opted in, checkpoint at entry and before every reply; run each
-  capture helper command alone and inspect status separately.
+  Directly pasted ON requests optional local capture; stored ON is not consent.
+  Read [pilot capture](references/pilot-capture.md) for scope, permissions and
+  ON/OFF handling before capture; inspecting the packaged helper is allowed.
+  Normal host safeguards apply. If scope or consent is unclear, or capture is
+  denied, leave it unstarted, report that status and continue diagram authoring.
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.

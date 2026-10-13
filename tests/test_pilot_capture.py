@@ -194,6 +194,64 @@ class CaptureTests(unittest.TestCase):
         (support / 'CONNECT.md').write_text(text)
         return text
 
+    def test_generated_setup_requires_matching_direct_consent_in_all_setup_modes(self):
+        # Render the real prompt, not a hand-maintained approximation of its protocol.
+        script = """
+const vm=require('node:vm'),{readSource}=require('./tools/source-loader.cjs');
+const context=vm.createContext({});vm.runInContext(readSource('workbench/agent-chat.js'),context);
+const prompts=[];
+for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const legacy of [false,true]){
+  const identity={sessionId:'flowview-session',connectionId:'connection-1'};
+  if(!legacy)identity.artifacts={spec:'story.spec.json',ledger:'story.ledger.md',metadata:'.flowview-agent'};
+  const prompt=choice=>context.folderAgentInstructions('Diagram','mixed',resume,identity,workflow,choice);
+  prompts.push({workflow,resume,legacy,on:prompt(true),off:prompt(false)});
+}
+process.stdout.write(JSON.stringify(prompts));
+"""
+        prompts = json.loads(subprocess.run(['node', '-e', script], cwd=ROOT,
+                            check=True, capture_output=True, text=True, timeout=15).stdout)
+        for index, setup in enumerate(prompts):
+            for scenario in ['direct', 'stored_only', 'wrong_connection', 'monitor', 'off']:
+                with self.subTest(workflow=setup['workflow'], resume=setup['resume'],
+                                  legacy=setup['legacy'], scenario=scenario):
+                    folder = self.root / ('generated-' + str(index) + '-' + scenario)
+                    support = folder if setup['legacy'] else folder / '.flowview-agent'
+                    support.mkdir(parents=True)
+                    prompt = setup['off'] if scenario == 'off' else setup['on']
+                    (support / 'session.json').write_text(json.dumps({'protocol': 'flowview-folder-v1', **OWNER}))
+                    (support / 'CONNECT.md').write_text(prompt)
+                    self.assertEqual(capture.setup_capture_gate(folder),
+                                     {**OWNER, 'choice': 'OFF' if scenario == 'off' else 'ON'})
+                    earlier = encoded(user('unrelated'), assistant('unrelated'))
+                    if scenario == 'stored_only':
+                        current = encoded(user('read-file', content='Read CONNECT.md and continue the diagram.'),
+                                          user('file-result', content=[{'type': 'tool_result', 'tool_use_id': 'read',
+                                                                       'content': prompt}]))
+                    elif scenario == 'wrong_connection':
+                        current = encoded(user('wrong-setup', content=prompt.replace('"connection-1"', '"stale-connection"')))
+                    elif scenario == 'monitor':
+                        current = encoded(monitor('monitor-setup'),
+                                          user('notification', content='<task-notification>' + prompt + '</task-notification>'))
+                    else:
+                        current = encoded(user('setup', content=prompt), assistant('setup-reply'))
+                    self.native.write_bytes(earlier + current)
+                    if scenario == 'off':
+                        with patch.object(capture, 'source_for', side_effect=AssertionError('OFF must block native discovery')):
+                            result = self.run_capture(folder=folder)
+                    else:
+                        result = self.run_capture(folder=folder)
+                    if scenario == 'direct':
+                        self.assertEqual(result['status'], 'captured')
+                        self.assertEqual((folder / capture.TRANSCRIPT).read_bytes(), current)
+                        usage = json.loads((folder / capture.USAGE).read_text())
+                        self.assertEqual(usage['sessions'][0]['captureStart']['participantTurnId'], 'setup')
+                        self.assertEqual(usage['sessions'][0]['captureStart']['nativeByteOffset'], len(earlier))
+                    else:
+                        self.assertEqual(result['status'], 'disabled')
+                        self.assertFalse((folder / capture.TRANSCRIPT).exists())
+                        self.assertFalse((folder / capture.USAGE).exists())
+                        self.assertFalse((folder / capture.PRIVATE / 'config.json').exists())
+
     def test_never_enrolled_session_can_directly_paste_new_on_after_off(self):
         self.run_capture()  # Another participant has already used this folder.
         self.write_setup('OFF')

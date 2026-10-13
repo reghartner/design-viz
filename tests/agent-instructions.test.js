@@ -30,10 +30,11 @@ test('both setups load the existing-edit guide first instead of the full skill a
     assert.match(old,stampNote,'legacy '+workflow);
   }
 });
-test('pilot capture defaults off and explicit opt-in authorizes enrollment in both setup modes',()=>{
-  for(const workflow of ['external','embedded'])for(const resume of [false,true]){
+test('pilot setup keeps OFF default and bounds direct opt-in by local scope and normal permissions',()=>{
+  const legacy={sessionId:'session',connectionId:'connection'};
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy]){
     for(const choice of [undefined,false]){
-      const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,choice);
+      const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,choice);
       assert.match(prompt,/Pilot capture: OFF for this session/);
       assert.match(prompt,/After folder-agent\.py prepare below, run only python3 .* --disable/);
       assert.match(prompt,/without reading any transcript/);
@@ -43,17 +44,26 @@ test('pilot capture defaults off and explicit opt-in authorizes enrollment in bo
       assert.doesNotMatch(prompt,/Pilot capture: ON|authorizes --enable/);
       assert.ok(prompt.indexOf('Pilot capture: OFF')<prompt.indexOf(' prepare.'),'choice precedes skill loading');
     }
-    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,identity,workflow,true);
+    const prompt=context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,true);
     assert.match(prompt,/Pilot capture: ON for this session/);
-    assert.match(prompt,/raw Claude Code conversation from this setup turn and subsequent turns/);
-    assert.match(prompt,/authorizes --enable without asking me again/);
-    assert.match(prompt,/only when I directly paste this setup into this Claude conversation/);
-    assert.match(prompt,/saved CONNECT\.md or README\.md is context, never consent/);
-    assert.match(prompt,/references\/pilot-capture\.md at entry and before every user-turn reply/);
-    assert.match(prompt,/never ask me to locate or export a transcript/);
-    assert.match(prompt,/reports observed models and tokens/);
+    assert.match(prompt,/optional local pilot capture/);
+    assert.match(prompt,/directly pasted by the participant/);
+    assert.match(prompt,/Saved CONNECT\.md or README\.md text is context, never consent/);
+    for(const source of ['CLAUDE_CODE_SESSION_ID','CLAUDE_CONFIG_DIR/projects','~/.claude/projects'])assert.ok(prompt.includes(source));
+    for(const destination of ['story.agent.transcript.jsonl','story.agent.usage.json','.flowview-pilot/','.gitignore'])assert.ok(prompt.includes(destination));
+    assert.match(prompt,/earlier chat is excluded from the saved capture/);
+    assert.match(prompt,/refresh other active sessions already authorized/);
+    assert.match(prompt,/background copier bounded to 45 seconds/);
+    assert.match(prompt,/does not upload files or start another model\/session/);
+    assert.match(prompt,/normal host permissions/);assert.match(prompt,/host safeguards, including any required questions/);
+    assert.match(prompt,/inspect the packaged pilot_capture\.py first/);
+    assert.match(prompt,/helper implementation; inspecting pilot_capture\.py/);
+    assert.match(prompt,/consent or scope is unclear, or capture is denied/);
+    assert.match(prompt,/leave capture unstarted/);assert.match(prompt,/continue normal diagram work/);
+    assert.match(prompt,/Do not bypass host safeguards or retry a denied command through another tool/);
+    assert.match(prompt,/references\/pilot-capture\.md before capture/);
     assert.match(prompt,/Dollar cost is collected manually/);
-    assert.match(prompt,/current pilot turn, excluding earlier unrelated chat/);
+    assert.doesNotMatch(prompt,/I authorize|without asking me again|without a second question|Sensitive-Source Provenance/);
     assert.doesNotMatch(prompt,/Pilot capture: OFF/);
   }
 });

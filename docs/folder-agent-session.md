@@ -114,12 +114,20 @@ In agent setup, select **Enable pilot capture for this session** to opt in.
 It is off by default for each new setup, including a reopened diagram folder.
 Setup explains the scope and the review screen repeats your choice. The browser
 does not capture a transcript: after you paste the setup instructions into
-Claude Code, the packaged skill saves the raw conversation from that turn and
-subsequent turns, observed models, and token usage locally. The pilot owner
-collects dollar cost manually. Participants do not locate or export transcripts.
+Claude Code, the agent can request local capture under normal host permissions.
+The helper reads the matching native session JSONL under `CLAUDE_CONFIG_DIR/projects/`
+(default `~/.claude/projects/`), selected by `CLAUDE_CODE_SESSION_ID`. It reads the
+file to verify the consent boundary, saving exact complete lines from that turn
+onward, observed models, and token usage. Earlier chat is excluded from saved
+capture, not from the source read. The pilot owner collects dollar cost manually.
+Participants do not locate or export transcripts.
 
 The generated prompt explicitly says ON or OFF. Directly pasting ON into your
-Claude conversation authorizes `--enable` without a second question. Stored
+Claude conversation requests optional enrollment with `--enable`. Normal tool
+permissions and host safeguards still apply; the agent may inspect the packaged
+helper first. If consent or scope is unclear, or capture is denied, it leaves
+capture unstarted, reports that status, and continues normal diagram work. It
+must not change permissions or retry a denial through another tool. Stored
 `CONNECT.md` or `README.md` ON text never authorizes another Claude session;
 the helper checks the current participant turn before enrollment. OFF overrides old folder settings and prior enrollment:
 Claude runs only the metadata-only `--disable` command after preparing the folder.
@@ -136,13 +144,11 @@ waiting for the registry lock, and stops checkpoints. A new OFF setup gates old
 copiers immediately when the setup is saved, before it is pasted into Claude. Each new participant authorizes their own session; an
 existing folder alone never grants consent.
 
-Run every `pilot_capture.py` invocation in its **own Bash call**, including
-`--enable` (with or without `--explicit-opt-in`), turn-start refresh,
-`--after-turn`, and `--disable`. Include only the helper command: no `;`, `&&`,
-pipes, `cat`, `ls`, other commands, or file reads. Folder preparation is a
-separate call. Afterwards inspect `.flowview-pilot/after-turn-status.json` with
-a separate **Read** call, preferably on the next turn. Inspect `editor.json`
-and `story.agent.*` with **Read**, not `cat`, separately from capture.
+The packaged [pilot instructions](../.claude/skills/hld-to-page/references/pilot-capture.md)
+centralize scope, commands and status verification. Run each helper operation
+separately so its scope and result can be reviewed. This does not override a
+permission denial. A busy registry may require retrying the metadata-only stop
+update; that retry reads no transcript.
 
 Capture writes `story.agent.transcript.jsonl` and `story.agent.usage.json` beside
 the spec/ledger, and uses `.flowview-pilot/` for local session copies and status.
@@ -161,12 +167,16 @@ cannot be confused with an entire session. Each participant's pilot slice is ret
 separately and included in the combined transcript; returning to a session does
 not duplicate it. Separate subagent transcripts are outside this capture scope.
 
-The agent checkpoints at entry and before each reply, and can schedule a bounded
-final copy with a 45-second wait budget for the final response. It reports
-the actual capture status and any gaps; a scheduled copy is not a verified copy.
-No hooks, additional Claude session or permanent listener is installed. The next
-turn refreshes all recorded sessions, including a previous participant's final
-native writes. If no later checkpoint occurs, delayed writes can remain missing.
+While opted in and permitted, the agent checkpoints at entry and later turns,
+and can schedule one background copier per `--after-turn` call with a 45-second
+wait budget for the final response. This is separate from conversation delivery;
+copy/paste mode still does not start Monitor or a persistent request watcher.
+It reports the actual capture status and any gaps; a scheduled copy is not a verified copy.
+No hooks, additional model call/session or permanent listener is installed. A
+checkpoint refreshes other active sessions already authorized for this folder and
+current setup, including a previous participant's final native writes. Suspended
+or setup-blocked sessions retain saved copies without native reads. If no later
+checkpoint occurs, delayed writes can remain missing.
 For the Beta route, a verified Monitor `flowview_request` is a participant turn;
 its `flowview_result` is attached to the same request. Duplicate delivery is
 deduplicated, and unrelated background, shell and local-command notifications

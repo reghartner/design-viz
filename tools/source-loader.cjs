@@ -39,7 +39,12 @@ function repositoryUrl(value, file) {
     throw companyError(file, 'repository must be an https:// repository root such as ' + EXAMPLE_REPOSITORY);
   return url.origin + '/' + segments.join('/');
 }
-function imageDataUri(file, logo, config) {
+function inside(directory, file) {
+  const relative = path.relative(directory, file);
+  return relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+function imageDataUri(file, logo, config, company) {
+  if (!inside(company, file)) throw companyError(config, 'logo ' + logo + ' must be a relative path inside company/');
   if (!fs.existsSync(file)) throw companyError(config, 'logo file not found: ' + logo);
   const bytes = fs.readFileSync(file);
   const kind = bytes.subarray(0, 8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])) ? 'png'
@@ -49,7 +54,7 @@ function imageDataUri(file, logo, config) {
   if (bytes.length > IMAGE_MAX_BYTES) throw companyError(config, 'logo ' + logo + ' must be at most 512 KiB');
   return 'data:image/' + kind + ';base64,' + bytes.toString('base64');
 }
-function readBrand(file, companyName) {
+function readBrand(file, companyName, company) {
   let raw;
   try { raw = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { throw companyError(file, error.message); }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw companyError(file, 'expected a JSON object');
@@ -66,7 +71,7 @@ function readBrand(file, companyName) {
         throw companyError(file, 'logo must be at most 512 KiB');
       brand.logo = logo;
     } else if (/\.(?:png|jpe?g|webp)$/i.test(logo)) {
-      brand.logo = imageDataUri(path.resolve(path.dirname(file), logo), logo, file);
+      brand.logo = imageDataUri(path.resolve(path.dirname(file), logo), logo, file, company);
     } else if (logo.length >= 1 && logo.length <= 4 && !/[\u0000-\u001f\u007f<>]/.test(logo)) {
       brand.logo = logo;
     } else throw companyError(file, 'logo must be a 1–4 character monogram, a PNG/JPEG/WebP data URI, or a relative .png/.jpg/.webp path');
@@ -102,8 +107,9 @@ function companyConfig(root = sourceRoot) {
   if (raw.brand != null) {
     if (typeof raw.brand !== 'string' || !raw.brand.trim()) throw companyError(file, 'brand must be a path relative to company.json');
     const brandFile = path.resolve(company, raw.brand);
+    if (!inside(company, brandFile)) throw companyError(file, 'brand must be a relative path inside company/');
     if (!fs.existsSync(brandFile)) throw companyError(file, 'brand file not found: ' + raw.brand);
-    config.brand = readBrand(brandFile, config.companyName);
+    config.brand = readBrand(brandFile, config.companyName, company);
   }
   if (raw.package != null) {
     if (!raw.package || typeof raw.package !== 'object' || Array.isArray(raw.package)) throw companyError(file, 'package must be an object');

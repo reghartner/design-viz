@@ -9,13 +9,15 @@
  *   package.repositoryUrl, else git+<company.json repository>.git.
  * publishConfig.registry: FLOWVIEW_PACKAGE_REGISTRY, else company/company.json
  *   package.registry.
- * With neither, this runs `npm pack|publish` in apps/backstage with the same
- * options. Otherwise it builds once (the package's prepack) unless
+ * npm always runs with apps/backstage as its working directory, so that
+ * folder's .npmrc and relative npm path options mean the same in both modes.
+ * With neither value, this runs `npm pack|publish` for the package with the
+ * same options. Otherwise it builds once (the package's prepack) unless
  * --ignore-scripts is given, copies exactly the files npm would pack into a
- * staging folder with a patched package.json, and runs npm there with
- * --ignore-scripts. In both cases a relative --pack-destination resolves from
- * the current directory, which is also the default destination, as for
- * `npm pack` run in that directory.
+ * staging folder with a patched package.json, and runs
+ * `npm pack|publish <staging folder> --ignore-scripts`. In both modes a
+ * relative --pack-destination resolves from the current directory, which is
+ * also the default destination, as for `npm pack` run in that directory.
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -54,6 +56,11 @@ function resolveDestinations(args) {
     else out.push(arg);
   }
   return { args: out, destination };
+}
+
+// The npm command line for the staged package: run from apps/backstage.
+export function stagedCommand(command, args, staging) {
+  return [command, staging, ...args.filter(arg => arg !== '--ignore-scripts'), '--ignore-scripts'];
 }
 
 function packedFiles(stdout) {
@@ -96,7 +103,7 @@ async function main(argv) {
     await writeFile(path.join(staging, 'package.json'), JSON.stringify(stagedManifest(manifest, identity), null, 2) + '\n');
     console.error('Packing with ' + [identity.repositoryUrl && 'repository.url ' + identity.repositoryUrl,
       identity.registry && 'publishConfig.registry ' + identity.registry].filter(Boolean).join(' and ') + '.');
-    return run([command, ...args.filter(arg => arg !== '--ignore-scripts'), '--ignore-scripts'], staging);
+    return run(stagedCommand(command, args, staging), source);
   } finally { await rm(staging, { recursive: true, force: true }); }
 }
 

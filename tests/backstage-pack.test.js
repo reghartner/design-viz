@@ -28,6 +28,15 @@ test('package identity comes from the environment, then company.json, then nothi
   assert.deepEqual(stagedManifest(manifest,{repositoryUrl:null,registry:null}),manifest);
 });
 
+test('the staged package is named on the npm command line, so npm keeps apps/backstage config',async()=>{
+  const {stagedCommand}=await tool();
+  assert.deepEqual(stagedCommand('pack',['--pack-destination','/out','--ignore-scripts','--json'],'/tmp/stage'),
+    ['pack','/tmp/stage','--pack-destination','/out','--json','--ignore-scripts']);
+  assert.deepEqual(stagedCommand('publish',['--tag','next'],'/tmp/stage'),['publish','/tmp/stage','--tag','next','--ignore-scripts']);
+  const source=fs.readFileSync(path.join(ROOT,'tools/backstage-pack.mjs'),'utf8');
+  assert.match(source,/run\(stagedCommand\(command, args, staging\), source\)/);
+});
+
 function packed(t,env){
   const destination=fs.mkdtempSync(path.join(os.tmpdir(),'flowview-pack-identity-'));
   t.after(()=>fs.rmSync(destination,{recursive:true,force:true}));

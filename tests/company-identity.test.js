@@ -90,6 +90,9 @@ test('invalid company identity fails the build with the field to fix',t=>{
   fails({version:1,companyName:'<b>Acme</b>'},undefined,/companyName must be/);
   fails({version:1,revision:'main branch'},undefined,/revision must be/);
   fails({version:1,brand:'missing.json'},undefined,/brand file not found: missing\.json/);
+  fails({version:1,brand:'../src/flowview.demo.json'},undefined,/brand must be a relative path inside company\//);
+  fails({version:1,brand:'/etc/hosts'},undefined,/brand must be a relative path inside company\//);
+  fails({version:1,brand:'brand.json'},{logo:'../src/fonts/x.png'},/logo \.\.\/src\/fonts\/x\.png must be a relative path inside company\//);
   fails({version:1,brand:'brand.json'},{tagline:'x'},/unknown field tagline/);
   fails({version:1,brand:'brand.json'},{primaryColor:'blue'},/primaryColor must be #RGB or #RRGGBB/);
   fails({version:1,brand:'brand.json'},{logo:'TOOLONG'},/logo must be a 1–4 character monogram/);

@@ -88,7 +88,9 @@ function createStagedFileImport(opts){
   listen(surface,'dragover',function(ev){if(!active() || !external(ev))return;ev.preventDefault();if(ev.dataTransfer)ev.dataTransfer.dropEffect='copy';});
   listen(surface,'dragleave',function(ev){if(!external(ev))return;depth=Math.max(0,depth-1);if(!depth)overlay.hidden=true;});
   listen(surface,'drop',function(ev){if(!active() || !external(ev))return;ev.preventDefault();hideOverlay();start(ev.dataTransfer.files);});
-  listen(document,'dragend',hideOverlay);listen(document,'drop',hideOverlay);
+  /* Canvas image drops stop bubbling after ingestion; retire the file overlay
+     during capture so it cannot remain above a successfully added image. */
+  listen(document,'dragend',hideOverlay);listen(document,'drop',hideOverlay,true);
   listen(confirm,'click',function(){
     var staged=pending;if(!staged)return;pending=null;if(dialog.open)dialog.close();
     try{

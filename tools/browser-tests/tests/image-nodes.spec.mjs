@@ -23,9 +23,12 @@ async function transfer(page,kind,{base64=PNG,name='camera-capture.png',type='im
 
 test('drop and paste add ordinary image nodes in Standard and Explore with one Undo each',async({page,server})=>{
   await page.goto(server.origin+'/workbench.html');const raw=fixture(),original=JSON.stringify(raw,null,2);await pastePage(page,original);await closeTools(page);
+  await transfer(page,'dragenter');
   await transfer(page,'dragover');await expect(board(page)).toHaveClass(/dv-image-drop-target/);
   expect(await transfer(page,'drop')).toBe(true);
   const image=page.locator('#docview [data-dv-node-image="true"]');await expect(image).toHaveCount(1);
+  await expect(page.locator('.file-drop-overlay:visible')).toHaveCount(0);
+  await expect(page.locator('.file-import-dialog:visible')).toHaveCount(0);
   await expect(image.locator('image.node-image')).toHaveAttribute('href',/^data:image\/png;base64,/);
   await expect(image).toHaveAttribute('aria-label',/Camera capture/);
   await image.click();await page.locator('#editor-tab-inspect').click();
@@ -49,7 +52,8 @@ test('drop and paste add ordinary image nodes in Standard and Explore with one U
 
 test('unsupported images, ordinary clipboard/files, stale reads and destroy never partially mutate',async({page,server})=>{
   await page.goto(server.origin+'/lifetime/index.html');const original=JSON.stringify(fixture());await pastePage(page,original);await closeTools(page);
-  expect(await transfer(page,'drop',{base64:GIF,name:'animation.gif',type:'image/gif'})).toBe(false);
+  expect(await transfer(page,'drop',{base64:GIF,name:'animation.gif',type:'image/gif'})).toBe(true);
+  await expect(page.locator('.file-import-status:visible')).toContainText('Binary files are not supported');
   expect(await transfer(page,'drop',{base64:PNG.slice(0,24),name:'truncated.png',type:'image/png'})).toBe(true);
   await expect(page.locator('#src')).toHaveValue(original);await expect(page.locator('#guide')).toContainText(/not a real PNG, JPEG or WebP/);
   const isolated=await page.evaluate(()=>{
@@ -58,7 +62,9 @@ test('unsupported images, ordinary clipboard/files, stale reads and destroy neve
     const json=new DataTransfer();json.items.add(new File(['{}'],'diagram.json',{type:'application/json'}));const drop=new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:json});target.dispatchEvent(drop);
     return {paste:paste.defaultPrevented,drop:drop.defaultPrevented};
   });
-  expect(isolated).toEqual({paste:false,drop:false});await expect(page.locator('#src')).toHaveValue(original);
+  // The file importer now owns external JSON drops; image ingestion must still
+  // leave ordinary clipboard text and rejected documents unchanged.
+  expect(isolated).toEqual({paste:false,drop:true});await expect(page.locator('#src')).toHaveValue(original);
   const mixed=await page.evaluate(({base64})=>{
     const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),image=()=>new File([bytes],'mixed.png',{type:'image/png'});
     const target=document.querySelector('#docview .doc-sec[data-dv-section="0"] .board:not([hidden])');
@@ -70,7 +76,9 @@ test('unsupported images, ordinary clipboard/files, stale reads and destroy neve
     const multiple=new DataTransfer();multiple.items.add(image());multiple.items.add(image());
     return {text:dispatch('paste',text),html:dispatch('paste',html),uri:dispatch('paste',uri),nonimage:dispatch('drop',nonimage),multiple:dispatch('drop',multiple)};
   },{base64:PNG});
-  expect(mixed).toEqual({text:false,html:false,uri:false,nonimage:false,multiple:false});await expect(page.locator('#src')).toHaveValue(original);
+  expect(mixed).toEqual({text:false,html:false,uri:false,nonimage:true,multiple:true});
+  await expect(page.locator('.file-import-status:visible')).toContainText('Choose one file');
+  await expect(page.locator('#src')).toHaveValue(original);
   await page.evaluate(({base64})=>{
     const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),data=new DataTransfer();data.items.add(new File([bytes],'late.png',{type:'image/png'}));
     const target=document.querySelector('#docview .doc-sec[data-dv-section="0"] .board:not([hidden])');target.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:data}));

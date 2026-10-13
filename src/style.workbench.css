@@ -1504,6 +1504,7 @@ body.workspace-canvas{--workspace-header-bottom:56px;--workspace-content-top:112
  .workspace-canvas .workspace-save{gap:3px;}
  .workspace-canvas .workspace-tools :is(.bbtn,.rbtn){padding:6px;font-size:11px;}
  .workspace-canvas .workspace-save>[data-workbench-tour]{display:none;}
+ .workspace-canvas .workspace-more-body:has(#folder-agent-working:not([hidden])){flex-wrap:wrap;}
  .workspace-canvas #docview .section-view-options-body{position:fixed;top:var(--workspace-content-top);right:12px;}
 }
 .welcome-active:not(.canon-reader-active) #workbench-reader-title,.canon-reader-active #workbench-editor-title{display:none!important;}

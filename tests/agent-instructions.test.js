@@ -58,13 +58,34 @@ test('pilot setup keeps OFF default and bounds direct opt-in by local scope and 
     assert.match(prompt,/normal host permissions/);assert.match(prompt,/host safeguards, including any required questions/);
     assert.match(prompt,/inspect the packaged pilot_capture\.py first/);
     assert.match(prompt,/helper implementation; inspecting pilot_capture\.py/);
-    assert.match(prompt,/consent or scope is unclear, or capture is denied/);
-    assert.match(prompt,/leave capture unstarted/);assert.match(prompt,/continue normal diagram work/);
+    assert.match(prompt,/continue normal diagram work/i);
     assert.match(prompt,/Do not bypass host safeguards or retry a denied command through another tool/);
     assert.match(prompt,/references\/pilot-capture\.md before capture/);
     assert.match(prompt,/Dollar cost is collected manually/);
     assert.doesNotMatch(prompt,/I authorize|without asking me again|without a second question|Sensitive-Source Provenance/);
     assert.doesNotMatch(prompt,/Pilot capture: OFF/);
+  }
+});
+test('all pilot routes require permitted checkpoints and distinguish denied starts from later gaps',()=>{
+  const fs=require('node:fs'),path=require('node:path');
+  const routes=['.claude/skills/hld-to-page/SKILL.md','.claude/skills/hld-to-page/references/pilot-capture.md',
+    'docs/folder-agent-existing-edit.md','docs/folder-agent-session.md']
+    .map(file=>[file,fs.readFileSync(path.join(__dirname,'..',file),'utf8')]);
+  const legacy={sessionId:'session',connectionId:'connection'};
+  for(const workflow of ['external','embedded'])for(const resume of [false,true])for(const owner of [identity,legacy])
+    routes.push([`${workflow} resume=${resume} legacy=${!owner.artifacts}`,
+      context.folderAgentInstructions('Doorbell','mixed',resume,owner,workflow,true)]);
+  for(const [route,source] of routes){
+    const text=source.replace(/[`*]/g,'').replace(/\s+/g,' ');
+    assert.match(text,/While opted in and permitted, checkpoint at entry and at the start of every later user turn/,route);
+    assert.match(text,/While opted in and permitted,[^.]*run --after-turn immediately before every reply/,route);
+    assert.match(text,/including questions, approval waits, errors and completion/,route);
+    assert.match(text,/If enrollment lacks consent or (?:clear )?scope, or is denied, (?:do not start it|it must not start)/,route);
+    assert.match(text,/If a later checkpoint or final copy is blocked or fails, retain existing captures and report/,route);
+    assert.match(text,/gap or unverified final response/,route);
+    assert.match(text,/claim capture stopped only after (?:a )?successful metadata-only --disable/i,route);
+    assert.match(text,/do not run (?:it|a blocked operation)/i,route);
+    assert.doesNotMatch(text,/optional --after-turn|optional final-response copy|copy can be requested|leave capture unstarted/i,route);
   }
 });
 test('all pilot entry guidance honors explicit OFF before saved folder settings',()=>{

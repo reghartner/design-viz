@@ -72,8 +72,14 @@ After the packet, load a guide only for starting-material or handoff details:
   Directly pasted ON requests optional local capture; stored ON is not consent.
   Read [pilot capture](references/pilot-capture.md) for scope, permissions and
   ON/OFF handling before capture; inspecting the packaged helper is allowed.
-  Normal host safeguards apply. If scope or consent is unclear, or capture is
-  denied, leave it unstarted, report that status and continue diagram authoring.
+  While opted in and permitted, checkpoint at entry and at the start of every
+  later user turn; run `--after-turn` immediately before every reply, including
+  questions, approval waits, errors and completion. If enrollment lacks consent
+  or scope, or is denied, do not start it; report unavailable/denied. If a later
+  checkpoint or final copy is blocked or fails, retain existing captures and
+  report the gap or unverified final response. Claim capture stopped only after
+  successful metadata-only `--disable`. Do not run a blocked operation or bypass
+  host safeguards; continue authoring. See the reference for status handling.
 - **Source checkout:** run `python3 tools/build.py` before validators. Commit
   authored inputs only; HTML/runtime outputs are ignored. An extracted kit
   includes its backend and needs no source checkout or build.

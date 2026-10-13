@@ -402,6 +402,9 @@ test('pilot capture is an explicit session choice and resets when changing or re
     await expect(page.locator('#folder-agent-pilot-review')).toContainText('If capture is unavailable or denied, diagram work continues');
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/directly pasted by the participant/);
     await expect(page.locator('#folder-agent-instructions')).toHaveValue(/inspect the packaged pilot_capture\.py first/);
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/While opted in and permitted, checkpoint at entry/);
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/run --after-turn immediately before every reply/);
+    await expect(page.locator('#folder-agent-instructions')).toHaveValue(/If a later checkpoint or final copy is blocked or fails, retain existing captures/);
     await expect(page.locator('#folder-agent-instructions')).not.toHaveValue(/without asking me again/);
     expect(await readFile(path.join(h.session,'CONNECT.md'),'utf8')).toContain('Pilot capture: ON for this session');
     await page.screenshot({path:info.outputPath('pilot-capture-review.png')});

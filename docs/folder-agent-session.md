@@ -125,9 +125,13 @@ Participants do not locate or export transcripts.
 The generated prompt explicitly says ON or OFF. Directly pasting ON into your
 Claude conversation requests optional enrollment with `--enable`. Normal tool
 permissions and host safeguards still apply; the agent may inspect the packaged
-helper first. If consent or scope is unclear, or capture is denied, it leaves
-capture unstarted, reports that status, and continues normal diagram work. It
-must not change permissions or retry a denial through another tool. Stored
+helper first. If enrollment lacks consent or clear scope, or is denied, it must
+not start; the agent reports unavailable/denied. If a later checkpoint or final
+copy is blocked or fails, retain existing captures and report the gap or
+unverified final response. Do not describe prior capture as unstarted; claim
+capture stopped only after successful metadata-only `--disable`. Do not run a
+blocked operation, inspect native transcripts merely to diagnose it, change
+permissions or retry a denial through another tool. Continue normal diagram work. Stored
 `CONNECT.md` or `README.md` ON text never authorizes another Claude session;
 the helper checks the current participant turn before enrollment. OFF overrides old folder settings and prior enrollment:
 Claude runs only the metadata-only `--disable` command after preparing the folder.
@@ -167,9 +171,10 @@ cannot be confused with an entire session. Each participant's pilot slice is ret
 separately and included in the combined transcript; returning to a session does
 not duplicate it. Separate subagent transcripts are outside this capture scope.
 
-While opted in and permitted, the agent checkpoints at entry and later turns,
-and can schedule one background copier per `--after-turn` call with a 45-second
-wait budget for the final response. This is separate from conversation delivery;
+While opted in and permitted, checkpoint at entry and at the start of every
+later user turn; run `--after-turn` immediately before every reply, including
+questions, approval waits, errors and completion. Each call schedules one
+background copier with a 45-second wait budget for the final response. This is separate from conversation delivery;
 copy/paste mode still does not start Monitor or a persistent request watcher.
 It reports the actual capture status and any gaps; a scheduled copy is not a verified copy.
 No hooks, additional model call/session or permanent listener is installed. A

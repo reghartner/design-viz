@@ -13,11 +13,19 @@ safeguards remain authoritative, including any required questions. You may
 inspect the packaged `scripts/pilot_capture.py` before running it, even when the
 normal authoring route discourages preloading helper implementations.
 
-If consent is missing, scope cannot be established, or the runtime denies
-capture, leave capture unstarted, report it unavailable or denied, and continue
-normal diagram work. Do not disable protections, change permissions, suppress
-required questions, or repackage/retry a denied command through another tool.
-Do not invoke a checkpoint just to discover consent.
+If enrollment lacks consent or clear scope, or is denied, do not start it;
+report it unavailable or denied. If a later checkpoint or final copy is blocked
+or fails, retain existing captures and report the denied checkpoint, capture gap
+or unverified final response. Do not describe prior capture as unstarted; claim
+capture stopped only after a successful metadata-only `--disable`. A failed
+checkpoint does not prove that a previously scheduled copier stopped.
+
+If any capture operation is blocked by consent, scope or host permissions, do
+not run it. Report the actual gap and continue normal diagram work. Do not read
+native transcripts or private captures merely to diagnose a denial. Do not
+disable protections, change permissions, suppress required questions, or
+repackage/retry a denied command through another tool. Do not invoke a checkpoint
+just to discover consent.
 
 ## Local scope, before any capture command
 
@@ -54,7 +62,7 @@ The helper writes these local artifacts beside the spec and ledger:
   rules. Do not force-add these artifacts or put raw conversations in the ledger.
 
 Capture does not upload these files, make a model call, start another agent
-session or install hooks. The optional `--after-turn` operation does start one
+session or install hooks. The `--after-turn` operation does start one
 local background copier per call, with a wait budget of up to 45 seconds for the
 final response. This bounded copier is separate from Monitor or a persistent
 request watcher; copy/paste conversation delivery still starts neither. Dollar
@@ -138,11 +146,13 @@ update without reading transcripts, but do not retry a permission denial through
 another tool. Only a later direct opt-in can resume capture.
 
 With no browser setup choice, a saved config continues only already authorized
-sessions. Missing consent leaves capture unstarted; a saved setting is not an
-invitation to enroll someone else.
+sessions. Without consent, do not enroll another session; retain prior captures
+and report the unavailable enrollment. A saved setting is not an invitation to
+enroll someone else.
 
-While this participant remains opted in and capture is permitted, at the
-beginning of later user turns, run this refresh:
+While opted in and permitted, checkpoint at entry and at the start of every
+later user turn. Enrollment performs the first checkpoint; for an already
+enrolled session, run this refresh:
 
 ```sh
 python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram"
@@ -151,8 +161,8 @@ python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/p
 It refreshes the active authorized sessions described above, retaining suspended
 captures without reading their native sources.
 
-Before replies, while still opted in and permitted, the optional final-response
-copy can be requested with:
+While opted in and permitted, run `--after-turn` immediately before every reply,
+including questions, approval waits, errors and completion:
 
 ```sh
 python3 "<VIZ>/.claude/skills/hld-to-page/scripts/pilot_capture.py" --folder "/path/to/diagram" --after-turn

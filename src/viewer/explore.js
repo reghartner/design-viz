@@ -881,6 +881,18 @@ function createSectionViewport(box, toolbar, grid, board, bar, d, boardSize, pro
     navigationKeydown:keydown,
     canvasZoom:function(value){if(value==null)return graphPixels/graphWidth();cancelDeferredFit();zoom=clamp(value,zoomFloor(),4);sizeGraph(true);},
     overlayScale:sizingScale,setOverlayScale:changeOverlayScale,
+    setReaderPresentation:function(options){
+      if(!active || retired)return;
+      options=options || {};
+      if(options.panelsHidden!==undefined)memory.focus=!!options.panelsHidden;
+      if(options.panelsHiddenWhenGraphVisible!==undefined)memory.focus=!!options.panelsHiddenWhenGraphVisible && !canvasBoardHidden;
+      if(Number.isFinite(options.overlayScale)){
+        var value=Math.round(clamp(options.overlayScale,.5,1.25)*100)/100;
+        if(onCanvas() && !canvasWindow(playerWindow)){var canvasLayout=memory.layout.canvas || (memory.layout.canvas={});canvasLayout.controlsScale=value;}
+        if(!onCanvas() || hasFloatingPanels())memory.layout.overlayScale=value;
+      }
+      paint();
+    },
     fitCanvas:fitCanvas,
     fitSelection:function(extent,insets,obstacles){if(workbenchCanvas)fitCanvas(insets,extent,obstacles);},
     restoreInitialCamera:function(force){

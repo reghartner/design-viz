@@ -70,10 +70,10 @@ function uiHarness(options={}){
   }
   const elements={};ids.forEach(id=>elements['agent-update-'+id]=element(id));
   const observers=[];class Observer{constructor(callback){this.callback=callback;this.disconnected=false;observers.push(this);}observe(){this.observed=true;}disconnect(){this.disconnected=true;}}
-  const doc={defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0;
+  const doc={defaultView:{MutationObserver:Observer},getElementById:id=>elements[id]};let snapshot,rendered=0,destroyed=0,canvasDestroyed=0,canvasOptions;
   const pages=[],accepted=[];
   const c={document:doc,navigator:{clipboard:{}},normalize:raw=>raw.page || raw,validate:()=>({errors:[]}),renderPage(root,page){rendered++;pages.push(plain(page));return {destroy(){destroyed++;}};},
-    initViewerExploreCanvas(){return {destroy(){canvasDestroyed++;}};}};
+    initViewerExploreCanvas(ctl,view,opts){canvasOptions=opts;return {destroy(){canvasDestroyed++;}};}};
   vm.createContext(c);vm.runInContext(readSource('core/navigation.js'),c);vm.runInContext(readSource('core/document.js'),c);vm.runInContext(readSource('workbench/lifetime.js'),c);vm.runInContext(readSource('workbench/agent-review.js'),c);
   let session;
   if(options.topology){
@@ -87,11 +87,11 @@ function uiHarness(options={}){
   if(options.current)snapshot.current=options.current;if(options.source)snapshot.source=options.source;
   if(options.ok===false)snapshot.review.ok=false;
   const ui=c.initWorkbenchAgentReview({document:doc,resolve:session && !options.omitResolver?session.resolve:undefined,snapshot:()=>snapshot,accept:async version=>accepted.push({version,source:snapshot.source}),reject:async()=>{}});
-  return {c,ui,elements,observers,pages,accepted,snapshot,session,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
+  return {c,ui,elements,observers,pages,accepted,snapshot,session,canvasOptions:()=>canvasOptions,counts:()=>({rendered,destroyed,canvasDestroyed}),review:snapshot.review};
 }
 test('review UI keeps highlight state through redraws, resets on reopen, and retires observers and renderers',()=>{
   const h=uiHarness(),e=h.elements;h.ui.update(h.review);e['agent-update-open'].fire('click');
-  assert.equal(h.counts().rendered,1);assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true');assert.equal(e['agent-update-commit'].disabled,false);
+  assert.equal(h.counts().rendered,1);assert.equal(h.canvasOptions().initialContentsOpen,false);assert.deepEqual(plain(h.canvasOptions().presentation),{panelsHiddenWhenGraphVisible:true,overlayScale:.5});assert.equal(h.canvasOptions().forceFit,true);assert.equal(h.canvasOptions().refitOnResize,true);assert.deepEqual(plain(h.canvasOptions().fitInsets),{left:24,right:24,top:20,bottom:24});assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'true');assert.equal(e['agent-update-commit'].disabled,false);
   e['agent-update-immersive'].fire('click');assert.equal(e['agent-update-dialog'].classList.contains('agent-update-immersive'),true);
   e['agent-update-highlights'].fire('click');assert.equal(e['agent-update-highlights'].getAttribute('aria-pressed'),'false');
   const firstObserver=h.observers[0];e['agent-update-current'].fire('click');assert.equal(firstObserver.disconnected,true);assert.equal(h.counts().rendered,2);

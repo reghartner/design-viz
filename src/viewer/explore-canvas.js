@@ -4,11 +4,15 @@
 function initViewerExploreCanvas(ctl,view,opts){
   var container=opts && opts.container || document.body;
   view.classList.toggle('navigation-contained',container!==document.body || !!(opts && opts.contained));
-  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,lastTarget=null,standardScroll=null;
+  var active=null,detailRoot=null,detailOriginExplore=false,seen=new Set(),frame=0,refitFrame=0,lastTarget=null,standardScroll=null;
   var contained=container!==document.body || !!(opts && opts.contained);
   var fitObserver=new ResizeObserver(function(entries){
     if(!frame && entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))frame=requestAnimationFrame(firstFit);
   }),fitRecord=null,fitDefinition=null,fitKey=null;
+  var refitObserver=opts && opts.refitOnResize?new ResizeObserver(function(entries){
+    if(refitFrame || !active || !entries.some(function(entry){return entry.contentRect.width && entry.contentRect.height;}))return;
+    refitFrame=requestAnimationFrame(function(){refitFrame=0;if(active && active.viewport)active.viewport.fitCanvas(opts.fitInsets);});
+  }):null;
   function selectSection(rec){
     detailRoot=null;
     if(ctl.views && !ctl.views.ensure(rec,undefined,true))return;
@@ -25,7 +29,7 @@ function initViewerExploreCanvas(ctl,view,opts){
       }
     }
   }
-  var navigation=createExploreNavigation(ctl,{contents:true,container:container,selectSection:selectSection,action:opts && opts.action,singleShareAction:!!(opts && opts.singleShareAction),isCanvas:function(){return !!active;}});
+  var navigation=createExploreNavigation(ctl,{contents:true,container:container,initialOpen:opts && opts.initialContentsOpen,selectSection:selectSection,action:opts && opts.action,singleShareAction:!!(opts && opts.singleShareAction),isCanvas:function(){return !!active;}});
   function cancelFirstFit(){cancelAnimationFrame(frame);frame=0;fitObserver.disconnect();fitRecord=fitDefinition=fitKey=null;}
   function firstFit(){
     frame=0;var rec=fitRecord,definition=fitDefinition,key=fitKey;
@@ -33,10 +37,11 @@ function initViewerExploreCanvas(ctl,view,opts){
     var board=rec.sectionEl.querySelector('.board');
     if(!board || !board.clientWidth || !board.clientHeight){if(board)fitObserver.observe(board);return;}
     cancelFirstFit();seen.add(key);
-    if(!(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas({left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180});
+    if(opts && opts.forceFit || !(definition.exploreLayout && definition.exploreLayout.camera))active.viewport.fitCanvas(opts && opts.fitInsets || {left:24,right:board.clientWidth<=640?24:260,top:20,bottom:180});
   }
   function show(rec){
     cancelFirstFit();
+    if(refitObserver)refitObserver.disconnect();
     var definition=ctl.views && ctl.views.current(rec);
     var previous=active;active=rec && (rec.viewport && rec.viewport.isExplore() || !rec.viewport && definition && definition.presentation==='explore')?rec:null;
     if(previous && previous!==active){
@@ -65,7 +70,9 @@ function initViewerExploreCanvas(ctl,view,opts){
     var detail=ctl.details && ctl.details.snapshot(),root=detail && ctl.sections.find(function(r){return r.reference===detail.section;});
     if(!active.viewport)return;
     active.viewport.setReaderCanvas(true);
+    if(opts && opts.presentation)active.viewport.setReaderPresentation(opts.presentation);
     active.viewport.restoreInitialCamera();
+    if(refitObserver){var board=active.sectionEl.querySelector('.board');if(board)refitObserver.observe(board);}
     var definition=active.viewport.viewDefinition(),key=active.number+':'+definition.id;
     if(!seen.has(key)){
       fitRecord=rec;fitDefinition=definition;fitKey=key;frame=requestAnimationFrame(function(){
@@ -129,5 +136,5 @@ function initViewerExploreCanvas(ctl,view,opts){
   ctl.onChange=changed;
   window.addEventListener('hashchange',navigationChanged);
   show(navigationState().rec);lastTarget=navigationState().key;if(ctl.details && ctl.details.activeSection && ctl.details.activeSection())detailChanged();
-  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
+  return {destroy:function(){if(ctl.onChange===changed)ctl.onChange=priorChange;window.removeEventListener('hashchange',navigationChanged);view.removeEventListener('detail-navigation',detailChanged);view.removeEventListener('diagram-view-change',viewChanged);cancelFirstFit();cancelAnimationFrame(refitFrame);if(refitObserver)refitObserver.disconnect();show(null);navigation.destroy();view.classList.remove('navigation-contained');view.removeEventListener('tab-view-change',tabViewChanged);}};
 }

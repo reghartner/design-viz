@@ -1,5 +1,31 @@
 # Copy, paste and duplicate objects
 
+## Add a diagram to an existing canvas
+
+Choose **Add → Add / Paste diagram** (also available in Inspect), drop a
+Flowview `.json` or Mermaid `.mmd`, `.mermaid`, `.md`, or `.txt` file onto the
+active Diagram or Explore canvas, or paste an unambiguous Flowview document or
+Mermaid sequence outside text fields. The preview names the destination,
+offers a source section chooser when the document contains multiple diagrams,
+and reports node, group, and connection counts before **Add diagram**.
+
+This merges the graph only: nodes, groups, internal connections, and their
+protocol meanings get independent IDs. Source rows/stacks and floats become a
+positioned block at the drop point (or beside existing content), preserving
+their relative centers. Existing nodes and locked pins do not move. Panels,
+timelines, prose, and named views are not merged. The new nodes are selected;
+one Undo restores the exact previous source.
+
+Files and pasted input are limited to 2 MiB. Markdown Mermaid fences work.
+Conditional/loop blocks that omit connections, colliding Mermaid participant
+IDs, unresolved local references, shared topology, and local section/timeline
+dependencies are refused with an explanation before any edit. Export a resolved
+standalone graph or convert local navigation to external links first. Changing
+the destination source, section, or project retires the pending preview.
+Cancel, invalid input, and stale reads leave the source and history unchanged.
+Native text editing, image paste/drop, object clipboard actions below, and
+whole-project File import retain their own behavior.
+
 The editor toolbar has **Copy**, **Paste into Section…**, and **Duplicate**.
 Copy and Duplicate enable only when the selection supports that action. A
 single story step supports Duplicate; use **Reuse steps…** to copy it elsewhere.

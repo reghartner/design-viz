@@ -95,6 +95,7 @@ function planPasteBuilderClipboard(text,raw,data,destination){
     // Preserve effective protocol meanings, including overridden built-ins.
     var page = next.page || next, defs = resolveProtocols(page), protocolMap = Object.create(null);
     var protocolTaken = Object.assign(Object.create(null),defs);
+    Object.keys(data.protocols || {}).forEach(function(key){protocolTaken[key]=true;});
     Object.keys(data.protocols || {}).forEach(function(key){
       var definition = data.protocols[key], mapped = key;
       if (Object.prototype.hasOwnProperty.call(defs,key) && JSON.stringify(defs[key]) !== JSON.stringify(definition)) mapped = builderClipboardFresh(protocolTaken,key);

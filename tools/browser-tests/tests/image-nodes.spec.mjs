@@ -65,9 +65,10 @@ test('unsupported images, ordinary clipboard/files, stale reads and destroy neve
     const json=new DataTransfer();json.items.add(new File(['{}'],'diagram.json',{type:'application/json'}));const drop=new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:json});target.dispatchEvent(drop);
     return {paste:paste.defaultPrevented,drop:drop.defaultPrevented};
   });
-  // The file importer now owns external JSON drops; image ingestion must still
-  // leave ordinary clipboard text and rejected documents unchanged.
+  // The additive board importer owns diagram JSON drops; image ingestion must
+  // still leave ordinary clipboard text and rejected documents unchanged.
   expect(isolated).toEqual({paste:false,drop:true});await expect(page.locator('#src')).toHaveValue(original);
+  await page.locator('#diagram-import-cancel').click();
   const mixed=await page.evaluate(({base64})=>{
     const bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0)),image=()=>new File([bytes],'mixed.png',{type:'image/png'});
     const target=document.querySelector('#docview .doc-sec[data-dv-section="0"] .board:not([hidden])');

@@ -2,7 +2,7 @@
 
 /* ---------------- Mermaid sequence skeleton ---------------- */
 
-function mermaidToSpec(text){
+function mermaidToSpec(text, options){
   if (typeof text !== 'string') throw new Error('line 1: expected mermaid text');
   /* Match the CLI: the first mermaid fence wins, even if it is not a sequence. */
   var fence = /^```mermaid\s*$([\s\S]*?)^```\s*$/m.exec(text);
@@ -11,11 +11,14 @@ function mermaidToSpec(text){
   if (!lines.length || lines[0] !== 'sequenceDiagram')
     throw new Error('line 1: not a sequenceDiagram (first line is ' +
       JSON.stringify(lines[0] || '<empty>') + '); only mermaid sequenceDiagram input is supported');
-  var order = [], titles = Object.create(null), messages = [], todos = [];
+  var order = [], titles = Object.create(null), originals=Object.create(null), messages = [], todos = [];
   var depth = 0, skipped = 0, header = null, blockLine = 0, n = 1;
   function ensure(pid, title){
     var id = pid.toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (!id) throw new Error('line ' + n + ': participant id ' + JSON.stringify(pid) + ' slugs to nothing');
+    if(options && options.strictIds && Object.prototype.hasOwnProperty.call(originals,id) && originals[id]!==pid)
+      throw new Error('line '+n+': participant IDs '+JSON.stringify(originals[id])+' and '+JSON.stringify(pid)+' map to the same node; rename one before merging');
+    originals[id]=pid;
     if (!Object.prototype.hasOwnProperty.call(titles, id)){
       order.push(id);
       titles[id] = title || pid;
